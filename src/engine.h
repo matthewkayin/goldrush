@@ -1,0 +1,58 @@
+#pragma once
+
+#include "util.h"
+#include <cstdint>
+
+extern uint8_t MOUSE_BUTTON_LEFT;
+extern uint8_t MOUSE_BUTTON_RIGHT;
+
+enum Font {
+    FONT_HACK,
+    FONT_WESTERN8,
+    FONT_WESTERN16,
+    FONT_WESTERN32,
+    FONT_COUNT
+};
+
+struct color_t {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+
+    color_t() = default;
+    color_t(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a): r(r), g(g), b(b), a(a) {}
+};
+
+const color_t COLOR_WHITE(255, 255, 255, 255);
+const color_t COLOR_BLACK(0, 0, 0, 255);
+const color_t COLOR_SAND(244, 204, 161, 255);
+const color_t COLOR_RED(230, 72, 46, 255);
+
+enum TextAnchor {
+    TEXT_ANCHOR_TOP_LEFT,
+    TEXT_ANCHOR_BOTTOM_LEFT
+};
+const int RENDER_TEXT_CENTERED = -1;
+
+bool engine_init();
+void engine_quit();
+
+// Input
+bool input_pump_events();
+bool input_is_mouse_button_pressed(uint8_t button);
+bool input_is_mouse_button_just_pressed(uint8_t button);
+bool input_is_mouse_button_just_released(uint8_t button);
+
+xy input_get_mouse_position();
+
+void input_start_text_input(const rect& text_input_rect);
+void input_stop_text_input();
+bool input_is_text_input_active();
+void input_set_text_input_value(const char* value);
+const char* input_get_text_input_value();
+
+void render_clear(color_t color = COLOR_BLACK);
+void render_present();
+void render_text(Font font, const char* text, color_t color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
+void render_rect(rect r, color_t color);
