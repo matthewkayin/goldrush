@@ -11,6 +11,7 @@ struct state_t {
     ENetHost* host;
     ENetPeer* peer;
     bool is_server;
+    NetworkStatus status;
 };
 static state_t state;
 
@@ -21,6 +22,7 @@ bool network_init() {
     }
 
     state.is_server = false;
+    state.status = NETWORK_STATUS_OFFLINE;
 
     return true;
 }
@@ -31,11 +33,37 @@ void network_quit() {
 
 void network_disconnect() {
     state.is_server = false;
-    enet_host_destroy(state.host);
+
+    if (state.status == NETWORK_STATUS_CONNECTING) {
+        enet_peer_reset(state.peer);
+    }
+    if (state.host != NULL) {
+        enet_host_destroy(state.host);
+    }
 }
 
 bool network_is_server() {
     return state.is_server;
+}
+
+NetworkStatus network_get_status() {
+    return state.status;
+}
+
+void network_poll_events() {
+    if (state.status == NETWORK_STATUS_OFFLINE) {
+        return;
+    }
+    
+    ENetEvent event;
+    while (enet_host_service(state.host, &event, 0) > 0) {
+        if (state.is_server && event.type == ENET_EVENT_TYPE_CONNECT) {
+            log_info("new client connected. %x id %u", event.peer->address.host, event.peer->incomingPeerID);
+        } else if (!state.is_server && event.type == ENET_EVENT_TYPE_CONNECT) {
+            state.status = NETWORK_STATUS_CONNECTED;
+            log_info("connected to server");
+        }
+    }
 }
 
 // SERVER
@@ -46,13 +74,14 @@ bool network_server_create() {
     address.port = PORT;
 
     state.host = enet_host_create(&address, MAX_PLAYERS - 1, 2, 0, 0);
-    if (state.host == nullptr) {
+    if (state.host == NULL) {
         log_error("Could not create enet host.");
         return false;
     }
 
     log_info("Created server.");
     state.is_server = true;
+    state.status = NETWORK_STATUS_CONNECTED;
     return true;
 }
 
@@ -67,7 +96,7 @@ void network_server_get_ip(char* ip_buffer) {
 
 bool network_client_create(const char* server_ip) {
     state.host = enet_host_create(NULL, 1, 2, 0, 0);
-    if (state.host == nullptr) {
+    if (state.host == NULL) {
         log_error("Couldnot create enet host.");
         return false;
     }
@@ -77,10 +106,13 @@ bool network_client_create(const char* server_ip) {
     address.port = PORT;
 
     state.peer = enet_host_connect(state.host, &address, 2, 0);
-    if (state.peer == nullptr) {
+    if (state.peer == NULL) {
         log_error("No peers available for initiating an enet connection.");
         return false;
     }
+
+    state.status = NETWORK_STATUS_CONNECTING;
+    state.is_server = false;
 
     return true;
 }

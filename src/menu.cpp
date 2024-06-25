@@ -8,6 +8,12 @@
 #include <string>
 #include <unordered_map>
 
+#ifdef GOLD_DEBUG
+    #define GOLD_DEFAULT_JOIN_IP "127.0.0.1"
+#else
+    #define GOLD_DEFAULT_JOIN_IP ""
+#endif
+
 static const int TEXT_INPUT_WIDTH = 264;
 static const int TEXT_INPUT_HEIGHT = 35;
 static const rect TEXT_INPUT_RECT = rect(xy((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
@@ -56,10 +62,54 @@ struct menu_state_t {
     MenuButton button_hovered;
 };
 
+bool is_valid_username(const char* username) {
+    std::string input_text = std::string(username);
+    return input_text.length() != 0;
+}
+
+bool is_valid_ip(const char* ip_addr) {
+    std::string text_input = std::string(ip_addr);
+    unsigned int number_count = 0;
+    while (text_input.length() != 0) {
+        // Take the next part of the IP address
+        size_t dot_index = text_input.find('.');
+        std::string part;
+        if (dot_index == std::string::npos) {
+            part = text_input;
+            text_input = "";
+        } else {
+            part = text_input.substr(0, dot_index);
+            text_input = text_input.substr(dot_index + 1);
+        }
+
+        // Check that it's numeric
+        bool is_part_numeric = true;
+        for (char c : part) {
+            if (c < '0' || c > '9') {
+                is_part_numeric = false;
+                break;
+            }
+        }
+        if (!is_part_numeric) {
+            break;
+        }
+
+        // Check that it's <= 255
+        unsigned int part_number = std::stoul(part);
+        if (part_number > 255) {
+            break;
+        }
+
+        number_count++;
+    } // End parse text_input
+
+    return number_count == 4;
+}
+
 menu_t::menu_t() {
     state = std::make_unique<menu_state_t>();
     state->username = "";
-    state->ip_address = "";
+    state->ip_address = GOLD_DEFAULT_JOIN_IP;
     set_mode(MENU_MODE_MAIN);
 }
 
@@ -71,73 +121,6 @@ void menu_t::show_status(const char* message) {
 }
 
 void menu_t::set_mode(MenuMode mode) {
-    // Validate input
-    if (state->mode == MENU_MODE_MAIN && (mode == MENU_MODE_JOIN_IP || mode == MENU_MODE_LOBBY)) {
-        std::string input_text = std::string(input_get_text_input_value());
-        if (input_text.length() == 0) {
-            show_status("Enter a username.");
-            return;
-        } 
-        state->username = input_text;
-    } 
-    if (state->mode == MENU_MODE_JOIN_IP && mode == MENU_MODE_JOIN_CONNECTING) {
-        std::string text_input = std::string(input_get_text_input_value());
-        unsigned int number_count = 0;
-        while (text_input.length() != 0) {
-            // Take the next part of the IP address
-            size_t dot_index = text_input.find('.');
-            std::string part;
-            if (dot_index == std::string::npos) {
-                part = text_input;
-                text_input = "";
-            } else {
-                part = text_input.substr(0, dot_index);
-                text_input = text_input.substr(dot_index + 1);
-            }
-
-            // Check that it's numeric
-            bool is_part_numeric = true;
-            for (char c : part) {
-                if (c < '0' || c > '9') {
-                    is_part_numeric = false;
-                    break;
-                }
-            }
-            if (!is_part_numeric) {
-                break;
-            }
-
-            // Check that it's <= 255
-            unsigned int part_number = std::stoul(part);
-            if (part_number > 255) {
-                break;
-            }
-
-            number_count++;
-        } // End parse text_input
-
-        bool is_ip_valid = number_count == 4;
-        if (!is_ip_valid) {
-            show_status("Invalid IP address.");
-            return;
-        }
-
-        state->ip_address = std::string(input_get_text_input_value());
-    // End validate IP address
-    } 
-    if (state->mode == MENU_MODE_MAIN && mode == MENU_MODE_LOBBY) {
-        if (!network_server_create()) {
-            show_status("Could not create server.");
-            return;
-        }
-        char ip_buffer[17];
-        network_server_get_ip(ip_buffer);
-        state->host_ip_address = std::string(ip_buffer);
-    } 
-    if (state->mode == MENU_MODE_LOBBY && mode == MENU_MODE_MAIN) {
-        network_disconnect();
-    }
-
     // Set mode
     state->mode = mode;
     state->status_timer = 0;
@@ -177,6 +160,14 @@ void menu_t::update() {
         state->status_timer--;
     }
 
+    if (state->mode == MENU_MODE_JOIN_CONNECTING && network_get_status() == NETWORK_STATUS_OFFLINE) {
+        network_disconnect();
+        set_mode(MENU_MODE_JOIN_IP);
+        show_status("Failed to connect to server.");
+    } else if (state->mode == MENU_MODE_JOIN_CONNECTING && network_get_status() == NETWORK_STATUS_CONNECTED) {
+        set_mode(MENU_MODE_LOBBY);
+    }
+
     // Button hover
     xy mouse_position = input_get_mouse_position();
     state->button_hovered = MENU_BUTTON_NONE;
@@ -201,21 +192,54 @@ void menu_t::update() {
 
         switch (state->button_hovered) {
             case MENU_BUTTON_HOST:
-                set_mode(MENU_MODE_LOBBY);
-                break;
+                {
+                    if (!is_valid_username(input_get_text_input_value())) {
+                        show_status("Invalid username.");
+                        break;
+                    }
+
+                    state->username = std::string(input_get_text_input_value());
+                    if (!network_server_create()) {
+                        show_status("Could not create server.");
+                        break;
+                    }
+                    state->host_ip_address = "who knows, man.";
+                    set_mode(MENU_MODE_LOBBY);
+                    break;
+                }
             case MENU_BUTTON_JOIN:
-                set_mode(MENU_MODE_JOIN_IP);
-                break;
+                {
+                    if (!is_valid_username(input_get_text_input_value())) {
+                        show_status("Invalid username.");
+                        break;
+                    }
+
+                    state->username = std::string(input_get_text_input_value());
+                    set_mode(MENU_MODE_JOIN_IP);
+                    break;
+                }
             case MENU_BUTTON_JOIN_IP_BACK:
                 set_mode(MENU_MODE_MAIN);
                 break;
             case MENU_BUTTON_JOIN_IP_CONNECT:
-                set_mode(MENU_MODE_JOIN_CONNECTING);
-                break;
+                {
+                    if (!is_valid_ip(input_get_text_input_value())) {
+                        show_status("Invalid IP address.");
+                        break;
+                    }
+
+                    state->ip_address = std::string(input_get_text_input_value());
+                    network_client_create(state->ip_address.c_str());
+                    set_mode(MENU_MODE_JOIN_CONNECTING);
+
+                    break;
+                }
             case MENU_BUTTON_CONNECTING_BACK:
+                network_disconnect();
                 set_mode(MENU_MODE_JOIN_IP);
                 break;
             case MENU_BUTTON_LOBBY_BACK:
+                network_disconnect();
                 set_mode(MENU_MODE_MAIN);
                 break;
             default:
@@ -225,7 +249,7 @@ void menu_t::update() {
 }
 
 void menu_t::render() const {
-    render_clear(COLOR_SAND);
+    render_rect(rect(xy(0, 0), xy(SCREEN_WIDTH, SCREEN_HEIGHT)), COLOR_SAND, true);
 
     if (state->mode != MENU_MODE_LOBBY) {
         render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, xy(RENDER_TEXT_CENTERED, 36));

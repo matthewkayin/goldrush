@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(Windows) Launch",
+            "name": "Default",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gold",
@@ -20,6 +20,63 @@
                 "targetArchitecture": "arm64",
                 "externalConsole": false,
             }
+        },
+        {
+            "name": "Server",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--logfile",
+                "server.log",
+                "--resolution",
+                "640x360"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/bin",
+            "environment": [],
+            "windows": {
+                "type": "cppvsdbg",
+                "program": "${workspaceFolder}/bin/gold.exe",
+                "console": "integratedTerminal"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "targetArchitecture": "arm64",
+                "externalConsole": false,
+            },
+        },
+        {
+            "name": "Client",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--logfile",
+                "client.log",
+                "--resolution",
+                "640x360"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/bin",
+            "environment": [],
+            "windows": {
+                "type": "cppvsdbg",
+                "program": "${workspaceFolder}/bin/gold.exe",
+                "console": "integratedTerminal"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "targetArchitecture": "arm64",
+                "externalConsole": false,
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Client / Server",
+            "configurations": ["Client", "Server"],
+            "stopAll": true
         }
     ]
 }

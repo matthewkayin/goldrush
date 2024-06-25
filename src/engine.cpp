@@ -65,7 +65,7 @@ struct engine_t {
 };
 static engine_t engine;
 
-bool engine_init() {
+bool engine_init(xy window_size) {
     // Init SDL
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
@@ -73,7 +73,7 @@ bool engine_init() {
     }
 
     // Create window
-    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, SDL_WINDOW_SHOWN);
+    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, SDL_WINDOW_SHOWN);
     if (engine.window == NULL) {
         log_error("Error creating window: %s", SDL_GetError());
         return false;
@@ -237,8 +237,8 @@ size_t input_get_text_input_length() {
 
 // RENDER
 
-void render_clear(color_t color) {
-    SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+void render_clear() {
+    SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
     SDL_RenderClear(engine.renderer);
 }
 
@@ -281,10 +281,14 @@ void render_text(Font font, const char* text, color_t color, xy position, TextAn
     SDL_DestroyTexture(text_texture);
 }
 
-void render_rect(rect r, color_t color) {
+void render_rect(rect r, color_t color, bool fill) {
     SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
     SDL_Rect sdl_rect = rect_to_sdl(r);
-    SDL_RenderDrawRect(engine.renderer, &sdl_rect);
+    if (fill) {
+        SDL_RenderFillRect(engine.renderer, &sdl_rect);
+    } else {
+        SDL_RenderDrawRect(engine.renderer, &sdl_rect);
+    }
 }
 
 void render_line(xy start, xy end, color_t color) {

@@ -4,7 +4,7 @@
 #define LOG_LEVEL 1
 #endif
 
-bool logger_init();
+bool logger_init(const char* logfile_path);
 void logger_quit();
 void logger_output(bool is_error, const char* message, ...);
 

@@ -12,8 +12,8 @@ void platform_console_write_error(const char* message);
 
 static FILE* logfile;
 
-bool logger_init() {
-    logfile = fopen("console.log", "w");
+bool logger_init(const char* logfile_path) {
+    logfile = fopen(logfile_path, "w");
     if (logfile == NULL) {
         log_error("Unable to open log file for writing.");
         return false;

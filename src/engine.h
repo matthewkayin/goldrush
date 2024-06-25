@@ -36,7 +36,7 @@ enum TextAnchor {
 };
 const int RENDER_TEXT_CENTERED = -1;
 
-bool engine_init();
+bool engine_init(xy window_size);
 void engine_quit();
 
 // Input
@@ -54,8 +54,8 @@ void input_set_text_input_value(const char* value);
 const char* input_get_text_input_value();
 size_t input_get_text_input_length();
 
-void render_clear(color_t color = COLOR_BLACK);
+void render_clear();
 void render_present();
 void render_text(Font font, const char* text, color_t color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
-void render_rect(rect r, color_t color);
+void render_rect(rect r, color_t color, bool fill = false);
 void render_line(xy start, xy end, color_t color);
