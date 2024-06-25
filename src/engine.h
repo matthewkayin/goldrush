@@ -2,6 +2,7 @@
 
 #include "util.h"
 #include <cstdint>
+#include <string>
 
 extern uint8_t MOUSE_BUTTON_LEFT;
 extern uint8_t MOUSE_BUTTON_RIGHT;
@@ -51,8 +52,10 @@ void input_stop_text_input();
 bool input_is_text_input_active();
 void input_set_text_input_value(const char* value);
 const char* input_get_text_input_value();
+size_t input_get_text_input_length();
 
 void render_clear(color_t color = COLOR_BLACK);
 void render_present();
 void render_text(Font font, const char* text, color_t color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
 void render_rect(rect r, color_t color);
+void render_line(xy start, xy end, color_t color);

@@ -231,6 +231,10 @@ const char* input_get_text_input_value() {
     return engine.input_text.c_str();
 }
 
+size_t input_get_text_input_length() {
+    return engine.input_text.length();
+}
+
 // RENDER
 
 void render_clear(color_t color) {
@@ -281,4 +285,9 @@ void render_rect(rect r, color_t color) {
     SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
     SDL_Rect sdl_rect = rect_to_sdl(r);
     SDL_RenderDrawRect(engine.renderer, &sdl_rect);
+}
+
+void render_line(xy start, xy end, color_t color) {
+    SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+    SDL_RenderDrawLine(engine.renderer, start.x, start.y, end.x, end.y);
 }
