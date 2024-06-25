@@ -3,25 +3,27 @@
 #include "engine.h"
 #include "defines.h"
 #include "util.h"
+#include "network.h"
+#include "logger.h"
 #include <string>
 #include <unordered_map>
 
-const int TEXT_INPUT_WIDTH = 264;
-const int TEXT_INPUT_HEIGHT = 35;
-const rect TEXT_INPUT_RECT = rect(xy((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
+static const int TEXT_INPUT_WIDTH = 264;
+static const int TEXT_INPUT_HEIGHT = 35;
+static const rect TEXT_INPUT_RECT = rect(xy((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
                                               xy(TEXT_INPUT_WIDTH, TEXT_INPUT_HEIGHT));
-const rect PLAYERLIST_RECT = rect(xy(24, 32), xy(384, 242));
-const unsigned int STATUS_TIMER_DURATION = 60;
+static const rect PLAYERLIST_RECT = rect(xy(24, 32), xy(384, 242));
+static const unsigned int STATUS_TIMER_DURATION = 60;
 
-const int BUTTON_Y = 232;
-const rect HOST_BUTTON_RECT = rect(xy(300, BUTTON_Y), xy(76, 30));
-const rect JOIN_BUTTON_RECT = rect(xy(HOST_BUTTON_RECT.position.x + HOST_BUTTON_RECT.size.x + 8, BUTTON_Y), xy(72, 30));
-const rect JOIN_IP_BACK_BUTTON_RECT = rect(xy(248, BUTTON_Y), xy(78, 30));
-const rect JOIN_IP_CONNECT_BUTTON_RECT = rect(xy(JOIN_IP_BACK_BUTTON_RECT.position.x + JOIN_IP_BACK_BUTTON_RECT.size.x + 8, BUTTON_Y), xy(132, 30));
-const rect CONNECTING_BACK_BUTTON_RECT = rect(xy((SCREEN_WIDTH / 2) - (JOIN_IP_BACK_BUTTON_RECT.size.x / 2), BUTTON_Y), JOIN_IP_BACK_BUTTON_RECT.size);
-const rect LOBBY_BACK_RECT = rect(PLAYERLIST_RECT.position + xy(0, PLAYERLIST_RECT.size.y + 8), JOIN_IP_BACK_BUTTON_RECT.size);
-const rect LOBBY_START_RECT = rect(LOBBY_BACK_RECT.position + xy(LOBBY_BACK_RECT.size.x + 8, 0), xy(92, 30));
-const rect LOBBY_READY_RECT = rect(LOBBY_BACK_RECT.position + xy(LOBBY_BACK_RECT.size.x + 8, 0), xy(100, 30));
+static const int BUTTON_Y = 232;
+static const rect HOST_BUTTON_RECT = rect(xy(300, BUTTON_Y), xy(76, 30));
+static const rect JOIN_BUTTON_RECT = rect(xy(HOST_BUTTON_RECT.position.x + HOST_BUTTON_RECT.size.x + 8, BUTTON_Y), xy(72, 30));
+static const rect JOIN_IP_BACK_BUTTON_RECT = rect(xy(248, BUTTON_Y), xy(78, 30));
+static const rect JOIN_IP_CONNECT_BUTTON_RECT = rect(xy(JOIN_IP_BACK_BUTTON_RECT.position.x + JOIN_IP_BACK_BUTTON_RECT.size.x + 8, BUTTON_Y), xy(132, 30));
+static const rect CONNECTING_BACK_BUTTON_RECT = rect(xy((SCREEN_WIDTH / 2) - (JOIN_IP_BACK_BUTTON_RECT.size.x / 2), BUTTON_Y), JOIN_IP_BACK_BUTTON_RECT.size);
+static const rect LOBBY_BACK_RECT = rect(PLAYERLIST_RECT.position + xy(0, PLAYERLIST_RECT.size.y + 8), JOIN_IP_BACK_BUTTON_RECT.size);
+static const rect LOBBY_START_RECT = rect(LOBBY_BACK_RECT.position + xy(LOBBY_BACK_RECT.size.x + 8, 0), xy(92, 30));
+static const rect LOBBY_READY_RECT = rect(LOBBY_BACK_RECT.position + xy(LOBBY_BACK_RECT.size.x + 8, 0), xy(100, 30));
 
 enum MenuButton {
     MENU_BUTTON_NONE,
@@ -48,6 +50,7 @@ struct menu_state_t {
 
     std::string username;
     std::string ip_address;
+    std::string host_ip_address;
 
     std::unordered_map<MenuButton, menu_button_t> buttons;
     MenuButton button_hovered;
@@ -76,7 +79,8 @@ void menu_t::set_mode(MenuMode mode) {
             return;
         } 
         state->username = input_text;
-    } else if (state->mode == MENU_MODE_JOIN_IP && mode == MENU_MODE_JOIN_CONNECTING) {
+    } 
+    if (state->mode == MENU_MODE_JOIN_IP && mode == MENU_MODE_JOIN_CONNECTING) {
         std::string text_input = std::string(input_get_text_input_value());
         unsigned int number_count = 0;
         while (text_input.length() != 0) {
@@ -119,7 +123,20 @@ void menu_t::set_mode(MenuMode mode) {
         }
 
         state->ip_address = std::string(input_get_text_input_value());
-    } // End validate IP address
+    // End validate IP address
+    } 
+    if (state->mode == MENU_MODE_MAIN && mode == MENU_MODE_LOBBY) {
+        if (!network_server_create()) {
+            show_status("Could not create server.");
+            return;
+        }
+        char ip_buffer[17];
+        network_server_get_ip(ip_buffer);
+        state->host_ip_address = std::string(ip_buffer);
+    } 
+    if (state->mode == MENU_MODE_LOBBY && mode == MENU_MODE_MAIN) {
+        network_disconnect();
+    }
 
     // Set mode
     state->mode = mode;
@@ -144,8 +161,11 @@ void menu_t::set_mode(MenuMode mode) {
             break;
         case MENU_MODE_LOBBY:
             state->buttons[MENU_BUTTON_LOBBY_BACK] = (menu_button_t) { .text = "BACK", ._rect = LOBBY_BACK_RECT };
-            // state->buttons[MENU_BUTTON_LOBBY_START] = (menu_button_t) { .text = "START", ._rect = LOBBY_START_RECT };
-            state->buttons[MENU_BUTTON_LOBBY_READY] = (menu_button_t) { .text = "READY", ._rect = LOBBY_READY_RECT };
+            if (network_is_server()) {
+                state->buttons[MENU_BUTTON_LOBBY_START] = (menu_button_t) { .text = "START", ._rect = LOBBY_START_RECT };
+            } else {
+                state->buttons[MENU_BUTTON_LOBBY_READY] = (menu_button_t) { .text = "READY", ._rect = LOBBY_READY_RECT };
+            }
         default:
             break;
     }
@@ -245,9 +265,11 @@ void menu_t::render() const {
             render_line(PLAYERLIST_RECT.position + xy(0, line_y), PLAYERLIST_RECT.position + xy(PLAYERLIST_RECT.size.x - 1, line_y), COLOR_BLACK);
         }
 
-        xy side_text_pos = PLAYERLIST_RECT.position + xy(PLAYERLIST_RECT.size.x + 2, 0);
-        render_text(FONT_WESTERN8, "You are the host.", COLOR_BLACK, side_text_pos);
-        render_text(FONT_WESTERN8, "Your IP is 192.168.1.103", COLOR_BLACK, side_text_pos + xy(0, 16));
+        if (network_is_server()) {
+            xy side_text_pos = PLAYERLIST_RECT.position + xy(PLAYERLIST_RECT.size.x + 2, 0);
+            render_text(FONT_WESTERN8, "You are the host.", COLOR_BLACK, side_text_pos);
+            render_text(FONT_WESTERN8, (std::string("Your IP is ") + state->host_ip_address).c_str(), COLOR_BLACK, side_text_pos + xy(0, 16));
+        }
     }
 
     for (auto it : state->buttons) {

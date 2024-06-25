@@ -3,6 +3,7 @@
 #include "engine.h"
 #include "util.h"
 #include "menu.h"
+#include "network.h"
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -13,6 +14,13 @@ const auto FRAME_TIME = std::chrono::seconds(1) / 60.0;
 int main() {
     logger_init();
     if (!engine_init()) {
+        log_info("Closing logger...");
+        logger_quit();
+        return 1;
+    }
+    if (!network_init()) {
+        log_info("Closing engine...");
+        engine_quit();
         log_info("Closing logger...");
         logger_quit();
         return 1;
@@ -66,6 +74,9 @@ int main() {
         render_present();
     } // End while running
 
+    network_quit();
     engine_quit();
+    logger_quit();
+
     return 0;
 }
