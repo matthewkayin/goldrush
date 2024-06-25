@@ -2,7 +2,7 @@ ifeq ($(OS),Windows_NT)
 	PLATFORM := WIN32
 else
 	UNAME_S := $(shell uname -s)
-	ifeq ($(UNAME_S),DARWIN)
+	ifeq ($(UNAME_S),Darwin)
 		PLATFORM := OSX
 	endif
 endif
@@ -15,17 +15,18 @@ BUILD_DIR := bin
 OBJ_DIR := obj
 COMPILER_FLAGS := -g -std=c++17 -Wall -O0 
 INCLUDE_FLAGS := -Isrc -Ivendor
-LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lenet64
+LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf
 DEFINES := -D_CRT_SECURE_NO_WARNINGS -DGOLD_DEBUG
 
 # Use -Wno-deprecated-declarations on OSX because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 ifeq ($(PLATFORM),OSX)
 	COMPILER_FLAGS += -Wno-deprecated-declarations
+	LINKER_FLAGS += -lenet
 endif
 
 ifeq ($(PLATFORM),WIN32)
 	EXTENSION := .exe
-	LINKER_FLAGS += -luser32 -lws2_32 -lwinmm
+	LINKER_FLAGS += -luser32 -lws2_32 -lwinmm -lenet64
 
 # Make does not offer a recursive wildcard function, so here's one:
 	rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
