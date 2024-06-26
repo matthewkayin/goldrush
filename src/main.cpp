@@ -63,8 +63,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    log_info("%u %u %u %u", COLOR_SAND.r, COLOR_SAND.g, COLOR_SAND.b, COLOR_SAND.a);
-
     bool is_running = true;
 
     bool is_in_menu = true;
@@ -91,6 +89,7 @@ int main(int argc, char** argv) {
 
         // INPUT
         is_running = input_pump_events();
+
         network_poll_events();
 
         // UPDATE

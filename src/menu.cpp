@@ -56,7 +56,6 @@ struct menu_state_t {
 
     std::string username;
     std::string ip_address;
-    std::string host_ip_address;
 
     std::unordered_map<MenuButton, menu_button_t> buttons;
     MenuButton button_hovered;
@@ -161,6 +160,7 @@ void menu_t::update() {
     }
 
     if (state->mode == MENU_MODE_JOIN_CONNECTING && network_get_status() == NETWORK_STATUS_OFFLINE) {
+        log_info("Failed to connect to server?");
         network_disconnect();
         set_mode(MENU_MODE_JOIN_IP);
         show_status("Failed to connect to server.");
@@ -199,11 +199,10 @@ void menu_t::update() {
                     }
 
                     state->username = std::string(input_get_text_input_value());
-                    if (!network_server_create()) {
+                    if (!network_server_create(state->username.c_str())) {
                         show_status("Could not create server.");
                         break;
                     }
-                    state->host_ip_address = "who knows, man.";
                     set_mode(MENU_MODE_LOBBY);
                     break;
                 }
@@ -229,7 +228,7 @@ void menu_t::update() {
                     }
 
                     state->ip_address = std::string(input_get_text_input_value());
-                    network_client_create(state->ip_address.c_str());
+                    network_client_create(state->username.c_str(), state->ip_address.c_str());
                     set_mode(MENU_MODE_JOIN_CONNECTING);
 
                     break;
@@ -278,21 +277,31 @@ void menu_t::render() const {
     if (state->mode == MENU_MODE_LOBBY) {
         render_rect(PLAYERLIST_RECT, COLOR_BLACK);
 
-        std::string players[] = {
-            "Banana",
-            "Goat",
-            "Yeet"
-        };
-        for (unsigned int player_index = 0; player_index < 3; player_index++) {
+        unsigned int player_index = 0;
+        for (uint8_t player_id = 0; player_id < NETWORK_MAX_PLAYERS; player_id++) {
+            const player_t& player = network_get_player(player_id);
+            if (player.status == PLAYER_STATUS_NONE) {
+                continue;
+            }
+
+            std::string player_name_text = std::string(player.name);
+            if (player.status == PLAYER_STATUS_HOST) {
+                player_name_text += ": HOST";
+            } else if (player.status == PLAYER_STATUS_NOT_READY) {
+                player_name_text += ": NOT READY";
+            } else if (player.status == PLAYER_STATUS_READY) {
+                player_name_text += ": READY";
+            }
+
             int line_y = 16 * (player_index + 1);
-            render_text(FONT_WESTERN8, players[player_index].c_str(), COLOR_BLACK, PLAYERLIST_RECT.position + xy(4, line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
+            render_text(FONT_WESTERN8, player_name_text.c_str(), COLOR_BLACK, PLAYERLIST_RECT.position + xy(4, line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
             render_line(PLAYERLIST_RECT.position + xy(0, line_y), PLAYERLIST_RECT.position + xy(PLAYERLIST_RECT.size.x - 1, line_y), COLOR_BLACK);
+            player_index++;
         }
 
         if (network_is_server()) {
             xy side_text_pos = PLAYERLIST_RECT.position + xy(PLAYERLIST_RECT.size.x + 2, 0);
             render_text(FONT_WESTERN8, "You are the host.", COLOR_BLACK, side_text_pos);
-            render_text(FONT_WESTERN8, (std::string("Your IP is ") + state->host_ip_address).c_str(), COLOR_BLACK, side_text_pos + xy(0, 16));
         }
     }
 

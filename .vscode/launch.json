@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Default",
+            "name": "Run 1 instance",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gold",
@@ -22,13 +22,13 @@
             }
         },
         {
-            "name": "Server",
+            "name": "player1",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--logfile",
-                "server.log",
+                "player1.log",
                 "--resolution",
                 "640x360"
             ],
@@ -47,13 +47,13 @@
             },
         },
         {
-            "name": "Client",
+            "name": "player2",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--logfile",
-                "client.log",
+                "player2.log",
                 "--resolution",
                 "640x360"
             ],
@@ -69,13 +69,43 @@
                 "MIMode": "lldb",
                 "targetArchitecture": "arm64",
                 "externalConsole": false,
-            }
+            },
+        },
+        {
+            "name": "player 3",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--logfile",
+                "player3.log",
+                "--resolution",
+                "640x360"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/bin",
+            "environment": [],
+            "windows": {
+                "type": "cppvsdbg",
+                "program": "${workspaceFolder}/bin/gold.exe",
+                "console": "integratedTerminal"
+            },
+            "osx": {
+                "MIMode": "lldb",
+                "targetArchitecture": "arm64",
+                "externalConsole": false,
+            },
         }
     ],
     "compounds": [
         {
-            "name": "Client / Server",
-            "configurations": ["Client", "Server"],
+            "name": "Run 2 instances",
+            "configurations": ["player1", "player2"],
+            "stopAll": true
+        },
+        {
+            "name": "Run 3 instances",
+            "configurations": ["player1", "player2", "player 3"],
             "stopAll": true
         }
     ]

@@ -68,6 +68,10 @@ void logger_output(bool is_error, const char* message, ...) {
                 out_ptr += sprintf(out_ptr, "%f", va_arg(arg_ptr, double));
                 break;
             }
+            case 'x': {
+                out_ptr += sprintf(out_ptr, "%x", va_arg(arg_ptr, unsigned int));
+                break;
+            }
         }
 
         message++;
@@ -101,7 +105,7 @@ void report_assertion_failure(const char* expression, const char* message, const
 
 void platform_console_write(const char* message) {
     HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    SetConsoleTextAttribute(console_handle, 8);
+    SetConsoleTextAttribute(console_handle, 7);
     OutputDebugStringA(message);
     uint64_t length = strlen(message);
     LPDWORD number_written = 0;
