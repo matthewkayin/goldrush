@@ -159,13 +159,17 @@ void menu_t::update() {
         state->status_timer--;
     }
 
-    if (state->mode == MENU_MODE_JOIN_CONNECTING && network_get_status() == NETWORK_STATUS_OFFLINE) {
+    NetworkStatus network_status = network_get_status();
+    if (state->mode == MENU_MODE_JOIN_CONNECTING && network_status == NETWORK_STATUS_OFFLINE) {
         log_info("Failed to connect to server?");
         network_disconnect();
         set_mode(MENU_MODE_JOIN_IP);
         show_status("Failed to connect to server.");
-    } else if (state->mode == MENU_MODE_JOIN_CONNECTING && network_get_status() == NETWORK_STATUS_CONNECTED) {
+    } else if (state->mode == MENU_MODE_JOIN_CONNECTING && network_status == NETWORK_STATUS_CONNECTED) {
         set_mode(MENU_MODE_LOBBY);
+    } else if (state->mode == MENU_MODE_LOBBY && network_status == NETWORK_STATUS_OFFLINE) {
+        network_disconnect();
+        set_mode(MENU_MODE_MAIN);
     }
 
     // Button hover

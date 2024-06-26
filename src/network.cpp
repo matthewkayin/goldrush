@@ -235,6 +235,7 @@ void network_disconnect() {
                 if (state.host->peers[peer_id].state == ENET_PEER_STATE_CONNECTED) {
                     enet_peer_disconnect(&state.host->peers[peer_id], 0);
                 }
+                enet_host_flush(state.host);
             }
             enet_host_destroy(state.host);
             state.host = NULL;
