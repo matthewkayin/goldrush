@@ -119,6 +119,10 @@ void menu_t::show_status(const char* message) {
     state->status_timer = STATUS_TIMER_DURATION;
 }
 
+MenuMode menu_t::get_mode() const {
+    return state->mode;
+}
+
 void menu_t::set_mode(MenuMode mode) {
     // Set mode
     state->mode = mode;
@@ -154,22 +158,50 @@ void menu_t::set_mode(MenuMode mode) {
 }
 
 void menu_t::update() {
+    if (state->mode == MENU_MODE_MATCH_START) {
+        return;
+    }
+
     // Status timer
     if (state->status_timer > 0) {
         state->status_timer--;
     }
 
-    NetworkStatus network_status = network_get_status();
-    if (state->mode == MENU_MODE_JOIN_CONNECTING && network_status == NETWORK_STATUS_OFFLINE) {
-        log_info("Failed to connect to server?");
-        network_disconnect();
-        set_mode(MENU_MODE_JOIN_IP);
-        show_status("Failed to connect to server.");
-    } else if (state->mode == MENU_MODE_JOIN_CONNECTING && network_status == NETWORK_STATUS_CONNECTED) {
-        set_mode(MENU_MODE_LOBBY);
-    } else if (state->mode == MENU_MODE_LOBBY && network_status == NETWORK_STATUS_OFFLINE) {
-        network_disconnect();
-        set_mode(MENU_MODE_MAIN);
+    network_service();
+    network_event_t network_event;
+    while (network_poll_events(&network_event)) {
+        switch (network_event.type) {
+            case NETWORK_EVENT_CONNECTION_FAILED: {
+                set_mode(MENU_MODE_JOIN_IP);
+                show_status("Failed to connect to server.");
+                break;
+            }
+            case NETWORK_EVENT_SERVER_DISCONNECTED: {
+                set_mode(MENU_MODE_MAIN);
+                show_status("Server disconnected.");
+                break;
+            }
+            case NETWORK_EVENT_LOBBY_FULL: {
+                set_mode(MENU_MODE_MAIN);
+                show_status("That lobby is full.");
+                break;
+            }
+            case NETWORK_EVENT_INVALID_VERSION: {
+                set_mode(MENU_MODE_MAIN);
+                show_status("Client version does not match.");
+                break;
+            }
+            case NETWORK_EVENT_JOINED_LOBBY: {
+                set_mode(MENU_MODE_LOBBY);
+                break;
+            }
+            case NETWORK_EVENT_MATCH_START: {
+                set_mode(MENU_MODE_MATCH_START);
+                break;
+            }
+            default:
+                break;
+        }
     }
 
     // Button hover
@@ -245,6 +277,12 @@ void menu_t::update() {
                 network_disconnect();
                 set_mode(MENU_MODE_MAIN);
                 break;
+            case MENU_BUTTON_LOBBY_READY:
+                network_client_toggle_ready();
+                break;
+            case MENU_BUTTON_LOBBY_START:
+                network_server_start_game();
+                break;
             default:
                 break;
         }
@@ -252,6 +290,10 @@ void menu_t::update() {
 }
 
 void menu_t::render() const {
+    if (state->mode == MENU_MODE_MATCH_START) {
+        return;
+    }
+
     render_rect(rect(xy(0, 0), xy(SCREEN_WIDTH, SCREEN_HEIGHT)), COLOR_SAND, true);
 
     if (state->mode != MENU_MODE_LOBBY) {

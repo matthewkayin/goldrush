@@ -90,8 +90,6 @@ int main(int argc, char** argv) {
         // INPUT
         is_running = input_pump_events();
 
-        network_poll_events();
-
         // UPDATE
         if (is_in_menu) {
             menu.update();

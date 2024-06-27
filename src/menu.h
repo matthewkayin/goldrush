@@ -6,7 +6,8 @@ enum MenuMode {
     MENU_MODE_MAIN,
     MENU_MODE_JOIN_IP,
     MENU_MODE_JOIN_CONNECTING,
-    MENU_MODE_LOBBY
+    MENU_MODE_LOBBY,
+    MENU_MODE_MATCH_START
 };
 
 struct menu_state_t;
@@ -15,6 +16,7 @@ struct menu_t {
     menu_t();
     ~menu_t();
     void show_status(const char* message);
+    MenuMode get_mode() const;
     void set_mode(MenuMode mode);
     void update();
     void render() const;
