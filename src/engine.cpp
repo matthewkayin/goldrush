@@ -24,7 +24,7 @@ struct font_params_t {
     int size;
 };
 
-static const std::unordered_map<unsigned int, font_params_t> font_params = {
+static const std::unordered_map<uint32_t, font_params_t> font_params = {
     { FONT_HACK, (font_params_t) {
         .path = "font/hack.ttf",
         .size = 10
@@ -58,14 +58,14 @@ struct engine_t {
     // Input state
     bool mouse_button_state[INPUT_MOUSE_BUTTON_COUNT];
     bool mouse_button_previous_state[INPUT_MOUSE_BUTTON_COUNT];
-    xy mouse_position;
+    ivec2 mouse_position;
     std::string input_text;
 
     std::vector<TTF_Font*> fonts;
 };
 static engine_t engine;
 
-bool engine_init(xy window_size) {
+bool engine_init(ivec2 window_size) {
     // Init SDL
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
@@ -96,13 +96,13 @@ bool engine_init(xy window_size) {
     // Init input
     memset(engine.mouse_button_state, 0, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
     memset(engine.mouse_button_previous_state, 0, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
-    engine.mouse_position = xy(0, 0);
+    engine.mouse_position = ivec2(0, 0);
 
     // Load fonts
     std::string resource_base_path = std::string(RESOURCE_BASE_PATH);
 
     engine.fonts.reserve(FONT_COUNT);
-    for (unsigned int i = 0; i < FONT_COUNT; i++) {
+    for (uint32_t i = 0; i < FONT_COUNT; i++) {
         // Get the font params
         auto font_params_it = font_params.find(i);
         if (font_params_it == font_params.end()) {
@@ -164,7 +164,7 @@ bool input_pump_events() {
         }
         // Update mouse position
         if (event.type == SDL_MOUSEMOTION) {
-            engine.mouse_position = xy(event.motion.x, event.motion.y);
+            engine.mouse_position = ivec2(event.motion.x, event.motion.y);
             break;
         }
         // Handle mouse button
@@ -205,7 +205,7 @@ bool input_is_mouse_button_just_released(uint8_t button) {
     return !engine.mouse_button_state[button - 1] && engine.mouse_button_previous_state[button - 1];
 }
 
-xy input_get_mouse_position() {
+ivec2 input_get_mouse_position() {
     return engine.mouse_position;
 }
 
@@ -246,7 +246,7 @@ void render_present() {
     SDL_RenderPresent(engine.renderer);
 }
 
-void render_text(Font font, const char* text, color_t color, xy position, TextAnchor anchor) {
+void render_text(Font font, const char* text, color_t color, ivec2 position, TextAnchor anchor) {
     // Don't render empty strings
     if (text[0] == '\0') {
         return;
@@ -291,7 +291,7 @@ void render_rect(rect r, color_t color, bool fill) {
     }
 }
 
-void render_line(xy start, xy end, color_t color) {
+void render_line(ivec2 start, ivec2 end, color_t color) {
     SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
     SDL_RenderDrawLine(engine.renderer, start.x, start.y, end.x, end.y);
 }

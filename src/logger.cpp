@@ -2,6 +2,7 @@
 
 #include "asserts.h"
 #include "defines.h"
+#include "util.h"
 #include <cstdarg>
 #include <cstring>
 #include <cstdint>
@@ -66,6 +67,13 @@ void logger_output(bool is_error, const char* message, ...) {
             }
             case 'f': {
                 out_ptr += sprintf(out_ptr, "%f", va_arg(arg_ptr, double));
+                break;
+            }
+            case 'd': {
+                static const int32_t ONE_THOUSAND = 1000;
+                static const int32_t TWO_TO_THE_EIGHT = 1 << 8;
+                fp8 fp = va_arg(arg_ptr, fp8);
+                out_ptr += sprintf(out_ptr, "%i.%i", fp.integer_part(), fp.fractional_value());
                 break;
             }
             case 'x': {

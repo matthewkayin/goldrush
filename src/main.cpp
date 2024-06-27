@@ -8,12 +8,14 @@
 #include <cstdio>
 #include <string>
 #include <chrono>
+#include <bitset>
+#include <iostream>
 
 const auto FRAME_TIME = std::chrono::seconds(1) / 60.0;
 
 int main(int argc, char** argv) {
     std::string logfile_path = "goldrush.log";
-    xy window_size = xy(1280, 720);
+    ivec2 window_size = ivec2(SCREEN_WIDTH, SCREEN_HEIGHT);
     for (int argn = 1; argn < argc; argn++) {
         std::string arg = std::string(argv[argn]);
         if (arg == "--logfile" && argn + 1 < argc) {
@@ -45,7 +47,7 @@ int main(int argc, char** argv) {
                 continue;
             }
 
-            window_size = xy(std::stoi(width_string.c_str()), std::stoi(height_string.c_str()));
+            window_size = ivec2(std::stoi(width_string.c_str()), std::stoi(height_string.c_str()));
         }
     }
 
@@ -63,6 +65,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    fp8 inc = fp8::from_raw(1);
+    log_info("inc: %d", inc);
+    for (fp8 i = fp8::from_raw(0); i < fp8::integer(1) / 4; i += inc) {
+        log_info("%d", i);
+    }
+
     bool is_running = true;
 
     bool is_in_menu = true;
@@ -70,8 +78,8 @@ int main(int argc, char** argv) {
 
     auto last_time = std::chrono::system_clock::now();
     auto last_second = last_time;
-    unsigned int frames = 0;
-    unsigned int fps = 0;
+    uint32_t frames = 0;
+    uint32_t fps = 0;
 
     while (is_running) {
         // TIMEKEEP
@@ -93,6 +101,9 @@ int main(int argc, char** argv) {
         // UPDATE
         if (is_in_menu) {
             menu.update();
+            if (menu.get_mode() == MENU_MODE_MATCH_START) {
+                is_in_menu = false;
+            }
         }
 
         // RENDER
@@ -104,7 +115,7 @@ int main(int argc, char** argv) {
 
         char fps_text[16];
         sprintf(fps_text, "FPS: %u", fps);
-        render_text(FONT_HACK, fps_text, COLOR_BLACK, xy(0, 0));
+        render_text(FONT_HACK, fps_text, COLOR_BLACK, ivec2(0, 0));
 
         render_present();
     } // End while running

@@ -8,7 +8,7 @@
 #include <string>
 
 static const uint16_t PORT = 9378;
-static const unsigned int EVENT_QUEUE_SIZE = 16;
+static const uint32_t EVENT_QUEUE_SIZE = 16;
 
 // STATE
 
@@ -23,8 +23,8 @@ struct state_t {
     player_t players[NETWORK_MAX_PLAYERS];
 
     network_event_t event_queue[EVENT_QUEUE_SIZE];
-    unsigned int event_queue_count = 0;
-    unsigned int event_queue_head = 0;
+    uint32_t event_queue_count = 0;
+    uint32_t event_queue_head = 0;
 };
 static state_t state;
 
@@ -236,7 +236,7 @@ bool network_poll_events(network_event_t* event) {
 
 void network_event_enqueue(const network_event_t& event) {
     GOLD_ASSERT(state.event_queue_count != EVENT_QUEUE_SIZE);
-    unsigned int index = (state.event_queue_head + state.event_queue_count) % EVENT_QUEUE_SIZE;
+    uint32_t index = (state.event_queue_head + state.event_queue_count) % EVENT_QUEUE_SIZE;
     state.event_queue[index] = event;
     state.event_queue_count++;
 }

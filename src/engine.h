@@ -36,7 +36,7 @@ enum TextAnchor {
 };
 const int RENDER_TEXT_CENTERED = -1;
 
-bool engine_init(xy window_size);
+bool engine_init(ivec2 window_size);
 void engine_quit();
 
 // Input
@@ -45,7 +45,7 @@ bool input_is_mouse_button_pressed(uint8_t button);
 bool input_is_mouse_button_just_pressed(uint8_t button);
 bool input_is_mouse_button_just_released(uint8_t button);
 
-xy input_get_mouse_position();
+ivec2 input_get_mouse_position();
 
 void input_start_text_input(const rect& text_input_rect);
 void input_stop_text_input();
@@ -56,6 +56,6 @@ size_t input_get_text_input_length();
 
 void render_clear();
 void render_present();
-void render_text(Font font, const char* text, color_t color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
+void render_text(Font font, const char* text, color_t color, ivec2 position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
 void render_rect(rect r, color_t color, bool fill = false);
-void render_line(xy start, xy end, color_t color);
+void render_line(ivec2 start, ivec2 end, color_t color);

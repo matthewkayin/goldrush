@@ -1,5 +1,109 @@
 #pragma once
 
+#include <cstdint>
+
+struct fp8 {
+    static const size_t integer_bits = 24;
+    static const size_t fractional_bits = 8;
+    static const int32_t fractional_mask = ((int32_t)1 << fractional_bits) - 1;
+    static const int32_t fractional_divisor = (int32_t)1 << fractional_bits;
+    static const size_t total_bits = integer_bits + fractional_bits;
+    int32_t raw_value;
+
+    static constexpr fp8 from_raw(int32_t raw_value) {
+        return (fp8) { .raw_value = raw_value };
+    }
+
+    static fp8 integer(int32_t integer_value) {
+        return (fp8) { .raw_value = integer_value << fractional_bits };
+    }
+
+    int32_t integer_part() const {
+        return raw_value >> fractional_bits;
+    }
+    int32_t fractional_part() const {
+        return raw_value & fractional_mask;
+    }
+    int32_t fractional_value() const {
+        return ((raw_value & fractional_mask) * 1000) / fractional_divisor;
+    }
+
+    fp8 floor() const {
+        return integer(integer_part());
+    }
+    fp8 ceil() const {
+        return integer(integer_part() + 1);
+    }
+    fp8 abs() const {
+        return *this >= integer(0) ? *this : from_raw(-raw_value);
+    }
+
+    bool operator==(const fp8& other) const {
+        return raw_value == other.raw_value;
+    }
+    bool operator!=(const fp8& other) const {
+        return raw_value != other.raw_value;
+    }
+    bool operator<(const fp8& other) const {
+        return raw_value < other.raw_value;
+    }
+    bool operator<=(const fp8& other) const {
+        return raw_value <= other.raw_value;
+    }
+    bool operator>(const fp8& other) const {
+        return raw_value > other.raw_value;
+    }
+    bool operator>=(const fp8& other) const {
+        return raw_value >= other.raw_value;
+    }
+
+    fp8 operator-() const {
+        return from_raw(-raw_value);
+    }
+    fp8& operator+=(const fp8& other) {
+        raw_value += other.raw_value;
+        return *this;
+    }
+    fp8 operator+(const fp8& other) const {
+        return from_raw(raw_value + other.raw_value);
+    }
+    fp8& operator-=(const fp8& other) {
+        raw_value -= other.raw_value;
+        return *this;
+    }
+    fp8 operator-(const fp8& other) {
+        return from_raw(raw_value - other.raw_value);
+    }
+    fp8& operator*=(const fp8& other) {
+        raw_value *= other.raw_value;
+        return *this;
+    }
+    fp8& operator*=(int scaler) {
+        raw_value *= scaler;
+        return *this;
+    }
+    fp8 operator*(const fp8& other) const {
+        return from_raw(raw_value * other.raw_value);
+    }
+    fp8 operator*(int scaler) const {
+        return from_raw(raw_value * scaler);
+    }
+    fp8& operator/=(const fp8& other) {
+        raw_value /= other.raw_value;
+        return *this;
+    }
+    fp8& operator/=(int scaler) {
+        raw_value /= scaler;
+        return *this;
+    }
+    fp8 operator/(const fp8& other) const {
+        return from_raw(raw_value / other.raw_value);
+    }
+    fp8 operator/(int scaler) const {
+        return from_raw(raw_value / scaler);
+    }
+};
+
 template <typename utype>
 struct xy_t {
     utype x;
@@ -63,5 +167,7 @@ struct rect_t {
     }
 };
 
-using xy = xy_t<int>;
-using rect = rect_t<xy>;
+using ivec2 = xy_t<int>;
+using vec2 = xy_t<fp8>;
+
+using rect = rect_t<ivec2>;

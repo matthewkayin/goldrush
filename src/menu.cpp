@@ -16,20 +16,20 @@
 
 static const int TEXT_INPUT_WIDTH = 264;
 static const int TEXT_INPUT_HEIGHT = 35;
-static const rect TEXT_INPUT_RECT = rect(xy((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
-                                              xy(TEXT_INPUT_WIDTH, TEXT_INPUT_HEIGHT));
-static const rect PLAYERLIST_RECT = rect(xy(24, 32), xy(384, 242));
-static const unsigned int STATUS_TIMER_DURATION = 60;
+static const rect TEXT_INPUT_RECT = rect(ivec2((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
+                                              ivec2(TEXT_INPUT_WIDTH, TEXT_INPUT_HEIGHT));
+static const rect PLAYERLIST_RECT = rect(ivec2(24, 32), ivec2(384, 242));
+static const uint32_t STATUS_TIMER_DURATION = 60;
 
 static const int BUTTON_Y = 232;
-static const rect HOST_BUTTON_RECT = rect(xy(300, BUTTON_Y), xy(76, 30));
-static const rect JOIN_BUTTON_RECT = rect(xy(HOST_BUTTON_RECT.position.x + HOST_BUTTON_RECT.size.x + 8, BUTTON_Y), xy(72, 30));
-static const rect JOIN_IP_BACK_BUTTON_RECT = rect(xy(248, BUTTON_Y), xy(78, 30));
-static const rect JOIN_IP_CONNECT_BUTTON_RECT = rect(xy(JOIN_IP_BACK_BUTTON_RECT.position.x + JOIN_IP_BACK_BUTTON_RECT.size.x + 8, BUTTON_Y), xy(132, 30));
-static const rect CONNECTING_BACK_BUTTON_RECT = rect(xy((SCREEN_WIDTH / 2) - (JOIN_IP_BACK_BUTTON_RECT.size.x / 2), BUTTON_Y), JOIN_IP_BACK_BUTTON_RECT.size);
-static const rect LOBBY_BACK_RECT = rect(PLAYERLIST_RECT.position + xy(0, PLAYERLIST_RECT.size.y + 8), JOIN_IP_BACK_BUTTON_RECT.size);
-static const rect LOBBY_START_RECT = rect(LOBBY_BACK_RECT.position + xy(LOBBY_BACK_RECT.size.x + 8, 0), xy(92, 30));
-static const rect LOBBY_READY_RECT = rect(LOBBY_BACK_RECT.position + xy(LOBBY_BACK_RECT.size.x + 8, 0), xy(100, 30));
+static const rect HOST_BUTTON_RECT = rect(ivec2(300, BUTTON_Y), ivec2(76, 30));
+static const rect JOIN_BUTTON_RECT = rect(ivec2(HOST_BUTTON_RECT.position.x + HOST_BUTTON_RECT.size.x + 8, BUTTON_Y), ivec2(72, 30));
+static const rect JOIN_IP_BACK_BUTTON_RECT = rect(ivec2(248, BUTTON_Y), ivec2(78, 30));
+static const rect JOIN_IP_CONNECT_BUTTON_RECT = rect(ivec2(JOIN_IP_BACK_BUTTON_RECT.position.x + JOIN_IP_BACK_BUTTON_RECT.size.x + 8, BUTTON_Y), ivec2(132, 30));
+static const rect CONNECTING_BACK_BUTTON_RECT = rect(ivec2((SCREEN_WIDTH / 2) - (JOIN_IP_BACK_BUTTON_RECT.size.x / 2), BUTTON_Y), JOIN_IP_BACK_BUTTON_RECT.size);
+static const rect LOBBY_BACK_RECT = rect(PLAYERLIST_RECT.position + ivec2(0, PLAYERLIST_RECT.size.y + 8), JOIN_IP_BACK_BUTTON_RECT.size);
+static const rect LOBBY_START_RECT = rect(LOBBY_BACK_RECT.position + ivec2(LOBBY_BACK_RECT.size.x + 8, 0), ivec2(92, 30));
+static const rect LOBBY_READY_RECT = rect(LOBBY_BACK_RECT.position + ivec2(LOBBY_BACK_RECT.size.x + 8, 0), ivec2(100, 30));
 
 enum MenuButton {
     MENU_BUTTON_NONE,
@@ -52,7 +52,7 @@ struct menu_state_t {
     MenuMode mode;
 
     std::string status_text;
-    unsigned int status_timer;
+    uint32_t status_timer;
 
     std::string username;
     std::string ip_address;
@@ -68,7 +68,7 @@ bool is_valid_username(const char* username) {
 
 bool is_valid_ip(const char* ip_addr) {
     std::string text_input = std::string(ip_addr);
-    unsigned int number_count = 0;
+    uint32_t number_count = 0;
     while (text_input.length() != 0) {
         // Take the next part of the IP address
         size_t dot_index = text_input.find('.');
@@ -94,7 +94,7 @@ bool is_valid_ip(const char* ip_addr) {
         }
 
         // Check that it's <= 255
-        unsigned int part_number = std::stoul(part);
+        uint32_t part_number = std::stoul(part);
         if (part_number > 255) {
             break;
         }
@@ -205,7 +205,7 @@ void menu_t::update() {
     }
 
     // Button hover
-    xy mouse_position = input_get_mouse_position();
+    ivec2 mouse_position = input_get_mouse_position();
     state->button_hovered = MENU_BUTTON_NONE;
     for (auto it : state->buttons) {
         if (it.second._rect.has_point(mouse_position)) {
@@ -294,36 +294,36 @@ void menu_t::render() const {
         return;
     }
 
-    render_rect(rect(xy(0, 0), xy(SCREEN_WIDTH, SCREEN_HEIGHT)), COLOR_SAND, true);
+    render_rect(rect(ivec2(0, 0), ivec2(SCREEN_WIDTH, SCREEN_HEIGHT)), COLOR_SAND, true);
 
     if (state->mode != MENU_MODE_LOBBY) {
-        render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, xy(RENDER_TEXT_CENTERED, 36));
+        render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, ivec2(RENDER_TEXT_CENTERED, 36));
     }
 
     char version_string[16];
     sprintf(version_string, "Version %s", APP_VERSION);
-    render_text(FONT_WESTERN8, version_string, COLOR_BLACK, xy(4, SCREEN_HEIGHT - 14));
+    render_text(FONT_WESTERN8, version_string, COLOR_BLACK, ivec2(4, SCREEN_HEIGHT - 14));
 
     if (state->status_timer > 0) {
-        render_text(FONT_WESTERN8, state->status_text.c_str(), COLOR_RED, xy(RENDER_TEXT_CENTERED, TEXT_INPUT_RECT.position.y - 48));
+        render_text(FONT_WESTERN8, state->status_text.c_str(), COLOR_RED, ivec2(RENDER_TEXT_CENTERED, TEXT_INPUT_RECT.position.y - 48));
     }
 
     if (state->mode == MENU_MODE_MAIN || state->mode == MENU_MODE_JOIN_IP) {
         const char* prompt = state->mode == MENU_MODE_MAIN ? "USERNAME" : "IP ADDRESS";
-        render_text(FONT_WESTERN8, prompt, COLOR_BLACK, TEXT_INPUT_RECT.position + xy(1, -13));
+        render_text(FONT_WESTERN8, prompt, COLOR_BLACK, TEXT_INPUT_RECT.position + ivec2(1, -13));
         render_rect(TEXT_INPUT_RECT, COLOR_BLACK);
 
-        render_text(FONT_WESTERN16, input_get_text_input_value(), COLOR_BLACK, TEXT_INPUT_RECT.position + xy(2, TEXT_INPUT_RECT.size.y - 4), TEXT_ANCHOR_BOTTOM_LEFT);
+        render_text(FONT_WESTERN16, input_get_text_input_value(), COLOR_BLACK, TEXT_INPUT_RECT.position + ivec2(2, TEXT_INPUT_RECT.size.y - 4), TEXT_ANCHOR_BOTTOM_LEFT);
     }
 
     if (state->mode == MENU_MODE_JOIN_CONNECTING) {
-        render_text(FONT_WESTERN16, "Connecting...", COLOR_BLACK, xy(RENDER_TEXT_CENTERED, RENDER_TEXT_CENTERED));
+        render_text(FONT_WESTERN16, "Connecting...", COLOR_BLACK, ivec2(RENDER_TEXT_CENTERED, RENDER_TEXT_CENTERED));
     }
 
     if (state->mode == MENU_MODE_LOBBY) {
         render_rect(PLAYERLIST_RECT, COLOR_BLACK);
 
-        unsigned int player_index = 0;
+        uint32_t player_index = 0;
         for (uint8_t player_id = 0; player_id < NETWORK_MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
             if (player.status == PLAYER_STATUS_NONE) {
@@ -340,20 +340,20 @@ void menu_t::render() const {
             }
 
             int line_y = 16 * (player_index + 1);
-            render_text(FONT_WESTERN8, player_name_text.c_str(), COLOR_BLACK, PLAYERLIST_RECT.position + xy(4, line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
-            render_line(PLAYERLIST_RECT.position + xy(0, line_y), PLAYERLIST_RECT.position + xy(PLAYERLIST_RECT.size.x - 1, line_y), COLOR_BLACK);
+            render_text(FONT_WESTERN8, player_name_text.c_str(), COLOR_BLACK, PLAYERLIST_RECT.position + ivec2(4, line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
+            render_line(PLAYERLIST_RECT.position + ivec2(0, line_y), PLAYERLIST_RECT.position + ivec2(PLAYERLIST_RECT.size.x - 1, line_y), COLOR_BLACK);
             player_index++;
         }
 
         if (network_is_server()) {
-            xy side_text_pos = PLAYERLIST_RECT.position + xy(PLAYERLIST_RECT.size.x + 2, 0);
+            ivec2 side_text_pos = PLAYERLIST_RECT.position + ivec2(PLAYERLIST_RECT.size.x + 2, 0);
             render_text(FONT_WESTERN8, "You are the host.", COLOR_BLACK, side_text_pos);
         }
     }
 
     for (auto it : state->buttons) {
         color_t button_color = state->button_hovered == it.first ? COLOR_WHITE : COLOR_BLACK;
-        render_text(FONT_WESTERN16, it.second.text, button_color, it.second._rect.position + xy(4, 4));
+        render_text(FONT_WESTERN16, it.second.text, button_color, it.second._rect.position + ivec2(4, 4));
         render_rect(it.second._rect, button_color);
     }
 }
