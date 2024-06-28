@@ -5,6 +5,7 @@
 #include "logger.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_image.h>
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -43,6 +44,37 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
     }}
 };
 
+struct sprite_params_t {
+    const char* path;
+    int h_frames;
+    int v_frames;
+};
+
+static const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
+    { SPRITE_TILES, (sprite_params_t) {
+        .path = "sprite/tiles.png",
+        .h_frames = -1,
+        .v_frames = -1
+    }},
+    { SPRITE_SELECT_RING, (sprite_params_t) {
+        .path = "sprite/select_ring.png",
+        .h_frames = 1,
+        .v_frames = 1
+    }},
+    { SPRITE_UNIT_MINER, (sprite_params_t) {
+        .path = "sprite/unit_miner.png",
+        .h_frames = 4,
+        .v_frames = 1
+    }}  
+};
+
+struct sprite_t {
+    SDL_Texture* texture;
+    ivec2 frame_size;
+    int h_frames;
+    int v_frames;
+};
+
 SDL_Rect rect_to_sdl(const rect& r) {
     return (SDL_Rect) { .x = r.position.x, .y = r.position.y, .w = r.size.x, .h = r.size.y };
 }
@@ -62,6 +94,7 @@ struct engine_t {
     std::string input_text;
 
     std::vector<TTF_Font*> fonts;
+    std::vector<sprite_t> sprites;
 };
 static engine_t engine;
 
@@ -93,6 +126,13 @@ bool engine_init(ivec2 window_size) {
         return false;
     }
 
+    // Init IMG
+    int img_flags = IMG_INIT_PNG;
+    if (!(IMG_Init(img_flags) & img_flags)) {
+        log_error("SDL_image failed to initialize: %s", IMG_GetError());
+        return false;
+    }
+
     // Init input
     memset(engine.mouse_button_state, 0, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
     memset(engine.mouse_button_previous_state, 0, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
@@ -119,6 +159,45 @@ bool engine_init(ivec2 window_size) {
         engine.fonts.push_back(font);
     }
 
+    engine.sprites.reserve(SPRITE_COUNT);
+    for (uint32_t i = 0; i < SPRITE_COUNT; i++) {
+        // Get the sprite params
+        auto sprite_params_it = sprite_params.find(i);
+        if (sprite_params_it == sprite_params.end()) {
+            log_error("Sprite params not defined for sprite id %u", i);
+            return false;
+        }
+
+        // Load the sprite
+        sprite_t sprite;
+        SDL_Surface* sprite_surface = IMG_Load((resource_base_path + std::string(sprite_params_it->second.path)).c_str());
+        if (sprite_surface == NULL) {
+            log_error("Error loading sprite %s: %s", sprite_params_it->second.path, IMG_GetError());
+            return false;
+        }
+
+        sprite.texture = SDL_CreateTextureFromSurface(engine.renderer, sprite_surface);
+        if (sprite.texture == NULL) {
+            log_error("Error creating texture for sprite %s: %s", sprite_params_it->second.path, SDL_GetError());
+            return false;
+        }
+
+        if (i == SPRITE_TILES) {
+            sprite.frame_size = ivec2(TILE_SIZE, TILE_SIZE);
+            sprite.h_frames = sprite_surface->w / sprite.frame_size.x;
+            sprite.v_frames = sprite_surface->h / sprite.frame_size.y;
+        } else {
+            sprite.h_frames = sprite_params_it->second.h_frames;
+            sprite.v_frames = sprite_params_it->second.v_frames;
+            sprite.frame_size = ivec2(sprite_surface->w / sprite.h_frames, sprite_surface->h / sprite.v_frames);
+        }
+        GOLD_ASSERT(sprite_surface->w % sprite.frame_size.x == 0);
+        GOLD_ASSERT(sprite_surface->h % sprite.frame_size.y == 0);
+        engine.sprites.push_back(sprite);
+
+        SDL_FreeSurface(sprite_surface);
+    }
+
     log_info("%s initialized.", APP_NAME);
     return true;
 }
@@ -126,6 +205,9 @@ bool engine_init(ivec2 window_size) {
 void engine_quit() {
     for (TTF_Font* font : engine.fonts) {
         TTF_CloseFont(font);
+    }
+    for (sprite_t sprite : engine.sprites) {
+        SDL_DestroyTexture(sprite.texture);
     }
 
     SDL_DestroyRenderer(engine.renderer);
@@ -136,6 +218,10 @@ void engine_quit() {
 
     log_info("Application quit gracefully.");
     logger_quit();
+}
+
+ivec2 engine_get_sprite_frame_size(Sprite sprite) {
+    return engine.sprites[sprite].frame_size;
 }
 
 // INPUT
@@ -294,4 +380,46 @@ void render_rect(rect r, color_t color, bool fill) {
 void render_line(ivec2 start, ivec2 end, color_t color) {
     SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
     SDL_RenderDrawLine(engine.renderer, start.x, start.y, end.x, end.y);
+}
+
+void render_map(ivec2 camera_offset, int* tiles, int map_width, int map_height) {
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
+    SDL_Rect dst_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
+    ivec2 base_pos = ivec2(-(camera_offset.x % TILE_SIZE), -(camera_offset.y % TILE_SIZE));
+    ivec2 base_coords = ivec2(camera_offset.x / TILE_SIZE, camera_offset.y / TILE_SIZE);
+    ivec2 max_visible_tiles = ivec2(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT / TILE_SIZE) + 1);
+    if (base_pos.x != 0) {
+        max_visible_tiles.x++;
+    }
+    if (base_pos.y != 0) {
+        max_visible_tiles.y++;
+    }
+    rect screen_rect = rect(ivec2(0, 0), ivec2(SCREEN_WIDTH, SCREEN_HEIGHT));
+
+    for (int y = 0; y < max_visible_tiles.y; y++) {
+        for (int x = 0; x < max_visible_tiles.x; x++) {
+            int map_index = (base_coords.x + x) + ((base_coords.y + y) * map_width);
+            src_rect.x = (tiles[map_index] % engine.sprites[SPRITE_TILES].h_frames) * TILE_SIZE;
+            src_rect.y = (tiles[map_index] / engine.sprites[SPRITE_TILES].h_frames) * TILE_SIZE;
+
+            dst_rect.x = base_pos.x + (x * TILE_SIZE);
+            dst_rect.y = base_pos.y + (y * TILE_SIZE);
+
+            SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &src_rect, &dst_rect);
+        }
+    }
+}
+
+void render_sprite(ivec2 camera_offset, Sprite sprite, ivec2 frame, vec2 position) {
+    SDL_Rect src_rect = (SDL_Rect) { 
+        .x = frame.x * engine.sprites[sprite].frame_size.x, .y = frame.y * engine.sprites[sprite].frame_size.y, 
+        .w = engine.sprites[sprite].frame_size.x, .h = engine.sprites[sprite].frame_size.y };
+    SDL_Rect dst_rect = (SDL_Rect) {
+        .x = position.x.integer_part() - camera_offset.x, .y = position.y.integer_part() - camera_offset.y,
+        .w = src_rect.w, .h = src_rect.h
+    };
+    if (dst_rect.x + dst_rect.w < 0 || dst_rect.x > SCREEN_WIDTH || dst_rect.y + dst_rect.h > SCREEN_HEIGHT || dst_rect.y < 0) {
+        return;
+    }
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 }

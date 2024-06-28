@@ -121,7 +121,7 @@ struct xy_t {
         return xy_t(x + other.x, y + other.y);
     }
     xy_t operator-(const xy_t& other) const {
-        return xy_t(x - other.x, y + other.y);
+        return xy_t(x - other.x, y - other.y);
     }
     template <typename T>
     xy_t operator*(const T other) const {
@@ -164,6 +164,12 @@ struct rect_t {
     rect_t(const utype& position, const utype& size): position(position), size(size) {}
     bool has_point(const utype& point) const {
         return !(point.x < position.x || point.x >= position.x + size.x || point.y < position.y || point.y >= position.y + size.y);
+    }
+    bool intersects(const rect_t& other) const {
+        return !(position.x > other.position.x + other.size.x ||
+                 other.position.x > position.x + size.x ||
+                 position.y > other.position.y + other.size.y ||
+                 other.position.y > position.y + size.y);
     }
 };
 

@@ -3,6 +3,7 @@
 #include "engine.h"
 #include "util.h"
 #include "menu.h"
+#include "match.h"
 #include "network.h"
 #include <cstdint>
 #include <cstdio>
@@ -12,6 +13,11 @@
 #include <iostream>
 
 const auto FRAME_TIME = std::chrono::seconds(1) / 60.0;
+
+enum Mode {
+    MODE_MENU,
+    MODE_MATCH
+};
 
 int main(int argc, char** argv) {
     std::string logfile_path = "goldrush.log";
@@ -65,16 +71,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    fp8 inc = fp8::from_raw(1);
-    log_info("inc: %d", inc);
-    for (fp8 i = fp8::from_raw(0); i < fp8::integer(1) / 4; i += inc) {
-        log_info("%d", i);
-    }
-
     bool is_running = true;
-
-    bool is_in_menu = true;
-    menu_t menu;
+    Mode mode = MODE_MENU;
+    menu_init();
 
     auto last_time = std::chrono::system_clock::now();
     auto last_second = last_time;
@@ -99,18 +98,31 @@ int main(int argc, char** argv) {
         is_running = input_pump_events();
 
         // UPDATE
-        if (is_in_menu) {
-            menu.update();
-            if (menu.get_mode() == MENU_MODE_MATCH_START) {
-                is_in_menu = false;
+        switch (mode) {
+            case MODE_MENU: {
+                menu_update();
+                if (menu_get_mode() == MENU_MODE_MATCH_START) {
+                    match_init();
+                    mode = MODE_MATCH;
+                }
+                break;
+            }
+            case MODE_MATCH: {
+                match_update();
+                break;
             }
         }
 
         // RENDER
         render_clear();
 
-        if (is_in_menu) {
-            menu.render();
+        switch (mode) {
+            case MODE_MENU:
+                menu_render();
+                break;
+            case MODE_MATCH:
+                match_render();
+                break;
         }
 
         char fps_text[16];

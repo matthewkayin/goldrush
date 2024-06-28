@@ -60,6 +60,10 @@ struct menu_state_t {
     std::unordered_map<MenuButton, menu_button_t> buttons;
     MenuButton button_hovered;
 };
+static menu_state_t state;
+
+void menu_show_status(const char* message);
+void menu_set_mode(MenuMode mode);
 
 bool is_valid_username(const char* username) {
     std::string input_text = std::string(username);
@@ -105,66 +109,63 @@ bool is_valid_ip(const char* ip_addr) {
     return number_count == 4;
 }
 
-menu_t::menu_t() {
-    state = std::make_unique<menu_state_t>();
-    state->username = "";
-    state->ip_address = GOLD_DEFAULT_JOIN_IP;
-    set_mode(MENU_MODE_MAIN);
+void menu_init() {
+    state.username = "";
+    state.ip_address = GOLD_DEFAULT_JOIN_IP;
+    menu_set_mode(MENU_MODE_MAIN);
 }
 
-menu_t::~menu_t() {}
-
-void menu_t::show_status(const char* message) {
-    state->status_text = message;
-    state->status_timer = STATUS_TIMER_DURATION;
+void menu_show_status(const char* message) {
+    state.status_text = message;
+    state.status_timer = STATUS_TIMER_DURATION;
 }
 
-MenuMode menu_t::get_mode() const {
-    return state->mode;
+MenuMode menu_get_mode() {
+    return state.mode;
 }
 
-void menu_t::set_mode(MenuMode mode) {
+void menu_set_mode(MenuMode mode) {
     // Set mode
-    state->mode = mode;
-    state->status_timer = 0;
-    state->button_hovered = MENU_BUTTON_NONE;
+    state.mode = mode;
+    state.status_timer = 0;
+    state.button_hovered = MENU_BUTTON_NONE;
 
     // Set buttons
-    state->buttons.clear();
-    switch(state->mode) {
+    state.buttons.clear();
+    switch(state.mode) {
         case MENU_MODE_MAIN:
-            state->buttons[MENU_BUTTON_HOST] = (menu_button_t) { .text = "HOST", ._rect = HOST_BUTTON_RECT };
-            state->buttons[MENU_BUTTON_JOIN] = (menu_button_t) { .text = "JOIN", ._rect = JOIN_BUTTON_RECT };
-            input_set_text_input_value(state->username.c_str());
+            state.buttons[MENU_BUTTON_HOST] = (menu_button_t) { .text = "HOST", ._rect = HOST_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_JOIN] = (menu_button_t) { .text = "JOIN", ._rect = JOIN_BUTTON_RECT };
+            input_set_text_input_value(state.username.c_str());
             break;
         case MENU_MODE_JOIN_IP:
-            state->buttons[MENU_BUTTON_JOIN_IP_BACK] = (menu_button_t) { .text = "BACK", ._rect = JOIN_IP_BACK_BUTTON_RECT };
-            state->buttons[MENU_BUTTON_JOIN_IP_CONNECT] = (menu_button_t) { .text = "CONNECT", ._rect = JOIN_IP_CONNECT_BUTTON_RECT };
-            input_set_text_input_value(state->ip_address.c_str());
+            state.buttons[MENU_BUTTON_JOIN_IP_BACK] = (menu_button_t) { .text = "BACK", ._rect = JOIN_IP_BACK_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_JOIN_IP_CONNECT] = (menu_button_t) { .text = "CONNECT", ._rect = JOIN_IP_CONNECT_BUTTON_RECT };
+            input_set_text_input_value(state.ip_address.c_str());
             break;
         case MENU_MODE_JOIN_CONNECTING:
-            state->buttons[MENU_BUTTON_CONNECTING_BACK] = (menu_button_t) { .text = "BACK", ._rect = CONNECTING_BACK_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_CONNECTING_BACK] = (menu_button_t) { .text = "BACK", ._rect = CONNECTING_BACK_BUTTON_RECT };
             break;
         case MENU_MODE_LOBBY:
-            state->buttons[MENU_BUTTON_LOBBY_BACK] = (menu_button_t) { .text = "BACK", ._rect = LOBBY_BACK_RECT };
+            state.buttons[MENU_BUTTON_LOBBY_BACK] = (menu_button_t) { .text = "BACK", ._rect = LOBBY_BACK_RECT };
             if (network_is_server()) {
-                state->buttons[MENU_BUTTON_LOBBY_START] = (menu_button_t) { .text = "START", ._rect = LOBBY_START_RECT };
+                state.buttons[MENU_BUTTON_LOBBY_START] = (menu_button_t) { .text = "START", ._rect = LOBBY_START_RECT };
             } else {
-                state->buttons[MENU_BUTTON_LOBBY_READY] = (menu_button_t) { .text = "READY", ._rect = LOBBY_READY_RECT };
+                state.buttons[MENU_BUTTON_LOBBY_READY] = (menu_button_t) { .text = "READY", ._rect = LOBBY_READY_RECT };
             }
         default:
             break;
     }
 }
 
-void menu_t::update() {
-    if (state->mode == MENU_MODE_MATCH_START) {
+void menu_update() {
+    if (state.mode == MENU_MODE_MATCH_START) {
         return;
     }
 
     // Status timer
-    if (state->status_timer > 0) {
-        state->status_timer--;
+    if (state.status_timer > 0) {
+        state.status_timer--;
     }
 
     network_service();
@@ -172,31 +173,31 @@ void menu_t::update() {
     while (network_poll_events(&network_event)) {
         switch (network_event.type) {
             case NETWORK_EVENT_CONNECTION_FAILED: {
-                set_mode(MENU_MODE_JOIN_IP);
-                show_status("Failed to connect to server.");
+                menu_set_mode(MENU_MODE_JOIN_IP);
+                menu_show_status("Failed to connect to server.");
                 break;
             }
             case NETWORK_EVENT_SERVER_DISCONNECTED: {
-                set_mode(MENU_MODE_MAIN);
-                show_status("Server disconnected.");
+                menu_set_mode(MENU_MODE_MAIN);
+                menu_show_status("Server disconnected.");
                 break;
             }
             case NETWORK_EVENT_LOBBY_FULL: {
-                set_mode(MENU_MODE_MAIN);
-                show_status("That lobby is full.");
+                menu_set_mode(MENU_MODE_MAIN);
+                menu_show_status("That lobby is full.");
                 break;
             }
             case NETWORK_EVENT_INVALID_VERSION: {
-                set_mode(MENU_MODE_MAIN);
-                show_status("Client version does not match.");
+                menu_set_mode(MENU_MODE_MAIN);
+                menu_show_status("Client version does not match.");
                 break;
             }
             case NETWORK_EVENT_JOINED_LOBBY: {
-                set_mode(MENU_MODE_LOBBY);
+                menu_set_mode(MENU_MODE_LOBBY);
                 break;
             }
             case NETWORK_EVENT_MATCH_START: {
-                set_mode(MENU_MODE_MATCH_START);
+                menu_set_mode(MENU_MODE_MATCH_START);
                 break;
             }
             default:
@@ -206,17 +207,17 @@ void menu_t::update() {
 
     // Button hover
     ivec2 mouse_position = input_get_mouse_position();
-    state->button_hovered = MENU_BUTTON_NONE;
-    for (auto it : state->buttons) {
+    state.button_hovered = MENU_BUTTON_NONE;
+    for (auto it : state.buttons) {
         if (it.second._rect.has_point(mouse_position)) {
-            state->button_hovered = it.first;
+            state.button_hovered = it.first;
         }
     }
 
     // Mouse pressed
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
         // Text input focus
-        if (state->mode == MENU_MODE_MAIN || state->mode == MENU_MODE_JOIN_IP) {
+        if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_JOIN_IP) {
             bool input_text_focused = TEXT_INPUT_RECT.has_point(mouse_position);
             bool is_text_input_active = input_is_text_input_active();
             if (input_text_focused && !is_text_input_active) {
@@ -226,56 +227,56 @@ void menu_t::update() {
             }
         }
 
-        switch (state->button_hovered) {
+        switch (state.button_hovered) {
             case MENU_BUTTON_HOST:
                 {
                     if (!is_valid_username(input_get_text_input_value())) {
-                        show_status("Invalid username.");
+                        menu_show_status("Invalid username.");
                         break;
                     }
 
-                    state->username = std::string(input_get_text_input_value());
-                    if (!network_server_create(state->username.c_str())) {
-                        show_status("Could not create server.");
+                    state.username = std::string(input_get_text_input_value());
+                    if (!network_server_create(state.username.c_str())) {
+                        menu_show_status("Could not create server.");
                         break;
                     }
-                    set_mode(MENU_MODE_LOBBY);
+                    menu_set_mode(MENU_MODE_LOBBY);
                     break;
                 }
             case MENU_BUTTON_JOIN:
                 {
                     if (!is_valid_username(input_get_text_input_value())) {
-                        show_status("Invalid username.");
+                        menu_show_status("Invalid username.");
                         break;
                     }
 
-                    state->username = std::string(input_get_text_input_value());
-                    set_mode(MENU_MODE_JOIN_IP);
+                    state.username = std::string(input_get_text_input_value());
+                    menu_set_mode(MENU_MODE_JOIN_IP);
                     break;
                 }
             case MENU_BUTTON_JOIN_IP_BACK:
-                set_mode(MENU_MODE_MAIN);
+                menu_set_mode(MENU_MODE_MAIN);
                 break;
             case MENU_BUTTON_JOIN_IP_CONNECT:
                 {
                     if (!is_valid_ip(input_get_text_input_value())) {
-                        show_status("Invalid IP address.");
+                        menu_show_status("Invalid IP address.");
                         break;
                     }
 
-                    state->ip_address = std::string(input_get_text_input_value());
-                    network_client_create(state->username.c_str(), state->ip_address.c_str());
-                    set_mode(MENU_MODE_JOIN_CONNECTING);
+                    state.ip_address = std::string(input_get_text_input_value());
+                    network_client_create(state.username.c_str(), state.ip_address.c_str());
+                    menu_set_mode(MENU_MODE_JOIN_CONNECTING);
 
                     break;
                 }
             case MENU_BUTTON_CONNECTING_BACK:
                 network_disconnect();
-                set_mode(MENU_MODE_JOIN_IP);
+                menu_set_mode(MENU_MODE_JOIN_IP);
                 break;
             case MENU_BUTTON_LOBBY_BACK:
                 network_disconnect();
-                set_mode(MENU_MODE_MAIN);
+                menu_set_mode(MENU_MODE_MAIN);
                 break;
             case MENU_BUTTON_LOBBY_READY:
                 network_client_toggle_ready();
@@ -289,14 +290,14 @@ void menu_t::update() {
     }
 }
 
-void menu_t::render() const {
-    if (state->mode == MENU_MODE_MATCH_START) {
+void menu_render() {
+    if (state.mode == MENU_MODE_MATCH_START) {
         return;
     }
 
     render_rect(rect(ivec2(0, 0), ivec2(SCREEN_WIDTH, SCREEN_HEIGHT)), COLOR_SAND, true);
 
-    if (state->mode != MENU_MODE_LOBBY) {
+    if (state.mode != MENU_MODE_LOBBY) {
         render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, ivec2(RENDER_TEXT_CENTERED, 36));
     }
 
@@ -304,27 +305,27 @@ void menu_t::render() const {
     sprintf(version_string, "Version %s", APP_VERSION);
     render_text(FONT_WESTERN8, version_string, COLOR_BLACK, ivec2(4, SCREEN_HEIGHT - 14));
 
-    if (state->status_timer > 0) {
-        render_text(FONT_WESTERN8, state->status_text.c_str(), COLOR_RED, ivec2(RENDER_TEXT_CENTERED, TEXT_INPUT_RECT.position.y - 48));
+    if (state.status_timer > 0) {
+        render_text(FONT_WESTERN8, state.status_text.c_str(), COLOR_RED, ivec2(RENDER_TEXT_CENTERED, TEXT_INPUT_RECT.position.y - 48));
     }
 
-    if (state->mode == MENU_MODE_MAIN || state->mode == MENU_MODE_JOIN_IP) {
-        const char* prompt = state->mode == MENU_MODE_MAIN ? "USERNAME" : "IP ADDRESS";
+    if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_JOIN_IP) {
+        const char* prompt = state.mode == MENU_MODE_MAIN ? "USERNAME" : "IP ADDRESS";
         render_text(FONT_WESTERN8, prompt, COLOR_BLACK, TEXT_INPUT_RECT.position + ivec2(1, -13));
         render_rect(TEXT_INPUT_RECT, COLOR_BLACK);
 
         render_text(FONT_WESTERN16, input_get_text_input_value(), COLOR_BLACK, TEXT_INPUT_RECT.position + ivec2(2, TEXT_INPUT_RECT.size.y - 4), TEXT_ANCHOR_BOTTOM_LEFT);
     }
 
-    if (state->mode == MENU_MODE_JOIN_CONNECTING) {
+    if (state.mode == MENU_MODE_JOIN_CONNECTING) {
         render_text(FONT_WESTERN16, "Connecting...", COLOR_BLACK, ivec2(RENDER_TEXT_CENTERED, RENDER_TEXT_CENTERED));
     }
 
-    if (state->mode == MENU_MODE_LOBBY) {
+    if (state.mode == MENU_MODE_LOBBY) {
         render_rect(PLAYERLIST_RECT, COLOR_BLACK);
 
         uint32_t player_index = 0;
-        for (uint8_t player_id = 0; player_id < NETWORK_MAX_PLAYERS; player_id++) {
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
             if (player.status == PLAYER_STATUS_NONE) {
                 continue;
@@ -351,8 +352,8 @@ void menu_t::render() const {
         }
     }
 
-    for (auto it : state->buttons) {
-        color_t button_color = state->button_hovered == it.first ? COLOR_WHITE : COLOR_BLACK;
+    for (auto it : state.buttons) {
+        color_t button_color = state.button_hovered == it.first ? COLOR_WHITE : COLOR_BLACK;
         render_text(FONT_WESTERN16, it.second.text, button_color, it.second._rect.position + ivec2(4, 4));
         render_rect(it.second._rect, button_color);
     }

@@ -70,14 +70,17 @@ void logger_output(bool is_error, const char* message, ...) {
                 break;
             }
             case 'd': {
-                static const int32_t ONE_THOUSAND = 1000;
-                static const int32_t TWO_TO_THE_EIGHT = 1 << 8;
                 fp8 fp = va_arg(arg_ptr, fp8);
                 out_ptr += sprintf(out_ptr, "%i.%i", fp.integer_part(), fp.fractional_value());
                 break;
             }
             case 'x': {
                 out_ptr += sprintf(out_ptr, "%x", va_arg(arg_ptr, unsigned int));
+                break;
+            }
+            case 'r': {
+                rect* r = va_arg(arg_ptr, rect*);
+                out_ptr += sprintf(out_ptr, "<%i %i %i %i>", r->position.x, r->position.y, r->size.x, r->size.y);
                 break;
             }
         }

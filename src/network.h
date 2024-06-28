@@ -4,7 +4,6 @@
 #include <cstdint>
 
 const size_t MAX_USERNAME_LENGTH = 16;
-const size_t NETWORK_MAX_PLAYERS = 8;
 
 enum NetworkStatus {
     NETWORK_STATUS_OFFLINE,
@@ -45,6 +44,7 @@ void network_disconnect();
 
 bool network_is_server();
 NetworkStatus network_get_status();
+uint8_t network_get_player_id();
 const player_t& network_get_player(uint8_t player_id);
 
 void network_service();

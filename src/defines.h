@@ -4,6 +4,8 @@
 #define APP_VERSION "0.1"
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
+#define MAX_PLAYERS 8
+#define TILE_SIZE 32
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1

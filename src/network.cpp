@@ -20,7 +20,7 @@ struct state_t {
     char client_username[MAX_USERNAME_LENGTH + 1];
 
     uint8_t player_id;
-    player_t players[NETWORK_MAX_PLAYERS];
+    player_t players[MAX_PLAYERS];
 
     network_event_t event_queue[EVENT_QUEUE_SIZE];
     uint32_t event_queue_count = 0;
@@ -58,7 +58,7 @@ struct message_greet_response_t {
 
 struct message_playerlist_t {
     const uint8_t type = MESSAGE_PLAYERLIST;
-    player_t players[NETWORK_MAX_PLAYERS];
+    player_t players[MAX_PLAYERS];
 };
 
 struct message_ready_t {
@@ -147,6 +147,10 @@ NetworkStatus network_get_status() {
     return state.status;
 }
 
+uint8_t network_get_player_id() {
+    return state.player_id;
+}
+
 const player_t& network_get_player(uint8_t player_id) {
     return state.players[player_id];
 }
@@ -175,9 +179,6 @@ void network_service() {
                     // On client disconnected
                     log_info("player %u disconnected.", event.peer->incomingPeerID + 1);
                     state.players[event.peer->incomingPeerID + 1].status = PLAYER_STATUS_NONE;
-                    for (uint8_t i = 0; i < state.host->peerCount; i++) {
-                        log_info("player_id %u. status: %u connected: %i", i + 1, (uint8_t)state.players[i + 1].status, (int)(state.host->peers[i].state == ENET_PEER_STATE_CONNECTED));
-                    }
                     server_broadcast_playerlist();
                 } else if (state.status == NETWORK_STATUS_DISCONNECTING) {
                     enet_host_destroy(state.host);
@@ -248,11 +249,7 @@ bool network_server_create(const char* username) {
     address.host = ENET_HOST_ANY;
     address.port = PORT;
 
-    char ip_test[17];
-    enet_address_get_host_ip(&address, ip_test, 17);
-    log_info("You IP is %s", ip_test);
-
-    state.host = enet_host_create(&address, NETWORK_MAX_PLAYERS - 1, 2, 0, 0);
+    state.host = enet_host_create(&address, MAX_PLAYERS - 1, 2, 0, 0);
     if (state.host == NULL) {
         log_error("Could not create enet host.");
         return false;
@@ -265,10 +262,6 @@ bool network_server_create(const char* username) {
     state.player_id = 0;
     strncpy_s(state.players[state.player_id].name, username, 17);
     state.players[state.player_id].status = PLAYER_STATUS_HOST;
-
-    for (uint8_t i = 0; i < state.host->peerCount; i++) {
-        log_info("player_id %u. connected? %i", i + 1, (int)(state.host->peers[i].state == ENET_PEER_STATE_CONNECTED));
-    }
 
     return true;
 }
@@ -291,9 +284,6 @@ void server_handle_message(uint8_t* data, size_t lenght, uint8_t player_id) {
                 strncpy(state.players[player_id].name, greet.username, MAX_USERNAME_LENGTH + 1);
                 state.players[player_id].status = PLAYER_STATUS_NOT_READY;
                 log_info("Client is now player %u", player_id);
-                for (uint8_t i = 0; i < state.host->peerCount; i++) {
-                    log_info("player_id %u. status: %u connected: %i", i + 1, (uint8_t)state.players[i + 1].status, (int)(state.host->peers[i].state == ENET_PEER_STATE_CONNECTED));
-                }
 
                 response.status = GREET_RESPONSE_ACCEPTED;
             }
@@ -325,7 +315,7 @@ void server_broadcast_playerlist() {
 
 
 void network_server_start_game() {
-    for (uint8_t player_id = 0; player_id < NETWORK_MAX_PLAYERS; player_id++) {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.players[player_id].status == PLAYER_STATUS_NOT_READY) {
             return;
         }

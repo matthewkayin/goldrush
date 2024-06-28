@@ -2,7 +2,6 @@
 
 #include "util.h"
 #include <cstdint>
-#include <string>
 
 extern uint8_t MOUSE_BUTTON_LEFT;
 extern uint8_t MOUSE_BUTTON_RIGHT;
@@ -13,6 +12,13 @@ enum Font {
     FONT_WESTERN16,
     FONT_WESTERN32,
     FONT_COUNT
+};
+
+enum Sprite {
+    SPRITE_TILES,
+    SPRITE_SELECT_RING,
+    SPRITE_UNIT_MINER,
+    SPRITE_COUNT
 };
 
 struct color_t {
@@ -39,6 +45,8 @@ const int RENDER_TEXT_CENTERED = -1;
 bool engine_init(ivec2 window_size);
 void engine_quit();
 
+ivec2 engine_get_sprite_frame_size(Sprite sprite);
+
 // Input
 bool input_pump_events();
 bool input_is_mouse_button_pressed(uint8_t button);
@@ -59,3 +67,5 @@ void render_present();
 void render_text(Font font, const char* text, color_t color, ivec2 position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
 void render_rect(rect r, color_t color, bool fill = false);
 void render_line(ivec2 start, ivec2 end, color_t color);
+void render_map(ivec2 camera_offset, int* tiles, int map_width, int map_height);
+void render_sprite(ivec2 camera_offset, Sprite sprite, ivec2 frame, vec2 position);
