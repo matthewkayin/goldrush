@@ -79,7 +79,7 @@ void logger_output(bool is_error, const char* message, ...) {
                 break;
             }
             case 'r': {
-                rect* r = va_arg(arg_ptr, rect*);
+                rect_t* r = va_arg(arg_ptr, rect_t*);
                 out_ptr += sprintf(out_ptr, "<%i %i %i %i>", r->position.x, r->position.y, r->size.x, r->size.y);
                 break;
             }

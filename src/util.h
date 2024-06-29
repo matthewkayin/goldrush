@@ -2,6 +2,25 @@
 
 #include <cstdint>
 
+// from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
+// sqrt_i64 computes the squrare root of a 64bit integer and returns
+// a 64bit integer value. It requires that v is positive.
+inline int64_t sqrt_i64(int64_t v) {
+    uint64_t b = ((uint64_t)1)<<62, q = 0, r = v;
+    while (b > r)
+        b >>= 2;
+    while( b > 0 ) {
+        uint64_t t = q + b;
+        q >>= 1;           
+        if( r >= t ) {     
+            r -= t;        
+            q += b;        
+        }
+        b >>= 2;
+    }
+    return q;
+}
+
 struct fp8 {
     static const size_t integer_bits = 24;
     static const size_t fractional_bits = 8;
@@ -14,7 +33,7 @@ struct fp8 {
         return (fp8) { .raw_value = raw_value };
     }
 
-    static fp8 integer(int32_t integer_value) {
+    static fp8 from_int(int32_t integer_value) {
         return (fp8) { .raw_value = integer_value << fractional_bits };
     }
 
@@ -29,13 +48,13 @@ struct fp8 {
     }
 
     fp8 floor() const {
-        return integer(integer_part());
+        return from_int(integer_part());
     }
     fp8 ceil() const {
-        return integer(integer_part() + 1);
+        return from_int(integer_part() + 1);
     }
     fp8 abs() const {
-        return *this >= integer(0) ? *this : from_raw(-raw_value);
+        return *this >= from_int(0) ? *this : from_raw(-raw_value);
     }
 
     bool operator==(const fp8& other) const {
@@ -71,7 +90,7 @@ struct fp8 {
         raw_value -= other.raw_value;
         return *this;
     }
-    fp8 operator-(const fp8& other) {
+    fp8 operator-(const fp8& other) const {
         return from_raw(raw_value - other.raw_value);
     }
     fp8& operator*=(const fp8& other) {
@@ -83,7 +102,7 @@ struct fp8 {
         return *this;
     }
     fp8 operator*(const fp8& other) const {
-        return from_raw(raw_value * other.raw_value);
+        return from_raw(raw_value * other.integer_part());
     }
     fp8 operator*(int scaler) const {
         return from_raw(raw_value * scaler);
@@ -97,72 +116,117 @@ struct fp8 {
         return *this;
     }
     fp8 operator/(const fp8& other) const {
-        return from_raw(raw_value / other.raw_value);
+        return from_raw((raw_value << fractional_bits) / other.raw_value);
     }
     fp8 operator/(int scaler) const {
         return from_raw(raw_value / scaler);
     }
 };
 
-template <typename utype>
-struct xy_t {
-    utype x;
-    utype y;
+struct ivec2 {
+    int x;
+    int y;
 
-    xy_t() = default;
-    xy_t(utype x, utype y) : x(x), y(y) {}
-    xy_t operator==(const xy_t& other) const {
+    ivec2() = default;
+    ivec2(int x, int y) : x(x), y(y) {}
+    bool operator==(const ivec2& other) const {
         return this->x == other.x && this->y == other.y;
     }
-    xy_t operator-() const {
-        return xy_t(-x, -y);
+    ivec2 operator-() const {
+        return ivec2(-x, -y);
     }
-    xy_t operator+(const xy_t& other) const {
-        return xy_t(x + other.x, y + other.y);
+    ivec2 operator+(const ivec2& other) const {
+        return ivec2(x + other.x, y + other.y);
     }
-    xy_t operator-(const xy_t& other) const {
-        return xy_t(x - other.x, y - other.y);
-    }
-    template <typename T>
-    xy_t operator*(const T other) const {
-        return xy_t(x * other, y * other);
-    }
-    template <typename T>
-    xy_t operator/(const T other) const {
-        return xy_t(x / other, y / other);
-    }
-    xy_t& operator+=(const xy_t& other) {
+    ivec2& operator+=(const ivec2& other) {
         x += other.x;
         y += other.y;
         return *this;
     }
-    xy_t& operator-=(const xy_t& other) {
+    ivec2 operator-(const ivec2& other) const {
+        return ivec2(x - other.x, y - other.y);
+    }
+    ivec2& operator-=(const ivec2& other) {
         x -= other.x;
         y -= other.y;
         return *this;
     }
-    template <typename T>
-    xy_t& operator*=(const T& other) {
-        x *= other;
-        y *= other;
-        return *this;
-    }
-    template <typename T>
-    xy_t& operator/=(const T& other) {
-        x /= other;
-        y /= other;
-        return *this;
+    ivec2 operator*(int scaler) const {
+        return ivec2(x * scaler, y * scaler);
     }
 };
 
-template <typename utype>
+struct vec2 {
+    fp8 x;
+    fp8 y;
+
+    vec2() = default;
+    vec2(fp8 x, fp8 y) : x(x), y(y) {}
+    bool operator==(const vec2& other) const {
+        return this->x == other.x && this->y == other.y;
+    }
+    vec2 operator-() const {
+        return vec2(-x, -y);
+    }
+    vec2 operator+(const vec2& other) const {
+        return vec2(x + other.x, y + other.y);
+    }
+    vec2& operator+=(const vec2& other) {
+        x += other.x;
+        y += other.y;
+        return *this;
+    }
+    vec2 operator-(const vec2& other) const {
+        return vec2(x - other.x, y - other.y);
+    }
+    vec2& operator-=(const vec2& other) {
+        x -= other.x;
+        y -= other.y;
+        return *this;
+    }
+    vec2 operator*(const fp8& scaler) const {
+        return vec2(x * scaler, y * scaler);
+    }
+    vec2& operator*=(const fp8& scaler) {
+        x *= scaler;
+        y *= scaler;
+        return *this;
+    }
+    vec2 operator/(const fp8& scaler) const {
+        return vec2(x / scaler, y / scaler);
+    }
+    vec2& operator/=(const fp8& scaler) {
+        x /= scaler;
+        y /= scaler;
+        return *this;
+    }
+    fp8 length() const {
+        int64_t x64 = (int64_t)x.raw_value;
+        int64_t y64 = (int64_t)y.raw_value;
+        return fp8::from_raw((int32_t)sqrt_i64((x64 * x64) + (y64 * y64)));
+    }
+    vec2 normalized() const {
+        fp8 _length = length();
+        if (_length.raw_value == 0) {
+            return vec2(fp8::from_raw(0), fp8::from_raw(0));
+        }
+        return vec2(x / _length, y / _length);
+    }
+    vec2 direction_to(const vec2& other) const {
+        return (other - *this).normalized();
+    }
+    fp8 distance_to(const vec2& other) const {
+        return (other - *this).length();
+    }
+};
+
 struct rect_t {
-    utype position;
-    utype size;
+    ivec2 position;
+    ivec2 size;
 
     rect_t() = default;
-    rect_t(const utype& position, const utype& size): position(position), size(size) {}
-    bool has_point(const utype& point) const {
+    rect_t(const ivec2& position, const ivec2& size): position(position), size(size) {}
+    bool has_point(const ivec2& point) const {
         return !(point.x < position.x || point.x >= position.x + size.x || point.y < position.y || point.y >= position.y + size.y);
     }
     bool intersects(const rect_t& other) const {
@@ -172,8 +236,3 @@ struct rect_t {
                  other.position.y > position.y + size.y);
     }
 };
-
-using ivec2 = xy_t<int>;
-using vec2 = xy_t<fp8>;
-
-using rect = rect_t<ivec2>;

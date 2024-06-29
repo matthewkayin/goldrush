@@ -55,7 +55,7 @@ bool input_is_mouse_button_just_released(uint8_t button);
 
 ivec2 input_get_mouse_position();
 
-void input_start_text_input(const rect& text_input_rect);
+void input_start_text_input(const rect_t& text_input_rect);
 void input_stop_text_input();
 bool input_is_text_input_active();
 void input_set_text_input_value(const char* value);
@@ -65,7 +65,7 @@ size_t input_get_text_input_length();
 void render_clear();
 void render_present();
 void render_text(Font font, const char* text, color_t color, ivec2 position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
-void render_rect(rect r, color_t color, bool fill = false);
+void render_rect(rect_t r, color_t color, bool fill = false);
 void render_line(ivec2 start, ivec2 end, color_t color);
 void render_map(ivec2 camera_offset, int* tiles, int map_width, int map_height);
 void render_sprite(ivec2 camera_offset, Sprite sprite, ivec2 frame, vec2 position);

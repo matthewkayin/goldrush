@@ -16,20 +16,20 @@
 
 static const int TEXT_INPUT_WIDTH = 264;
 static const int TEXT_INPUT_HEIGHT = 35;
-static const rect TEXT_INPUT_RECT = rect(ivec2((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
+static const rect_t TEXT_INPUT_RECT = rect_t(ivec2((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
                                               ivec2(TEXT_INPUT_WIDTH, TEXT_INPUT_HEIGHT));
-static const rect PLAYERLIST_RECT = rect(ivec2(24, 32), ivec2(384, 242));
+static const rect_t PLAYERLIST_RECT = rect_t(ivec2(24, 32), ivec2(384, 242));
 static const uint32_t STATUS_TIMER_DURATION = 60;
 
 static const int BUTTON_Y = 232;
-static const rect HOST_BUTTON_RECT = rect(ivec2(300, BUTTON_Y), ivec2(76, 30));
-static const rect JOIN_BUTTON_RECT = rect(ivec2(HOST_BUTTON_RECT.position.x + HOST_BUTTON_RECT.size.x + 8, BUTTON_Y), ivec2(72, 30));
-static const rect JOIN_IP_BACK_BUTTON_RECT = rect(ivec2(248, BUTTON_Y), ivec2(78, 30));
-static const rect JOIN_IP_CONNECT_BUTTON_RECT = rect(ivec2(JOIN_IP_BACK_BUTTON_RECT.position.x + JOIN_IP_BACK_BUTTON_RECT.size.x + 8, BUTTON_Y), ivec2(132, 30));
-static const rect CONNECTING_BACK_BUTTON_RECT = rect(ivec2((SCREEN_WIDTH / 2) - (JOIN_IP_BACK_BUTTON_RECT.size.x / 2), BUTTON_Y), JOIN_IP_BACK_BUTTON_RECT.size);
-static const rect LOBBY_BACK_RECT = rect(PLAYERLIST_RECT.position + ivec2(0, PLAYERLIST_RECT.size.y + 8), JOIN_IP_BACK_BUTTON_RECT.size);
-static const rect LOBBY_START_RECT = rect(LOBBY_BACK_RECT.position + ivec2(LOBBY_BACK_RECT.size.x + 8, 0), ivec2(92, 30));
-static const rect LOBBY_READY_RECT = rect(LOBBY_BACK_RECT.position + ivec2(LOBBY_BACK_RECT.size.x + 8, 0), ivec2(100, 30));
+static const rect_t HOST_BUTTON_RECT = rect_t(ivec2(300, BUTTON_Y), ivec2(76, 30));
+static const rect_t JOIN_BUTTON_RECT = rect_t(ivec2(HOST_BUTTON_RECT.position.x + HOST_BUTTON_RECT.size.x + 8, BUTTON_Y), ivec2(72, 30));
+static const rect_t JOIN_IP_BACK_BUTTON_RECT = rect_t(ivec2(248, BUTTON_Y), ivec2(78, 30));
+static const rect_t JOIN_IP_CONNECT_BUTTON_RECT = rect_t(ivec2(JOIN_IP_BACK_BUTTON_RECT.position.x + JOIN_IP_BACK_BUTTON_RECT.size.x + 8, BUTTON_Y), ivec2(132, 30));
+static const rect_t CONNECTING_BACK_BUTTON_RECT = rect_t(ivec2((SCREEN_WIDTH / 2) - (JOIN_IP_BACK_BUTTON_RECT.size.x / 2), BUTTON_Y), JOIN_IP_BACK_BUTTON_RECT.size);
+static const rect_t LOBBY_BACK_RECT = rect_t(PLAYERLIST_RECT.position + ivec2(0, PLAYERLIST_RECT.size.y + 8), JOIN_IP_BACK_BUTTON_RECT.size);
+static const rect_t LOBBY_START_RECT = rect_t(LOBBY_BACK_RECT.position + ivec2(LOBBY_BACK_RECT.size.x + 8, 0), ivec2(92, 30));
+static const rect_t LOBBY_READY_RECT = rect_t(LOBBY_BACK_RECT.position + ivec2(LOBBY_BACK_RECT.size.x + 8, 0), ivec2(100, 30));
 
 enum MenuButton {
     MENU_BUTTON_NONE,
@@ -45,7 +45,7 @@ enum MenuButton {
 
 struct menu_button_t {
     const char* text;
-    rect _rect;
+    rect_t rect;
 };
 
 struct menu_state_t {
@@ -134,24 +134,24 @@ void menu_set_mode(MenuMode mode) {
     state.buttons.clear();
     switch(state.mode) {
         case MENU_MODE_MAIN:
-            state.buttons[MENU_BUTTON_HOST] = (menu_button_t) { .text = "HOST", ._rect = HOST_BUTTON_RECT };
-            state.buttons[MENU_BUTTON_JOIN] = (menu_button_t) { .text = "JOIN", ._rect = JOIN_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_HOST] = (menu_button_t) { .text = "HOST", .rect = HOST_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_JOIN] = (menu_button_t) { .text = "JOIN", .rect = JOIN_BUTTON_RECT };
             input_set_text_input_value(state.username.c_str());
             break;
         case MENU_MODE_JOIN_IP:
-            state.buttons[MENU_BUTTON_JOIN_IP_BACK] = (menu_button_t) { .text = "BACK", ._rect = JOIN_IP_BACK_BUTTON_RECT };
-            state.buttons[MENU_BUTTON_JOIN_IP_CONNECT] = (menu_button_t) { .text = "CONNECT", ._rect = JOIN_IP_CONNECT_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_JOIN_IP_BACK] = (menu_button_t) { .text = "BACK", .rect = JOIN_IP_BACK_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_JOIN_IP_CONNECT] = (menu_button_t) { .text = "CONNECT", .rect = JOIN_IP_CONNECT_BUTTON_RECT };
             input_set_text_input_value(state.ip_address.c_str());
             break;
         case MENU_MODE_JOIN_CONNECTING:
-            state.buttons[MENU_BUTTON_CONNECTING_BACK] = (menu_button_t) { .text = "BACK", ._rect = CONNECTING_BACK_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_CONNECTING_BACK] = (menu_button_t) { .text = "BACK", .rect = CONNECTING_BACK_BUTTON_RECT };
             break;
         case MENU_MODE_LOBBY:
-            state.buttons[MENU_BUTTON_LOBBY_BACK] = (menu_button_t) { .text = "BACK", ._rect = LOBBY_BACK_RECT };
+            state.buttons[MENU_BUTTON_LOBBY_BACK] = (menu_button_t) { .text = "BACK", .rect = LOBBY_BACK_RECT };
             if (network_is_server()) {
-                state.buttons[MENU_BUTTON_LOBBY_START] = (menu_button_t) { .text = "START", ._rect = LOBBY_START_RECT };
+                state.buttons[MENU_BUTTON_LOBBY_START] = (menu_button_t) { .text = "START", .rect = LOBBY_START_RECT };
             } else {
-                state.buttons[MENU_BUTTON_LOBBY_READY] = (menu_button_t) { .text = "READY", ._rect = LOBBY_READY_RECT };
+                state.buttons[MENU_BUTTON_LOBBY_READY] = (menu_button_t) { .text = "READY", .rect = LOBBY_READY_RECT };
             }
         default:
             break;
@@ -209,7 +209,7 @@ void menu_update() {
     ivec2 mouse_position = input_get_mouse_position();
     state.button_hovered = MENU_BUTTON_NONE;
     for (auto it : state.buttons) {
-        if (it.second._rect.has_point(mouse_position)) {
+        if (it.second.rect.has_point(mouse_position)) {
             state.button_hovered = it.first;
         }
     }
@@ -295,7 +295,7 @@ void menu_render() {
         return;
     }
 
-    render_rect(rect(ivec2(0, 0), ivec2(SCREEN_WIDTH, SCREEN_HEIGHT)), COLOR_SAND, true);
+    render_rect(rect_t(ivec2(0, 0), ivec2(SCREEN_WIDTH, SCREEN_HEIGHT)), COLOR_SAND, true);
 
     if (state.mode != MENU_MODE_LOBBY) {
         render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, ivec2(RENDER_TEXT_CENTERED, 36));
@@ -354,7 +354,7 @@ void menu_render() {
 
     for (auto it : state.buttons) {
         color_t button_color = state.button_hovered == it.first ? COLOR_WHITE : COLOR_BLACK;
-        render_text(FONT_WESTERN16, it.second.text, button_color, it.second._rect.position + ivec2(4, 4));
-        render_rect(it.second._rect, button_color);
+        render_text(FONT_WESTERN16, it.second.text, button_color, it.second.rect.position + ivec2(4, 4));
+        render_rect(it.second.rect, button_color);
     }
 }

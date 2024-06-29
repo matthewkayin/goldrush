@@ -75,7 +75,7 @@ struct sprite_t {
     int v_frames;
 };
 
-SDL_Rect rect_to_sdl(const rect& r) {
+SDL_Rect rect_to_sdl(const rect_t& r) {
     return (SDL_Rect) { .x = r.position.x, .y = r.position.y, .w = r.size.x, .h = r.size.y };
 }
 
@@ -255,7 +255,7 @@ bool input_pump_events() {
         }
         // Handle mouse button
         if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)  {
-            if (event.button.button < INPUT_MOUSE_BUTTON_COUNT) {
+            if (event.button.button < INPUT_MOUSE_BUTTON_COUNT + 1) {
                 engine.mouse_button_state[event.button.button - 1] = event.type == SDL_MOUSEBUTTONDOWN;
             }
             break;
@@ -295,7 +295,7 @@ ivec2 input_get_mouse_position() {
     return engine.mouse_position;
 }
 
-void input_start_text_input(const rect& text_input_rect) {
+void input_start_text_input(const rect_t& text_input_rect) {
     SDL_Rect sdl_text_input_rect = rect_to_sdl(text_input_rect);
     SDL_SetTextInputRect(&sdl_text_input_rect);
     SDL_StartTextInput();
@@ -367,7 +367,7 @@ void render_text(Font font, const char* text, color_t color, ivec2 position, Tex
     SDL_DestroyTexture(text_texture);
 }
 
-void render_rect(rect r, color_t color, bool fill) {
+void render_rect(rect_t r, color_t color, bool fill) {
     SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
     SDL_Rect sdl_rect = rect_to_sdl(r);
     if (fill) {
@@ -394,7 +394,7 @@ void render_map(ivec2 camera_offset, int* tiles, int map_width, int map_height) 
     if (base_pos.y != 0) {
         max_visible_tiles.y++;
     }
-    rect screen_rect = rect(ivec2(0, 0), ivec2(SCREEN_WIDTH, SCREEN_HEIGHT));
+    rect_t screen_rect = rect_t(ivec2(0, 0), ivec2(SCREEN_WIDTH, SCREEN_HEIGHT));
 
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
