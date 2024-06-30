@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include <cstdint>
+#include <cstddef>
 
 const size_t MAX_USERNAME_LENGTH = 16;
 

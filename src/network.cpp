@@ -260,7 +260,7 @@ bool network_server_create(const char* username) {
 
     memset(state.players, 0, sizeof(state.players));
     state.player_id = 0;
-    strncpy_s(state.players[state.player_id].name, username, 17);
+    strncpy(state.players[state.player_id].name, username, 17);
     state.players[state.player_id].status = PLAYER_STATUS_HOST;
 
     return true;

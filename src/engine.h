@@ -2,6 +2,7 @@
 
 #include "util.h"
 #include <cstdint>
+#include <cstddef>
 
 extern uint8_t MOUSE_BUTTON_LEFT;
 extern uint8_t MOUSE_BUTTON_RIGHT;

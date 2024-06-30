@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 
 // from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
 // sqrt_i64 computes the squrare root of a 64bit integer and returns
