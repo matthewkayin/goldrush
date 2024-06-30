@@ -22,7 +22,7 @@ struct unit_t {
 
     unit_t() {
         is_selected = false;
-        target_position = vec2(fp8::from_int(-1), fp8::from_int(-1));
+        target_position = vec2(fixed::from_int(-1), fixed::from_int(-1));
     }
 
     rect_t get_rect() {
@@ -79,11 +79,11 @@ void match_init() {
         state.units[player_id].reserve(MAX_UNITS);
     }
     state.units[0].push_back(unit_t());
-    state.units[0][0].position = vec2(fp8::from_int(16), fp8::from_int(32));
+    state.units[0][0].position = vec2(fixed::from_int(16), fixed::from_int(32));
     state.units[0].push_back(unit_t());
-    state.units[0][1].position = vec2(fp8::from_int(32), fp8::from_int(48));
+    state.units[0][1].position = vec2(fixed::from_int(32), fixed::from_int(48));
     state.units[0].push_back(unit_t());
-    state.units[0][2].position = vec2(fp8::from_int(64), fp8::from_int(16));
+    state.units[0][2].position = vec2(fixed::from_int(64), fixed::from_int(16));
 
     // Init cell grid
     /*
@@ -147,13 +147,11 @@ void match_update() {
 
     // Command
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
-        log_info("hi");
         for (unit_t& unit : state.units[current_player_id]) {
             if (!unit.is_selected) {
                 continue;
             }
-            log_info("hey");
-            unit.target_position = vec2(fp8::from_int(mouse_world_pos.x), fp8::from_int(mouse_world_pos.y));
+            unit.target_position = vec2(fixed::from_int(mouse_world_pos.x), fixed::from_int(mouse_world_pos.y));
         }
     }
 
@@ -163,12 +161,11 @@ void match_update() {
             if (unit.target_position.x.integer_part() == -1 && unit.target_position.y.integer_part() == -1) {
                 continue;
             }
-            fp8 step = fp8::from_int(8);
-            fp8 distance = unit.position.distance_to(unit.target_position);
-            log_info("dist %d", distance);
+            fixed step = fixed::from_int(2);
+            fixed distance = unit.position.distance_to(unit.target_position);
             if (distance < step) {
                 unit.position = unit.target_position;
-                unit.target_position = vec2(fp8::from_int(-1), fp8::from_int(-1));
+                unit.target_position = vec2(fixed::from_int(-1), fixed::from_int(-1));
             } else {
                 unit.position += unit.position.direction_to(unit.target_position) * step;
             }
@@ -198,7 +195,7 @@ void match_render() {
     // Select rings
     for (const unit_t& unit : state.units[current_player_id]) {
         if (unit.is_selected) {
-            render_sprite(state.camera_offset, SPRITE_SELECT_RING, ivec2(0, 0), unit.position + vec2(fp8::from_int(0), fp8::from_int(17)));
+            render_sprite(state.camera_offset, SPRITE_SELECT_RING, ivec2(0, 0), unit.position + vec2(fixed::from_int(0), fixed::from_int(17)));
         }
     }
 

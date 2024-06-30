@@ -70,7 +70,7 @@ void logger_output(bool is_error, const char* message, ...) {
                 break;
             }
             case 'd': {
-                fp8 fp = va_arg(arg_ptr, fp8);
+                fixed fp = va_arg(arg_ptr, fixed);
                 out_ptr += sprintf(out_ptr, "%i.%i", fp.integer_part(), fp.fractional_value());
                 break;
             }

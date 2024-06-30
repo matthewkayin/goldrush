@@ -5,7 +5,7 @@
 // from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
 // sqrt_i64 computes the squrare root of a 64bit integer and returns
 // a 64bit integer value. It requires that v is positive.
-inline int64_t sqrt_i64(int64_t v) {
+inline int64_t sqrt_i64(uint64_t v) {
     uint64_t b = ((uint64_t)1)<<62, q = 0, r = v;
     while (b > r)
         b >>= 2;
@@ -21,20 +21,20 @@ inline int64_t sqrt_i64(int64_t v) {
     return q;
 }
 
-struct fp8 {
+struct fixed {
     static const size_t integer_bits = 24;
     static const size_t fractional_bits = 8;
-    static const int32_t fractional_mask = ((int32_t)1 << fractional_bits) - 1;
-    static const int32_t fractional_divisor = (int32_t)1 << fractional_bits;
+    static const int32_t scale_factor = (int32_t)1 << fractional_bits;
+    static const int32_t fractional_mask = scale_factor - 1;
     static const size_t total_bits = integer_bits + fractional_bits;
     int32_t raw_value;
 
-    static constexpr fp8 from_raw(int32_t raw_value) {
-        return (fp8) { .raw_value = raw_value };
+    static constexpr fixed from_raw(int32_t raw_value) {
+        return (fixed) { .raw_value = raw_value };
     }
 
-    static fp8 from_int(int32_t integer_value) {
-        return (fp8) { .raw_value = integer_value << fractional_bits };
+    static fixed from_int(int32_t integer_value) {
+        return (fixed) { .raw_value = integer_value << fractional_bits };
     }
 
     int32_t integer_part() const {
@@ -44,81 +44,69 @@ struct fp8 {
         return raw_value & fractional_mask;
     }
     int32_t fractional_value() const {
-        return ((raw_value & fractional_mask) * 1000) / fractional_divisor;
+        return ((raw_value & fractional_mask) * 1000) / scale_factor;
     }
 
-    fp8 floor() const {
+    fixed floor() const {
         return from_int(integer_part());
     }
-    fp8 ceil() const {
+    fixed ceil() const {
         return from_int(integer_part() + 1);
     }
-    fp8 abs() const {
+    fixed abs() const {
         return *this >= from_int(0) ? *this : from_raw(-raw_value);
     }
 
-    bool operator==(const fp8& other) const {
+    static fixed sqrt(const fixed& value) {
+        return from_raw((int32_t)sqrt_i64(((int64_t)value.raw_value) << fractional_bits));
+    }
+
+    bool operator==(const fixed& other) const {
         return raw_value == other.raw_value;
     }
-    bool operator!=(const fp8& other) const {
+    bool operator!=(const fixed& other) const {
         return raw_value != other.raw_value;
     }
-    bool operator<(const fp8& other) const {
+    bool operator<(const fixed& other) const {
         return raw_value < other.raw_value;
     }
-    bool operator<=(const fp8& other) const {
+    bool operator<=(const fixed& other) const {
         return raw_value <= other.raw_value;
     }
-    bool operator>(const fp8& other) const {
+    bool operator>(const fixed& other) const {
         return raw_value > other.raw_value;
     }
-    bool operator>=(const fp8& other) const {
+    bool operator>=(const fixed& other) const {
         return raw_value >= other.raw_value;
     }
 
-    fp8 operator-() const {
+    fixed operator-() const {
         return from_raw(-raw_value);
     }
-    fp8& operator+=(const fp8& other) {
+    fixed& operator+=(const fixed& other) {
         raw_value += other.raw_value;
         return *this;
     }
-    fp8 operator+(const fp8& other) const {
+    fixed operator+(const fixed& other) const {
         return from_raw(raw_value + other.raw_value);
     }
-    fp8& operator-=(const fp8& other) {
+    fixed& operator-=(const fixed& other) {
         raw_value -= other.raw_value;
         return *this;
     }
-    fp8 operator-(const fp8& other) const {
+    fixed operator-(const fixed& other) const {
         return from_raw(raw_value - other.raw_value);
     }
-    fp8& operator*=(const fp8& other) {
-        raw_value *= other.raw_value;
-        return *this;
+    fixed operator*(const fixed& other) const {
+        return from_raw(((int64_t)raw_value * other.raw_value) >> fractional_bits);
     }
-    fp8& operator*=(int scaler) {
-        raw_value *= scaler;
-        return *this;
-    }
-    fp8 operator*(const fp8& other) const {
-        return from_raw(raw_value * other.integer_part());
-    }
-    fp8 operator*(int scaler) const {
+    fixed operator*(int scaler) const {
         return from_raw(raw_value * scaler);
     }
-    fp8& operator/=(const fp8& other) {
-        raw_value /= other.raw_value;
-        return *this;
+    fixed operator/(const fixed& other) const {
+        return from_raw((((int64_t)raw_value) << fractional_bits) / other.raw_value);
     }
-    fp8& operator/=(int scaler) {
-        raw_value /= scaler;
-        return *this;
-    }
-    fp8 operator/(const fp8& other) const {
-        return from_raw((raw_value << fractional_bits) / other.raw_value);
-    }
-    fp8 operator/(int scaler) const {
+    fixed operator/(int scaler) const {
         return from_raw(raw_value / scaler);
     }
 };
@@ -157,11 +145,11 @@ struct ivec2 {
 };
 
 struct vec2 {
-    fp8 x;
-    fp8 y;
+    fixed x;
+    fixed y;
 
     vec2() = default;
-    vec2(fp8 x, fp8 y) : x(x), y(y) {}
+    vec2(fixed x, fixed y) : x(x), y(y) {}
     bool operator==(const vec2& other) const {
         return this->x == other.x && this->y == other.y;
     }
@@ -184,38 +172,29 @@ struct vec2 {
         y -= other.y;
         return *this;
     }
-    vec2 operator*(const fp8& scaler) const {
+    vec2 operator*(const fixed& scaler) const {
         return vec2(x * scaler, y * scaler);
     }
-    vec2& operator*=(const fp8& scaler) {
-        x *= scaler;
-        y *= scaler;
-        return *this;
-    }
-    vec2 operator/(const fp8& scaler) const {
+    vec2 operator/(const fixed& scaler) const {
         return vec2(x / scaler, y / scaler);
     }
-    vec2& operator/=(const fp8& scaler) {
-        x /= scaler;
-        y /= scaler;
-        return *this;
-    }
-    fp8 length() const {
-        int64_t x64 = (int64_t)x.raw_value;
-        int64_t y64 = (int64_t)y.raw_value;
-        return fp8::from_raw((int32_t)sqrt_i64((x64 * x64) + (y64 * y64)));
+    fixed length() const {
+        uint64_t x64 = (uint64_t)(x.raw_value < 0 ? -x.integer_part() : x.integer_part());
+        uint64_t y64 = (uint64_t)(y.raw_value < 0 ? -y.integer_part() : y.integer_part());
+        uint64_t length_squared = (x64 * x64) + (y64 * y64);
+        return fixed::from_raw((int32_t)sqrt_i64(length_squared) << fixed::fractional_bits);
     }
     vec2 normalized() const {
-        fp8 _length = length();
+        fixed _length = length();
         if (_length.raw_value == 0) {
-            return vec2(fp8::from_raw(0), fp8::from_raw(0));
+            return vec2(fixed::from_raw(0), fixed::from_raw(0));
         }
         return vec2(x / _length, y / _length);
     }
     vec2 direction_to(const vec2& other) const {
         return (other - *this).normalized();
     }
-    fp8 distance_to(const vec2& other) const {
+    fixed distance_to(const vec2& other) const {
         return (other - *this).length();
     }
 };
