@@ -15,6 +15,8 @@ static const int CAMERA_DRAG_MARGIN = 16;
 static const int CAMERA_DRAG_SPEED = 8;
 static const int CELL_SIZE = 8;
 
+// UNIT
+
 struct unit_t {
     bool is_selected;
     vec2 position;
@@ -29,6 +31,26 @@ struct unit_t {
         return rect_t(ivec2(position.x.integer_part(), position.y.integer_part()), engine_get_sprite_frame_size(SPRITE_UNIT_MINER));
     }
 };
+
+// INPUT
+
+enum InputType {
+    INPUT_NONE,
+    INPUT_MOVE
+};
+
+struct input_none_t {
+    const uint8_t type = INPUT_NONE;
+};
+
+struct input_move_t {
+    const uint8_t type = INPUT_MOVE;
+    vec2 target_position;
+    std::vector<unit_t> units;
+};
+
+
+// STATE
 
 struct match_state_t {
     ivec2 camera_offset;
