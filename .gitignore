@@ -2,3 +2,4 @@ bin/
 ase/
 obj/
 .log
+.DS_Store
