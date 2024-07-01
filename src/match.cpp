@@ -1,6 +1,7 @@
 #include "match.h"
 
 #include "defines.h"
+#include "asserts.h"
 #include "engine.h"
 #include "logger.h"
 #include "util.h"
@@ -9,6 +10,7 @@
 #include <cstdlib>
 #include <algorithm>
 
+static const uint32_t TICK_DURATION = 4;
 static const uint32_t MAX_UNITS = 200;
 
 static const int CAMERA_DRAG_MARGIN = 16;
@@ -39,20 +41,26 @@ enum InputType {
     INPUT_MOVE
 };
 
-struct input_none_t {
-    const uint8_t type = INPUT_NONE;
-};
-
 struct input_move_t {
-    const uint8_t type = INPUT_MOVE;
     vec2 target_position;
-    std::vector<unit_t> units;
+    uint8_t unit_count;
+    uint8_t unit_ids[MAX_UNITS];
 };
 
+struct input_t {
+    uint8_t type;
+    union {
+        input_move_t move;
+    };
+};
 
 // STATE
 
 struct match_state_t {
+    std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
+    std::vector<input_t> input_queue;
+    uint32_t tick_timer;
+
     ivec2 camera_offset;
 
     bool is_selecting;
@@ -73,7 +81,106 @@ struct match_state_t {
 };
 static match_state_t state;
 
+void input_flush() {
+    static const uint32_t INPUT_MAX_SIZE = 201;
+
+    static uint8_t out_buffer[INPUT_BUFFER_SIZE];
+    static size_t out_buffer_length;
+
+    // Always send at least 1 input per tick
+    if (state.input_queue.empty()) {
+        input_t empty_input;
+        empty_input.type = INPUT_NONE;
+        state.input_queue.push_back(empty_input);
+    }
+
+    // Assert that the out buffer is big enough
+    GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * state.input_queue.size()));
+
+    // Leave a space in the buffer for the network message type
+    uint8_t current_player_id = network_get_player_id();
+    out_buffer[1] = current_player_id;
+    out_buffer_length = 2;
+    log_info("sending outputs, player_id: %u", current_player_id);
+
+    // Serialize the inputs
+    for (const input_t& input : state.input_queue) {
+        out_buffer[out_buffer_length] = input.type;
+        out_buffer_length++;
+        switch (input.type) {
+            case INPUT_MOVE: {
+                memcpy(out_buffer + out_buffer_length, &input.move.target_position, sizeof(vec2));
+                out_buffer_length += sizeof(vec2);
+
+                out_buffer[out_buffer_length] = input.move.unit_count;
+                out_buffer_length += 1;
+
+                memcpy(out_buffer + 1, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
+                out_buffer_length += input.move.unit_count * sizeof(uint8_t);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    state.inputs[current_player_id].push_back(state.input_queue);
+    state.input_queue.clear();
+
+    // Send them to other players
+    if (network_is_server()) {
+        network_server_send_input(out_buffer, out_buffer_length);
+    } else {
+        network_client_send_input(out_buffer, out_buffer_length);
+    }
+}
+
+void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
+    std::vector<input_t> tick_inputs;
+
+    uint8_t in_player_id = in_buffer[1];
+    size_t in_buffer_head = 2;
+
+    while (in_buffer_head < in_buffer_length) {
+        input_t input;
+        input.type = in_buffer[in_buffer_head];
+        in_buffer_head++;
+
+        switch (input.type) {
+            case INPUT_MOVE: {
+                memcpy(&input.move.target_position, in_buffer + in_buffer_head, sizeof(vec2));
+                in_buffer_head += sizeof(vec2);
+
+                input.move.unit_count = in_buffer[in_buffer_head];
+                memcpy(input.move.unit_ids, in_buffer + 1, input.move.unit_count * sizeof(uint8_t));
+                in_buffer_head += 1 + input.move.unit_count;
+            }
+            default:
+                break;
+        }
+
+        tick_inputs.push_back(input);
+    }
+
+    state.inputs[in_player_id].push_back(tick_inputs);
+}
+
 void match_init() {
+    // Init input queues
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        const player_t& player = network_get_player(player_id);
+        if (player.status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+
+        input_t empty_input;
+        empty_input.type = INPUT_NONE;
+        std::vector<input_t> empty_input_list = { empty_input };
+        state.inputs[player_id].push_back(empty_input_list);
+        state.inputs[player_id].push_back(empty_input_list);
+        state.inputs[player_id].push_back(empty_input_list);
+    }
+    state.tick_timer = 0;
+
     state.camera_offset = ivec2(0, 0);
     state.is_selecting = false;
 
@@ -125,7 +232,75 @@ void match_init() {
     */
 }
 
+void match_handle_input(uint8_t player_id, const input_t& input) {
+    switch (input.type) {
+        case INPUT_MOVE: {
+            log_info("input move player: %u, unit count %u, target: %d,%d", player_id, input.move.unit_count, input.move.target_position);
+            for (uint32_t i = 0; i < input.move.unit_count; i++) {
+                state.units[player_id][input.move.unit_ids[i]].target_position = input.move.target_position;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 void match_update() {
+    // NETWORK EVENTS
+    network_service();
+    network_event_t network_event;
+    while (network_poll_events(&network_event)) {
+        switch (network_event.type) {
+            case NETWORK_EVENT_INPUT: {
+                input_deserialize(network_event.input.data, network_event.input.data_length);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    // NETWORK
+    if (state.tick_timer == 0) {
+        bool has_all_inputs = true;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            const player_t& player = network_get_player(player_id);
+            if (player.status == PLAYER_STATUS_NONE) {
+                continue;
+            }
+
+            if (state.inputs[player_id].empty()) {
+                has_all_inputs = false;
+                break;
+            }
+        }
+
+        if (!has_all_inputs) {
+            log_info("missing inputs for this frame. waiting...");
+            return;
+        }
+
+        // Begin next tick
+        log_info("beginning next tick...");
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            const player_t& player = network_get_player(player_id);
+            if (player.status == PLAYER_STATUS_NONE) {
+                continue;
+            }
+
+            log_info("player %u input size: %u", player_id, state.inputs[player_id][0].size());
+            for (const input_t& input : state.inputs[player_id][0]) {
+                match_handle_input(player_id, input);
+            }
+            state.inputs[player_id].erase(state.inputs[player_id].begin());
+        }
+
+        state.tick_timer = TICK_DURATION;
+        input_flush();
+    }
+    state.tick_timer--;
+
     ivec2 mouse_pos = input_get_mouse_position();
     uint8_t current_player_id = network_get_player_id();
 
@@ -169,11 +344,19 @@ void match_update() {
 
     // Command
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
-        for (unit_t& unit : state.units[current_player_id]) {
-            if (!unit.is_selected) {
+        input_t input;
+        input.type = INPUT_MOVE;
+        input.move.target_position = vec2(fixed::from_int(mouse_world_pos.x), fixed::from_int(mouse_world_pos.y));
+        input.move.unit_count = 0;
+        for (uint8_t unit_id = 0; unit_id < state.units[current_player_id].size(); unit_id++) {
+            if (!state.units[current_player_id][unit_id].is_selected) {
                 continue;
             }
-            unit.target_position = vec2(fixed::from_int(mouse_world_pos.x), fixed::from_int(mouse_world_pos.y));
+            input.move.unit_ids[input.move.unit_count] = unit_id;
+            input.move.unit_count++;
+        }
+        if (input.move.unit_count != 0) {
+            state.input_queue.push_back(input);
         }
     }
 

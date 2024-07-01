@@ -35,7 +35,8 @@ enum MessageType {
     MESSAGE_GREET_RESPONSE,
     MESSAGE_PLAYERLIST,
     MESSAGE_READY,
-    MESSAGE_MATCH_START
+    MESSAGE_MATCH_START,
+    MESSAGE_INPUT
 };
 
 struct message_greet_t {
@@ -266,9 +267,8 @@ bool network_server_create(const char* username) {
     return true;
 }
 
-void server_handle_message(uint8_t* data, size_t lenght, uint8_t player_id) {
+void server_handle_message(uint8_t* data, size_t length, uint8_t player_id) {
     uint8_t message_type = data[0];
-    log_info("Received message with type %u from player %u", message_type, player_id);
 
     switch (message_type) {
         case MESSAGE_GREET: {
@@ -301,6 +301,28 @@ void server_handle_message(uint8_t* data, size_t lenght, uint8_t player_id) {
             server_broadcast_playerlist();
             enet_host_flush(state.host);
         }
+        case MESSAGE_INPUT: {
+            // Send the message to the game
+            network_event_t network_event;
+            network_event.type = NETWORK_EVENT_INPUT;
+            network_event.input.data_length = length;
+            memcpy(network_event.input.data, data, length);
+            network_event_enqueue(network_event);
+
+            // Relay the message to other clients, skipping player_id 0 because that is the server
+            for (uint8_t relay_player_id = 1; relay_player_id < MAX_PLAYERS; relay_player_id++) {
+                // Don't relay the message back to the sender
+                if (relay_player_id == player_id) {
+                    continue;
+                } 
+
+                ENetPacket* relay_packet = enet_packet_create(data, length, ENET_PACKET_FLAG_RELIABLE);
+                enet_peer_send(&state.host->peers[relay_player_id - 1], 0, relay_packet);
+            }
+            enet_host_flush(state.host);
+
+            break;
+        }
         default:
             break;
     }
@@ -312,7 +334,6 @@ void server_broadcast_playerlist() {
     ENetPacket* packet = enet_packet_create(&playerlist, sizeof(message_playerlist_t), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
 }
-
 
 void network_server_start_game() {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -329,6 +350,14 @@ void network_server_start_game() {
     network_event_t event;
     event.type = NETWORK_EVENT_MATCH_START;
     network_event_enqueue(event);
+}
+
+void network_server_send_input(uint8_t* data, size_t data_length) {
+    data[0] = MESSAGE_INPUT;
+    ENetPacket* packet = enet_packet_create(data, data_length * sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+    log_info("server sent input");
 }
 
 // CLIENT
@@ -360,7 +389,6 @@ bool network_client_create(const char* username, const char* server_ip) {
 
 void client_handle_message(uint8_t* data, size_t length) {
     uint8_t message_type = data[0];
-    log_info("Received message with type %u from server", message_type);
 
     switch (message_type) {
         case MESSAGE_GREET_RESPONSE: {
@@ -397,6 +425,15 @@ void client_handle_message(uint8_t* data, size_t length) {
             network_event_enqueue(event);
             break;
         }
+        case MESSAGE_INPUT: {
+            network_event_t network_event;
+            network_event.type = NETWORK_EVENT_INPUT;
+            network_event.input.data_length = length;
+            memcpy(network_event.input.data, data, length);
+            network_event_enqueue(network_event);
+
+            break;
+        }
         default:
             break;
     }
@@ -407,4 +444,12 @@ void network_client_toggle_ready() {
     ENetPacket* packet = enet_packet_create(&ready, sizeof(message_ready_t), ENET_PACKET_FLAG_RELIABLE);
     enet_peer_send(state.peer, 0, packet);
     enet_host_flush(state.host);
+}
+
+void network_client_send_input(uint8_t* data, size_t data_length) {
+    data[0] = MESSAGE_INPUT;
+    ENetPacket* packet = enet_packet_create(data, data_length * sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(state.peer, 0, packet);
+    enet_host_flush(state.host);
+    log_info("client sent input");
 }
