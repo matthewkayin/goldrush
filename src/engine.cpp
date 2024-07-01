@@ -62,8 +62,8 @@ static const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .v_frames = 1
     }},
     { SPRITE_UNIT_MINER, (sprite_params_t) {
-        .path = "sprite/unit_miner.png",
-        .h_frames = 4,
+        .path = "sprite/unit_miner_side.png",
+        .h_frames = 2,
         .v_frames = 1
     }}  
 };
@@ -73,6 +73,10 @@ struct sprite_t {
     ivec2 frame_size;
     int h_frames;
     int v_frames;
+};
+
+static const std::unordered_map<uint32_t, uint32_t> animation_frame_duration = {
+    { SPRITE_UNIT_MINER, 8 }
 };
 
 SDL_Rect rect_to_sdl(const rect_t& r) {
@@ -220,8 +224,45 @@ void engine_quit() {
     logger_quit();
 }
 
-ivec2 engine_get_sprite_frame_size(Sprite sprite) {
+uint32_t engine_get_ticks() {
+    return SDL_GetTicks();
+}
+
+// SPRITE
+
+ivec2 sprite_get_frame_size(Sprite sprite) {
     return engine.sprites[sprite].frame_size;
+}
+
+animation_t::animation_t(Sprite sprite) {
+    this->sprite = sprite;
+    frame = ivec2(0, 0);
+    is_playing = false;
+
+    // A little check to make sure I don't forget to specify the frame duration
+    auto it = animation_frame_duration.find(sprite);
+    GOLD_ASSERT(it != animation_frame_duration.end());
+}
+
+void animation_t::start() {
+    is_playing = true;
+    timer = animation_frame_duration.at(sprite);
+}
+
+void animation_t::stop() {
+    is_playing = false;
+}
+
+void animation_t::update() {
+    if (!is_playing) {
+        return;
+    }
+
+    timer--;
+    if (timer == 0) {
+        frame.x = (frame.x + 1) % engine.sprites[sprite].h_frames;
+        timer = animation_frame_duration.at(sprite);
+    }
 }
 
 // INPUT
@@ -422,4 +463,8 @@ void render_sprite(ivec2 camera_offset, Sprite sprite, ivec2 frame, vec2 positio
         return;
     }
     SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+}
+
+void render_sprite_animation(ivec2 camera_offset, animation_t animation, vec2 position) {
+    render_sprite(camera_offset, animation.sprite, animation.frame, position);
 }

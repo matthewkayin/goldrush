@@ -23,14 +23,16 @@ struct unit_t {
     bool is_selected;
     vec2 position;
     vec2 target_position;
+    animation_t animation;
 
     unit_t() {
+        animation = animation_t(SPRITE_UNIT_MINER);
         is_selected = false;
         target_position = vec2(fixed::from_int(-1), fixed::from_int(-1));
     }
 
     rect_t get_rect() {
-        return rect_t(ivec2(position.x.integer_part(), position.y.integer_part()), engine_get_sprite_frame_size(SPRITE_UNIT_MINER));
+        return rect_t(ivec2(position.x.integer_part(), position.y.integer_part()), sprite_get_frame_size(SPRITE_UNIT_MINER));
     }
 };
 
@@ -136,8 +138,6 @@ void input_flush() {
 void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
     std::vector<input_t> tick_inputs;
 
-    log_info("deserializing. in_buffer[0] %z in_buffer[1] %z", in_buffer[0], in_buffer[1]);
-
     uint8_t in_player_id = in_buffer[1];
     size_t in_buffer_head = 2;
 
@@ -145,18 +145,14 @@ void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
         input_t input;
         input.type = in_buffer[in_buffer_head];
         in_buffer_head++;
-        log_info("input.type: %u buffer head is now %z", input.type, in_buffer_head);
 
         switch (input.type) {
             case INPUT_MOVE: {
                 memcpy(&input.move.target_position, in_buffer + in_buffer_head, sizeof(vec2));
                 in_buffer_head += sizeof(vec2);
-                log_info("target pos %d,%d buffer head: %z", input.move.target_position.x, input.move.target_position.y, in_buffer_head);
-                log_info("buffer: %b", in_buffer + in_buffer_head, in_buffer_length - in_buffer_head);
 
                 input.move.unit_count = in_buffer[in_buffer_head];
                 memcpy(input.move.unit_ids, in_buffer + in_buffer_head + 1, input.move.unit_count * sizeof(uint8_t));
-                log_info("move.unit_count: %u move.unit_ids: %b", input.move.unit_count, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
                 in_buffer_head += 1 + input.move.unit_count;
             }
             default:
@@ -248,9 +244,9 @@ void match_init() {
 void match_handle_input(uint8_t player_id, const input_t& input) {
     switch (input.type) {
         case INPUT_MOVE: {
-            log_info("input move player: %u, unit count %u, target: %d,%d", player_id, input.move.unit_count, input.move.target_position);
             for (uint32_t i = 0; i < input.move.unit_count; i++) {
                 state.units[player_id][input.move.unit_ids[i]].target_position = input.move.target_position;
+                state.units[player_id][input.move.unit_ids[i]].animation.start();
             }
             break;
         }
@@ -295,14 +291,12 @@ void match_update() {
         }
 
         // Begin next tick
-        log_info("beginning next tick...");
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
             if (player.status == PLAYER_STATUS_NONE) {
                 continue;
             }
 
-            log_info("player %u input size: %u", player_id, state.inputs[player_id][0].size());
             for (const input_t& input : state.inputs[player_id][0]) {
                 match_handle_input(player_id, input);
             }
@@ -379,14 +373,20 @@ void match_update() {
             if (unit.target_position.x.integer_part() == -1 && unit.target_position.y.integer_part() == -1) {
                 continue;
             }
+            // unit.animation.update();
             fixed step = fixed::from_int(2);
             fixed distance = unit.position.distance_to(unit.target_position);
+            vec2 old_position = unit.position;
             if (distance < step) {
                 unit.position = unit.target_position;
                 unit.target_position = vec2(fixed::from_int(-1), fixed::from_int(-1));
+                unit.animation.stop();
+                unit.animation.frame.x = 0;
             } else {
                 unit.position += unit.position.direction_to(unit.target_position) * step;
             }
+            vec2 actual_step = unit.position - old_position;
+            log_info("step: %d,%d position: %d,%d", actual_step.x, actual_step.y, unit.position.x, unit.position.y);
         }
     }
 }
@@ -420,7 +420,7 @@ void match_render() {
     // Units
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (const unit_t& unit : state.units[player_id]) {
-            render_sprite(state.camera_offset, SPRITE_UNIT_MINER, ivec2(0, 0), unit.position);
+            render_sprite_animation(state.camera_offset, unit.animation, unit.position);
         }
     }
 

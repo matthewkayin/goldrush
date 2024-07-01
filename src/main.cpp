@@ -5,14 +5,13 @@
 #include "menu.h"
 #include "match.h"
 #include "network.h"
+#include "platform.h"
 #include <cstdint>
 #include <cstdio>
 #include <string>
-#include <chrono>
-#include <bitset>
-#include <iostream>
 
-const auto FRAME_TIME = std::chrono::seconds(1) / 60.0;
+// const uint32_t UPDATE_TIME = 1000 / 60;
+const double UPDATE_TIME = 1.0 / 60.0;
 
 enum Mode {
     MODE_MENU,
@@ -75,41 +74,55 @@ int main(int argc, char** argv) {
     Mode mode = MODE_MENU;
     menu_init();
 
-    auto last_time = std::chrono::system_clock::now();
-    auto last_second = last_time;
+    double last_time = platform_get_absolute_time();
+    double last_second = last_time;
+    double update_accumulator = 0.0;
+    /*
+    uint32_t last_time = engine_get_ticks();
+    uint32_t last_second = last_time;
+    uint32_t accumulator = 0;
+    */
     uint32_t frames = 0;
     uint32_t fps = 0;
+    uint32_t updates = 0;
+    uint32_t ups = 0;
 
     while (is_running) {
         // TIMEKEEP
-        auto current_time = std::chrono::system_clock::now();
-        while (current_time - last_time < FRAME_TIME) {
-            current_time = std::chrono::system_clock::now();
-        }
+        double current_time = platform_get_absolute_time();
+        update_accumulator += current_time - last_time;
+        last_time = current_time;
 
-        if (current_time - last_second >= std::chrono::seconds(1)) {
+        if (current_time - last_second >= 1.0) {
             fps = frames;
             frames = 0;
-            last_second += std::chrono::seconds(1);
+            ups = updates;
+            updates = 0;
+            last_second += 1.0;
         }
         frames++;
 
-        // INPUT
-        is_running = input_pump_events();
+        while (update_accumulator >= UPDATE_TIME) {
+            update_accumulator -= UPDATE_TIME;
+            updates++;
 
-        // UPDATE
-        switch (mode) {
-            case MODE_MENU: {
-                menu_update();
-                if (menu_get_mode() == MENU_MODE_MATCH_START) {
-                    match_init();
-                    mode = MODE_MATCH;
+            // INPUT
+            is_running = input_pump_events();
+
+            // UPDATE
+            switch (mode) {
+                case MODE_MENU: {
+                    menu_update();
+                    if (menu_get_mode() == MENU_MODE_MATCH_START) {
+                        match_init();
+                        mode = MODE_MATCH;
+                    }
+                    break;
                 }
-                break;
-            }
-            case MODE_MATCH: {
-                match_update();
-                break;
+                case MODE_MATCH: {
+                    match_update();
+                    break;
+                }
             }
         }
 
@@ -127,7 +140,10 @@ int main(int argc, char** argv) {
 
         char fps_text[16];
         sprintf(fps_text, "FPS: %u", fps);
+        char ups_text[16];
+        sprintf(ups_text, "UPS: %u", ups);
         render_text(FONT_HACK, fps_text, COLOR_BLACK, ivec2(0, 0));
+        render_text(FONT_HACK, ups_text, COLOR_BLACK, ivec2(0, 12));
 
         render_present();
     } // End while running

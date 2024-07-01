@@ -22,6 +22,19 @@ enum Sprite {
     SPRITE_COUNT
 };
 
+struct animation_t {
+    Sprite sprite;
+    ivec2 frame;
+    uint32_t timer;
+    bool is_playing;
+
+    animation_t() = default;
+    animation_t(Sprite sprite);
+    void start();
+    void stop();
+    void update();
+};
+
 struct color_t {
     uint8_t r;
     uint8_t g;
@@ -45,8 +58,9 @@ const int RENDER_TEXT_CENTERED = -1;
 
 bool engine_init(ivec2 window_size);
 void engine_quit();
+uint32_t engine_get_ticks();
 
-ivec2 engine_get_sprite_frame_size(Sprite sprite);
+ivec2 sprite_get_frame_size(Sprite sprite);
 
 // Input
 bool input_pump_events();
@@ -70,3 +84,4 @@ void render_rect(rect_t r, color_t color, bool fill = false);
 void render_line(ivec2 start, ivec2 end, color_t color);
 void render_map(ivec2 camera_offset, int* tiles, int map_width, int map_height);
 void render_sprite(ivec2 camera_offset, Sprite sprite, ivec2 frame, vec2 position);
+void render_sprite_animation(ivec2 camera_offset, animation_t animation, vec2 position);
