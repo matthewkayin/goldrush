@@ -70,7 +70,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    bool is_running = true;
     Mode mode = MODE_MENU;
     menu_init();
 
@@ -87,7 +86,7 @@ int main(int argc, char** argv) {
     uint32_t updates = 0;
     uint32_t ups = 0;
 
-    while (is_running) {
+    while (engine_is_running()) {
         // TIMEKEEP
         double current_time = platform_get_absolute_time();
         update_accumulator += current_time - last_time;
@@ -107,7 +106,7 @@ int main(int argc, char** argv) {
             updates++;
 
             // INPUT
-            is_running = input_pump_events();
+            input_pump_events();
 
             // UPDATE
             switch (mode) {

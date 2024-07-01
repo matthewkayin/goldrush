@@ -58,12 +58,14 @@ const int RENDER_TEXT_CENTERED = -1;
 
 bool engine_init(ivec2 window_size);
 void engine_quit();
-uint32_t engine_get_ticks();
+bool engine_is_running();
+void engine_set_running(bool value);
 
 ivec2 sprite_get_frame_size(Sprite sprite);
 
 // Input
-bool input_pump_events();
+void input_pump_events();
+
 bool input_is_mouse_button_pressed(uint8_t button);
 bool input_is_mouse_button_just_pressed(uint8_t button);
 bool input_is_mouse_button_just_released(uint8_t button);

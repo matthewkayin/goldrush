@@ -91,6 +91,8 @@ struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
 
+    bool is_running = false;
+
     // Input state
     bool mouse_button_state[INPUT_MOUSE_BUTTON_COUNT];
     bool mouse_button_previous_state[INPUT_MOUSE_BUTTON_COUNT];
@@ -202,6 +204,7 @@ bool engine_init(ivec2 window_size) {
         SDL_FreeSurface(sprite_surface);
     }
 
+    engine.is_running = true;
     log_info("%s initialized.", APP_NAME);
     return true;
 }
@@ -224,8 +227,12 @@ void engine_quit() {
     logger_quit();
 }
 
-uint32_t engine_get_ticks() {
-    return SDL_GetTicks();
+bool engine_is_running() {
+    return engine.is_running;
+}
+
+void engine_set_running(bool value) {
+    engine.is_running = value;
 }
 
 // SPRITE
@@ -267,14 +274,14 @@ void animation_t::update() {
 
 // INPUT
 
-bool input_pump_events() {
+void input_pump_events() {
     memcpy(engine.mouse_button_previous_state, engine.mouse_button_state, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         // Handle quit
         if (event.type == SDL_QUIT) {
-            return false;
+            engine.is_running = false;
         }
         // Capture mouse
         if (SDL_GetWindowGrab(engine.window) == SDL_FALSE) {
@@ -313,8 +320,6 @@ bool input_pump_events() {
             break;
         }
     }
-
-    return true;
 }
 
 bool input_is_mouse_button_pressed(uint8_t button) {
