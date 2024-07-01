@@ -101,7 +101,6 @@ void input_flush() {
     uint8_t current_player_id = network_get_player_id();
     out_buffer[1] = current_player_id;
     out_buffer_length = 2;
-    log_info("sending outputs, player_id: %u", current_player_id);
 
     // Serialize the inputs
     for (const input_t& input : state.input_queue) {
@@ -115,7 +114,7 @@ void input_flush() {
                 out_buffer[out_buffer_length] = input.move.unit_count;
                 out_buffer_length += 1;
 
-                memcpy(out_buffer + 1, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
+                memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
                 out_buffer_length += input.move.unit_count * sizeof(uint8_t);
                 break;
             }
@@ -137,6 +136,8 @@ void input_flush() {
 void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
     std::vector<input_t> tick_inputs;
 
+    log_info("deserializing. in_buffer[0] %z in_buffer[1] %z", in_buffer[0], in_buffer[1]);
+
     uint8_t in_player_id = in_buffer[1];
     size_t in_buffer_head = 2;
 
@@ -144,14 +145,18 @@ void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
         input_t input;
         input.type = in_buffer[in_buffer_head];
         in_buffer_head++;
+        log_info("input.type: %u buffer head is now %z", input.type, in_buffer_head);
 
         switch (input.type) {
             case INPUT_MOVE: {
                 memcpy(&input.move.target_position, in_buffer + in_buffer_head, sizeof(vec2));
                 in_buffer_head += sizeof(vec2);
+                log_info("target pos %d,%d buffer head: %z", input.move.target_position.x, input.move.target_position.y, in_buffer_head);
+                log_info("buffer: %b", in_buffer + in_buffer_head, in_buffer_length - in_buffer_head);
 
                 input.move.unit_count = in_buffer[in_buffer_head];
-                memcpy(input.move.unit_ids, in_buffer + 1, input.move.unit_count * sizeof(uint8_t));
+                memcpy(input.move.unit_ids, in_buffer + in_buffer_head + 1, input.move.unit_count * sizeof(uint8_t));
+                log_info("move.unit_count: %u move.unit_ids: %b", input.move.unit_count, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
                 in_buffer_head += 1 + input.move.unit_count;
             }
             default:
@@ -207,12 +212,20 @@ void match_init() {
         }
         state.units[player_id].reserve(MAX_UNITS);
     }
+
     state.units[0].push_back(unit_t());
     state.units[0][0].position = vec2(fixed::from_int(16), fixed::from_int(32));
     state.units[0].push_back(unit_t());
     state.units[0][1].position = vec2(fixed::from_int(32), fixed::from_int(48));
     state.units[0].push_back(unit_t());
     state.units[0][2].position = vec2(fixed::from_int(64), fixed::from_int(16));
+
+    state.units[1].push_back(unit_t());
+    state.units[1][0].position = vec2(fixed::from_int(128), fixed::from_int(32));
+    state.units[1].push_back(unit_t());
+    state.units[1][1].position = vec2(fixed::from_int(128 + 32), fixed::from_int(48));
+    state.units[1].push_back(unit_t());
+    state.units[1][2].position = vec2(fixed::from_int(128 + 64), fixed::from_int(16));
 
     // Init cell grid
     /*

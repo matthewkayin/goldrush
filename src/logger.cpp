@@ -74,13 +74,28 @@ void logger_output(bool is_error, const char* message, ...) {
                 out_ptr += sprintf(out_ptr, "%i.%i", fp.integer_part(), fp.fractional_value());
                 break;
             }
-            case 'x': {
-                out_ptr += sprintf(out_ptr, "%x", va_arg(arg_ptr, unsigned int));
+            case 'b': {
+                uint8_t* data = va_arg(arg_ptr, uint8_t*);
+                size_t length = va_arg(arg_ptr, size_t);
+
+                static char str[1024];
+                char* str_ptr = str;
+                for (size_t i = 0; i < length; i++) {
+                    sprintf(str_ptr, " %02x", data[i]);
+                    str_ptr += 3;
+                }
+                str_ptr[0] = '\0';
+                
+                out_ptr += sprintf(out_ptr, "%s", str);
                 break;
             }
             case 'r': {
                 rect_t* r = va_arg(arg_ptr, rect_t*);
                 out_ptr += sprintf(out_ptr, "<%i %i %i %i>", r->position.x, r->position.y, r->size.x, r->size.y);
+                break;
+            }
+            case 'z': {
+                out_ptr += sprintf(out_ptr, "%zu", va_arg(arg_ptr, size_t));
                 break;
             }
         }

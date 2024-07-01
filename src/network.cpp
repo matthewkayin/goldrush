@@ -70,19 +70,9 @@ struct message_match_start_t {
     const uint8_t type = MESSAGE_MATCH_START;
 };
 
-char* message_data_to_string(uint8_t* data, size_t length) {
-    char* str = (char*)malloc(((3 * length) + 1) * sizeof(char));
-    char* str_ptr = str;
-    for (size_t i = 0; i < length; i++) {
-        sprintf(str_ptr, " %02x", data[i]);
-        str_ptr += 3;
-    }
-    str_ptr[0] = '\0';
-    return str;
-}
-
 void network_event_enqueue(const network_event_t& event);
-void server_handle_message(uint8_t* data, size_t lenght, uint8_t player_id);
+void network_event_input_message_enqueue(uint8_t* data, size_t length);
+void server_handle_message(uint8_t* data, size_t length, uint8_t player_id);
 void server_broadcast_playerlist();
 void client_handle_message(uint8_t* data, size_t length);
 
@@ -204,9 +194,7 @@ void network_service() {
                 break;
             }
             case ENET_EVENT_TYPE_RECEIVE: {
-                char* data_str = message_data_to_string(event.packet->data, event.packet->dataLength);
-                log_info("received message %s/%u", data_str, event.packet->dataLength);
-                free(data_str);
+                log_info("received message %b", event.packet->data, event.packet->dataLength);
 
                 // Implicit: don't handle / throw away any events if status CONNECTING or DISCONNECTING
                 if (state.status == NETWORK_STATUS_SERVER) {
@@ -241,6 +229,14 @@ void network_event_enqueue(const network_event_t& event) {
     uint32_t index = (state.event_queue_head + state.event_queue_count) % EVENT_QUEUE_SIZE;
     state.event_queue[index] = event;
     state.event_queue_count++;
+}
+
+void network_event_input_message_enqueue(uint8_t* data, size_t length) {
+    network_event_t network_event;
+    network_event.type = NETWORK_EVENT_INPUT;
+    network_event.input.data_length = length;
+    memcpy(network_event.input.data, data, network_event.input.data_length);
+    network_event_enqueue(network_event);
 }
 
 // SERVER
@@ -303,11 +299,7 @@ void server_handle_message(uint8_t* data, size_t length, uint8_t player_id) {
         }
         case MESSAGE_INPUT: {
             // Send the message to the game
-            network_event_t network_event;
-            network_event.type = NETWORK_EVENT_INPUT;
-            network_event.input.data_length = length;
-            memcpy(network_event.input.data, data, length);
-            network_event_enqueue(network_event);
+            network_event_input_message_enqueue(data, length);
 
             // Relay the message to other clients, skipping player_id 0 because that is the server
             for (uint8_t relay_player_id = 1; relay_player_id < MAX_PLAYERS; relay_player_id++) {
@@ -357,7 +349,6 @@ void network_server_send_input(uint8_t* data, size_t data_length) {
     ENetPacket* packet = enet_packet_create(data, data_length * sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
-    log_info("server sent input");
 }
 
 // CLIENT
@@ -426,12 +417,7 @@ void client_handle_message(uint8_t* data, size_t length) {
             break;
         }
         case MESSAGE_INPUT: {
-            network_event_t network_event;
-            network_event.type = NETWORK_EVENT_INPUT;
-            network_event.input.data_length = length;
-            memcpy(network_event.input.data, data, length);
-            network_event_enqueue(network_event);
-
+            network_event_input_message_enqueue(data, length);
             break;
         }
         default:
