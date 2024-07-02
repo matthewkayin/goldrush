@@ -73,97 +73,16 @@ struct match_state_t {
     int map_width;
     int map_height;
 
-    /*
     std::vector<bool> cell_is_blocked;
     int cell_width;
     int cell_height;
-    */
 
     std::vector<unit_t> units[MAX_PLAYERS];
 };
 static match_state_t state;
 
-void input_flush() {
-    static const uint32_t INPUT_MAX_SIZE = 201;
-
-    static uint8_t out_buffer[INPUT_BUFFER_SIZE];
-    static size_t out_buffer_length;
-
-    // Always send at least 1 input per tick
-    if (state.input_queue.empty()) {
-        input_t empty_input;
-        empty_input.type = INPUT_NONE;
-        state.input_queue.push_back(empty_input);
-    }
-
-    // Assert that the out buffer is big enough
-    GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * state.input_queue.size()));
-
-    // Leave a space in the buffer for the network message type
-    uint8_t current_player_id = network_get_player_id();
-    out_buffer[1] = current_player_id;
-    out_buffer_length = 2;
-
-    // Serialize the inputs
-    for (const input_t& input : state.input_queue) {
-        out_buffer[out_buffer_length] = input.type;
-        out_buffer_length++;
-        switch (input.type) {
-            case INPUT_MOVE: {
-                memcpy(out_buffer + out_buffer_length, &input.move.target_position, sizeof(vec2));
-                out_buffer_length += sizeof(vec2);
-
-                out_buffer[out_buffer_length] = input.move.unit_count;
-                out_buffer_length += 1;
-
-                memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
-                out_buffer_length += input.move.unit_count * sizeof(uint8_t);
-                break;
-            }
-            default:
-                break;
-        }
-    }
-    state.inputs[current_player_id].push_back(state.input_queue);
-    state.input_queue.clear();
-
-    // Send them to other players
-    if (network_is_server()) {
-        network_server_send_input(out_buffer, out_buffer_length);
-    } else {
-        network_client_send_input(out_buffer, out_buffer_length);
-    }
-}
-
-void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
-    std::vector<input_t> tick_inputs;
-
-    uint8_t in_player_id = in_buffer[1];
-    size_t in_buffer_head = 2;
-
-    while (in_buffer_head < in_buffer_length) {
-        input_t input;
-        input.type = in_buffer[in_buffer_head];
-        in_buffer_head++;
-
-        switch (input.type) {
-            case INPUT_MOVE: {
-                memcpy(&input.move.target_position, in_buffer + in_buffer_head, sizeof(vec2));
-                in_buffer_head += sizeof(vec2);
-
-                input.move.unit_count = in_buffer[in_buffer_head];
-                memcpy(input.move.unit_ids, in_buffer + in_buffer_head + 1, input.move.unit_count * sizeof(uint8_t));
-                in_buffer_head += 1 + input.move.unit_count;
-            }
-            default:
-                break;
-        }
-
-        tick_inputs.push_back(input);
-    }
-
-    state.inputs[in_player_id].push_back(tick_inputs);
-}
+void input_flush();
+void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length);
 
 void match_init() {
     // Init input queues
@@ -224,21 +143,13 @@ void match_init() {
     state.units[1][2].position = vec2(fixed::from_int(128 + 64), fixed::from_int(16));
 
     // Init cell grid
-    /*
     state.cell_width = state.map_width * (TILE_SIZE / CELL_SIZE);
     state.cell_height = state.map_height * (TILE_SIZE / CELL_SIZE);
     state.cell_is_blocked = std::vector<bool>(state.cell_width * state.cell_height, false);
     for (unit_t& unit : state.units[0]) {
-        ivec2 start_cell = ivec2(unit.position.x.integer_part(), unit.position.y.integer_part()) / CELL_SIZE;
-        ivec2 end_cell = ivec2(std::min(start_cell.x + unit.cell_size.x, state.cell_width - 1), std::min(start_cell.y + unit.cell_size.y, state.cell_height - 1));
-
-        for (int cell_y = start_cell.y; cell_y < end_cell.y; cell_y++) {
-            for (int cell_x = start_cell.x; cell_x < end_cell.x; cell_x++) {
-                state.cell_is_blocked[cell_x + (cell_y * state.cell_width)] = true;
-            }
-        }
+        ivec2 cell = ivec2(unit.position.x.integer_part() / CELL_SIZE, unit.position.y.integer_part() / CELL_SIZE);
+        state.cell_is_blocked[cell.x + (cell.y * state.cell_width)] = true;
     }
-    */
 }
 
 void match_handle_input(uint8_t player_id, const input_t& input) {
@@ -373,32 +284,25 @@ void match_update() {
             if (unit.target_position.x.integer_part() == -1 && unit.target_position.y.integer_part() == -1) {
                 continue;
             }
-            // unit.animation.update();
-            fixed step = fixed::from_int(2);
+            fixed step_size = fixed::from_int(2);
             fixed distance = unit.position.distance_to(unit.target_position);
-            vec2 old_position = unit.position;
-            if (distance < step) {
+            if (distance <= step_size) {
                 unit.position = unit.target_position;
                 unit.target_position = vec2(fixed::from_int(-1), fixed::from_int(-1));
-                unit.animation.stop();
-                unit.animation.frame.x = 0;
             } else {
-                // vec2 velocity = unit.position.direction_to(unit.target_position) * step;
-                // velocity.x = fixed::from_int(fixed::round(velocity.x));
-                // velocity.y = fixed::from_int(fixed::round(velocity.y));
-                unit.position += unit.position.direction_to(unit.target_position) * step;
-            }
-            vec2 actual_step = unit.position - old_position;
-            if (actual_step.x.raw_value != 0 || actual_step.y.raw_value != 0) {
-                if (fixed::abs(actual_step.x) > fixed::abs(actual_step.y)) {
-                    fixed x = fixed::from_int(fixed::round(unit.position.x));
-                    unit.position.y = fixed::from_int(fixed::round(unit.position.y + (x - unit.position.x) * actual_step.y / actual_step.x));
+                vec2 velocity = unit.position.direction_to(unit.target_position) * step_size;
+                unit.position += velocity;
+                if (fixed::abs(velocity.x) > fixed::abs(velocity.y)) {
+                    fixed x = fixed::round(unit.position.x);
+                    unit.position.y = fixed::round(unit.position.y + (x - unit.position.x) * velocity.y / velocity.x);
+                    unit.position.x = x;
                 } else {
-                    fixed y = fixed::from_int(fixed::round(unit.position.y));
-                    unit.position.x = fixed::from_int(fixed::round(unit.position.x + (y - unit.position.y) * actual_step.x / actual_step.y));
+                    fixed y = fixed::round(unit.position.y);
+                    unit.position.x = fixed::round(unit.position.x + (y - unit.position.y) * velocity.x / velocity.y);
+                    unit.position.y = y;
                 }
+                log_info("pos %d,%d", unit.position.x, unit.position.y);
             }
-            log_info("step: %d,%d position: %d,%d", actual_step.x, actual_step.y, unit.position.x, unit.position.y);
         }
     }
 }
@@ -440,4 +344,86 @@ void match_render() {
     if (state.is_selecting) {
         render_rect(rect_t(state.select_rect.position - state.camera_offset, state.select_rect.size), COLOR_WHITE);
     }
+}
+
+void input_flush() {
+    static const uint32_t INPUT_MAX_SIZE = 201;
+
+    static uint8_t out_buffer[INPUT_BUFFER_SIZE];
+    static size_t out_buffer_length;
+
+    // Always send at least 1 input per tick
+    if (state.input_queue.empty()) {
+        input_t empty_input;
+        empty_input.type = INPUT_NONE;
+        state.input_queue.push_back(empty_input);
+    }
+
+    // Assert that the out buffer is big enough
+    GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * state.input_queue.size()));
+
+    // Leave a space in the buffer for the network message type
+    uint8_t current_player_id = network_get_player_id();
+    out_buffer[1] = current_player_id;
+    out_buffer_length = 2;
+
+    // Serialize the inputs
+    for (const input_t& input : state.input_queue) {
+        out_buffer[out_buffer_length] = input.type;
+        out_buffer_length++;
+        switch (input.type) {
+            case INPUT_MOVE: {
+                memcpy(out_buffer + out_buffer_length, &input.move.target_position, sizeof(vec2));
+                out_buffer_length += sizeof(vec2);
+
+                out_buffer[out_buffer_length] = input.move.unit_count;
+                out_buffer_length += 1;
+
+                memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
+                out_buffer_length += input.move.unit_count * sizeof(uint8_t);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    state.inputs[current_player_id].push_back(state.input_queue);
+    state.input_queue.clear();
+
+    // Send them to other players
+    if (network_is_server()) {
+        network_server_send_input(out_buffer, out_buffer_length);
+    } else {
+        network_client_send_input(out_buffer, out_buffer_length);
+    }
+}
+
+void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
+    std::vector<input_t> tick_inputs;
+
+    uint8_t in_player_id = in_buffer[1];
+    size_t in_buffer_head = 2;
+
+    while (in_buffer_head < in_buffer_length) {
+        input_t input;
+        input.type = in_buffer[in_buffer_head];
+        in_buffer_head++;
+
+        switch (input.type) {
+            case INPUT_MOVE: {
+                memcpy(&input.move.target_position, in_buffer + in_buffer_head, sizeof(vec2));
+                in_buffer_head += sizeof(vec2);
+
+                input.move.unit_count = in_buffer[in_buffer_head];
+                memcpy(input.move.unit_ids, in_buffer + in_buffer_head + 1, input.move.unit_count * sizeof(uint8_t));
+                in_buffer_head += 1 + input.move.unit_count;
+            }
+            default:
+                break;
+        }
+
+        tick_inputs.push_back(input);
+    }
+
+    state.inputs[in_player_id].push_back(tick_inputs);
 }
