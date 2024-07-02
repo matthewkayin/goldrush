@@ -10,7 +10,6 @@
 #include <cstdio>
 #include <string>
 
-// const uint32_t UPDATE_TIME = 1000 / 60;
 const double UPDATE_TIME = 1.0 / 60.0;
 
 enum Mode {

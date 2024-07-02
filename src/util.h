@@ -48,18 +48,18 @@ struct fixed {
         return ((raw_value & fractional_mask) * 1000) / scale_factor;
     }
 
-    fixed floor() const {
-        return from_int(integer_part());
-    }
-    fixed ceil() const {
-        return from_int(integer_part() + 1);
-    }
-    fixed abs() const {
-        return *this >= from_int(0) ? *this : from_raw(-raw_value);
-    }
-
     static fixed sqrt(const fixed& value) {
         return from_raw((int32_t)sqrt_i64(((int64_t)value.raw_value) << fractional_bits));
+    }
+    static int32_t round(const fixed& value) {
+        int32_t result = value.integer_part();
+        if (value.fractional_part() >= scale_factor / 2) {
+            result += value.raw_value > 0 ? 1 : -1;
+        }
+        return result;
+    }
+    static fixed abs(const fixed& value) {
+        return value.raw_value < 0 ? from_raw(-value.raw_value) : from_raw(value.raw_value);
     }
 
     bool operator==(const fixed& other) const {

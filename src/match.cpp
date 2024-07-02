@@ -383,9 +383,21 @@ void match_update() {
                 unit.animation.stop();
                 unit.animation.frame.x = 0;
             } else {
+                // vec2 velocity = unit.position.direction_to(unit.target_position) * step;
+                // velocity.x = fixed::from_int(fixed::round(velocity.x));
+                // velocity.y = fixed::from_int(fixed::round(velocity.y));
                 unit.position += unit.position.direction_to(unit.target_position) * step;
             }
             vec2 actual_step = unit.position - old_position;
+            if (actual_step.x.raw_value != 0 || actual_step.y.raw_value != 0) {
+                if (fixed::abs(actual_step.x) > fixed::abs(actual_step.y)) {
+                    fixed x = fixed::from_int(fixed::round(unit.position.x));
+                    unit.position.y = fixed::from_int(fixed::round(unit.position.y + (x - unit.position.x) * actual_step.y / actual_step.x));
+                } else {
+                    fixed y = fixed::from_int(fixed::round(unit.position.y));
+                    unit.position.x = fixed::from_int(fixed::round(unit.position.x + (y - unit.position.y) * actual_step.x / actual_step.y));
+                }
+            }
             log_info("step: %d,%d position: %d,%d", actual_step.x, actual_step.y, unit.position.x, unit.position.y);
         }
     }
