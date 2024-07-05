@@ -50,6 +50,13 @@ struct sprite_params_t {
     int v_frames;
 };
 
+struct sprite_t {
+    SDL_Texture* texture;
+    ivec2 frame_size;
+    int h_frames;
+    int v_frames;
+};
+
 static const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     { SPRITE_TILES, (sprite_params_t) {
         .path = "sprite/tiles.png",
@@ -62,21 +69,10 @@ static const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .v_frames = 1
     }},
     { SPRITE_UNIT_MINER, (sprite_params_t) {
-        .path = "sprite/unit_miner_side.png",
-        .h_frames = 2,
-        .v_frames = 1
+        .path = "sprite/unit_miner.png",
+        .h_frames = 8,
+        .v_frames = 4
     }}  
-};
-
-struct sprite_t {
-    SDL_Texture* texture;
-    ivec2 frame_size;
-    int h_frames;
-    int v_frames;
-};
-
-static const std::unordered_map<uint32_t, uint32_t> animation_frame_duration = {
-    { SPRITE_UNIT_MINER, 8 }
 };
 
 SDL_Rect rect_to_sdl(const rect_t& r) {
@@ -239,37 +235,6 @@ void engine_set_running(bool value) {
 
 ivec2 sprite_get_frame_size(Sprite sprite) {
     return engine.sprites[sprite].frame_size;
-}
-
-animation_t::animation_t(Sprite sprite) {
-    this->sprite = sprite;
-    frame = ivec2(0, 0);
-    is_playing = false;
-
-    // A little check to make sure I don't forget to specify the frame duration
-    auto it = animation_frame_duration.find(sprite);
-    GOLD_ASSERT(it != animation_frame_duration.end());
-}
-
-void animation_t::start() {
-    is_playing = true;
-    timer = animation_frame_duration.at(sprite);
-}
-
-void animation_t::stop() {
-    is_playing = false;
-}
-
-void animation_t::update() {
-    if (!is_playing) {
-        return;
-    }
-
-    timer--;
-    if (timer == 0) {
-        frame.x = (frame.x + 1) % engine.sprites[sprite].h_frames;
-        timer = animation_frame_duration.at(sprite);
-    }
 }
 
 // INPUT
@@ -456,7 +421,7 @@ void render_map(ivec2 camera_offset, int* tiles, int map_width, int map_height) 
     }
 }
 
-void render_sprite(ivec2 camera_offset, Sprite sprite, ivec2 frame, vec2 position) {
+void render_sprite(ivec2 camera_offset, Sprite sprite, const ivec2& frame, const vec2& position, bool centered) {
     SDL_Rect src_rect = (SDL_Rect) { 
         .x = frame.x * engine.sprites[sprite].frame_size.x, .y = frame.y * engine.sprites[sprite].frame_size.y, 
         .w = engine.sprites[sprite].frame_size.x, .h = engine.sprites[sprite].frame_size.y };
@@ -467,9 +432,9 @@ void render_sprite(ivec2 camera_offset, Sprite sprite, ivec2 frame, vec2 positio
     if (dst_rect.x + dst_rect.w < 0 || dst_rect.x > SCREEN_WIDTH || dst_rect.y + dst_rect.h > SCREEN_HEIGHT || dst_rect.y < 0) {
         return;
     }
+    if (centered) {
+        dst_rect.x -= (dst_rect.w / 2);
+        dst_rect.y -= (dst_rect.h / 2);
+    }
     SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
-}
-
-void render_sprite_animation(ivec2 camera_offset, animation_t animation, vec2 position) {
-    render_sprite(camera_offset, animation.sprite, animation.frame, position);
 }

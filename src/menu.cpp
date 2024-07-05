@@ -18,7 +18,7 @@ static const int TEXT_INPUT_WIDTH = 264;
 static const int TEXT_INPUT_HEIGHT = 35;
 static const rect_t TEXT_INPUT_RECT = rect_t(ivec2((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
                                               ivec2(TEXT_INPUT_WIDTH, TEXT_INPUT_HEIGHT));
-static const rect_t PLAYERLIST_RECT = rect_t(ivec2(24, 32), ivec2(384, 242));
+static const rect_t PLAYERLIST_RECT = rect_t(ivec2(24, 32), ivec2(384, 242 / 2));
 static const uint32_t STATUS_TIMER_DURATION = 60;
 
 static const int BUTTON_Y = 232;

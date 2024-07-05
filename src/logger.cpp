@@ -96,6 +96,22 @@ void logger_output(bool is_error, const char* message, ...) {
                 out_ptr += sprintf(out_ptr, "%zu", va_arg(arg_ptr, size_t));
                 break;
             }
+            case 'v': {
+                message++;
+                switch (*message) {
+                    case 'i': {
+                        ivec2* v = va_arg(arg_ptr, ivec2*);
+                        out_ptr += sprintf(out_ptr, "<%i, %i>", v->x, v->y);
+                        break;
+                    }
+                    case 'f': {
+                        vec2* v = va_arg(arg_ptr, vec2*);
+                        out_ptr += sprintf(out_ptr, "<%i.%i, %i.%i>", v->x.integer_part(), v->x.fractional_value(), v->y.integer_part(), v->y.fractional_value());
+                        break;
+                    }
+                }
+                break;
+            }
         }
 
         message++;

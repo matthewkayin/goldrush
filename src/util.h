@@ -30,12 +30,16 @@ struct fixed {
     static const size_t total_bits = integer_bits + fractional_bits;
     int32_t raw_value;
 
+    static fixed from_int(int32_t integer_value) {
+        return (fixed) { .raw_value = integer_value << fractional_bits };
+    }
+
     static constexpr fixed from_raw(int32_t raw_value) {
         return (fixed) { .raw_value = raw_value };
     }
-
-    static fixed from_int(int32_t integer_value) {
-        return (fixed) { .raw_value = integer_value << fractional_bits };
+    fixed& operator=(int32_t value) {
+        raw_value = value << fractional_bits;
+        return *this;
     }
 
     int32_t integer_part() const {
@@ -59,7 +63,7 @@ struct fixed {
         return result;
     }
     static fixed round(const fixed& value) {
-        return from_int(roundi(value));
+        return fixed::from_int(roundi(value));
     }
     static fixed abs(const fixed& value) {
         return value.raw_value < 0 ? from_raw(-value.raw_value) : from_raw(value.raw_value);
@@ -146,6 +150,9 @@ struct ivec2 {
     ivec2 operator*(int scaler) const {
         return ivec2(x * scaler, y * scaler);
     }
+    ivec2 operator/(int scaler) const {
+        return ivec2(x / scaler, y / scaler);
+    }
 };
 
 struct vec2 {
@@ -188,6 +195,9 @@ struct vec2 {
         uint64_t length_squared = (x64 * x64) + (y64 * y64);
         return fixed::from_raw((int32_t)sqrt_i64(length_squared) << fixed::fractional_bits);
     }
+    fixed length_squared() const {
+        return (x * x) + (y * y);
+    }
     vec2 normalized() const {
         fixed _length = length();
         if (_length.raw_value == 0) {
@@ -218,4 +228,36 @@ struct rect_t {
                  position.y > other.position.y + other.size.y ||
                  other.position.y > position.y + size.y);
     }
+};
+
+enum Direction {
+    DIRECTION_NORTH,
+    DIRECTION_NORTHEAST,
+    DIRECTION_EAST,
+    DIRECTION_SOUTHEAST,
+    DIRECTION_SOUTH,
+    DIRECTION_SOUTHWEST,
+    DIRECTION_WEST,
+    DIRECTION_NORTHWEST,
+    DIRECTION_COUNT
+};
+const ivec2 DIRECTION_IVEC2[8] = {
+    ivec2(0, -1), // North
+    ivec2(1, -1), // Northeast
+    ivec2(1, 0), // East
+    ivec2(1, 1), // Southeast
+    ivec2(0, 1), // South
+    ivec2(-1, 1), // Southwest
+    ivec2(-1, 0), // West
+    ivec2(-1, -1), // Northwest
+};
+const vec2 DIRECTION_VEC2[8] = {
+    vec2(fixed::from_int(0), fixed::from_int(-1)), // North
+    vec2(fixed::from_int(1), fixed::from_int(-1)).normalized(), // Northeast
+    vec2(fixed::from_int(1), fixed::from_int(0)), // East
+    vec2(fixed::from_int(1), fixed::from_int(1)).normalized(), // Southeast
+    vec2(fixed::from_int(0), fixed::from_int(1)), // South
+    vec2(fixed::from_int(-1), fixed::from_int(1)).normalized(), // Southwest
+    vec2(fixed::from_int(-1), fixed::from_int(0)), // West
+    vec2(fixed::from_int(-1), fixed::from_int(-1)).normalized() // Northwest
 };
