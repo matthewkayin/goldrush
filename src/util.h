@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cmath>
 
 // from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
 // sqrt_i64 computes the squrare root of a 64bit integer and returns
@@ -153,14 +154,19 @@ struct ivec2 {
     ivec2 operator/(int scaler) const {
         return ivec2(x / scaler, y / scaler);
     }
+    static int manhattan_distance(const ivec2& a, const ivec2& b) {
+        return abs(a.x - b.x) + abs(a.y - b.y);
+    }
 };
 
+#include "logger.h"
 struct vec2 {
     fixed x;
     fixed y;
 
     vec2() = default;
     vec2(fixed x, fixed y) : x(x), y(y) {}
+    vec2(const ivec2& other) : x(fixed::from_int(other.x)), y(fixed::from_int(other.y)) {}
     bool operator==(const vec2& other) const {
         return this->x == other.x && this->y == other.y;
     }
@@ -190,20 +196,19 @@ struct vec2 {
         return vec2(x / scaler, y / scaler);
     }
     fixed length() const {
-        uint64_t x64 = (uint64_t)(x.raw_value < 0 ? -x.integer_part() : x.integer_part());
-        uint64_t y64 = (uint64_t)(y.raw_value < 0 ? -y.integer_part() : y.integer_part());
+        int64_t x64 = x.raw_value;
+        int64_t y64 = y.raw_value;
         uint64_t length_squared = (x64 * x64) + (y64 * y64);
-        return fixed::from_raw((int32_t)sqrt_i64(length_squared) << fixed::fractional_bits);
-    }
-    fixed length_squared() const {
-        return (x * x) + (y * y);
+        return fixed::from_raw((int32_t)sqrt_i64(length_squared));
     }
     vec2 normalized() const {
         fixed _length = length();
+        // fixed _length = length();
         if (_length.raw_value == 0) {
             return vec2(fixed::from_raw(0), fixed::from_raw(0));
         }
-        return vec2(x / _length, y / _length);
+        vec2 result = vec2(x / _length, y / _length);
+        return result;
     }
     vec2 direction_to(const vec2& other) const {
         return (other - *this).normalized();
@@ -251,13 +256,19 @@ const ivec2 DIRECTION_IVEC2[8] = {
     ivec2(-1, 0), // West
     ivec2(-1, -1), // Northwest
 };
+
+/*
+ * Quick note: vec2(1,1).normalized() in the diagonal direction would result in vec2(0.707,0.707)
+ * To create a fixed with value .707, we take the fractional scale 256 * .707 = 181
+*/
+
 const vec2 DIRECTION_VEC2[8] = {
     vec2(fixed::from_int(0), fixed::from_int(-1)), // North
-    vec2(fixed::from_int(1), fixed::from_int(-1)).normalized(), // Northeast
+    vec2(fixed::from_raw(181), fixed::from_raw(-181)), // Northeast
     vec2(fixed::from_int(1), fixed::from_int(0)), // East
-    vec2(fixed::from_int(1), fixed::from_int(1)).normalized(), // Southeast
+    vec2(fixed::from_raw(181), fixed::from_raw(181)), // Southeast
     vec2(fixed::from_int(0), fixed::from_int(1)), // South
-    vec2(fixed::from_int(-1), fixed::from_int(1)).normalized(), // Southwest
+    vec2(fixed::from_raw(-181), fixed::from_raw(181)), // Southwest
     vec2(fixed::from_int(-1), fixed::from_int(0)), // West
-    vec2(fixed::from_int(-1), fixed::from_int(-1)).normalized() // Northwest
+    vec2(fixed::from_raw(-181), fixed::from_raw(-181)) // Northwest
 };

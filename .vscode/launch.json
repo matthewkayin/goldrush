@@ -8,7 +8,7 @@
             "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--resolution",
-                "1280x720"
+                "960x540"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",

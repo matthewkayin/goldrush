@@ -25,10 +25,10 @@ struct unit_t {
     int direction;
     vec2 position;
     vec2 target_position;
-
-    ivec2 target_cell;
     ivec2 cell;
     std::vector<ivec2> path;
+    uint32_t path_timer;
+    static const uint32_t path_pause_duration = 60;
 
     ivec2 animation_frame;
     uint32_t animation_timer;
@@ -74,9 +74,9 @@ struct match_state_t {
     rect_t select_rect;
 
     std::vector<int> map_tiles;
-    std::vector<bool> cell_is_blocked;
     int map_width;
     int map_height;
+    std::vector<bool> cell_is_blocked;
 
     std::vector<unit_t> units[MAX_PLAYERS];
 };
@@ -88,6 +88,7 @@ void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length);
 vec2 cell_center_position(ivec2 cell);
 void unit_spawn(uint8_t player_id, ivec2 cell);
 void unit_try_move(unit_t& unit);
+void unit_update(unit_t& unit);
 std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
 
 void match_init() {
@@ -145,9 +146,40 @@ void match_init() {
 void match_handle_input(uint8_t player_id, const input_t& input) {
     switch (input.type) {
         case INPUT_MOVE: {
+            // Calculate unit group info
+            ivec2 first_unit_cell = state.units[player_id][input.move.unit_ids[0]].cell;
+            ivec2 group_center = first_unit_cell;
+            ivec2 group_min = first_unit_cell;
+            ivec2 group_max = first_unit_cell;
+            for (uint32_t i = 1; i < input.move.unit_count; i++) {
+                unit_t& unit = state.units[player_id][input.move.unit_ids[i]];
+                group_center += unit.cell;
+                group_min.x = std::min(group_min.x, unit.cell.x);
+                group_min.y = std::min(group_min.y, unit.cell.y);
+                group_max.x = std::max(group_max.x, unit.cell.x);
+                group_max.y = std::max(group_max.y, unit.cell.y);
+            }
+            group_center = group_center / input.move.unit_count;
+            bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
+
             for (uint32_t i = 0; i < input.move.unit_count; i++) {
                 unit_t& unit = state.units[player_id][input.move.unit_ids[i]];
-                unit.path = pathfind(unit.is_moving ? unit.target_cell : unit.cell, input.move.target_cell);
+
+                // Determine the unit's target
+                ivec2 offset = unit.cell - group_center;
+                ivec2 unit_target = input.move.target_cell + offset;
+                bool is_target_invalid = is_target_inside_group || unit_target.x < 0 || unit_target.x >= state.map_width || unit_target.y < 0 || unit_target.y >= state.map_height ||
+                                         ivec2::manhattan_distance(unit_target, input.move.target_cell) > 3 || state.cell_is_blocked[unit_target.x + (unit_target.y * state.map_width)];
+                if (is_target_invalid) {
+                    unit_target = input.move.target_cell;
+                }
+
+                // Don't bother pathfinding to the same cell
+                if (unit_target == unit.cell) {
+                    continue;
+                }
+                // Path to the target
+                unit.path = pathfind(unit.cell, unit_target);
             }
             break;
         }
@@ -271,58 +303,7 @@ void match_update() {
     // Unit update
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (unit_t& unit : state.units[player_id]) {
-            if (!unit.is_moving && !unit.path.empty()) {
-                unit_try_move(unit);
-                if (unit.is_moving) {
-                    unit.animation_frame.x = 1;
-                    unit.animation_timer = unit.animation_frame_duration;
-                }
-            }
-            if (unit.is_moving) {
-                fixed movement_left = fixed::from_int(1);
-                while (movement_left.raw_value > 0) {
-                    fixed distance_to_target = unit.position.distance_to(unit.target_position);
-                    if (distance_to_target > movement_left) {
-                        unit.position += DIRECTION_VEC2[unit.direction] * movement_left;
-                        movement_left = 0;
-                    } else {
-                        unit.position = unit.target_position;
-                        state.cell_is_blocked[unit.cell.x + (unit.cell.y * state.map_width)] = false;
-                        unit.cell = unit.target_cell;
-                        unit.is_moving = false;
-                        movement_left -= distance_to_target;
-                        if (!unit.path.empty()) {
-                            unit_try_move(unit);
-                        }
-                        if (!unit.is_moving) {
-                            movement_left.raw_value = 0;
-                        }
-                    }
-                }
-            }
-
-            if (!unit.is_moving) {
-                unit.animation_frame.x = 0;
-            } else {
-                unit.animation_timer--;
-                if (unit.animation_timer == 0) {
-                    unit.animation_frame.x++;
-                    if (unit.animation_frame.x == 5) {
-                        unit.animation_frame.x = 1;
-                    }
-                    unit.animation_timer = unit.animation_frame_duration;
-                }
-            }
-            if (unit.direction == DIRECTION_NORTH) {
-                unit.animation_frame.y = 1;
-            } else if (unit.direction == DIRECTION_SOUTH) {
-                unit.animation_frame.y = 0;
-            } else if (unit.direction > DIRECTION_SOUTH) {
-                unit.animation_frame.y = 3;
-            } else {
-                unit.animation_frame.y = 2;
-            }
-            // unit.animation.update();
+            unit_update(unit);
         }
     }
 }
@@ -468,11 +449,72 @@ void unit_try_move(unit_t& unit) {
     }
 
     // Set state to begin movement
-    state.cell_is_blocked[next_point.x + (next_point.y * state.map_width)] = true;
-    unit.target_cell = next_point;
-    unit.target_position = cell_center_position(unit.target_cell);
+    state.cell_is_blocked[unit.cell.x + (unit.cell.y * state.map_width)] = false;
+    unit.cell = next_point;
+    state.cell_is_blocked[unit.cell.x + (unit.cell.y * state.map_width)] = true;
+    unit.target_position = cell_center_position(unit.cell);
     unit.path.erase(unit.path.begin());
     unit.is_moving = true;
+    unit.path_timer = 0;
+}
+
+void unit_update(unit_t& unit) {
+    if (!unit.is_moving && !unit.path.empty()) {
+        unit_try_move(unit);
+        if (unit.is_moving) {
+            unit.animation_frame.x = 1;
+            unit.animation_timer = unit.animation_frame_duration;
+        } else if (unit.path_timer == 0) {
+            unit.path_timer = unit.path_pause_duration;
+        }
+    }
+    if (unit.is_moving) {
+        fixed movement_left = fixed::from_int(1);
+        while (movement_left.raw_value > 0) {
+            fixed distance_to_target = unit.position.distance_to(unit.target_position);
+            if (distance_to_target > movement_left) {
+                unit.position += DIRECTION_VEC2[unit.direction] * movement_left;
+                movement_left = 0;
+            } else {
+                unit.position = unit.target_position;
+                unit.is_moving = false;
+                movement_left -= distance_to_target;
+                if (!unit.path.empty()) {
+                    unit_try_move(unit);
+                }
+                if (!unit.is_moving) {
+                    movement_left.raw_value = 0;
+                }
+            }
+        }
+    } else if (!unit.path.empty()) {
+        unit.path_timer--;
+        if (unit.path_timer == 0) {
+            unit.path.clear();
+        }
+    }
+
+    if (!unit.is_moving) {
+        unit.animation_frame.x = 0;
+    } else {
+        unit.animation_timer--;
+        if (unit.animation_timer == 0) {
+            unit.animation_frame.x++;
+            if (unit.animation_frame.x == 5) {
+                unit.animation_frame.x = 1;
+            }
+            unit.animation_timer = unit.animation_frame_duration;
+        }
+    }
+    if (unit.direction == DIRECTION_NORTH) {
+        unit.animation_frame.y = 1;
+    } else if (unit.direction == DIRECTION_SOUTH) {
+        unit.animation_frame.y = 0;
+    } else if (unit.direction > DIRECTION_SOUTH) {
+        unit.animation_frame.y = 3;
+    } else {
+        unit.animation_frame.y = 2;
+    }
 }
 
 std::vector<ivec2> pathfind(ivec2 from, ivec2 to) {
