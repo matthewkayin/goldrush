@@ -33,6 +33,8 @@ enum NetworkEventType {
     NETWORK_EVENT_JOINED_LOBBY,
     NETWORK_EVENT_LOBBY_FULL,
     NETWORK_EVENT_INVALID_VERSION,
+    NETWORK_EVENT_CLIENT_READY,
+    NETWORK_EVENT_MATCH_LOAD,
     NETWORK_EVENT_MATCH_START,
     NETWORK_EVENT_INPUT
 };
@@ -62,7 +64,9 @@ void network_service();
 bool network_poll_events(network_event_t* event);
 
 bool network_server_create(const char* username);
-void network_server_start_game();
+void network_server_broadcast_playerlist();
+void network_server_start_loading();
+void network_server_start_match();
 void network_server_send_input(uint8_t* data, size_t data_length);
 
 bool network_client_create(const char* username, const char* server_ip);

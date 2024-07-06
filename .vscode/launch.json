@@ -33,7 +33,7 @@
                 "--logfile",
                 "player1.log",
                 "--resolution",
-                "640x360"
+                "960x540"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",
@@ -58,7 +58,7 @@
                 "--logfile",
                 "player2.log",
                 "--resolution",
-                "640x360"
+                "960x540"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",
@@ -81,9 +81,7 @@
             "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--logfile",
-                "player3.log",
-                "--resolution",
-                "640x360"
+                "player3.log"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",

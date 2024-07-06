@@ -196,7 +196,11 @@ void menu_update() {
                 menu_set_mode(MENU_MODE_LOBBY);
                 break;
             }
-            case NETWORK_EVENT_MATCH_START: {
+            case NETWORK_EVENT_CLIENT_READY: {
+                network_server_broadcast_playerlist();
+                break;
+            }
+            case NETWORK_EVENT_MATCH_LOAD: {
                 menu_set_mode(MENU_MODE_MATCH_START);
                 break;
             }
@@ -282,7 +286,7 @@ void menu_update() {
                 network_client_toggle_ready();
                 break;
             case MENU_BUTTON_LOBBY_START:
-                network_server_start_game();
+                network_server_start_loading();
                 break;
             default:
                 break;

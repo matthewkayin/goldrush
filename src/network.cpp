@@ -6,6 +6,7 @@
 #include <enet/enet.h>
 #include <cstdint>
 #include <string>
+#include <ctime>
 
 static const uint16_t PORT = 9378;
 static const uint32_t EVENT_QUEUE_SIZE = 16;
@@ -35,6 +36,7 @@ enum MessageType {
     MESSAGE_GREET_RESPONSE,
     MESSAGE_PLAYERLIST,
     MESSAGE_READY,
+    MESSAGE_MATCH_LOAD,
     MESSAGE_MATCH_START,
     MESSAGE_INPUT
 };
@@ -66,6 +68,12 @@ struct message_ready_t {
     const uint8_t type = MESSAGE_READY;
 };
 
+struct message_match_load_t {
+    const uint8_t type = MESSAGE_MATCH_LOAD;
+    uint8_t padding[3];
+    uint32_t random_seed;
+};
+
 struct message_match_start_t {
     const uint8_t type = MESSAGE_MATCH_START;
 };
@@ -73,7 +81,6 @@ struct message_match_start_t {
 void network_event_enqueue(const network_event_t& event);
 void network_event_input_message_enqueue(uint8_t* data, size_t length);
 void server_handle_message(uint8_t* data, size_t length, uint8_t player_id);
-void server_broadcast_playerlist();
 void client_handle_message(uint8_t* data, size_t length);
 
 // GENERAL
@@ -170,7 +177,7 @@ void network_service() {
                     // On client disconnected
                     log_info("player %u disconnected.", event.peer->incomingPeerID + 1);
                     state.players[event.peer->incomingPeerID + 1].status = PLAYER_STATUS_NONE;
-                    server_broadcast_playerlist();
+                    network_server_broadcast_playerlist();
                 } else if (state.status == NETWORK_STATUS_DISCONNECTING) {
                     enet_host_destroy(state.host);
                     state.host = NULL;
@@ -287,15 +294,16 @@ void server_handle_message(uint8_t* data, size_t length, uint8_t player_id) {
             ENetPacket* packet = enet_packet_create(&response, sizeof(message_greet_response_t), ENET_PACKET_FLAG_RELIABLE);
             enet_peer_send(&state.host->peers[player_id - 1], 0, packet);
             if (response.status == GREET_RESPONSE_ACCEPTED) {
-                server_broadcast_playerlist();
+                network_server_broadcast_playerlist();
             }
             enet_host_flush(state.host);
             break;
         }
         case MESSAGE_READY: {
             state.players[player_id].status = state.players[player_id].status == PLAYER_STATUS_NOT_READY ? PLAYER_STATUS_READY : PLAYER_STATUS_NOT_READY;
-            server_broadcast_playerlist();
-            enet_host_flush(state.host);
+            network_event_t network_event;
+            network_event.type = NETWORK_EVENT_CLIENT_READY;
+            network_event_enqueue(network_event);
         }
         case MESSAGE_INPUT: {
             // Send the message to the game
@@ -320,28 +328,50 @@ void server_handle_message(uint8_t* data, size_t length, uint8_t player_id) {
     }
 }
 
-void server_broadcast_playerlist() {
+void network_server_broadcast_playerlist() {
     message_playerlist_t playerlist;
     memcpy(&playerlist.players, state.players, sizeof(state.players));
     ENetPacket* packet = enet_packet_create(&playerlist, sizeof(message_playerlist_t), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
 }
 
-void network_server_start_game() {
+void network_server_start_loading() {
+    // Check that all the players are ready
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.players[player_id].status == PLAYER_STATUS_NOT_READY) {
             return;
         }
     }
 
+    // Set them to not ready so that they can re-ready themselves once they enter the match state
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status == PLAYER_STATUS_READY) {
+            state.players[player_id].status = PLAYER_STATUS_NOT_READY;
+        }
+    }
+
+    // Broadcast a match start message to all clients
+    message_match_load_t match_load;
+    match_load.random_seed = (uint32_t)time(NULL);
+    ENetPacket* packet = enet_packet_create(&match_load, sizeof(message_match_load_t), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+
+    // Send a match start even to the menu
+    network_event_t event;
+    event.type = NETWORK_EVENT_MATCH_LOAD;
+    network_event_enqueue(event);
+
+    srand(match_load.random_seed);
+    log_info("Set random seed to %u", match_load.random_seed);
+}
+
+void network_server_start_match() {
     message_match_start_t match_start;
     ENetPacket* packet = enet_packet_create(&match_start, sizeof(message_match_start_t), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
-
-    network_event_t event;
-    event.type = NETWORK_EVENT_MATCH_START;
-    network_event_enqueue(event);
 }
 
 void network_server_send_input(uint8_t* data, size_t data_length) {
@@ -408,6 +438,17 @@ void client_handle_message(uint8_t* data, size_t length) {
         case MESSAGE_PLAYERLIST: {
             // Data is copied from data + 1 because we're copying straight into players so we need to offset by the type
             memcpy(state.players, data + 1, sizeof(state.players));
+            break;
+        }
+        case MESSAGE_MATCH_LOAD: {
+            uint32_t random_seed;
+            memcpy(&random_seed, data + 4, sizeof(uint32_t)); 
+            srand(random_seed);
+            log_info("Set random seed to %u", random_seed);
+
+            network_event_t event;
+            event.type = NETWORK_EVENT_MATCH_LOAD;
+            network_event_enqueue(event);
             break;
         }
         case MESSAGE_MATCH_START: {

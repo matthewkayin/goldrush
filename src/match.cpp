@@ -62,7 +62,14 @@ struct input_t {
 
 // STATE
 
+enum MatchMode {
+    MATCH_MODE_NOT_STARTED,
+    MATCH_MODE_RUNNING
+};
+
 struct match_state_t {
+    MatchMode mode;
+
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
     std::vector<input_t> input_queue;
     uint32_t tick_timer;
@@ -141,6 +148,11 @@ void match_init() {
     unit_spawn(0, ivec2(1, 1));
     unit_spawn(0, ivec2(2, 2));
     unit_spawn(0, ivec2(3, 1));
+
+    state.mode = MATCH_MODE_NOT_STARTED;
+    if (!network_is_server()) {
+        network_client_toggle_ready();
+    }
 }
 
 void match_handle_input(uint8_t player_id, const input_t& input) {
@@ -191,6 +203,36 @@ void match_handle_input(uint8_t player_id, const input_t& input) {
 void match_update() {
     // NETWORK EVENTS
     network_service();
+
+    if (state.mode == MATCH_MODE_NOT_STARTED) {
+        network_event_t network_event;
+        while (network_poll_events(&network_event)) {
+            if (network_is_server() && network_event.type == NETWORK_EVENT_CLIENT_READY) {
+                bool all_players_ready = true;
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    const player_t& player = network_get_player(player_id);
+                    if (player.status == PLAYER_STATUS_NOT_READY) {
+                        all_players_ready = false;
+                    }
+                }
+
+                if (all_players_ready) {
+                    network_server_start_match();
+                    state.mode = MATCH_MODE_RUNNING;
+                    log_info("match start");
+                }
+            } else if (!network_is_server() && network_event.type == NETWORK_EVENT_MATCH_START) {
+                state.mode = MATCH_MODE_RUNNING;
+                log_info("match start");
+            }
+        }
+        
+        // We make the check again here in case the mode changed
+        if (state.mode == MATCH_MODE_NOT_STARTED) {
+            return;
+        }
+    }
+
     network_event_t network_event;
     while (network_poll_events(&network_event)) {
         switch (network_event.type) {
