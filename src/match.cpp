@@ -92,6 +92,7 @@ static match_state_t state;
 void input_flush();
 void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length);
 
+void camera_move_to_cell(ivec2 cell);
 vec2 cell_center_position(ivec2 cell);
 void unit_spawn(uint8_t player_id, ivec2 cell);
 void unit_try_move(unit_t& unit);
@@ -137,17 +138,55 @@ void match_init() {
     state.cell_is_blocked = std::vector<bool>(state.map_width * state.map_height, false);
 
     // Init units
+    ivec2 player_spawns[MAX_PLAYERS];
+    uint8_t current_player_id = network_get_player_id();
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
-        if (player.status == PLAYER_STATUS_NOT_READY) {
+        if (player.status == PLAYER_STATUS_NONE) {
             continue;
         }
-        state.units[player_id].reserve(MAX_UNITS);
-    }
 
-    unit_spawn(0, ivec2(1, 1));
-    unit_spawn(0, ivec2(2, 2));
-    unit_spawn(0, ivec2(3, 1));
+        ivec2 spawn_point;
+        bool is_spawn_point_valid = false;
+        while (!is_spawn_point_valid) {
+            int spawn_edge = rand() % 4; 
+            // north edge
+            if (spawn_edge == 0) {
+                spawn_point = ivec2(1 + (rand() % (state.map_width - 2)), 1 + (rand() % 4));
+            // south edge
+            } else if (spawn_edge == 1) {
+                spawn_point = ivec2(1 + (rand() % (state.map_width - 2)), state.map_height - (1 + (rand() % 4)));
+            // west edge
+            } else if (spawn_edge == 2) {
+                spawn_point = ivec2(1 + (rand() % 4), 1 + (rand() % (state.map_height - 2)));
+            // east edge
+            } else {
+                spawn_point = ivec2(state.map_width - (1 + (rand() % 4)), 1 + (rand() % (state.map_height - 2)));
+            }
+            // Assert that the spawn point is even in the map
+            GOLD_ASSERT(rect_t(ivec2(0, 0), ivec2(state.map_width, state.map_height)).has_point(spawn_point));
+
+            is_spawn_point_valid = true;
+            for (uint8_t other_player_id = 0; other_player_id < player_id; other_player_id++) {
+                if (ivec2::manhattan_distance(spawn_point, player_spawns[other_player_id]) < 8) {
+                    is_spawn_point_valid = false;
+                    break;
+                }
+            }
+
+            player_spawns[player_id] = spawn_point;
+        }
+
+        if (player_id == current_player_id) {
+            camera_move_to_cell(spawn_point);
+        }
+        state.units[player_id].reserve(MAX_UNITS);
+        unit_spawn(player_id, spawn_point + ivec2(-1, -1));
+        unit_spawn(player_id, spawn_point + ivec2(1, -1));
+        unit_spawn(player_id, spawn_point + ivec2(0, 1));
+
+        log_info("player %u spawn %vi", player_id, &spawn_point);
+    }
 
     state.mode = MATCH_MODE_NOT_STARTED;
     if (!network_is_server()) {
@@ -455,6 +494,12 @@ void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
     }
 
     state.inputs[in_player_id].push_back(tick_inputs);
+}
+
+void camera_move_to_cell(ivec2 cell) {
+    state.camera_offset = ivec2((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
+    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map_width * TILE_SIZE) - SCREEN_WIDTH);
+    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map_height * TILE_SIZE) - SCREEN_HEIGHT);
 }
 
 vec2 cell_center_position(ivec2 cell) {

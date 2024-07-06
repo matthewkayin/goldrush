@@ -332,14 +332,11 @@ void menu_render() {
         uint32_t player_index = 0;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
-            /*
             if (player.status == PLAYER_STATUS_NONE) {
                 continue;
             }
-            */
 
             std::string player_name_text = std::string(player.name);
-            player_name_text = "BREADBREADFISH";
             if (player.status == PLAYER_STATUS_HOST) {
                 player_name_text += ": HOST";
             } else if (player.status == PLAYER_STATUS_NOT_READY) {
