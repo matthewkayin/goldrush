@@ -59,7 +59,7 @@ bool input_is_mouse_button_just_released(uint8_t button);
 
 ivec2 input_get_mouse_position();
 
-void input_start_text_input(const rect_t& text_input_rect);
+void input_start_text_input(const rect_t& text_input_rect, size_t input_length_limit);
 void input_stop_text_input();
 bool input_is_text_input_active();
 void input_set_text_input_value(const char* value);

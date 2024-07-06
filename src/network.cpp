@@ -61,6 +61,7 @@ struct message_greet_response_t {
 
 struct message_playerlist_t {
     const uint8_t type = MESSAGE_PLAYERLIST;
+    uint8_t padding[3];
     player_t players[MAX_PLAYERS];
 };
 
@@ -178,6 +179,10 @@ void network_service() {
                     log_info("player %u disconnected.", event.peer->incomingPeerID + 1);
                     state.players[event.peer->incomingPeerID + 1].status = PLAYER_STATUS_NONE;
                     network_server_broadcast_playerlist();
+
+                    network_event_t network_event;
+                    network_event.type = NETWORK_EVENT_CLIENT_DISCONNECTED;
+                    network_event_enqueue(network_event);
                 } else if (state.status == NETWORK_STATUS_DISCONNECTING) {
                     enet_host_destroy(state.host);
                     state.host = NULL;
@@ -264,7 +269,7 @@ bool network_server_create(const char* username) {
 
     memset(state.players, 0, sizeof(state.players));
     state.player_id = 0;
-    strncpy(state.players[state.player_id].name, username, 17);
+    strncpy(state.players[state.player_id].name, username, MAX_USERNAME_LENGTH + 1);
     state.players[state.player_id].status = PLAYER_STATUS_HOST;
 
     return true;
@@ -436,8 +441,7 @@ void client_handle_message(uint8_t* data, size_t length) {
             break;
         }
         case MESSAGE_PLAYERLIST: {
-            // Data is copied from data + 1 because we're copying straight into players so we need to offset by the type
-            memcpy(state.players, data + 1, sizeof(state.players));
+            memcpy(state.players, data + 4, sizeof(state.players));
             break;
         }
         case MESSAGE_MATCH_LOAD: {
@@ -478,5 +482,4 @@ void network_client_send_input(uint8_t* data, size_t data_length) {
     ENetPacket* packet = enet_packet_create(data, data_length * sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
     enet_peer_send(state.peer, 0, packet);
     enet_host_flush(state.host);
-    log_info("client sent input");
 }

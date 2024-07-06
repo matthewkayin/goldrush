@@ -40,7 +40,7 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
     }},
     { FONT_WESTERN32, (font_params_t) {
         .path = "font/western.ttf",
-        .size = 32 
+        .size = 24 
     }}
 };
 
@@ -94,6 +94,7 @@ struct engine_t {
     bool mouse_button_previous_state[INPUT_MOUSE_BUTTON_COUNT];
     ivec2 mouse_position;
     std::string input_text;
+    size_t input_length_limit;
 
     std::vector<TTF_Font*> fonts;
     std::vector<sprite_t> sprites;
@@ -200,6 +201,8 @@ bool engine_init(ivec2 window_size) {
         SDL_FreeSurface(sprite_surface);
     }
 
+    SDL_StopTextInput();
+
     engine.is_running = true;
     log_info("%s initialized.", APP_NAME);
     return true;
@@ -276,6 +279,9 @@ void input_pump_events() {
         // Text input
         if (event.type == SDL_TEXTINPUT) {
             engine.input_text += std::string(event.text.text);
+            if (engine.input_text.length() > engine.input_length_limit) {
+                engine.input_text = engine.input_text.substr(0, engine.input_length_limit);
+            }
             break;
         }
         if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {
@@ -306,7 +312,8 @@ ivec2 input_get_mouse_position() {
     return engine.mouse_position;
 }
 
-void input_start_text_input(const rect_t& text_input_rect) {
+void input_start_text_input(const rect_t& text_input_rect, size_t input_length_limit) {
+    engine.input_length_limit = input_length_limit;
     SDL_Rect sdl_text_input_rect = rect_to_sdl(text_input_rect);
     SDL_SetTextInputRect(&sdl_text_input_rect);
     SDL_StartTextInput();

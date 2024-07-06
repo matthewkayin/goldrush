@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstddef>
 
-const size_t MAX_USERNAME_LENGTH = 16;
+const size_t MAX_USERNAME_LENGTH = 14;
 const size_t INPUT_BUFFER_SIZE = 1024;
 
 enum NetworkStatus {
@@ -19,17 +19,20 @@ enum PlayerStatus {
     PLAYER_STATUS_NONE,
     PLAYER_STATUS_HOST,
     PLAYER_STATUS_NOT_READY,
-    PLAYER_STATUS_READY
+    PLAYER_STATUS_READY,
+    PLAYER_STATUS_DISCONNECTED
 };
 
 struct player_t {
-    char name[17];
+    char name[16];
     uint8_t status;
+    uint8_t padding[3];
 };
 
 enum NetworkEventType {
     NETWORK_EVENT_CONNECTION_FAILED,
     NETWORK_EVENT_SERVER_DISCONNECTED,
+    NETWORK_EVENT_CLIENT_DISCONNECTED,
     NETWORK_EVENT_JOINED_LOBBY,
     NETWORK_EVENT_LOBBY_FULL,
     NETWORK_EVENT_INVALID_VERSION,

@@ -81,7 +81,9 @@
             "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--logfile",
-                "player3.log"
+                "player3.log",
+                "--resolution",
+                "960x540"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",

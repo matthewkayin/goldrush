@@ -207,7 +207,7 @@ void match_update() {
     if (state.mode == MATCH_MODE_NOT_STARTED) {
         network_event_t network_event;
         while (network_poll_events(&network_event)) {
-            if (network_is_server() && network_event.type == NETWORK_EVENT_CLIENT_READY) {
+            if (network_is_server() && (network_event.type == NETWORK_EVENT_CLIENT_READY || network_event.type == NETWORK_EVENT_CLIENT_DISCONNECTED)) {
                 bool all_players_ready = true;
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     const player_t& player = network_get_player(player_id);

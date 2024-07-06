@@ -18,13 +18,13 @@ static const int TEXT_INPUT_WIDTH = 264;
 static const int TEXT_INPUT_HEIGHT = 35;
 static const rect_t TEXT_INPUT_RECT = rect_t(ivec2((SCREEN_WIDTH / 2) - (TEXT_INPUT_WIDTH / 2), (SCREEN_HEIGHT / 2) - (TEXT_INPUT_HEIGHT / 2)), 
                                               ivec2(TEXT_INPUT_WIDTH, TEXT_INPUT_HEIGHT));
-static const rect_t PLAYERLIST_RECT = rect_t(ivec2(24, 32), ivec2(384, 242 / 2));
+static const rect_t PLAYERLIST_RECT = rect_t(ivec2(24, 32), ivec2(256, 128));
 static const uint32_t STATUS_TIMER_DURATION = 60;
 
-static const int BUTTON_Y = 232;
-static const rect_t HOST_BUTTON_RECT = rect_t(ivec2(300, BUTTON_Y), ivec2(76, 30));
+static const int BUTTON_Y = TEXT_INPUT_RECT.position.y + TEXT_INPUT_RECT.size.y + 16;
+static const rect_t HOST_BUTTON_RECT = rect_t(ivec2(250, BUTTON_Y), ivec2(76, 30));
 static const rect_t JOIN_BUTTON_RECT = rect_t(ivec2(HOST_BUTTON_RECT.position.x + HOST_BUTTON_RECT.size.x + 8, BUTTON_Y), ivec2(72, 30));
-static const rect_t JOIN_IP_BACK_BUTTON_RECT = rect_t(ivec2(248, BUTTON_Y), ivec2(78, 30));
+static const rect_t JOIN_IP_BACK_BUTTON_RECT = rect_t(ivec2(200, BUTTON_Y), ivec2(78, 30));
 static const rect_t JOIN_IP_CONNECT_BUTTON_RECT = rect_t(ivec2(JOIN_IP_BACK_BUTTON_RECT.position.x + JOIN_IP_BACK_BUTTON_RECT.size.x + 8, BUTTON_Y), ivec2(132, 30));
 static const rect_t CONNECTING_BACK_BUTTON_RECT = rect_t(ivec2((SCREEN_WIDTH / 2) - (JOIN_IP_BACK_BUTTON_RECT.size.x / 2), BUTTON_Y), JOIN_IP_BACK_BUTTON_RECT.size);
 static const rect_t LOBBY_BACK_RECT = rect_t(PLAYERLIST_RECT.position + ivec2(0, PLAYERLIST_RECT.size.y + 8), JOIN_IP_BACK_BUTTON_RECT.size);
@@ -112,6 +112,7 @@ bool is_valid_ip(const char* ip_addr) {
 void menu_init() {
     state.username = "";
     state.ip_address = GOLD_DEFAULT_JOIN_IP;
+    input_set_text_input_value("");
     menu_set_mode(MENU_MODE_MAIN);
 }
 
@@ -225,7 +226,7 @@ void menu_update() {
             bool input_text_focused = TEXT_INPUT_RECT.has_point(mouse_position);
             bool is_text_input_active = input_is_text_input_active();
             if (input_text_focused && !is_text_input_active) {
-                input_start_text_input(TEXT_INPUT_RECT);
+                input_start_text_input(TEXT_INPUT_RECT, state.mode == MENU_MODE_MAIN ? MAX_USERNAME_LENGTH : 16);
             } else if (!input_text_focused && is_text_input_active) {
                 input_stop_text_input();
             }
@@ -302,7 +303,7 @@ void menu_render() {
     render_rect(rect_t(ivec2(0, 0), ivec2(SCREEN_WIDTH, SCREEN_HEIGHT)), COLOR_SAND, true);
 
     if (state.mode != MENU_MODE_LOBBY) {
-        render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, ivec2(RENDER_TEXT_CENTERED, 36));
+        render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, ivec2(RENDER_TEXT_CENTERED, 24));
     }
 
     char version_string[16];
@@ -310,7 +311,7 @@ void menu_render() {
     render_text(FONT_WESTERN8, version_string, COLOR_BLACK, ivec2(4, SCREEN_HEIGHT - 14));
 
     if (state.status_timer > 0) {
-        render_text(FONT_WESTERN8, state.status_text.c_str(), COLOR_RED, ivec2(RENDER_TEXT_CENTERED, TEXT_INPUT_RECT.position.y - 48));
+        render_text(FONT_WESTERN8, state.status_text.c_str(), COLOR_RED, ivec2(RENDER_TEXT_CENTERED, TEXT_INPUT_RECT.position.y - 38));
     }
 
     if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_JOIN_IP) {
@@ -331,11 +332,14 @@ void menu_render() {
         uint32_t player_index = 0;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
+            /*
             if (player.status == PLAYER_STATUS_NONE) {
                 continue;
             }
+            */
 
             std::string player_name_text = std::string(player.name);
+            player_name_text = "BREADBREADFISH";
             if (player.status == PLAYER_STATUS_HOST) {
                 player_name_text += ": HOST";
             } else if (player.status == PLAYER_STATUS_NOT_READY) {
