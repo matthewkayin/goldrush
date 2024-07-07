@@ -404,7 +404,7 @@ void match_t::camera_move_to_cell(ivec2 cell) {
 }
 
 bool match_t::cell_is_blocked(ivec2 cell) {
-    return map_cells[cell.x + (cell.y * map_width)] == CELL_EMPTY;
+    return map_cells[cell.x + (cell.y * map_width)] != CELL_EMPTY;
 }
 
 void match_t::cell_set_value(ivec2 cell, int value) {
@@ -453,7 +453,6 @@ void match_t::unit_try_move(unit_t& unit) {
 
 void match_t::unit_update(unit_t& unit) {
     if (!unit.is_moving && !unit.path.empty()) {
-        log_info("try move");
         unit_try_move(unit);
         if (unit.is_moving) {
             unit.animation_frame.x = 1;

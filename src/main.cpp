@@ -736,7 +736,8 @@ void render_match(const match_t& match) {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, COLOR_GREEN.a);
         for (const unit_t& unit : match.units[player_id]) {
-            SDL_RenderDrawPoint(engine.renderer, unit.cell.x, unit.cell.y);
+            SDL_Rect unit_rect = (SDL_Rect) { .x = unit.cell.x, .y = unit.cell.y, .w = 2, .h = 2 };
+            SDL_RenderDrawRect(engine.renderer, &unit_rect);
         }
     } 
 
