@@ -1,5 +1,96 @@
 #pragma once
 
-void match_init();
-void match_update();
-void match_render();
+#include "defines.h"
+#include "util.h"
+#include <vector>
+#include <unordered_map>
+
+const uint32_t MAX_UNITS = 200;
+const int CELL_EMPTY = 0;
+const int CELL_FILLED = 1;
+const int UI_HEIGHT = 62;
+
+struct unit_t {
+    bool is_selected;
+
+    bool is_moving;
+    int direction;
+    vec2 position;
+    vec2 target_position;
+    ivec2 cell;
+    std::vector<ivec2> path;
+    uint32_t path_timer;
+    static const uint32_t path_pause_duration = 60;
+
+    ivec2 animation_frame;
+    uint32_t animation_timer;
+    static const uint32_t animation_frame_duration = 8;
+
+    rect_t get_rect() {
+        ivec2 size = ivec2(16, 16);
+        return rect_t(ivec2(position.x.integer_part(), position.y.integer_part()) - (size / 2), size);
+    }
+};
+
+enum InputType {
+    INPUT_NONE,
+    INPUT_MOVE
+};
+
+struct input_move_t {
+    ivec2 target_cell;
+    uint8_t unit_count;
+    uint8_t unit_ids[MAX_UNITS];
+};
+
+struct input_t {
+    uint8_t type;
+    union {
+        input_move_t move;
+    };
+};
+
+
+enum MatchMode {
+    MATCH_MODE_NOT_STARTED,
+    MATCH_MODE_RUNNING
+};
+
+struct match_t {
+    MatchMode mode;
+
+    std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
+    std::vector<input_t> input_queue;
+    uint32_t tick_timer;
+
+    ivec2 camera_offset;
+
+    bool is_selecting;
+    ivec2 select_origin;
+    rect_t select_rect;
+
+    std::vector<int> map_tiles;
+    std::vector<int> map_cells;
+    int map_width;
+    int map_height;
+
+    std::vector<unit_t> units[MAX_PLAYERS];
+
+    void init();
+    void update();
+    void handle_input(uint8_t player_id, const input_t& input);
+    void input_flush();
+    void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length);
+
+    void camera_clamp();
+    void camera_move_to_cell(ivec2 cell);
+
+    bool cell_is_blocked(ivec2 cell);
+    void cell_set_value(ivec2 cell, int value);
+
+    void unit_spawn(uint8_t player_id, ivec2 cell);
+    void unit_try_move(unit_t& unit);
+    void unit_update(unit_t& unit);
+
+    std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
+};

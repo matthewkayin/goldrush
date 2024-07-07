@@ -2,112 +2,22 @@
 
 #include "defines.h"
 #include "asserts.h"
-#include "engine.h"
 #include "logger.h"
-#include "util.h"
+#include "input.h"
 #include "network.h"
-#include <vector>
 #include <cstdlib>
 #include <algorithm>
 
 static const uint32_t TICK_DURATION = 4;
-static const uint32_t MAX_UNITS = 200;
 
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
-static const int CELL_EMPTY = -1;
+vec2 cell_center_position(ivec2 cell) {
+    return vec2(fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)), fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2)));
+}
 
-// UNIT
-
-struct unit_t {
-    bool is_selected;
-
-    bool is_moving;
-    int direction;
-    vec2 position;
-    vec2 target_position;
-    ivec2 cell;
-    std::vector<ivec2> path;
-    uint32_t path_timer;
-    static const uint32_t path_pause_duration = 60;
-
-    ivec2 animation_frame;
-    uint32_t animation_timer;
-    static const uint32_t animation_frame_duration = 8;
-
-    rect_t get_rect() {
-        ivec2 size = sprite_get_frame_size(SPRITE_UNIT_MINER);
-        return rect_t(ivec2(position.x.integer_part(), position.y.integer_part()) - (size / 2), size);
-    }
-};
-
-// INPUT
-
-enum InputType {
-    INPUT_NONE,
-    INPUT_MOVE
-};
-
-struct input_move_t {
-    ivec2 target_cell;
-    uint8_t unit_count;
-    uint8_t unit_ids[MAX_UNITS];
-};
-
-struct input_t {
-    uint8_t type;
-    union {
-        input_move_t move;
-    };
-};
-
-// STATE
-
-enum MatchMode {
-    MATCH_MODE_NOT_STARTED,
-    MATCH_MODE_RUNNING
-};
-
-struct match_state_t {
-    MatchMode mode;
-
-    std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
-    std::vector<input_t> input_queue;
-    uint32_t tick_timer;
-
-    ivec2 camera_offset;
-
-    bool is_selecting;
-    ivec2 select_origin;
-    rect_t select_rect;
-
-    std::vector<int> map_tiles;
-    std::vector<int> map_cells;
-    int map_width;
-    int map_height;
-
-    std::vector<unit_t> units[MAX_PLAYERS];
-};
-static match_state_t state;
-
-void input_flush();
-void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length);
-
-void camera_clamp();
-void camera_move_to_cell(ivec2 cell);
-
-vec2 cell_center_position(ivec2 cell);
-bool cell_is_blocked(ivec2 cell);
-void cell_set_value(ivec2 cell, int value);
-
-void unit_spawn(uint8_t player_id, ivec2 cell);
-void unit_try_move(uint8_t player_id, unit_t& unit);
-void unit_update(uint8_t player_id, unit_t& unit);
-
-std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
-
-void match_init() {
+void match_t::init() {
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
@@ -118,31 +28,30 @@ void match_init() {
         input_t empty_input;
         empty_input.type = INPUT_NONE;
         std::vector<input_t> empty_input_list = { empty_input };
-        state.inputs[player_id].push_back(empty_input_list);
-        state.inputs[player_id].push_back(empty_input_list);
-        state.inputs[player_id].push_back(empty_input_list);
+        inputs[player_id].push_back(empty_input_list);
+        inputs[player_id].push_back(empty_input_list);
+        inputs[player_id].push_back(empty_input_list);
     }
-    state.tick_timer = 0;
+    tick_timer = 0;
 
-    state.camera_offset = ivec2(0, 0);
-    state.is_selecting = false;
+    camera_offset = ivec2(0, 0);
+    is_selecting = false;
 
     // Init map
-    state.map_width = 80;
-    state.map_height = 48;
-    state.map_tiles = std::vector<int>(state.map_width * state.map_height);
-    state.map_cells = std::vector<int>(state.map_width * state.map_height, CELL_EMPTY);
-    for (int i = 0; i < state.map_width * state.map_height; i += 3) {
-        state.map_tiles[i] = 1;
+    map_width = 80;
+    map_height = 48;
+    map_tiles = std::vector<int>(map_width * map_height);
+    map_cells = std::vector<int>(map_width * map_height, CELL_EMPTY);
+    for (int i = 0; i < map_width * map_height; i += 3) {
+        map_tiles[i] = 1;
     }
-    for (int y = 0; y < state.map_height; y++) {
-        for (int x = 0; x < state.map_width; x++) {
-            if (y == 0 || y == state.map_height - 1 || x == 0 || x == state.map_width - 1) {
-                state.map_tiles[x + (y * state.map_width)] = 2;
+    for (int y = 0; y < map_height; y++) {
+        for (int x = 0; x < map_width; x++) {
+            if (y == 0 || y == map_height - 1 || x == 0 || x == map_width - 1) {
+                map_tiles[x + (y * map_width)] = 2;
             }
         }
     }
-    render_create_minimap_texture(state.map_width, state.map_height);
 
     // Init units
     ivec2 player_spawns[MAX_PLAYERS];
@@ -162,19 +71,19 @@ void match_init() {
             int spawn_edge = rand() % 4; 
             // north edge
             if (spawn_edge == 0) {
-                spawn_point = ivec2(spawn_margin + (rand() % (state.map_width - (2 * spawn_margin))), spawn_margin + (rand() % 4));
+                spawn_point = ivec2(spawn_margin + (rand() % (map_width - (2 * spawn_margin))), spawn_margin + (rand() % 4));
             // south edge
             } else if (spawn_edge == 1) {
-                spawn_point = ivec2(spawn_margin + (rand() % (state.map_width - (2 * spawn_margin))), state.map_height - (spawn_margin + (rand() % 4)));
+                spawn_point = ivec2(spawn_margin + (rand() % (map_width - (2 * spawn_margin))), map_height - (spawn_margin + (rand() % 4)));
             // west edge
             } else if (spawn_edge == 2) {
-                spawn_point = ivec2(spawn_margin + (rand() % 4), spawn_margin + (rand() % (state.map_height - (2 * spawn_margin))));
+                spawn_point = ivec2(spawn_margin + (rand() % 4), spawn_margin + (rand() % (map_height - (2 * spawn_margin))));
             // east edge
             } else {
-                spawn_point = ivec2(state.map_width - (spawn_margin + (rand() % 4)), spawn_margin + (rand() % (state.map_height - (2 * spawn_margin))));
+                spawn_point = ivec2(map_width - (spawn_margin + (rand() % 4)), spawn_margin + (rand() % (map_height - (2 * spawn_margin))));
             }
             // Assert that the spawn point is even in the map
-            GOLD_ASSERT(rect_t(ivec2(0, 0), ivec2(state.map_width, state.map_height)).has_point(spawn_point));
+            GOLD_ASSERT(rect_t(ivec2(0, 0), ivec2(map_width, map_height)).has_point(spawn_point));
 
             is_spawn_point_valid = true;
             for (uint8_t other_player_id = 0; other_player_id < player_id; other_player_id++) {
@@ -190,7 +99,7 @@ void match_init() {
         if (player_id == current_player_id) {
             camera_move_to_cell(spawn_point);
         }
-        state.units[player_id].reserve(MAX_UNITS);
+        units[player_id].reserve(MAX_UNITS);
         unit_spawn(player_id, spawn_point + ivec2(-1, -1));
         unit_spawn(player_id, spawn_point + ivec2(1, -1));
         unit_spawn(player_id, spawn_point + ivec2(0, 1));
@@ -199,25 +108,174 @@ void match_init() {
     }
     log_info("players initialized");
 
-    state.mode = MATCH_MODE_NOT_STARTED;
+    mode = MATCH_MODE_NOT_STARTED;
     if (!network_is_server()) {
         network_client_toggle_ready();
     }
     if (network_is_server() && player_count == 1) {
-        state.mode = MATCH_MODE_RUNNING;
+        mode = MATCH_MODE_RUNNING;
     }
 }
 
-void match_handle_input(uint8_t player_id, const input_t& input) {
+void match_t::update() {
+    // NETWORK EVENTS
+    network_service();
+
+    if (mode == MATCH_MODE_NOT_STARTED) {
+        network_event_t network_event;
+        while (network_poll_events(&network_event)) {
+            if (network_is_server() && (network_event.type == NETWORK_EVENT_CLIENT_READY || network_event.type == NETWORK_EVENT_CLIENT_DISCONNECTED)) {
+                bool all_players_ready = true;
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    const player_t& player = network_get_player(player_id);
+                    if (player.status == PLAYER_STATUS_NOT_READY) {
+                        all_players_ready = false;
+                    }
+                }
+
+                if (all_players_ready) {
+                    network_server_start_match();
+                    mode = MATCH_MODE_RUNNING;
+                }
+            } else if (!network_is_server() && network_event.type == NETWORK_EVENT_MATCH_START) {
+                mode = MATCH_MODE_RUNNING;
+            }
+        }
+        
+        // We make the check again here in case the mode changed
+        if (mode == MATCH_MODE_NOT_STARTED) {
+            return;
+        }
+    }
+
+    network_event_t network_event;
+    while (network_poll_events(&network_event)) {
+        switch (network_event.type) {
+            case NETWORK_EVENT_INPUT: {
+                input_deserialize(network_event.input.data, network_event.input.data_length);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    // NETWORK
+    if (tick_timer == 0) {
+        bool has_all_inputs = true;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            const player_t& player = network_get_player(player_id);
+            if (player.status == PLAYER_STATUS_NONE) {
+                continue;
+            }
+
+            if (inputs[player_id].empty()) {
+                has_all_inputs = false;
+                break;
+            }
+        }
+
+        if (!has_all_inputs) {
+            log_info("missing inputs for this frame. waiting...");
+            return;
+        }
+
+        // Begin next tick
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            const player_t& player = network_get_player(player_id);
+            if (player.status == PLAYER_STATUS_NONE) {
+                continue;
+            }
+
+            for (const input_t& input : inputs[player_id][0]) {
+                handle_input(player_id, input);
+            }
+            inputs[player_id].erase(inputs[player_id].begin());
+        }
+
+        tick_timer = TICK_DURATION;
+        input_flush();
+    }
+    tick_timer--;
+
+    ivec2 mouse_pos = input_get_mouse_position();
+    uint8_t current_player_id = network_get_player_id();
+
+    // CAMERA DRAG
+    if (!is_selecting) {
+        ivec2 camera_drag_direction = ivec2(0, 0);
+        if (mouse_pos.x < CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.x = -1;
+        } else if (mouse_pos.x > SCREEN_WIDTH - CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.x = 1;
+        }
+        if (mouse_pos.y < CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.y = -1;
+        } else if (mouse_pos.y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.y = 1;
+        }
+        camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
+        camera_clamp();
+    }
+
+    // SELECT RECT
+    ivec2 mouse_world_pos = mouse_pos + camera_offset;
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
+        // On begin selecting
+        is_selecting = true;
+        select_origin = mouse_world_pos;
+    }
+    if (is_selecting) {
+        // Update select rect
+        select_rect.position = ivec2(std::min(select_origin.x, mouse_world_pos.x), std::min(select_origin.y, mouse_world_pos.y));
+        select_rect.size = ivec2(std::max(1, std::abs(select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(select_origin.y - mouse_world_pos.y)));
+
+        // Update unit selection
+        for (unit_t& unit : units[current_player_id]) {
+            unit.is_selected = unit.get_rect().intersects(select_rect);
+        }
+    }
+    if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
+        // On finished selecting
+        is_selecting = false;
+    } 
+
+    // Command
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
+        input_t input;
+        input.type = INPUT_MOVE;
+        input.move.target_cell = mouse_world_pos / TILE_SIZE;
+        input.move.unit_count = 0;
+        for (uint8_t unit_id = 0; unit_id < units[current_player_id].size(); unit_id++) {
+            if (!units[current_player_id][unit_id].is_selected) {
+                continue;
+            }
+            input.move.unit_ids[input.move.unit_count] = unit_id;
+            input.move.unit_count++;
+        }
+        if (input.move.unit_count != 0) {
+            input_queue.push_back(input);
+        }
+    }
+
+    // Unit update
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        for (unit_t& unit : units[player_id]) {
+            unit_update(unit);
+        }
+    }
+}
+
+void match_t::handle_input(uint8_t player_id, const input_t& input) {
     switch (input.type) {
         case INPUT_MOVE: {
             // Calculate unit group info
-            ivec2 first_unit_cell = state.units[player_id][input.move.unit_ids[0]].cell;
+            ivec2 first_unit_cell = units[player_id][input.move.unit_ids[0]].cell;
             ivec2 group_center = first_unit_cell;
             ivec2 group_min = first_unit_cell;
             ivec2 group_max = first_unit_cell;
             for (uint32_t i = 1; i < input.move.unit_count; i++) {
-                unit_t& unit = state.units[player_id][input.move.unit_ids[i]];
+                unit_t& unit = units[player_id][input.move.unit_ids[i]];
                 group_center += unit.cell;
                 group_min.x = std::min(group_min.x, unit.cell.x);
                 group_min.y = std::min(group_min.y, unit.cell.y);
@@ -228,12 +286,12 @@ void match_handle_input(uint8_t player_id, const input_t& input) {
             bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
 
             for (uint32_t i = 0; i < input.move.unit_count; i++) {
-                unit_t& unit = state.units[player_id][input.move.unit_ids[i]];
+                unit_t& unit = units[player_id][input.move.unit_ids[i]];
 
                 // Determine the unit's target
                 ivec2 offset = unit.cell - group_center;
                 ivec2 unit_target = input.move.target_cell + offset;
-                bool is_target_invalid = is_target_inside_group || unit_target.x < 0 || unit_target.x >= state.map_width || unit_target.y < 0 || unit_target.y >= state.map_height ||
+                bool is_target_invalid = is_target_inside_group || unit_target.x < 0 || unit_target.x >= map_width || unit_target.y < 0 || unit_target.y >= map_height ||
                                          ivec2::manhattan_distance(unit_target, input.move.target_cell) > 3 || cell_is_blocked(unit_target);
                 if (is_target_invalid) {
                     unit_target = input.move.target_cell;
@@ -253,172 +311,21 @@ void match_handle_input(uint8_t player_id, const input_t& input) {
     }
 }
 
-void match_update() {
-    // NETWORK EVENTS
-    network_service();
-
-    if (state.mode == MATCH_MODE_NOT_STARTED) {
-        network_event_t network_event;
-        while (network_poll_events(&network_event)) {
-            if (network_is_server() && (network_event.type == NETWORK_EVENT_CLIENT_READY || network_event.type == NETWORK_EVENT_CLIENT_DISCONNECTED)) {
-                bool all_players_ready = true;
-                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                    const player_t& player = network_get_player(player_id);
-                    if (player.status == PLAYER_STATUS_NOT_READY) {
-                        all_players_ready = false;
-                    }
-                }
-
-                if (all_players_ready) {
-                    network_server_start_match();
-                    state.mode = MATCH_MODE_RUNNING;
-                    log_info("match start");
-                }
-            } else if (!network_is_server() && network_event.type == NETWORK_EVENT_MATCH_START) {
-                state.mode = MATCH_MODE_RUNNING;
-                log_info("match start");
-            }
-        }
-        
-        // We make the check again here in case the mode changed
-        if (state.mode == MATCH_MODE_NOT_STARTED) {
-            return;
-        }
-    }
-
-    network_event_t network_event;
-    while (network_poll_events(&network_event)) {
-        switch (network_event.type) {
-            case NETWORK_EVENT_INPUT: {
-                input_deserialize(network_event.input.data, network_event.input.data_length);
-                break;
-            }
-            default:
-                break;
-        }
-    }
-
-    // NETWORK
-    if (state.tick_timer == 0) {
-        bool has_all_inputs = true;
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            const player_t& player = network_get_player(player_id);
-            if (player.status == PLAYER_STATUS_NONE) {
-                continue;
-            }
-
-            if (state.inputs[player_id].empty()) {
-                has_all_inputs = false;
-                break;
-            }
-        }
-
-        if (!has_all_inputs) {
-            log_info("missing inputs for this frame. waiting...");
-            return;
-        }
-
-        // Begin next tick
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            const player_t& player = network_get_player(player_id);
-            if (player.status == PLAYER_STATUS_NONE) {
-                continue;
-            }
-
-            for (const input_t& input : state.inputs[player_id][0]) {
-                match_handle_input(player_id, input);
-            }
-            state.inputs[player_id].erase(state.inputs[player_id].begin());
-        }
-
-        state.tick_timer = TICK_DURATION;
-        input_flush();
-    }
-    state.tick_timer--;
-
-    ivec2 mouse_pos = input_get_mouse_position();
-    uint8_t current_player_id = network_get_player_id();
-
-    // CAMERA DRAG
-    if (!state.is_selecting) {
-        ivec2 camera_drag_direction = ivec2(0, 0);
-        if (mouse_pos.x < CAMERA_DRAG_MARGIN) {
-            camera_drag_direction.x = -1;
-        } else if (mouse_pos.x > SCREEN_WIDTH - CAMERA_DRAG_MARGIN) {
-            camera_drag_direction.x = 1;
-        }
-        if (mouse_pos.y < CAMERA_DRAG_MARGIN) {
-            camera_drag_direction.y = -1;
-        } else if (mouse_pos.y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
-            camera_drag_direction.y = 1;
-        }
-        state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
-        camera_clamp();
-    }
-
-    // SELECT RECT
-    ivec2 mouse_world_pos = mouse_pos + state.camera_offset;
-    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
-        // On begin selecting
-        state.is_selecting = true;
-        state.select_origin = mouse_world_pos;
-    }
-    if (state.is_selecting) {
-        // Update select rect
-        state.select_rect.position = ivec2(std::min(state.select_origin.x, mouse_world_pos.x), std::min(state.select_origin.y, mouse_world_pos.y));
-        state.select_rect.size = ivec2(std::max(1, std::abs(state.select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(state.select_origin.y - mouse_world_pos.y)));
-
-        // Update unit selection
-        for (unit_t& unit : state.units[current_player_id]) {
-            unit.is_selected = unit.get_rect().intersects(state.select_rect);
-        }
-    }
-    if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
-        // On finished selecting
-        state.is_selecting = false;
-    } 
-
-    // Command
-    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
-        input_t input;
-        input.type = INPUT_MOVE;
-        input.move.target_cell = mouse_world_pos / TILE_SIZE;
-        input.move.unit_count = 0;
-        for (uint8_t unit_id = 0; unit_id < state.units[current_player_id].size(); unit_id++) {
-            if (!state.units[current_player_id][unit_id].is_selected) {
-                continue;
-            }
-            input.move.unit_ids[input.move.unit_count] = unit_id;
-            input.move.unit_count++;
-        }
-        if (input.move.unit_count != 0) {
-            state.input_queue.push_back(input);
-        }
-    }
-
-    // Unit update
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (unit_t& unit : state.units[player_id]) {
-            unit_update(player_id, unit);
-        }
-    }
-}
-
-void input_flush() {
+void match_t::input_flush() {
     static const uint32_t INPUT_MAX_SIZE = 201;
 
     static uint8_t out_buffer[INPUT_BUFFER_SIZE];
     static size_t out_buffer_length;
 
     // Always send at least 1 input per tick
-    if (state.input_queue.empty()) {
+    if (input_queue.empty()) {
         input_t empty_input;
         empty_input.type = INPUT_NONE;
-        state.input_queue.push_back(empty_input);
+        input_queue.push_back(empty_input);
     }
 
     // Assert that the out buffer is big enough
-    GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * state.input_queue.size()));
+    GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * input_queue.size()));
 
     // Leave a space in the buffer for the network message type
     uint8_t current_player_id = network_get_player_id();
@@ -426,7 +333,7 @@ void input_flush() {
     out_buffer_length = 2;
 
     // Serialize the inputs
-    for (const input_t& input : state.input_queue) {
+    for (const input_t& input : input_queue) {
         out_buffer[out_buffer_length] = input.type;
         out_buffer_length++;
         switch (input.type) {
@@ -445,8 +352,8 @@ void input_flush() {
                 break;
         }
     }
-    state.inputs[current_player_id].push_back(state.input_queue);
-    state.input_queue.clear();
+    inputs[current_player_id].push_back(input_queue);
+    input_queue.clear();
 
     // Send them to other players
     if (network_is_server()) {
@@ -456,7 +363,7 @@ void input_flush() {
     }
 }
 
-void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
+void match_t::input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
     std::vector<input_t> tick_inputs;
 
     uint8_t in_player_id = in_buffer[1];
@@ -483,44 +390,40 @@ void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
         tick_inputs.push_back(input);
     }
 
-    state.inputs[in_player_id].push_back(tick_inputs);
+    inputs[in_player_id].push_back(tick_inputs);
 }
 
-void camera_clamp() {
-    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map_width * TILE_SIZE) - SCREEN_WIDTH);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT);
+void match_t::camera_clamp() {
+    camera_offset.x = std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH);
+    camera_offset.y = std::clamp(camera_offset.y, 0, (map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT);
 }
 
-void camera_move_to_cell(ivec2 cell) {
-    state.camera_offset = ivec2((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
+void match_t::camera_move_to_cell(ivec2 cell) {
+    camera_offset = ivec2((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
     camera_clamp();
 }
 
-vec2 cell_center_position(ivec2 cell) {
-    return vec2(fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)), fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2)));
+bool match_t::cell_is_blocked(ivec2 cell) {
+    return map_cells[cell.x + (cell.y * map_width)] == CELL_EMPTY;
 }
 
-bool cell_is_blocked(ivec2 cell) {
-    return state.map_cells[cell.x + (cell.y * state.map_width)] == CELL_EMPTY;
+void match_t::cell_set_value(ivec2 cell, int value) {
+    map_cells[cell.x + (cell.y * map_width)] = value;
 }
 
-void cell_set_value(ivec2 cell, int value) {
-    state.map_cells[cell.x + (cell.y * state.map_width)] = value;
-}
-
-void unit_spawn(uint8_t player_id, ivec2 cell) {
+void match_t::unit_spawn(uint8_t player_id, ivec2 cell) {
     unit_t unit;
     unit.is_selected = false;
     unit.is_moving = false;
     unit.cell = cell;
     unit.position = cell_center_position(cell);
     unit.direction = DIRECTION_SOUTH;
-    state.units[player_id].push_back(unit);
+    units[player_id].push_back(unit);
 
-    cell_set_value(cell, player_id);
+    cell_set_value(cell, CELL_FILLED);
 }
 
-void unit_try_move(uint8_t player_id, unit_t& unit) {
+void match_t::unit_try_move(unit_t& unit) {
     ivec2 next_point = unit.path[0];
 
     // Set the unit's direction, even if it doesn't begin movement
@@ -534,22 +437,24 @@ void unit_try_move(uint8_t player_id, unit_t& unit) {
 
     // Don't move if the tile is blocked
     if (cell_is_blocked(next_point)) {
+        log_info("cell is blocked?");
         return;
     }
 
     // Set state to begin movement
     cell_set_value(unit.cell, CELL_EMPTY);
     unit.cell = next_point;
-    cell_set_value(unit.cell, player_id);
+    cell_set_value(unit.cell, CELL_FILLED);
     unit.target_position = cell_center_position(unit.cell);
     unit.path.erase(unit.path.begin());
     unit.is_moving = true;
     unit.path_timer = 0;
 }
 
-void unit_update(uint8_t player_id, unit_t& unit) {
+void match_t::unit_update(unit_t& unit) {
     if (!unit.is_moving && !unit.path.empty()) {
-        unit_try_move(player_id, unit);
+        log_info("try move");
+        unit_try_move(unit);
         if (unit.is_moving) {
             unit.animation_frame.x = 1;
             unit.animation_timer = unit.animation_frame_duration;
@@ -569,7 +474,7 @@ void unit_update(uint8_t player_id, unit_t& unit) {
                 unit.is_moving = false;
                 movement_left -= distance_to_target;
                 if (!unit.path.empty()) {
-                    unit_try_move(player_id, unit);
+                    unit_try_move(unit);
                 }
                 if (!unit.is_moving) {
                     movement_left.raw_value = 0;
@@ -606,7 +511,7 @@ void unit_update(uint8_t player_id, unit_t& unit) {
     }
 }
 
-std::vector<ivec2> pathfind(ivec2 from, ivec2 to) {
+std::vector<ivec2> match_t::pathfind(ivec2 from, ivec2 to) {
     struct path_t {
         int score;
         std::vector<ivec2> points;
@@ -647,7 +552,7 @@ std::vector<ivec2> pathfind(ivec2 from, ivec2 to) {
             ivec2 child = smallest_head + DIRECTION_IVEC2[direction];
             int child_score = smallest.points.size() + 1 + abs(child.x - to.x) + abs(child.y - to.y);
             // Don't consider out of bounds children
-            if (child.x < 0 || child.x >= state.map_width || child.y < 0 || child.y >= state.map_height) {
+            if (child.x < 0 || child.x >= map_width || child.y < 0 || child.y >= map_height) {
                 continue;
             }
             // Don't consider blocked spaces
@@ -695,34 +600,4 @@ std::vector<ivec2> pathfind(ivec2 from, ivec2 to) {
 
     std::vector<ivec2> empty_path;
     return empty_path;
-}
-
-void match_render() {
-    uint8_t current_player_id = network_get_player_id();
-
-    render_map(state.camera_offset, &state.map_tiles[0], state.map_width, state.map_height);
-
-    // Select rings
-    for (const unit_t& unit : state.units[current_player_id]) {
-        if (unit.is_selected) {
-            render_sprite(state.camera_offset, SPRITE_SELECT_RING, ivec2(0, 0), unit.position, true);
-        }
-    }
-
-    // Units
-    for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (const unit_t& unit : state.units[player_id]) {
-            render_sprite(state.camera_offset, SPRITE_UNIT_MINER, unit.animation_frame, unit.position, true);
-        }
-    }
-
-    // Select rect
-    if (state.is_selecting) {
-        render_rect(rect_t(state.select_rect.position - state.camera_offset, state.select_rect.size), COLOR_WHITE);
-    }
-
-    // UI 
-    render_sprite(ivec2(0, 0), SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(72, SCREEN_HEIGHT - UI_HEIGHT));
-    render_sprite(ivec2(0, 0), SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - 72));
-    render_minimap(state.camera_offset, &state.map_tiles[0], &state.map_cells[0], state.map_width, state.map_height, ivec2(4, SCREEN_HEIGHT - 72 + 4), ivec2(64, 64));
 }
