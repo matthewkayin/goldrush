@@ -63,6 +63,21 @@ static const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .h_frames = -1,
         .v_frames = -1
     }},
+    { SPRITE_UI_FRAME, (sprite_params_t) {
+        .path = "sprite/frame.png",
+        .h_frames = 3,
+        .v_frames = 3
+    }},
+    { SPRITE_UI_FRAME_BOTTOM, (sprite_params_t) {
+        .path = "sprite/ui_frame_bottom.png",
+        .h_frames = 1,
+        .v_frames = 1
+    }},
+    { SPRITE_UI_MINIMAP, (sprite_params_t) {
+        .path = "sprite/ui_minimap.png",
+        .h_frames = 1,
+        .v_frames = 1
+    }},
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .h_frames = 1,
@@ -88,6 +103,7 @@ struct engine_t {
     SDL_Renderer* renderer;
 
     bool is_running = false;
+    bool is_fullscreen = false;
 
     // Input state
     bool mouse_button_state[INPUT_MOUSE_BUTTON_COUNT];
@@ -98,6 +114,7 @@ struct engine_t {
 
     std::vector<TTF_Font*> fonts;
     std::vector<sprite_t> sprites;
+    SDL_Texture* minimap_texture;
 };
 static engine_t engine;
 
@@ -201,9 +218,10 @@ bool engine_init(ivec2 window_size) {
         SDL_FreeSurface(sprite_surface);
     }
 
+    engine.minimap_texture = NULL;
     SDL_StopTextInput();
-
     engine.is_running = true;
+
     log_info("%s initialized.", APP_NAME);
     return true;
 }
@@ -214,6 +232,9 @@ void engine_quit() {
     }
     for (sprite_t sprite : engine.sprites) {
         SDL_DestroyTexture(sprite.texture);
+    }
+    if (engine.minimap_texture != NULL) {
+        SDL_DestroyTexture(engine.minimap_texture);
     }
 
     SDL_DestroyRenderer(engine.renderer);
@@ -250,6 +271,17 @@ void input_pump_events() {
         // Handle quit
         if (event.type == SDL_QUIT) {
             engine.is_running = false;
+        }
+        // Toggle fullscreen
+        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
+            engine.is_fullscreen = !engine.is_fullscreen;
+            if (engine.is_fullscreen) {
+                SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+                SDL_SetWindowGrab(engine.window, SDL_TRUE);
+            } else {
+                SDL_SetWindowFullscreen(engine.window, 0);
+            }
+            break;
         }
         // Capture mouse
         if (SDL_GetWindowGrab(engine.window) == SDL_FALSE) {
@@ -405,7 +437,7 @@ void render_map(ivec2 camera_offset, int* tiles, int map_width, int map_height) 
     SDL_Rect dst_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
     ivec2 base_pos = ivec2(-(camera_offset.x % TILE_SIZE), -(camera_offset.y % TILE_SIZE));
     ivec2 base_coords = ivec2(camera_offset.x / TILE_SIZE, camera_offset.y / TILE_SIZE);
-    ivec2 max_visible_tiles = ivec2(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT / TILE_SIZE) + 1);
+    ivec2 max_visible_tiles = ivec2(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE);
     if (base_pos.x != 0) {
         max_visible_tiles.x++;
     }
@@ -444,4 +476,61 @@ void render_sprite(ivec2 camera_offset, Sprite sprite, const ivec2& frame, const
         dst_rect.y -= (dst_rect.h / 2);
     }
     SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+}
+
+void render_ui_frame(ivec2 position, ivec2 size) {
+    sprite_t& sprite = engine.sprites[SPRITE_UI_FRAME];
+    GOLD_ASSERT(size.x % sprite.frame_size.x == 0 && size.y % sprite.frame_size.y == 0);
+
+    SDL_Rect src_rect = (SDL_Rect) {
+        .x = 0, .y = 0, .w = sprite.frame_size.x, .h = sprite.frame_size.y
+    };
+    SDL_Rect dst_rect = (SDL_Rect) {
+        .x = 0, .y = 0, .w = src_rect.w, .h = src_rect.h
+    };
+
+    for (int y = position.y; y < position.y + size.y; y += sprite.frame_size.y) {
+        for (int x = position.x; x < position.x + size.x; x += sprite.frame_size.x) {
+            if (x == position.x) {
+                src_rect.x = 0;
+            } else if (x == position.x + size.x - sprite.frame_size.x) {
+                src_rect.x = 2 * sprite.frame_size.x;
+            } else {
+                src_rect.x = sprite.frame_size.x;
+            }
+            if (y == position.y) {
+                src_rect.y = 0;
+            } else if (y == position.y + size.y - sprite.frame_size.y) {
+                src_rect.y = 2 * sprite.frame_size.y;
+            } else {
+                src_rect.y = sprite.frame_size.y;
+            }
+            dst_rect.x = x;
+            dst_rect.y = y;
+
+            SDL_RenderCopy(engine.renderer, sprite.texture, &src_rect, &dst_rect);
+        }
+    }
+}
+
+void render_create_minimap_texture(int map_width, int map_height) {
+    engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, map_width, map_height);
+}
+
+void render_minimap(ivec2 camera_offset, int* tiles, int* cells, int map_width, int map_height, ivec2 position, ivec2 size) {
+    SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
+
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND.r, COLOR_SAND.g, COLOR_SAND.b, COLOR_SAND.a);
+    SDL_RenderClear(engine.renderer);
+
+    SDL_Rect camera_rect = (SDL_Rect) { .x = camera_offset.x / TILE_SIZE, .y = camera_offset.y / TILE_SIZE, .w = SCREEN_WIDTH / TILE_SIZE, .h = (SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE };
+    SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+    SDL_RenderDrawRect(engine.renderer, &camera_rect);
+
+    SDL_SetRenderTarget(engine.renderer, NULL);
+
+    // Render the minimap texture
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = map_width, .h = map_height };
+    SDL_Rect dst_rect = (SDL_Rect) { .x = position.x, .y = position.y, .w = size.x, .h = size.y };
+    SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
 }

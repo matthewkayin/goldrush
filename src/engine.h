@@ -6,6 +6,7 @@
 
 extern uint8_t MOUSE_BUTTON_LEFT;
 extern uint8_t MOUSE_BUTTON_RIGHT;
+const int UI_HEIGHT = 62;
 
 enum Font {
     FONT_HACK,
@@ -17,6 +18,9 @@ enum Font {
 
 enum Sprite {
     SPRITE_TILES,
+    SPRITE_UI_FRAME,
+    SPRITE_UI_FRAME_BOTTOM,
+    SPRITE_UI_MINIMAP,
     SPRITE_SELECT_RING,
     SPRITE_UNIT_MINER,
     SPRITE_COUNT
@@ -34,8 +38,8 @@ struct color_t {
 
 const color_t COLOR_WHITE(255, 255, 255, 255);
 const color_t COLOR_BLACK(0, 0, 0, 255);
-const color_t COLOR_SAND(244, 204, 161, 255);
-const color_t COLOR_RED(230, 72, 46, 255);
+const color_t COLOR_SAND(226, 179, 152, 255);
+const color_t COLOR_RED(186, 97, 95, 255);
 
 enum TextAnchor {
     TEXT_ANCHOR_TOP_LEFT,
@@ -73,3 +77,6 @@ void render_rect(rect_t r, color_t color, bool fill = false);
 void render_line(ivec2 start, ivec2 end, color_t color);
 void render_map(ivec2 camera_offset, int* tiles, int map_width, int map_height);
 void render_sprite(ivec2 camera_offset, Sprite sprite, const ivec2& frame, const vec2& position, bool centered = false);
+void render_ui_frame(ivec2 position, ivec2 size);
+void render_create_minimap_texture(int map_width, int map_height);
+void render_minimap(ivec2 camera_offset, int* tiles, int* cells, int map_width, int map_height, ivec2 position, ivec2 size);

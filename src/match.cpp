@@ -13,8 +13,10 @@
 static const uint32_t TICK_DURATION = 4;
 static const uint32_t MAX_UNITS = 200;
 
-static const int CAMERA_DRAG_MARGIN = 16;
+static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
+
+static const int CELL_EMPTY = -1;
 
 // UNIT
 
@@ -81,9 +83,9 @@ struct match_state_t {
     rect_t select_rect;
 
     std::vector<int> map_tiles;
+    std::vector<int> map_cells;
     int map_width;
     int map_height;
-    std::vector<bool> cell_is_blocked;
 
     std::vector<unit_t> units[MAX_PLAYERS];
 };
@@ -92,11 +94,17 @@ static match_state_t state;
 void input_flush();
 void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length);
 
+void camera_clamp();
 void camera_move_to_cell(ivec2 cell);
+
 vec2 cell_center_position(ivec2 cell);
+bool cell_is_blocked(ivec2 cell);
+void cell_set_value(ivec2 cell, int value);
+
 void unit_spawn(uint8_t player_id, ivec2 cell);
-void unit_try_move(unit_t& unit);
-void unit_update(unit_t& unit);
+void unit_try_move(uint8_t player_id, unit_t& unit);
+void unit_update(uint8_t player_id, unit_t& unit);
+
 std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
 
 void match_init() {
@@ -120,9 +128,10 @@ void match_init() {
     state.is_selecting = false;
 
     // Init map
-    state.map_width = 40;
-    state.map_height = 24;
+    state.map_width = 80;
+    state.map_height = 48;
     state.map_tiles = std::vector<int>(state.map_width * state.map_height);
+    state.map_cells = std::vector<int>(state.map_width * state.map_height, CELL_EMPTY);
     for (int i = 0; i < state.map_width * state.map_height; i += 3) {
         state.map_tiles[i] = 1;
     }
@@ -133,35 +142,36 @@ void match_init() {
             }
         }
     }
-
-    // Init cell grid
-    state.cell_is_blocked = std::vector<bool>(state.map_width * state.map_height, false);
+    render_create_minimap_texture(state.map_width, state.map_height);
 
     // Init units
     ivec2 player_spawns[MAX_PLAYERS];
     uint8_t current_player_id = network_get_player_id();
+    uint32_t player_count = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
             continue;
         }
+        player_count++;
 
         ivec2 spawn_point;
         bool is_spawn_point_valid = false;
+        int spawn_margin = 6;
         while (!is_spawn_point_valid) {
             int spawn_edge = rand() % 4; 
             // north edge
             if (spawn_edge == 0) {
-                spawn_point = ivec2(1 + (rand() % (state.map_width - 2)), 1 + (rand() % 4));
+                spawn_point = ivec2(spawn_margin + (rand() % (state.map_width - (2 * spawn_margin))), spawn_margin + (rand() % 4));
             // south edge
             } else if (spawn_edge == 1) {
-                spawn_point = ivec2(1 + (rand() % (state.map_width - 2)), state.map_height - (1 + (rand() % 4)));
+                spawn_point = ivec2(spawn_margin + (rand() % (state.map_width - (2 * spawn_margin))), state.map_height - (spawn_margin + (rand() % 4)));
             // west edge
             } else if (spawn_edge == 2) {
-                spawn_point = ivec2(1 + (rand() % 4), 1 + (rand() % (state.map_height - 2)));
+                spawn_point = ivec2(spawn_margin + (rand() % 4), spawn_margin + (rand() % (state.map_height - (2 * spawn_margin))));
             // east edge
             } else {
-                spawn_point = ivec2(state.map_width - (1 + (rand() % 4)), 1 + (rand() % (state.map_height - 2)));
+                spawn_point = ivec2(state.map_width - (spawn_margin + (rand() % 4)), spawn_margin + (rand() % (state.map_height - (2 * spawn_margin))));
             }
             // Assert that the spawn point is even in the map
             GOLD_ASSERT(rect_t(ivec2(0, 0), ivec2(state.map_width, state.map_height)).has_point(spawn_point));
@@ -187,10 +197,14 @@ void match_init() {
 
         log_info("player %u spawn %vi", player_id, &spawn_point);
     }
+    log_info("players initialized");
 
     state.mode = MATCH_MODE_NOT_STARTED;
     if (!network_is_server()) {
         network_client_toggle_ready();
+    }
+    if (network_is_server() && player_count == 1) {
+        state.mode = MATCH_MODE_RUNNING;
     }
 }
 
@@ -220,7 +234,7 @@ void match_handle_input(uint8_t player_id, const input_t& input) {
                 ivec2 offset = unit.cell - group_center;
                 ivec2 unit_target = input.move.target_cell + offset;
                 bool is_target_invalid = is_target_inside_group || unit_target.x < 0 || unit_target.x >= state.map_width || unit_target.y < 0 || unit_target.y >= state.map_height ||
-                                         ivec2::manhattan_distance(unit_target, input.move.target_cell) > 3 || state.cell_is_blocked[unit_target.x + (unit_target.y * state.map_width)];
+                                         ivec2::manhattan_distance(unit_target, input.move.target_cell) > 3 || cell_is_blocked(unit_target);
                 if (is_target_invalid) {
                     unit_target = input.move.target_cell;
                 }
@@ -326,20 +340,21 @@ void match_update() {
     uint8_t current_player_id = network_get_player_id();
 
     // CAMERA DRAG
-    ivec2 camera_drag_direction = ivec2(0, 0);
-    if (mouse_pos.x < CAMERA_DRAG_MARGIN) {
-        camera_drag_direction.x = -1;
-    } else if (mouse_pos.x > SCREEN_WIDTH - CAMERA_DRAG_MARGIN) {
-        camera_drag_direction.x = 1;
+    if (!state.is_selecting) {
+        ivec2 camera_drag_direction = ivec2(0, 0);
+        if (mouse_pos.x < CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.x = -1;
+        } else if (mouse_pos.x > SCREEN_WIDTH - CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.x = 1;
+        }
+        if (mouse_pos.y < CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.y = -1;
+        } else if (mouse_pos.y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.y = 1;
+        }
+        state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
+        camera_clamp();
     }
-    if (mouse_pos.y < CAMERA_DRAG_MARGIN) {
-        camera_drag_direction.y = -1;
-    } else if (mouse_pos.y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
-        camera_drag_direction.y = 1;
-    }
-    state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
-    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map_width * TILE_SIZE) - SCREEN_WIDTH);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map_height * TILE_SIZE) - SCREEN_HEIGHT);
 
     // SELECT RECT
     ivec2 mouse_world_pos = mouse_pos + state.camera_offset;
@@ -384,33 +399,8 @@ void match_update() {
     // Unit update
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (unit_t& unit : state.units[player_id]) {
-            unit_update(unit);
+            unit_update(player_id, unit);
         }
-    }
-}
-
-void match_render() {
-    uint8_t current_player_id = network_get_player_id();
-
-    render_map(state.camera_offset, &state.map_tiles[0], state.map_width, state.map_height);
-
-    // Select rings
-    for (const unit_t& unit : state.units[current_player_id]) {
-        if (unit.is_selected) {
-            render_sprite(state.camera_offset, SPRITE_SELECT_RING, ivec2(0, 0), unit.position, true);
-        }
-    }
-
-    // Units
-    for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (const unit_t& unit : state.units[player_id]) {
-            render_sprite(state.camera_offset, SPRITE_UNIT_MINER, unit.animation_frame, unit.position, true);
-        }
-    }
-
-    // Select rect
-    if (state.is_selecting) {
-        render_rect(rect_t(state.select_rect.position - state.camera_offset, state.select_rect.size), COLOR_WHITE);
     }
 }
 
@@ -496,14 +486,26 @@ void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
     state.inputs[in_player_id].push_back(tick_inputs);
 }
 
+void camera_clamp() {
+    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map_width * TILE_SIZE) - SCREEN_WIDTH);
+    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT);
+}
+
 void camera_move_to_cell(ivec2 cell) {
     state.camera_offset = ivec2((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
-    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map_width * TILE_SIZE) - SCREEN_WIDTH);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map_height * TILE_SIZE) - SCREEN_HEIGHT);
+    camera_clamp();
 }
 
 vec2 cell_center_position(ivec2 cell) {
     return vec2(fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)), fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2)));
+}
+
+bool cell_is_blocked(ivec2 cell) {
+    return state.map_cells[cell.x + (cell.y * state.map_width)] == CELL_EMPTY;
+}
+
+void cell_set_value(ivec2 cell, int value) {
+    state.map_cells[cell.x + (cell.y * state.map_width)] = value;
 }
 
 void unit_spawn(uint8_t player_id, ivec2 cell) {
@@ -515,10 +517,10 @@ void unit_spawn(uint8_t player_id, ivec2 cell) {
     unit.direction = DIRECTION_SOUTH;
     state.units[player_id].push_back(unit);
 
-    state.cell_is_blocked[cell.x + (cell.y * state.map_width)] = true;
+    cell_set_value(cell, player_id);
 }
 
-void unit_try_move(unit_t& unit) {
+void unit_try_move(uint8_t player_id, unit_t& unit) {
     ivec2 next_point = unit.path[0];
 
     // Set the unit's direction, even if it doesn't begin movement
@@ -531,23 +533,23 @@ void unit_try_move(unit_t& unit) {
     }
 
     // Don't move if the tile is blocked
-    if (state.cell_is_blocked[next_point.x + (next_point.y * state.map_width)]) {
+    if (cell_is_blocked(next_point)) {
         return;
     }
 
     // Set state to begin movement
-    state.cell_is_blocked[unit.cell.x + (unit.cell.y * state.map_width)] = false;
+    cell_set_value(unit.cell, CELL_EMPTY);
     unit.cell = next_point;
-    state.cell_is_blocked[unit.cell.x + (unit.cell.y * state.map_width)] = true;
+    cell_set_value(unit.cell, player_id);
     unit.target_position = cell_center_position(unit.cell);
     unit.path.erase(unit.path.begin());
     unit.is_moving = true;
     unit.path_timer = 0;
 }
 
-void unit_update(unit_t& unit) {
+void unit_update(uint8_t player_id, unit_t& unit) {
     if (!unit.is_moving && !unit.path.empty()) {
-        unit_try_move(unit);
+        unit_try_move(player_id, unit);
         if (unit.is_moving) {
             unit.animation_frame.x = 1;
             unit.animation_timer = unit.animation_frame_duration;
@@ -567,7 +569,7 @@ void unit_update(unit_t& unit) {
                 unit.is_moving = false;
                 movement_left -= distance_to_target;
                 if (!unit.path.empty()) {
-                    unit_try_move(unit);
+                    unit_try_move(player_id, unit);
                 }
                 if (!unit.is_moving) {
                     movement_left.raw_value = 0;
@@ -649,7 +651,7 @@ std::vector<ivec2> pathfind(ivec2 from, ivec2 to) {
                 continue;
             }
             // Don't consider blocked spaces
-            if (state.cell_is_blocked[child.x + (state.map_width * child.y)]) {
+            if (cell_is_blocked(child)) {
                 continue;
             }
             // Don't consider already explored children
@@ -693,4 +695,34 @@ std::vector<ivec2> pathfind(ivec2 from, ivec2 to) {
 
     std::vector<ivec2> empty_path;
     return empty_path;
+}
+
+void match_render() {
+    uint8_t current_player_id = network_get_player_id();
+
+    render_map(state.camera_offset, &state.map_tiles[0], state.map_width, state.map_height);
+
+    // Select rings
+    for (const unit_t& unit : state.units[current_player_id]) {
+        if (unit.is_selected) {
+            render_sprite(state.camera_offset, SPRITE_SELECT_RING, ivec2(0, 0), unit.position, true);
+        }
+    }
+
+    // Units
+    for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        for (const unit_t& unit : state.units[player_id]) {
+            render_sprite(state.camera_offset, SPRITE_UNIT_MINER, unit.animation_frame, unit.position, true);
+        }
+    }
+
+    // Select rect
+    if (state.is_selecting) {
+        render_rect(rect_t(state.select_rect.position - state.camera_offset, state.select_rect.size), COLOR_WHITE);
+    }
+
+    // UI 
+    render_sprite(ivec2(0, 0), SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(72, SCREEN_HEIGHT - UI_HEIGHT));
+    render_sprite(ivec2(0, 0), SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - 72));
+    render_minimap(state.camera_offset, &state.map_tiles[0], &state.map_cells[0], state.map_width, state.map_height, ivec2(4, SCREEN_HEIGHT - 72 + 4), ivec2(64, 64));
 }
