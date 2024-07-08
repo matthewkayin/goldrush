@@ -2,8 +2,8 @@
 
 #define APP_NAME "GOLD RUSH"
 #define APP_VERSION "0.1"
-#define SCREEN_WIDTH 480
-#define SCREEN_HEIGHT 270
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 8
 #define TILE_SIZE 16
 

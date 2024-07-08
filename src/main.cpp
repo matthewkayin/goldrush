@@ -33,6 +33,7 @@ const int RENDER_TEXT_CENTERED = -1;
 const SDL_Color COLOR_BLACK = (SDL_Color) { .r = 0, .g = 0, .b = 0, .a = 255 };
 const SDL_Color COLOR_WHITE = (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 };
 const SDL_Color COLOR_SAND = (SDL_Color) { .r = 226, .g = 179, .b = 152, .a = 255 };
+const SDL_Color COLOR_SAND_DARK = (SDL_Color) { .r = 204, .g = 162, .b = 139, .a = 255 };
 const SDL_Color COLOR_RED = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 };
 const SDL_Color COLOR_GREEN = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
 
@@ -468,7 +469,7 @@ bool engine_init(ivec2 window_size) {
         SDL_FreeSurface(sprite_surface);
     }
 
-    engine.minimap_texture = NULL;
+    engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 128, 128);
     SDL_StopTextInput();
     engine.is_running = true;
 
@@ -483,9 +484,7 @@ void engine_quit() {
     for (sprite_t sprite : engine.sprites) {
         SDL_DestroyTexture(sprite.texture);
     }
-    if (engine.minimap_texture != NULL) {
-        SDL_DestroyTexture(engine.minimap_texture);
-    }
+    SDL_DestroyTexture(engine.minimap_texture);
 
     SDL_DestroyRenderer(engine.renderer);
     SDL_DestroyWindow(engine.window);
@@ -735,34 +734,35 @@ void render_match(const match_t& match) {
     }
 
     // UI 
-    render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(72, SCREEN_HEIGHT - UI_HEIGHT));
-    render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - 72));
+    render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT));
+    render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
 
     // Render minimap
-    if (engine.minimap_texture == NULL) {
-        engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, match.map_width, match.map_height);
-    }
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
 
-    SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND.r, COLOR_SAND.g, COLOR_SAND.b, COLOR_SAND.a);
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND_DARK.r, COLOR_SAND_DARK.g, COLOR_SAND_DARK.b, COLOR_SAND_DARK.a);
     SDL_RenderClear(engine.renderer);
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, COLOR_GREEN.a);
         for (const unit_t& unit : match.units[player_id]) {
-            SDL_Rect unit_rect = (SDL_Rect) { .x = unit.cell.x, .y = unit.cell.y, .w = 2, .h = 2 };
+            SDL_Rect unit_rect = (SDL_Rect) { .x = (unit.cell.x * MINIMAP_RECT.size.x) / match.map_width, .y = (unit.cell.y * MINIMAP_RECT.size.y) / match.map_height, .w = 2, .h = 2 };
             SDL_RenderDrawRect(engine.renderer, &unit_rect);
         }
     } 
 
-    SDL_Rect camera_rect = (SDL_Rect) { .x = match.camera_offset.x / TILE_SIZE, .y = match.camera_offset.y / TILE_SIZE, .w = SCREEN_WIDTH / TILE_SIZE, .h = (SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE };
+    SDL_Rect camera_rect = (SDL_Rect) { 
+        .x = ((match.camera_offset.x / TILE_SIZE) * MINIMAP_RECT.size.x) / match.map_width, 
+        .y = ((match.camera_offset.y / TILE_SIZE) * MINIMAP_RECT.size.y) / match.map_height, 
+        .w = ((SCREEN_WIDTH / TILE_SIZE) * MINIMAP_RECT.size.x) / match.map_width, 
+        .h = 1 + (((SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE) * MINIMAP_RECT.size.y) / match.map_height };
     SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(engine.renderer, &camera_rect);
 
     SDL_SetRenderTarget(engine.renderer, NULL);
 
     // Render the minimap texture
-    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = match.map_width, .h = match.map_height };
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
 }

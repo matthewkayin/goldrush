@@ -8,8 +8,8 @@
 const uint32_t MAX_UNITS = 200;
 const int CELL_EMPTY = 0;
 const int CELL_FILLED = 1;
-const int UI_HEIGHT = 62;
-const rect_t MINIMAP_RECT = rect_t(ivec2(4, SCREEN_HEIGHT - 72 + 4), ivec2(64, 64));
+const int UI_HEIGHT = 88;
+const rect_t MINIMAP_RECT = rect_t(ivec2(4, SCREEN_HEIGHT - 132), ivec2(128, 128));
 
 enum Animation {
     ANIMATION_UI_MOVE,

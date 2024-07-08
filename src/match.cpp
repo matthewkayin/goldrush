@@ -125,8 +125,8 @@ void match_t::init() {
     is_minimap_dragging = false;
 
     // Init map
-    map_width = 80;
-    map_height = 48;
+    map_width = 256;
+    map_height = 256;
     map_tiles = std::vector<int>(map_width * map_height);
     map_cells = std::vector<int>(map_width * map_height, CELL_EMPTY);
     for (int i = 0; i < map_width * map_height; i += 3) {
