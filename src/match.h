@@ -2,7 +2,6 @@
 
 #include "defines.h"
 #include "util.h"
-#include "sprite.h"
 #include <vector>
 #include <unordered_map>
 
@@ -11,6 +10,24 @@ const int CELL_EMPTY = 0;
 const int CELL_FILLED = 1;
 const int UI_HEIGHT = 62;
 const rect_t MINIMAP_RECT = rect_t(ivec2(4, SCREEN_HEIGHT - 72 + 4), ivec2(64, 64));
+
+enum Animation {
+    ANIMATION_UI_MOVE,
+    ANIMATION_UNIT_IDLE,
+    ANIMATION_UNIT_MOVE,
+    ANIMATION_UNIT_ATTACK
+};
+
+struct animation_t {
+    Animation animation;
+    uint32_t timer;
+    ivec2 frame;
+    bool is_playing = false;
+
+    void play(Animation animation);
+    void update();
+    void stop();
+};
 
 struct unit_t {
     bool is_selected;
@@ -24,9 +41,7 @@ struct unit_t {
     uint32_t path_timer;
     static const uint32_t PATH_PAUSE_DURATION = 60;
 
-    ivec2 animation_frame;
-    uint32_t animation_timer;
-    static const uint32_t animation_frame_duration = 8;
+    animation_t animation;
 
     rect_t get_rect() {
         ivec2 size = ivec2(16, 16);
@@ -72,7 +87,7 @@ struct match_t {
     rect_t select_rect;
 
     ivec2 ui_move_position;
-    animation_player_t ui_move_animation;
+    animation_t ui_move_animation;
 
     std::vector<int> map_tiles;
     std::vector<int> map_cells;

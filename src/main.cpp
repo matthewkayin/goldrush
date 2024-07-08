@@ -7,7 +7,6 @@
 #include "network.h"
 #include "platform.h"
 #include "input.h"
-#include "sprite.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
@@ -73,6 +72,17 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
 
 // SPRITE
 
+enum Sprite {
+    SPRITE_TILES,
+    SPRITE_UI_FRAME,
+    SPRITE_UI_FRAME_BOTTOM,
+    SPRITE_UI_MINIMAP,
+    SPRITE_UI_MOVE,
+    SPRITE_SELECT_RING,
+    SPRITE_UNIT_MINER,
+    SPRITE_COUNT
+};
+
 struct sprite_params_t {
     const char* path;
     int h_frames;
@@ -122,24 +132,6 @@ struct sprite_t {
     ivec2 frame_size;
     int h_frames;
     int v_frames;
-};
-
-struct animation_t {
-    Sprite sprite;
-    int h_frame_start;
-    int h_frame_end;
-    int v_frame;
-    uint32_t frame_duration;
-};
-
-const std::unordered_map<uint32_t, animation_t> animations = {
-    { ANIMATION_UI_MOVE, (animation_t) {
-        .sprite = SPRITE_UI_MOVE,
-        .h_frame_start = 0,
-        .h_frame_end = 4,
-        .v_frame = 0,
-        .frame_duration = 4
-    }}
 };
 
 struct engine_t {
@@ -553,46 +545,6 @@ size_t input_get_text_input_length() {
     return engine.input_text.length();
 }
 
-// ANIMATION
-
-void animation_player_t::play(Animation animation, bool looping) {
-    auto it = animations.find(animation);
-    GOLD_ASSERT(it != animations.end());
-
-    this->animation = animation;
-    this->looping = looping;
-    timer = 0;
-    frame.x = it->second.h_frame_start;
-    frame.y = it->second.v_frame;
-    is_playing = true;
-}
-
-void animation_player_t::update() {
-    if (!is_playing) {
-        return;
-    }
-    
-    auto it = animations.find(animation);
-
-    timer++;
-    if (timer == it->second.frame_duration) {
-        timer = 0;
-        frame.x++;
-        if (frame.x == it->second.h_frame_end + 1) {
-            if (looping) {
-                frame.x = it->second.h_frame_start;
-            } else {
-                frame.x--;
-                is_playing = false;
-            }
-        }
-    }
-}
-
-void animation_player_t::stop() {
-    is_playing = false;
-}
-
 // RENDER
 
 void render_text(Font font, const char* text, SDL_Color color, ivec2 position, TextAnchor anchor) {
@@ -726,10 +678,6 @@ void render_sprite(Sprite sprite, const ivec2& frame, const ivec2& position, boo
     SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 }
 
-void render_animation(const animation_player_t& animation, const ivec2& position) {
-    render_sprite(animations.at(animation.animation).sprite, animation.frame, position);
-}
-
 void render_match(const match_t& match) {
     uint8_t current_player_id = network_get_player_id();
 
@@ -769,13 +717,13 @@ void render_match(const match_t& match) {
 
     // UI move
     if (match.ui_move_animation.is_playing) {
-        render_sprite(animations.at(match.ui_move_animation.animation).sprite, match.ui_move_animation.frame, match.ui_move_position - match.camera_offset, true);
+        render_sprite(SPRITE_UI_MOVE, match.ui_move_animation.frame, match.ui_move_position - match.camera_offset, true);
     }
 
     // Units
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (const unit_t& unit : match.units[player_id]) {
-            render_sprite(SPRITE_UNIT_MINER, unit.animation_frame, unit.position.to_ivec2() - match.camera_offset, true);
+            render_sprite(SPRITE_UNIT_MINER, unit.animation.frame, unit.position.to_ivec2() - match.camera_offset, true);
         }
     }
 

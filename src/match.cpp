@@ -13,6 +13,92 @@ static const uint32_t TICK_DURATION = 4;
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
+// ANIMATION
+
+struct animation_data_t {
+    int v_frame;
+    int h_frame_start;
+    int h_frame_end;
+    uint32_t frame_duration;
+    bool is_looping;
+};
+
+static const std::unordered_map<uint32_t, animation_data_t> animation_data = {
+    { ANIMATION_UI_MOVE, (animation_data_t) {
+        .v_frame = 0,
+        .h_frame_start = 0, .h_frame_end = 4,
+        .frame_duration = 4,
+        .is_looping = false
+    }},
+    { ANIMATION_UNIT_IDLE, (animation_data_t) {
+        .v_frame = -1,
+        .h_frame_start = 0, .h_frame_end = 0,
+        .frame_duration = 0,
+        .is_looping = false
+    }},
+    { ANIMATION_UNIT_MOVE, (animation_data_t) {
+        .v_frame = -1,
+        .h_frame_start = 1, .h_frame_end = 4,
+        .frame_duration = 8,
+        .is_looping = true
+    }},
+    { ANIMATION_UNIT_ATTACK, (animation_data_t) {
+        .v_frame = -1,
+        .h_frame_start = 5, .h_frame_end = 7,
+        .frame_duration = 8,
+        .is_looping = false
+    }},
+};
+
+void animation_t::play(Animation animation) {
+    if (this->animation == animation && is_playing) {
+        return;
+    }
+    this->animation = animation;
+
+    auto it = animation_data.find(animation);
+    GOLD_ASSERT(it != animation_data.end());
+
+    timer = 0;
+    frame.x = it->second.h_frame_start;
+    if (it->second.v_frame != -1) {
+        frame.y = it->second.v_frame;
+    }
+    
+    // If h_frame_start == h_frame_end, then this is a single-frame "animation" so we shouldn't play it
+    if (it->second.h_frame_start == it->second.h_frame_end) {
+        is_playing = false;
+    } else {
+        is_playing = true;
+    }
+}
+
+void animation_t::update() {
+    if (!is_playing) {
+        return;
+    }
+    
+    auto it = animation_data.find(animation);
+
+    timer++;
+    if (timer == it->second.frame_duration) {
+        timer = 0;
+        frame.x++;
+        if (frame.x == it->second.h_frame_end + 1) {
+            if (it->second.is_looping) {
+                frame.x = it->second.h_frame_start;
+            } else {
+                frame.x--;
+                is_playing = false;
+            }
+        }
+    }
+}
+
+void animation_t::stop() {
+    is_playing = false;
+}
+
 vec2 cell_center_position(ivec2 cell) {
     return vec2(fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)), fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2)));
 }
@@ -279,9 +365,10 @@ void match_t::update() {
             }
             if (input.move.unit_count != 0) {
                 input_queue.push_back(input);
+
+                ui_move_position = move_target;
+                ui_move_animation.play(ANIMATION_UI_MOVE);
             }
-            ui_move_position = move_target;
-            ui_move_animation.play(ANIMATION_UI_MOVE, false);
         } 
     }
 
@@ -483,10 +570,7 @@ void match_t::unit_try_move(unit_t& unit) {
 void match_t::unit_update(unit_t& unit) {
     if (!unit.is_moving && !unit.path.empty()) {
         unit_try_move(unit);
-        if (unit.is_moving) {
-            unit.animation_frame.x = 1;
-            unit.animation_timer = unit.animation_frame_duration;
-        } else if (unit.path_timer == 0) {
+        if (!unit.is_moving) {
             unit.path_timer = unit_t::PATH_PAUSE_DURATION;
         }
     }
@@ -516,26 +600,20 @@ void match_t::unit_update(unit_t& unit) {
         }
     }
 
-    if (!unit.is_moving) {
-        unit.animation_frame.x = 0;
+    unit.animation.update();
+    if (unit.is_moving) {
+        unit.animation.play(ANIMATION_UNIT_MOVE);
     } else {
-        unit.animation_timer--;
-        if (unit.animation_timer == 0) {
-            unit.animation_frame.x++;
-            if (unit.animation_frame.x == 5) {
-                unit.animation_frame.x = 1;
-            }
-            unit.animation_timer = unit.animation_frame_duration;
-        }
+        unit.animation.play(ANIMATION_UNIT_IDLE);
     }
     if (unit.direction == DIRECTION_NORTH) {
-        unit.animation_frame.y = 1;
+        unit.animation.frame.y = 1;
     } else if (unit.direction == DIRECTION_SOUTH) {
-        unit.animation_frame.y = 0;
+        unit.animation.frame.y = 0;
     } else if (unit.direction > DIRECTION_SOUTH) {
-        unit.animation_frame.y = 3;
+        unit.animation.frame.y = 3;
     } else {
-        unit.animation_frame.y = 2;
+        unit.animation.frame.y = 2;
     }
 }
 
