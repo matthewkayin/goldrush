@@ -36,6 +36,7 @@ void match_t::init() {
 
     camera_offset = ivec2(0, 0);
     is_selecting = false;
+    is_minimap_dragging = false;
 
     // Init map
     map_width = 80;
@@ -202,7 +203,7 @@ void match_t::update() {
     uint8_t current_player_id = network_get_player_id();
 
     // CAMERA DRAG
-    if (!is_selecting) {
+    if (!is_selecting && !is_minimap_dragging) {
         ivec2 camera_drag_direction = ivec2(0, 0);
         if (mouse_pos.x < CAMERA_DRAG_MARGIN) {
             camera_drag_direction.x = -1;
@@ -221,9 +222,13 @@ void match_t::update() {
     // SELECT RECT
     ivec2 mouse_world_pos = mouse_pos + camera_offset;
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
-        // On begin selecting
-        is_selecting = true;
-        select_origin = mouse_world_pos;
+        if (MINIMAP_RECT.has_point(mouse_pos)) {
+            is_minimap_dragging = true;
+        } else {
+            // On begin selecting
+            is_selecting = true;
+            select_origin = mouse_world_pos;
+        } 
     }
     if (is_selecting) {
         // Update select rect
@@ -234,28 +239,50 @@ void match_t::update() {
         for (unit_t& unit : units[current_player_id]) {
             unit.is_selected = unit.get_rect().intersects(select_rect);
         }
+    } else if (is_minimap_dragging) {
+        ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
+        minimap_pos.x = std::clamp(minimap_pos.x, 0, MINIMAP_RECT.size.x);
+        minimap_pos.y = std::clamp(minimap_pos.y, 0, MINIMAP_RECT.size.y);
+        ivec2 map_pos = ivec2((map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+        camera_move_to_cell(map_pos / TILE_SIZE);
     }
     if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
         // On finished selecting
         is_selecting = false;
+        is_minimap_dragging = false;
     } 
 
     // Command
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
-        input_t input;
-        input.type = INPUT_MOVE;
-        input.move.target_cell = mouse_world_pos / TILE_SIZE;
-        input.move.unit_count = 0;
-        for (uint8_t unit_id = 0; unit_id < units[current_player_id].size(); unit_id++) {
-            if (!units[current_player_id][unit_id].is_selected) {
-                continue;
+        bool should_command_move = false;
+        ivec2 move_target;
+        if (MINIMAP_RECT.has_point(mouse_pos)) {
+            ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
+            move_target = ivec2((map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+            should_command_move = true;
+        } else if (mouse_pos.y < SCREEN_HEIGHT - UI_HEIGHT) {
+            move_target = mouse_world_pos;
+            should_command_move = true;
+        }
+
+        if (should_command_move) {
+            input_t input;
+            input.type = INPUT_MOVE;
+            input.move.target_cell = move_target / TILE_SIZE;
+            input.move.unit_count = 0;
+            for (uint8_t unit_id = 0; unit_id < units[current_player_id].size(); unit_id++) {
+                if (!units[current_player_id][unit_id].is_selected) {
+                    continue;
+                }
+                input.move.unit_ids[input.move.unit_count] = unit_id;
+                input.move.unit_count++;
             }
-            input.move.unit_ids[input.move.unit_count] = unit_id;
-            input.move.unit_count++;
-        }
-        if (input.move.unit_count != 0) {
-            input_queue.push_back(input);
-        }
+            if (input.move.unit_count != 0) {
+                input_queue.push_back(input);
+            }
+            ui_move_position = move_target;
+            ui_move_animation.play(ANIMATION_UI_MOVE, false);
+        } 
     }
 
     // Unit update
@@ -264,6 +291,9 @@ void match_t::update() {
             unit_update(unit);
         }
     }
+
+    // UI update
+    ui_move_animation.update();
 }
 
 void match_t::handle_input(uint8_t player_id, const input_t& input) {
@@ -305,7 +335,7 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
                 unit.path = pathfind(unit.cell, unit_target);
             }
             break;
-        }
+        } // End case UNIT_MOVE
         default:
             break;
     }
@@ -437,7 +467,6 @@ void match_t::unit_try_move(unit_t& unit) {
 
     // Don't move if the tile is blocked
     if (cell_is_blocked(next_point)) {
-        log_info("cell is blocked?");
         return;
     }
 
@@ -458,7 +487,7 @@ void match_t::unit_update(unit_t& unit) {
             unit.animation_frame.x = 1;
             unit.animation_timer = unit.animation_frame_duration;
         } else if (unit.path_timer == 0) {
-            unit.path_timer = unit.path_pause_duration;
+            unit.path_timer = unit_t::PATH_PAUSE_DURATION;
         }
     }
     if (unit.is_moving) {

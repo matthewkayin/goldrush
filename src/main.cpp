@@ -7,6 +7,7 @@
 #include "network.h"
 #include "platform.h"
 #include "input.h"
+#include "sprite.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
@@ -70,32 +71,15 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
     }}
 };
 
+// SPRITE
+
 struct sprite_params_t {
     const char* path;
     int h_frames;
     int v_frames;
 };
 
-// SPRITE
-
-enum Sprite {
-    SPRITE_TILES,
-    SPRITE_UI_FRAME,
-    SPRITE_UI_FRAME_BOTTOM,
-    SPRITE_UI_MINIMAP,
-    SPRITE_SELECT_RING,
-    SPRITE_UNIT_MINER,
-    SPRITE_COUNT
-};
-
-struct sprite_t {
-    SDL_Texture* texture;
-    ivec2 frame_size;
-    int h_frames;
-    int v_frames;
-};
-
-static const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
+const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     { SPRITE_TILES, (sprite_params_t) {
         .path = "sprite/tiles.png",
         .h_frames = -1,
@@ -116,6 +100,11 @@ static const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .h_frames = 1,
         .v_frames = 1
     }},
+    { SPRITE_UI_MOVE, (sprite_params_t) {
+        .path = "sprite/ui_move.png",
+        .h_frames = 5,
+        .v_frames = 1
+    }},
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .h_frames = 1,
@@ -126,6 +115,31 @@ static const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .h_frames = 8,
         .v_frames = 4
     }}  
+};
+
+struct sprite_t {
+    SDL_Texture* texture;
+    ivec2 frame_size;
+    int h_frames;
+    int v_frames;
+};
+
+struct animation_t {
+    Sprite sprite;
+    int h_frame_start;
+    int h_frame_end;
+    int v_frame;
+    uint32_t frame_duration;
+};
+
+const std::unordered_map<uint32_t, animation_t> animations = {
+    { ANIMATION_UI_MOVE, (animation_t) {
+        .sprite = SPRITE_UI_MOVE,
+        .h_frame_start = 0,
+        .h_frame_end = 4,
+        .v_frame = 0,
+        .frame_duration = 4
+    }}
 };
 
 struct engine_t {
@@ -290,7 +304,6 @@ int main(int argc, char** argv) {
             // Handle mouse button
             if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)  {
                 if (event.button.button - 1 < INPUT_MOUSE_BUTTON_COUNT) {
-                    log_info("button %i", event.button.button);
                     engine.mouse_button_state[event.button.button - 1] = event.type == SDL_MOUSEBUTTONDOWN;
                 }
                 break;
@@ -492,6 +505,8 @@ void engine_quit() {
     logger_quit();
 }
 
+// INPUT
+
 bool input_is_mouse_button_pressed(uint8_t button) {
     GOLD_ASSERT(button - 1 < INPUT_MOUSE_BUTTON_COUNT);
     return engine.mouse_button_state[button - 1];
@@ -538,6 +553,47 @@ size_t input_get_text_input_length() {
     return engine.input_text.length();
 }
 
+// ANIMATION
+
+void animation_player_t::play(Animation animation, bool looping) {
+    auto it = animations.find(animation);
+    GOLD_ASSERT(it != animations.end());
+
+    this->animation = animation;
+    this->looping = looping;
+    timer = 0;
+    frame.x = it->second.h_frame_start;
+    frame.y = it->second.v_frame;
+    is_playing = true;
+}
+
+void animation_player_t::update() {
+    if (!is_playing) {
+        return;
+    }
+    
+    auto it = animations.find(animation);
+
+    timer++;
+    if (timer == it->second.frame_duration) {
+        timer = 0;
+        frame.x++;
+        if (frame.x == it->second.h_frame_end + 1) {
+            if (looping) {
+                frame.x = it->second.h_frame_start;
+            } else {
+                frame.x--;
+                is_playing = false;
+            }
+        }
+    }
+}
+
+void animation_player_t::stop() {
+    is_playing = false;
+}
+
+// RENDER
 
 void render_text(Font font, const char* text, SDL_Color color, ivec2 position, TextAnchor anchor) {
     // Don't render empty strings
@@ -652,12 +708,12 @@ void render_menu(const menu_t& menu) {
     }
 }
 
-void render_sprite(ivec2 camera_offset, Sprite sprite, const ivec2& frame, const vec2& position, bool centered = false) {
+void render_sprite(Sprite sprite, const ivec2& frame, const ivec2& position, bool centered = false) {
     SDL_Rect src_rect = (SDL_Rect) { 
         .x = frame.x * engine.sprites[sprite].frame_size.x, .y = frame.y * engine.sprites[sprite].frame_size.y, 
         .w = engine.sprites[sprite].frame_size.x, .h = engine.sprites[sprite].frame_size.y };
     SDL_Rect dst_rect = (SDL_Rect) {
-        .x = position.x.integer_part() - camera_offset.x, .y = position.y.integer_part() - camera_offset.y,
+        .x = position.x, .y = position.y,
         .w = src_rect.w, .h = src_rect.h
     };
     if (dst_rect.x + dst_rect.w < 0 || dst_rect.x > SCREEN_WIDTH || dst_rect.y + dst_rect.h > SCREEN_HEIGHT || dst_rect.y < 0) {
@@ -668,6 +724,10 @@ void render_sprite(ivec2 camera_offset, Sprite sprite, const ivec2& frame, const
         dst_rect.y -= (dst_rect.h / 2);
     }
     SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+}
+
+void render_animation(const animation_player_t& animation, const ivec2& position) {
+    render_sprite(animations.at(animation.animation).sprite, animation.frame, position);
 }
 
 void render_match(const match_t& match) {
@@ -703,14 +763,19 @@ void render_match(const match_t& match) {
     // Select rings
     for (const unit_t& unit : match.units[current_player_id]) {
         if (unit.is_selected) {
-            render_sprite(match.camera_offset, SPRITE_SELECT_RING, ivec2(0, 0), unit.position, true);
+            render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, true);
         }
+    }
+
+    // UI move
+    if (match.ui_move_animation.is_playing) {
+        render_sprite(animations.at(match.ui_move_animation.animation).sprite, match.ui_move_animation.frame, match.ui_move_position - match.camera_offset, true);
     }
 
     // Units
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (const unit_t& unit : match.units[player_id]) {
-            render_sprite(match.camera_offset, SPRITE_UNIT_MINER, unit.animation_frame, unit.position, true);
+            render_sprite(SPRITE_UNIT_MINER, unit.animation_frame, unit.position.to_ivec2() - match.camera_offset, true);
         }
     }
 
@@ -722,8 +787,8 @@ void render_match(const match_t& match) {
     }
 
     // UI 
-    render_sprite(ivec2(0, 0), SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(72, SCREEN_HEIGHT - UI_HEIGHT));
-    render_sprite(ivec2(0, 0), SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - 72));
+    render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(72, SCREEN_HEIGHT - UI_HEIGHT));
+    render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - 72));
 
     // Render minimap
     if (engine.minimap_texture == NULL) {
@@ -750,6 +815,6 @@ void render_match(const match_t& match) {
 
     // Render the minimap texture
     SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = match.map_width, .h = match.map_height };
-    SDL_Rect dst_rect = (SDL_Rect) { .x = 4, .y = SCREEN_HEIGHT - 72 + 4, .w = 64, .h = 64 };
+    SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
 }

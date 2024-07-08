@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include "util.h"
+#include "sprite.h"
 #include <vector>
 #include <unordered_map>
 
@@ -9,6 +10,7 @@ const uint32_t MAX_UNITS = 200;
 const int CELL_EMPTY = 0;
 const int CELL_FILLED = 1;
 const int UI_HEIGHT = 62;
+const rect_t MINIMAP_RECT = rect_t(ivec2(4, SCREEN_HEIGHT - 72 + 4), ivec2(64, 64));
 
 struct unit_t {
     bool is_selected;
@@ -20,7 +22,7 @@ struct unit_t {
     ivec2 cell;
     std::vector<ivec2> path;
     uint32_t path_timer;
-    static const uint32_t path_pause_duration = 60;
+    static const uint32_t PATH_PAUSE_DURATION = 60;
 
     ivec2 animation_frame;
     uint32_t animation_timer;
@@ -50,7 +52,6 @@ struct input_t {
     };
 };
 
-
 enum MatchMode {
     MATCH_MODE_NOT_STARTED,
     MATCH_MODE_RUNNING
@@ -65,9 +66,13 @@ struct match_t {
 
     ivec2 camera_offset;
 
+    bool is_minimap_dragging;
     bool is_selecting;
     ivec2 select_origin;
     rect_t select_rect;
+
+    ivec2 ui_move_position;
+    animation_player_t ui_move_animation;
 
     std::vector<int> map_tiles;
     std::vector<int> map_cells;

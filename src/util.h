@@ -167,6 +167,9 @@ struct vec2 {
     vec2() = default;
     vec2(fixed x, fixed y) : x(x), y(y) {}
     vec2(const ivec2& other) : x(fixed::from_int(other.x)), y(fixed::from_int(other.y)) {}
+    ivec2 to_ivec2() const {
+        return ivec2(x.integer_part(), y.integer_part());
+    }
     bool operator==(const vec2& other) const {
         return this->x == other.x && this->y == other.y;
     }
