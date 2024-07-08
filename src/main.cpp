@@ -580,7 +580,8 @@ void render_menu(const menu_t& menu) {
     }
 
     SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND.r, COLOR_SAND.g, COLOR_SAND.b, COLOR_SAND.a);
-    SDL_RenderClear(engine.renderer);
+    SDL_Rect background_rect = (SDL_Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
+    SDL_RenderFillRect(engine.renderer, &background_rect);
 
     if (menu.mode != MENU_MODE_LOBBY) {
         render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, ivec2(RENDER_TEXT_CENTERED, 24));
