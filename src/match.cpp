@@ -209,6 +209,11 @@ void match_t::init() {
     }
     ui_button_hovered = -1;
 
+    // Init resources
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        player_gold[player_id] = 150;
+    }
+
     mode = MATCH_MODE_NOT_STARTED;
     if (!network_is_server()) {
         network_client_toggle_ready();

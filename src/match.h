@@ -138,6 +138,7 @@ struct match_t {
     int map_height;
 
     std::vector<unit_t> units[MAX_PLAYERS];
+    uint32_t player_gold[MAX_PLAYERS];
 
     void init();
     void update();

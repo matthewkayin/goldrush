@@ -81,6 +81,7 @@ enum Sprite {
     SPRITE_UI_MINIMAP,
     SPRITE_UI_BUTTON,
     SPRITE_UI_BUTTON_ICON,
+    SPRITE_UI_GOLD,
     SPRITE_UI_MOVE,
     SPRITE_SELECT_RING,
     SPRITE_UNIT_MINER,
@@ -128,6 +129,11 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .path = "sprite/ui_button_icon.png",
         .h_frames = 3,
         .v_frames = 2
+    }},
+    { SPRITE_UI_GOLD, (sprite_params_t) {
+        .path = "sprite/ui_gold.png",
+        .h_frames = 1,
+        .v_frames = 1
     }},
     { SPRITE_UI_MOVE, (sprite_params_t) {
         .path = "sprite/ui_move.png",
@@ -810,6 +816,12 @@ void render_match(const match_t& match) {
         render_sprite(SPRITE_UI_BUTTON, ivec2(is_button_hovered && !is_button_pressed ? 1 : 0, 0), match.ui_buttons[i].rect.position + offset);
         render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(match.ui_buttons[i].icon, is_button_hovered && !is_button_pressed ? 1 : 0), match.ui_buttons[i].rect.position + offset);
     }
+
+    // Resource counters
+    char gold_text[8];
+    sprintf(gold_text, "%u", match.player_gold[current_player_id]);
+    render_text(FONT_WESTERN8, gold_text, COLOR_BLACK, ivec2(SCREEN_WIDTH - 64 + 18, 4));
+    render_sprite(SPRITE_UI_GOLD, ivec2(0, 0), ivec2(SCREEN_WIDTH - 64, 2));
 
     // Render minimap
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
