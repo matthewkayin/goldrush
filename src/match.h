@@ -60,7 +60,11 @@ struct animation_t {
 enum ButtonIcon {
     BUTTON_ICON_MOVE,
     BUTTON_ICON_STOP,
-    BUTTON_ICON_ATTACK
+    BUTTON_ICON_ATTACK,
+    BUTTON_ICON_BUILD,
+    BUTTON_ICON_BUILD_HOUSE,
+    BUTTON_ICON_CANCEL,
+    BUTTON_ICON_COUNT
 };
 
 struct ui_button_t {
@@ -112,17 +116,25 @@ enum MatchMode {
     MATCH_MODE_RUNNING
 };
 
+enum UiMode {
+    UI_MODE_NONE,
+    UI_MODE_SELECTING,
+    UI_MODE_MINIMAP_DRAG,
+    UI_MODE_MINER,
+    UI_MODE_BUILD
+};
+
 struct match_t {
     MatchMode mode;
 
+    // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
     std::vector<input_t> input_queue;
     uint32_t tick_timer;
 
+    // UI
+    UiMode ui_mode;
     ivec2 camera_offset;
-
-    bool is_minimap_dragging;
-    bool is_selecting;
     ivec2 select_origin;
     rect_t select_rect;
 
@@ -132,11 +144,13 @@ struct match_t {
     ui_button_t ui_buttons[6];
     int ui_button_hovered;
 
+    // Map
     std::vector<int> map_tiles;
     std::vector<int> map_cells;
     int map_width;
     int map_height;
 
+    // Units and players
     std::vector<unit_t> units[MAX_PLAYERS];
     uint32_t player_gold[MAX_PLAYERS];
 
@@ -146,6 +160,8 @@ struct match_t {
     void input_flush();
     void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length);
 
+    void ui_refresh_buttons();
+    void ui_handle_button_pressed(ButtonIcon icon);
     void camera_clamp();
     void camera_move_to_cell(ivec2 cell);
 

@@ -127,7 +127,7 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     }},
     { SPRITE_UI_BUTTON_ICON, (sprite_params_t) {
         .path = "sprite/ui_button_icon.png",
-        .h_frames = 3,
+        .h_frames = BUTTON_ICON_COUNT,
         .v_frames = 2
     }},
     { SPRITE_UI_GOLD, (sprite_params_t) {
@@ -793,7 +793,7 @@ void render_match(const match_t& match) {
     }
 
     // Select rect
-    if (match.is_selecting) {
+    if (match.ui_mode == UI_MODE_SELECTING) {
         SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
         SDL_Rect select_rect = (SDL_Rect) { .x = match.select_rect.position.x - match.camera_offset.x, .y = match.select_rect.position.y - match.camera_offset.y, .w = match.select_rect.size.x, .h = match.select_rect.size.y };
         SDL_RenderDrawRect(engine.renderer, &select_rect);

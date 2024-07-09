@@ -121,9 +121,24 @@ void match_t::init() {
     }
     tick_timer = 0;
 
+    // Init UI
+    ui_mode = UI_MODE_NONE;
     camera_offset = ivec2(0, 0);
-    is_selecting = false;
-    is_minimap_dragging = false;
+    // Init ui buttons
+    ivec2 ui_button_padding = ivec2(4, 6);
+    ivec2 ui_button_top_left = ivec2(SCREEN_WIDTH - 132 + 14, SCREEN_HEIGHT - UI_HEIGHT + 10);
+    for (int y = 0; y < 2; y++) {
+        for (int x = 0; x < 3; x++) {
+            int index = x + (y * 3);
+            ui_buttons[index].enabled = index < 5;
+            ui_buttons[index].icon = (ButtonIcon)x;
+            ui_buttons[index].rect = rect_t(ui_button_top_left + ivec2((32 + ui_button_padding.x) * x, (32 + ui_button_padding.y) * y), ivec2(32, 32));
+        }
+    }
+    ui_buttons[3].icon = BUTTON_ICON_BUILD;
+    ui_buttons[4].icon = BUTTON_ICON_BUILD_HOUSE;
+    ui_button_hovered = -1;
+    ui_refresh_buttons();
 
     // Init map
     map_width = 256;
@@ -195,19 +210,6 @@ void match_t::init() {
         log_info("player %u spawn %vi", player_id, &spawn_point);
     }
     log_info("players initialized");
-
-    // Init ui buttons
-    ivec2 ui_button_padding = ivec2(4, 6);
-    ivec2 ui_button_top_left = ivec2(SCREEN_WIDTH - 132 + 14, SCREEN_HEIGHT - UI_HEIGHT + 10);
-    for (int y = 0; y < 2; y++) {
-        for (int x = 0; x < 3; x++) {
-            int index = x + (y * 3);
-            ui_buttons[index].enabled = false;
-            ui_buttons[index].icon = (ButtonIcon)x;
-            ui_buttons[index].rect = rect_t(ui_button_top_left + ivec2((32 + ui_button_padding.x) * x, (32 + ui_button_padding.y) * y), ivec2(32, 32));
-        }
-    }
-    ui_button_hovered = -1;
 
     // Init resources
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -308,7 +310,7 @@ void match_t::update() {
     uint8_t current_player_id = network_get_player_id();
 
     // CAMERA DRAG
-    if (!is_selecting && !is_minimap_dragging) {
+    if (ui_mode != UI_MODE_SELECTING && ui_mode != UI_MODE_MINIMAP_DRAG) {
         ivec2 camera_drag_direction = ivec2(0, 0);
         if (mouse_pos.x < CAMERA_DRAG_MARGIN) {
             camera_drag_direction.x = -1;
@@ -343,17 +345,17 @@ void match_t::update() {
     ivec2 mouse_world_pos = mouse_pos + camera_offset;
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
         if (ui_button_hovered != -1) {
-            // handle ui button press
+            ui_handle_button_pressed(ui_buttons[ui_button_hovered].icon);
         } else if (MINIMAP_RECT.has_point(mouse_pos)) {
-            is_minimap_dragging = true;
+            ui_mode = UI_MODE_MINIMAP_DRAG;
         } else if (mouse_pos.y < SCREEN_HEIGHT - UI_HEIGHT) {
             // On begin selecting
-            is_selecting = true;
+            ui_mode = UI_MODE_SELECTING;
             select_origin = mouse_world_pos;
         } 
     }
     // SELECT RECT
-    if (is_selecting) {
+    if (ui_mode == UI_MODE_SELECTING) {
         // Update select rect
         select_rect.position = ivec2(std::min(select_origin.x, mouse_world_pos.x), std::min(select_origin.y, mouse_world_pos.y));
         select_rect.size = ivec2(std::max(1, std::abs(select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(select_origin.y - mouse_world_pos.y)));
@@ -362,7 +364,7 @@ void match_t::update() {
         for (unit_t& unit : units[current_player_id]) {
             unit.is_selected = unit.get_rect().intersects(select_rect);
         }
-    } else if (is_minimap_dragging) {
+    } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
         ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
         minimap_pos.x = std::clamp(minimap_pos.x, 0, MINIMAP_RECT.size.x);
         minimap_pos.y = std::clamp(minimap_pos.y, 0, MINIMAP_RECT.size.y);
@@ -371,8 +373,25 @@ void match_t::update() {
     }
     if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
         // On finished selecting
-        is_selecting = false;
-        is_minimap_dragging = false;
+        if (ui_mode == UI_MODE_SELECTING) {
+            bool is_selecting_only_miners = true;
+            uint32_t unit_count = 0;
+            for (unit_t& unit : units[current_player_id]) {
+                if (!unit.is_selected) {
+                    continue;
+                }
+                unit_count++;
+            }
+
+            if (unit_count == 0) {
+                ui_mode = UI_MODE_NONE;
+            } else if (is_selecting_only_miners) {
+                ui_mode = UI_MODE_MINER;
+            }
+            ui_refresh_buttons();
+        } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
+            ui_mode = UI_MODE_NONE;
+        }
     } 
 
     // Command
@@ -546,6 +565,57 @@ void match_t::input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
     }
 
     inputs[in_player_id].push_back(tick_inputs);
+}
+
+void match_t::ui_refresh_buttons() {
+    switch (ui_mode) {
+        case UI_MODE_MINER: {
+            for (uint32_t i = 0; i < 6; i++) {
+                ui_buttons[i].enabled = i < 4;
+            }
+            ui_buttons[0].icon = BUTTON_ICON_MOVE;
+            ui_buttons[1].icon = BUTTON_ICON_STOP;
+            ui_buttons[2].icon = BUTTON_ICON_ATTACK;
+            ui_buttons[3].icon = BUTTON_ICON_BUILD;
+
+            break;
+        }
+        case UI_MODE_BUILD: {
+            for (uint32_t i = 0; i < 6; i++) {
+                ui_buttons[i].enabled = i == 0 || i == 5;
+            }
+            ui_buttons[0].icon = BUTTON_ICON_BUILD_HOUSE;
+            ui_buttons[5].icon = BUTTON_ICON_CANCEL;
+            
+            break;
+        }
+        case UI_MODE_NONE:
+        default: {
+            for (uint32_t i = 0; i < 6; i++) {
+                ui_buttons[i].enabled = false;
+            }
+        }
+            break;
+    }
+}
+
+void match_t::ui_handle_button_pressed(ButtonIcon icon) {
+    switch (icon) {
+        case BUTTON_ICON_BUILD: {
+            ui_mode = UI_MODE_BUILD;
+            ui_refresh_buttons();
+            break;
+        }
+        case BUTTON_ICON_CANCEL: {
+            if (ui_mode == UI_MODE_BUILD) {
+                ui_mode = UI_MODE_MINER;
+                ui_refresh_buttons();
+            }
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 void match_t::camera_clamp() {
