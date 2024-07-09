@@ -47,7 +47,7 @@ static const std::unordered_map<uint32_t, animation_data_t> animation_data = {
         .h_frame_start = 5, .h_frame_end = 7,
         .frame_duration = 8,
         .is_looping = false
-    }},
+    }}
 };
 
 void animation_t::play(Animation animation) {
@@ -83,7 +83,8 @@ void animation_t::update() {
     timer++;
     if (timer == it->second.frame_duration) {
         timer = 0;
-        frame.x++;
+        int direction = it->second.h_frame_start < it->second.h_frame_end ? 1 : -1;
+        frame.x += direction;
         if (frame.x == it->second.h_frame_end + 1) {
             if (it->second.is_looping) {
                 frame.x = it->second.h_frame_start;
@@ -195,6 +196,19 @@ void match_t::init() {
     }
     log_info("players initialized");
 
+    // Init ui buttons
+    ivec2 ui_button_padding = ivec2(4, 6);
+    ivec2 ui_button_top_left = ivec2(SCREEN_WIDTH - 132 + 14, SCREEN_HEIGHT - UI_HEIGHT + 10);
+    for (int y = 0; y < 2; y++) {
+        for (int x = 0; x < 3; x++) {
+            int index = x + (y * 3);
+            ui_buttons[index].enabled = false;
+            ui_buttons[index].icon = (ButtonIcon)x;
+            ui_buttons[index].rect = rect_t(ui_button_top_left + ivec2((32 + ui_button_padding.x) * x, (32 + ui_button_padding.y) * y), ivec2(32, 32));
+        }
+    }
+    ui_button_hovered = -1;
+
     mode = MATCH_MODE_NOT_STARTED;
     if (!network_is_server()) {
         network_client_toggle_ready();
@@ -305,17 +319,35 @@ void match_t::update() {
         camera_clamp();
     }
 
-    // SELECT RECT
+    // UI Buttons
+    if (!input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT)) {
+        ui_button_hovered = -1;
+        for (int i = 0; i < 6; i++) {
+            if (!ui_buttons[i].enabled) {
+                continue;
+            }
+
+            if (ui_buttons[i].rect.has_point(mouse_pos)) {
+                ui_button_hovered = i;
+                break;
+            }
+        }
+    }
+
+    // LEFT MOUSE CLICK
     ivec2 mouse_world_pos = mouse_pos + camera_offset;
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
-        if (MINIMAP_RECT.has_point(mouse_pos)) {
+        if (ui_button_hovered != -1) {
+            // handle ui button press
+        } else if (MINIMAP_RECT.has_point(mouse_pos)) {
             is_minimap_dragging = true;
-        } else {
+        } else if (mouse_pos.y < SCREEN_HEIGHT - UI_HEIGHT) {
             // On begin selecting
             is_selecting = true;
             select_origin = mouse_world_pos;
         } 
     }
+    // SELECT RECT
     if (is_selecting) {
         // Update select rect
         select_rect.position = ivec2(std::min(select_origin.x, mouse_world_pos.x), std::min(select_origin.y, mouse_world_pos.y));

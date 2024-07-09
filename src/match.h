@@ -41,7 +41,9 @@ enum Animation {
     ANIMATION_UI_MOVE,
     ANIMATION_UNIT_IDLE,
     ANIMATION_UNIT_MOVE,
-    ANIMATION_UNIT_ATTACK
+    ANIMATION_UNIT_ATTACK,
+    ANIMATION_UI_BUTTON_HOVER,
+    ANIMATION_UI_BUTTON_UNHOVER,
 };
 
 struct animation_t {
@@ -53,6 +55,18 @@ struct animation_t {
     void play(Animation animation);
     void update();
     void stop();
+};
+
+enum ButtonIcon {
+    BUTTON_ICON_MOVE,
+    BUTTON_ICON_STOP,
+    BUTTON_ICON_ATTACK
+};
+
+struct ui_button_t {
+    bool enabled;
+    ButtonIcon icon;
+    rect_t rect;
 };
 
 struct unit_t {
@@ -114,6 +128,9 @@ struct match_t {
 
     ivec2 ui_move_position;
     animation_t ui_move_animation;
+
+    ui_button_t ui_buttons[6];
+    int ui_button_hovered;
 
     std::vector<int> map_tiles;
     std::vector<int> map_cells;

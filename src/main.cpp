@@ -77,7 +77,10 @@ enum Sprite {
     SPRITE_TILES,
     SPRITE_UI_FRAME,
     SPRITE_UI_FRAME_BOTTOM,
+    SPRITE_UI_FRAME_BUTTONS,
     SPRITE_UI_MINIMAP,
+    SPRITE_UI_BUTTON,
+    SPRITE_UI_BUTTON_ICON,
     SPRITE_UI_MOVE,
     SPRITE_SELECT_RING,
     SPRITE_UNIT_MINER,
@@ -106,10 +109,25 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .h_frames = 1,
         .v_frames = 1
     }},
+    { SPRITE_UI_FRAME_BUTTONS, (sprite_params_t) {
+        .path = "sprite/ui_frame_buttons.png",
+        .h_frames = 1,
+        .v_frames = 1
+    }},
     { SPRITE_UI_MINIMAP, (sprite_params_t) {
         .path = "sprite/ui_minimap.png",
         .h_frames = 1,
         .v_frames = 1
+    }},
+    { SPRITE_UI_BUTTON, (sprite_params_t) {
+        .path = "sprite/ui_button.png",
+        .h_frames = 2,
+        .v_frames = 1
+    }},
+    { SPRITE_UI_BUTTON_ICON, (sprite_params_t) {
+        .path = "sprite/ui_button_icon.png",
+        .h_frames = 3,
+        .v_frames = 2
     }},
     { SPRITE_UI_MOVE, (sprite_params_t) {
         .path = "sprite/ui_move.png",
@@ -776,8 +794,22 @@ void render_match(const match_t& match) {
     }
 
     // UI 
-    render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT));
     render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
+    render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT));
+    render_sprite(SPRITE_UI_FRAME_BUTTONS, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x + engine.sprites[SPRITE_UI_FRAME_BOTTOM].frame_size.x, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y));
+
+    // UI Buttons
+    for (int i = 0; i < 6; i++) {
+        if (!match.ui_buttons[i].enabled) {
+            continue;
+        }
+
+        bool is_button_hovered = match.ui_button_hovered == i;
+        bool is_button_pressed = is_button_hovered && input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT);
+        ivec2 offset = is_button_pressed ? ivec2(1, 1) : (is_button_hovered ? ivec2(0, -1) : ivec2(0, 0));
+        render_sprite(SPRITE_UI_BUTTON, ivec2(is_button_hovered && !is_button_pressed ? 1 : 0, 0), match.ui_buttons[i].rect.position + offset);
+        render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(match.ui_buttons[i].icon, is_button_hovered && !is_button_pressed ? 1 : 0), match.ui_buttons[i].rect.position + offset);
+    }
 
     // Render minimap
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
