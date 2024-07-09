@@ -6,6 +6,11 @@ const uint8_t MOUSE_BUTTON_LEFT = 1;
 const uint8_t MOUSE_BUTTON_MIDDLE = 2;
 const uint8_t MOUSE_BUTTON_RIGHT = 3;
 
+enum Cursor {
+    CURSOR_DEFAULT,
+    CURSOR_COUNT
+};
+
 bool input_is_mouse_button_pressed(uint8_t button);
 bool input_is_mouse_button_just_pressed(uint8_t button);
 bool input_is_mouse_button_just_released(uint8_t button);

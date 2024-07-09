@@ -367,6 +367,7 @@ void match_t::update() {
                 input_queue.push_back(input);
 
                 ui_move_position = move_target;
+                ui_move_animation.stop();
                 ui_move_animation.play(ANIMATION_UI_MOVE);
             }
         } 
@@ -564,14 +565,14 @@ void match_t::unit_try_move(unit_t& unit) {
     unit.target_position = cell_center_position(unit.cell);
     unit.path.erase(unit.path.begin());
     unit.is_moving = true;
-    unit.path_timer = 0;
+    unit.path_timer.stop();
 }
 
 void match_t::unit_update(unit_t& unit) {
     if (!unit.is_moving && !unit.path.empty()) {
         unit_try_move(unit);
-        if (!unit.is_moving) {
-            unit.path_timer = unit_t::PATH_PAUSE_DURATION;
+        if (!unit.is_moving && unit.path_timer.is_stopped) {
+            unit.path_timer.start(unit_t::PATH_PAUSE_DURATION);
         }
     }
     if (unit.is_moving) {
@@ -593,10 +594,16 @@ void match_t::unit_update(unit_t& unit) {
                 }
             }
         }
-    } else if (!unit.path.empty()) {
-        unit.path_timer--;
-        if (unit.path_timer == 0) {
+    } else if (!unit.path_timer.is_stopped) {
+        unit.path_timer.update();
+        if (unit.path_timer.is_finished) {
+            unit.path_timer.stop();
+            ivec2 unit_target = unit.path[unit.path.size() - 1];
             unit.path.clear();
+            if (!cell_is_blocked(unit_target)) {
+                log_info("repathing");
+                unit.path = pathfind(unit.cell, unit_target);
+            }
         }
     }
 

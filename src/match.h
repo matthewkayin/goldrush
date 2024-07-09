@@ -11,6 +11,32 @@ const int CELL_FILLED = 1;
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(ivec2(4, SCREEN_HEIGHT - 132), ivec2(128, 128));
 
+struct timer_t {
+    uint32_t value;
+    bool is_finished = false;
+    bool is_stopped = true;
+
+    void start(uint32_t duration) {
+        value = duration;
+        is_stopped = false;
+        is_finished = false;
+    }
+    void stop() {
+        is_stopped = true;
+        is_finished = false;
+    }
+    void update() {
+        if (is_stopped) {
+            return;
+        }
+
+        value--;
+        if (value == 0) {
+            is_finished = true;
+        }
+    }
+};
+
 enum Animation {
     ANIMATION_UI_MOVE,
     ANIMATION_UNIT_IDLE,
@@ -38,7 +64,7 @@ struct unit_t {
     vec2 target_position;
     ivec2 cell;
     std::vector<ivec2> path;
-    uint32_t path_timer;
+    timer_t path_timer;
     static const uint32_t PATH_PAUSE_DURATION = 60;
 
     animation_t animation;

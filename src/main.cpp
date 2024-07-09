@@ -135,6 +135,22 @@ struct sprite_t {
     int v_frames;
 };
 
+// CURSOR
+
+struct cursor_params_t {    
+    const char* path;
+    int hot_x;
+    int hot_y;
+};
+
+const std::unordered_map<uint32_t, cursor_params_t> cursor_params = {
+    { CURSOR_DEFAULT, (cursor_params_t) {
+        .path = "sprite/ui_cursor.png",
+        .hot_x = 0,
+        .hot_y = 0
+    }}
+};
+
 struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -151,6 +167,7 @@ struct engine_t {
     // Resources
     std::vector<TTF_Font*> fonts;
     std::vector<sprite_t> sprites;
+    std::vector<SDL_Cursor*> cursors;
     SDL_Texture* minimap_texture;
 
 };
@@ -231,11 +248,6 @@ int main(int argc, char** argv) {
     double last_time = platform_get_absolute_time();
     double last_second = last_time;
     double update_accumulator = 0.0;
-    /*
-    uint32_t last_time = engine_get_ticks();
-    uint32_t last_second = last_time;
-    uint32_t accumulator = 0;
-    */
     uint32_t frames = 0;
     uint32_t fps = 0;
     uint32_t updates = 0;
@@ -469,6 +481,33 @@ bool engine_init(ivec2 window_size) {
         SDL_FreeSurface(sprite_surface);
     }
 
+    engine.cursors.reserve(CURSOR_COUNT);
+    for (uint32_t i = 0; i < CURSOR_COUNT; i++) {
+        auto it = cursor_params.find(i);
+        if (it == cursor_params.end()) {
+            log_error("Cursor params not defined for cursor %u", i);
+            return false;
+        }
+
+        SDL_Surface* cursor_image = IMG_Load((resource_base_path + std::string(it->second.path)).c_str());
+        if (cursor_image == NULL) {
+            log_error("Unable to load cursor image at path %s: %s", it->second.path, IMG_GetError());
+            return false;
+        }
+
+        SDL_Cursor* cursor = SDL_CreateColorCursor(cursor_image, it->second.hot_x, it->second.hot_y);
+        if (cursor == NULL) {
+            log_error("Unable to create cursor %u: %s", i, SDL_GetError());
+            return false;
+        }
+
+        engine.cursors.push_back(cursor);
+
+        SDL_FreeSurface(cursor_image);
+    }
+
+    SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
+
     engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 128, 128);
     SDL_StopTextInput();
     engine.is_running = true;
@@ -483,6 +522,9 @@ void engine_quit() {
     }
     for (sprite_t sprite : engine.sprites) {
         SDL_DestroyTexture(sprite.texture);
+    }
+    for (SDL_Cursor* cursor : engine.cursors) {
+        SDL_FreeCursor(cursor);
     }
     SDL_DestroyTexture(engine.minimap_texture);
 
