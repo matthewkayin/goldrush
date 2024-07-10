@@ -202,7 +202,6 @@ void match_t::init() {
         if (player_id == current_player_id) {
             camera_move_to_cell(spawn_point);
         }
-        units[player_id].reserve(MAX_UNITS);
         unit_spawn(player_id, spawn_point + ivec2(-1, -1));
         unit_spawn(player_id, spawn_point + ivec2(1, -1));
         unit_spawn(player_id, spawn_point + ivec2(0, 1));
@@ -373,7 +372,8 @@ void match_t::update() {
         select_rect.size = ivec2(std::max(1, std::abs(select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(select_origin.y - mouse_world_pos.y)));
 
         // Update unit selection
-        for (unit_t& unit : units[current_player_id]) {
+        for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
+            unit_t& unit = units[current_player_id][unit_id];
             unit.is_selected = unit.get_rect().intersects(select_rect);
         }
     } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
@@ -388,7 +388,8 @@ void match_t::update() {
         if (ui_mode == UI_MODE_SELECTING) {
             bool is_selecting_only_miners = true;
             uint32_t unit_count = 0;
-            for (unit_t& unit : units[current_player_id]) {
+            for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
+                unit_t& unit = units[current_player_id][unit_id];
                 if (!unit.is_selected) {
                     continue;
                 }
@@ -424,7 +425,7 @@ void match_t::update() {
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
             input.move.unit_count = 0;
-            for (uint8_t unit_id = 0; unit_id < units[current_player_id].size(); unit_id++) {
+            for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
                 if (!units[current_player_id][unit_id].is_selected) {
                     continue;
                 }
@@ -443,8 +444,8 @@ void match_t::update() {
 
     // Unit update
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (unit_t& unit : units[player_id]) {
-            unit_update(unit);
+        for (uint8_t unit_id = units[player_id].first(); unit_id != units[player_id].end(); units[player_id].next(unit_id)) {
+            unit_update(units[player_id][unit_id]);
         }
     }
 

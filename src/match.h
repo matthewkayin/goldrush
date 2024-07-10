@@ -2,10 +2,12 @@
 
 #include "defines.h"
 #include "util.h"
+#include "container.h"
 #include <vector>
 #include <unordered_map>
 
 const uint32_t MAX_UNITS = 200;
+const uint32_t MAX_BUILDINGS = 64;
 const int CELL_EMPTY = 0;
 const int CELL_FILLED = 1;
 const int UI_HEIGHT = 88;
@@ -187,8 +189,8 @@ struct match_t {
     int map_height;
 
     // Units and players
-    std::vector<unit_t> units[MAX_PLAYERS];
-    std::vector<building_t> buildings[MAX_PLAYERS];
+    swiss_array<unit_t, MAX_UNITS> units[MAX_PLAYERS];
+    swiss_array<building_t, MAX_BUILDINGS> buildings[MAX_PLAYERS];
     uint32_t player_gold[MAX_PLAYERS];
 
     void init();

@@ -7,6 +7,7 @@
 #include "network.h"
 #include "platform.h"
 #include "input.h"
+#include "container.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
@@ -782,7 +783,8 @@ void render_match(const match_t& match) {
     }
 
     // Select rings
-    for (const unit_t& unit : match.units[current_player_id]) {
+    for (uint8_t unit_id = match.units[current_player_id].first(); unit_id != match.units[current_player_id].end(); match.units[current_player_id].next(unit_id)) {
+        const unit_t& unit = match.units[current_player_id][unit_id];
         if (unit.is_selected) {
             render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, true);
         }
@@ -795,7 +797,8 @@ void render_match(const match_t& match) {
 
     // Units
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (const unit_t& unit : match.units[player_id]) {
+        for (uint8_t unit_id = match.units[player_id].first(); unit_id != match.units[player_id].end(); match.units[player_id].next(unit_id)) {
+            const unit_t& unit = match.units[current_player_id][unit_id];
             render_sprite(SPRITE_UNIT_MINER, unit.animation.frame, unit.position.to_ivec2() - match.camera_offset, true);
         }
     }
@@ -867,7 +870,8 @@ void render_match(const match_t& match) {
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, COLOR_GREEN.a);
-        for (const unit_t& unit : match.units[player_id]) {
+        for (uint8_t unit_id = match.units[player_id].first(); unit_id != match.units[player_id].end(); match.units[player_id].next(unit_id)) {
+            const unit_t& unit = match.units[player_id][unit_id];
             SDL_Rect unit_rect = (SDL_Rect) { .x = (unit.cell.x * MINIMAP_RECT.size.x) / match.map_width, .y = (unit.cell.y * MINIMAP_RECT.size.y) / match.map_height, .w = 2, .h = 2 };
             SDL_RenderDrawRect(engine.renderer, &unit_rect);
         }
