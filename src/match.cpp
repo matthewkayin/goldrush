@@ -543,7 +543,7 @@ void match_t::input_flush() {
                 out_buffer[out_buffer_length] = input.stop.unit_count;
                 out_buffer_length += 1;
 
-                memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.stop.unit_count * sizeof(uint8_t));
+                memcpy(out_buffer + out_buffer_length, input.stop.unit_ids, input.stop.unit_count * sizeof(uint8_t));
                 out_buffer_length += input.stop.unit_count * sizeof(uint8_t);
                 break;
             }
@@ -586,7 +586,7 @@ void match_t::input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
             case INPUT_STOP: {
                 input.stop.unit_count = in_buffer[in_buffer_head];
                 memcpy(input.stop.unit_ids, in_buffer + in_buffer_head + 1, input.stop.unit_count * sizeof(uint8_t));
-                in_buffer_head += 1 + input.move.unit_count;
+                in_buffer_head += 1 + input.stop.unit_count;
                 break;
             }
             default:
