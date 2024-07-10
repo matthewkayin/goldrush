@@ -129,7 +129,8 @@ struct building_t {
 
 enum InputType {
     INPUT_NONE,
-    INPUT_MOVE
+    INPUT_MOVE,
+    INPUT_STOP
 };
 
 struct input_move_t {
@@ -138,10 +139,16 @@ struct input_move_t {
     uint8_t unit_ids[MAX_UNITS];
 };
 
+struct input_stop_t {
+    uint8_t unit_count;
+    uint8_t unit_ids[MAX_UNITS];
+};
+
 struct input_t {
     uint8_t type;
     union {
         input_move_t move;
+        input_stop_t stop;
     };
 };
 
@@ -209,6 +216,7 @@ struct match_t {
     void cell_set_value(ivec2 cell, int value);
     void cell_set_value(ivec2 cell, ivec2 cell_size, int value);
 
+    void unit_get_selected_unit_ids(uint8_t* unit_ids, uint8_t& unit_count);
     void unit_spawn(uint8_t player_id, ivec2 cell);
     void unit_try_move(unit_t& unit);
     void unit_update(unit_t& unit);

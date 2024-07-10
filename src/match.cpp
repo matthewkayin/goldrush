@@ -141,8 +141,8 @@ void match_t::init() {
     ui_refresh_buttons();
 
     // Init map
-    map_width = 256;
-    map_height = 256;
+    map_width = 64;
+    map_height = 64;
     map_tiles = std::vector<int>(map_width * map_height);
     map_cells = std::vector<int>(map_width * map_height, CELL_EMPTY);
     for (int i = 0; i < map_width * map_height; i += 3) {
@@ -407,8 +407,8 @@ void match_t::update() {
         }
     } 
 
-    // Command
-    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
+    // Right-click move
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT) && (ui_mode != UI_MODE_SELECTING && ui_mode != UI_MODE_MINIMAP_DRAG && ui_mode != UI_MODE_BUILDING_PLACE)) {
         bool should_command_move = false;
         ivec2 move_target;
         if (MINIMAP_RECT.has_point(mouse_pos)) {
@@ -424,14 +424,7 @@ void match_t::update() {
             input_t input;
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
-            input.move.unit_count = 0;
-            for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
-                if (!units[current_player_id][unit_id].is_selected) {
-                    continue;
-                }
-                input.move.unit_ids[input.move.unit_count] = unit_id;
-                input.move.unit_count++;
-            }
+            unit_get_selected_unit_ids(input.move.unit_ids, input.move.unit_count);
             if (input.move.unit_count != 0) {
                 input_queue.push_back(input);
 
@@ -472,7 +465,7 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
             group_center = group_center / input.move.unit_count;
             bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
 
-            for (uint32_t i = 0; i < input.move.unit_count; i++) {
+            for (uint8_t i = 0; i < input.move.unit_count; i++) {
                 unit_t& unit = units[player_id][input.move.unit_ids[i]];
 
                 // Determine the unit's target
@@ -488,11 +481,22 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
                 if (unit_target == unit.cell) {
                     continue;
                 }
+                if (cell_is_blocked(unit_target)) {
+                    continue;
+                }
                 // Path to the target
                 unit.path = pathfind(unit.cell, unit_target);
             }
             break;
-        } // End case UNIT_MOVE
+        } // End case INPUT_MOVE
+        case INPUT_STOP: {
+            for (uint8_t i = 0; i < input.stop.unit_count; i++) {
+                unit_t& unit = units[player_id][input.stop.unit_ids[i]];
+
+                unit.path.clear();
+            }
+            break;
+        }
         default:
             break;
     }
@@ -535,6 +539,14 @@ void match_t::input_flush() {
                 out_buffer_length += input.move.unit_count * sizeof(uint8_t);
                 break;
             }
+            case INPUT_STOP: {
+                out_buffer[out_buffer_length] = input.stop.unit_count;
+                out_buffer_length += 1;
+
+                memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.stop.unit_count * sizeof(uint8_t));
+                out_buffer_length += input.stop.unit_count * sizeof(uint8_t);
+                break;
+            }
             default:
                 break;
         }
@@ -569,6 +581,13 @@ void match_t::input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
                 input.move.unit_count = in_buffer[in_buffer_head];
                 memcpy(input.move.unit_ids, in_buffer + in_buffer_head + 1, input.move.unit_count * sizeof(uint8_t));
                 in_buffer_head += 1 + input.move.unit_count;
+                break;
+            }
+            case INPUT_STOP: {
+                input.stop.unit_count = in_buffer[in_buffer_head];
+                memcpy(input.stop.unit_ids, in_buffer + in_buffer_head + 1, input.stop.unit_count * sizeof(uint8_t));
+                in_buffer_head += 1 + input.move.unit_count;
+                break;
             }
             default:
                 break;
@@ -621,6 +640,15 @@ void match_t::ui_refresh_buttons() {
 
 void match_t::ui_handle_button_pressed(ButtonIcon icon) {
     switch (icon) {
+        case BUTTON_ICON_STOP: {
+            input_t input;
+            input.type = INPUT_STOP;
+            unit_get_selected_unit_ids(input.stop.unit_ids, input.stop.unit_count);
+            if (input.stop.unit_count != 0) {
+                input_queue.push_back(input);
+            }
+            break;
+        }
         case BUTTON_ICON_BUILD: {
             ui_mode = UI_MODE_BUILD;
             ui_refresh_buttons();
@@ -682,6 +710,19 @@ void match_t::cell_set_value(ivec2 cell, ivec2 cell_size, int value) {
         for (int x = cell.x; x < cell.x + cell_size.x; x++) {
             map_cells[x + (y * map_width)] = value;
         }
+    }
+}
+
+void match_t::unit_get_selected_unit_ids(uint8_t* unit_ids, uint8_t& unit_count) {
+    uint8_t player_id = network_get_player_id();
+    unit_count = 0;
+    for (uint8_t unit_id = units[player_id].first(); unit_id != units[player_id].end(); units[player_id].next(unit_id)) {
+        if (!units[player_id][unit_id].is_selected) {
+            continue;
+        }
+
+        unit_ids[unit_count] = unit_id;
+        unit_count++;
     }
 }
 
