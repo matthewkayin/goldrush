@@ -325,6 +325,10 @@ void match_t::update() {
         camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
         camera_clamp();
     }
+    ivec2 mouse_world_pos = mouse_pos + camera_offset;
+    bool is_mouse_in_ui = (mouse_pos.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
+                            (mouse_pos.x <= 136 && mouse_pos.y >= SCREEN_HEIGHT - 136) ||
+                            (mouse_pos.x >= SCREEN_WIDTH - 132 && mouse_pos.y >= SCREEN_HEIGHT - 106);
 
     // UI Buttons
     if (!input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT)) {
@@ -341,14 +345,22 @@ void match_t::update() {
         }
     }
 
+    // Building placement
+    if (ui_mode == UI_MODE_BUILDING_PLACE) {
+        if (is_mouse_in_ui) {
+            ui_building_cell = ivec2(-1, -1);
+        } else {
+            ui_building_cell = mouse_world_pos / TILE_SIZE;
+        }
+    }
+
     // LEFT MOUSE CLICK
-    ivec2 mouse_world_pos = mouse_pos + camera_offset;
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
         if (ui_button_hovered != -1) {
             ui_handle_button_pressed(ui_buttons[ui_button_hovered].icon);
         } else if (MINIMAP_RECT.has_point(mouse_pos)) {
             ui_mode = UI_MODE_MINIMAP_DRAG;
-        } else if (mouse_pos.y < SCREEN_HEIGHT - UI_HEIGHT) {
+        } else if (!is_mouse_in_ui) {
             // On begin selecting
             ui_mode = UI_MODE_SELECTING;
             select_origin = mouse_world_pos;
@@ -589,6 +601,13 @@ void match_t::ui_refresh_buttons() {
             
             break;
         }
+        case UI_MODE_BUILDING_PLACE: {
+            for (uint32_t i = 0; i < 6; i++) {
+                ui_buttons[i].enabled = i == 5;
+            }
+            ui_buttons[5].icon = BUTTON_ICON_CANCEL;
+            break;
+        }
         case UI_MODE_NONE:
         default: {
             for (uint32_t i = 0; i < 6; i++) {
@@ -609,8 +628,17 @@ void match_t::ui_handle_button_pressed(ButtonIcon icon) {
         case BUTTON_ICON_CANCEL: {
             if (ui_mode == UI_MODE_BUILD) {
                 ui_mode = UI_MODE_MINER;
-                ui_refresh_buttons();
+            } else if (ui_mode == UI_MODE_BUILDING_PLACE) {
+                ui_mode = UI_MODE_BUILD;
             }
+            ui_refresh_buttons();
+            break;
+        }
+        case BUTTON_ICON_BUILD_HOUSE: {
+            ui_mode = UI_MODE_BUILDING_PLACE;
+            ui_building_type = BUILDING_HOUSE;
+            ui_building_cell = ivec2(-1, -1);
+            ui_refresh_buttons();
             break;
         }
         default:
@@ -628,12 +656,32 @@ void match_t::camera_move_to_cell(ivec2 cell) {
     camera_clamp();
 }
 
-bool match_t::cell_is_blocked(ivec2 cell) {
+bool match_t::cell_is_blocked(ivec2 cell) const {
     return map_cells[cell.x + (cell.y * map_width)] != CELL_EMPTY;
+}
+
+bool match_t::cell_is_blocked(ivec2 cell, ivec2 cell_size) const {
+    for (int y = cell.y; y < cell.y + cell_size.y; y++) {
+        for (int x = cell.x; x < cell.x + cell_size.x; x++) {
+            if (map_cells[x + (y * map_width)] != CELL_EMPTY) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 void match_t::cell_set_value(ivec2 cell, int value) {
     map_cells[cell.x + (cell.y * map_width)] = value;
+}
+
+void match_t::cell_set_value(ivec2 cell, ivec2 cell_size, int value) {
+    for (int y = cell.y; y < cell.y + cell_size.y; y++) {
+        for (int x = cell.x; x < cell.x + cell_size.x; x++) {
+            map_cells[x + (y * map_width)] = value;
+        }
+    }
 }
 
 void match_t::unit_spawn(uint8_t player_id, ivec2 cell) {
@@ -820,4 +868,20 @@ std::vector<ivec2> match_t::pathfind(ivec2 from, ivec2 to) {
 
     std::vector<ivec2> empty_path;
     return empty_path;
+}
+
+// BUILDINGS
+
+void match_t::building_create(uint8_t player_id, BuildingType type, ivec2 cell) {
+    auto it = building_data.find(type);
+    GOLD_ASSERT(it != building_data.end());
+
+    building_t building;
+    building.cell = cell;
+    building.type = type;
+    building.health = 3;
+    building.is_finished = false;
+
+    cell_set_value(cell, ivec2(it->second.cell_width, it->second.cell_height), CELL_FILLED);
+    buildings[player_id].push_back(building);
 }

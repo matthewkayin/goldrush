@@ -49,7 +49,7 @@ enum Animation {
 struct animation_t {
     Animation animation;
     uint32_t timer;
-    ivec2 frame;
+    ivec2 frame = ivec2(0, 0);
     bool is_playing = false;
 
     void play(Animation animation);
@@ -93,6 +93,38 @@ struct unit_t {
     }
 };
 
+enum BuildingType {
+    BUILDING_HOUSE
+};
+
+struct building_data_t {
+    int cell_width;
+    int cell_height;
+    uint32_t cost;
+    uint32_t max_health;
+};
+
+const std::unordered_map<uint32_t, building_data_t> building_data = {
+    { BUILDING_HOUSE, (building_data_t) {
+        .cell_width = 2, .cell_height = 2,
+        .cost = 100,
+        .max_health = 100
+    }}
+};
+
+struct building_t {
+    BuildingType type;
+    ivec2 cell;
+    uint32_t health;
+    bool is_finished;
+
+    rect_t get_rect() {
+        auto it = building_data.find(type);
+        return rect_t(cell * TILE_SIZE, ivec2(it->second.cell_width, it->second.cell_height) * TILE_SIZE);
+    }
+};
+
+
 enum InputType {
     INPUT_NONE,
     INPUT_MOVE
@@ -121,7 +153,8 @@ enum UiMode {
     UI_MODE_SELECTING,
     UI_MODE_MINIMAP_DRAG,
     UI_MODE_MINER,
-    UI_MODE_BUILD
+    UI_MODE_BUILD,
+    UI_MODE_BUILDING_PLACE
 };
 
 struct match_t {
@@ -144,6 +177,9 @@ struct match_t {
     ui_button_t ui_buttons[6];
     int ui_button_hovered;
 
+    BuildingType ui_building_type;
+    ivec2 ui_building_cell;
+
     // Map
     std::vector<int> map_tiles;
     std::vector<int> map_cells;
@@ -152,6 +188,7 @@ struct match_t {
 
     // Units and players
     std::vector<unit_t> units[MAX_PLAYERS];
+    std::vector<building_t> buildings[MAX_PLAYERS];
     uint32_t player_gold[MAX_PLAYERS];
 
     void init();
@@ -165,12 +202,15 @@ struct match_t {
     void camera_clamp();
     void camera_move_to_cell(ivec2 cell);
 
-    bool cell_is_blocked(ivec2 cell);
+    bool cell_is_blocked(ivec2 cell) const;
+    bool cell_is_blocked(ivec2 cell, ivec2 cell_size) const;
     void cell_set_value(ivec2 cell, int value);
+    void cell_set_value(ivec2 cell, ivec2 cell_size, int value);
 
     void unit_spawn(uint8_t player_id, ivec2 cell);
     void unit_try_move(unit_t& unit);
     void unit_update(unit_t& unit);
-
     std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
+
+    void building_create(uint8_t player_id, BuildingType type, ivec2 cell);
 };

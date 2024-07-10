@@ -85,6 +85,7 @@ enum Sprite {
     SPRITE_UI_MOVE,
     SPRITE_SELECT_RING,
     SPRITE_UNIT_MINER,
+    SPRITE_BUILDING_HOUSE,
     SPRITE_COUNT
 };
 
@@ -149,6 +150,11 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .path = "sprite/unit_miner.png",
         .h_frames = 8,
         .v_frames = 4
+    }},
+    { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
+        .path = "sprite/building_house.png",
+        .h_frames = 4,
+        .v_frames = 1
     }}  
 };
 
@@ -726,6 +732,8 @@ void render_menu(const menu_t& menu) {
 }
 
 void render_sprite(Sprite sprite, const ivec2& frame, const ivec2& position, bool centered = false) {
+    GOLD_ASSERT(frame.x < engine.sprites[sprite].h_frames && frame.y < engine.sprites[sprite].v_frames);
+
     SDL_Rect src_rect = (SDL_Rect) { 
         .x = frame.x * engine.sprites[sprite].frame_size.x, .y = frame.y * engine.sprites[sprite].frame_size.y, 
         .w = engine.sprites[sprite].frame_size.x, .h = engine.sprites[sprite].frame_size.y };
@@ -792,6 +800,34 @@ void render_match(const match_t& match) {
         }
     }
 
+    // Building placement
+    if (match.ui_mode == UI_MODE_BUILDING_PLACE && match.ui_building_cell.x != -1) {
+        int sprite = SPRITE_BUILDING_HOUSE + match.ui_building_type;
+        GOLD_ASSERT(sprite < SPRITE_COUNT);
+        render_sprite((Sprite)(sprite), ivec2(3, 0), (match.ui_building_cell * TILE_SIZE) - match.camera_offset);
+
+        auto it = building_data.find(match.ui_building_type);
+        bool is_placement_out_of_bounds = match.ui_building_cell.x + it->second.cell_width > match.map_width || 
+                                          match.ui_building_cell.y + it->second.cell_height > match.map_height;
+        SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+        for (int y = match.ui_building_cell.y; y < match.ui_building_cell.y + it->second.cell_height; y++) {
+            for (int x = match.ui_building_cell.x; x < match.ui_building_cell.x + it->second.cell_width; x++) {
+                bool is_cell_green;
+                if (is_placement_out_of_bounds) {
+                    is_cell_green = false;
+                } else {
+                    is_cell_green = !match.cell_is_blocked(ivec2(x, y));
+                }
+
+                SDL_Color cell_color = is_cell_green ? COLOR_GREEN : COLOR_RED;
+                SDL_SetRenderDrawColor(engine.renderer, cell_color.r, cell_color.g, cell_color.b, 128);
+                SDL_Rect cell_rect = (SDL_Rect) { .x = (x * TILE_SIZE) - match.camera_offset.x, .y = (y * TILE_SIZE) - match.camera_offset.y, .w = TILE_SIZE, .h = TILE_SIZE };
+                SDL_RenderFillRect(engine.renderer, &cell_rect);
+            }
+        }
+        SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
+    }
+
     // Select rect
     if (match.ui_mode == UI_MODE_SELECTING) {
         SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
@@ -799,7 +835,7 @@ void render_match(const match_t& match) {
         SDL_RenderDrawRect(engine.renderer, &select_rect);
     }
 
-    // UI 
+    // UI frames
     render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
     render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT));
     render_sprite(SPRITE_UI_FRAME_BUTTONS, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x + engine.sprites[SPRITE_UI_FRAME_BOTTOM].frame_size.x, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y));
