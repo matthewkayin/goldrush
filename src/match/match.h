@@ -3,15 +3,60 @@
 #include "defines.h"
 #include "util.h"
 #include "container.h"
+#include "animation.h"
+#include "match_input.h"
 #include <vector>
 #include <unordered_map>
 
-const uint32_t MAX_UNITS = 200;
-const uint32_t MAX_BUILDINGS = 64;
-const int CELL_EMPTY = 0;
-const int CELL_FILLED = 1;
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(ivec2(4, SCREEN_HEIGHT - 132), ivec2(128, 128));
+
+// ENUMS
+
+enum ButtonIcon {
+    BUTTON_ICON_MOVE,
+    BUTTON_ICON_STOP,
+    BUTTON_ICON_ATTACK,
+    BUTTON_ICON_BUILD,
+    BUTTON_ICON_BUILD_HOUSE,
+    BUTTON_ICON_CANCEL,
+    BUTTON_ICON_COUNT
+};
+
+enum BuildingType {
+    BUILDING_HOUSE
+};
+
+enum CellValue {
+    CELL_EMPTY,
+    CELL_FILLED
+};
+
+enum MatchMode {
+    MATCH_MODE_NOT_STARTED,
+    MATCH_MODE_RUNNING
+};
+
+enum OrderType {
+    ORDER_NONE,
+    ORDER_MOVE,
+    ORDER_BUILD
+};
+
+enum UiMode {
+    UI_MODE_NONE,
+    UI_MODE_SELECTING,
+    UI_MODE_MINIMAP_DRAG,
+    UI_MODE_MINER,
+    UI_MODE_BUILD,
+    UI_MODE_BUILDING_PLACE
+};
+
+enum UnitMode {
+    UNIT_MODE_IDLE,
+    UNIT_MODE_STEP,
+    UNIT_MODE_BUILD
+};
 
 struct timer_t {
     uint32_t value;
@@ -39,64 +84,40 @@ struct timer_t {
     }
 };
 
-enum Animation {
-    ANIMATION_UI_MOVE,
-    ANIMATION_UNIT_IDLE,
-    ANIMATION_UNIT_MOVE,
-    ANIMATION_UNIT_ATTACK,
-    ANIMATION_UI_BUTTON_HOVER,
-    ANIMATION_UI_BUTTON_UNHOVER,
-};
-
-struct animation_t {
-    Animation animation;
-    uint32_t timer;
-    ivec2 frame = ivec2(0, 0);
-    bool is_playing = false;
-
-    void play(Animation animation);
-    void update();
-    void stop();
-};
-
-enum ButtonIcon {
-    BUTTON_ICON_MOVE,
-    BUTTON_ICON_STOP,
-    BUTTON_ICON_ATTACK,
-    BUTTON_ICON_BUILD,
-    BUTTON_ICON_BUILD_HOUSE,
-    BUTTON_ICON_CANCEL,
-    BUTTON_ICON_COUNT
-};
-
 struct ui_button_t {
     bool enabled;
     ButtonIcon icon;
     rect_t rect;
 };
 
+struct order_move_t {
+    ivec2 cell;
+};
+
+struct order_build_t {
+    ivec2 cell;
+    BuildingType type;
+};
+
 struct unit_t {
     bool is_selected;
+    UnitMode mode;
+    OrderType order_type;
+    ivec2 order_cell;
+    BuildingType order_building_type;
 
-    bool is_moving;
     int direction;
+    ivec2 cell;
     vec2 position;
     vec2 target_position;
-    ivec2 cell;
+
     std::vector<ivec2> path;
     timer_t path_timer;
     static const uint32_t PATH_PAUSE_DURATION = 60;
 
+    uint8_t building_id;
+
     animation_t animation;
-
-    rect_t get_rect() {
-        ivec2 size = ivec2(16, 16);
-        return rect_t(ivec2(position.x.integer_part(), position.y.integer_part()) - (size / 2), size);
-    }
-};
-
-enum BuildingType {
-    BUILDING_HOUSE
 };
 
 struct building_data_t {
@@ -106,64 +127,11 @@ struct building_data_t {
     uint32_t max_health;
 };
 
-const std::unordered_map<uint32_t, building_data_t> building_data = {
-    { BUILDING_HOUSE, (building_data_t) {
-        .cell_width = 2, .cell_height = 2,
-        .cost = 100,
-        .max_health = 100
-    }}
-};
-
 struct building_t {
     BuildingType type;
     ivec2 cell;
     uint32_t health;
     bool is_finished;
-
-    rect_t get_rect() {
-        auto it = building_data.find(type);
-        return rect_t(cell * TILE_SIZE, ivec2(it->second.cell_width, it->second.cell_height) * TILE_SIZE);
-    }
-};
-
-
-enum InputType {
-    INPUT_NONE,
-    INPUT_MOVE,
-    INPUT_STOP
-};
-
-struct input_move_t {
-    ivec2 target_cell;
-    uint8_t unit_count;
-    uint8_t unit_ids[MAX_UNITS];
-};
-
-struct input_stop_t {
-    uint8_t unit_count;
-    uint8_t unit_ids[MAX_UNITS];
-};
-
-struct input_t {
-    uint8_t type;
-    union {
-        input_move_t move;
-        input_stop_t stop;
-    };
-};
-
-enum MatchMode {
-    MATCH_MODE_NOT_STARTED,
-    MATCH_MODE_RUNNING
-};
-
-enum UiMode {
-    UI_MODE_NONE,
-    UI_MODE_SELECTING,
-    UI_MODE_MINIMAP_DRAG,
-    UI_MODE_MINER,
-    UI_MODE_BUILD,
-    UI_MODE_BUILDING_PLACE
 };
 
 struct match_t {
@@ -203,24 +171,33 @@ struct match_t {
     void init();
     void update();
     void handle_input(uint8_t player_id, const input_t& input);
-    void input_flush();
-    void input_deserialize(uint8_t* in_buffer, size_t in_buffer_length);
 
+    void ui_on_selection_changed();
     void ui_refresh_buttons();
     void ui_handle_button_pressed(ButtonIcon icon);
     void camera_clamp();
     void camera_move_to_cell(ivec2 cell);
 
+    bool cell_is_in_bounds(ivec2 cell) const;
     bool cell_is_blocked(ivec2 cell) const;
     bool cell_is_blocked(ivec2 cell, ivec2 cell_size) const;
     void cell_set_value(ivec2 cell, int value);
     void cell_set_value(ivec2 cell, ivec2 cell_size, int value);
 
-    void unit_get_selected_unit_ids(uint8_t* unit_ids, uint8_t& unit_count);
-    void unit_spawn(uint8_t player_id, ivec2 cell);
-    void unit_try_move(unit_t& unit);
-    void unit_update(unit_t& unit);
+    void unit_create(uint8_t player_id, ivec2 cell);
+    rect_t unit_get_rect(unit_t& unit) const;
+    void unit_try_step(unit_t& unit);
+    void unit_update(uint8_t player_id, unit_t& unit);
     std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
 
-    void building_create(uint8_t player_id, BuildingType type, ivec2 cell);
+    uint8_t building_create(uint8_t player_id, BuildingType type, ivec2 cell);
+    ivec2 building_get_nearest_free_cell(building_t& building) const;
+};
+
+const std::unordered_map<uint32_t, building_data_t> building_data = {
+    { BUILDING_HOUSE, (building_data_t) {
+        .cell_width = 2, .cell_height = 2,
+        .cost = 100,
+        .max_health = 100
+    }}
 };

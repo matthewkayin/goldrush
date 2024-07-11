@@ -3,7 +3,7 @@
 #include "logger.h"
 #include "util.h"
 #include "menu.h"
-#include "match.h"
+#include "match/match.h"
 #include "network.h"
 #include "platform.h"
 #include "input.h"

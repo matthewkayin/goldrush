@@ -39,7 +39,7 @@ struct swiss_array {
         }
     }
 
-    void push_back(const T& value) {
+    uint8_t push_back(const T& value) {
         GOLD_ASSERT(length < capacity);
 
         uint8_t index = 0;
@@ -49,6 +49,8 @@ struct swiss_array {
         data[index] = value;
         filled[index] = true;
         length++;
+
+        return index;
     }
     void remove_at(uint8_t index) {
         GOLD_ASSERT(filled[index]);

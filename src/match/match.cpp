@@ -13,93 +13,6 @@ static const uint32_t TICK_DURATION = 4;
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
-// ANIMATION
-
-struct animation_data_t {
-    int v_frame;
-    int h_frame_start;
-    int h_frame_end;
-    uint32_t frame_duration;
-    bool is_looping;
-};
-
-static const std::unordered_map<uint32_t, animation_data_t> animation_data = {
-    { ANIMATION_UI_MOVE, (animation_data_t) {
-        .v_frame = 0,
-        .h_frame_start = 0, .h_frame_end = 4,
-        .frame_duration = 4,
-        .is_looping = false
-    }},
-    { ANIMATION_UNIT_IDLE, (animation_data_t) {
-        .v_frame = -1,
-        .h_frame_start = 0, .h_frame_end = 0,
-        .frame_duration = 0,
-        .is_looping = false
-    }},
-    { ANIMATION_UNIT_MOVE, (animation_data_t) {
-        .v_frame = -1,
-        .h_frame_start = 1, .h_frame_end = 4,
-        .frame_duration = 8,
-        .is_looping = true
-    }},
-    { ANIMATION_UNIT_ATTACK, (animation_data_t) {
-        .v_frame = -1,
-        .h_frame_start = 5, .h_frame_end = 7,
-        .frame_duration = 8,
-        .is_looping = false
-    }}
-};
-
-void animation_t::play(Animation animation) {
-    if (this->animation == animation && is_playing) {
-        return;
-    }
-    this->animation = animation;
-
-    auto it = animation_data.find(animation);
-    GOLD_ASSERT(it != animation_data.end());
-
-    timer = 0;
-    frame.x = it->second.h_frame_start;
-    if (it->second.v_frame != -1) {
-        frame.y = it->second.v_frame;
-    }
-    
-    // If h_frame_start == h_frame_end, then this is a single-frame "animation" so we shouldn't play it
-    if (it->second.h_frame_start == it->second.h_frame_end) {
-        is_playing = false;
-    } else {
-        is_playing = true;
-    }
-}
-
-void animation_t::update() {
-    if (!is_playing) {
-        return;
-    }
-    
-    auto it = animation_data.find(animation);
-
-    timer++;
-    if (timer == it->second.frame_duration) {
-        timer = 0;
-        int direction = it->second.h_frame_start < it->second.h_frame_end ? 1 : -1;
-        frame.x += direction;
-        if (frame.x == it->second.h_frame_end + 1) {
-            if (it->second.is_looping) {
-                frame.x = it->second.h_frame_start;
-            } else {
-                frame.x--;
-                is_playing = false;
-            }
-        }
-    }
-}
-
-void animation_t::stop() {
-    is_playing = false;
-}
-
 vec2 cell_center_position(ivec2 cell) {
     return vec2(fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)), fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2)));
 }
@@ -202,9 +115,9 @@ void match_t::init() {
         if (player_id == current_player_id) {
             camera_move_to_cell(spawn_point);
         }
-        unit_spawn(player_id, spawn_point + ivec2(-1, -1));
-        unit_spawn(player_id, spawn_point + ivec2(1, -1));
-        unit_spawn(player_id, spawn_point + ivec2(0, 1));
+        unit_create(player_id, spawn_point + ivec2(-1, -1));
+        unit_create(player_id, spawn_point + ivec2(1, -1));
+        unit_create(player_id, spawn_point + ivec2(0, 1));
 
         log_info("player %u spawn %vi", player_id, &spawn_point);
     }
@@ -259,7 +172,20 @@ void match_t::update() {
     while (network_poll_events(&network_event)) {
         switch (network_event.type) {
             case NETWORK_EVENT_INPUT: {
-                input_deserialize(network_event.input.data, network_event.input.data_length);
+                // Deserialize input
+                std::vector<input_t> tick_inputs;
+
+                uint8_t* in_buffer = network_event.input.data;
+                size_t in_buffer_length = network_event.input.data_length;
+
+                uint8_t in_player_id = in_buffer[1];
+                size_t in_buffer_head = 2;
+
+                while (in_buffer_head < in_buffer_length) {
+                    tick_inputs.push_back(input_deserialize(in_buffer, in_buffer_head));
+                }
+
+                inputs[in_player_id].push_back(tick_inputs);
                 break;
             }
             default:
@@ -301,7 +227,39 @@ void match_t::update() {
         }
 
         tick_timer = TICK_DURATION;
-        input_flush();
+
+        // Flush input
+        static uint8_t out_buffer[INPUT_BUFFER_SIZE];
+        static size_t out_buffer_length;
+
+        // Always send at least 1 input per tick
+        if (input_queue.empty()) {
+            input_t empty_input;
+            empty_input.type = INPUT_NONE;
+            input_queue.push_back(empty_input);
+        }
+
+        // Assert that the out buffer is big enough
+        GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * input_queue.size()));
+
+        // Leave a space in the buffer for the network message type
+        uint8_t current_player_id = network_get_player_id();
+        out_buffer[1] = current_player_id;
+        out_buffer_length = 2;
+
+        // Serialize the inputs
+        for (const input_t& input : input_queue) {
+            input_serialize(out_buffer, out_buffer_length, input);
+        }
+        inputs[current_player_id].push_back(input_queue);
+        input_queue.clear();
+
+        // Send them to other players
+        if (network_is_server()) {
+            network_server_send_input(out_buffer, out_buffer_length);
+        } else {
+            network_client_send_input(out_buffer, out_buffer_length);
+        }
     }
     tick_timer--;
 
@@ -357,6 +315,29 @@ void match_t::update() {
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
         if (ui_button_hovered != -1) {
             ui_handle_button_pressed(ui_buttons[ui_button_hovered].icon);
+        } else if (ui_mode == UI_MODE_BUILDING_PLACE) {
+            if (!is_mouse_in_ui) {
+                ivec2 building_cell_size = ivec2(building_data.at(ui_building_type).cell_width, building_data.at(ui_building_type).cell_height);
+                bool building_can_be_placed = ui_building_cell.x + building_cell_size.x < map_width + 1 && 
+                                              ui_building_cell.y + building_cell_size.y < map_height + 1 &&
+                                              !cell_is_blocked(ui_building_cell, building_cell_size);
+                if (building_can_be_placed) {
+                    input_t input;
+                    input.type = INPUT_BUILD;
+                    input.build.building_type = ui_building_type;
+                    input.build.target_cell = ui_building_cell;
+                    for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
+                        if (units[current_player_id][unit_id].is_selected) {
+                            input.build.unit_id = unit_id;
+                            break;
+                        }
+                    }
+                    log_info("ordering build for unit %u", input.build.unit_id);
+                    input_queue.push_back(input);
+
+                    ui_mode = UI_MODE_MINER;
+                }
+            }
         } else if (MINIMAP_RECT.has_point(mouse_pos)) {
             ui_mode = UI_MODE_MINIMAP_DRAG;
         } else if (!is_mouse_in_ui) {
@@ -374,7 +355,7 @@ void match_t::update() {
         // Update unit selection
         for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
             unit_t& unit = units[current_player_id][unit_id];
-            unit.is_selected = unit.get_rect().intersects(select_rect);
+            unit.is_selected = unit_get_rect(unit).intersects(select_rect);
         }
     } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
         ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
@@ -386,22 +367,7 @@ void match_t::update() {
     if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
         // On finished selecting
         if (ui_mode == UI_MODE_SELECTING) {
-            bool is_selecting_only_miners = true;
-            uint32_t unit_count = 0;
-            for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
-                unit_t& unit = units[current_player_id][unit_id];
-                if (!unit.is_selected) {
-                    continue;
-                }
-                unit_count++;
-            }
-
-            if (unit_count == 0) {
-                ui_mode = UI_MODE_NONE;
-            } else if (is_selecting_only_miners) {
-                ui_mode = UI_MODE_MINER;
-            }
-            ui_refresh_buttons();
+            ui_on_selection_changed();
         } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
             ui_mode = UI_MODE_NONE;
         }
@@ -424,7 +390,15 @@ void match_t::update() {
             input_t input;
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
-            unit_get_selected_unit_ids(input.move.unit_ids, input.move.unit_count);
+            input.move.unit_count = 0;
+            for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
+                if (!units[current_player_id][unit_id].is_selected) {
+                    continue;
+                }
+                input.move.unit_ids[input.move.unit_count] = unit_id;
+                input.move.unit_count++;
+            }
+            log_info("selected unit count %i", input.move.unit_count);
             if (input.move.unit_count != 0) {
                 input_queue.push_back(input);
 
@@ -438,7 +412,7 @@ void match_t::update() {
     // Unit update
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (uint8_t unit_id = units[player_id].first(); unit_id != units[player_id].end(); units[player_id].next(unit_id)) {
-            unit_update(units[player_id][unit_id]);
+            unit_update(player_id, units[player_id][unit_id]);
         }
     }
 
@@ -486,6 +460,7 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
                 }
                 // Path to the target
                 unit.path = pathfind(unit.cell, unit_target);
+                unit.order_type = ORDER_MOVE;
             }
             break;
         } // End case INPUT_MOVE
@@ -497,106 +472,58 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
             }
             break;
         }
+        case INPUT_BUILD: {
+            unit_t& unit = units[player_id][input.build.unit_id];
+
+            // Determine the unit's target
+            ivec2 nearest_cell = input.build.target_cell;
+            int nearest_cell_dist = ivec2::manhattan_distance(unit.cell, nearest_cell);
+            for (int y = input.build.target_cell.y; y < input.build.target_cell.y + building_data.at(input.build.building_type).cell_height; y++) {
+                for (int x = input.build.target_cell.x; x < input.build.target_cell.x + building_data.at(input.build.building_type).cell_width; x++) {
+                    if (x == 0 && y == 0) {
+                        continue;
+                    }
+
+                    int cell_dist = ivec2::manhattan_distance(unit.cell, ivec2(x, y));
+                    if (cell_dist < nearest_cell_dist) {
+                        nearest_cell = ivec2(x, y);
+                        nearest_cell_dist = cell_dist;
+                    }
+                }
+            }
+
+            unit.path = pathfind(unit.cell, nearest_cell);
+            unit.order_type = ORDER_BUILD;
+            unit.order_building_type = (BuildingType)input.build.building_type;
+            unit.order_cell = input.build.target_cell;
+        }
         default:
             break;
     }
 }
 
-void match_t::input_flush() {
-    static const uint32_t INPUT_MAX_SIZE = 201;
+// UI
 
-    static uint8_t out_buffer[INPUT_BUFFER_SIZE];
-    static size_t out_buffer_length;
-
-    // Always send at least 1 input per tick
-    if (input_queue.empty()) {
-        input_t empty_input;
-        empty_input.type = INPUT_NONE;
-        input_queue.push_back(empty_input);
-    }
-
-    // Assert that the out buffer is big enough
-    GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * input_queue.size()));
-
-    // Leave a space in the buffer for the network message type
+void match_t::ui_on_selection_changed() {
     uint8_t current_player_id = network_get_player_id();
-    out_buffer[1] = current_player_id;
-    out_buffer_length = 2;
 
-    // Serialize the inputs
-    for (const input_t& input : input_queue) {
-        out_buffer[out_buffer_length] = input.type;
-        out_buffer_length++;
-        switch (input.type) {
-            case INPUT_MOVE: {
-                memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(ivec2));
-                out_buffer_length += sizeof(ivec2);
-
-                out_buffer[out_buffer_length] = input.move.unit_count;
-                out_buffer_length += 1;
-
-                memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
-                out_buffer_length += input.move.unit_count * sizeof(uint8_t);
-                break;
-            }
-            case INPUT_STOP: {
-                out_buffer[out_buffer_length] = input.stop.unit_count;
-                out_buffer_length += 1;
-
-                memcpy(out_buffer + out_buffer_length, input.stop.unit_ids, input.stop.unit_count * sizeof(uint8_t));
-                out_buffer_length += input.stop.unit_count * sizeof(uint8_t);
-                break;
-            }
-            default:
-                break;
+    uint32_t unit_count = 0;
+    for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
+        unit_t& unit = units[current_player_id][unit_id];
+        if (!unit.is_selected) {
+            continue;
         }
+        unit_count++;
     }
-    inputs[current_player_id].push_back(input_queue);
-    input_queue.clear();
 
-    // Send them to other players
-    if (network_is_server()) {
-        network_server_send_input(out_buffer, out_buffer_length);
+    if (unit_count == 0) {
+        ui_mode = UI_MODE_NONE;
+    } else if (unit_count == 1) {
+        ui_mode = UI_MODE_MINER;
     } else {
-        network_client_send_input(out_buffer, out_buffer_length);
+        ui_mode = UI_MODE_NONE;
     }
-}
-
-void match_t::input_deserialize(uint8_t* in_buffer, size_t in_buffer_length) {
-    std::vector<input_t> tick_inputs;
-
-    uint8_t in_player_id = in_buffer[1];
-    size_t in_buffer_head = 2;
-
-    while (in_buffer_head < in_buffer_length) {
-        input_t input;
-        input.type = in_buffer[in_buffer_head];
-        in_buffer_head++;
-
-        switch (input.type) {
-            case INPUT_MOVE: {
-                memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(ivec2));
-                in_buffer_head += sizeof(ivec2);
-
-                input.move.unit_count = in_buffer[in_buffer_head];
-                memcpy(input.move.unit_ids, in_buffer + in_buffer_head + 1, input.move.unit_count * sizeof(uint8_t));
-                in_buffer_head += 1 + input.move.unit_count;
-                break;
-            }
-            case INPUT_STOP: {
-                input.stop.unit_count = in_buffer[in_buffer_head];
-                memcpy(input.stop.unit_ids, in_buffer + in_buffer_head + 1, input.stop.unit_count * sizeof(uint8_t));
-                in_buffer_head += 1 + input.stop.unit_count;
-                break;
-            }
-            default:
-                break;
-        }
-
-        tick_inputs.push_back(input);
-    }
-
-    inputs[in_player_id].push_back(tick_inputs);
+    ui_refresh_buttons();
 }
 
 void match_t::ui_refresh_buttons() {
@@ -643,7 +570,15 @@ void match_t::ui_handle_button_pressed(ButtonIcon icon) {
         case BUTTON_ICON_STOP: {
             input_t input;
             input.type = INPUT_STOP;
-            unit_get_selected_unit_ids(input.stop.unit_ids, input.stop.unit_count);
+            input.stop.unit_count = 0;
+            uint8_t player_id = network_get_player_id();
+            for (uint8_t unit_id = units[player_id].first(); unit_id != units[player_id].end(); units[player_id].next(unit_id)) {
+                if (!units[player_id][unit_id].is_selected) {
+                    continue;
+                }
+                input.stop.unit_ids[input.stop.unit_count] = unit_id;
+                input.stop.unit_count++;
+            }
             if (input.stop.unit_count != 0) {
                 input_queue.push_back(input);
             }
@@ -685,6 +620,12 @@ void match_t::camera_move_to_cell(ivec2 cell) {
     camera_clamp();
 }
 
+// CELL HELPERS
+
+bool match_t::cell_is_in_bounds(ivec2 cell) const {
+    return !(cell.x < 0 || cell.y < 0 || cell.x >= map_width || cell.y >= map_height);
+}
+
 bool match_t::cell_is_blocked(ivec2 cell) const {
     return map_cells[cell.x + (cell.y * map_width)] != CELL_EMPTY;
 }
@@ -693,12 +634,12 @@ bool match_t::cell_is_blocked(ivec2 cell, ivec2 cell_size) const {
     for (int y = cell.y; y < cell.y + cell_size.y; y++) {
         for (int x = cell.x; x < cell.x + cell_size.x; x++) {
             if (map_cells[x + (y * map_width)] != CELL_EMPTY) {
-                return false;
+                return true;
             }
         }
     }
 
-    return true;
+    return false;
 }
 
 void match_t::cell_set_value(ivec2 cell, int value) {
@@ -713,23 +654,12 @@ void match_t::cell_set_value(ivec2 cell, ivec2 cell_size, int value) {
     }
 }
 
-void match_t::unit_get_selected_unit_ids(uint8_t* unit_ids, uint8_t& unit_count) {
-    uint8_t player_id = network_get_player_id();
-    unit_count = 0;
-    for (uint8_t unit_id = units[player_id].first(); unit_id != units[player_id].end(); units[player_id].next(unit_id)) {
-        if (!units[player_id][unit_id].is_selected) {
-            continue;
-        }
+// UNITS
 
-        unit_ids[unit_count] = unit_id;
-        unit_count++;
-    }
-}
-
-void match_t::unit_spawn(uint8_t player_id, ivec2 cell) {
+void match_t::unit_create(uint8_t player_id, ivec2 cell) {
     unit_t unit;
     unit.is_selected = false;
-    unit.is_moving = false;
+    unit.mode = UNIT_MODE_IDLE;
     unit.cell = cell;
     unit.position = cell_center_position(cell);
     unit.direction = DIRECTION_SOUTH;
@@ -738,7 +668,11 @@ void match_t::unit_spawn(uint8_t player_id, ivec2 cell) {
     cell_set_value(cell, CELL_FILLED);
 }
 
-void match_t::unit_try_move(unit_t& unit) {
+rect_t match_t::unit_get_rect(unit_t& unit) const {
+    return rect_t(ivec2(unit.position.x.integer_part(), unit.position.y.integer_part()), ivec2(16, 16));
+}
+
+void match_t::unit_try_step(unit_t& unit) {
     ivec2 next_point = unit.path[0];
 
     // Set the unit's direction, even if it doesn't begin movement
@@ -752,6 +686,7 @@ void match_t::unit_try_move(unit_t& unit) {
 
     // Don't move if the tile is blocked
     if (cell_is_blocked(next_point)) {
+        unit.path_timer.start(unit_t::PATH_PAUSE_DURATION);
         return;
     }
 
@@ -761,18 +696,17 @@ void match_t::unit_try_move(unit_t& unit) {
     cell_set_value(unit.cell, CELL_FILLED);
     unit.target_position = cell_center_position(unit.cell);
     unit.path.erase(unit.path.begin());
-    unit.is_moving = true;
+    unit.mode = UNIT_MODE_STEP;
     unit.path_timer.stop();
 }
 
-void match_t::unit_update(unit_t& unit) {
-    if (!unit.is_moving && !unit.path.empty()) {
-        unit_try_move(unit);
-        if (!unit.is_moving && unit.path_timer.is_stopped) {
-            unit.path_timer.start(unit_t::PATH_PAUSE_DURATION);
-        }
+void match_t::unit_update(uint8_t player_id, unit_t& unit) {
+    // If we're not stepping but we have a path to follow, then try to move
+    if (unit.mode != UNIT_MODE_STEP && !unit.path.empty()) {
+        unit_try_step(unit);
     }
-    if (unit.is_moving) {
+    // Update step
+    if (unit.mode == UNIT_MODE_STEP) {
         fixed movement_left = fixed::from_int(1);
         while (movement_left.raw_value > 0) {
             fixed distance_to_target = unit.position.distance_to(unit.target_position);
@@ -781,16 +715,30 @@ void match_t::unit_update(unit_t& unit) {
                 movement_left = 0;
             } else {
                 unit.position = unit.target_position;
-                unit.is_moving = false;
+                unit.mode = UNIT_MODE_IDLE;
                 movement_left -= distance_to_target;
+
                 if (!unit.path.empty()) {
-                    unit_try_move(unit);
+                    unit_try_step(unit);
+                } else {
+                    // on finished movement
+                    if (unit.order_type == ORDER_MOVE) {
+                        unit.order_type = ORDER_NONE;
+                    } else if (unit.order_type == ORDER_BUILD) {
+                        log_info("unit creating building.");
+                        unit.building_id = building_create(player_id, unit.order_building_type, unit.order_cell);
+                        unit.mode = UNIT_MODE_BUILD;
+                        unit.is_selected = false;
+                        ui_on_selection_changed();
+                    }
                 }
-                if (!unit.is_moving) {
+
+                if (unit.mode != UNIT_MODE_STEP) {
                     movement_left.raw_value = 0;
                 }
             }
         }
+    // Update path timer
     } else if (!unit.path_timer.is_stopped) {
         unit.path_timer.update();
         if (unit.path_timer.is_finished) {
@@ -798,14 +746,34 @@ void match_t::unit_update(unit_t& unit) {
             ivec2 unit_target = unit.path[unit.path.size() - 1];
             unit.path.clear();
             if (!cell_is_blocked(unit_target)) {
-                log_info("repathing");
                 unit.path = pathfind(unit.cell, unit_target);
+            } else {
+                unit.order_type = ORDER_NONE;
             }
+        }
+    // Update building
+    } else if (unit.mode == UNIT_MODE_BUILD) {
+        building_t& building = buildings[player_id][unit.building_id];
+
+        building.health++;
+        if (building.health >= building_data.at(building.type).max_health) {
+            building.health = building_data.at(building.type).max_health;
+            building.is_finished = true;
+        }
+        if (building.is_finished) {
+            // On building finished
+            log_info("building finished");
+            unit.cell = building_get_nearest_free_cell(building);
+            cell_set_value(unit.cell, CELL_FILLED);
+            unit.position = cell_center_position(unit.cell);
+            unit.mode = UNIT_MODE_IDLE;
+            unit.order_type = ORDER_NONE;
         }
     }
 
+    // Update animation
     unit.animation.update();
-    if (unit.is_moving) {
+    if (unit.mode == UNIT_MODE_STEP) {
         unit.animation.play(ANIMATION_UNIT_MOVE);
     } else {
         unit.animation.play(ANIMATION_UNIT_IDLE);
@@ -914,7 +882,8 @@ std::vector<ivec2> match_t::pathfind(ivec2 from, ivec2 to) {
 
 // BUILDINGS
 
-void match_t::building_create(uint8_t player_id, BuildingType type, ivec2 cell) {
+uint8_t match_t::building_create(uint8_t player_id, BuildingType type, ivec2 cell) {
+    log_info("building create called");
     auto it = building_data.find(type);
     GOLD_ASSERT(it != building_data.end());
 
@@ -925,5 +894,52 @@ void match_t::building_create(uint8_t player_id, BuildingType type, ivec2 cell) 
     building.is_finished = false;
 
     cell_set_value(cell, ivec2(it->second.cell_width, it->second.cell_height), CELL_FILLED);
-    buildings[player_id].push_back(building);
+    return buildings[player_id].push_back(building);
+}
+
+ivec2 match_t::building_get_nearest_free_cell(building_t& building) const {
+    ivec2 cell = building.cell + ivec2(-1, 0);
+    bool cell_is_valid = cell_is_in_bounds(cell) && !cell_is_blocked(cell);
+
+    int step_count = 0;
+    int x_step_amount = building_data.at(building.type).cell_width + 1;
+    int y_step_amount = building_data.at(building.type).cell_height;
+    Direction step_direction = DIRECTION_SOUTH;
+
+    while (!cell_is_valid) {
+        cell += DIRECTION_IVEC2[step_direction];
+        step_count++;
+
+        bool is_y_stepping = step_direction == DIRECTION_SOUTH || step_direction == DIRECTION_NORTH;
+        int step_amount = is_y_stepping ? y_step_amount : x_step_amount;
+        if (step_count == step_amount) {
+            if (is_y_stepping) {
+                y_step_amount++;
+            } else {
+                x_step_amount++;
+            }
+            step_count = 0;
+
+            switch (step_direction) {
+                case DIRECTION_SOUTH:
+                    step_direction = DIRECTION_EAST;
+                    break;
+                case DIRECTION_EAST:
+                    step_direction = DIRECTION_NORTH;
+                    break;
+                case DIRECTION_NORTH:
+                    step_direction = DIRECTION_WEST;
+                    break;
+                case DIRECTION_WEST:
+                    step_direction = DIRECTION_SOUTH;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        cell_is_valid = cell_is_in_bounds(cell) && !cell_is_blocked(cell);
+    }
+
+    return cell;
 }
