@@ -728,6 +728,7 @@ void match_t::unit_update(uint8_t player_id, unit_t& unit) {
                         log_info("unit creating building.");
                         unit.building_id = building_create(player_id, unit.order_building_type, unit.order_cell);
                         unit.mode = UNIT_MODE_BUILD;
+                        unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
                         unit.is_selected = false;
                         ui_on_selection_changed();
                     }
@@ -753,39 +754,48 @@ void match_t::unit_update(uint8_t player_id, unit_t& unit) {
         }
     // Update building
     } else if (unit.mode == UNIT_MODE_BUILD) {
-        building_t& building = buildings[player_id][unit.building_id];
+        unit.build_timer.update();
+        if (unit.build_timer.is_finished) {
+            building_t& building = buildings[player_id][unit.building_id];
 
-        building.health++;
-        if (building.health >= building_data.at(building.type).max_health) {
-            building.health = building_data.at(building.type).max_health;
-            building.is_finished = true;
-        }
-        if (building.is_finished) {
-            // On building finished
-            log_info("building finished");
-            unit.cell = building_get_nearest_free_cell(building);
-            cell_set_value(unit.cell, CELL_FILLED);
-            unit.position = cell_center_position(unit.cell);
-            unit.mode = UNIT_MODE_IDLE;
-            unit.order_type = ORDER_NONE;
-        }
+            building.health++;
+            if (building.health >= building_data.at(building.type).max_health) {
+                building.health = building_data.at(building.type).max_health;
+                building.is_finished = true;
+            }
+            if (building.is_finished) {
+                // On building finished
+                log_info("building finished");
+                unit.cell = building_get_nearest_free_cell(building);
+                cell_set_value(unit.cell, CELL_FILLED);
+                unit.position = cell_center_position(unit.cell);
+                unit.mode = UNIT_MODE_IDLE;
+                unit.order_type = ORDER_NONE;
+            } else {
+                unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
+            }
+        } 
     }
 
     // Update animation
-    unit.animation.update();
     if (unit.mode == UNIT_MODE_STEP) {
         unit.animation.play(ANIMATION_UNIT_MOVE);
+    } else if (unit.mode == UNIT_MODE_BUILD) {
+        unit.animation.play(ANIMATION_UNIT_BUILD);
     } else {
         unit.animation.play(ANIMATION_UNIT_IDLE);
     }
-    if (unit.direction == DIRECTION_NORTH) {
-        unit.animation.frame.y = 1;
-    } else if (unit.direction == DIRECTION_SOUTH) {
-        unit.animation.frame.y = 0;
-    } else if (unit.direction > DIRECTION_SOUTH) {
-        unit.animation.frame.y = 3;
-    } else {
-        unit.animation.frame.y = 2;
+    unit.animation.update();
+    if (unit.mode != UNIT_MODE_BUILD) {
+        if (unit.direction == DIRECTION_NORTH) {
+            unit.animation.frame.y = 1;
+        } else if (unit.direction == DIRECTION_SOUTH) {
+            unit.animation.frame.y = 0;
+        } else if (unit.direction > DIRECTION_SOUTH) {
+            unit.animation.frame.y = 3;
+        } else {
+            unit.animation.frame.y = 2;
+        }
     }
 }
 

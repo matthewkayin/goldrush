@@ -116,6 +116,8 @@ struct unit_t {
     static const uint32_t PATH_PAUSE_DURATION = 60;
 
     uint8_t building_id;
+    timer_t build_timer;
+    static const uint32_t BUILD_TICK_DURATION = 8;
 
     animation_t animation;
 };
@@ -125,6 +127,18 @@ struct building_data_t {
     int cell_height;
     uint32_t cost;
     uint32_t max_health;
+    int builder_position_x[3];
+    int builder_position_y[3];
+};
+
+const std::unordered_map<uint32_t, building_data_t> building_data = {
+    { BUILDING_HOUSE, (building_data_t) {
+        .cell_width = 2, .cell_height = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_position_x = { 3, 16, -4 },
+        .builder_position_y = { 15, 15, 3 }
+    }}
 };
 
 struct building_t {
@@ -192,12 +206,4 @@ struct match_t {
 
     uint8_t building_create(uint8_t player_id, BuildingType type, ivec2 cell);
     ivec2 building_get_nearest_free_cell(building_t& building) const;
-};
-
-const std::unordered_map<uint32_t, building_data_t> building_data = {
-    { BUILDING_HOUSE, (building_data_t) {
-        .cell_width = 2, .cell_height = 2,
-        .cost = 100,
-        .max_health = 100
-    }}
 };

@@ -35,6 +35,12 @@ static const std::unordered_map<uint32_t, animation_data_t> animation_data = {
         .h_frame_start = 5, .h_frame_end = 7,
         .frame_duration = 8,
         .is_looping = false
+    }},
+    { ANIMATION_UNIT_BUILD, (animation_data_t) {
+        .v_frame = 0,
+        .h_frame_start = 0, .h_frame_end = 1,
+        .frame_duration = 8,
+        .is_looping = true
     }}
 };
 
@@ -53,26 +59,19 @@ void animation_t::play(Animation animation) {
         frame.y = it->second.v_frame;
     }
     
-    // If h_frame_start == h_frame_end, then this is a single-frame "animation" so we shouldn't play it
-    if (it->second.h_frame_start == it->second.h_frame_end) {
-        is_playing = false;
-    } else {
-        is_playing = true;
-    }
+    is_playing = true;
 }
 
 void animation_t::update() {
-    if (!is_playing) {
+    auto it = animation_data.find(animation);
+    if (!is_playing || it->second.h_frame_start == it->second.h_frame_end) {
         return;
     }
-    
-    auto it = animation_data.find(animation);
 
     timer++;
     if (timer == it->second.frame_duration) {
         timer = 0;
-        int direction = it->second.h_frame_start < it->second.h_frame_end ? 1 : -1;
-        frame.x += direction;
+        frame.x++;
         if (frame.x == it->second.h_frame_end + 1) {
             if (it->second.is_looping) {
                 frame.x = it->second.h_frame_start;

@@ -85,6 +85,7 @@ enum Sprite {
     SPRITE_UI_GOLD,
     SPRITE_UI_MOVE,
     SPRITE_SELECT_RING,
+    SPRITE_MINER_BUILDING,
     SPRITE_UNIT_MINER,
     SPRITE_BUILDING_HOUSE,
     SPRITE_COUNT
@@ -145,6 +146,11 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .h_frames = 1,
+        .v_frames = 1
+    }},
+    { SPRITE_MINER_BUILDING, (sprite_params_t) {
+        .path = "sprite/unit_miner_building.png",
+        .h_frames = 2,
         .v_frames = 1
     }},
     { SPRITE_UNIT_MINER, (sprite_params_t) {
@@ -732,8 +738,22 @@ void render_menu(const menu_t& menu) {
     }
 }
 
-void render_sprite(Sprite sprite, const ivec2& frame, const ivec2& position, bool centered = false, bool cull = true) {
+struct render_sprite_params_t {
+    Sprite sprite;
+    ivec2 position;
+    ivec2 frame;
+    uint32_t options;
+};
+const uint32_t RENDER_SPRITE_FLIP_H = 1;
+const uint32_t RENDER_SPRITE_CENTERED = 1 << 1;
+const uint32_t RENDER_SPRITE_NO_CULL = 1 << 2;
+
+void render_sprite(Sprite sprite, const ivec2& frame, const ivec2& position, uint32_t options = 0) {
     GOLD_ASSERT(frame.x < engine.sprites[sprite].h_frames && frame.y < engine.sprites[sprite].v_frames);
+
+    bool flip_h = (options & RENDER_SPRITE_FLIP_H) == RENDER_SPRITE_FLIP_H;
+    bool centered = (options & RENDER_SPRITE_CENTERED) == RENDER_SPRITE_CENTERED;
+    bool cull = !((options & RENDER_SPRITE_NO_CULL) == RENDER_SPRITE_NO_CULL);
 
     SDL_Rect src_rect = (SDL_Rect) { 
         .x = frame.x * engine.sprites[sprite].frame_size.x, .y = frame.y * engine.sprites[sprite].frame_size.y, 
@@ -751,40 +771,35 @@ void render_sprite(Sprite sprite, const ivec2& frame, const ivec2& position, boo
         dst_rect.x -= (dst_rect.w / 2);
         dst_rect.y -= (dst_rect.h / 2);
     }
-    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+
+    SDL_RenderCopyEx(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect, NULL, NULL, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 }
 
-struct rendered_unit_t {
-    Sprite sprite;
-    ivec2 position;
-    ivec2 frame;
-};
-
-int unit_ysort_partition(rendered_unit_t* rendered_units, int low, int high) {
-    rendered_unit_t pivot = rendered_units[high];
+int ysort_partition(render_sprite_params_t* params, int low, int high) {
+    render_sprite_params_t pivot = params[high];
     int i = low - 1;
 
     for (int j = low; j <= high - 1; j++) {
-        if (rendered_units[j].position.y < pivot.position.y) {
+        if (params[j].position.y < pivot.position.y) {
             i++;
-            rendered_unit_t temp = rendered_units[j];
-            rendered_units[j] = rendered_units[i];
-            rendered_units[i] = temp;
+            render_sprite_params_t temp = params[j];
+            params[j] = params[i];
+            params[i] = temp;
         }
     }
 
-    rendered_unit_t temp = rendered_units[high];
-    rendered_units[high] = rendered_units[i + 1];
-    rendered_units[i + 1] = temp;
+    render_sprite_params_t temp = params[high];
+    params[high] = params[i + 1];
+    params[i + 1] = temp;
 
     return i + 1;
 }
 
-void unit_ysort(rendered_unit_t* rendered_units, int low, int high) {
+void ysort(render_sprite_params_t* params, int low, int high) {
     if (low < high) {
-        int partition_index = unit_ysort_partition(rendered_units, low, high);
-        unit_ysort(rendered_units, low, partition_index - 1);
-        unit_ysort(rendered_units, partition_index + 1, high);
+        int partition_index = ysort_partition(params, low, high);
+        ysort(params, low, partition_index - 1);
+        ysort(params, partition_index + 1, high);
     }
 }
 
@@ -822,18 +837,45 @@ void render_match(const match_t& match) {
     for (uint8_t unit_id = match.units[current_player_id].first(); unit_id != match.units[current_player_id].end(); match.units[current_player_id].next(unit_id)) {
         const unit_t& unit = match.units[current_player_id][unit_id];
         if (unit.is_selected) {
-            render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, true);
+            render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, RENDER_SPRITE_CENTERED);
         }
     }
 
     // UI move
     if (match.ui_move_animation.is_playing) {
-        render_sprite(SPRITE_UI_MOVE, match.ui_move_animation.frame, match.ui_move_position - match.camera_offset, true);
+        render_sprite(SPRITE_UI_MOVE, match.ui_move_animation.frame, match.ui_move_position - match.camera_offset, RENDER_SPRITE_CENTERED);
+    }
+
+    // Y-Sort
+    static render_sprite_params_t ysorted[(MAX_UNITS + MAX_BUILDINGS) * MAX_PLAYERS];
+    uint32_t ysorted_count = 0;
+
+    // Buildings
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        for (uint8_t building_id = match.buildings[player_id].first(); building_id != match.buildings[player_id].end(); match.buildings[player_id].next(building_id)) {
+            const building_t& building = match.buildings[player_id][building_id];
+            int sprite = SPRITE_BUILDING_HOUSE + building.type;
+            GOLD_ASSERT(sprite < SPRITE_COUNT);
+
+            // Cull the building sprite
+            ivec2 building_render_pos = (building.cell * TILE_SIZE) - match.camera_offset;
+            ivec2 building_render_size = engine.sprites[sprite].frame_size;
+            if (building_render_pos.x + building_render_size.x < 0 || building_render_pos.x > SCREEN_WIDTH || building_render_pos.y + building_render_size.y < 0 || building_render_pos.y > SCREEN_HEIGHT) {
+                continue;
+            }
+
+            int hframe = building.is_finished ? 3 : ((3 * building.health) / building_data.at(building.type).max_health);
+            ysorted[ysorted_count] = (render_sprite_params_t) {
+                .sprite = (Sprite)sprite,
+                .position = building_render_pos,
+                .frame = ivec2(hframe, 0),
+                .options = RENDER_SPRITE_NO_CULL
+            };
+            ysorted_count++;
+        }
     }
 
     // Units
-    static rendered_unit_t rendered_units[MAX_UNITS * MAX_PLAYERS];
-    uint32_t rendered_unit_count = 0;
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (uint8_t unit_id = match.units[player_id].first(); unit_id != match.units[player_id].end(); match.units[player_id].next(unit_id)) {
             const unit_t& unit = match.units[player_id][unit_id];
@@ -845,26 +887,34 @@ void render_match(const match_t& match) {
                 continue;
             }
 
-            rendered_units[rendered_unit_count] = (rendered_unit_t) { .sprite = SPRITE_UNIT_MINER, .position = unit_render_pos, .frame = unit.animation.frame };
-            rendered_unit_count++;
+            ysorted[ysorted_count] = (render_sprite_params_t) { 
+                .sprite = SPRITE_UNIT_MINER, 
+                .position = unit_render_pos, 
+                .frame = unit.animation.frame ,
+                .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
+            };
+            if (unit.mode == UNIT_MODE_BUILD) {
+                const building_t& building = match.buildings[player_id][unit.building_id];
+                const building_data_t& data = building_data.at(building.type);
+                int hframe = ((3 * building.health) / data.max_health);
+                ysorted[ysorted_count].sprite = SPRITE_MINER_BUILDING;
+
+                ivec2 building_position = (building.cell * TILE_SIZE) - match.camera_offset;
+                ysorted[ysorted_count].position.x = building_position.x + data.builder_position_x[hframe];
+                ysorted[ysorted_count].position.y = building_position.y + data.builder_position_y[hframe];
+
+                ysorted[ysorted_count].options &= ~RENDER_SPRITE_CENTERED;
+                if (hframe == 1) {
+                    ysorted[ysorted_count].options |= RENDER_SPRITE_FLIP_H;
+                }
+            }
+            ysorted_count++;
         }
     }
-    unit_ysort(rendered_units, 0, rendered_unit_count - 1);
-    for (uint32_t i = 0; i < rendered_unit_count; i++) {
-        const rendered_unit_t& unit = rendered_units[i];
-        render_sprite(unit.sprite, unit.frame, unit.position, true, false);
-    }
-
-    // Buildings
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (uint8_t building_id = match.buildings[player_id].first(); building_id != match.buildings[player_id].end(); match.buildings[player_id].next(building_id)) {
-            const building_t& building = match.buildings[player_id][building_id];
-            int sprite = SPRITE_BUILDING_HOUSE + building.type;
-            GOLD_ASSERT(sprite < SPRITE_COUNT);
-
-            int hframe = building.is_finished ? 3 : ((3 * building.health) / building_data.at(building.type).max_health);
-            render_sprite((Sprite)sprite, ivec2(hframe, 0), (building.cell * TILE_SIZE) - match.camera_offset);
-        }
+    ysort(ysorted, 0, ysorted_count - 1);
+    for (uint32_t i = 0; i < ysorted_count; i++) {
+        const render_sprite_params_t& params= ysorted[i];
+        render_sprite(params.sprite, params.frame, params.position, params.options);
     }
 
     // Building placement
