@@ -21,11 +21,13 @@ enum ButtonIcon {
     BUTTON_ICON_BUILD,
     BUTTON_ICON_BUILD_HOUSE,
     BUTTON_ICON_CANCEL,
+    BUTTON_ICON_BUILD_CAMP,
     BUTTON_ICON_COUNT
 };
 
 enum BuildingType {
-    BUILDING_HOUSE
+    BUILDING_HOUSE,
+    BUILDING_CAMP
 };
 
 enum CellValue {
@@ -145,6 +147,7 @@ struct building_data_t {
     uint32_t max_health;
     int builder_positions_x[3];
     int builder_positions_y[3];
+    bool builder_flip_h[3];
 
     ivec2 cell_size() const {
         return ivec2(cell_width, cell_height);
@@ -248,5 +251,15 @@ const std::unordered_map<uint32_t, building_data_t> building_data = {
         .max_health = 100,
         .builder_positions_x = { 3, 16, -4 },
         .builder_positions_y = { 15, 15, 3 },
+        .builder_flip_h = { false, true, false }
+    }},
+    { BUILDING_CAMP, (building_data_t) {
+        .cell_width = 2,
+        .cell_height = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_positions_x = { 1, 15, 14 },
+        .builder_positions_y = { 13, 13, 2 },
+        .builder_flip_h = { false, true, true }
     }}
 };

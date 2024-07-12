@@ -609,9 +609,10 @@ void match_t::ui_refresh_buttons() {
         }
         case UI_MODE_BUILD: {
             for (uint32_t i = 0; i < 6; i++) {
-                ui_buttons[i].enabled = i == 0 || i == 5;
+                ui_buttons[i].enabled = i == 0 || i == 1 || i == 5;
             }
             ui_buttons[0].icon = BUTTON_ICON_BUILD_HOUSE;
+            ui_buttons[1].icon = BUTTON_ICON_BUILD_CAMP;
             ui_buttons[5].icon = BUTTON_ICON_CANCEL;
             
             break;
@@ -680,6 +681,10 @@ void match_t::ui_handle_button_pressed(ButtonIcon icon) {
             ui_try_begin_building_place(BUILDING_HOUSE);
             break;
         }
+        case BUTTON_ICON_BUILD_CAMP: {
+            ui_try_begin_building_place(BUILDING_CAMP);
+            break;
+        }
         default:
             break;
     }
@@ -691,7 +696,7 @@ void match_t::ui_try_begin_building_place(BuildingType building_type) {
         ui_show_status("Not enough gold.");
     } else {
         ui_mode = UI_MODE_BUILDING_PLACE;
-        ui_building_type = BUILDING_HOUSE;
+        ui_building_type = building_type;
         ui_building_cell = ivec2(-1, -1);
         ui_refresh_buttons();
     }

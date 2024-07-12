@@ -89,6 +89,7 @@ enum Sprite {
     SPRITE_MINER_BUILDING,
     SPRITE_UNIT_MINER,
     SPRITE_BUILDING_HOUSE,
+    SPRITE_BUILDING_CAMP,
     SPRITE_COUNT
 };
 
@@ -166,6 +167,11 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     }},
     { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
         .path = "sprite/building_house.png",
+        .h_frames = 4,
+        .v_frames = 1
+    }},
+    { SPRITE_BUILDING_CAMP, (sprite_params_t) {
+        .path = "sprite/building_camp.png",
         .h_frames = 4,
         .v_frames = 1
     }}  
@@ -953,7 +959,7 @@ void render_match(const match_t& match) {
                 ysorted[ysorted_count].position = building_position + data.builder_positions(hframe);
 
                 ysorted[ysorted_count].options &= ~RENDER_SPRITE_CENTERED;
-                if (hframe == 1) {
+                if (data.builder_flip_h[hframe]) {
                     ysorted[ysorted_count].options |= RENDER_SPRITE_FLIP_H;
                 }
             }
