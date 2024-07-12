@@ -28,6 +28,7 @@ void input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input
         }
         case INPUT_BUILD: {
             memcpy(out_buffer + out_buffer_length, &input.build, sizeof(input_build_t));
+            out_buffer_length += sizeof(input_build_t);
             break;
         }
         default:

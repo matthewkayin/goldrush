@@ -11,7 +11,7 @@
 #define MAX_BUILDINGS 64
 #define TILE_SIZE 16
 
-typedef uint16_t id_t;
+typedef uint8_t id_t;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1

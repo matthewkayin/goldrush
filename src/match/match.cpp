@@ -439,7 +439,11 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
             bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
 
             for (uint8_t i = 0; i < input.move.unit_count; i++) {
-                unit_t& unit = units[player_id][input.move.unit_ids[i]];
+                uint32_t unit_index = units[player_id].get_index_of(input.move.unit_ids[i]);
+                if (unit_index == id_array<unit_t>::INDEX_INVALID) {
+                    continue;
+                }
+                unit_t& unit = units[player_id][unit_index];
 
                 // Determine the unit's target
                 ivec2 offset = unit.cell - group_center;
@@ -465,14 +469,22 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
         } // End case INPUT_MOVE
         case INPUT_STOP: {
             for (uint8_t i = 0; i < input.stop.unit_count; i++) {
-                unit_t& unit = units[player_id][input.stop.unit_ids[i]];
+                uint32_t unit_index = units[player_id].get_index_of(input.stop.unit_ids[i]);
+                if (unit_index == id_array<unit_t>::INDEX_INVALID) {
+                    continue;
+                }
+                unit_t& unit = units[player_id][unit_index];
 
                 unit.path.clear();
             }
             break;
         }
         case INPUT_BUILD: {
-            unit_t& unit = units[player_id][input.build.unit_id];
+            uint32_t unit_index = units[player_id].get_index_of(input.build.unit_id);
+            if (unit_index == id_array<unit_t>::INDEX_INVALID) {
+                break;
+            }
+            unit_t& unit = units[player_id][unit_index];
 
             // Determine the unit's target
             ivec2 nearest_cell = input.build.target_cell;

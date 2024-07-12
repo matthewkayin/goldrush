@@ -12,7 +12,7 @@ struct id_array {
     using iterator = typename std::vector<T>::iterator;
     using const_iterator = typename std::vector<T>::const_iterator;
 
-    static const id_t ID_MAX = 512;
+    static const id_t ID_MAX = 255;
     static const uint32_t INDEX_INVALID = 65535;
 
     std::vector<T> data;
@@ -30,7 +30,7 @@ struct id_array {
         GOLD_ASSERT(index != INDEX_INVALID); 
         return data[index]; 
     }
-    const T& operator[](uint8_t index) const { 
+    const T& operator[](uint32_t index) const { 
         GOLD_ASSERT(index != INDEX_INVALID);
         return data[index]; 
     }
