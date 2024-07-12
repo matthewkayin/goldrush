@@ -839,18 +839,56 @@ void render_match(const match_t& match) {
         }
     }
 
-    // Select rings
+    // Select rings and healthbars
+    static const int HEALTHBAR_HEIGHT = 4;
+    static const int HEALTHBAR_PADDING = 2;
+    static const int BUILDING_HEALTHBAR_PADDING = 5;
     if (match.is_selecting_building) {
         uint32_t building_index = match.buildings[current_player_id].get_index_of(match.selected_building_id);
         if (building_index != id_array<building_t>::INDEX_INVALID) {
             const building_t& building = match.buildings[current_player_id][building_index];
             rect_t building_rect = match.building_get_rect(building);
             render_sprite(SPRITE_SELECT_RING_HOUSE, ivec2(0, 0), building_rect.position + (building_rect.size / 2) - match.camera_offset, RENDER_SPRITE_CENTERED);
+
+            // Determine healthbar rect
+            ivec2 building_render_pos = building_rect.position - match.camera_offset;
+            SDL_Rect healthbar_rect = (SDL_Rect) { .x = building_render_pos.x, .y = building_render_pos.y + building_rect.size.y + BUILDING_HEALTHBAR_PADDING, .w = building_rect.size.x, .h = HEALTHBAR_HEIGHT };
+            SDL_Rect healthbar_subrect = healthbar_rect;
+            healthbar_subrect.w = (healthbar_rect.w * building.health) / building_data.at(building.type).max_health;
+
+            // Cull the healthbar
+            if (!(healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT)) {
+                // Render the healthbar
+                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+            }
         }
     } else {
         for (const unit_t& unit : match.units[current_player_id]) {
             if (unit.is_selected) {
                 render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, RENDER_SPRITE_CENTERED);
+
+                // Determine healthbar rect
+                ivec2 unit_render_pos = unit.position.to_ivec2() - match.camera_offset;
+                ivec2 unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
+                SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
+                SDL_Rect healthbar_subrect = healthbar_rect;
+                healthbar_subrect.w = (healthbar_rect.w * unit.health) / unit_data.at(unit.type).max_health;
+
+                // Cull the healthbar
+                if (healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT ) {
+                    continue;
+                }
+
+                // Render the healthbar
+                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
             }
         }
     }
@@ -912,8 +950,7 @@ void render_match(const match_t& match) {
                 ysorted[ysorted_count].sprite = SPRITE_MINER_BUILDING;
 
                 ivec2 building_position = (building.cell * TILE_SIZE) - match.camera_offset;
-                ysorted[ysorted_count].position.x = building_position.x + data.builder_position_x[hframe];
-                ysorted[ysorted_count].position.y = building_position.y + data.builder_position_y[hframe];
+                ysorted[ysorted_count].position = building_position + data.builder_positions(hframe);
 
                 ysorted[ysorted_count].options &= ~RENDER_SPRITE_CENTERED;
                 if (hframe == 1) {
@@ -1005,7 +1042,7 @@ void render_match(const match_t& match) {
             SDL_Rect building_rect = (SDL_Rect) { 
                 .x = (building.cell.x * MINIMAP_RECT.size.x) / match.map_width,
                 .y = (building.cell.y * MINIMAP_RECT.size.y) / match.map_height, 
-                .w = 2 * building_data.at(building.type).cell_width, 
+                .w = 2 * building_data.at(building.type).cell_width,
                 .h = 2 * building_data.at(building.type).cell_height
             };
             SDL_RenderFillRect(engine.renderer, &building_rect);

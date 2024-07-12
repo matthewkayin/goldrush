@@ -61,6 +61,10 @@ enum UnitMode {
     UNIT_MODE_BUILD
 };
 
+enum UnitType {
+    UNIT_MINER
+};
+
 struct timer_t {
     uint32_t value;
     bool is_finished = false;
@@ -102,9 +106,18 @@ struct order_build_t {
     BuildingType type;
 };
 
+struct unit_data_t {
+    uint32_t cost;
+    uint32_t max_health;
+};
+
 struct unit_t {
-    bool is_selected;
+    UnitType type;
     UnitMode mode;
+
+    uint32_t health;
+
+    bool is_selected;
     OrderType order_type;
     ivec2 order_cell;
     BuildingType order_building_type;
@@ -130,18 +143,15 @@ struct building_data_t {
     int cell_height;
     uint32_t cost;
     uint32_t max_health;
-    int builder_position_x[3];
-    int builder_position_y[3];
-};
+    int builder_positions_x[3];
+    int builder_positions_y[3];
 
-const std::unordered_map<uint32_t, building_data_t> building_data = {
-    { BUILDING_HOUSE, (building_data_t) {
-        .cell_width = 2, .cell_height = 2,
-        .cost = 100,
-        .max_health = 100,
-        .builder_position_x = { 3, 16, -4 },
-        .builder_position_y = { 15, 15, 3 }
-    }}
+    ivec2 cell_size() const {
+        return ivec2(cell_width, cell_height);
+    }
+    ivec2 builder_positions(int i) const {
+        return ivec2(builder_positions_x[i], builder_positions_y[i]);
+    }
 };
 
 struct building_t {
@@ -200,6 +210,7 @@ struct match_t {
     void ui_on_selection_changed();
     void ui_refresh_buttons();
     void ui_handle_button_pressed(ButtonIcon icon);
+    void ui_try_begin_building_place(BuildingType building_type);
     void camera_clamp();
     void camera_move_to_cell(ivec2 cell);
 
@@ -209,7 +220,7 @@ struct match_t {
     void cell_set_value(ivec2 cell, int value);
     void cell_set_value(ivec2 cell, ivec2 cell_size, int value);
 
-    void unit_create(uint8_t player_id, ivec2 cell);
+    void unit_create(uint8_t player_id, UnitType type, ivec2 cell);
     rect_t unit_get_rect(const unit_t& unit) const;
     void unit_try_step(unit_t& unit);
     void unit_update(uint8_t player_id, unit_t& unit);
@@ -220,4 +231,22 @@ struct match_t {
     void building_destroy(uint8_t player_id, uint8_t building_id);
     rect_t building_get_rect(const building_t& building) const;
     ivec2 building_get_nearest_free_cell(building_t& building) const;
+};
+
+const std::unordered_map<uint32_t, unit_data_t> unit_data = {
+    { UNIT_MINER, (unit_data_t) {
+        .cost = 50,
+        .max_health = 20
+    }}
+};
+
+const std::unordered_map<uint32_t, building_data_t> building_data = {
+    { BUILDING_HOUSE, (building_data_t) {
+        .cell_width = 2,
+        .cell_height = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_positions_x = { 3, 16, -4 },
+        .builder_positions_y = { 15, 15, 3 },
+    }}
 };
