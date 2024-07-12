@@ -161,6 +161,7 @@ struct match_t {
     ivec2 camera_offset;
     ivec2 select_origin;
     rect_t select_rect;
+    uint8_t selected_building_id;
 
     ivec2 ui_move_position;
     animation_t ui_move_animation;
