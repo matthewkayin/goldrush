@@ -85,6 +85,7 @@ enum Sprite {
     SPRITE_UI_GOLD,
     SPRITE_UI_MOVE,
     SPRITE_SELECT_RING,
+    SPRITE_SELECT_RING_HOUSE,
     SPRITE_MINER_BUILDING,
     SPRITE_UNIT_MINER,
     SPRITE_BUILDING_HOUSE,
@@ -145,6 +146,11 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     }},
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
+        .h_frames = 1,
+        .v_frames = 1
+    }},
+    { SPRITE_SELECT_RING_HOUSE, (sprite_params_t) {
+        .path = "sprite/select_ring_house.png",
         .h_frames = 1,
         .v_frames = 1
     }},
@@ -834,9 +840,18 @@ void render_match(const match_t& match) {
     }
 
     // Select rings
-    for (const unit_t& unit : match.units[current_player_id]) {
-        if (unit.is_selected) {
-            render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, RENDER_SPRITE_CENTERED);
+    if (match.is_selecting_building) {
+        uint32_t building_index = match.buildings[current_player_id].get_index_of(match.selected_building_id);
+        if (building_index != id_array<building_t>::INDEX_INVALID) {
+            const building_t& building = match.buildings[current_player_id][building_index];
+            rect_t building_rect = match.building_get_rect(building);
+            render_sprite(SPRITE_SELECT_RING_HOUSE, ivec2(0, 0), building_rect.position + (building_rect.size / 2) - match.camera_offset, RENDER_SPRITE_CENTERED);
+        }
+    } else {
+        for (const unit_t& unit : match.units[current_player_id]) {
+            if (unit.is_selected) {
+                render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, RENDER_SPRITE_CENTERED);
+            }
         }
     }
 
@@ -965,6 +980,11 @@ void render_match(const match_t& match) {
         ivec2 offset = is_button_pressed ? ivec2(1, 1) : (is_button_hovered ? ivec2(0, -1) : ivec2(0, 0));
         render_sprite(SPRITE_UI_BUTTON, ivec2(is_button_hovered && !is_button_pressed ? 1 : 0, 0), match.ui_buttons[i].rect.position + offset);
         render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(match.ui_buttons[i].icon, is_button_hovered && !is_button_pressed ? 1 : 0), match.ui_buttons[i].rect.position + offset);
+    }
+
+    // UI Status message
+    if (!match.ui_status_timer.is_stopped) {
+        render_text(FONT_HACK, match.ui_status_message.c_str(), COLOR_WHITE, ivec2(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 128));
     }
 
     // Resource counters

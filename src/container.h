@@ -35,14 +35,14 @@ struct id_array {
         return data[index]; 
     }
 
-    uint32_t get_index_of(id_t id) {
+    uint32_t get_index_of(id_t id) const {
         auto index_it = id_to_index.find(id);
         if (index_it == id_to_index.end()) {
             return INDEX_INVALID;
         }
         return index_it->second;
     }
-    id_t get_id_of(uint32_t index) {
+    id_t get_id_of(uint32_t index) const {
         return ids[index];
     }
 

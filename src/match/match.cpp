@@ -123,6 +123,8 @@ void match_t::init() {
     }
     log_info("players initialized");
 
+    is_selecting_building = false;
+
     // Init resources
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         player_gold[player_id] = 150;
@@ -336,6 +338,9 @@ void match_t::update() {
                     input_queue.push_back(input);
 
                     ui_mode = UI_MODE_MINER;
+                    ui_refresh_buttons();
+                } else {
+                    ui_show_status("You can't build there.");
                 }
             }
         } else if (MINIMAP_RECT.has_point(mouse_pos)) {
@@ -344,6 +349,7 @@ void match_t::update() {
             // On begin selecting
             ui_mode = UI_MODE_SELECTING;
             select_origin = mouse_world_pos;
+            is_selecting_building = false;
         } 
     }
     // SELECT RECT
@@ -354,7 +360,7 @@ void match_t::update() {
 
         // Update unit selection
         for (unit_t& unit : units[current_player_id]) {
-            unit.is_selected = unit_get_rect(unit).intersects(select_rect);
+            unit.is_selected = unit.mode != UNIT_MODE_BUILD && unit_get_rect(unit).intersects(select_rect);
         }
     } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
         ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
@@ -417,6 +423,13 @@ void match_t::update() {
 
     // UI update
     ui_move_animation.update();
+    
+    if (!ui_status_timer.is_stopped) {
+        ui_status_timer.update();
+        if (ui_status_timer.is_finished) {
+            ui_status_timer.stop();
+        }
+    }
 }
 
 void match_t::handle_input(uint8_t player_id, const input_t& input) {
@@ -515,6 +528,11 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
 
 // UI
 
+void match_t::ui_show_status(const char* message) {
+    ui_status_message = std::string(message);
+    ui_status_timer.start(UI_STATUS_DURATION);
+}
+
 void match_t::ui_on_selection_changed() {
     uint8_t current_player_id = network_get_player_id();
 
@@ -526,10 +544,33 @@ void match_t::ui_on_selection_changed() {
         unit_count++;
     }
 
+    bool is_selected_building_finished = false;
     if (unit_count == 0) {
-        ui_mode = UI_MODE_NONE;
-    } else if (unit_count == 1) {
+        if (ui_mode == UI_MODE_SELECTING) {
+            for (uint32_t building_index = 0; building_index < buildings[current_player_id].size(); building_index++) {
+                if (building_get_rect(buildings[current_player_id][building_index]).intersects(select_rect)) {
+                    is_selecting_building = true;
+                    selected_building_id = buildings[current_player_id].get_id_of(building_index);
+                    is_selected_building_finished = buildings[current_player_id][building_index].is_finished;
+                    break;
+                }
+            }
+        } else {
+            uint32_t building_index = buildings[current_player_id].get_index_of(selected_building_id);
+            if (building_index == id_array<building_t>::INDEX_INVALID) {
+                is_selecting_building = false;
+            } else {
+                is_selected_building_finished = buildings[current_player_id][building_index].is_finished;
+            }
+        }
+    }
+
+    if (is_selecting_building && !is_selected_building_finished) {
+        ui_mode = UI_MODE_BUILDING_IN_PROGRESS;
+    } else if (!is_selecting_building && unit_count == 1) {
         ui_mode = UI_MODE_MINER;
+    } else if (!is_selecting_building && unit_count != 0) {
+        ui_mode = UI_MODE_UNIT;
     } else {
         ui_mode = UI_MODE_NONE;
     }
@@ -538,6 +579,16 @@ void match_t::ui_on_selection_changed() {
 
 void match_t::ui_refresh_buttons() {
     switch (ui_mode) {
+        case UI_MODE_UNIT: {
+            for (uint32_t i = 0; i < 6; i++) {
+                ui_buttons[i].enabled = i < 3;
+            }
+            ui_buttons[0].icon = BUTTON_ICON_MOVE;
+            ui_buttons[1].icon = BUTTON_ICON_STOP;
+            ui_buttons[2].icon = BUTTON_ICON_ATTACK;
+
+            break;
+        }
         case UI_MODE_MINER: {
             for (uint32_t i = 0; i < 6; i++) {
                 ui_buttons[i].enabled = i < 4;
@@ -558,7 +609,8 @@ void match_t::ui_refresh_buttons() {
             
             break;
         }
-        case UI_MODE_BUILDING_PLACE: {
+        case UI_MODE_BUILDING_PLACE: 
+        case UI_MODE_BUILDING_IN_PROGRESS: {
             for (uint32_t i = 0; i < 6; i++) {
                 ui_buttons[i].enabled = i == 5;
             }
@@ -678,7 +730,7 @@ void match_t::unit_create(uint8_t player_id, ivec2 cell) {
     cell_set_value(cell, CELL_FILLED);
 }
 
-rect_t match_t::unit_get_rect(unit_t& unit) const {
+rect_t match_t::unit_get_rect(const unit_t& unit) const {
     return rect_t(ivec2(unit.position.x.integer_part(), unit.position.y.integer_part()), ivec2(16, 16));
 }
 
@@ -735,12 +787,21 @@ void match_t::unit_update(uint8_t player_id, unit_t& unit) {
                     if (unit.order_type == ORDER_MOVE) {
                         unit.order_type = ORDER_NONE;
                     } else if (unit.order_type == ORDER_BUILD) {
-                        log_info("unit creating building.");
-                        unit.building_id = building_create(player_id, unit.order_building_type, unit.order_cell);
-                        unit.mode = UNIT_MODE_BUILD;
-                        unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
-                        unit.is_selected = false;
-                        ui_on_selection_changed();
+                        auto it = building_data.find(unit.order_building_type);
+                        // Since the unit is on top of the building space, we have to temporarily set the cell to empty so that we can check if the building space is free
+                        cell_set_value(unit.cell, CELL_EMPTY);
+                        if (cell_is_blocked(unit.order_cell, ivec2(it->second.cell_width, it->second.cell_height))) {
+                            unit.order_type = ORDER_NONE;
+                            cell_set_value(unit.cell, CELL_FILLED);
+                            ui_show_status("You can't build there.");
+                        } else {
+                            log_info("unit creating building.");
+                            unit.building_id = building_create(player_id, unit.order_building_type, unit.order_cell);
+                            unit.mode = UNIT_MODE_BUILD;
+                            unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
+                            unit.is_selected = false;
+                            ui_on_selection_changed();
+                        }
                     }
                 }
 
@@ -782,6 +843,10 @@ void match_t::unit_update(uint8_t player_id, unit_t& unit) {
                 unit.position = cell_center_position(unit.cell);
                 unit.mode = UNIT_MODE_IDLE;
                 unit.order_type = ORDER_NONE;
+
+                if (is_selecting_building && selected_building_id == unit.building_id) {
+                    ui_on_selection_changed();
+                }
             } else {
                 unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
             }
@@ -916,6 +981,11 @@ uint8_t match_t::building_create(uint8_t player_id, BuildingType type, ivec2 cel
 
     cell_set_value(cell, ivec2(it->second.cell_width, it->second.cell_height), CELL_FILLED);
     return buildings[player_id].push_back(building);
+}
+
+rect_t match_t::building_get_rect(const building_t& building) const {
+    auto it = building_data.find(building.type);
+    return rect_t(building.cell * TILE_SIZE, ivec2(it->second.cell_width, it->second.cell_height) * TILE_SIZE);
 }
 
 ivec2 match_t::building_get_nearest_free_cell(building_t& building) const {

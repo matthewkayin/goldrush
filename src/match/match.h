@@ -7,6 +7,7 @@
 #include "match_input.h"
 #include <vector>
 #include <unordered_map>
+#include <string>
 
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(ivec2(4, SCREEN_HEIGHT - 132), ivec2(128, 128));
@@ -47,9 +48,11 @@ enum UiMode {
     UI_MODE_NONE,
     UI_MODE_SELECTING,
     UI_MODE_MINIMAP_DRAG,
+    UI_MODE_UNIT,
     UI_MODE_MINER,
     UI_MODE_BUILD,
-    UI_MODE_BUILDING_PLACE
+    UI_MODE_BUILDING_PLACE,
+    UI_MODE_BUILDING_IN_PROGRESS
 };
 
 enum UnitMode {
@@ -146,6 +149,7 @@ struct building_t {
     ivec2 cell;
     uint32_t health;
     bool is_finished;
+    bool is_selected;
 };
 
 struct match_t {
@@ -161,7 +165,8 @@ struct match_t {
     ivec2 camera_offset;
     ivec2 select_origin;
     rect_t select_rect;
-    uint8_t selected_building_id;
+    id_t selected_building_id;
+    bool is_selecting_building;
 
     ivec2 ui_move_position;
     animation_t ui_move_animation;
@@ -171,6 +176,10 @@ struct match_t {
 
     BuildingType ui_building_type;
     ivec2 ui_building_cell;
+
+    std::string ui_status_message;
+    timer_t ui_status_timer;
+    static const uint32_t UI_STATUS_DURATION = 60;
 
     // Map
     std::vector<int> map_tiles;
@@ -187,6 +196,7 @@ struct match_t {
     void update();
     void handle_input(uint8_t player_id, const input_t& input);
 
+    void ui_show_status(const char* message);
     void ui_on_selection_changed();
     void ui_refresh_buttons();
     void ui_handle_button_pressed(ButtonIcon icon);
@@ -200,11 +210,12 @@ struct match_t {
     void cell_set_value(ivec2 cell, ivec2 cell_size, int value);
 
     void unit_create(uint8_t player_id, ivec2 cell);
-    rect_t unit_get_rect(unit_t& unit) const;
+    rect_t unit_get_rect(const unit_t& unit) const;
     void unit_try_step(unit_t& unit);
     void unit_update(uint8_t player_id, unit_t& unit);
     std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
 
     uint8_t building_create(uint8_t player_id, BuildingType type, ivec2 cell);
+    rect_t building_get_rect(const building_t& building) const;
     ivec2 building_get_nearest_free_cell(building_t& building) const;
 };
