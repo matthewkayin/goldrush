@@ -834,8 +834,7 @@ void render_match(const match_t& match) {
     }
 
     // Select rings
-    for (uint8_t unit_id = match.units[current_player_id].first(); unit_id != match.units[current_player_id].end(); match.units[current_player_id].next(unit_id)) {
-        const unit_t& unit = match.units[current_player_id][unit_id];
+    for (const unit_t& unit : match.units[current_player_id]) {
         if (unit.is_selected) {
             render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, RENDER_SPRITE_CENTERED);
         }
@@ -852,8 +851,7 @@ void render_match(const match_t& match) {
 
     // Buildings
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (uint8_t building_id = match.buildings[player_id].first(); building_id != match.buildings[player_id].end(); match.buildings[player_id].next(building_id)) {
-            const building_t& building = match.buildings[player_id][building_id];
+        for (const building_t& building : match.buildings[player_id]) {
             int sprite = SPRITE_BUILDING_HOUSE + building.type;
             GOLD_ASSERT(sprite < SPRITE_COUNT);
 
@@ -877,8 +875,7 @@ void render_match(const match_t& match) {
 
     // Units
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (uint8_t unit_id = match.units[player_id].first(); unit_id != match.units[player_id].end(); match.units[player_id].next(unit_id)) {
-            const unit_t& unit = match.units[player_id][unit_id];
+        for (const unit_t& unit : match.units[player_id]) {
             ivec2 unit_render_pos = unit.position.to_ivec2() - match.camera_offset;
             ivec2 unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
 
@@ -984,10 +981,18 @@ void render_match(const match_t& match) {
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, COLOR_GREEN.a);
-        for (uint8_t unit_id = match.units[player_id].first(); unit_id != match.units[player_id].end(); match.units[player_id].next(unit_id)) {
-            const unit_t& unit = match.units[player_id][unit_id];
+        for (const building_t& building : match.buildings[player_id]) {
+            SDL_Rect building_rect = (SDL_Rect) { 
+                .x = (building.cell.x * MINIMAP_RECT.size.x) / match.map_width,
+                .y = (building.cell.y * MINIMAP_RECT.size.y) / match.map_height, 
+                .w = 2 * building_data.at(building.type).cell_width, 
+                .h = 2 * building_data.at(building.type).cell_height
+            };
+            SDL_RenderFillRect(engine.renderer, &building_rect);
+        }
+        for (const unit_t& unit : match.units[player_id]) {
             SDL_Rect unit_rect = (SDL_Rect) { .x = (unit.cell.x * MINIMAP_RECT.size.x) / match.map_width, .y = (unit.cell.y * MINIMAP_RECT.size.y) / match.map_height, .w = 2, .h = 2 };
-            SDL_RenderDrawRect(engine.renderer, &unit_rect);
+            SDL_RenderFillRect(engine.renderer, &unit_rect);
         }
     } 
 

@@ -1,19 +1,19 @@
 #pragma once
 
 #include "asserts.h"
+#include "defines.h"
 #include <cstdint>
 #include <vector>
 #include <queue>
 #include <unordered_map>
 
-typedef uint16_t id_t;
-
 template <typename T>
 struct id_array {
-    static const id_t ID_MAX = 512;
-    static const uint32_t INDEX_INVALID = 65535;
     using iterator = typename std::vector<T>::iterator;
     using const_iterator = typename std::vector<T>::const_iterator;
+
+    static const id_t ID_MAX = 512;
+    static const uint32_t INDEX_INVALID = 65535;
 
     std::vector<T> data;
     std::vector<id_t> ids;
@@ -85,62 +85,5 @@ struct id_array {
 
         // add the id back into the free list
         available_ids.push(id);
-    }
-};
-
-// Using uint8_t instead of size_t for the index because the indices need to be sent over the network during gameplay
-template <typename T, uint8_t capacity>
-struct swiss_array {
-    uint8_t length;
-    T data[capacity];
-    bool filled[capacity];
-
-    swiss_array() {
-        memset(filled, 0, sizeof(filled));
-        length = 0;
-    }
-
-    T& operator[](uint8_t index) {
-        return data[index];
-    }
-    const T& operator[](uint8_t index) const {
-        return data[index];
-    }
-
-    uint8_t first() const {
-        uint8_t index = 0;
-        while (index < capacity && !filled[index]) {
-            index++;
-        }
-        return index;
-    }
-    uint8_t end() const {
-        return capacity;
-    }
-    void next(uint8_t& index) const {
-        index++;
-        while (index < capacity && !filled[index]) {
-            index++;
-        }
-    }
-
-    uint8_t push_back(const T& value) {
-        GOLD_ASSERT(length < capacity);
-
-        uint8_t index = 0;
-        while (filled[index]) {
-            index++;
-        }
-        data[index] = value;
-        filled[index] = true;
-        length++;
-
-        return index;
-    }
-    void remove_at(uint8_t index) {
-        GOLD_ASSERT(filled[index]);
-
-        filled[index] = false;
-        length--;
     }
 };

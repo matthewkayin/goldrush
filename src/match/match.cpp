@@ -326,9 +326,9 @@ void match_t::update() {
                     input.type = INPUT_BUILD;
                     input.build.building_type = ui_building_type;
                     input.build.target_cell = ui_building_cell;
-                    for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
-                        if (units[current_player_id][unit_id].is_selected) {
-                            input.build.unit_id = unit_id;
+                    for (uint32_t unit_index = 0; unit_index < units[current_player_id].size(); unit_index++) {
+                        if (units[current_player_id][unit_index].is_selected) {
+                            input.build.unit_id = units[current_player_id].get_id_of(unit_index);
                             break;
                         }
                     }
@@ -353,8 +353,7 @@ void match_t::update() {
         select_rect.size = ivec2(std::max(1, std::abs(select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(select_origin.y - mouse_world_pos.y)));
 
         // Update unit selection
-        for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
-            unit_t& unit = units[current_player_id][unit_id];
+        for (unit_t& unit : units[current_player_id]) {
             unit.is_selected = unit_get_rect(unit).intersects(select_rect);
         }
     } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
@@ -391,11 +390,11 @@ void match_t::update() {
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
             input.move.unit_count = 0;
-            for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
-                if (!units[current_player_id][unit_id].is_selected) {
+            for (uint32_t unit_index = 0; unit_index < units[current_player_id].size(); unit_index++) {
+                if (!units[current_player_id][unit_index].is_selected) {
                     continue;
                 }
-                input.move.unit_ids[input.move.unit_count] = unit_id;
+                input.move.unit_ids[input.move.unit_count] = units[current_player_id].get_id_of(unit_index);
                 input.move.unit_count++;
             }
             log_info("selected unit count %i", input.move.unit_count);
@@ -411,8 +410,8 @@ void match_t::update() {
 
     // Unit update
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (uint8_t unit_id = units[player_id].first(); unit_id != units[player_id].end(); units[player_id].next(unit_id)) {
-            unit_update(player_id, units[player_id][unit_id]);
+        for (unit_t& unit : units[player_id]) {
+            unit_update(player_id, unit);
         }
     }
 
@@ -508,8 +507,7 @@ void match_t::ui_on_selection_changed() {
     uint8_t current_player_id = network_get_player_id();
 
     uint32_t unit_count = 0;
-    for (uint8_t unit_id = units[current_player_id].first(); unit_id != units[current_player_id].end(); units[current_player_id].next(unit_id)) {
-        unit_t& unit = units[current_player_id][unit_id];
+    for (unit_t& unit : units[current_player_id]) {
         if (!unit.is_selected) {
             continue;
         }
@@ -572,11 +570,11 @@ void match_t::ui_handle_button_pressed(ButtonIcon icon) {
             input.type = INPUT_STOP;
             input.stop.unit_count = 0;
             uint8_t player_id = network_get_player_id();
-            for (uint8_t unit_id = units[player_id].first(); unit_id != units[player_id].end(); units[player_id].next(unit_id)) {
-                if (!units[player_id][unit_id].is_selected) {
+            for (uint32_t unit_index = 0; unit_index < units[player_id].size(); unit_index++) {
+                if (!units[player_id][unit_index].is_selected) {
                     continue;
                 }
-                input.stop.unit_ids[input.stop.unit_count] = unit_id;
+                input.stop.unit_ids[input.stop.unit_count] = units[player_id].get_id_of(unit_index);
                 input.stop.unit_count++;
             }
             if (input.stop.unit_count != 0) {
@@ -756,7 +754,8 @@ void match_t::unit_update(uint8_t player_id, unit_t& unit) {
     } else if (unit.mode == UNIT_MODE_BUILD) {
         unit.build_timer.update();
         if (unit.build_timer.is_finished) {
-            building_t& building = buildings[player_id][unit.building_id];
+            // NOTE: this is kinda unsafe, but we will handle it better when we implement unit destruction
+            building_t& building = buildings[player_id][buildings[player_id].get_index_of(unit.building_id)];
 
             building.health++;
             if (building.health >= building_data.at(building.type).max_health) {

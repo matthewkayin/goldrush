@@ -179,8 +179,8 @@ struct match_t {
     int map_height;
 
     // Units and players
-    swiss_array<unit_t, MAX_UNITS> units[MAX_PLAYERS];
-    swiss_array<building_t, MAX_BUILDINGS> buildings[MAX_PLAYERS];
+    id_array<unit_t> units[MAX_PLAYERS];
+    id_array<building_t> buildings[MAX_PLAYERS];
     uint32_t player_gold[MAX_PLAYERS];
 
     void init();
