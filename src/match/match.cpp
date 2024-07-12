@@ -656,6 +656,11 @@ void match_t::ui_handle_button_pressed(ButtonIcon icon) {
                 ui_mode = UI_MODE_MINER;
             } else if (ui_mode == UI_MODE_BUILDING_PLACE) {
                 ui_mode = UI_MODE_BUILD;
+            } else if (ui_mode == UI_MODE_BUILDING_IN_PROGRESS) {
+                uint8_t player_id = network_get_player_id();
+                building_destroy(player_id, selected_building_id);
+                ui_mode = UI_MODE_NONE;
+                is_selecting_building = false;
             }
             ui_refresh_buttons();
             break;
@@ -795,8 +800,8 @@ void match_t::unit_update(uint8_t player_id, unit_t& unit) {
                             cell_set_value(unit.cell, CELL_FILLED);
                             ui_show_status("You can't build there.");
                         } else {
-                            log_info("unit creating building.");
                             unit.building_id = building_create(player_id, unit.order_building_type, unit.order_cell);
+                            log_info("unit creating building. %u", unit.building_id);
                             unit.mode = UNIT_MODE_BUILD;
                             unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
                             unit.is_selected = false;
@@ -838,12 +843,7 @@ void match_t::unit_update(uint8_t player_id, unit_t& unit) {
             if (building.is_finished) {
                 // On building finished
                 log_info("building finished");
-                unit.cell = building_get_nearest_free_cell(building);
-                cell_set_value(unit.cell, CELL_FILLED);
-                unit.position = cell_center_position(unit.cell);
-                unit.mode = UNIT_MODE_IDLE;
-                unit.order_type = ORDER_NONE;
-
+                unit_eject_from_building(unit, building);
                 if (is_selecting_building && selected_building_id == unit.building_id) {
                     ui_on_selection_changed();
                 }
@@ -873,6 +873,14 @@ void match_t::unit_update(uint8_t player_id, unit_t& unit) {
             unit.animation.frame.y = 2;
         }
     }
+}
+
+void match_t::unit_eject_from_building(unit_t& unit, building_t& building) {
+    unit.cell = building_get_nearest_free_cell(building);
+    cell_set_value(unit.cell, CELL_FILLED);
+    unit.position = cell_center_position(unit.cell);
+    unit.mode = UNIT_MODE_IDLE;
+    unit.order_type = ORDER_NONE;
 }
 
 std::vector<ivec2> match_t::pathfind(ivec2 from, ivec2 to) {
@@ -981,6 +989,24 @@ uint8_t match_t::building_create(uint8_t player_id, BuildingType type, ivec2 cel
 
     cell_set_value(cell, ivec2(it->second.cell_width, it->second.cell_height), CELL_FILLED);
     return buildings[player_id].push_back(building);
+}
+
+void match_t::building_destroy(uint8_t player_id, uint8_t building_id) {
+    uint32_t index = buildings[player_id].get_index_of(building_id);
+    building_t& building = buildings[player_id][index];
+
+    if (!building.is_finished) {
+        for (unit_t& unit : units[player_id]) {
+            if (unit.mode == UNIT_MODE_BUILD && unit.building_id == building_id) {
+                unit_eject_from_building(unit, building);
+                break;
+            }
+        }
+    }
+
+    auto it = building_data.find(building.type);
+    cell_set_value(building.cell, ivec2(it->second.cell_width, it->second.cell_height), false);
+    buildings[player_id].remove_at(index);
 }
 
 rect_t match_t::building_get_rect(const building_t& building) const {

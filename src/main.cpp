@@ -778,7 +778,7 @@ void render_sprite(Sprite sprite, const ivec2& frame, const ivec2& position, uin
         dst_rect.y -= (dst_rect.h / 2);
     }
 
-    SDL_RenderCopyEx(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect, NULL, NULL, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+    SDL_RenderCopyEx(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect, 0.0, NULL, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 }
 
 int ysort_partition(render_sprite_params_t* params, int low, int high) {
@@ -906,7 +906,7 @@ void render_match(const match_t& match) {
                 .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
             };
             if (unit.mode == UNIT_MODE_BUILD) {
-                const building_t& building = match.buildings[player_id][unit.building_id];
+                const building_t& building = match.buildings[player_id][match.buildings->get_index_of(unit.building_id)];
                 const building_data_t& data = building_data.at(building.type);
                 int hframe = ((3 * building.health) / data.max_health);
                 ysorted[ysorted_count].sprite = SPRITE_MINER_BUILDING;

@@ -165,7 +165,7 @@ struct match_t {
     ivec2 camera_offset;
     ivec2 select_origin;
     rect_t select_rect;
-    id_t selected_building_id;
+    uint8_t selected_building_id;
     bool is_selecting_building;
 
     ivec2 ui_move_position;
@@ -213,9 +213,11 @@ struct match_t {
     rect_t unit_get_rect(const unit_t& unit) const;
     void unit_try_step(unit_t& unit);
     void unit_update(uint8_t player_id, unit_t& unit);
+    void unit_eject_from_building(unit_t& unit, building_t& building);
     std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
 
     uint8_t building_create(uint8_t player_id, BuildingType type, ivec2 cell);
+    void building_destroy(uint8_t player_id, uint8_t building_id);
     rect_t building_get_rect(const building_t& building) const;
     ivec2 building_get_nearest_free_cell(building_t& building) const;
 };

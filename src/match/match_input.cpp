@@ -14,16 +14,16 @@ void input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input
             out_buffer[out_buffer_length] = input.move.unit_count;
             out_buffer_length += 1;
 
-            memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(id_t));
-            out_buffer_length += input.move.unit_count * sizeof(id_t);
+            memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(uint8_t));
+            out_buffer_length += input.move.unit_count * sizeof(uint8_t);
             break;
         }
         case INPUT_STOP: {
             out_buffer[out_buffer_length] = input.stop.unit_count;
             out_buffer_length += 1;
 
-            memcpy(out_buffer + out_buffer_length, input.stop.unit_ids, input.stop.unit_count * sizeof(id_t));
-            out_buffer_length += input.stop.unit_count * sizeof(id_t);
+            memcpy(out_buffer + out_buffer_length, input.stop.unit_ids, input.stop.unit_count * sizeof(uint8_t));
+            out_buffer_length += input.stop.unit_count * sizeof(uint8_t);
             break;
         }
         case INPUT_BUILD: {
@@ -48,15 +48,15 @@ input_t input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             input.move.unit_count = in_buffer[in_buffer_head];
             in_buffer_head++;
-            memcpy(input.move.unit_ids, in_buffer + in_buffer_head, input.move.unit_count * sizeof(id_t));
-            in_buffer_head += input.move.unit_count * sizeof(id_t);
+            memcpy(input.move.unit_ids, in_buffer + in_buffer_head, input.move.unit_count * sizeof(uint8_t));
+            in_buffer_head += input.move.unit_count * sizeof(uint8_t);
             break;
         }
         case INPUT_STOP: {
             input.stop.unit_count = in_buffer[in_buffer_head];
             in_buffer_head++;
-            memcpy(input.stop.unit_ids, in_buffer + in_buffer_head, input.stop.unit_count * sizeof(id_t));
-            in_buffer_head += input.stop.unit_count * sizeof(id_t);
+            memcpy(input.stop.unit_ids, in_buffer + in_buffer_head, input.stop.unit_count * sizeof(uint8_t));
+            in_buffer_head += input.stop.unit_count * sizeof(uint8_t);
             break;
         }
         case INPUT_BUILD: {
