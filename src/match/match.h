@@ -32,7 +32,8 @@ enum BuildingType {
 
 enum CellValue {
     CELL_EMPTY,
-    CELL_FILLED
+    CELL_FILLED,
+    CELL_GOLD
 };
 
 enum MatchMode {
@@ -99,26 +100,18 @@ struct ui_button_t {
     rect_t rect;
 };
 
-struct order_move_t {
-    ivec2 cell;
-};
-
-struct order_build_t {
-    ivec2 cell;
-    BuildingType type;
-};
-
 struct unit_data_t {
     uint32_t cost;
     uint32_t max_health;
 };
 
 struct unit_t {
+    static const uint32_t PATH_PAUSE_DURATION = 60;
+    static const uint32_t BUILD_TICK_DURATION = 8;
+
     UnitType type;
     UnitMode mode;
-
     uint32_t health;
-
     bool is_selected;
     OrderType order_type;
     ivec2 order_cell;
@@ -128,14 +121,10 @@ struct unit_t {
     ivec2 cell;
     vec2 position;
     vec2 target_position;
-
     std::vector<ivec2> path;
     timer_t path_timer;
-    static const uint32_t PATH_PAUSE_DURATION = 60;
-
     uint8_t building_id;
     timer_t build_timer;
-    static const uint32_t BUILD_TICK_DURATION = 8;
 
     animation_t animation;
 };
@@ -222,13 +211,13 @@ struct match_t {
     bool cell_is_blocked(ivec2 cell, ivec2 cell_size) const;
     void cell_set_value(ivec2 cell, int value);
     void cell_set_value(ivec2 cell, ivec2 cell_size, int value);
+    std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
 
     void unit_create(uint8_t player_id, UnitType type, ivec2 cell);
     rect_t unit_get_rect(const unit_t& unit) const;
     void unit_try_step(unit_t& unit);
     void unit_update(uint8_t player_id, unit_t& unit);
     void unit_eject_from_building(unit_t& unit, building_t& building);
-    std::vector<ivec2> pathfind(ivec2 from, ivec2 to);
 
     uint8_t building_create(uint8_t player_id, BuildingType type, ivec2 cell);
     void building_destroy(uint8_t player_id, uint8_t building_id);

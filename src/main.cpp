@@ -76,6 +76,7 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
 
 enum Sprite {
     SPRITE_TILES,
+    SPRITE_TILE_GOLD,
     SPRITE_UI_FRAME,
     SPRITE_UI_FRAME_BOTTOM,
     SPRITE_UI_FRAME_BUTTONS,
@@ -102,6 +103,11 @@ struct sprite_params_t {
 const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     { SPRITE_TILES, (sprite_params_t) {
         .path = "sprite/tiles.png",
+        .h_frames = -1,
+        .v_frames = -1
+    }},
+    { SPRITE_TILE_GOLD, (sprite_params_t) {
+        .path = "sprite/tile_gold.png",
         .h_frames = -1,
         .v_frames = -1
     }},
@@ -327,7 +333,7 @@ int main(int argc, char** argv) {
                 engine.is_running = false;
             }
             // Toggle fullscreen
-            if (event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_F11 || event.key.keysym.sym == SDLK_f)) {
+            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
                 engine.is_fullscreen = !engine.is_fullscreen;
                 if (engine.is_fullscreen) {
                     SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -340,6 +346,7 @@ int main(int argc, char** argv) {
             // Capture mouse
             if (SDL_GetWindowGrab(engine.window) == SDL_FALSE) {
                 if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+                    log_info("catch mouse.");
                     SDL_SetWindowGrab(engine.window, SDL_TRUE);
                 }
                 // If the mouse is not captured, don't handle any other input
@@ -347,6 +354,7 @@ int main(int argc, char** argv) {
             }
             // Release mouse
             if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+                log_info("release mouse.");
                 SDL_SetWindowGrab(engine.window, SDL_FALSE);
                 break;
             }
@@ -514,7 +522,7 @@ bool engine_init(ivec2 window_size) {
             return false;
         }
 
-        if (i == SPRITE_TILES) {
+        if (sprite_params_it->second.h_frames == -1) {
             sprite.frame_size = ivec2(TILE_SIZE, TILE_SIZE);
             sprite.h_frames = sprite_surface->w / sprite.frame_size.x;
             sprite.v_frames = sprite_surface->h / sprite.frame_size.y;
@@ -818,6 +826,9 @@ void ysort(render_sprite_params_t* params, int low, int high) {
 void render_match(const match_t& match) {
     uint8_t current_player_id = network_get_player_id();
 
+    // Y-Sort
+    std::vector<render_sprite_params_t> ysorted;
+
     // Render map
     SDL_Rect tile_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
     SDL_Rect tile_dst_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
@@ -842,6 +853,16 @@ void render_match(const match_t& match) {
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
+
+            // Render gold
+            if (match.map_cells[map_index] == CELL_GOLD) {
+                ysorted.push_back((render_sprite_params_t) {
+                    .sprite = SPRITE_TILE_GOLD,
+                    .position = ivec2(tile_dst_rect.x, tile_dst_rect.y),
+                    .frame = ivec2(0, 0),
+                    .options = RENDER_SPRITE_NO_CULL
+                });
+            }
         }
     }
 
@@ -904,10 +925,6 @@ void render_match(const match_t& match) {
         render_sprite(SPRITE_UI_MOVE, match.ui_move_animation.frame, match.ui_move_position - match.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
-    // Y-Sort
-    static render_sprite_params_t ysorted[(MAX_UNITS + MAX_BUILDINGS) * MAX_PLAYERS];
-    uint32_t ysorted_count = 0;
-
     // Buildings
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         for (const building_t& building : match.buildings[player_id]) {
@@ -922,13 +939,12 @@ void render_match(const match_t& match) {
             }
 
             int hframe = building.is_finished ? 3 : ((3 * building.health) / building_data.at(building.type).max_health);
-            ysorted[ysorted_count] = (render_sprite_params_t) {
+            ysorted.push_back((render_sprite_params_t) {
                 .sprite = (Sprite)sprite,
                 .position = building_render_pos,
                 .frame = ivec2(hframe, 0),
                 .options = RENDER_SPRITE_NO_CULL
-            };
-            ysorted_count++;
+            });
         }
     }
 
@@ -943,7 +959,7 @@ void render_match(const match_t& match) {
                 continue;
             }
 
-            ysorted[ysorted_count] = (render_sprite_params_t) { 
+            render_sprite_params_t unit_params = (render_sprite_params_t) { 
                 .sprite = SPRITE_UNIT_MINER, 
                 .position = unit_render_pos, 
                 .frame = unit.animation.frame ,
@@ -953,21 +969,21 @@ void render_match(const match_t& match) {
                 const building_t& building = match.buildings[player_id][match.buildings->get_index_of(unit.building_id)];
                 const building_data_t& data = building_data.at(building.type);
                 int hframe = ((3 * building.health) / data.max_health);
-                ysorted[ysorted_count].sprite = SPRITE_MINER_BUILDING;
+                unit_params.sprite = SPRITE_MINER_BUILDING;
 
                 ivec2 building_position = (building.cell * TILE_SIZE) - match.camera_offset;
-                ysorted[ysorted_count].position = building_position + data.builder_positions(hframe);
+                unit_params.position = building_position + data.builder_positions(hframe);
 
-                ysorted[ysorted_count].options &= ~RENDER_SPRITE_CENTERED;
+                unit_params.options &= ~RENDER_SPRITE_CENTERED;
                 if (data.builder_flip_h[hframe]) {
-                    ysorted[ysorted_count].options |= RENDER_SPRITE_FLIP_H;
+                    unit_params.options |= RENDER_SPRITE_FLIP_H;
                 }
             }
-            ysorted_count++;
+            ysorted.push_back(unit_params);
         }
     }
-    ysort(ysorted, 0, ysorted_count - 1);
-    for (uint32_t i = 0; i < ysorted_count; i++) {
+    ysort(&ysorted[0], 0, ysorted.size() - 1);
+    for (uint32_t i = 0; i < ysorted.size(); i++) {
         const render_sprite_params_t& params= ysorted[i];
         render_sprite(params.sprite, params.frame, params.position, params.options);
     }

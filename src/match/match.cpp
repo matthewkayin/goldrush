@@ -72,7 +72,10 @@ void match_t::init() {
     // Init units
     ivec2 player_spawns[MAX_PLAYERS];
     uint8_t current_player_id = network_get_player_id();
+    bool is_spawn_direction_used[DIRECTION_COUNT];
+    memset(is_spawn_direction_used, 0, sizeof(is_spawn_direction_used));
     uint32_t player_count = 0;
+    ivec2 map_center = ivec2(map_width / 2, map_height / 2);
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
@@ -80,58 +83,38 @@ void match_t::init() {
         }
         player_count++;
 
-        ivec2 spawn_point;
-        bool is_spawn_point_valid = false;
-        int spawn_margin = 6;
-        while (!is_spawn_point_valid) {
-            int spawn_edge = rand() % 4; 
-            // north edge
-            if (spawn_edge == 0) {
-                spawn_point = ivec2(spawn_margin + (rand() % (map_width - (2 * spawn_margin))), spawn_margin + (rand() % 4));
-            // south edge
-            } else if (spawn_edge == 1) {
-                spawn_point = ivec2(spawn_margin + (rand() % (map_width - (2 * spawn_margin))), map_height - (spawn_margin + (rand() % 4)));
-            // west edge
-            } else if (spawn_edge == 2) {
-                spawn_point = ivec2(spawn_margin + (rand() % 4), spawn_margin + (rand() % (map_height - (2 * spawn_margin))));
-            // east edge
-            } else {
-                spawn_point = ivec2(map_width - (spawn_margin + (rand() % 4)), spawn_margin + (rand() % (map_height - (2 * spawn_margin))));
-            }
-            // Assert that the spawn point is even in the map
-            GOLD_ASSERT(rect_t(ivec2(0, 0), ivec2(map_width, map_height)).has_point(spawn_point));
-
-            is_spawn_point_valid = true;
-            for (uint8_t other_player_id = 0; other_player_id < player_id; other_player_id++) {
-                if (ivec2::manhattan_distance(spawn_point, player_spawns[other_player_id]) < 8) {
-                    is_spawn_point_valid = false;
-                    break;
-                }
-            }
-
-            player_spawns[player_id] = spawn_point;
+        int spawn_direction = rand() % DIRECTION_COUNT;
+        while (is_spawn_direction_used[spawn_direction]) {
+            spawn_direction = rand() % DIRECTION_COUNT;
         }
 
-        if (player_id == current_player_id) {
-            camera_move_to_cell(spawn_point);
-        }
-        unit_create(player_id, UNIT_MINER, spawn_point + ivec2(-1, -1));
-        unit_create(player_id, UNIT_MINER, spawn_point + ivec2(1, -1));
-        unit_create(player_id, UNIT_MINER, spawn_point + ivec2(0, 1));
-        units[player_id][1].health = 10;
-        units[player_id][2].health = 5;
+        player_spawns[player_id] = map_center + ivec2(DIRECTION_IVEC2[spawn_direction].x * ((map_width * 7) / 16), DIRECTION_IVEC2[spawn_direction].y * ((map_height * 7) / 16));
 
-        log_info("player %u spawn %vi", player_id, &spawn_point);
+        unit_create(player_id, UNIT_MINER, player_spawns[player_id] + ivec2(-1, -1));
+        unit_create(player_id, UNIT_MINER, player_spawns[player_id] + ivec2(1, -1));
+        unit_create(player_id, UNIT_MINER, player_spawns[player_id] + ivec2(0, 1));
+
+        log_info("player %u spawn %vi", player_id, &player_spawns[player_id]);
     }
+    camera_move_to_cell(player_spawns[current_player_id]);
     log_info("players initialized");
 
-    is_selecting_building = false;
+    // Place gold on map
+    int gold_remaining = 32;
+    while (gold_remaining != 0) {
+        ivec2 gold_location = ivec2(rand() % map_width, rand() % map_height);
+        if (map_cells[gold_location.x + (gold_location.y * map_width)] == CELL_EMPTY) {
+            map_cells[gold_location.x + (gold_location.y * map_width)] = CELL_GOLD;
+            gold_remaining--;
+        }
+    }
 
     // Init resources
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         player_gold[player_id] = 150;
     }
 
+    is_selecting_building = false;
     mode = MATCH_MODE_NOT_STARTED;
     if (!network_is_server()) {
         network_client_toggle_ready();
@@ -405,7 +388,6 @@ void match_t::update() {
                 input.move.unit_ids[input.move.unit_count] = units[current_player_id].get_id_of(unit_index);
                 input.move.unit_count++;
             }
-            log_info("selected unit count %i", input.move.unit_count);
             if (input.move.unit_count != 0) {
                 input_queue.push_back(input);
 
@@ -469,16 +451,10 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
                     unit_target = input.move.target_cell;
                 }
 
-                // Don't bother pathfinding to the same cell
-                if (unit_target == unit.cell) {
-                    continue;
-                }
-                if (cell_is_blocked(unit_target)) {
-                    continue;
-                }
-                // Path to the target
                 unit.path = pathfind(unit.cell, unit_target);
-                unit.order_type = ORDER_MOVE;
+                if (!unit.path.empty()) {
+                    unit.order_type = ORDER_MOVE;
+                }
             }
             break;
         } // End case INPUT_MOVE
@@ -520,9 +496,11 @@ void match_t::handle_input(uint8_t player_id, const input_t& input) {
             }
 
             unit.path = pathfind(unit.cell, nearest_cell);
-            unit.order_type = ORDER_BUILD;
-            unit.order_building_type = (BuildingType)input.build.building_type;
-            unit.order_cell = input.build.target_cell;
+            if (!unit.path.empty()) {
+                unit.order_type = ORDER_BUILD;
+                unit.order_building_type = (BuildingType)input.build.building_type;
+                unit.order_cell = input.build.target_cell;
+            }
         }
         default:
             break;
@@ -746,178 +724,51 @@ void match_t::cell_set_value(ivec2 cell, ivec2 cell_size, int value) {
     }
 }
 
-// UNITS
-
-void match_t::unit_create(uint8_t player_id, UnitType type, ivec2 cell) {
-    auto it = unit_data.find(type);
-    GOLD_ASSERT(it != unit_data.end());
-
-    unit_t unit;
-    unit.type = type;
-    unit.health = it->second.max_health;
-    unit.is_selected = false;
-    unit.mode = UNIT_MODE_IDLE;
-    unit.cell = cell;
-    unit.position = cell_center_position(cell);
-    unit.direction = DIRECTION_SOUTH;
-    units[player_id].push_back(unit);
-
-    cell_set_value(cell, CELL_FILLED);
-}
-
-rect_t match_t::unit_get_rect(const unit_t& unit) const {
-    return rect_t(ivec2(unit.position.x.integer_part(), unit.position.y.integer_part()), ivec2(16, 16));
-}
-
-void match_t::unit_try_step(unit_t& unit) {
-    ivec2 next_point = unit.path[0];
-
-    // Set the unit's direction, even if it doesn't begin movement
-    ivec2 next_direction = next_point - unit.cell;
-    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-        if (DIRECTION_IVEC2[direction] == next_direction) {
-            unit.direction = direction;
-            break;
-        }
-    }
-
-    // Don't move if the tile is blocked
-    if (cell_is_blocked(next_point)) {
-        unit.path_timer.start(unit_t::PATH_PAUSE_DURATION);
-        return;
-    }
-
-    // Set state to begin movement
-    cell_set_value(unit.cell, CELL_EMPTY);
-    unit.cell = next_point;
-    cell_set_value(unit.cell, CELL_FILLED);
-    unit.target_position = cell_center_position(unit.cell);
-    unit.path.erase(unit.path.begin());
-    unit.mode = UNIT_MODE_STEP;
-    unit.path_timer.stop();
-}
-
-void match_t::unit_update(uint8_t player_id, unit_t& unit) {
-    // If we're not stepping but we have a path to follow, then try to move
-    if (unit.mode != UNIT_MODE_STEP && !unit.path.empty()) {
-        unit_try_step(unit);
-    }
-    // Update step
-    if (unit.mode == UNIT_MODE_STEP) {
-        fixed movement_left = fixed::from_int(1);
-        while (movement_left.raw_value > 0) {
-            fixed distance_to_target = unit.position.distance_to(unit.target_position);
-            if (distance_to_target > movement_left) {
-                unit.position += DIRECTION_VEC2[unit.direction] * movement_left;
-                movement_left = 0;
-            } else {
-                unit.position = unit.target_position;
-                unit.mode = UNIT_MODE_IDLE;
-                movement_left -= distance_to_target;
-
-                if (!unit.path.empty()) {
-                    unit_try_step(unit);
-                } else {
-                    // on finished movement
-                    if (unit.order_type == ORDER_MOVE) {
-                        unit.order_type = ORDER_NONE;
-                    } else if (unit.order_type == ORDER_BUILD) {
-                        // Since the unit is on top of the building space, we have to temporarily set the cell to empty so that we can check if the building space is free
-                        cell_set_value(unit.cell, CELL_EMPTY);
-                        if (cell_is_blocked(unit.order_cell, building_data.at(unit.order_building_type).cell_size())) {
-                            unit.order_type = ORDER_NONE;
-                            cell_set_value(unit.cell, CELL_FILLED);
-                            ui_show_status("You can't build there.");
-                        } else {
-                            unit.building_id = building_create(player_id, unit.order_building_type, unit.order_cell);
-                            player_gold[player_id] -= building_data.at(unit.order_building_type).cost;
-                            log_info("unit creating building. %u", unit.building_id);
-                            unit.mode = UNIT_MODE_BUILD;
-                            unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
-                            unit.is_selected = false;
-                            ui_on_selection_changed();
-                        }
-                    }
-                }
-
-                if (unit.mode != UNIT_MODE_STEP) {
-                    movement_left.raw_value = 0;
-                }
-            }
-        }
-    // Update path timer
-    } else if (!unit.path_timer.is_stopped) {
-        unit.path_timer.update();
-        if (unit.path_timer.is_finished) {
-            unit.path_timer.stop();
-            ivec2 unit_target = unit.path[unit.path.size() - 1];
-            unit.path.clear();
-            if (!cell_is_blocked(unit_target)) {
-                unit.path = pathfind(unit.cell, unit_target);
-            } else {
-                unit.order_type = ORDER_NONE;
-            }
-        }
-    // Update building
-    } else if (unit.mode == UNIT_MODE_BUILD) {
-        unit.build_timer.update();
-        if (unit.build_timer.is_finished) {
-            // NOTE: this is kinda unsafe, but we will handle it better when we implement unit destruction
-            building_t& building = buildings[player_id][buildings[player_id].get_index_of(unit.building_id)];
-
-            building.health++;
-            if (building.health >= building_data.at(building.type).max_health) {
-                building.health = building_data.at(building.type).max_health;
-                building.is_finished = true;
-            }
-            if (building.is_finished) {
-                // On building finished
-                log_info("building finished");
-                unit_eject_from_building(unit, building);
-                if (is_selecting_building && selected_building_id == unit.building_id) {
-                    ui_on_selection_changed();
-                }
-            } else {
-                unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
-            }
-        } 
-    }
-
-    // Update animation
-    if (unit.mode == UNIT_MODE_STEP) {
-        unit.animation.play(ANIMATION_UNIT_MOVE);
-    } else if (unit.mode == UNIT_MODE_BUILD) {
-        unit.animation.play(ANIMATION_UNIT_BUILD);
-    } else {
-        unit.animation.play(ANIMATION_UNIT_IDLE);
-    }
-    unit.animation.update();
-    if (unit.mode != UNIT_MODE_BUILD) {
-        if (unit.direction == DIRECTION_NORTH) {
-            unit.animation.frame.y = 1;
-        } else if (unit.direction == DIRECTION_SOUTH) {
-            unit.animation.frame.y = 0;
-        } else if (unit.direction > DIRECTION_SOUTH) {
-            unit.animation.frame.y = 3;
-        } else {
-            unit.animation.frame.y = 2;
-        }
-    }
-}
-
-void match_t::unit_eject_from_building(unit_t& unit, building_t& building) {
-    unit.cell = building_get_nearest_free_cell(building);
-    cell_set_value(unit.cell, CELL_FILLED);
-    unit.position = cell_center_position(unit.cell);
-    unit.mode = UNIT_MODE_IDLE;
-    unit.order_type = ORDER_NONE;
-}
-
 std::vector<ivec2> match_t::pathfind(ivec2 from, ivec2 to) {
     struct path_t {
         int score;
         std::vector<ivec2> points;
     };
+
+    if (from == to) {
+        return std::vector<ivec2>();
+    }
+
+    // If the cell we are pathing to is blocked, choose a cell surrounding it to path to instead
+    if (cell_is_blocked(to)) {
+        // We start with a radius of 1 and search in ever-increasing "circles" until we find a suitable point
+        int radius = 1;
+        int nearest_cell_distance = -1;
+        ivec2 nearest_cell;
+        while (nearest_cell_distance == -1) {
+            log_info("searching for nearest, radius: %i", radius);
+            // For each cell in the "circle"...
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                ivec2 cell = to + (DIRECTION_IVEC2[direction] * radius);
+                // If the cell is outside the map, ignore it
+                if (cell.x < 0 || cell.x >= map_width || cell.y < 0 || cell.y >= map_height) {
+                    continue;
+                }
+                // If the cell is equal to the target point, then return an empty path (unit will not move)
+                if (cell == from) {
+                    return std::vector<ivec2>();
+                }
+                // If the cell is blocked, ignore it 
+                if (cell_is_blocked(cell)) {
+                    continue;
+                }
+
+                // Choose the cell if it is closer than the previously chosen nearest cell
+                int cell_distance = ivec2::manhattan_distance(cell, from);
+                if (nearest_cell_distance == -1 || cell_distance < nearest_cell_distance) {
+                    nearest_cell = cell;
+                    nearest_cell_distance = cell_distance;
+                }
+            }
+        }
+
+        to = nearest_cell;
+    }
 
     std::vector<path_t> frontier;
     std::vector<ivec2> explored;
@@ -926,6 +777,7 @@ std::vector<ivec2> match_t::pathfind(ivec2 from, ivec2 to) {
         .score = abs(to.x - from.x) + abs(to.y - from.y), 
         .points = { from } 
     });
+
     while (!frontier.empty()) {
         // Find the smallest path
         uint32_t smallest_index = 0;
@@ -1000,8 +852,174 @@ std::vector<ivec2> match_t::pathfind(ivec2 from, ivec2 to) {
         } // End for each child
     } // End while !frontier.empty()
 
-    std::vector<ivec2> empty_path;
-    return empty_path;
+    return std::vector<ivec2>();
+}
+
+// UNITS
+
+void match_t::unit_create(uint8_t player_id, UnitType type, ivec2 cell) {
+    auto it = unit_data.find(type);
+    GOLD_ASSERT(it != unit_data.end());
+
+    unit_t unit;
+    unit.type = type;
+    unit.health = it->second.max_health;
+    unit.is_selected = false;
+    unit.mode = UNIT_MODE_IDLE;
+    unit.cell = cell;
+    unit.position = cell_center_position(cell);
+    unit.direction = DIRECTION_SOUTH;
+    units[player_id].push_back(unit);
+
+    cell_set_value(cell, CELL_FILLED);
+}
+
+rect_t match_t::unit_get_rect(const unit_t& unit) const {
+    return rect_t(ivec2(unit.position.x.integer_part(), unit.position.y.integer_part()), ivec2(16, 16));
+}
+
+void match_t::unit_try_step(unit_t& unit) {
+    ivec2 next_point = unit.path[0];
+
+    // Set the unit's direction, even if it doesn't begin movement
+    ivec2 next_direction = next_point - unit.cell;
+    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+        if (DIRECTION_IVEC2[direction] == next_direction) {
+            unit.direction = direction;
+            break;
+        }
+    }
+
+    // Don't move if the tile is blocked
+    if (cell_is_blocked(next_point)) {
+        unit.path_timer.start(unit_t::PATH_PAUSE_DURATION);
+        return;
+    }
+
+    // Set state to begin movement
+    cell_set_value(unit.cell, CELL_EMPTY);
+    unit.cell = next_point;
+    cell_set_value(unit.cell, CELL_FILLED);
+    unit.target_position = cell_center_position(unit.cell);
+    unit.path.erase(unit.path.begin());
+    unit.mode = UNIT_MODE_STEP;
+    unit.path_timer.stop();
+}
+
+void match_t::unit_update(uint8_t player_id, unit_t& unit) {
+    // If we're not stepping but we have a path to follow, then try to move
+    if (unit.mode != UNIT_MODE_STEP && !unit.path.empty()) {
+        unit_try_step(unit);
+    }
+    // Update step
+    if (unit.mode == UNIT_MODE_STEP) {
+        unit.path_timer.stop();
+        fixed movement_left = fixed::from_int(1);
+        while (movement_left.raw_value > 0) {
+            fixed distance_to_target = unit.position.distance_to(unit.target_position);
+            if (distance_to_target > movement_left) {
+                unit.position += DIRECTION_VEC2[unit.direction] * movement_left;
+                movement_left = 0;
+            } else {
+                unit.position = unit.target_position;
+                unit.mode = UNIT_MODE_IDLE;
+                movement_left -= distance_to_target;
+
+                if (!unit.path.empty()) {
+                    unit_try_step(unit);
+                } else {
+                    // on finished movement
+                    if (unit.order_type == ORDER_MOVE) {
+                        unit.order_type = ORDER_NONE;
+                    } else if (unit.order_type == ORDER_BUILD) {
+                        // Since the unit is on top of the building space, we have to temporarily set the cell to empty so that we can check if the building space is free
+                        cell_set_value(unit.cell, CELL_EMPTY);
+                        if (cell_is_blocked(unit.order_cell, building_data.at(unit.order_building_type).cell_size())) {
+                            unit.order_type = ORDER_NONE;
+                            cell_set_value(unit.cell, CELL_FILLED);
+                            ui_show_status("You can't build there.");
+                        } else {
+                            unit.building_id = building_create(player_id, unit.order_building_type, unit.order_cell);
+                            player_gold[player_id] -= building_data.at(unit.order_building_type).cost;
+                            log_info("unit creating building. %u", unit.building_id);
+                            unit.mode = UNIT_MODE_BUILD;
+                            unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
+                            unit.is_selected = false;
+                            ui_on_selection_changed();
+                        }
+                    }
+                }
+
+                if (unit.mode != UNIT_MODE_STEP) {
+                    movement_left.raw_value = 0;
+                }
+            }
+        }
+    // Update path timer
+    } else if (!unit.path_timer.is_stopped) {
+        unit.path_timer.update();
+        if (unit.path_timer.is_finished) {
+            unit.path_timer.stop();
+            ivec2 unit_target = unit.path[unit.path.size() - 1];
+            unit.path.clear();
+            unit.path = pathfind(unit.cell, unit_target);
+            if (unit.path.empty()) {
+                unit.order_type = ORDER_NONE;
+            } 
+        }
+    // Update building
+    } else if (unit.mode == UNIT_MODE_BUILD) {
+        unit.build_timer.update();
+        if (unit.build_timer.is_finished) {
+            // NOTE: this is kinda unsafe, but we will handle it better when we implement unit destruction
+            building_t& building = buildings[player_id][buildings[player_id].get_index_of(unit.building_id)];
+
+            building.health++;
+            if (building.health >= building_data.at(building.type).max_health) {
+                building.health = building_data.at(building.type).max_health;
+                building.is_finished = true;
+            }
+            if (building.is_finished) {
+                // On building finished
+                log_info("building finished");
+                unit_eject_from_building(unit, building);
+                if (is_selecting_building && selected_building_id == unit.building_id) {
+                    ui_on_selection_changed();
+                }
+            } else {
+                unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
+            }
+        } 
+    }
+
+    // Update animation
+    if (unit.mode == UNIT_MODE_STEP) {
+        unit.animation.play(ANIMATION_UNIT_MOVE);
+    } else if (unit.mode == UNIT_MODE_BUILD) {
+        unit.animation.play(ANIMATION_UNIT_BUILD);
+    } else {
+        unit.animation.play(ANIMATION_UNIT_IDLE);
+    }
+    unit.animation.update();
+    if (unit.mode != UNIT_MODE_BUILD) {
+        if (unit.direction == DIRECTION_NORTH) {
+            unit.animation.frame.y = 1;
+        } else if (unit.direction == DIRECTION_SOUTH) {
+            unit.animation.frame.y = 0;
+        } else if (unit.direction > DIRECTION_SOUTH) {
+            unit.animation.frame.y = 3;
+        } else {
+            unit.animation.frame.y = 2;
+        }
+    }
+}
+
+void match_t::unit_eject_from_building(unit_t& unit, building_t& building) {
+    unit.cell = building_get_nearest_free_cell(building);
+    cell_set_value(unit.cell, CELL_FILLED);
+    unit.position = cell_center_position(unit.cell);
+    unit.mode = UNIT_MODE_IDLE;
+    unit.order_type = ORDER_NONE;
 }
 
 // BUILDINGS
