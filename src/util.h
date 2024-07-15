@@ -129,6 +129,9 @@ struct ivec2 {
     bool operator==(const ivec2& other) const {
         return this->x == other.x && this->y == other.y;
     }
+    bool operator!=(const ivec2& other) const {
+        return this->x != other.x || this->y != other.y;
+    }
     ivec2 operator-() const {
         return ivec2(-x, -y);
     }
@@ -172,6 +175,9 @@ struct vec2 {
     }
     bool operator==(const vec2& other) const {
         return this->x == other.x && this->y == other.y;
+    }
+    bool operator!=(const vec2& other) const {
+        return this->x != other.x || this->y != other.y;
     }
     vec2 operator-() const {
         return vec2(-x, -y);

@@ -154,6 +154,16 @@ const player_t& network_get_player(uint8_t player_id) {
     return state.players[player_id];
 }
 
+bool network_are_all_players_ready() {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status == PLAYER_STATUS_NOT_READY) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 // POLL EVENTS
 
 void network_service() {

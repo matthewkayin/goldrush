@@ -12,16 +12,16 @@ struct id_array {
     using iterator = typename std::vector<T>::iterator;
     using const_iterator = typename std::vector<T>::const_iterator;
 
-    static const uint8_t ID_MAX = 255;
+    static const uint16_t ID_MAX = 2 * MAX_PLAYERS * MAX_UNITS;
     static const uint32_t INDEX_INVALID = 65535;
 
     std::vector<T> data;
-    std::vector<uint8_t> ids;
-    std::queue<uint8_t> available_ids;
-    std::unordered_map<uint8_t, uint32_t> id_to_index;
+    std::vector<uint16_t> ids;
+    std::queue<uint16_t> available_ids;
+    std::unordered_map<uint16_t, uint32_t> id_to_index;
 
     id_array() {
-        for (uint8_t id = 0; id < ID_MAX; id++) {
+        for (uint16_t id = 0; id < ID_MAX; id++) {
             available_ids.push(id);
         }
     }
@@ -35,14 +35,14 @@ struct id_array {
         return data[index]; 
     }
 
-    uint32_t get_index_of(uint8_t id) const {
+    uint32_t get_index_of(uint16_t id) const {
         auto index_it = id_to_index.find(id);
         if (index_it == id_to_index.end()) {
             return INDEX_INVALID;
         }
         return index_it->second;
     }
-    uint8_t get_id_of(uint32_t index) const {
+    uint16_t get_id_of(uint32_t index) const {
         return ids[index];
     }
 
@@ -53,10 +53,10 @@ struct id_array {
 
     size_t size() const { return data.size(); }
 
-    uint8_t push_back(const T& value) {
+    uint16_t push_back(const T& value) {
         GOLD_ASSERT(!available_ids.empty());
 
-        uint8_t id = available_ids.front();
+        uint16_t id = available_ids.front();
         available_ids.pop();
         id_to_index[id] = data.size();
         ids.push_back(id);
@@ -67,12 +67,12 @@ struct id_array {
 
     void remove_at(uint32_t index) {
         // remove the mapping for this id
-        uint8_t id = ids[index];
+        uint16_t id = ids[index];
         id_to_index.erase(id);
 
         // update the mapping of elements whose index got shifted
         for (uint32_t other_index = index + 1; other_index < data.size(); other_index++) {
-            uint8_t other_id = ids[other_index];
+            uint16_t other_id = ids[other_index];
             id_to_index[other_id] = other_index - 1;
         }
 

@@ -138,7 +138,7 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     }},
     { SPRITE_UI_BUTTON_ICON, (sprite_params_t) {
         .path = "sprite/ui_button_icon.png",
-        .h_frames = BUTTON_ICON_COUNT,
+        .h_frames = BUTTON_COUNT,
         .v_frames = 2
     }},
     { SPRITE_UI_GOLD, (sprite_params_t) {
@@ -236,7 +236,7 @@ bool engine_init(ivec2 window_size);
 void engine_quit();
 void render_text(Font font, const char* text, SDL_Color color, ivec2 position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
 void render_menu(const menu_t& menu);
-void render_match(const match_t& match);
+void render_match(const match_state_t& state);
 
 enum Mode {
     MODE_MENU,
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
 
     Mode mode = MODE_MENU;
     menu_t menu;
-    match_t match;
+    match_state_t match_state;
 
     double last_time = platform_get_absolute_time();
     double last_second = last_time;
@@ -396,13 +396,13 @@ int main(int argc, char** argv) {
                 case MODE_MENU: {
                     menu.update();
                     if (menu.get_mode() == MENU_MODE_MATCH_START) {
-                        match.init();
+                        match_state = match_init();
                         mode = MODE_MATCH;
                     }
                     break;
                 }
                 case MODE_MATCH: {
-                    match.update();
+                    match_update(match_state);
                     break;
                 }
             }
@@ -417,7 +417,7 @@ int main(int argc, char** argv) {
                 render_menu(menu);
                 break;
             case MODE_MATCH:
-                render_match(match);
+                render_match(match_state);
                 break;
         }
 
@@ -823,7 +823,7 @@ void ysort(render_sprite_params_t* params, int low, int high) {
     }
 }
 
-void render_match(const match_t& match) {
+void render_match(const match_state_t& match) {
     uint8_t current_player_id = network_get_player_id();
 
     // Y-Sort
@@ -845,9 +845,9 @@ void render_match(const match_t& match) {
 
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
-            int map_index = (base_coords.x + x) + ((base_coords.y + y) * match.map_width);
-            tile_src_rect.x = (match.map_tiles[map_index] % engine.sprites[SPRITE_TILES].h_frames) * TILE_SIZE;
-            tile_src_rect.y = (match.map_tiles[map_index] / engine.sprites[SPRITE_TILES].h_frames) * TILE_SIZE;
+            int map_index = (base_coords.x + x) + ((base_coords.y + y) * match.map.width);
+            tile_src_rect.x = (match.map.tiles[map_index] % engine.sprites[SPRITE_TILES].h_frames) * TILE_SIZE;
+            tile_src_rect.y = (match.map.tiles[map_index] / engine.sprites[SPRITE_TILES].h_frames) * TILE_SIZE;
 
             tile_dst_rect.x = base_pos.x + (x * TILE_SIZE);
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
@@ -855,7 +855,7 @@ void render_match(const match_t& match) {
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
 
             // Render gold
-            if (match.map_cells[map_index] == CELL_GOLD) {
+            if (match.map.cells[map_index] == CELL_GOLD) {
                 ysorted.push_back((render_sprite_params_t) {
                     .sprite = SPRITE_TILE_GOLD,
                     .position = ivec2(tile_dst_rect.x, tile_dst_rect.y),
@@ -870,18 +870,18 @@ void render_match(const match_t& match) {
     static const int HEALTHBAR_HEIGHT = 4;
     static const int HEALTHBAR_PADDING = 2;
     static const int BUILDING_HEALTHBAR_PADDING = 5;
-    if (match.is_selecting_building) {
-        uint32_t building_index = match.buildings[current_player_id].get_index_of(match.selected_building_id);
+    if (match.selection.type == SELECTION_TYPE_BUILDINGS) {
+        uint32_t building_index = match.buildings.get_index_of(match.selection.ids[0]);
         if (building_index != id_array<building_t>::INDEX_INVALID) {
-            const building_t& building = match.buildings[current_player_id][building_index];
-            rect_t building_rect = match.building_get_rect(building);
-            render_sprite(SPRITE_SELECT_RING_HOUSE, ivec2(0, 0), building_rect.position + (building_rect.size / 2) - match.camera_offset, RENDER_SPRITE_CENTERED);
+            const building_t& building = match.buildings[building_index];
+            rect_t _building_rect = building_rect(building);
+            render_sprite(SPRITE_SELECT_RING_HOUSE, ivec2(0, 0), _building_rect.position + (_building_rect.size / 2) - match.camera_offset, RENDER_SPRITE_CENTERED);
 
             // Determine healthbar rect
-            ivec2 building_render_pos = building_rect.position - match.camera_offset;
-            SDL_Rect healthbar_rect = (SDL_Rect) { .x = building_render_pos.x, .y = building_render_pos.y + building_rect.size.y + BUILDING_HEALTHBAR_PADDING, .w = building_rect.size.x, .h = HEALTHBAR_HEIGHT };
+            ivec2 building_render_pos = _building_rect.position - match.camera_offset;
+            SDL_Rect healthbar_rect = (SDL_Rect) { .x = building_render_pos.x, .y = building_render_pos.y + _building_rect.size.y + BUILDING_HEALTHBAR_PADDING, .w = _building_rect.size.x, .h = HEALTHBAR_HEIGHT };
             SDL_Rect healthbar_subrect = healthbar_rect;
-            healthbar_subrect.w = (healthbar_rect.w * building.health) / building_data.at(building.type).max_health;
+            healthbar_subrect.w = (healthbar_rect.w * building.health) / BUILDING_DATA.at(building.type).max_health;
 
             // Cull the healthbar
             if (!(healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT)) {
@@ -894,29 +894,33 @@ void render_match(const match_t& match) {
             }
         }
     } else {
-        for (const unit_t& unit : match.units[current_player_id]) {
-            if (unit.is_selected) {
-                render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, RENDER_SPRITE_CENTERED);
+        for (auto unit_id_it = match.selection.ids.begin(); unit_id_it != match.selection.ids.end(); unit_id_it++) {
+            uint32_t index = match.units.get_index_of(*unit_id_it);
+            if (index == id_array<unit_t>::INDEX_INVALID) {
+                continue;
+            }
+            const unit_t& unit = match.units[index];
 
-                // Determine healthbar rect
-                ivec2 unit_render_pos = unit.position.to_ivec2() - match.camera_offset;
-                ivec2 unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
-                SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
-                SDL_Rect healthbar_subrect = healthbar_rect;
-                healthbar_subrect.w = (healthbar_rect.w * unit.health) / unit_data.at(unit.type).max_health;
+            render_sprite(SPRITE_SELECT_RING, ivec2(0, 0), unit.position.to_ivec2() - match.camera_offset, RENDER_SPRITE_CENTERED);
+
+            // Determine healthbar rect
+            ivec2 unit_render_pos = unit.position.to_ivec2() - match.camera_offset;
+            ivec2 unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
+            SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
+            SDL_Rect healthbar_subrect = healthbar_rect;
+            healthbar_subrect.w = (healthbar_rect.w * unit.health) / UNIT_DATA.at(unit.type).max_health;
 
                 // Cull the healthbar
-                if (healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT ) {
-                    continue;
-                }
-
-                // Render the healthbar
-                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
-                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
-                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
-                SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
-                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+            if (healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT ) {
+                continue;
             }
+
+            // Render the healthbar
+            SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+            SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+            SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+            SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+            SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
         }
     }
 
@@ -926,61 +930,57 @@ void render_match(const match_t& match) {
     }
 
     // Buildings
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (const building_t& building : match.buildings[player_id]) {
-            int sprite = SPRITE_BUILDING_HOUSE + building.type;
-            GOLD_ASSERT(sprite < SPRITE_COUNT);
+    for (const building_t& building : match.buildings) {
+        int sprite = SPRITE_BUILDING_HOUSE + building.type;
+        GOLD_ASSERT(sprite < SPRITE_COUNT);
 
-            // Cull the building sprite
-            ivec2 building_render_pos = (building.cell * TILE_SIZE) - match.camera_offset;
-            ivec2 building_render_size = engine.sprites[sprite].frame_size;
-            if (building_render_pos.x + building_render_size.x < 0 || building_render_pos.x > SCREEN_WIDTH || building_render_pos.y + building_render_size.y < 0 || building_render_pos.y > SCREEN_HEIGHT) {
-                continue;
-            }
-
-            int hframe = building.is_finished ? 3 : ((3 * building.health) / building_data.at(building.type).max_health);
-            ysorted.push_back((render_sprite_params_t) {
-                .sprite = (Sprite)sprite,
-                .position = building_render_pos,
-                .frame = ivec2(hframe, 0),
-                .options = RENDER_SPRITE_NO_CULL
-            });
+        // Cull the building sprite
+        ivec2 building_render_pos = (building.cell * TILE_SIZE) - match.camera_offset;
+        ivec2 building_render_size = engine.sprites[sprite].frame_size;
+        if (building_render_pos.x + building_render_size.x < 0 || building_render_pos.x > SCREEN_WIDTH || building_render_pos.y + building_render_size.y < 0 || building_render_pos.y > SCREEN_HEIGHT) {
+            continue;
         }
+
+        int hframe = building.is_finished ? 3 : ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
+        ysorted.push_back((render_sprite_params_t) {
+            .sprite = (Sprite)sprite,
+            .position = building_render_pos,
+            .frame = ivec2(hframe, 0),
+            .options = RENDER_SPRITE_NO_CULL
+        });
     }
 
     // Units
-    for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (const unit_t& unit : match.units[player_id]) {
-            ivec2 unit_render_pos = unit.position.to_ivec2() - match.camera_offset;
-            ivec2 unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
+    for (const unit_t& unit : match.units) {
+        ivec2 unit_render_pos = unit.position.to_ivec2() - match.camera_offset;
+        ivec2 unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
 
-            // Cull the unit sprite
-            if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
-                continue;
-            }
-
-            render_sprite_params_t unit_params = (render_sprite_params_t) { 
-                .sprite = SPRITE_UNIT_MINER, 
-                .position = unit_render_pos, 
-                .frame = unit.animation.frame ,
-                .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
-            };
-            if (unit.mode == UNIT_MODE_BUILD) {
-                const building_t& building = match.buildings[player_id][match.buildings->get_index_of(unit.building_id)];
-                const building_data_t& data = building_data.at(building.type);
-                int hframe = ((3 * building.health) / data.max_health);
-                unit_params.sprite = SPRITE_MINER_BUILDING;
-
-                ivec2 building_position = (building.cell * TILE_SIZE) - match.camera_offset;
-                unit_params.position = building_position + data.builder_positions(hframe);
-
-                unit_params.options &= ~RENDER_SPRITE_CENTERED;
-                if (data.builder_flip_h[hframe]) {
-                    unit_params.options |= RENDER_SPRITE_FLIP_H;
-                }
-            }
-            ysorted.push_back(unit_params);
+        // Cull the unit sprite
+        if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
+            continue;
         }
+
+        render_sprite_params_t unit_params = (render_sprite_params_t) { 
+            .sprite = SPRITE_UNIT_MINER, 
+            .position = unit_render_pos, 
+            .frame = unit.animation.frame ,
+            .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
+        };
+        if (unit_is_building(unit)) {
+            const building_t& building = match.buildings[match.buildings.get_index_of(unit.order.build.building_id)];
+            const building_data_t& data = BUILDING_DATA.at(building.type);
+            int hframe = ((3 * building.health) / data.max_health);
+            unit_params.sprite = SPRITE_MINER_BUILDING;
+
+            ivec2 building_position = (building.cell * TILE_SIZE) - match.camera_offset;
+            unit_params.position = building_position + data.builder_positions(hframe);
+
+            unit_params.options &= ~RENDER_SPRITE_CENTERED;
+            if (data.builder_flip_h[hframe]) {
+                unit_params.options |= RENDER_SPRITE_FLIP_H;
+            }
+        }
+        ysorted.push_back(unit_params);
     }
     ysort(&ysorted[0], 0, ysorted.size() - 1);
     for (uint32_t i = 0; i < ysorted.size(); i++) {
@@ -994,17 +994,17 @@ void render_match(const match_t& match) {
         GOLD_ASSERT(sprite < SPRITE_COUNT);
         render_sprite((Sprite)(sprite), ivec2(3, 0), (match.ui_building_cell * TILE_SIZE) - match.camera_offset);
 
-        auto it = building_data.find(match.ui_building_type);
-        bool is_placement_out_of_bounds = match.ui_building_cell.x + it->second.cell_width > match.map_width || 
-                                          match.ui_building_cell.y + it->second.cell_height > match.map_height;
+        const building_data_t& data = BUILDING_DATA.at(match.ui_building_type);
+        bool is_placement_out_of_bounds = match.ui_building_cell.x + data.cell_width > match.map.width || 
+                                          match.ui_building_cell.y + data.cell_height > match.map.height;
         SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
-        for (int y = match.ui_building_cell.y; y < match.ui_building_cell.y + it->second.cell_height; y++) {
-            for (int x = match.ui_building_cell.x; x < match.ui_building_cell.x + it->second.cell_width; x++) {
+        for (int y = match.ui_building_cell.y; y < match.ui_building_cell.y + data.cell_height; y++) {
+            for (int x = match.ui_building_cell.x; x < match.ui_building_cell.x + data.cell_width; x++) {
                 bool is_cell_green;
                 if (is_placement_out_of_bounds) {
                     is_cell_green = false;
                 } else {
-                    is_cell_green = !match.cell_is_blocked(ivec2(x, y));
+                    is_cell_green = !map_cell_is_blocked(match.map, ivec2(x, y));
                 }
 
                 SDL_Color cell_color = is_cell_green ? COLOR_GREEN : COLOR_RED;
@@ -1030,19 +1030,20 @@ void render_match(const match_t& match) {
 
     // UI Buttons
     for (int i = 0; i < 6; i++) {
-        if (!match.ui_buttons[i].enabled) {
+        Button ui_button = UI_BUTTONS.at(match.ui_buttonset)[i];
+        if (ui_button == BUTTON_NONE) {
             continue;
         }
 
         bool is_button_hovered = match.ui_button_hovered == i;
         bool is_button_pressed = is_button_hovered && input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT);
         ivec2 offset = is_button_pressed ? ivec2(1, 1) : (is_button_hovered ? ivec2(0, -1) : ivec2(0, 0));
-        render_sprite(SPRITE_UI_BUTTON, ivec2(is_button_hovered && !is_button_pressed ? 1 : 0, 0), match.ui_buttons[i].rect.position + offset);
-        render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(match.ui_buttons[i].icon, is_button_hovered && !is_button_pressed ? 1 : 0), match.ui_buttons[i].rect.position + offset);
+        render_sprite(SPRITE_UI_BUTTON, ivec2(is_button_hovered && !is_button_pressed ? 1 : 0, 0), UI_BUTTON_RECT[i].position + offset);
+        render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(ui_button, is_button_hovered && !is_button_pressed ? 1 : 0), UI_BUTTON_RECT[i].position + offset);
     }
 
     // UI Status message
-    if (!match.ui_status_timer.is_stopped) {
+    if (match.ui_status_timer != 0) {
         render_text(FONT_HACK, match.ui_status_message.c_str(), COLOR_WHITE, ivec2(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 128));
     }
 
@@ -1058,28 +1059,27 @@ void render_match(const match_t& match) {
     SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND_DARK.r, COLOR_SAND_DARK.g, COLOR_SAND_DARK.b, COLOR_SAND_DARK.a);
     SDL_RenderClear(engine.renderer);
 
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, COLOR_GREEN.a);
-        for (const building_t& building : match.buildings[player_id]) {
-            SDL_Rect building_rect = (SDL_Rect) { 
-                .x = (building.cell.x * MINIMAP_RECT.size.x) / match.map_width,
-                .y = (building.cell.y * MINIMAP_RECT.size.y) / match.map_height, 
-                .w = 2 * building_data.at(building.type).cell_width,
-                .h = 2 * building_data.at(building.type).cell_height
-            };
-            SDL_RenderFillRect(engine.renderer, &building_rect);
-        }
-        for (const unit_t& unit : match.units[player_id]) {
-            SDL_Rect unit_rect = (SDL_Rect) { .x = (unit.cell.x * MINIMAP_RECT.size.x) / match.map_width, .y = (unit.cell.y * MINIMAP_RECT.size.y) / match.map_height, .w = 2, .h = 2 };
-            SDL_RenderFillRect(engine.renderer, &unit_rect);
-        }
-    } 
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, COLOR_GREEN.a);
+    for (const building_t& building : match.buildings) {
+        SDL_Rect building_rect = (SDL_Rect) { 
+            .x = (building.cell.x * MINIMAP_RECT.size.x) / match.map.width,
+            .y = (building.cell.y * MINIMAP_RECT.size.y) / match.map.height, 
+            .w = 2 * BUILDING_DATA.at(building.type).cell_width,
+            .h = 2 * BUILDING_DATA.at(building.type).cell_height
+        };
+        SDL_RenderFillRect(engine.renderer, &building_rect);
+    }
+
+    for (const unit_t& unit : match.units) {
+        SDL_Rect unit_rect = (SDL_Rect) { .x = (unit.cell.x * MINIMAP_RECT.size.x) / match.map.width, .y = (unit.cell.y * MINIMAP_RECT.size.y) / match.map.height, .w = 2, .h = 2 };
+        SDL_RenderFillRect(engine.renderer, &unit_rect);
+    }
 
     SDL_Rect camera_rect = (SDL_Rect) { 
-        .x = ((match.camera_offset.x / TILE_SIZE) * MINIMAP_RECT.size.x) / match.map_width, 
-        .y = ((match.camera_offset.y / TILE_SIZE) * MINIMAP_RECT.size.y) / match.map_height, 
-        .w = ((SCREEN_WIDTH / TILE_SIZE) * MINIMAP_RECT.size.x) / match.map_width, 
-        .h = 1 + (((SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE) * MINIMAP_RECT.size.y) / match.map_height };
+        .x = ((match.camera_offset.x / TILE_SIZE) * MINIMAP_RECT.size.x) / match.map.width, 
+        .y = ((match.camera_offset.y / TILE_SIZE) * MINIMAP_RECT.size.y) / match.map.height, 
+        .w = ((SCREEN_WIDTH / TILE_SIZE) * MINIMAP_RECT.size.x) / match.map.width, 
+        .h = 1 + (((SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE) * MINIMAP_RECT.size.y) / match.map.height };
     SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(engine.renderer, &camera_rect);
 

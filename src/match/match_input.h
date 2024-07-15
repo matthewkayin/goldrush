@@ -16,16 +16,16 @@ enum InputType {
 struct input_move_t {
     ivec2 target_cell;
     uint8_t unit_count;
-    uint8_t unit_ids[MAX_UNITS];
+    uint16_t unit_ids[MAX_UNITS];
 };
 
 struct input_stop_t {
     uint8_t unit_count;
-    uint8_t unit_ids[MAX_UNITS];
+    uint16_t unit_ids[MAX_UNITS];
 };
 
 struct input_build_t {
-    uint8_t unit_id;
+    uint16_t unit_id;
     uint8_t building_type;
     ivec2 target_cell;
 };

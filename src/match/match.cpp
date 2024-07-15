@@ -10,14 +10,70 @@
 
 static const uint32_t TICK_DURATION = 4;
 
+static const uint32_t UI_STATUS_DURATION = 60;
+const std::unordered_map<UiButtonset, std::array<Button, 6>> UI_BUTTONS = {
+    { UI_BUTTONSET_NONE, { BUTTON_NONE, BUTTON_NONE, BUTTON_NONE,
+                      BUTTON_NONE, BUTTON_NONE, BUTTON_NONE }},
+    { UI_BUTTONSET_UNIT, { BUTTON_MOVE, BUTTON_STOP, BUTTON_ATTACK,
+                      BUTTON_NONE, BUTTON_NONE, BUTTON_NONE }},
+    { UI_BUTTONSET_MINER, { BUTTON_MOVE, BUTTON_STOP, BUTTON_ATTACK,
+                      BUTTON_BUILD, BUTTON_NONE, BUTTON_NONE }},
+    { UI_BUTTONSET_BUILD, { BUTTON_BUILD_HOUSE, BUTTON_BUILD_CAMP, BUTTON_NONE,
+                      BUTTON_BUILD, BUTTON_NONE, BUTTON_CANCEL }},
+    { UI_BUTTONSET_CANCEL, { BUTTON_NONE, BUTTON_NONE, BUTTON_NONE,
+                      BUTTON_NONE, BUTTON_NONE, BUTTON_CANCEL }}
+};
+static const ivec2 UI_BUTTON_SIZE = ivec2(32, 32);
+static const ivec2 UI_BUTTON_PADDING = ivec2(4, 6);
+static const ivec2 UI_BUTTON_TOP_LEFT = ivec2(SCREEN_WIDTH - 132 + 14, SCREEN_HEIGHT - UI_HEIGHT + 10);
+static const ivec2 UI_BUTTON_POSITIONS[6] = { UI_BUTTON_TOP_LEFT, UI_BUTTON_TOP_LEFT + ivec2(UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x, 0), UI_BUTTON_TOP_LEFT + ivec2(2 * (UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x), 0),
+                                              UI_BUTTON_TOP_LEFT + ivec2(0, UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y), UI_BUTTON_TOP_LEFT + ivec2(UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x, UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y), UI_BUTTON_TOP_LEFT + ivec2(2 * (UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x), UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y) };
+const rect_t UI_BUTTON_RECT[6] = {
+    rect_t(UI_BUTTON_POSITIONS[0], UI_BUTTON_SIZE),
+    rect_t(UI_BUTTON_POSITIONS[1], UI_BUTTON_SIZE),
+    rect_t(UI_BUTTON_POSITIONS[2], UI_BUTTON_SIZE),
+    rect_t(UI_BUTTON_POSITIONS[3], UI_BUTTON_SIZE),
+    rect_t(UI_BUTTON_POSITIONS[4], UI_BUTTON_SIZE),
+    rect_t(UI_BUTTON_POSITIONS[5], UI_BUTTON_SIZE),
+};
+
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
-vec2 cell_center_position(ivec2 cell) {
-    return vec2(fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)), fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2)));
-}
+static const uint32_t PATH_PAUSE_DURATION = 60;
+static const uint32_t BUILD_TICK_DURATION = 8;
 
-void match_t::init() {
+const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
+    { UNIT_MINER, (unit_data_t) {
+        .cost = 50,
+        .max_health = 20
+    }}
+};
+
+const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
+    { BUILDING_HOUSE, (building_data_t) {
+        .cell_width = 2,
+        .cell_height = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_positions_x = { 3, 16, -4 },
+        .builder_positions_y = { 15, 15, 3 },
+        .builder_flip_h = { false, true, false }
+    }},
+    { BUILDING_CAMP, (building_data_t) {
+        .cell_width = 2,
+        .cell_height = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_positions_x = { 1, 15, 14 },
+        .builder_positions_y = { 13, 13, 2 },
+        .builder_flip_h = { false, true, true }
+    }}
+};
+
+match_state_t match_init() {
+    match_state_t state;
+
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
@@ -25,57 +81,35 @@ void match_t::init() {
             continue;
         }
 
+        // Since all inputs will be handled 4 ticks in the future, 
+        // we pad the input list with 3 ticks-worth of empty inputs
         input_t empty_input;
         empty_input.type = INPUT_NONE;
         std::vector<input_t> empty_input_list = { empty_input };
-        inputs[player_id].push_back(empty_input_list);
-        inputs[player_id].push_back(empty_input_list);
-        inputs[player_id].push_back(empty_input_list);
+        state.inputs[player_id].push_back(empty_input_list);
+        state.inputs[player_id].push_back(empty_input_list);
+        state.inputs[player_id].push_back(empty_input_list);
     }
-    tick_timer = 0;
+    state.tick_timer = 0;
 
     // Init UI
-    ui_mode = UI_MODE_NONE;
-    camera_offset = ivec2(0, 0);
-    // Init ui buttons
-    ivec2 ui_button_padding = ivec2(4, 6);
-    ivec2 ui_button_top_left = ivec2(SCREEN_WIDTH - 132 + 14, SCREEN_HEIGHT - UI_HEIGHT + 10);
-    for (int y = 0; y < 2; y++) {
-        for (int x = 0; x < 3; x++) {
-            int index = x + (y * 3);
-            ui_buttons[index].enabled = index < 5;
-            ui_buttons[index].icon = (ButtonIcon)x;
-            ui_buttons[index].rect = rect_t(ui_button_top_left + ivec2((32 + ui_button_padding.x) * x, (32 + ui_button_padding.y) * y), ivec2(32, 32));
-        }
-    }
-    ui_buttons[3].icon = BUTTON_ICON_BUILD;
-    ui_buttons[4].icon = BUTTON_ICON_BUILD_HOUSE;
-    ui_button_hovered = -1;
-    ui_refresh_buttons();
+    state.ui_mode = UI_MODE_NONE;
+    state.ui_buttonset = UI_BUTTONSET_NONE;
+    state.camera_offset = ivec2(0, 0);
+    state.selection.type = SELECTION_TYPE_NONE;
+    state.ui_button_hovered = -1;
+    state.ui_status_timer = 0;
 
     // Init map
-    map_width = 64;
-    map_height = 64;
-    map_tiles = std::vector<int>(map_width * map_height);
-    map_cells = std::vector<int>(map_width * map_height, CELL_EMPTY);
-    for (int i = 0; i < map_width * map_height; i += 3) {
-        map_tiles[i] = 1;
-    }
-    for (int y = 0; y < map_height; y++) {
-        for (int x = 0; x < map_width; x++) {
-            if (y == 0 || y == map_height - 1 || x == 0 || x == map_width - 1) {
-                map_tiles[x + (y * map_width)] = 2;
-            }
-        }
-    }
+    state.map = map_init(ivec2(64, 64));
 
-    // Init units
+    // Spawn players and Init units
     ivec2 player_spawns[MAX_PLAYERS];
     uint8_t current_player_id = network_get_player_id();
     bool is_spawn_direction_used[DIRECTION_COUNT];
     memset(is_spawn_direction_used, 0, sizeof(is_spawn_direction_used));
     uint32_t player_count = 0;
-    ivec2 map_center = ivec2(map_width / 2, map_height / 2);
+    ivec2 map_center = ivec2(state.map.width / 2, state.map.height / 2);
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
@@ -88,73 +122,58 @@ void match_t::init() {
             spawn_direction = rand() % DIRECTION_COUNT;
         }
 
-        player_spawns[player_id] = map_center + ivec2(DIRECTION_IVEC2[spawn_direction].x * ((map_width * 7) / 16), DIRECTION_IVEC2[spawn_direction].y * ((map_height * 7) / 16));
+        player_spawns[player_id] = map_center + ivec2(DIRECTION_IVEC2[spawn_direction].x * ((state.map.width * 7) / 16), DIRECTION_IVEC2[spawn_direction].y * ((state.map.height * 7) / 16));
 
-        unit_create(player_id, UNIT_MINER, player_spawns[player_id] + ivec2(-1, -1));
-        unit_create(player_id, UNIT_MINER, player_spawns[player_id] + ivec2(1, -1));
-        unit_create(player_id, UNIT_MINER, player_spawns[player_id] + ivec2(0, 1));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + ivec2(-1, -1));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + ivec2(1, -1));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + ivec2(0, 1));
 
         log_info("player %u spawn %vi", player_id, &player_spawns[player_id]);
     }
-    camera_move_to_cell(player_spawns[current_player_id]);
+    state.camera_offset = camera_clamp(camera_centered_on_cell(player_spawns[current_player_id]), state.map.width, state.map.height);
     log_info("players initialized");
-
-    // Place gold on map
-    int gold_remaining = 32;
-    while (gold_remaining != 0) {
-        ivec2 gold_location = ivec2(rand() % map_width, rand() % map_height);
-        if (map_cells[gold_location.x + (gold_location.y * map_width)] == CELL_EMPTY) {
-            map_cells[gold_location.x + (gold_location.y * map_width)] = CELL_GOLD;
-            gold_remaining--;
-        }
-    }
 
     // Init resources
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        player_gold[player_id] = 150;
+        state.player_gold[player_id] = 150;
     }
 
-    is_selecting_building = false;
-    mode = MATCH_MODE_NOT_STARTED;
+    state.mode = MATCH_MODE_NOT_STARTED;
     if (!network_is_server()) {
         network_client_toggle_ready();
     }
     if (network_is_server() && player_count == 1) {
-        mode = MATCH_MODE_RUNNING;
+        state.mode = MATCH_MODE_RUNNING;
     }
+
+    return state;
 }
 
-void match_t::update() {
+void match_update(match_state_t& state) {
     // NETWORK EVENTS
     network_service();
 
-    if (mode == MATCH_MODE_NOT_STARTED) {
+    // Wait for match to start
+    if (state.mode == MATCH_MODE_NOT_STARTED) {
         network_event_t network_event;
         while (network_poll_events(&network_event)) {
             if (network_is_server() && (network_event.type == NETWORK_EVENT_CLIENT_READY || network_event.type == NETWORK_EVENT_CLIENT_DISCONNECTED)) {
-                bool all_players_ready = true;
-                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                    const player_t& player = network_get_player(player_id);
-                    if (player.status == PLAYER_STATUS_NOT_READY) {
-                        all_players_ready = false;
-                    }
-                }
-
-                if (all_players_ready) {
+                if (network_are_all_players_ready()) {
                     network_server_start_match();
-                    mode = MATCH_MODE_RUNNING;
+                    state.mode = MATCH_MODE_RUNNING;
                 }
             } else if (!network_is_server() && network_event.type == NETWORK_EVENT_MATCH_START) {
-                mode = MATCH_MODE_RUNNING;
+                state.mode = MATCH_MODE_RUNNING;
             }
         }
         
         // We make the check again here in case the mode changed
-        if (mode == MATCH_MODE_NOT_STARTED) {
+        if (state.mode == MATCH_MODE_NOT_STARTED) {
             return;
         }
     }
 
+    // Poll network events
     network_event_t network_event;
     while (network_poll_events(&network_event)) {
         switch (network_event.type) {
@@ -164,7 +183,6 @@ void match_t::update() {
 
                 uint8_t* in_buffer = network_event.input.data;
                 size_t in_buffer_length = network_event.input.data_length;
-
                 uint8_t in_player_id = in_buffer[1];
                 size_t in_buffer_head = 2;
 
@@ -172,7 +190,7 @@ void match_t::update() {
                     tick_inputs.push_back(input_deserialize(in_buffer, in_buffer_head));
                 }
 
-                inputs[in_player_id].push_back(tick_inputs);
+                state.inputs[in_player_id].push_back(tick_inputs);
                 break;
             }
             default:
@@ -180,8 +198,8 @@ void match_t::update() {
         }
     }
 
-    // NETWORK
-    if (tick_timer == 0) {
+    // Tick loop
+    if (state.tick_timer == 0) {
         bool has_all_inputs = true;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
@@ -189,7 +207,7 @@ void match_t::update() {
                 continue;
             }
 
-            if (inputs[player_id].empty()) {
+            if (state.inputs[player_id].empty()) {
                 has_all_inputs = false;
                 break;
             }
@@ -201,33 +219,138 @@ void match_t::update() {
         }
 
         // Begin next tick
+
+        // HANDLE INPUT
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
             if (player.status == PLAYER_STATUS_NONE) {
                 continue;
             }
 
-            for (const input_t& input : inputs[player_id][0]) {
-                handle_input(player_id, input);
-            }
-            inputs[player_id].erase(inputs[player_id].begin());
-        }
+            for (const input_t& input : state.inputs[player_id][0]) {
+                switch (input.type) {
+                    case INPUT_MOVE: {
+                        // Calculate unit group info
+                        bool has_found_first_unit = false;
+                        ivec2 group_center;
+                        ivec2 group_min;
+                        ivec2 group_max;
+                        uint32_t unit_count = 0;
+                        for (uint32_t i = 0; i < input.move.unit_count; i++) {
+                            uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
+                            if (unit_index == id_array<unit_t>::INDEX_INVALID) {
+                                continue;
+                            }
 
-        tick_timer = TICK_DURATION;
+                            unit_t& unit = state.units[unit_index];
+                            if (!has_found_first_unit) {
+                                group_center = unit.cell;
+                                group_min = unit.cell;
+                                group_max = unit.cell;
+                                has_found_first_unit = true;
+                            } else {
+                                group_center += unit.cell;
+                                group_min.x = std::min(group_min.x, unit.cell.x);
+                                group_min.y = std::min(group_min.y, unit.cell.y);
+                                group_max.x = std::max(group_max.x, unit.cell.x);
+                                group_max.y = std::max(group_max.y, unit.cell.y);
+                            }
+                            unit_count++;
+                        }
+                        group_center = group_center / unit_count;
+                        bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
+
+                        for (uint32_t i = 0; i < input.move.unit_count; i++) {
+                            uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
+                            if (unit_index == id_array<unit_t>::INDEX_INVALID) {
+                                continue;
+                            }
+                            unit_t& unit = state.units[unit_index];
+
+                            // Determine the unit's target
+                            ivec2 offset = unit.cell - group_center;
+                            ivec2 unit_target = input.move.target_cell + offset;
+                            bool is_target_invalid = is_target_inside_group || unit_target.x < 0 || unit_target.x >= state.map.width || unit_target.y < 0 || unit_target.y >= state.map.height ||
+                                                    ivec2::manhattan_distance(unit_target, input.move.target_cell) > 3 || map_cell_is_blocked(state.map, unit_target);
+                            if (is_target_invalid) {
+                                unit_target = input.move.target_cell;
+                            }
+
+                            unit.path = map_pathfind(state.map, unit.cell, unit_target);
+                            order_t move_order;
+                            move_order.type = ORDER_MOVE;
+                            move_order.move.target_cell = unit_target;
+                            unit.order = move_order;
+                        }
+                        break;
+                    } // End case INPUT_MOVE
+                    case INPUT_STOP: {
+                        for (uint32_t i = 0; i < input.stop.unit_count; i++) {
+                            uint32_t unit_index = state.units.get_index_of(input.stop.unit_ids[i]);
+                            if (unit_index == id_array<unit_t>::INDEX_INVALID) {
+                                continue;
+                            }
+                            unit_t& unit = state.units[unit_index];
+
+                            unit.path.clear();
+                        }
+                        break;
+                    }
+                    case INPUT_BUILD: {
+                        uint32_t unit_index = state.units.get_index_of(input.build.unit_id);
+                        if (unit_index == id_array<unit_t>::INDEX_INVALID) {
+                            break;
+                        }
+                        unit_t& unit = state.units[unit_index];
+
+                        // Determine the unit's target
+                        ivec2 nearest_cell = input.build.target_cell;
+                        int nearest_cell_dist = ivec2::manhattan_distance(unit.cell, nearest_cell);
+                        ivec2 building_cell_size = BUILDING_DATA.at(input.build.building_type).cell_size();
+                        for (int y = input.build.target_cell.y; y < input.build.target_cell.y + building_cell_size.y; y++) {
+                            for (int x = input.build.target_cell.x; x < input.build.target_cell.x + building_cell_size.x; x++) {
+                                if (x == 0 && y == 0) {
+                                    continue;
+                                }
+
+                                int cell_dist = ivec2::manhattan_distance(unit.cell, ivec2(x, y));
+                                if (cell_dist < nearest_cell_dist) {
+                                    nearest_cell = ivec2(x, y);
+                                    nearest_cell_dist = cell_dist;
+                                }
+                            }
+                        }
+
+                        order_t build_order;
+                        build_order.type = ORDER_BUILD;
+                        build_order.build.building_type = (BuildingType)input.build.building_type;
+                        build_order.build.building_cell = input.build.target_cell;
+                        build_order.build.unit_cell = nearest_cell;
+                        unit.order = build_order;
+                    }
+                    default:
+                        break;
+                } // End switch input.type
+            } // End for each input in player queue
+            state.inputs[player_id].erase(state.inputs[player_id].begin());
+        } // End for each player
+        // End handle input
+
+        state.tick_timer = TICK_DURATION;
 
         // Flush input
         static uint8_t out_buffer[INPUT_BUFFER_SIZE];
         static size_t out_buffer_length;
 
         // Always send at least 1 input per tick
-        if (input_queue.empty()) {
+        if (state.input_queue.empty()) {
             input_t empty_input;
             empty_input.type = INPUT_NONE;
-            input_queue.push_back(empty_input);
+            state.input_queue.push_back(empty_input);
         }
 
         // Assert that the out buffer is big enough
-        GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * input_queue.size()));
+        GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * state.input_queue.size()));
 
         // Leave a space in the buffer for the network message type
         uint8_t current_player_id = network_get_player_id();
@@ -235,11 +358,11 @@ void match_t::update() {
         out_buffer_length = 2;
 
         // Serialize the inputs
-        for (const input_t& input : input_queue) {
+        for (const input_t& input : state.input_queue) {
             input_serialize(out_buffer, out_buffer_length, input);
         }
-        inputs[current_player_id].push_back(input_queue);
-        input_queue.clear();
+        state.inputs[current_player_id].push_back(state.input_queue);
+        state.input_queue.clear();
 
         // Send them to other players
         if (network_is_server()) {
@@ -248,13 +371,158 @@ void match_t::update() {
             network_client_send_input(out_buffer, out_buffer_length);
         }
     }
-    tick_timer--;
+    state.tick_timer--;
 
     ivec2 mouse_pos = input_get_mouse_position();
     uint8_t current_player_id = network_get_player_id();
+    ivec2 mouse_world_pos = mouse_pos + state.camera_offset;
+    bool is_mouse_in_ui = (mouse_pos.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
+                            (mouse_pos.x <= 136 && mouse_pos.y >= SCREEN_HEIGHT - 136) ||
+                            (mouse_pos.x >= SCREEN_WIDTH - 132 && mouse_pos.y >= SCREEN_HEIGHT - 106);
+    Button ui_button_pressed = BUTTON_NONE;
+
+    // UI Buttons
+    if (!input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT)) {
+        state.ui_button_hovered = -1;
+        for (int i = 0; i < 6; i++) {
+            if (UI_BUTTONS.at(state.ui_buttonset)[i] == BUTTON_NONE) {
+                continue;
+            }
+
+            if (UI_BUTTON_RECT[i].has_point(mouse_pos)) {
+                state.ui_button_hovered = i;
+                break;
+            }
+        }
+    }
+
+    // Building placement
+    if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
+        if (is_mouse_in_ui) {
+            state.ui_building_cell = ivec2(-1, -1);
+        } else {
+            state.ui_building_cell = mouse_world_pos / TILE_SIZE;
+        }
+    }
+
+    // LEFT MOUSE CLICK
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
+        if (state.ui_button_hovered != -1) {
+            // On UI button pressed
+            ui_button_pressed = UI_BUTTONS.at(state.ui_buttonset)[state.ui_button_hovered];
+        } else if (state.ui_mode == UI_MODE_BUILDING_PLACE && !is_mouse_in_ui) {
+            // On building place
+            ivec2 building_cell_size = BUILDING_DATA.at(state.ui_building_type).cell_size();
+            bool building_can_be_placed = state.ui_building_cell.x + building_cell_size.x < state.map.width + 1 && 
+                                            state.ui_building_cell.y + building_cell_size.y < state.map.height + 1 &&
+                                            !map_cells_are_blocked(state.map, state.ui_building_cell, building_cell_size);
+            if (building_can_be_placed) {
+                input_t input;
+                input.type = INPUT_BUILD;
+                input.build.building_type = state.ui_building_type;
+                input.build.target_cell = state.ui_building_cell;
+                input.build.unit_id = state.selection.ids[0];
+                log_info("ordering build for unit %u", input.build.unit_id);
+                state.input_queue.push_back(input);
+
+                state.ui_buttonset = UI_BUTTONSET_MINER;
+            } else {
+                ui_show_status(state, "You can't build there.");
+            }
+        } else if (state.ui_mode == UI_MODE_NONE && MINIMAP_RECT.has_point(mouse_pos)) {
+            // On begin minimap drag
+            state.ui_mode = UI_MODE_MINIMAP_DRAG;
+        } else if (state.ui_mode == UI_MODE_NONE && !is_mouse_in_ui) {
+            // On begin selecting
+            state.ui_mode = UI_MODE_SELECTING;
+            state.select_origin = mouse_world_pos;
+        } 
+    } 
+
+    // UI BUTTON PRESSED
+    switch (ui_button_pressed) {
+        case BUTTON_STOP: {
+            if (state.selection.type == SELECTION_TYPE_UNITS) {
+                input_t input;
+                input.type = INPUT_STOP;
+                memcpy(input.stop.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
+                input.stop.unit_count = state.selection.ids.size();
+                state.input_queue.push_back(input);
+            }
+            break;
+        }
+        case BUTTON_BUILD: {
+            state.ui_buttonset = UI_BUTTONSET_BUILD;
+            break;
+        }
+        case BUTTON_CANCEL: {
+            if (state.ui_buttonset == UI_BUTTONSET_BUILD) {
+                state.ui_buttonset = UI_BUTTONSET_MINER;
+            } else if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
+                state.ui_mode = UI_MODE_NONE;
+                state.ui_buttonset = UI_BUTTONSET_BUILD;
+            } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+                uint8_t player_id = network_get_player_id();
+                uint32_t index = state.buildings.get_index_of(state.selection.ids[0]);
+                building_t& building = state.buildings[index];
+
+                // Destroy the building
+                building_destroy(state, state.selection.ids[0]);
+                // Refund the player
+                state.player_gold[player_id] += BUILDING_DATA.at(building.type).cost;
+                // Clear the player's selection
+                selection_t empty_selection;
+                empty_selection.type = SELECTION_TYPE_NONE;
+                ui_set_selection(state, empty_selection);
+            }
+            break;
+        }
+        case BUTTON_BUILD_HOUSE:
+        case BUTTON_BUILD_CAMP: {
+            // Begin building placement
+            BuildingType building_type = (BuildingType)(ui_button_pressed - BUTTON_BUILD_HOUSE);
+            uint8_t player_id = network_get_player_id();
+
+            if (state.player_gold[player_id] < BUILDING_DATA.at(building_type).cost) {
+                ui_show_status(state, "Not enough gold.");
+            } else {
+                state.ui_mode = UI_MODE_BUILDING_PLACE;
+                state.ui_building_type = building_type;
+                state.ui_building_cell = ivec2(-1, -1);
+            }
+
+            break;
+        }
+        case BUTTON_NONE:
+        default:
+            break;
+    }
+
+    // SELECT RECT
+    if (state.ui_mode == UI_MODE_SELECTING) {
+        // Update select rect
+        state.select_rect.position = ivec2(std::min(state.select_origin.x, mouse_world_pos.x), std::min(state.select_origin.y, mouse_world_pos.y));
+        state.select_rect.size = ivec2(std::max(1, std::abs(state.select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(state.select_origin.y - mouse_world_pos.y)));
+    } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
+        ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
+        minimap_pos.x = std::clamp(minimap_pos.x, 0, MINIMAP_RECT.size.x);
+        minimap_pos.y = std::clamp(minimap_pos.y, 0, MINIMAP_RECT.size.y);
+        ivec2 map_pos = ivec2((state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+        state.camera_offset = camera_clamp(camera_centered_on_cell(map_pos / TILE_SIZE), state.map.width, state.map.height);
+    }
+
+    // LEFT MOUSE RELEASE
+    if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
+        // On finished selecting
+        if (state.ui_mode == UI_MODE_SELECTING) {
+            selection_t selection = selection_create(state.units, state.buildings, current_player_id, state.select_rect);
+            ui_set_selection(state, selection);
+        } 
+        state.ui_mode = UI_MODE_NONE;
+    }
 
     // CAMERA DRAG
-    if (ui_mode != UI_MODE_SELECTING && ui_mode != UI_MODE_MINIMAP_DRAG) {
+    if (state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
         ivec2 camera_drag_direction = ivec2(0, 0);
         if (mouse_pos.x < CAMERA_DRAG_MARGIN) {
             camera_drag_direction.x = -1;
@@ -266,843 +534,374 @@ void match_t::update() {
         } else if (mouse_pos.y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
             camera_drag_direction.y = 1;
         }
-        camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
-        camera_clamp();
+        state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
+        state.camera_offset = camera_clamp(state.camera_offset, state.map.width, state.map.height);
     }
-    ivec2 mouse_world_pos = mouse_pos + camera_offset;
-    bool is_mouse_in_ui = (mouse_pos.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
-                            (mouse_pos.x <= 136 && mouse_pos.y >= SCREEN_HEIGHT - 136) ||
-                            (mouse_pos.x >= SCREEN_WIDTH - 132 && mouse_pos.y >= SCREEN_HEIGHT - 106);
-
-    // UI Buttons
-    if (!input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT)) {
-        ui_button_hovered = -1;
-        for (int i = 0; i < 6; i++) {
-            if (!ui_buttons[i].enabled) {
-                continue;
-            }
-
-            if (ui_buttons[i].rect.has_point(mouse_pos)) {
-                ui_button_hovered = i;
-                break;
-            }
-        }
-    }
-
-    // Building placement
-    if (ui_mode == UI_MODE_BUILDING_PLACE) {
-        if (is_mouse_in_ui) {
-            ui_building_cell = ivec2(-1, -1);
-        } else {
-            ui_building_cell = mouse_world_pos / TILE_SIZE;
-        }
-    }
-
-    // LEFT MOUSE CLICK
-    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
-        if (ui_button_hovered != -1) {
-            ui_handle_button_pressed(ui_buttons[ui_button_hovered].icon);
-        } else if (ui_mode == UI_MODE_BUILDING_PLACE) {
-            if (!is_mouse_in_ui) {
-                ivec2 building_cell_size = building_data.at(ui_building_type).cell_size();
-                bool building_can_be_placed = ui_building_cell.x + building_cell_size.x < map_width + 1 && 
-                                              ui_building_cell.y + building_cell_size.y < map_height + 1 &&
-                                              !cell_is_blocked(ui_building_cell, building_cell_size);
-                if (building_can_be_placed) {
-                    input_t input;
-                    input.type = INPUT_BUILD;
-                    input.build.building_type = ui_building_type;
-                    input.build.target_cell = ui_building_cell;
-                    for (uint32_t unit_index = 0; unit_index < units[current_player_id].size(); unit_index++) {
-                        if (units[current_player_id][unit_index].is_selected) {
-                            input.build.unit_id = units[current_player_id].get_id_of(unit_index);
-                            break;
-                        }
-                    }
-                    log_info("ordering build for unit %u", input.build.unit_id);
-                    input_queue.push_back(input);
-
-                    ui_mode = UI_MODE_MINER;
-                    ui_refresh_buttons();
-                } else {
-                    ui_show_status("You can't build there.");
-                }
-            }
-        } else if (MINIMAP_RECT.has_point(mouse_pos)) {
-            ui_mode = UI_MODE_MINIMAP_DRAG;
-        } else if (!is_mouse_in_ui) {
-            // On begin selecting
-            ui_mode = UI_MODE_SELECTING;
-            select_origin = mouse_world_pos;
-            is_selecting_building = false;
-        } 
-    }
-    // SELECT RECT
-    if (ui_mode == UI_MODE_SELECTING) {
-        // Update select rect
-        select_rect.position = ivec2(std::min(select_origin.x, mouse_world_pos.x), std::min(select_origin.y, mouse_world_pos.y));
-        select_rect.size = ivec2(std::max(1, std::abs(select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(select_origin.y - mouse_world_pos.y)));
-
-        // Update unit selection
-        for (unit_t& unit : units[current_player_id]) {
-            unit.is_selected = unit.mode != UNIT_MODE_BUILD && unit_get_rect(unit).intersects(select_rect);
-        }
-    } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
-        ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
-        minimap_pos.x = std::clamp(minimap_pos.x, 0, MINIMAP_RECT.size.x);
-        minimap_pos.y = std::clamp(minimap_pos.y, 0, MINIMAP_RECT.size.y);
-        ivec2 map_pos = ivec2((map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
-        camera_move_to_cell(map_pos / TILE_SIZE);
-    }
-    if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
-        // On finished selecting
-        if (ui_mode == UI_MODE_SELECTING) {
-            ui_on_selection_changed();
-        } else if (ui_mode == UI_MODE_MINIMAP_DRAG) {
-            ui_mode = UI_MODE_NONE;
-        }
-    } 
 
     // Right-click move
-    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT) && (ui_mode != UI_MODE_SELECTING && ui_mode != UI_MODE_MINIMAP_DRAG && ui_mode != UI_MODE_BUILDING_PLACE)) {
-        bool should_command_move = false;
-        ivec2 move_target;
-        if (MINIMAP_RECT.has_point(mouse_pos)) {
-            ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
-            move_target = ivec2((map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
-            should_command_move = true;
-        } else if (mouse_pos.y < SCREEN_HEIGHT - UI_HEIGHT) {
-            move_target = mouse_world_pos;
-            should_command_move = true;
-        }
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT) && state.ui_mode == UI_MODE_NONE && state.selection.type == SELECTION_TYPE_UNITS) {
+        bool should_command_move = !is_mouse_in_ui || MINIMAP_RECT.has_point(mouse_pos);
 
         if (should_command_move) {
+            // Determine move target
+            ivec2 move_target;
+            if (is_mouse_in_ui) {
+                ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
+                move_target = ivec2((state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+            } else {
+                move_target = mouse_world_pos;
+            }
+
+            // Create the move event
             input_t input;
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
             input.move.unit_count = 0;
-            for (uint32_t unit_index = 0; unit_index < units[current_player_id].size(); unit_index++) {
-                if (!units[current_player_id][unit_index].is_selected) {
-                    continue;
-                }
-                input.move.unit_ids[input.move.unit_count] = units[current_player_id].get_id_of(unit_index);
-                input.move.unit_count++;
-            }
-            if (input.move.unit_count != 0) {
-                input_queue.push_back(input);
+            memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
+            input.move.unit_count = state.selection.ids.size();
 
-                ui_move_position = move_target;
-                ui_move_animation.stop();
-                ui_move_animation.play(ANIMATION_UI_MOVE);
+            // Send the move event
+            if (input.move.unit_count != 0) {
+                state.input_queue.push_back(input);
+
+                // Play the move animation to provide instant user feedback
+                state.ui_move_position = move_target;
+                state.ui_move_animation = animation_start(ANIMATION_UI_MOVE);
             }
         } 
     }
 
     // Unit update
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        for (unit_t& unit : units[player_id]) {
-            unit_update(player_id, unit);
-        }
-    }
+    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+        unit_t& unit = state.units[unit_index];
+        uint16_t unit_id = state.units.ids[unit_index];
 
-    // UI update
-    ui_move_animation.update();
-    
-    if (!ui_status_timer.is_stopped) {
-        ui_status_timer.update();
-        if (ui_status_timer.is_finished) {
-            ui_status_timer.stop();
-        }
-    }
-}
-
-void match_t::handle_input(uint8_t player_id, const input_t& input) {
-    switch (input.type) {
-        case INPUT_MOVE: {
-            // Calculate unit group info
-            ivec2 first_unit_cell = units[player_id][input.move.unit_ids[0]].cell;
-            ivec2 group_center = first_unit_cell;
-            ivec2 group_min = first_unit_cell;
-            ivec2 group_max = first_unit_cell;
-            for (uint32_t i = 1; i < input.move.unit_count; i++) {
-                unit_t& unit = units[player_id][input.move.unit_ids[i]];
-                group_center += unit.cell;
-                group_min.x = std::min(group_min.x, unit.cell.x);
-                group_min.y = std::min(group_min.y, unit.cell.y);
-                group_max.x = std::max(group_max.x, unit.cell.x);
-                group_max.y = std::max(group_max.y, unit.cell.y);
-            }
-            group_center = group_center / input.move.unit_count;
-            bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
-
-            for (uint8_t i = 0; i < input.move.unit_count; i++) {
-                uint32_t unit_index = units[player_id].get_index_of(input.move.unit_ids[i]);
-                if (unit_index == id_array<unit_t>::INDEX_INVALID) {
-                    continue;
-                }
-                unit_t& unit = units[player_id][unit_index];
-
-                // Determine the unit's target
-                ivec2 offset = unit.cell - group_center;
-                ivec2 unit_target = input.move.target_cell + offset;
-                bool is_target_invalid = is_target_inside_group || unit_target.x < 0 || unit_target.x >= map_width || unit_target.y < 0 || unit_target.y >= map_height ||
-                                         ivec2::manhattan_distance(unit_target, input.move.target_cell) > 3 || cell_is_blocked(unit_target);
-                if (is_target_invalid) {
-                    unit_target = input.move.target_cell;
-                }
-
-                unit.path = pathfind(unit.cell, unit_target);
-                if (!unit.path.empty()) {
-                    unit.order_type = ORDER_MOVE;
-                }
-            }
-            break;
-        } // End case INPUT_MOVE
-        case INPUT_STOP: {
-            for (uint8_t i = 0; i < input.stop.unit_count; i++) {
-                uint32_t unit_index = units[player_id].get_index_of(input.stop.unit_ids[i]);
-                if (unit_index == id_array<unit_t>::INDEX_INVALID) {
-                    continue;
-                }
-                unit_t& unit = units[player_id][unit_index];
-
+        // Update path timer
+        if (unit.path_timer != 0) {
+            unit.path_timer--;
+            if (unit.path_timer == 0) {
+                // If the path timer runs out, clear the path
+                // It is intended that this triggers the below code to attempt to repath
                 unit.path.clear();
             }
-            break;
         }
-        case INPUT_BUILD: {
-            uint32_t unit_index = units[player_id].get_index_of(input.build.unit_id);
-            if (unit_index == id_array<unit_t>::INDEX_INVALID) {
-                break;
-            }
-            unit_t& unit = units[player_id][unit_index];
 
-            // Determine the unit's target
-            ivec2 nearest_cell = input.build.target_cell;
-            int nearest_cell_dist = ivec2::manhattan_distance(unit.cell, nearest_cell);
-            ivec2 building_cell_size = building_data.at(input.build.building_type).cell_size();
-            for (int y = input.build.target_cell.y; y < input.build.target_cell.y + building_cell_size.y; y++) {
-                for (int x = input.build.target_cell.x; x < input.build.target_cell.x + building_cell_size.x; x++) {
-                    if (x == 0 && y == 0) {
-                        continue;
+        // Pathfind if necessary
+        bool unit_should_be_moving = unit.order.type == ORDER_MOVE || (unit.order.type == ORDER_BUILD && unit.cell != unit.order.build.unit_cell);
+        if (unit_should_be_moving && unit.path.empty()) {
+            unit.path = map_pathfind(state.map, unit.cell, unit.order.move.target_cell);
+            // If no path is found, start the path timer
+            if (unit.path.empty()) {
+                unit.path_timer = PATH_PAUSE_DURATION;
+            }
+        }
+
+        // Movement
+        if (!unit.path.empty() || unit_is_moving(unit)) {
+            fixed movement_left = fixed::from_int(1);
+            while (movement_left.raw_value > 0) {
+                // Try to start moving to the next tile
+                if (!unit_is_moving(unit)) {
+                    ivec2 next_point = unit.path[0];
+
+                    // Set the unit's direction, even if it doesn't begin movement
+                    ivec2 next_direction = next_point - unit.cell;
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                        if (DIRECTION_IVEC2[direction] == next_direction) {
+                            unit.direction = direction;
+                            break;
+                        }
                     }
 
-                    int cell_dist = ivec2::manhattan_distance(unit.cell, ivec2(x, y));
-                    if (cell_dist < nearest_cell_dist) {
-                        nearest_cell = ivec2(x, y);
-                        nearest_cell_dist = cell_dist;
+                    // Don't move if the tile is blocked
+                    if (map_cell_is_blocked(state.map, next_point)) {
+                        if (unit.path_timer == 0) {
+                            unit.path_timer = PATH_PAUSE_DURATION;
+                        }
+                        break;
+                    }
+
+                    // Set state to begin movement step
+                    map_cell_set_value(state.map, unit.cell, CELL_EMPTY);
+                    unit.cell = next_point;
+                    map_cell_set_value(state.map, unit.cell, CELL_FILLED);
+                    unit.target_position = cell_center_position(unit.cell);
+                    unit.path_timer = 0;
+                }
+
+                // Step unit along movement
+                fixed distance_to_target = unit.position.distance_to(unit.target_position);
+                if (distance_to_target > movement_left) {
+                    unit.position += DIRECTION_VEC2[unit.direction] * movement_left;
+                    movement_left = 0;
+                } else {
+                    unit.position = unit.target_position;
+                    movement_left -= distance_to_target;
+                }
+            } // End while movement left != 0
+
+            // On finished movement
+            if (unit.path.empty() && !unit_is_moving(unit)) {
+                if (unit.order.type == ORDER_MOVE) {
+                    order_t order_none;
+                    order_none.type = ORDER_NONE;
+                    unit.order = order_none;
+                } else if (unit.order.type == ORDER_BUILD) {
+                    // Since the unit is on top of the building space, we have to temporarily set the cell to empty so that we can check if the building space is free
+                    map_cell_set_value(state.map, unit.cell, CELL_EMPTY);
+                    if (map_cells_are_blocked(state.map, unit.order.build.building_cell, BUILDING_DATA.at(unit.order.build.building_type).cell_size())) {
+                        order_t order_none;
+                        order_none.type = ORDER_NONE;
+                        unit.order = order_none;
+                        map_cell_set_value(state.map, unit.cell, CELL_FILLED);
+                        ui_show_status(state, "You can't build there.");
+                    } else {
+                        unit.order.build.building_id = building_create(state, unit.player_id, unit.order.build.building_type, unit.order.build.building_cell);
+                        state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.order.build.building_type).cost;
+                        log_info("unit creating building. %u", unit.order.build.building_id);
+                        unit.build_timer = BUILD_TICK_DURATION;
+
+                        // De-select the unit if necessary
+                        selection_t selection = state.selection;
+                        if (selection.type == SELECTION_TYPE_UNITS) {
+                            for (auto unit_id_it = selection.ids.begin(); unit_id_it != selection.ids.end(); unit_id_it++) {
+                                if (*unit_id_it == unit_id) {
+                                    // De-select the unit
+                                    selection.ids.erase(unit_id_it);
+
+                                    // If the selection is now empty, select the building instead
+                                    if (selection.ids.empty()) {
+                                        selection.type = SELECTION_TYPE_BUILDINGS;
+                                        selection.ids.push_back(unit.order.build.building_id);
+                                    }
+
+                                    ui_set_selection(state, selection);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+               } 
+            } // End on finished movement
+        } // End movement
+
+        // Update in-progress building
+        if (unit.build_timer != 0) {
+            unit.build_timer--;
+            if (unit.build_timer == 0) {
+                bool should_eject_from_building = false;
+
+                uint32_t index = state.buildings.get_index_of(unit.order.build.building_id);
+                if (index == id_array<building_t>::INDEX_INVALID) {
+                    should_eject_from_building = true;
+                } else {
+                    building_t& building = state.buildings[state.buildings.get_index_of(unit.order.build.building_id)];
+
+                    building.health++;
+                    if (building.health == BUILDING_DATA.at(unit.order.build.building_type).max_health) {
+                        // On building finished
+                        building.is_finished = true;
+                        should_eject_from_building = true;
+                        log_info("building finished.");
+                    } else {
+                        unit.build_timer = BUILD_TICK_DURATION;
                     }
                 }
-            }
 
-            unit.path = pathfind(unit.cell, nearest_cell);
-            if (!unit.path.empty()) {
-                unit.order_type = ORDER_BUILD;
-                unit.order_building_type = (BuildingType)input.build.building_type;
-                unit.order_cell = input.build.target_cell;
+                if (should_eject_from_building) {
+                    unit.cell = map_get_nearest_free_cell_around_cells(state.map, unit.order.build.building_cell, BUILDING_DATA.at(unit.order.build.building_type).cell_size());
+                    map_cell_set_value(state.map, unit.cell, CELL_FILLED);
+                    unit.position = cell_center_position(unit.cell);
+                    unit.target_position = unit.position;
+
+                    order_t order_none;
+                    order_none.type = ORDER_NONE;
+                    unit.order = order_none;
+                }
             }
         }
-        default:
-            break;
+
+        // Update animation
+        Animation should_be_playing;
+        if (unit.build_timer != 0) {
+            should_be_playing = ANIMATION_UNIT_BUILD;
+        } else if (unit_is_moving(unit)) {
+            should_be_playing = ANIMATION_UNIT_MOVE;
+        } else {
+            should_be_playing = ANIMATION_UNIT_IDLE;
+        }
+        if (unit.animation.animation != should_be_playing) {
+            unit.animation = animation_start(should_be_playing);
+        }
+        animation_update(unit.animation);
+
+        // Set sprite direction based on unit direction
+        if (unit.animation.animation != ANIMATION_UNIT_BUILD) {
+            if (unit.direction == DIRECTION_NORTH) {
+                unit.animation.frame.y = 1;
+            } else if (unit.direction == DIRECTION_SOUTH) {
+                unit.animation.frame.y = 0;
+            } else if (unit.direction > DIRECTION_SOUTH) {
+                unit.animation.frame.y = 3;
+            } else {
+                unit.animation.frame.y = 2;
+            }
+        }
+    } // End for each unit
+
+    // UI update
+    animation_update(state.ui_move_animation);
+
+    // Update UI status message timer
+    if (state.ui_status_timer != 0) {
+        state.ui_status_timer--;
     }
 }
 
 // UI
 
-void match_t::ui_show_status(const char* message) {
-    ui_status_message = std::string(message);
-    ui_status_timer.start(UI_STATUS_DURATION);
+void ui_show_status(match_state_t& state, const char* message) {
+    state.ui_status_message = std::string(message);
+    state.ui_status_timer = UI_STATUS_DURATION;
 }
 
-void match_t::ui_on_selection_changed() {
-    uint8_t current_player_id = network_get_player_id();
+selection_t selection_create(const id_array<unit_t>& units, const id_array<building_t>& buildings, uint8_t current_player_id, const rect_t& select_rect) {
+    selection_t selection;
+    selection.type = SELECTION_TYPE_NONE;
 
-    uint32_t unit_count = 0;
-    bool is_selection_miners_only = true;
-    for (unit_t& unit : units[current_player_id]) {
-        if (!unit.is_selected) {
+    // Check all the current player's units
+    for (uint32_t index = 0; index < units.size(); index++) {
+        const unit_t& unit = units[index];
+
+        // Don't select other player's units
+        if (unit.player_id != current_player_id) {
             continue;
         }
-        if (unit.type != UNIT_MINER) {
-            is_selection_miners_only = false;
+        // Don't select units which are building
+        if (unit_is_building(unit)) {
+            continue;
         }
-        unit_count++;
+
+        if (unit_rect(unit).intersects(select_rect)) {
+            selection.ids.push_back(units.get_id_of(index));
+        }
+    }
+    // If we're selecting units, then return the unit selection
+    if (!selection.ids.empty()) {
+        selection.type = SELECTION_TYPE_UNITS;
+        return selection;
     }
 
-    bool is_selected_building_finished = false;
-    if (unit_count == 0) {
-        if (ui_mode == UI_MODE_SELECTING) {
-            for (uint32_t building_index = 0; building_index < buildings[current_player_id].size(); building_index++) {
-                if (building_get_rect(buildings[current_player_id][building_index]).intersects(select_rect)) {
-                    is_selecting_building = true;
-                    selected_building_id = buildings[current_player_id].get_id_of(building_index);
-                    is_selected_building_finished = buildings[current_player_id][building_index].is_finished;
-                    break;
-                }
-            }
+    // Otherwise, check the player's buildings
+    for (uint32_t index = 0; index < buildings.size(); index++) {
+        const building_t& building = buildings[index];
+
+        // Don't select other player's buildings
+        // TODO: remove this to allow enemy building selection
+        if (building.player_id != current_player_id) {
+            continue;
+        }
+
+        if (building_rect(building).intersects(select_rect)) {
+            // Return here so that only one building can be selected at once
+            selection.ids.push_back(buildings.get_id_of(index));
+            selection.type = SELECTION_TYPE_BUILDINGS;
+            return selection;
+        }
+    }
+
+    return selection;
+}
+
+void ui_set_selection(match_state_t& state, selection_t& selection) {
+    state.selection = selection;
+
+    if (selection.type == SELECTION_TYPE_NONE) {
+        state.ui_buttonset = UI_BUTTONSET_NONE;
+    } else if (selection.type == SELECTION_TYPE_UNITS) {
+        if (selection.ids.size() == 1 && state.units[state.units.get_index_of(selection.ids[0])].type == UNIT_MINER) {
+            state.ui_buttonset = UI_BUTTONSET_MINER;
         } else {
-            uint32_t building_index = buildings[current_player_id].get_index_of(selected_building_id);
-            if (building_index == id_array<building_t>::INDEX_INVALID) {
-                is_selecting_building = false;
-            } else {
-                is_selected_building_finished = buildings[current_player_id][building_index].is_finished;
-            }
+            state.ui_buttonset = UI_BUTTONSET_UNIT;
         }
-    }
-
-    if (is_selecting_building && !is_selected_building_finished) {
-        ui_mode = UI_MODE_BUILDING_IN_PROGRESS;
-    } else if (!is_selecting_building && is_selection_miners_only && unit_count == 1) {
-        ui_mode = UI_MODE_MINER;
-    } else if (!is_selecting_building && unit_count != 0) {
-        ui_mode = UI_MODE_UNIT;
-    } else {
-        ui_mode = UI_MODE_NONE;
-    }
-    ui_refresh_buttons();
-}
-
-void match_t::ui_refresh_buttons() {
-    switch (ui_mode) {
-        case UI_MODE_UNIT: {
-            for (uint32_t i = 0; i < 6; i++) {
-                ui_buttons[i].enabled = i < 3;
-            }
-            ui_buttons[0].icon = BUTTON_ICON_MOVE;
-            ui_buttons[1].icon = BUTTON_ICON_STOP;
-            ui_buttons[2].icon = BUTTON_ICON_ATTACK;
-
-            break;
-        }
-        case UI_MODE_MINER: {
-            for (uint32_t i = 0; i < 6; i++) {
-                ui_buttons[i].enabled = i < 4;
-            }
-            ui_buttons[0].icon = BUTTON_ICON_MOVE;
-            ui_buttons[1].icon = BUTTON_ICON_STOP;
-            ui_buttons[2].icon = BUTTON_ICON_ATTACK;
-            ui_buttons[3].icon = BUTTON_ICON_BUILD;
-
-            break;
-        }
-        case UI_MODE_BUILD: {
-            for (uint32_t i = 0; i < 6; i++) {
-                ui_buttons[i].enabled = i == 0 || i == 1 || i == 5;
-            }
-            ui_buttons[0].icon = BUTTON_ICON_BUILD_HOUSE;
-            ui_buttons[1].icon = BUTTON_ICON_BUILD_CAMP;
-            ui_buttons[5].icon = BUTTON_ICON_CANCEL;
-            
-            break;
-        }
-        case UI_MODE_BUILDING_PLACE: 
-        case UI_MODE_BUILDING_IN_PROGRESS: {
-            for (uint32_t i = 0; i < 6; i++) {
-                ui_buttons[i].enabled = i == 5;
-            }
-            ui_buttons[5].icon = BUTTON_ICON_CANCEL;
-            break;
-        }
-        case UI_MODE_NONE:
-        default: {
-            for (uint32_t i = 0; i < 6; i++) {
-                ui_buttons[i].enabled = false;
-            }
-        }
-            break;
-    }
-}
-
-void match_t::ui_handle_button_pressed(ButtonIcon icon) {
-    switch (icon) {
-        case BUTTON_ICON_STOP: {
-            input_t input;
-            input.type = INPUT_STOP;
-            input.stop.unit_count = 0;
-            uint8_t player_id = network_get_player_id();
-            for (uint32_t unit_index = 0; unit_index < units[player_id].size(); unit_index++) {
-                if (!units[player_id][unit_index].is_selected) {
-                    continue;
-                }
-                input.stop.unit_ids[input.stop.unit_count] = units[player_id].get_id_of(unit_index);
-                input.stop.unit_count++;
-            }
-            if (input.stop.unit_count != 0) {
-                input_queue.push_back(input);
-            }
-            break;
-        }
-        case BUTTON_ICON_BUILD: {
-            ui_mode = UI_MODE_BUILD;
-            ui_refresh_buttons();
-            break;
-        }
-        case BUTTON_ICON_CANCEL: {
-            if (ui_mode == UI_MODE_BUILD) {
-                ui_mode = UI_MODE_MINER;
-            } else if (ui_mode == UI_MODE_BUILDING_PLACE) {
-                ui_mode = UI_MODE_BUILD;
-            } else if (ui_mode == UI_MODE_BUILDING_IN_PROGRESS) {
-                uint8_t player_id = network_get_player_id();
-                uint32_t index = buildings[player_id].get_index_of(selected_building_id);
-                building_t& building = buildings[player_id][index];
-
-                building_destroy(player_id, selected_building_id);
-                player_gold[player_id] += building_data.at(building.type).cost;
-                ui_mode = UI_MODE_NONE;
-                is_selecting_building = false;
-            }
-            ui_refresh_buttons();
-            break;
-        }
-        case BUTTON_ICON_BUILD_HOUSE: {
-            ui_try_begin_building_place(BUILDING_HOUSE);
-            break;
-        }
-        case BUTTON_ICON_BUILD_CAMP: {
-            ui_try_begin_building_place(BUILDING_CAMP);
-            break;
-        }
-        default:
-            break;
-    }
-}
-
-void match_t::ui_try_begin_building_place(BuildingType building_type) {
-    uint8_t current_player_id = network_get_player_id();
-    if (player_gold[current_player_id] < building_data.at(building_type).cost) {
-        ui_show_status("Not enough gold.");
-    } else {
-        ui_mode = UI_MODE_BUILDING_PLACE;
-        ui_building_type = building_type;
-        ui_building_cell = ivec2(-1, -1);
-        ui_refresh_buttons();
-    }
-}
-
-void match_t::camera_clamp() {
-    camera_offset.x = std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH);
-    camera_offset.y = std::clamp(camera_offset.y, 0, (map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT);
-}
-
-void match_t::camera_move_to_cell(ivec2 cell) {
-    camera_offset = ivec2((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
-    camera_clamp();
-}
-
-// CELL HELPERS
-
-bool match_t::cell_is_in_bounds(ivec2 cell) const {
-    return !(cell.x < 0 || cell.y < 0 || cell.x >= map_width || cell.y >= map_height);
-}
-
-bool match_t::cell_is_blocked(ivec2 cell) const {
-    return map_cells[cell.x + (cell.y * map_width)] != CELL_EMPTY;
-}
-
-bool match_t::cell_is_blocked(ivec2 cell, ivec2 cell_size) const {
-    for (int y = cell.y; y < cell.y + cell_size.y; y++) {
-        for (int x = cell.x; x < cell.x + cell_size.x; x++) {
-            if (map_cells[x + (y * map_width)] != CELL_EMPTY) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-void match_t::cell_set_value(ivec2 cell, int value) {
-    map_cells[cell.x + (cell.y * map_width)] = value;
-}
-
-void match_t::cell_set_value(ivec2 cell, ivec2 cell_size, int value) {
-    for (int y = cell.y; y < cell.y + cell_size.y; y++) {
-        for (int x = cell.x; x < cell.x + cell_size.x; x++) {
-            map_cells[x + (y * map_width)] = value;
+    } else if (selection.type == SELECTION_TYPE_BUILDINGS) {
+        building_t& building = state.buildings[state.buildings.get_index_of(selection.ids[0])];
+        if (!building.is_finished) {
+            state.ui_buttonset = UI_BUTTONSET_CANCEL;
+        } else {
+            state.ui_buttonset = UI_BUTTONSET_NONE;
         }
     }
 }
 
-std::vector<ivec2> match_t::pathfind(ivec2 from, ivec2 to) {
-    struct path_t {
-        int score;
-        std::vector<ivec2> points;
-    };
+// CAMERA
 
-    if (from == to) {
-        return std::vector<ivec2>();
-    }
+ivec2 camera_clamp(const ivec2& camera_offset, int map_width, int map_height) {
+    return ivec2(std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH),
+                 std::clamp(camera_offset.y, 0, (map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT));
+}
 
-    // If the cell we are pathing to is blocked, choose a cell surrounding it to path to instead
-    if (cell_is_blocked(to)) {
-        // We start with a radius of 1 and search in ever-increasing "circles" until we find a suitable point
-        int radius = 1;
-        int nearest_cell_distance = -1;
-        ivec2 nearest_cell;
-        while (nearest_cell_distance == -1) {
-            log_info("searching for nearest, radius: %i", radius);
-            // For each cell in the "circle"...
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                ivec2 cell = to + (DIRECTION_IVEC2[direction] * radius);
-                // If the cell is outside the map, ignore it
-                if (cell.x < 0 || cell.x >= map_width || cell.y < 0 || cell.y >= map_height) {
-                    continue;
-                }
-                // If the cell is equal to the target point, then return an empty path (unit will not move)
-                if (cell == from) {
-                    return std::vector<ivec2>();
-                }
-                // If the cell is blocked, ignore it 
-                if (cell_is_blocked(cell)) {
-                    continue;
-                }
-
-                // Choose the cell if it is closer than the previously chosen nearest cell
-                int cell_distance = ivec2::manhattan_distance(cell, from);
-                if (nearest_cell_distance == -1 || cell_distance < nearest_cell_distance) {
-                    nearest_cell = cell;
-                    nearest_cell_distance = cell_distance;
-                }
-            }
-        }
-
-        to = nearest_cell;
-    }
-
-    std::vector<path_t> frontier;
-    std::vector<ivec2> explored;
-
-    frontier.push_back((path_t) { 
-        .score = abs(to.x - from.x) + abs(to.y - from.y), 
-        .points = { from } 
-    });
-
-    while (!frontier.empty()) {
-        // Find the smallest path
-        uint32_t smallest_index = 0;
-        for (uint32_t i = 1; i < frontier.size(); i++) {
-            if (frontier[i].score < frontier[smallest_index].score) {
-                smallest_index = i;
-            }
-        }
-
-        // Pop the smallest path
-        path_t smallest = frontier[smallest_index];
-        frontier.erase(frontier.begin() + smallest_index);
-
-        // If it's the solution, return it
-        ivec2 smallest_head = smallest.points[smallest.points.size() - 1];
-        if (smallest_head == to) {
-            smallest.points.erase(smallest.points.begin());
-            return smallest.points;
-        }
-
-        // Otherwise, add this tile to the explored list
-        explored.push_back(smallest_head);
-
-        // Consider all children
-        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-            ivec2 child = smallest_head + DIRECTION_IVEC2[direction];
-            int child_score = smallest.points.size() + 1 + abs(child.x - to.x) + abs(child.y - to.y);
-            // Don't consider out of bounds children
-            if (child.x < 0 || child.x >= map_width || child.y < 0 || child.y >= map_height) {
-                continue;
-            }
-            // Don't consider blocked spaces
-            if (cell_is_blocked(child)) {
-                continue;
-            }
-            // Don't consider already explored children
-            bool is_in_explored = false;
-            for (const ivec2& explored_cell : explored) {
-                if (explored_cell == child) {
-                    is_in_explored = true;
-                    break;
-                }
-            }
-            if (is_in_explored) {
-                continue;
-            }
-            // Check if it's in the frontier
-            uint32_t frontier_index;
-            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                std::vector<ivec2>& frontier_path = frontier[frontier_index].points;
-                if (frontier_path[frontier_path.size() - 1] == child) {
-                    break;
-                }
-            }
-            // If it is in the frontier...
-            if (frontier_index < frontier.size()) {
-                // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
-                if (child_score < frontier[frontier_index].score) {
-                    frontier[frontier_index].points = smallest.points;
-                    frontier[frontier_index].points.push_back(child);
-                    frontier[frontier_index].score = child_score;
-                }
-                continue;
-            }
-            // If it's not in the frontier, then add it to the frontier
-            path_t new_path = (path_t) {
-                .score = child_score,
-                .points = smallest.points
-            };
-            new_path.points.push_back(child);
-            frontier.push_back(new_path);
-        } // End for each child
-    } // End while !frontier.empty()
-
-    return std::vector<ivec2>();
+ivec2 camera_centered_on_cell(const ivec2& cell) {
+    return ivec2((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
 }
 
 // UNITS
 
-void match_t::unit_create(uint8_t player_id, UnitType type, ivec2 cell) {
-    auto it = unit_data.find(type);
-    GOLD_ASSERT(it != unit_data.end());
+void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const ivec2& cell) {
+    auto it = UNIT_DATA.find(type);
+    GOLD_ASSERT(it != UNIT_DATA.end());
 
     unit_t unit;
     unit.type = type;
+    unit.player_id = player_id;
     unit.health = it->second.max_health;
-    unit.is_selected = false;
-    unit.mode = UNIT_MODE_IDLE;
     unit.cell = cell;
     unit.position = cell_center_position(cell);
+    unit.target_position = unit.position;
     unit.direction = DIRECTION_SOUTH;
-    units[player_id].push_back(unit);
+    state.units.push_back(unit);
 
-    cell_set_value(cell, CELL_FILLED);
+    map_cell_set_value(state.map, cell, CELL_FILLED);
 }
 
-rect_t match_t::unit_get_rect(const unit_t& unit) const {
+rect_t unit_rect(const unit_t& unit) {
     return rect_t(ivec2(unit.position.x.integer_part(), unit.position.y.integer_part()), ivec2(16, 16));
 }
 
-void match_t::unit_try_step(unit_t& unit) {
-    ivec2 next_point = unit.path[0];
-
-    // Set the unit's direction, even if it doesn't begin movement
-    ivec2 next_direction = next_point - unit.cell;
-    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-        if (DIRECTION_IVEC2[direction] == next_direction) {
-            unit.direction = direction;
-            break;
-        }
-    }
-
-    // Don't move if the tile is blocked
-    if (cell_is_blocked(next_point)) {
-        unit.path_timer.start(unit_t::PATH_PAUSE_DURATION);
-        return;
-    }
-
-    // Set state to begin movement
-    cell_set_value(unit.cell, CELL_EMPTY);
-    unit.cell = next_point;
-    cell_set_value(unit.cell, CELL_FILLED);
-    unit.target_position = cell_center_position(unit.cell);
-    unit.path.erase(unit.path.begin());
-    unit.mode = UNIT_MODE_STEP;
-    unit.path_timer.stop();
+bool unit_is_moving(const unit_t& unit) {
+    return unit.position != unit.target_position;
 }
 
-void match_t::unit_update(uint8_t player_id, unit_t& unit) {
-    // If we're not stepping but we have a path to follow, then try to move
-    if (unit.mode != UNIT_MODE_STEP && !unit.path.empty()) {
-        unit_try_step(unit);
-    }
-    // Update step
-    if (unit.mode == UNIT_MODE_STEP) {
-        unit.path_timer.stop();
-        fixed movement_left = fixed::from_int(1);
-        while (movement_left.raw_value > 0) {
-            fixed distance_to_target = unit.position.distance_to(unit.target_position);
-            if (distance_to_target > movement_left) {
-                unit.position += DIRECTION_VEC2[unit.direction] * movement_left;
-                movement_left = 0;
-            } else {
-                unit.position = unit.target_position;
-                unit.mode = UNIT_MODE_IDLE;
-                movement_left -= distance_to_target;
-
-                if (!unit.path.empty()) {
-                    unit_try_step(unit);
-                } else {
-                    // on finished movement
-                    if (unit.order_type == ORDER_MOVE) {
-                        unit.order_type = ORDER_NONE;
-                    } else if (unit.order_type == ORDER_BUILD) {
-                        // Since the unit is on top of the building space, we have to temporarily set the cell to empty so that we can check if the building space is free
-                        cell_set_value(unit.cell, CELL_EMPTY);
-                        if (cell_is_blocked(unit.order_cell, building_data.at(unit.order_building_type).cell_size())) {
-                            unit.order_type = ORDER_NONE;
-                            cell_set_value(unit.cell, CELL_FILLED);
-                            ui_show_status("You can't build there.");
-                        } else {
-                            unit.building_id = building_create(player_id, unit.order_building_type, unit.order_cell);
-                            player_gold[player_id] -= building_data.at(unit.order_building_type).cost;
-                            log_info("unit creating building. %u", unit.building_id);
-                            unit.mode = UNIT_MODE_BUILD;
-                            unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
-                            unit.is_selected = false;
-                            ui_on_selection_changed();
-                        }
-                    }
-                }
-
-                if (unit.mode != UNIT_MODE_STEP) {
-                    movement_left.raw_value = 0;
-                }
-            }
-        }
-    // Update path timer
-    } else if (!unit.path_timer.is_stopped) {
-        unit.path_timer.update();
-        if (unit.path_timer.is_finished) {
-            unit.path_timer.stop();
-            ivec2 unit_target = unit.path[unit.path.size() - 1];
-            unit.path.clear();
-            unit.path = pathfind(unit.cell, unit_target);
-            if (unit.path.empty()) {
-                unit.order_type = ORDER_NONE;
-            } 
-        }
-    // Update building
-    } else if (unit.mode == UNIT_MODE_BUILD) {
-        unit.build_timer.update();
-        if (unit.build_timer.is_finished) {
-            // NOTE: this is kinda unsafe, but we will handle it better when we implement unit destruction
-            building_t& building = buildings[player_id][buildings[player_id].get_index_of(unit.building_id)];
-
-            building.health++;
-            if (building.health >= building_data.at(building.type).max_health) {
-                building.health = building_data.at(building.type).max_health;
-                building.is_finished = true;
-            }
-            if (building.is_finished) {
-                // On building finished
-                log_info("building finished");
-                unit_eject_from_building(unit, building);
-                if (is_selecting_building && selected_building_id == unit.building_id) {
-                    ui_on_selection_changed();
-                }
-            } else {
-                unit.build_timer.start(unit_t::BUILD_TICK_DURATION);
-            }
-        } 
-    }
-
-    // Update animation
-    if (unit.mode == UNIT_MODE_STEP) {
-        unit.animation.play(ANIMATION_UNIT_MOVE);
-    } else if (unit.mode == UNIT_MODE_BUILD) {
-        unit.animation.play(ANIMATION_UNIT_BUILD);
-    } else {
-        unit.animation.play(ANIMATION_UNIT_IDLE);
-    }
-    unit.animation.update();
-    if (unit.mode != UNIT_MODE_BUILD) {
-        if (unit.direction == DIRECTION_NORTH) {
-            unit.animation.frame.y = 1;
-        } else if (unit.direction == DIRECTION_SOUTH) {
-            unit.animation.frame.y = 0;
-        } else if (unit.direction > DIRECTION_SOUTH) {
-            unit.animation.frame.y = 3;
-        } else {
-            unit.animation.frame.y = 2;
-        }
-    }
-}
-
-void match_t::unit_eject_from_building(unit_t& unit, building_t& building) {
-    unit.cell = building_get_nearest_free_cell(building);
-    cell_set_value(unit.cell, CELL_FILLED);
-    unit.position = cell_center_position(unit.cell);
-    unit.mode = UNIT_MODE_IDLE;
-    unit.order_type = ORDER_NONE;
+bool unit_is_building(const unit_t& unit) {
+    return unit.build_timer != 0;
 }
 
 // BUILDINGS
 
-uint8_t match_t::building_create(uint8_t player_id, BuildingType type, ivec2 cell) {
+uint8_t building_create(match_state_t& state, uint8_t player_id, BuildingType type, ivec2 cell) {
     log_info("building create called");
-    auto it = building_data.find(type);
-    GOLD_ASSERT(it != building_data.end());
+    auto it = BUILDING_DATA.find(type);
+    GOLD_ASSERT(it != BUILDING_DATA.end());
 
     building_t building;
+    building.player_id = player_id;
     building.cell = cell;
     building.type = type;
     building.health = 3;
     building.is_finished = false;
 
-    cell_set_value(cell, it->second.cell_size(), CELL_FILLED);
-    return buildings[player_id].push_back(building);
+    map_cells_set_value(state.map, cell, it->second.cell_size(), CELL_FILLED);
+    return state.buildings.push_back(building);
 }
 
-void match_t::building_destroy(uint8_t player_id, uint8_t building_id) {
-    uint32_t index = buildings[player_id].get_index_of(building_id);
-    building_t& building = buildings[player_id][index];
+void building_destroy(match_state_t& state, uint8_t building_id) {
+    uint32_t index = state.buildings.get_index_of(building_id);
+    building_t& building = state.buildings[index];
 
-    if (!building.is_finished) {
-        for (unit_t& unit : units[player_id]) {
-            if (unit.mode == UNIT_MODE_BUILD && unit.building_id == building_id) {
-                unit_eject_from_building(unit, building);
-                break;
-            }
-        }
-    }
-
-    cell_set_value(building.cell, building_data.at(building.type).cell_size(), false);
-    buildings[player_id].remove_at(index);
+    map_cells_set_value(state.map, building.cell, BUILDING_DATA.at(building.type).cell_size(), false);
+    state.buildings.remove_at(index);
 }
 
-rect_t match_t::building_get_rect(const building_t& building) const {
-    return rect_t(building.cell * TILE_SIZE, building_data.at(building.type).cell_size() * TILE_SIZE);
-}
-
-ivec2 match_t::building_get_nearest_free_cell(building_t& building) const {
-    ivec2 cell = building.cell + ivec2(-1, 0);
-    bool cell_is_valid = cell_is_in_bounds(cell) && !cell_is_blocked(cell);
-
-    int step_count = 0;
-    int x_step_amount = building_data.at(building.type).cell_width + 1;
-    int y_step_amount = building_data.at(building.type).cell_height;
-    Direction step_direction = DIRECTION_SOUTH;
-
-    while (!cell_is_valid) {
-        cell += DIRECTION_IVEC2[step_direction];
-        step_count++;
-
-        bool is_y_stepping = step_direction == DIRECTION_SOUTH || step_direction == DIRECTION_NORTH;
-        int step_amount = is_y_stepping ? y_step_amount : x_step_amount;
-        if (step_count == step_amount) {
-            if (is_y_stepping) {
-                y_step_amount++;
-            } else {
-                x_step_amount++;
-            }
-            step_count = 0;
-
-            switch (step_direction) {
-                case DIRECTION_SOUTH:
-                    step_direction = DIRECTION_EAST;
-                    break;
-                case DIRECTION_EAST:
-                    step_direction = DIRECTION_NORTH;
-                    break;
-                case DIRECTION_NORTH:
-                    step_direction = DIRECTION_WEST;
-                    break;
-                case DIRECTION_WEST:
-                    step_direction = DIRECTION_SOUTH;
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        cell_is_valid = cell_is_in_bounds(cell) && !cell_is_blocked(cell);
-    }
-
-    return cell;
+rect_t building_rect(const building_t& building) {
+    return rect_t(building.cell * TILE_SIZE, BUILDING_DATA.at(building.type).cell_size() * TILE_SIZE);
 }

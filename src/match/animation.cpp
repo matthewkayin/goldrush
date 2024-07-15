@@ -44,45 +44,34 @@ static const std::unordered_map<uint32_t, animation_data_t> animation_data = {
     }}
 };
 
-void animation_t::play(Animation animation) {
-    if (this->animation == animation && is_playing) {
-        return;
-    }
-    this->animation = animation;
-
+animation_state_t animation_start(Animation animation) {
     auto it = animation_data.find(animation);
     GOLD_ASSERT(it != animation_data.end());
 
-    timer = 0;
-    frame.x = it->second.h_frame_start;
-    if (it->second.v_frame != -1) {
-        frame.y = it->second.v_frame;
-    }
-    
-    is_playing = true;
+    animation_state_t state;
+    state.animation = animation;
+    state.timer = 0;
+    state.frame = ivec2(it->second.h_frame_start, it->second.v_frame != -1 ? it->second.v_frame : 0);
+    // Only set is playing to true if the animation has multiple frames
+    state.is_playing = it->second.h_frame_start != it->second.h_frame_end;
+
+    return state;
 }
 
-void animation_t::update() {
-    auto it = animation_data.find(animation);
-    if (!is_playing || it->second.h_frame_start == it->second.h_frame_end) {
-        return;
-    }
+void animation_update(animation_state_t& state) {
+    animation_data_t data = animation_data.at(state.animation);
 
-    timer++;
-    if (timer == it->second.frame_duration) {
-        timer = 0;
-        frame.x++;
-        if (frame.x == it->second.h_frame_end + 1) {
-            if (it->second.is_looping) {
-                frame.x = it->second.h_frame_start;
+    state.timer++;
+    if (state.timer == data.frame_duration) {
+        state.timer = 0;
+        state.frame.x++;
+        if (state.frame.x == data.h_frame_end + 1) {
+            if (data.is_looping) {
+                state.frame.x = data.h_frame_start;
             } else {
-                frame.x--;
-                is_playing = false;
+                state.frame.x--;
+                state.is_playing = false;
             }
         }
     }
-}
-
-void animation_t::stop() {
-    is_playing = false;
 }

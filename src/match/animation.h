@@ -11,13 +11,12 @@ enum Animation {
     ANIMATION_UNIT_BUILD
 };
 
-struct animation_t {
+struct animation_state_t {
     Animation animation;
     uint32_t timer;
-    ivec2 frame = ivec2(0, 0);
+    ivec2 frame;
     bool is_playing = false;
-
-    void play(Animation animation);
-    void update();
-    void stop();
 };
+
+animation_state_t animation_start(Animation animation);
+void animation_update(animation_state_t& state);
