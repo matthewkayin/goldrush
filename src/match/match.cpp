@@ -255,8 +255,11 @@ void match_update(match_state_t& state) {
                                 group_max.x = std::max(group_max.x, unit.cell.x);
                                 group_max.y = std::max(group_max.y, unit.cell.y);
                             }
+
                             unit_count++;
                         }
+                        group_max.x++;
+                        group_max.y++;
                         group_center = group_center / unit_count;
                         bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
 
@@ -276,11 +279,20 @@ void match_update(match_state_t& state) {
                                 unit_target = input.move.target_cell;
                             }
 
-                            unit.path = map_pathfind(state.map, unit.cell, unit_target);
+                            // Don't bother moving to the same cell
+                            if (unit_target == unit.cell) {
+                                continue;
+                            }
+                            // Don't bother moving to a blocked cell
+                            if (map_cell_is_blocked(state.map, unit_target)) {
+                                continue;
+                            }
+
                             order_t move_order;
                             move_order.type = ORDER_MOVE;
                             move_order.move.target_cell = unit_target;
                             unit.order = move_order;
+                            unit.path.clear();
                         }
                         break;
                     } // End case INPUT_MOVE
@@ -327,6 +339,7 @@ void match_update(match_state_t& state) {
                         build_order.build.building_cell = input.build.target_cell;
                         build_order.build.unit_cell = nearest_cell;
                         unit.order = build_order;
+                        unit.path.clear();
                     }
                     default:
                         break;
@@ -426,6 +439,7 @@ void match_update(match_state_t& state) {
                 state.input_queue.push_back(input);
 
                 state.ui_buttonset = UI_BUTTONSET_MINER;
+                state.ui_mode = UI_MODE_NONE;
             } else {
                 ui_show_status(state, "You can't build there.");
             }
@@ -463,13 +477,20 @@ void match_update(match_state_t& state) {
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
                 uint8_t player_id = network_get_player_id();
+                log_info("destroying building with id %u", state.selection.ids[0]);
                 uint32_t index = state.buildings.get_index_of(state.selection.ids[0]);
                 building_t& building = state.buildings[index];
 
-                // Destroy the building
-                building_destroy(state, state.selection.ids[0]);
                 // Refund the player
                 state.player_gold[player_id] += BUILDING_DATA.at(building.type).cost;
+                // Tell the unit to stop building this building
+                for (unit_t& unit : state.units) {
+                    if (unit.order.type == ORDER_BUILD && unit.order.build.building_id == state.selection.ids[0]) {
+                        unit_eject_from_building(unit, state.map);
+                    }
+                }
+                // Destroy the building
+                building_destroy(state, state.selection.ids[0]);
                 // Clear the player's selection
                 selection_t empty_selection;
                 empty_selection.type = SELECTION_TYPE_NONE;
@@ -478,8 +499,10 @@ void match_update(match_state_t& state) {
             break;
         }
         case BUTTON_BUILD_HOUSE:
+            log_info("building house pressed?");
         case BUTTON_BUILD_CAMP: {
             // Begin building placement
+            log_info("building pressed?");
             BuildingType building_type = (BuildingType)(ui_button_pressed - BUTTON_BUILD_HOUSE);
             uint8_t player_id = network_get_player_id();
 
@@ -517,8 +540,10 @@ void match_update(match_state_t& state) {
         if (state.ui_mode == UI_MODE_SELECTING) {
             selection_t selection = selection_create(state.units, state.buildings, current_player_id, state.select_rect);
             ui_set_selection(state, selection);
-        } 
-        state.ui_mode = UI_MODE_NONE;
+            state.ui_mode = UI_MODE_NONE;
+        } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
+            state.ui_mode = UI_MODE_NONE;
+        }
     }
 
     // CAMERA DRAG
@@ -576,32 +601,45 @@ void match_update(match_state_t& state) {
         unit_t& unit = state.units[unit_index];
         uint16_t unit_id = state.units.ids[unit_index];
 
-        // Update path timer
-        if (unit.path_timer != 0) {
-            unit.path_timer--;
-            if (unit.path_timer == 0) {
-                // If the path timer runs out, clear the path
-                // It is intended that this triggers the below code to attempt to repath
-                unit.path.clear();
+        if (unit.mode == UNIT_MODE_IDLE) {
+            // Determine if unit should move
+            ivec2 unit_target_cell;
+            bool unit_should_move = false;
+            if (unit.order.type == ORDER_MOVE) {
+                unit_target_cell = unit.order.move.target_cell;
+                unit_should_move = true;
+            } else if (unit.order.type == ORDER_BUILD) {
+                unit_target_cell = unit.order.build.unit_cell;
+                unit_should_move = true;
+            }
+
+            if (unit_should_move && unit_target_cell == unit.cell) {
+                unit_should_move = false;
+            }
+
+            if (unit_should_move && map_cell_is_blocked(state.map, unit_target_cell)) {
+                unit_should_move = false;
+            }
+
+            // If unit should move, pathfind
+            if (unit_should_move) {
+                unit.path = map_pathfind(state.map, unit.cell, unit_target_cell);
+                if (unit.path.empty()) {
+                    order_t none_order;
+                    none_order.type = ORDER_NONE;
+                    unit.order = none_order;
+                } else {
+                    unit.mode = UNIT_MODE_MOVE;
+                }
             }
         }
 
-        // Pathfind if necessary
-        bool unit_should_be_moving = unit.order.type == ORDER_MOVE || (unit.order.type == ORDER_BUILD && unit.cell != unit.order.build.unit_cell);
-        if (unit_should_be_moving && unit.path.empty()) {
-            unit.path = map_pathfind(state.map, unit.cell, unit.order.move.target_cell);
-            // If no path is found, start the path timer
-            if (unit.path.empty()) {
-                unit.path_timer = PATH_PAUSE_DURATION;
-            }
-        }
-
-        // Movement
-        if (!unit.path.empty() || unit_is_moving(unit)) {
+        if (unit.mode == UNIT_MODE_MOVE) {
+            // Movement
             fixed movement_left = fixed::from_int(1);
             while (movement_left.raw_value > 0) {
                 // Try to start moving to the next tile
-                if (!unit_is_moving(unit)) {
+                if (unit.position == unit.target_position) {
                     ivec2 next_point = unit.path[0];
 
                     // Set the unit's direction, even if it doesn't begin movement
@@ -616,7 +654,9 @@ void match_update(match_state_t& state) {
                     // Don't move if the tile is blocked
                     if (map_cell_is_blocked(state.map, next_point)) {
                         if (unit.path_timer == 0) {
+                            log_info("%u: cell is blocked starting path timer", unit_id);
                             unit.path_timer = PATH_PAUSE_DURATION;
+                            unit.mode = UNIT_MODE_MOVE_BLOCKED;
                         }
                         break;
                     }
@@ -627,105 +667,113 @@ void match_update(match_state_t& state) {
                     map_cell_set_value(state.map, unit.cell, CELL_FILLED);
                     unit.target_position = cell_center_position(unit.cell);
                     unit.path_timer = 0;
+                    unit.mode = UNIT_MODE_MOVE;
+                    unit.path.erase(unit.path.begin());
+                    log_info("%u: cell is free starting movement", unit_id);
                 }
 
                 // Step unit along movement
                 fixed distance_to_target = unit.position.distance_to(unit.target_position);
                 if (distance_to_target > movement_left) {
                     unit.position += DIRECTION_VEC2[unit.direction] * movement_left;
-                    movement_left = 0;
+                    movement_left = fixed::from_raw(0);
+                    log_info("%u: incremental movement", unit_id);
                 } else {
                     unit.position = unit.target_position;
                     movement_left -= distance_to_target;
+                    unit.mode = UNIT_MODE_IDLE;
+                    if (unit.path.empty()) {
+                        movement_left = fixed::from_raw(0);
+                    }
+                    log_info("%u: step movement. movement left: %d", unit_id, movement_left);
                 }
-            } // End while movement left != 0
-
-            // On finished movement
-            if (unit.path.empty() && !unit_is_moving(unit)) {
-                if (unit.order.type == ORDER_MOVE) {
-                    order_t order_none;
-                    order_none.type = ORDER_NONE;
-                    unit.order = order_none;
-                } else if (unit.order.type == ORDER_BUILD) {
-                    // Since the unit is on top of the building space, we have to temporarily set the cell to empty so that we can check if the building space is free
-                    map_cell_set_value(state.map, unit.cell, CELL_EMPTY);
-                    if (map_cells_are_blocked(state.map, unit.order.build.building_cell, BUILDING_DATA.at(unit.order.build.building_type).cell_size())) {
+                // On finished movement
+                if (unit.path.empty() && unit.position == unit.target_position) {
+                    if (unit.order.type == ORDER_MOVE) {
                         order_t order_none;
                         order_none.type = ORDER_NONE;
                         unit.order = order_none;
-                        map_cell_set_value(state.map, unit.cell, CELL_FILLED);
-                        ui_show_status(state, "You can't build there.");
-                    } else {
-                        unit.order.build.building_id = building_create(state, unit.player_id, unit.order.build.building_type, unit.order.build.building_cell);
-                        state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.order.build.building_type).cost;
-                        log_info("unit creating building. %u", unit.order.build.building_id);
-                        unit.build_timer = BUILD_TICK_DURATION;
+                        unit.mode = UNIT_MODE_IDLE;
+                    } else if (unit.order.type == ORDER_BUILD) {
+                        // Since the unit is on top of the building space, we have to temporarily set the cell to empty so that we can check if the building space is free
+                        map_cell_set_value(state.map, unit.cell, CELL_EMPTY);
+                        if (map_cells_are_blocked(state.map, unit.order.build.building_cell, BUILDING_DATA.at(unit.order.build.building_type).cell_size())) {
+                            order_t order_none;
+                            order_none.type = ORDER_NONE;
+                            unit.order = order_none;
+                            unit.mode = UNIT_MODE_IDLE;
+                            map_cell_set_value(state.map, unit.cell, CELL_FILLED);
+                            ui_show_status(state, "You can't build there.");
+                        } else {
+                            unit.order.build.building_id = building_create(state, unit.player_id, unit.order.build.building_type, unit.order.build.building_cell);
+                            state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.order.build.building_type).cost;
+                            log_info("unit creating building. %u", unit.order.build.building_id);
+                            unit.mode = UNIT_MODE_BUILD;
+                            unit.build_timer = BUILD_TICK_DURATION;
 
-                        // De-select the unit if necessary
-                        selection_t selection = state.selection;
-                        if (selection.type == SELECTION_TYPE_UNITS) {
-                            for (auto unit_id_it = selection.ids.begin(); unit_id_it != selection.ids.end(); unit_id_it++) {
-                                if (*unit_id_it == unit_id) {
-                                    // De-select the unit
-                                    selection.ids.erase(unit_id_it);
+                            // De-select the unit if necessary
+                            selection_t selection = state.selection;
+                            if (selection.type == SELECTION_TYPE_UNITS) {
+                                for (auto unit_id_it = selection.ids.begin(); unit_id_it != selection.ids.end(); unit_id_it++) {
+                                    if (*unit_id_it == unit_id) {
+                                        // De-select the unit
+                                        selection.ids.erase(unit_id_it);
 
-                                    // If the selection is now empty, select the building instead
-                                    if (selection.ids.empty()) {
-                                        selection.type = SELECTION_TYPE_BUILDINGS;
-                                        selection.ids.push_back(unit.order.build.building_id);
+                                        // If the selection is now empty, select the building instead
+                                        if (selection.ids.empty()) {
+                                            selection.type = SELECTION_TYPE_BUILDINGS;
+                                            selection.ids.push_back(unit.order.build.building_id);
+                                        }
+
+                                        ui_set_selection(state, selection);
+                                        log_info("state selection id 0 %u", state.selection.ids[0]);
+                                        break;
                                     }
-
-                                    ui_set_selection(state, selection);
-                                    break;
                                 }
                             }
                         }
-                    }
-               } 
-            } // End on finished movement
-        } // End movement
+                    } 
+                } // End on finished movement
+            } // End while movement left != 0
+        } // End if mode == MOVE
 
-        // Update in-progress building
-        if (unit.build_timer != 0) {
+        if (unit.mode == UNIT_MODE_MOVE_BLOCKED) {
+            // Increment path timer
+            unit.path_timer--;
+            if (unit.path_timer == 0) {
+                unit.mode = UNIT_MODE_MOVE;
+            }
+        }
+
+        if (unit.mode == UNIT_MODE_BUILD) {
             unit.build_timer--;
             if (unit.build_timer == 0) {
-                bool should_eject_from_building = false;
+                uint16_t building_id = unit.order.build.building_id;
+                uint32_t index = state.buildings.get_index_of(building_id);
+                building_t& building = state.buildings[index];
 
-                uint32_t index = state.buildings.get_index_of(unit.order.build.building_id);
-                if (index == id_array<building_t>::INDEX_INVALID) {
-                    should_eject_from_building = true;
-                } else {
-                    building_t& building = state.buildings[state.buildings.get_index_of(unit.order.build.building_id)];
+                building.health++;
+                if (building.health == BUILDING_DATA.at(unit.order.build.building_type).max_health) {
+                    // On building finished
+                    unit_eject_from_building(unit, state.map);
+                    building.is_finished = true;
 
-                    building.health++;
-                    if (building.health == BUILDING_DATA.at(unit.order.build.building_type).max_health) {
-                        // On building finished
-                        building.is_finished = true;
-                        should_eject_from_building = true;
-                        log_info("building finished.");
-                    } else {
-                        unit.build_timer = BUILD_TICK_DURATION;
+                    if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == building_id) {
+                        // Trigger a re-select so that ui buttons are updated correctly
+                        ui_set_selection(state, state.selection);
                     }
-                }
-
-                if (should_eject_from_building) {
-                    unit.cell = map_get_nearest_free_cell_around_cells(state.map, unit.order.build.building_cell, BUILDING_DATA.at(unit.order.build.building_type).cell_size());
-                    map_cell_set_value(state.map, unit.cell, CELL_FILLED);
-                    unit.position = cell_center_position(unit.cell);
-                    unit.target_position = unit.position;
-
-                    order_t order_none;
-                    order_none.type = ORDER_NONE;
-                    unit.order = order_none;
+                    log_info("building finished.");
+                } else {
+                    unit.build_timer = BUILD_TICK_DURATION;
                 }
             }
         }
 
         // Update animation
         Animation should_be_playing;
-        if (unit.build_timer != 0) {
+        if (unit.mode == UNIT_MODE_BUILD) {
             should_be_playing = ANIMATION_UNIT_BUILD;
-        } else if (unit_is_moving(unit)) {
+        } else if (unit.mode == UNIT_MODE_MOVE) {
             should_be_playing = ANIMATION_UNIT_MOVE;
         } else {
             should_be_playing = ANIMATION_UNIT_IDLE;
@@ -750,7 +798,9 @@ void match_update(match_state_t& state) {
     } // End for each unit
 
     // UI update
-    animation_update(state.ui_move_animation);
+    if (state.ui_move_animation.is_playing) {
+        animation_update(state.ui_move_animation);
+    }
 
     // Update UI status message timer
     if (state.ui_status_timer != 0) {
@@ -778,7 +828,7 @@ selection_t selection_create(const id_array<unit_t>& units, const id_array<build
             continue;
         }
         // Don't select units which are building
-        if (unit_is_building(unit)) {
+        if (unit.mode == UNIT_MODE_BUILD) {
             continue;
         }
 
@@ -859,6 +909,13 @@ void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const i
     unit.position = cell_center_position(cell);
     unit.target_position = unit.position;
     unit.direction = DIRECTION_SOUTH;
+    unit.mode = UNIT_MODE_IDLE;
+    order_t order_none;
+    order_none.type = ORDER_NONE;
+    unit.order = order_none;
+    unit.animation = animation_start(ANIMATION_UNIT_IDLE);
+    unit.path_timer = 0;
+    unit.build_timer = 0;
     state.units.push_back(unit);
 
     map_cell_set_value(state.map, cell, CELL_FILLED);
@@ -868,12 +925,16 @@ rect_t unit_rect(const unit_t& unit) {
     return rect_t(ivec2(unit.position.x.integer_part(), unit.position.y.integer_part()), ivec2(16, 16));
 }
 
-bool unit_is_moving(const unit_t& unit) {
-    return unit.position != unit.target_position;
-}
+void unit_eject_from_building(unit_t& unit, map_t& map) {
+    unit.cell = map_get_first_free_cell_around_cells(map, unit.order.build.building_cell, BUILDING_DATA.at(unit.order.build.building_type).cell_size());
+    map_cell_set_value(map, unit.cell, CELL_FILLED);
+    unit.position = cell_center_position(unit.cell);
+    unit.target_position = unit.position;
 
-bool unit_is_building(const unit_t& unit) {
-    return unit.build_timer != 0;
+    order_t order_none;
+    order_none.type = ORDER_NONE;
+    unit.order = order_none;
+    unit.mode = UNIT_MODE_IDLE;
 }
 
 // BUILDINGS

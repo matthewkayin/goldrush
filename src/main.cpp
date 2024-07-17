@@ -138,7 +138,7 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     }},
     { SPRITE_UI_BUTTON_ICON, (sprite_params_t) {
         .path = "sprite/ui_button_icon.png",
-        .h_frames = BUTTON_COUNT,
+        .h_frames = BUTTON_COUNT - 1,
         .v_frames = 2
     }},
     { SPRITE_UI_GOLD, (sprite_params_t) {
@@ -966,7 +966,7 @@ void render_match(const match_state_t& match) {
             .frame = unit.animation.frame ,
             .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
         };
-        if (unit_is_building(unit)) {
+        if (unit.mode == UNIT_MODE_BUILD) {
             const building_t& building = match.buildings[match.buildings.get_index_of(unit.order.build.building_id)];
             const building_data_t& data = BUILDING_DATA.at(building.type);
             int hframe = ((3 * building.health) / data.max_health);
@@ -1039,7 +1039,7 @@ void render_match(const match_state_t& match) {
         bool is_button_pressed = is_button_hovered && input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT);
         ivec2 offset = is_button_pressed ? ivec2(1, 1) : (is_button_hovered ? ivec2(0, -1) : ivec2(0, 0));
         render_sprite(SPRITE_UI_BUTTON, ivec2(is_button_hovered && !is_button_pressed ? 1 : 0, 0), UI_BUTTON_RECT[i].position + offset);
-        render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(ui_button, is_button_hovered && !is_button_pressed ? 1 : 0), UI_BUTTON_RECT[i].position + offset);
+        render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(ui_button - 1, is_button_hovered && !is_button_pressed ? 1 : 0), UI_BUTTON_RECT[i].position + offset);
     }
 
     // UI Status message

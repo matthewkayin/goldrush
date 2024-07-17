@@ -86,7 +86,8 @@ enum UnitType {
 
 enum UnitMode {
     UNIT_MODE_IDLE,
-    UNIT_MODE_STEP,
+    UNIT_MODE_MOVE,
+    UNIT_MODE_MOVE_BLOCKED,
     UNIT_MODE_BUILD
 };
 
@@ -100,6 +101,7 @@ struct unit_t {
     UnitType type;
     uint32_t health;
 
+    UnitMode mode;
     order_t order;
     int direction;
 
@@ -206,8 +208,7 @@ ivec2 camera_centered_on_cell(const ivec2& cell);
 
 void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const ivec2& cell);
 rect_t unit_rect(const unit_t& unit);
-bool unit_is_moving(const unit_t& unit);
-bool unit_is_building(const unit_t& unit);
+void unit_eject_from_building(unit_t& unit, map_t& map);
 
 uint8_t building_create(match_state_t& state, uint8_t player_id, BuildingType type, ivec2 cell);
 rect_t building_rect(const building_t& building);

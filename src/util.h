@@ -38,11 +38,6 @@ struct fixed {
     static constexpr fixed from_raw(int32_t raw_value) {
         return (fixed) { .raw_value = raw_value };
     }
-    fixed& operator=(int32_t value) {
-        raw_value = value << fractional_bits;
-        return *this;
-    }
-
     int32_t integer_part() const {
         return raw_value >> fractional_bits;
     }
