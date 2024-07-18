@@ -60,25 +60,6 @@ enum OrderType {
     ORDER_BUILD
 };
 
-struct order_move_t {
-    ivec2 target_cell;
-};
-
-struct order_build_t {
-    BuildingType building_type;
-    ivec2 building_cell;
-    uint16_t building_id;
-    ivec2 unit_cell;
-};
-
-struct order_t {
-    OrderType type;
-    union {
-        order_move_t move;
-        order_build_t build;
-    };
-};
-
 enum UnitType {
     UNIT_MINER,
     UNIT_TYPE_COUNT
@@ -102,13 +83,18 @@ struct unit_t {
     uint32_t health;
 
     UnitMode mode;
-    order_t order;
+    OrderType order;
     int direction;
 
     ivec2 cell;
+    ivec2 target_cell;
     vec2 position;
     vec2 target_position;
     std::vector<ivec2> path;
+
+    BuildingType building_type;
+    ivec2 building_cell;
+    uint16_t building_id;
 
     uint32_t path_timer;
     uint32_t build_timer;

@@ -24,4 +24,5 @@ int map_cell_get_value(const map_t& map, const ivec2& cell);
 void map_cell_set_value(map_t& map, const ivec2& cell, int value);
 void map_cells_set_value(map_t& map, const ivec2& cell, const ivec2& cell_size, int value);
 ivec2 map_get_first_free_cell_around_cells(const map_t& map, const ivec2& cell, const ivec2& cell_size);
+ivec2 map_get_nearest_free_cell_around_cell(const map_t& map, const ivec2& from, const ivec2& cell);
 std::vector<ivec2> map_pathfind(const map_t& map, const ivec2& from, const ivec2& to);

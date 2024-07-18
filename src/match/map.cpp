@@ -115,11 +115,63 @@ ivec2 map_get_first_free_cell_around_cells(const map_t& map, const ivec2& cell, 
     return _cell;
 }
 
+ivec2 map_get_nearest_free_cell_around_cell(const map_t& map, const ivec2& from, const ivec2& cell) {
+    int nearest_cell_distance = -1;
+    ivec2 nearest_cell;
+    int extents = 1;
+
+    while (nearest_cell_distance == -1) {
+        // first check adjacent directions
+        for (int direction = DIRECTION_NORTH; direction < DIRECTION_COUNT; direction += 2) {
+            int next_direction = direction + 1 == DIRECTION_COUNT ? 0 : direction + 1;
+            int previous_direction = direction - 1 == -1 ? DIRECTION_COUNT - 1 : direction - 1;
+            ivec2 step = DIRECTION_IVEC2[next_direction] - DIRECTION_IVEC2[direction];
+            ivec2 adjacent_cell = cell + (DIRECTION_IVEC2[previous_direction] * extents) + step;
+            ivec2 end_cell = cell + (DIRECTION_IVEC2[next_direction] * extents);
+            while (adjacent_cell != end_cell) {
+                if (map_cell_is_in_bounds(map, adjacent_cell) && !map_cell_is_blocked(map, adjacent_cell)) {
+                    int adjacent_cell_distance = ivec2::manhattan_distance(from, adjacent_cell);
+                    if (nearest_cell_distance == -1 || adjacent_cell_distance < nearest_cell_distance) {
+                        nearest_cell = adjacent_cell;
+                        nearest_cell_distance = adjacent_cell_distance;
+                    }
+                }
+
+                adjacent_cell += step;
+            }
+        }
+
+        if (nearest_cell_distance != -1) {
+            break;
+        }
+
+        // then check diagonal directions
+        for (int direction = DIRECTION_NORTHEAST; direction < DIRECTION_COUNT; direction += 2) {
+            ivec2 diagonal_cell = cell + (DIRECTION_IVEC2[direction] * extents);
+            if (map_cell_is_in_bounds(map, diagonal_cell) && !map_cell_is_blocked(map, diagonal_cell)) {
+                int diagonal_cell_distance = ivec2::manhattan_distance(from, diagonal_cell);
+                if (nearest_cell_distance == -1 || diagonal_cell_distance < nearest_cell_distance) {
+                    nearest_cell = diagonal_cell;
+                    nearest_cell_distance = diagonal_cell_distance;
+                }
+            }
+        }
+
+        extents++;
+    }
+
+    return nearest_cell;
+}
+
 std::vector<ivec2> map_pathfind(const map_t& map, const ivec2& from, const ivec2& to) {
     struct path_t {
         int score;
         std::vector<ivec2> points;
     };
+
+    if (map_cell_is_blocked(map, to)) {
+        return std::vector<ivec2>();
+    }
 
     std::vector<path_t> frontier;
     std::vector<ivec2> explored;

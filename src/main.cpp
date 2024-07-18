@@ -282,6 +282,7 @@ int main(int argc, char** argv) {
     }
 
     logger_init(logfile_path.c_str());
+    log_info("opened with window size %vi", &window_size);
 
     if (!engine_init(window_size)) {
         log_info("Closing logger...");
@@ -967,7 +968,7 @@ void render_match(const match_state_t& match) {
             .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
         };
         if (unit.mode == UNIT_MODE_BUILD) {
-            const building_t& building = match.buildings[match.buildings.get_index_of(unit.order.build.building_id)];
+            const building_t& building = match.buildings[match.buildings.get_index_of(unit.building_id)];
             const building_data_t& data = BUILDING_DATA.at(building.type);
             int hframe = ((3 * building.health) / data.max_health);
             unit_params.sprite = SPRITE_MINER_BUILDING;
