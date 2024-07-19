@@ -10,6 +10,7 @@
 #define MAX_UNITS 200
 #define MAX_BUILDINGS 64
 #define TILE_SIZE 16
+// #define VDEBUG_PATHFINDING
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1

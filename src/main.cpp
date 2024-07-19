@@ -235,7 +235,7 @@ SDL_Rect rect_to_sdl(const rect_t& r) {
 bool engine_init(ivec2 window_size);
 void engine_quit();
 void render_text(Font font, const char* text, SDL_Color color, ivec2 position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
-void render_menu(const menu_t& menu);
+void render_menu(const menu_state_t& menu);
 void render_match(const match_state_t& state);
 
 enum Mode {
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
     }
 
     Mode mode = MODE_MENU;
-    menu_t menu;
+    menu_state_t menu_state = menu_init();
     match_state_t match_state;
 
     double last_time = platform_get_absolute_time();
@@ -395,8 +395,8 @@ int main(int argc, char** argv) {
             // UPDATE
             switch (mode) {
                 case MODE_MENU: {
-                    menu.update();
-                    if (menu.get_mode() == MENU_MODE_MATCH_START) {
+                    menu_update(menu_state);
+                    if (menu_state.mode == MENU_MODE_MATCH_START) {
                         match_state = match_init();
                         mode = MODE_MATCH;
                     }
@@ -415,7 +415,7 @@ int main(int argc, char** argv) {
 
         switch (mode) {
             case MODE_MENU:
-                render_menu(menu);
+                render_menu(menu_state);
                 break;
             case MODE_MATCH:
                 render_match(match_state);
@@ -681,7 +681,7 @@ void render_text(Font font, const char* text, SDL_Color color, ivec2 position, T
     SDL_DestroyTexture(text_texture);
 }
 
-void render_menu(const menu_t& menu) {
+void render_menu(const menu_state_t& menu) {
     if (menu.mode == MENU_MODE_MATCH_START) {
         return;
     }
@@ -855,6 +855,13 @@ void render_match(const match_state_t& match) {
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
 
+#ifdef VDEBUG_PATHFINDING
+            if (match.map.cells[map_index] != CELL_EMPTY) {
+                SDL_SetRenderDrawColor(engine.renderer, 255, 0, 0, 128);
+                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+            }
+#endif
+
             // Render gold
             if (match.map.cells[map_index] == CELL_GOLD) {
                 ysorted.push_back((render_sprite_params_t) {
@@ -1024,6 +1031,23 @@ void render_match(const match_state_t& match) {
         SDL_RenderDrawRect(engine.renderer, &select_rect);
     }
 
+#ifdef VDEBUG_PATHFINDING
+    // Unit paths
+    SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+    for (const unit_t& unit : match.units) {
+        ivec2 point = unit.position.to_ivec2() - match.camera_offset;
+        ivec2 next_point = unit.target_position.to_ivec2() - match.camera_offset;
+        SDL_RenderDrawLine(engine.renderer, point.x, point.y, next_point.x, next_point.y);
+        size_t path_index = 0;
+        while (path_index < unit.path.size()) {
+            point = next_point;
+            next_point = (unit.path[0] * TILE_SIZE) + ivec2(TILE_SIZE / 2, TILE_SIZE / 2) - match.camera_offset;
+            SDL_RenderDrawLine(engine.renderer, point.x, point.y, next_point.x, next_point.y);
+            path_index++;
+        }
+    }
+#endif
+
     // UI frames
     render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
     render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT));
@@ -1090,4 +1114,20 @@ void render_match(const match_state_t& match) {
     SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
+
+#ifdef VDEBUG_PATHFINDING
+    // Debug text
+    int debug_text_y = 24;
+    const char* ORDER_STRINGS[3] = { "NONE", "MOVE", "BUILD" };
+    const char* MODE_STRINGS[4] = { "IDLE", "MOVE", "BLOCKED", "BUILD" };
+    if (match.selection.type == SELECTION_TYPE_UNITS) {
+        for (uint16_t id : match.selection.ids) {
+            const unit_t& unit = match.units[match.units.get_index_of(id)];
+            char unit_text[128];
+            sprintf(unit_text, "%u: Order: %s Mode: %s", id, ORDER_STRINGS[unit.order], MODE_STRINGS[unit.mode]);
+            render_text(FONT_HACK, unit_text, COLOR_BLACK, ivec2(0, debug_text_y));
+            debug_text_y += 12;
+        }
+    }
+#endif
 }

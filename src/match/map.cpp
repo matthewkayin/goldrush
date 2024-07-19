@@ -68,6 +68,22 @@ void map_cells_set_value(map_t& map, const ivec2& cell, const ivec2& cell_size, 
     }
 }
 
+void map_cell_set_temp_value(map_t& map, const ivec2& cell, int value) {
+    cell_value_t cell_value = (cell_value_t) {
+        .cell = cell,
+        .value = map.cells[cell.x + (cell.y * map.width)]
+    };
+    map.remembered_values.push_back(cell_value);
+    map_cell_set_value(map, cell, value);
+}
+
+void map_clear_temp_fills(map_t& map) {
+    for (cell_value_t& cell_value : map.remembered_values) {
+        map_cell_set_value(map, cell_value.cell, cell_value.value);
+    }
+    map.remembered_values.clear();
+}
+
 ivec2 map_get_first_free_cell_around_cells(const map_t& map, const ivec2& cell, const ivec2& cell_size) {
     ivec2 _cell = cell + ivec2(-1, 0);
     bool cell_is_valid = map_cell_is_in_bounds(map, _cell) && !map_cell_is_blocked(map, _cell);
@@ -129,6 +145,10 @@ ivec2 map_get_nearest_free_cell_around_cell(const map_t& map, const ivec2& from,
             ivec2 adjacent_cell = cell + (DIRECTION_IVEC2[previous_direction] * extents) + step;
             ivec2 end_cell = cell + (DIRECTION_IVEC2[next_direction] * extents);
             while (adjacent_cell != end_cell) {
+                if (adjacent_cell == from) {
+                    return from;
+                }
+
                 if (map_cell_is_in_bounds(map, adjacent_cell) && !map_cell_is_blocked(map, adjacent_cell)) {
                     int adjacent_cell_distance = ivec2::manhattan_distance(from, adjacent_cell);
                     if (nearest_cell_distance == -1 || adjacent_cell_distance < nearest_cell_distance) {
@@ -148,6 +168,10 @@ ivec2 map_get_nearest_free_cell_around_cell(const map_t& map, const ivec2& from,
         // then check diagonal directions
         for (int direction = DIRECTION_NORTHEAST; direction < DIRECTION_COUNT; direction += 2) {
             ivec2 diagonal_cell = cell + (DIRECTION_IVEC2[direction] * extents);
+            if (diagonal_cell == from) {
+                return from;
+            }
+            
             if (map_cell_is_in_bounds(map, diagonal_cell) && !map_cell_is_blocked(map, diagonal_cell)) {
                 int diagonal_cell_distance = ivec2::manhattan_distance(from, diagonal_cell);
                 if (nearest_cell_distance == -1 || diagonal_cell_distance < nearest_cell_distance) {
@@ -170,6 +194,7 @@ std::vector<ivec2> map_pathfind(const map_t& map, const ivec2& from, const ivec2
     };
 
     if (map_cell_is_blocked(map, to)) {
+        log_info("WARN: tried to pathfind on blocked space");
         return std::vector<ivec2>();
     }
 

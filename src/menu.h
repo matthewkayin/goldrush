@@ -47,7 +47,7 @@ struct menu_button_t {
     rect_t rect;
 };
 
-struct menu_t {
+struct menu_state_t {
     MenuMode mode;
 
     std::string status_text;
@@ -58,10 +58,9 @@ struct menu_t {
 
     std::unordered_map<MenuButton, menu_button_t> buttons;
     MenuButton button_hovered;
-
-    menu_t();
-    void show_status(const char* message);
-    MenuMode get_mode() const;
-    void set_mode(MenuMode mode);
-    void update();
 };
+
+menu_state_t menu_init();
+void menu_update(menu_state_t& state);
+void menu_show_status(menu_state_t& state, const char* message);
+void menu_set_mode(menu_state_t& state, MenuMode mode);

@@ -40,7 +40,7 @@ const rect_t UI_BUTTON_RECT[6] = {
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
-static const uint32_t PATH_PAUSE_DURATION = 60;
+static const uint32_t PATH_PAUSE_DURATION = 20;
 static const uint32_t BUILD_TICK_DURATION = 8;
 
 const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
@@ -231,37 +231,45 @@ void match_update(match_state_t& state) {
                 switch (input.type) {
                     case INPUT_MOVE: {
                         // Calculate unit group info
-                        bool has_found_first_unit = false;
+                        bool should_use_offset_of_target = !map_cell_is_blocked(state.map, input.move.target_cell);
                         ivec2 group_center;
-                        ivec2 group_min;
-                        ivec2 group_max;
-                        uint32_t unit_count = 0;
-                        for (uint32_t i = 0; i < input.move.unit_count; i++) {
-                            uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
-                            if (unit_index == id_array<unit_t>::INDEX_INVALID) {
-                                continue;
-                            }
 
-                            unit_t& unit = state.units[unit_index];
-                            if (!has_found_first_unit) {
-                                group_center = unit.cell;
-                                group_min = unit.cell;
-                                group_max = unit.cell;
-                                has_found_first_unit = true;
-                            } else {
-                                group_center += unit.cell;
-                                group_min.x = std::min(group_min.x, unit.cell.x);
-                                group_min.y = std::min(group_min.y, unit.cell.y);
-                                group_max.x = std::max(group_max.x, unit.cell.x);
-                                group_max.y = std::max(group_max.y, unit.cell.y);
-                            }
+                        if (should_use_offset_of_target) {
+                            log_info("calculating group center");
+                            bool has_found_first_unit = false;
+                            ivec2 group_min;
+                            ivec2 group_max;
+                            uint32_t unit_count = 0;
+                            for (uint32_t i = 0; i < input.move.unit_count; i++) {
+                                uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
+                                if (unit_index == id_array<unit_t>::INDEX_INVALID) {
+                                    continue;
+                                }
 
-                            unit_count++;
+                                unit_t& unit = state.units[unit_index];
+                                if (!has_found_first_unit) {
+                                    group_center = unit.cell;
+                                    group_min = unit.cell;
+                                    group_max = unit.cell;
+                                    has_found_first_unit = true;
+                                } else {
+                                    group_center += unit.cell;
+                                    group_min.x = std::min(group_min.x, unit.cell.x);
+                                    group_min.y = std::min(group_min.y, unit.cell.y);
+                                    group_max.x = std::max(group_max.x, unit.cell.x);
+                                    group_max.y = std::max(group_max.y, unit.cell.y);
+                                }
+
+                                unit_count++;
+                            }
+                            group_max.x++;
+                            group_max.y++;
+                            group_center = group_center / unit_count;
+                            bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
+                            if (is_target_inside_group) {
+                                should_use_offset_of_target = false;
+                            }
                         }
-                        group_max.x++;
-                        group_max.y++;
-                        group_center = group_center / unit_count;
-                        bool is_target_inside_group = rect_t(group_min, group_max - group_min).has_point(input.move.target_cell);
 
                         for (uint32_t i = 0; i < input.move.unit_count; i++) {
                             uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
@@ -271,12 +279,16 @@ void match_update(match_state_t& state) {
                             unit_t& unit = state.units[unit_index];
 
                             // Determine the unit's target
-                            ivec2 offset = unit.cell - group_center;
-                            ivec2 unit_target = input.move.target_cell + offset;
-                            bool is_target_invalid = is_target_inside_group || unit_target.x < 0 || unit_target.x >= state.map.width || unit_target.y < 0 || unit_target.y >= state.map.height ||
-                                                    ivec2::manhattan_distance(unit_target, input.move.target_cell) > 3 || map_cell_is_blocked(state.map, unit_target);
-                            if (is_target_invalid) {
-                                unit_target = input.move.target_cell;
+                            ivec2 unit_target = input.move.target_cell;
+                            if (should_use_offset_of_target) {
+                                ivec2 offset = unit.cell - group_center;
+                                unit_target = input.move.target_cell + offset;
+                                bool is_target_invalid = unit_target.x < 0 || unit_target.x >= state.map.width || unit_target.y < 0 || unit_target.y >= state.map.height ||
+                                                        ivec2::manhattan_distance(unit_target, input.move.target_cell) > 3;
+                                log_info("target invalid? %i", (int)is_target_invalid);
+                                if (is_target_invalid) {
+                                    unit_target = input.move.target_cell;
+                                }
                             }
 
                             // Don't bother moving to the same cell
@@ -284,15 +296,16 @@ void match_update(match_state_t& state) {
                                 continue;
                             }
                             // Don't bother moving to a blocked cell
-                            if (map_cell_is_blocked(state.map, input.move.target_cell) || map_cell_is_blocked(state.map, unit_target)) {
+                            if (map_cell_is_blocked(state.map, unit_target)) {
                                 unit_target = map_get_nearest_free_cell_around_cell(state.map, unit.cell, input.move.target_cell);
-                                log_info("unit %u: nearest free: %vi", input.move.unit_ids[i], &unit_target);
                             }
 
-                            log_info("unit %u: target: %vi", input.move.unit_ids[i], &unit_target);
                             unit.order = ORDER_MOVE;
                             unit.target_cell = unit_target;
+                            map_cell_set_temp_value(state.map, unit.target_cell, CELL_FILLED);
+                            map_cell_set_temp_value(state.map, unit.cell, CELL_EMPTY);
                         }
+                        map_clear_temp_fills(state.map);
                         break;
                     } // End case INPUT_MOVE
                     case INPUT_STOP: {
@@ -593,9 +606,22 @@ void match_update(match_state_t& state) {
         unit_t& unit = state.units[unit_index];
         uint16_t unit_id = state.units.ids[unit_index];
 
+        // Path timer
+        if (unit.mode == UNIT_MODE_MOVE_BLOCKED) {
+            // Increment path timer
+            unit.path_timer--;
+            if (unit.path_timer == 0) {
+                unit.mode = UNIT_MODE_IDLE;
+                unit.path.clear();
+            }
+        }
+
         // Pathfind
         bool unit_needs_to_pathfind = unit.cell != unit.target_cell && (unit.path.empty() || unit.path[unit.path.size() - 1] != unit.target_cell);
         if (unit_needs_to_pathfind) {
+            if (map_cell_is_blocked(state.map, unit.target_cell)) {
+                unit.target_cell = map_get_nearest_free_cell_around_cell(state.map, unit.cell, unit.target_cell);
+            }
             unit.path = map_pathfind(state.map, unit.cell, unit.target_cell);
             if (unit.path.empty()) {
                 unit.order = ORDER_NONE;
@@ -638,7 +664,6 @@ void match_update(match_state_t& state) {
                     unit.target_position = cell_center_position(unit.cell);
                     unit.path_timer = 0;
                     unit.mode = UNIT_MODE_MOVE;
-                    log_info("unit %u: path size %z", unit_id, unit.path.size());
                     unit.path.erase(unit.path.begin());
                 }
 
@@ -650,7 +675,6 @@ void match_update(match_state_t& state) {
                 } else {
                     unit.position = unit.target_position;
                     movement_left -= distance_to_target;
-                    unit.mode = UNIT_MODE_IDLE;
                     if (unit.path.empty()) {
                         movement_left = fixed::from_raw(0);
                     }
@@ -658,6 +682,7 @@ void match_update(match_state_t& state) {
                 // On finished movement
                 if (unit.path.empty() && unit.position == unit.target_position) {
                     if (unit.order == ORDER_MOVE && unit.cell == unit.target_cell) {
+                        log_info("reached target");
                         unit.order = ORDER_NONE;
                         unit.mode = UNIT_MODE_IDLE;
                     } else if (unit.order == ORDER_BUILD && unit.cell == unit.target_cell) {
@@ -695,6 +720,7 @@ void match_update(match_state_t& state) {
                             }
                         }
                     } else {
+                        log_info("something weird happened");
                         unit.order = ORDER_NONE;
                         unit.target_cell = unit.cell;
                         unit.mode = UNIT_MODE_IDLE;
@@ -702,14 +728,6 @@ void match_update(match_state_t& state) {
                 } // End on finished movement
             } // End while movement left != 0
         } // End if mode == MOVE
-
-        if (unit.mode == UNIT_MODE_MOVE_BLOCKED) {
-            // Increment path timer
-            unit.path_timer--;
-            if (unit.path_timer == 0) {
-                unit.mode = UNIT_MODE_MOVE;
-            }
-        }
 
         if (unit.mode == UNIT_MODE_BUILD) {
             unit.build_timer--;
