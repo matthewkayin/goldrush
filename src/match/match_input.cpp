@@ -31,6 +31,11 @@ void input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input
             out_buffer_length += sizeof(input_build_t);
             break;
         }
+        case INPUT_BUILD_CANCEL: {
+            memcpy(out_buffer + out_buffer_length, &input.build_cancel, sizeof(input_build_cancel_t));
+            out_buffer_length += sizeof(input_build_cancel_t);
+            break;
+        }
         default:
             break;
     }
@@ -63,6 +68,10 @@ input_t input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             memcpy(&input.build, in_buffer + in_buffer_head, sizeof(input_build_t));
             in_buffer_head += sizeof(input_build_t);
             break;
+        }
+        case INPUT_BUILD_CANCEL: {
+            memcpy(&input.build_cancel, in_buffer + in_buffer_head, sizeof(input_build_cancel_t));
+            in_buffer_head += sizeof(input_build_cancel_t);
         }
         default:
             break;

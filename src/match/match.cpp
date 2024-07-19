@@ -121,8 +121,9 @@ match_state_t match_init() {
         while (is_spawn_direction_used[spawn_direction]) {
             spawn_direction = rand() % DIRECTION_COUNT;
         }
+        is_spawn_direction_used[spawn_direction] = true;
 
-        player_spawns[player_id] = map_center + ivec2(DIRECTION_IVEC2[spawn_direction].x * ((state.map.width * 7) / 16), DIRECTION_IVEC2[spawn_direction].y * ((state.map.height * 7) / 16));
+        player_spawns[player_id] = map_center + ivec2(DIRECTION_IVEC2[spawn_direction].x * ((state.map.width * 6) / 16), DIRECTION_IVEC2[spawn_direction].y * ((state.map.height * 6) / 16));
 
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + ivec2(-1, -1));
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + ivec2(1, -1));
@@ -316,6 +317,8 @@ void match_update(match_state_t& state) {
                             }
                             unit_t& unit = state.units[unit_index];
 
+                            unit.order = ORDER_NONE;
+                            unit.target_cell = unit.cell;
                             unit.path.clear();
                         }
                         break;
@@ -349,6 +352,27 @@ void match_update(match_state_t& state) {
                         unit.building_cell = input.build.target_cell;
                         unit.target_cell = nearest_cell;
                         unit.order = ORDER_BUILD;
+
+                        break;
+                    }
+                    case INPUT_BUILD_CANCEL: {
+                        uint32_t index = state.buildings.get_index_of(input.build_cancel.building_id);
+                        if (index == id_array<building_t>::INDEX_INVALID) {
+                            continue;
+                        }
+                        building_t& building = state.buildings[index];
+
+                        // Refund the player
+                        state.player_gold[player_id] += BUILDING_DATA.at(building.type).cost;
+                        // Tell the unit to stop building this building
+                        for (unit_t& unit : state.units) {
+                            if (unit.mode == UNIT_MODE_BUILD && unit.building_id == input.build_cancel.building_id) {
+                                unit_eject_from_building(unit, state.map);
+                            }
+                        }
+                        // Destroy the building
+                        building_destroy(state, input.build_cancel.building_id);
+                        break;
                     }
                     default:
                         break;
@@ -484,20 +508,11 @@ void match_update(match_state_t& state) {
                 state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
-                uint8_t player_id = network_get_player_id();
-                uint32_t index = state.buildings.get_index_of(state.selection.ids[0]);
-                building_t& building = state.buildings[index];
+                input_t input;
+                input.type = INPUT_BUILD_CANCEL;
+                input.build_cancel.building_id = state.selection.ids[0];
+                state.input_queue.push_back(input);
 
-                // Refund the player
-                state.player_gold[player_id] += BUILDING_DATA.at(building.type).cost;
-                // Tell the unit to stop building this building
-                for (unit_t& unit : state.units) {
-                    if (unit.mode == UNIT_MODE_BUILD && unit.building_id == state.selection.ids[0]) {
-                        unit_eject_from_building(unit, state.map);
-                    }
-                }
-                // Destroy the building
-                building_destroy(state, state.selection.ids[0]);
                 // Clear the player's selection
                 selection_t empty_selection;
                 empty_selection.type = SELECTION_TYPE_NONE;
@@ -909,10 +924,10 @@ rect_t unit_rect(const unit_t& unit) {
 
 void unit_eject_from_building(unit_t& unit, map_t& map) {
     unit.cell = map_get_first_free_cell_around_cells(map, unit.building_cell, BUILDING_DATA.at(unit.building_type).cell_size());
+    unit.target_cell = unit.cell;
     map_cell_set_value(map, unit.cell, CELL_FILLED);
     unit.position = cell_center_position(unit.cell);
     unit.target_position = unit.position;
-
     unit.order = ORDER_NONE;
     unit.mode = UNIT_MODE_IDLE;
 }
