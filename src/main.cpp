@@ -87,6 +87,7 @@ enum Sprite {
     SPRITE_UI_MOVE,
     SPRITE_SELECT_RING,
     SPRITE_SELECT_RING_HOUSE,
+    SPRITE_SELECT_RING_GOLD,
     SPRITE_MINER_BUILDING,
     SPRITE_UNIT_MINER,
     SPRITE_BUILDING_HOUSE,
@@ -161,6 +162,11 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .h_frames = 1,
         .v_frames = 1
     }},
+    { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
+        .path = "sprite/select_ring_gold.png",
+        .h_frames = 2,
+        .v_frames = 1
+    }},
     { SPRITE_MINER_BUILDING, (sprite_params_t) {
         .path = "sprite/unit_miner_building.png",
         .h_frames = 2,
@@ -169,7 +175,7 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
     { SPRITE_UNIT_MINER, (sprite_params_t) {
         .path = "sprite/unit_miner.png",
         .h_frames = 8,
-        .v_frames = 4
+        .v_frames = 8
     }},
     { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
         .path = "sprite/building_house.png",
@@ -181,6 +187,11 @@ const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
         .h_frames = 4,
         .v_frames = 1
     }}  
+};
+
+const std::unordered_map<uint32_t, uint32_t> ANIMATION_SPRITE = {
+    { ANIMATION_UI_MOVE, SPRITE_UI_MOVE },
+    { ANIMATION_UI_MOVE_GOLD, SPRITE_SELECT_RING_GOLD },
 };
 
 struct sprite_t {
@@ -863,11 +874,11 @@ void render_match(const match_state_t& match) {
 #endif
 
             // Render gold
-            if (match.map.cells[map_index] == CELL_GOLD) {
+            if (map_cell_is_gold(match.map, ivec2(base_coords.x + x, base_coords.y + y))) {
                 ysorted.push_back((render_sprite_params_t) {
                     .sprite = SPRITE_TILE_GOLD,
                     .position = ivec2(tile_dst_rect.x, tile_dst_rect.y),
-                    .frame = ivec2(0, 0),
+                    .frame = ivec2(match.map.gold[match.map.cells[map_index]].face, 0),
                     .options = RENDER_SPRITE_NO_CULL
                 });
             }
@@ -932,9 +943,11 @@ void render_match(const match_state_t& match) {
         }
     }
 
-    // UI move
-    if (match.ui_move_animation.is_playing) {
-        render_sprite(SPRITE_UI_MOVE, match.ui_move_animation.frame, match.ui_move_position - match.camera_offset, RENDER_SPRITE_CENTERED);
+    // Particles
+    for (uint32_t i = 0; i < match.particles.size(); i++) {
+        if (animation_is_playing(match.particles[i].animation)) {
+            render_sprite((Sprite)ANIMATION_SPRITE.at(match.particles[i].animation.animation), match.particles[i].animation.frame, match.particles[i].position - match.camera_offset, RENDER_SPRITE_CENTERED);
+        }
     }
 
     // Buildings

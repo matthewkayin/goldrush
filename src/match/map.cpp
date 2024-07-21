@@ -1,6 +1,8 @@
 #include "map.h"
 
-map_t map_init(const ivec2& size) {
+#include "network.h"
+
+map_t map_init(const ivec2& size, ivec2* player_spawns) {
     map_t map;
 
     map.width = size.x;
@@ -19,13 +21,65 @@ map_t map_init(const ivec2& size) {
         }
     }
 
+    // Determine player spawns
+    bool is_spawn_direction_used[DIRECTION_COUNT];
+    memset(is_spawn_direction_used, 0, sizeof(is_spawn_direction_used));
+    ivec2 map_center = ivec2(map.width / 2, map.height / 2);
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        const player_t& player = network_get_player(player_id);
+        if (player.status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+
+        int spawn_direction = rand() % DIRECTION_COUNT;
+        while (is_spawn_direction_used[spawn_direction]) {
+            spawn_direction = rand() % DIRECTION_COUNT;
+        }
+        is_spawn_direction_used[spawn_direction] = true;
+
+        player_spawns[player_id] = map_center + ivec2(DIRECTION_IVEC2[spawn_direction].x * ((map.width * 6) / 16), DIRECTION_IVEC2[spawn_direction].y * ((map.height * 6) / 16));
+
+        log_info("player %u spawn %vi", player_id, &player_spawns[player_id]);
+    }
+
     // Place gold on the map
-    int gold_remaining = 32;
-    while (gold_remaining != 0) {
-        ivec2 gold_location = ivec2(rand() % map.width, rand() % map.height);
-        if (map_cell_get_value(map, gold_location) == CELL_EMPTY) {
-            map_cell_set_value(map, gold_location, CELL_GOLD);
-            gold_remaining--;
+    int gold_target = 128;
+    while (map.gold.size() < gold_target) {
+        ivec2 cluster_cell = ivec2(rand() % map.width, rand() % map.height);
+        if (map_cell_is_blocked(map, cluster_cell)) {
+            continue;
+        }
+        bool cluster_is_too_close_to_player = false;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            const player_t& player = network_get_player(player_id);
+            if (player.status != PLAYER_STATUS_NONE && ivec2::manhattan_distance(cluster_cell, player_spawns[player_id]) < 6) {
+                cluster_is_too_close_to_player = true;
+            }
+        }
+        if (cluster_is_too_close_to_player) {
+            continue;
+        }
+
+        int cluster_size = std::min(3 + (rand() % 7), gold_target - (int)map.gold.size());
+        for (int i = 0; i < cluster_size; i++) {
+            int gold_id = (int)map.gold.size();
+            map.gold.push_back((gold_t) { 
+                .face = rand() % 3,
+                .amount = 100,
+                .position = cluster_cell
+            });
+            map_cell_set_value(map, map.gold[gold_id].position, gold_id);
+
+            int guess_direction = rand() % DIRECTION_COUNT;
+            int direction = (guess_direction + 1) % DIRECTION_COUNT;
+            while (direction != guess_direction && map_cell_is_blocked(map, cluster_cell + DIRECTION_IVEC2[direction])) {
+                direction = (direction + 1) % DIRECTION_COUNT;
+            }
+
+            if (direction == guess_direction) {
+                break;
+            }
+            cluster_cell += DIRECTION_IVEC2[direction];
         }
     }
 
@@ -54,6 +108,10 @@ bool map_cells_are_blocked(const map_t& map, const ivec2& cell, const ivec2& cel
 
 int map_cell_get_value(const map_t& map, const ivec2& cell) {
     return map.cells[cell.x + (cell.y * map.width)];
+}
+
+bool map_cell_is_gold(const map_t& map, const ivec2& cell) {
+    return map.cells[cell.x + (map.width * cell.y)] > CELL_EMPTY;
 }
 
 void map_cell_set_value(map_t& map, const ivec2& cell, int value) {

@@ -57,7 +57,8 @@ enum BuildingType {
 enum OrderType {
     ORDER_NONE,
     ORDER_MOVE,
-    ORDER_BUILD
+    ORDER_BUILD,
+    ORDER_MINE
 };
 
 enum UnitType {
@@ -98,6 +99,8 @@ struct unit_t {
 
     uint32_t path_timer;
     uint32_t build_timer;
+
+    uint32_t gold_held;
 
     animation_state_t animation;
 };
@@ -143,6 +146,11 @@ struct selection_t {
 
 // State
 
+struct particle_t {
+    animation_state_t animation;
+    ivec2 position;
+};
+
 struct match_state_t {
     MatchMode mode;
 
@@ -159,8 +167,7 @@ struct match_state_t {
     rect_t select_rect;
     selection_t selection;
 
-    ivec2 ui_move_position;
-    animation_state_t ui_move_animation;
+    circular_vector<particle_t, 200> particles;
 
     int ui_button_hovered;
 

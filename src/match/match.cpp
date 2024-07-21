@@ -101,15 +101,12 @@ match_state_t match_init() {
     state.ui_status_timer = 0;
 
     // Init map
-    state.map = map_init(ivec2(64, 64));
-
-    // Spawn players and Init units
     ivec2 player_spawns[MAX_PLAYERS];
+    state.map = map_init(ivec2(64, 64), player_spawns);
+
+    // Init units
     uint8_t current_player_id = network_get_player_id();
-    bool is_spawn_direction_used[DIRECTION_COUNT];
-    memset(is_spawn_direction_used, 0, sizeof(is_spawn_direction_used));
     uint32_t player_count = 0;
-    ivec2 map_center = ivec2(state.map.width / 2, state.map.height / 2);
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
@@ -117,22 +114,11 @@ match_state_t match_init() {
         }
         player_count++;
 
-        int spawn_direction = rand() % DIRECTION_COUNT;
-        while (is_spawn_direction_used[spawn_direction]) {
-            spawn_direction = rand() % DIRECTION_COUNT;
-        }
-        is_spawn_direction_used[spawn_direction] = true;
-
-        player_spawns[player_id] = map_center + ivec2(DIRECTION_IVEC2[spawn_direction].x * ((state.map.width * 6) / 16), DIRECTION_IVEC2[spawn_direction].y * ((state.map.height * 6) / 16));
-
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + ivec2(-1, -1));
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + ivec2(1, -1));
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + ivec2(0, 1));
-
-        log_info("player %u spawn %vi", player_id, &player_spawns[player_id]);
     }
     state.camera_offset = camera_clamp(camera_centered_on_cell(player_spawns[current_player_id]), state.map.width, state.map.height);
-    log_info("players initialized");
 
     // Init resources
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -609,9 +595,27 @@ void match_update(match_state_t& state) {
             if (input.move.unit_count != 0) {
                 state.input_queue.push_back(input);
 
+                bool is_selection_all_miners = true;
+                for (uint16_t unit_id : state.selection.ids) {
+                    uint32_t unit_index = state.units.get_index_of(unit_id);
+                    if (unit_index != id_array<unit_t>::INDEX_INVALID && state.units[unit_index].type != UNIT_MINER) {
+                        is_selection_all_miners = false;
+                        break;
+                    }
+                }
+
                 // Play the move animation to provide instant user feedback
-                state.ui_move_position = move_target;
-                state.ui_move_animation = animation_start(ANIMATION_UI_MOVE);
+                if (is_selection_all_miners && map_cell_is_gold(state.map, input.move.target_cell)) {
+                    particle_t move_gold_particle;
+                    move_gold_particle.animation = animation_start(ANIMATION_UI_MOVE_GOLD);
+                    move_gold_particle.position = (input.move.target_cell * TILE_SIZE) + ivec2(TILE_SIZE / 2, TILE_SIZE / 2);
+                    state.particles.push_back(move_gold_particle);
+                } else {
+                    particle_t move_particle;
+                    move_particle.animation = animation_start(ANIMATION_UI_MOVE);
+                    move_particle.position = move_target;
+                    state.particles.push_back(move_particle);
+                }
             }
         } 
     }
@@ -792,12 +796,20 @@ void match_update(match_state_t& state) {
             } else {
                 unit.animation.frame.y = 2;
             }
+            if (unit.animation.animation == ANIMATION_UNIT_MOVE && unit.gold_held != 0) {
+                unit.animation.frame.y += 4;
+            }
         }
     } // End for each unit
 
     // UI update
-    if (state.ui_move_animation.is_playing) {
-        animation_update(state.ui_move_animation);
+    for (uint32_t i = 0; i < state.particles.size(); i++) {
+        if (animation_is_playing(state.particles[i].animation)) {
+            animation_update(state.particles[i].animation);
+        }
+    }
+    while (state.particles.size() > 0 && !animation_is_playing(state.particles[0].animation)) {
+        state.particles.pop_front();
     }
 
     // Update UI status message timer
@@ -913,6 +925,7 @@ void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const i
     unit.animation = animation_start(ANIMATION_UNIT_IDLE);
     unit.path_timer = 0;
     unit.build_timer = 0;
+    unit.gold_held = 0;
     state.units.push_back(unit);
 
     map_cell_set_value(state.map, cell, CELL_FILLED);

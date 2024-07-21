@@ -84,3 +84,44 @@ struct id_array {
         available_ids.push(id);
     }
 };
+
+template <typename T, uint32_t capacity>
+struct circular_vector {
+    T data[capacity];
+    uint32_t head = 0;
+    uint32_t tail = 0;
+
+    circular_vector(): head(0), tail(0) {}
+
+    T& operator[](uint32_t index) {
+        GOLD_ASSERT(index < size());
+        return data[(tail + index) % capacity];
+    }
+
+    const T& operator[](uint32_t index) const {
+        GOLD_ASSERT(index < size());
+        return data[(tail + index) % capacity];
+    }
+
+    uint32_t size() const {
+        if (head >= tail) {
+            return head - tail;
+        } else {
+            return (capacity - tail) + head;
+        }
+    }
+
+    void push_back(const T& value) {
+        uint32_t next_index = (head + 1) % capacity;
+        // If the array is full, delete the last element to make room for this new one
+        if (next_index == tail) {
+            tail = (tail + 1) % capacity;
+        }
+        data[head] = value;
+        head = next_index;
+    }
+
+    void pop_front() {
+        tail = (tail + 1) % capacity;
+    }
+};
