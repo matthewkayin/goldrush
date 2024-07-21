@@ -1,5 +1,6 @@
 #pragma once
 
+/*
 #include "asserts.h"
 #include "defines.h"
 #include <cstdint>
@@ -125,3 +126,4 @@ struct circular_vector {
         tail = (tail + 1) % capacity;
     }
 };
+*/

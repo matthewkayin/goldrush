@@ -7,8 +7,6 @@
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 8
-#define MAX_UNITS 200
-#define MAX_BUILDINGS 64
 #define TILE_SIZE 16
 // #define VDEBUG_PATHFINDING
 

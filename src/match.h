@@ -3,8 +3,11 @@
 #include "defines.h"
 #include "util.h"
 #include <cstdint>
+#include <vector>
 
-const uint32_t INPUT_MAX_SIZE = 201;
+const uint16_t CELL_EMPTY = 65535;
+const int UI_HEIGHT = 88;
+const uint32_t MAX_UNITS = 200;
 
 enum InputType {
     INPUT_NONE,
@@ -44,6 +47,29 @@ struct input_t {
         input_build_cancel_t build_cancel;
     };
 };
+
+enum UiMode {
+    UI_MODE_NOT_STARTED,
+    UI_MODE_NONE
+};
+
+struct match_state_t {
+    UiMode ui_mode;
+
+    std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
+    std::vector<input_t> input_queue;
+    uint32_t tick_timer;
+
+    std::vector<int> map_tiles;
+    std::vector<uint16_t> map_cells;
+    int map_width;
+    int map_height;
+
+    ivec2 camera_offset;
+};
+
+match_state_t match_init();
+void match_update(match_state_t& state);
 
 void input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
 input_t input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
