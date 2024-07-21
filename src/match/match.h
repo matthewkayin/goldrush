@@ -70,7 +70,8 @@ enum UnitMode {
     UNIT_MODE_IDLE,
     UNIT_MODE_MOVE,
     UNIT_MODE_MOVE_BLOCKED,
-    UNIT_MODE_BUILD
+    UNIT_MODE_BUILD,
+    UNIT_MODE_MINE
 };
 
 struct unit_data_t {
@@ -101,6 +102,7 @@ struct unit_t {
     uint32_t build_timer;
 
     uint32_t gold_held;
+    ivec2 gold_cell;
 
     animation_state_t animation;
 };
@@ -202,6 +204,7 @@ ivec2 camera_centered_on_cell(const ivec2& cell);
 void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const ivec2& cell);
 rect_t unit_rect(const unit_t& unit);
 void unit_eject_from_building(unit_t& unit, map_t& map);
+bool unit_find_nearest_camp(const match_state_t& state, unit_t& unit, uint16_t* nearest_building_id);
 
 uint8_t building_create(match_state_t& state, uint8_t player_id, BuildingType type, ivec2 cell);
 rect_t building_rect(const building_t& building);

@@ -287,7 +287,12 @@ void match_update(match_state_t& state) {
                                 unit_target = map_get_nearest_free_cell_around_cell(state.map, unit.cell, input.move.target_cell);
                             }
 
-                            unit.order = ORDER_MOVE;
+                            if (unit.type == UNIT_MINER && map_cell_is_gold(state.map, input.move.target_cell)) {
+                                unit.order = ORDER_MINE;
+                                unit.gold_cell = input.move.target_cell;
+                            } else {
+                                unit.order = ORDER_MOVE;
+                            }
                             unit.target_cell = unit_target;
                             map_cell_set_temp_value(state.map, unit.target_cell, CELL_FILLED);
                             map_cell_set_temp_value(state.map, unit.cell, CELL_EMPTY);
@@ -595,17 +600,8 @@ void match_update(match_state_t& state) {
             if (input.move.unit_count != 0) {
                 state.input_queue.push_back(input);
 
-                bool is_selection_all_miners = true;
-                for (uint16_t unit_id : state.selection.ids) {
-                    uint32_t unit_index = state.units.get_index_of(unit_id);
-                    if (unit_index != id_array<unit_t>::INDEX_INVALID && state.units[unit_index].type != UNIT_MINER) {
-                        is_selection_all_miners = false;
-                        break;
-                    }
-                }
-
                 // Play the move animation to provide instant user feedback
-                if (is_selection_all_miners && map_cell_is_gold(state.map, input.move.target_cell)) {
+                if (map_cell_is_gold(state.map, input.move.target_cell)) {
                     particle_t move_gold_particle;
                     move_gold_particle.animation = animation_start(ANIMATION_UI_MOVE_GOLD);
                     move_gold_particle.position = (input.move.target_cell * TILE_SIZE) + ivec2(TILE_SIZE / 2, TILE_SIZE / 2);
@@ -635,23 +631,36 @@ void match_update(match_state_t& state) {
             }
         }
 
+        // Determine target cell if mining
+        if (unit.order == ORDER_MINE && unit.mode == UNIT_MODE_IDLE && unit.cell == unit.target_cell) {
+            if (unit.gold_held == 0) {
+                log_info("retarget mining");
+                unit.target_cell = map_get_nearest_free_cell_around_cell(state.map, unit.cell, unit.gold_cell);
+            }
+        }
+
         // Pathfind
         bool unit_needs_to_pathfind = unit.cell != unit.target_cell && (unit.path.empty() || unit.path[unit.path.size() - 1] != unit.target_cell);
         if (unit_needs_to_pathfind) {
             if (map_cell_is_blocked(state.map, unit.target_cell)) {
-                unit.target_cell = map_get_nearest_free_cell_around_cell(state.map, unit.cell, unit.target_cell);
+                if (unit.order == ORDER_MINE) {
+                    unit.target_cell = map_get_nearest_free_cell_around_cell(state.map, unit.cell, unit.gold_cell);
+                } else {
+                    unit.target_cell = map_get_nearest_free_cell_around_cell(state.map, unit.cell, unit.target_cell);
+                }
             }
+
             unit.path = map_pathfind(state.map, unit.cell, unit.target_cell);
             if (unit.path.empty()) {
-                unit.order = ORDER_NONE;
-                unit.target_cell = unit.cell;
+                unit.path_timer = PATH_PAUSE_DURATION;
+                unit.mode = UNIT_MODE_MOVE_BLOCKED;
             } else {
                 unit.mode = UNIT_MODE_MOVE;
             }
         }
 
+        // Movement
         if (unit.mode == UNIT_MODE_MOVE) {
-            // Movement
             fixed movement_left = fixed::from_int(1);
             while (movement_left.raw_value > 0) {
                 // Try to start moving to the next tile
@@ -699,12 +708,12 @@ void match_update(match_state_t& state) {
                     }
                 }
                 // On finished movement
-                if (unit.path.empty() && unit.position == unit.target_position) {
-                    if (unit.order == ORDER_MOVE && unit.cell == unit.target_cell) {
+                if (unit.path.empty() && unit.position == unit.target_position && unit.cell == unit.target_cell) {
+                    if (unit.order == ORDER_MOVE) {
                         log_info("reached target");
                         unit.order = ORDER_NONE;
                         unit.mode = UNIT_MODE_IDLE;
-                    } else if (unit.order == ORDER_BUILD && unit.cell == unit.target_cell) {
+                    } else if (unit.order == ORDER_BUILD) {
                         // Since the unit is on top of the building space, we have to temporarily set the cell to empty so that we can check if the building space is free
                         map_cell_set_value(state.map, unit.cell, CELL_EMPTY);
                         if (map_cells_are_blocked(state.map, unit.building_cell, BUILDING_DATA.at(unit.building_type).cell_size())) {
@@ -738,10 +747,27 @@ void match_update(match_state_t& state) {
                                 }
                             }
                         }
+                    } else if (unit.order == ORDER_MINE) {
+                        log_info("finished and order is MINE.");
+                        if (unit.gold_held == 0 && ivec2::manhattan_distance(unit.cell, unit.gold_cell) == 1) {
+                            log_info("start mining?");
+                            // Make the unit face the gold as they are mining it
+                            ivec2 gold_direction = unit.target_cell - unit.cell;
+                            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                                if (DIRECTION_IVEC2[direction] == gold_direction) {
+                                    unit.direction = direction;
+                                    break;
+                                }
+                            }
+
+                            unit.mode = UNIT_MODE_MINE;
+                        } else {
+                            log_info("idle");
+                            unit.mode = UNIT_MODE_IDLE;
+                        }
                     } else {
-                        log_info("something weird happened");
+                        log_info("unhandled case on unit finished movement cell: %vi target cell: %vi", &unit.cell, &unit.target_cell);
                         unit.order = ORDER_NONE;
-                        unit.target_cell = unit.cell;
                         unit.mode = UNIT_MODE_IDLE;
                     }
                 } // End on finished movement
@@ -777,13 +803,32 @@ void match_update(match_state_t& state) {
             should_be_playing = ANIMATION_UNIT_BUILD;
         } else if (unit.mode == UNIT_MODE_MOVE) {
             should_be_playing = ANIMATION_UNIT_MOVE;
+        } else if (unit.mode == UNIT_MODE_MINE) {
+            should_be_playing = ANIMATION_UNIT_ATTACK;
         } else {
             should_be_playing = ANIMATION_UNIT_IDLE;
         }
-        if (unit.animation.animation != should_be_playing) {
+        if (unit.animation.animation != should_be_playing || !animation_is_playing(unit.animation)) {
             unit.animation = animation_start(should_be_playing);
         }
         animation_update(unit.animation);
+
+        // On animation finished
+        if (unit.mode == UNIT_MODE_MINE && !animation_is_playing(unit.animation)) {
+            unit.gold_held++;
+            if (unit.gold_held == 5) {
+                uint16_t nearest_building_id;
+                bool success = unit_find_nearest_camp(state, unit, &nearest_building_id);
+                if (success) {
+                    unit.order = ORDER_NONE;
+                    unit.mode = UNIT_MODE_IDLE;
+                    // unit.target_cell = map_get_nearest_free_cell_around_cells
+                } else {
+                    unit.order = ORDER_NONE;
+                    unit.mode = UNIT_MODE_IDLE;
+                }
+            }
+        }
 
         // Set sprite direction based on unit direction
         if (unit.animation.animation != ANIMATION_UNIT_BUILD) {
@@ -796,7 +841,7 @@ void match_update(match_state_t& state) {
             } else {
                 unit.animation.frame.y = 2;
             }
-            if (unit.animation.animation == ANIMATION_UNIT_MOVE && unit.gold_held != 0) {
+            if ((unit.animation.animation == ANIMATION_UNIT_MOVE || unit.animation.animation == ANIMATION_UNIT_IDLE) && unit.gold_held != 0) {
                 unit.animation.frame.y += 4;
             }
         }
@@ -943,6 +988,34 @@ void unit_eject_from_building(unit_t& unit, map_t& map) {
     unit.target_position = unit.position;
     unit.order = ORDER_NONE;
     unit.mode = UNIT_MODE_IDLE;
+}
+
+bool unit_find_nearest_camp(const match_state_t& state, unit_t& unit, uint16_t* nearest_building_id) {
+    int nearest_building_distance = -1;
+
+    for (uint32_t index = 0; index < state.buildings.size(); index++) {
+        const building_t& building = state.buildings[index];
+        if (building.player_id != unit.player_id || building.type != BUILDING_CAMP) {
+            continue;
+        }
+
+        int building_distance = -1;
+        const building_data_t& data = BUILDING_DATA.at(building.type);
+        for (int y = building.cell.y; y < building.cell.y + data.cell_height; y++) {
+            for (int x = building.cell.x; x < building.cell.x + data.cell_width; x++) {
+                if (building_distance == -1 || ivec2::manhattan_distance(ivec2(x, y), unit.cell) < building_distance) {
+                    building_distance = ivec2::manhattan_distance(ivec2(x, y), unit.cell);
+                }
+            }
+        }
+
+        if (nearest_building_distance == -1 || building_distance < nearest_building_distance) {
+            *nearest_building_id = state.buildings.ids[index];
+            nearest_building_distance = building_distance;
+        }
+    }
+
+    return nearest_building_distance != -1;
 }
 
 // BUILDINGS
