@@ -2,8 +2,10 @@
 
 #include "defines.h"
 #include "util.h"
+#include "sprite.h"
 #include <cstdint>
 #include <vector>
+#include <string>
 
 const uint16_t CELL_EMPTY = 65535;
 const int UI_HEIGHT = 88;
@@ -50,11 +52,26 @@ struct input_t {
 
 enum UiMode {
     UI_MODE_NOT_STARTED,
-    UI_MODE_NONE
+    UI_MODE_NONE,
+    UI_MODE_SELECTING,
+    UI_MODE_MINIMAP_DRAG,
+    UI_MODE_BUILDING_PLACE
+};
+
+enum UiButtonset {
+    UI_BUTTONSET_NONE,
+    UI_BUTTONSET_UNIT,
+    UI_BUTTONSET_MINER,
+    UI_BUTTONSET_BUILD,
+    UI_BUTTONSET_CANCEL
 };
 
 struct match_state_t {
     UiMode ui_mode;
+    UiButtonset ui_buttonset;
+    ivec2 camera_offset;
+    std::string ui_status_message;
+    uint32_t ui_status_timer;
 
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
     std::vector<input_t> input_queue;
@@ -65,11 +82,19 @@ struct match_state_t {
     int map_width;
     int map_height;
 
-    ivec2 camera_offset;
+    uint32_t player_gold[MAX_PLAYERS];
 };
 
 match_state_t match_init();
 void match_update(match_state_t& state);
 
-void input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
-input_t input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
+void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
+input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
+
+void match_ui_show_status(match_state_t& state, const char* message);
+UiButton match_get_ui_button(const match_state_t& state, int index);
+int match_get_ui_button_hovered(const match_state_t& state);
+const rect_t& match_get_ui_button_rect(int index);
+bool match_is_mouse_in_ui();
+ivec2 match_camera_clamp(const ivec2& camera_offset, int map_width, int map_height);
+ivec2 match_camera_centered_on_cell(const ivec2& cell);

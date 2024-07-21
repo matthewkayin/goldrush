@@ -157,7 +157,6 @@ struct ivec2 {
     }
 };
 
-#include "logger.h"
 struct vec2 {
     fixed x;
     fixed y;
@@ -250,7 +249,7 @@ enum Direction {
     DIRECTION_NORTHWEST,
     DIRECTION_COUNT
 };
-const ivec2 DIRECTION_IVEC2[8] = {
+const ivec2 DIRECTION_ivec2[8] = {
     ivec2(0, -1), // North
     ivec2(1, -1), // Northeast
     ivec2(1, 0), // East

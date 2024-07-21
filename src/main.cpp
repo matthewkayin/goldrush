@@ -717,6 +717,8 @@ void ysort(render_sprite_params_t* params, int low, int high) {
 }
 
 void render_match(const match_state_t& state) {
+    uint8_t current_player_id = network_get_player_id();
+
     // Render map
     SDL_Rect tile_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
     SDL_Rect tile_dst_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
@@ -743,6 +745,36 @@ void render_match(const match_state_t& state) {
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
         }
     }
+
+    // UI frames
+    render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
+    render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT));
+    render_sprite(SPRITE_UI_FRAME_BUTTONS, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x + engine.sprites[SPRITE_UI_FRAME_BOTTOM].frame_size.x, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y));
+
+    // UI Buttons
+    for (int i = 0; i < 6; i++) {
+        UiButton ui_button = match_get_ui_button(state, i);
+        if (ui_button == UI_BUTTON_NONE) {
+            continue;
+        }
+
+        bool is_button_hovered = match_get_ui_button_hovered(state) == i;
+        bool is_button_pressed = is_button_hovered && input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT);
+        ivec2 offset = is_button_pressed ? ivec2(1, 1) : (is_button_hovered ? ivec2(0, -1) : ivec2(0, 0));
+        render_sprite(SPRITE_UI_BUTTON, ivec2(is_button_hovered && !is_button_pressed ? 1 : 0, 0), match_get_ui_button_rect(i).position + offset);
+        render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(ui_button - 1, is_button_hovered && !is_button_pressed ? 1 : 0), match_get_ui_button_rect(i).position + offset);
+    }
+
+    // UI Status message
+    if (state.ui_status_timer != 0) {
+        render_text(FONT_HACK, state.ui_status_message.c_str(), COLOR_WHITE, ivec2(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 128));
+    }
+
+    // Resource counters
+    char gold_text[8];
+    sprintf(gold_text, "%u", state.player_gold[current_player_id]);
+    render_text(FONT_WESTERN8, gold_text, COLOR_BLACK, ivec2(SCREEN_WIDTH - 64 + 18, 4));
+    render_sprite(SPRITE_UI_GOLD, ivec2(0, 0), ivec2(SCREEN_WIDTH - 64, 2));
 
     /*
     uint8_t current_player_id = network_get_player_id();
@@ -927,35 +959,6 @@ void render_match(const match_state_t& state) {
     }
 #endif
 
-    // UI frames
-    render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
-    render_sprite(SPRITE_UI_FRAME_BOTTOM, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT));
-    render_sprite(SPRITE_UI_FRAME_BUTTONS, ivec2(0, 0), ivec2(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x + engine.sprites[SPRITE_UI_FRAME_BOTTOM].frame_size.x, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y));
-
-    // UI Buttons
-    for (int i = 0; i < 6; i++) {
-        Button ui_button = UI_BUTTONS.at(match.ui_buttonset)[i];
-        if (ui_button == BUTTON_NONE) {
-            continue;
-        }
-
-        bool is_button_hovered = match.ui_button_hovered == i;
-        bool is_button_pressed = is_button_hovered && input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT);
-        ivec2 offset = is_button_pressed ? ivec2(1, 1) : (is_button_hovered ? ivec2(0, -1) : ivec2(0, 0));
-        render_sprite(SPRITE_UI_BUTTON, ivec2(is_button_hovered && !is_button_pressed ? 1 : 0, 0), UI_BUTTON_RECT[i].position + offset);
-        render_sprite(SPRITE_UI_BUTTON_ICON, ivec2(ui_button - 1, is_button_hovered && !is_button_pressed ? 1 : 0), UI_BUTTON_RECT[i].position + offset);
-    }
-
-    // UI Status message
-    if (match.ui_status_timer != 0) {
-        render_text(FONT_HACK, match.ui_status_message.c_str(), COLOR_WHITE, ivec2(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 128));
-    }
-
-    // Resource counters
-    char gold_text[8];
-    sprintf(gold_text, "%u", match.player_gold[current_player_id]);
-    render_text(FONT_WESTERN8, gold_text, COLOR_BLACK, ivec2(SCREEN_WIDTH - 64 + 18, 4));
-    render_sprite(SPRITE_UI_GOLD, ivec2(0, 0), ivec2(SCREEN_WIDTH - 64, 2));
 
     // Render minimap
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
