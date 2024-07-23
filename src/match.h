@@ -17,6 +17,7 @@ const uint32_t CELL_GOLD = 1 << 18;
 const uint32_t CELL_TYPE_MASK = 0xffff0000;
 const uint32_t CELL_ID_MASK = 0x0000ffff;
 const int UI_HEIGHT = 88;
+const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 const uint32_t MAX_UNITS = 200;
 
 // Input
@@ -98,9 +99,18 @@ enum UnitType {
 
 struct unit_t {
     UnitType type;
+    uint8_t player_id;
     xy cell;
     animation_t animation;
+    uint32_t health;
 };
+
+struct unit_data_t {
+    Sprite sprite;
+    uint32_t max_health;
+};
+
+extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;
 
 // Building
 
@@ -115,6 +125,8 @@ struct match_state_t {
     xy camera_offset;
     std::string ui_status_message;
     uint32_t ui_status_timer;
+    xy select_origin;
+    rect_t select_rect;
     selection_t selection;
 
     // Inputs
@@ -149,6 +161,7 @@ UiButton match_get_ui_button(const match_state_t& state, int index);
 int match_get_ui_button_hovered(const match_state_t& state);
 const rect_t& match_get_ui_button_rect(int index);
 bool match_is_mouse_in_ui();
+selection_t match_ui_create_selection_from_rect(const match_state_t& state);
 void match_ui_set_selection(match_state_t& state, selection_t& selection);
 xy match_camera_clamp(xy camera_offset, int map_width, int map_height);
 xy match_camera_centered_on_cell(xy cell);

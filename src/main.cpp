@@ -745,6 +745,66 @@ void render_match(const match_state_t& state) {
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
         }
     }
+
+    // Select rings and healthbars
+    static const int HEALTHBAR_HEIGHT = 4;
+    static const int HEALTHBAR_PADDING = 2;
+    static const int BUILDING_HEALTHBAR_PADDING = 5;
+    if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+        /*
+        uint32_t building_index = match.buildings.get_index_of(match.selection.ids[0]);
+        if (building_index != id_array<building_t>::INDEX_INVALID) {
+            const building_t& building = match.buildings[building_index];
+            rect_t _building_rect = building_rect(building);
+            render_sprite(SPRITE_SELECT_RING_HOUSE, xy(0, 0), _building_rect.position + (_building_rect.size / 2) - match.camera_offset, RENDER_SPRITE_CENTERED);
+
+            // Determine healthbar rect
+            xy building_render_pos = _building_rect.position - match.camera_offset;
+            SDL_Rect healthbar_rect = (SDL_Rect) { .x = building_render_pos.x, .y = building_render_pos.y + _building_rect.size.y + BUILDING_HEALTHBAR_PADDING, .w = _building_rect.size.x, .h = HEALTHBAR_HEIGHT };
+            SDL_Rect healthbar_subrect = healthbar_rect;
+            healthbar_subrect.w = (healthbar_rect.w * building.health) / BUILDING_DATA.at(building.type).max_health;
+
+            // Cull the healthbar
+            if (!(healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT)) {
+                // Render the healthbar
+                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+            }
+        }
+        */
+    } else {
+        for (entity_id unit_id : state.selection.ids) {
+            uint32_t index = state.units.get_index_of(unit_id);
+            if (index == id_array<unit_t>::INVALID_INDEX) {
+                continue;
+            }
+            const unit_t& unit = state.units[index];
+
+            render_sprite(SPRITE_SELECT_RING, xy(0, 0), match_unit_get_position(unit) - state.camera_offset, RENDER_SPRITE_CENTERED);
+
+            // Determine healthbar rect
+            xy unit_render_pos = match_unit_get_position(unit) - state.camera_offset;
+            xy unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
+            SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
+            SDL_Rect healthbar_subrect = healthbar_rect;
+            healthbar_subrect.w = (healthbar_rect.w * unit.health) / UNIT_DATA.at(unit.type).max_health;
+
+                // Cull the healthbar
+            if (healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT ) {
+                continue;
+            }
+
+            // Render the healthbar
+            SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+            SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+            SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+            SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+            SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+        }
+    }
     
     // Begin Ysort
     std::vector<render_sprite_params_t> ysorted;
@@ -760,7 +820,7 @@ void render_match(const match_state_t& state) {
         }
 
         render_sprite_params_t unit_params = (render_sprite_params_t) { 
-            .sprite = SPRITE_UNIT_MINER, 
+            .sprite = UNIT_DATA.at(unit.type).sprite, 
             .position = unit_render_pos, 
             .frame = unit.animation.frame,
             .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
@@ -789,6 +849,18 @@ void render_match(const match_state_t& state) {
     for (uint32_t i = 0; i < ysorted.size(); i++) {
         const render_sprite_params_t& params= ysorted[i];
         render_sprite(params.sprite, params.frame, params.position, params.options);
+    }
+
+    // Select rect
+    if (state.ui_mode == UI_MODE_SELECTING) {
+        SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+        SDL_Rect select_rect = (SDL_Rect) { 
+            .x = state.select_rect.position.x - state.camera_offset.x, 
+            .y = state.select_rect.position.y - state.camera_offset.y, 
+            .w = state.select_rect.size.x, 
+            .h = state.select_rect.size.y 
+        };
+        SDL_RenderDrawRect(engine.renderer, &select_rect);
     }
 
     // UI frames

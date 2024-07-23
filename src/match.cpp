@@ -44,6 +44,13 @@ static const int CAMERA_DRAG_SPEED = 8;
 static const uint32_t PATH_PAUSE_DURATION = 20;
 static const uint32_t BUILD_TICK_DURATION = 8;
 
+const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
+    { UNIT_MINER, (unit_data_t) {
+        .sprite = SPRITE_UNIT_MINER,
+        .max_health = 20
+    }}
+};
+
 match_state_t match_init() {
     match_state_t state;
 
@@ -256,6 +263,69 @@ void match_update(match_state_t& state) {
     xy mouse_pos = input_get_mouse_position();
     xy mouse_world_pos = mouse_pos + state.camera_offset;
 
+    // LEFT MOUSE CLICK
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
+        if (match_get_ui_button_hovered(state) != -1) {
+            // On UI button pressed
+            // ui_button_pressed = UI_BUTTONS.at(state.ui_buttonset)[state.ui_button_hovered];
+        } else if (state.ui_mode == UI_MODE_BUILDING_PLACE && !match_is_mouse_in_ui()) {
+            /*
+            // On building place
+            ivec2 building_cell_size = BUILDING_DATA.at(state.ui_building_type).cell_size();
+            bool building_can_be_placed = state.ui_building_cell.x + building_cell_size.x < state.map.width + 1 && 
+                                            state.ui_building_cell.y + building_cell_size.y < state.map.height + 1 &&
+                                            !map_cells_are_blocked(state.map, state.ui_building_cell, building_cell_size);
+            if (building_can_be_placed) {
+                input_t input;
+                input.type = INPUT_BUILD;
+                input.build.building_type = state.ui_building_type;
+                input.build.target_cell = state.ui_building_cell;
+                input.build.unit_id = state.selection.ids[0];
+                state.input_queue.push_back(input);
+
+                state.ui_buttonset = UI_BUTTONSET_MINER;
+                state.ui_mode = UI_MODE_NONE;
+            } else {
+                ui_show_status(state, "You can't build there.");
+            }
+            */
+        } else if (state.ui_mode == UI_MODE_NONE && MINIMAP_RECT.has_point(mouse_pos)) {
+            // On begin minimap drag
+            state.ui_mode = UI_MODE_MINIMAP_DRAG;
+        } else if (state.ui_mode == UI_MODE_NONE && !match_is_mouse_in_ui()) {
+            // On begin selecting
+            state.ui_mode = UI_MODE_SELECTING;
+            state.select_origin = mouse_world_pos;
+        } 
+    } 
+
+    // SELECT RECT
+    if (state.ui_mode == UI_MODE_SELECTING) {
+        // Update select rect
+        state.select_rect.position = xy(std::min(state.select_origin.x, mouse_world_pos.x), std::min(state.select_origin.y, mouse_world_pos.y));
+        state.select_rect.size = xy(std::max(1, std::abs(state.select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(state.select_origin.y - mouse_world_pos.y)));
+    } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
+        /*
+        ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
+        minimap_pos.x = std::clamp(minimap_pos.x, 0, MINIMAP_RECT.size.x);
+        minimap_pos.y = std::clamp(minimap_pos.y, 0, MINIMAP_RECT.size.y);
+        ivec2 map_pos = ivec2((state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+        state.camera_offset = match_camera_clamp(match_camera_centered_on_cell(map_pos / TILE_SIZE), state.map_width, state.map_height);
+        */
+    }
+
+    // LEFT MOUSE RELEASE
+    if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
+        // On finished selecting
+        if (state.ui_mode == UI_MODE_SELECTING) {
+            selection_t selection = match_ui_create_selection_from_rect(state);
+            match_ui_set_selection(state, selection);
+            state.ui_mode = UI_MODE_NONE;
+        } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
+            state.ui_mode = UI_MODE_NONE;
+        }
+    }
+
     // CAMERA DRAG
     if (state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
         xy camera_drag_direction = xy(0, 0);
@@ -396,6 +466,59 @@ bool match_is_mouse_in_ui() {
            (mouse_pos.x >= SCREEN_WIDTH - 132 && mouse_pos.y >= SCREEN_HEIGHT - 106);
 }
 
+selection_t match_ui_create_selection_from_rect(const match_state_t& state) {
+    selection_t selection;
+    selection.type = SELECTION_TYPE_NONE;
+
+    // Check all the current player's units
+    for (uint32_t index = 0; index < state.units.size(); index++) {
+        const unit_t& unit = state.units[index];
+
+        // Don't select other player's units
+        if (unit.player_id != network_get_player_id()) {
+            continue;
+        }
+
+        // Don't select units which are building
+        /*
+        if (unit.mode == UNIT_MODE_BUILD) {
+            continue;
+        }
+        */
+
+        if (match_unit_get_rect(unit).intersects(state.select_rect)) {
+            selection.ids.push_back(state.units.get_id_of(index));
+        }
+    }
+    // If we're selecting units, then return the unit selection
+    if (!selection.ids.empty()) {
+        selection.type = SELECTION_TYPE_UNITS;
+        return selection;
+    }
+
+    /*
+    // Otherwise, check the player's buildings
+    for (uint32_t index = 0; index < buildings.size(); index++) {
+        const building_t& building = buildings[index];
+
+        // Don't select other player's buildings
+        // TODO: remove this to allow enemy building selection
+        if (building.player_id != current_player_id) {
+            continue;
+        }
+
+        if (building_rect(building).intersects(select_rect)) {
+            // Return here so that only one building can be selected at once
+            selection.ids.push_back(buildings.get_id_of(index));
+            selection.type = SELECTION_TYPE_BUILDINGS;
+            return selection;
+        }
+    }
+    */
+
+    return selection;
+}
+
 void match_ui_set_selection(match_state_t& state, selection_t& selection) {
     state.selection = selection;
 
@@ -450,10 +573,15 @@ void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint
 // Unit
 
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell) {
+    auto it = UNIT_DATA.find(type);
+    GOLD_ASSERT(it != UNIT_DATA.end());
+
     unit_t unit;
     unit.type = type;
+    unit.player_id = player_id;
     unit.cell = cell;
     unit.animation = animation_create(ANIMATION_UNIT_IDLE);
+    unit.health = it->second.max_health;
 
     entity_id unit_id = state.units.push_back(unit);
     match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
