@@ -15,7 +15,7 @@ bool input_is_mouse_button_pressed(uint8_t button);
 bool input_is_mouse_button_just_pressed(uint8_t button);
 bool input_is_mouse_button_just_released(uint8_t button);
 
-ivec2 input_get_mouse_position();
+xy input_get_mouse_position();
 
 void input_start_text_input(const rect_t& text_input_rect, size_t input_length_limit);
 void input_stop_text_input();

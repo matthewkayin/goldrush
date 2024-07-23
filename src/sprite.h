@@ -1,5 +1,7 @@
 #pragma once
 
+#include "asserts.h"
+#include "util.h"
 #include <unordered_map>
 
 enum UiButton {
@@ -37,94 +39,40 @@ enum Sprite {
 
 struct sprite_params_t {
     const char* path;
-    int h_frames;
-    int v_frames;
+    int hframes;
+    int vframes;
 };
 
-const std::unordered_map<uint32_t, sprite_params_t> sprite_params = {
-    { SPRITE_TILES, (sprite_params_t) {
-        .path = "sprite/tiles.png",
-        .h_frames = -1,
-        .v_frames = -1
-    }},
-    { SPRITE_TILE_GOLD, (sprite_params_t) {
-        .path = "sprite/tile_gold.png",
-        .h_frames = -1,
-        .v_frames = -1
-    }},
-    { SPRITE_UI_FRAME, (sprite_params_t) {
-        .path = "sprite/frame.png",
-        .h_frames = 3,
-        .v_frames = 3
-    }},
-    { SPRITE_UI_FRAME_BOTTOM, (sprite_params_t) {
-        .path = "sprite/ui_frame_bottom.png",
-        .h_frames = 1,
-        .v_frames = 1
-    }},
-    { SPRITE_UI_FRAME_BUTTONS, (sprite_params_t) {
-        .path = "sprite/ui_frame_buttons.png",
-        .h_frames = 1,
-        .v_frames = 1
-    }},
-    { SPRITE_UI_MINIMAP, (sprite_params_t) {
-        .path = "sprite/ui_minimap.png",
-        .h_frames = 1,
-        .v_frames = 1
-    }},
-    { SPRITE_UI_BUTTON, (sprite_params_t) {
-        .path = "sprite/ui_button.png",
-        .h_frames = 2,
-        .v_frames = 1
-    }},
-    { SPRITE_UI_BUTTON_ICON, (sprite_params_t) {
-        .path = "sprite/ui_button_icon.png",
-        .h_frames = UI_BUTTON_COUNT - 1,
-        .v_frames = 2
-    }},
-    { SPRITE_UI_GOLD, (sprite_params_t) {
-        .path = "sprite/ui_gold.png",
-        .h_frames = 1,
-        .v_frames = 1
-    }},
-    { SPRITE_UI_MOVE, (sprite_params_t) {
-        .path = "sprite/ui_move.png",
-        .h_frames = 5,
-        .v_frames = 1
-    }},
-    { SPRITE_SELECT_RING, (sprite_params_t) {
-        .path = "sprite/select_ring.png",
-        .h_frames = 1,
-        .v_frames = 1
-    }},
-    { SPRITE_SELECT_RING_HOUSE, (sprite_params_t) {
-        .path = "sprite/select_ring_house.png",
-        .h_frames = 1,
-        .v_frames = 1
-    }},
-    { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
-        .path = "sprite/select_ring_gold.png",
-        .h_frames = 2,
-        .v_frames = 1
-    }},
-    { SPRITE_MINER_BUILDING, (sprite_params_t) {
-        .path = "sprite/unit_miner_building.png",
-        .h_frames = 2,
-        .v_frames = 1
-    }},
-    { SPRITE_UNIT_MINER, (sprite_params_t) {
-        .path = "sprite/unit_miner.png",
-        .h_frames = 8,
-        .v_frames = 8
-    }},
-    { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
-        .path = "sprite/building_house.png",
-        .h_frames = 4,
-        .v_frames = 1
-    }},
-    { SPRITE_BUILDING_CAMP, (sprite_params_t) {
-        .path = "sprite/building_camp.png",
-        .h_frames = 4,
-        .v_frames = 1
-    }}  
+extern const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS;
+
+enum AnimationName {
+    ANIMATION_UI_MOVE,
+    ANIMATION_UI_MOVE_GOLD,
+    ANIMATION_UNIT_IDLE,
+    ANIMATION_UNIT_MOVE,
+    ANIMATION_UNIT_ATTACK,
+    ANIMATION_UNIT_BUILD
 };
+
+const int ANIMATION_LOOPS_INDEFINITELY = -1;
+
+struct animation_data_t {
+    int vframe;
+    int hframe_start;
+    int hframe_end;
+    uint32_t frame_duration;
+    int loops;
+};
+
+extern const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA;
+
+struct animation_t {
+    AnimationName name;
+    uint32_t timer;
+    xy frame;
+    int loops_remaining = 0;
+};
+
+animation_t animation_create(AnimationName name);
+bool animation_is_playing(const animation_t& animation);
+void animation_update(animation_t& animation);

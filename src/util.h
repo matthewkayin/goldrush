@@ -115,44 +115,44 @@ struct fixed {
     }
 };
 
-struct ivec2 {
+struct xy {
     int x;
     int y;
 
-    ivec2() = default;
-    ivec2(int x, int y) : x(x), y(y) {}
-    bool operator==(const ivec2& other) const {
+    xy() = default;
+    xy(int x, int y) : x(x), y(y) {}
+    bool operator==(const xy& other) const {
         return this->x == other.x && this->y == other.y;
     }
-    bool operator!=(const ivec2& other) const {
+    bool operator!=(const xy& other) const {
         return this->x != other.x || this->y != other.y;
     }
-    ivec2 operator-() const {
-        return ivec2(-x, -y);
+    xy operator-() const {
+        return xy(-x, -y);
     }
-    ivec2 operator+(const ivec2& other) const {
-        return ivec2(x + other.x, y + other.y);
+    xy operator+(const xy& other) const {
+        return xy(x + other.x, y + other.y);
     }
-    ivec2& operator+=(const ivec2& other) {
+    xy& operator+=(const xy& other) {
         x += other.x;
         y += other.y;
         return *this;
     }
-    ivec2 operator-(const ivec2& other) const {
-        return ivec2(x - other.x, y - other.y);
+    xy operator-(const xy& other) const {
+        return xy(x - other.x, y - other.y);
     }
-    ivec2& operator-=(const ivec2& other) {
+    xy& operator-=(const xy& other) {
         x -= other.x;
         y -= other.y;
         return *this;
     }
-    ivec2 operator*(int scaler) const {
-        return ivec2(x * scaler, y * scaler);
+    xy operator*(int scaler) const {
+        return xy(x * scaler, y * scaler);
     }
-    ivec2 operator/(int scaler) const {
-        return ivec2(x / scaler, y / scaler);
+    xy operator/(int scaler) const {
+        return xy(x / scaler, y / scaler);
     }
-    static int manhattan_distance(const ivec2& a, const ivec2& b) {
+    static int manhattan_distance(const xy& a, const xy& b) {
         return abs(a.x - b.x) + abs(a.y - b.y);
     }
 };
@@ -163,9 +163,9 @@ struct vec2 {
 
     vec2() = default;
     vec2(fixed x, fixed y) : x(x), y(y) {}
-    vec2(const ivec2& other) : x(fixed::from_int(other.x)), y(fixed::from_int(other.y)) {}
-    ivec2 to_ivec2() const {
-        return ivec2(x.integer_part(), y.integer_part());
+    vec2(const xy& other) : x(fixed::from_int(other.x)), y(fixed::from_int(other.y)) {}
+    xy to_xy() const {
+        return xy(x.integer_part(), y.integer_part());
     }
     bool operator==(const vec2& other) const {
         return this->x == other.x && this->y == other.y;
@@ -222,12 +222,12 @@ struct vec2 {
 };
 
 struct rect_t {
-    ivec2 position;
-    ivec2 size;
+    xy position;
+    xy size;
 
     rect_t() = default;
-    rect_t(const ivec2& position, const ivec2& size): position(position), size(size) {}
-    bool has_point(const ivec2& point) const {
+    rect_t(const xy& position, const xy& size): position(position), size(size) {}
+    bool has_point(const xy& point) const {
         return !(point.x < position.x || point.x >= position.x + size.x || point.y < position.y || point.y >= position.y + size.y);
     }
     bool intersects(const rect_t& other) const {
@@ -249,15 +249,15 @@ enum Direction {
     DIRECTION_NORTHWEST,
     DIRECTION_COUNT
 };
-const ivec2 DIRECTION_ivec2[8] = {
-    ivec2(0, -1), // North
-    ivec2(1, -1), // Northeast
-    ivec2(1, 0), // East
-    ivec2(1, 1), // Southeast
-    ivec2(0, 1), // South
-    ivec2(-1, 1), // Southwest
-    ivec2(-1, 0), // West
-    ivec2(-1, -1), // Northwest
+const xy DIRECTION_XY[8] = {
+    xy(0, -1), // North
+    xy(1, -1), // Northeast
+    xy(1, 0), // East
+    xy(1, 1), // Southeast
+    xy(0, 1), // South
+    xy(-1, 1), // Southwest
+    xy(-1, 0), // West
+    xy(-1, -1), // Northwest
 };
 
 /*

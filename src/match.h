@@ -3,13 +3,23 @@
 #include "defines.h"
 #include "util.h"
 #include "sprite.h"
+#include "container.h"
 #include <cstdint>
 #include <vector>
+#include <queue>
+#include <unordered_map>
 #include <string>
 
-const uint16_t CELL_EMPTY = 65535;
+const uint32_t CELL_EMPTY = 0;
+const uint32_t CELL_UNIT = 1 << 16;
+const uint32_t CELL_BUILDING = 1 << 17;
+const uint32_t CELL_GOLD = 1 << 18;
+const uint32_t CELL_TYPE_MASK = 0xffff0000;
+const uint32_t CELL_ID_MASK = 0x0000ffff;
 const int UI_HEIGHT = 88;
 const uint32_t MAX_UNITS = 200;
+
+// Input
 
 enum InputType {
     INPUT_NONE,
@@ -20,7 +30,7 @@ enum InputType {
 };
 
 struct input_move_t {
-    ivec2 target_cell;
+    xy target_cell;
     uint8_t unit_count;
     uint16_t unit_ids[MAX_UNITS];
 };
@@ -33,7 +43,7 @@ struct input_stop_t {
 struct input_build_t {
     uint16_t unit_id;
     uint8_t building_type;
-    ivec2 target_cell;
+    xy target_cell;
 };
 
 struct input_build_cancel_t {
@@ -49,6 +59,8 @@ struct input_t {
         input_build_cancel_t build_cancel;
     };
 };
+
+// UI
 
 enum UiMode {
     UI_MODE_NOT_STARTED,
@@ -66,35 +78,88 @@ enum UiButtonset {
     UI_BUTTONSET_CANCEL
 };
 
+enum SelectionType {
+    SELECTION_TYPE_NONE,
+    SELECTION_TYPE_UNITS,
+    SELECTION_TYPE_BUILDINGS
+};
+
+struct selection_t {
+    SelectionType type;
+    std::vector<entity_id> ids;
+};
+
+// Unit
+
+enum UnitType {
+    UNIT_MINER,
+    UNIT_TYPE_COUNT
+};
+
+struct unit_t {
+    UnitType type;
+    xy cell;
+    animation_t animation;
+};
+
+// Building
+
+struct building_t {
+    xy cell;
+};
+
 struct match_state_t {
+    // UI
     UiMode ui_mode;
     UiButtonset ui_buttonset;
-    ivec2 camera_offset;
+    xy camera_offset;
     std::string ui_status_message;
     uint32_t ui_status_timer;
+    selection_t selection;
 
+    // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
     std::vector<input_t> input_queue;
     uint32_t tick_timer;
 
-    std::vector<int> map_tiles;
-    std::vector<uint16_t> map_cells;
-    int map_width;
-    int map_height;
+    // Map
+    std::vector<uint32_t> map_tiles;
+    std::vector<uint32_t> map_cells;
+    uint32_t map_width;
+    uint32_t map_height;
 
+    // Entities
+    id_array<unit_t> units;
+    id_array<building_t> buildings;
+
+    // Players
     uint32_t player_gold[MAX_PLAYERS];
 };
 
 match_state_t match_init();
 void match_update(match_state_t& state);
 
+// Input
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
 input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
 
+// UI
 void match_ui_show_status(match_state_t& state, const char* message);
 UiButton match_get_ui_button(const match_state_t& state, int index);
 int match_get_ui_button_hovered(const match_state_t& state);
 const rect_t& match_get_ui_button_rect(int index);
 bool match_is_mouse_in_ui();
-ivec2 match_camera_clamp(const ivec2& camera_offset, int map_width, int map_height);
-ivec2 match_camera_centered_on_cell(const ivec2& cell);
+void match_ui_set_selection(match_state_t& state, selection_t& selection);
+xy match_camera_clamp(xy camera_offset, int map_width, int map_height);
+xy match_camera_centered_on_cell(xy cell);
+
+// Map
+uint32_t match_map_get_cell_value(const match_state_t& state, xy cell);
+uint32_t match_map_get_cell_type(const match_state_t& state, xy cell);
+entity_id match_map_get_cell_id(const match_state_t& state, xy cell);
+void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id = 0);
+
+// Unit
+void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
+xy match_unit_get_position(const unit_t& unit);
+rect_t match_unit_get_rect(const unit_t& unit);

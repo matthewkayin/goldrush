@@ -96,11 +96,11 @@ void logger_output(bool is_error, const char* message, ...) {
                 out_ptr += sprintf(out_ptr, "%zu", va_arg(arg_ptr, size_t));
                 break;
             }
-            case 'v': {
+            case 'x': {
                 message++;
                 switch (*message) {
-                    case 'i': {
-                        ivec2* v = va_arg(arg_ptr, ivec2*);
+                    case 'y': {
+                        xy* v = va_arg(arg_ptr, xy*);
                         out_ptr += sprintf(out_ptr, "<%i, %i>", v->x, v->y);
                         break;
                     }

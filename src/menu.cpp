@@ -156,7 +156,7 @@ void menu_update(menu_state_t& state) {
     }
 
     // Button hover
-    ivec2 mouse_position = input_get_mouse_position();
+    xy mouse_position = input_get_mouse_position();
     state.button_hovered = MENU_BUTTON_NONE;
     for (auto it : state.buttons) {
         if (it.second.rect.has_point(mouse_position)) {

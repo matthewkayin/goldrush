@@ -24,11 +24,11 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }}
 };
-static const ivec2 UI_BUTTON_SIZE = ivec2(32, 32);
-static const ivec2 UI_BUTTON_PADDING = ivec2(4, 6);
-static const ivec2 UI_BUTTON_TOP_LEFT = ivec2(SCREEN_WIDTH - 132 + 14, SCREEN_HEIGHT - UI_HEIGHT + 10);
-static const ivec2 UI_BUTTON_POSITIONS[6] = { UI_BUTTON_TOP_LEFT, UI_BUTTON_TOP_LEFT + ivec2(UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x, 0), UI_BUTTON_TOP_LEFT + ivec2(2 * (UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x), 0),
-                                              UI_BUTTON_TOP_LEFT + ivec2(0, UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y), UI_BUTTON_TOP_LEFT + ivec2(UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x, UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y), UI_BUTTON_TOP_LEFT + ivec2(2 * (UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x), UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y) };
+static const xy UI_BUTTON_SIZE = xy(32, 32);
+static const xy UI_BUTTON_PADDING = xy(4, 6);
+static const xy UI_BUTTON_TOP_LEFT = xy(SCREEN_WIDTH - 132 + 14, SCREEN_HEIGHT - UI_HEIGHT + 10);
+static const xy UI_BUTTON_POSITIONS[6] = { UI_BUTTON_TOP_LEFT, UI_BUTTON_TOP_LEFT + xy(UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x, 0), UI_BUTTON_TOP_LEFT + xy(2 * (UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x), 0),
+                                              UI_BUTTON_TOP_LEFT + xy(0, UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y), UI_BUTTON_TOP_LEFT + xy(UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x, UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y), UI_BUTTON_TOP_LEFT + xy(2 * (UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x), UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y) };
 static const rect_t UI_BUTTON_RECT[6] = {
     rect_t(UI_BUTTON_POSITIONS[0], UI_BUTTON_SIZE),
     rect_t(UI_BUTTON_POSITIONS[1], UI_BUTTON_SIZE),
@@ -50,7 +50,7 @@ match_state_t match_init() {
     // Init UI
     state.ui_mode = UI_MODE_NOT_STARTED;
     state.ui_buttonset = UI_BUTTONSET_NONE;
-    state.camera_offset = ivec2(0, 0);
+    state.camera_offset = xy(0, 0);
     state.ui_status_timer = 0;
 
     // Init input queues
@@ -74,14 +74,14 @@ match_state_t match_init() {
     // Init map
     state.map_width = 64;
     state.map_height = 64;
-    state.map_tiles = std::vector<int>(state.map_width * state.map_height);
-    state.map_cells = std::vector<uint16_t>(state.map_width * state.map_height, CELL_EMPTY);
+    state.map_tiles = std::vector<uint32_t>(state.map_width * state.map_height);
+    state.map_cells = std::vector<uint32_t>(state.map_width * state.map_height, CELL_EMPTY);
 
-    for (int i = 0; i < state.map_width * state.map_height; i += 3) {
+    for (uint32_t i = 0; i < state.map_width * state.map_height; i += 3) {
         state.map_tiles[i] = 1;
     }
-    for (int y = 0; y < state.map_height; y++) {
-        for (int x = 0; x < state.map_width; x++) {
+    for (uint32_t y = 0; y < state.map_height; y++) {
+        for (uint32_t x = 0; x < state.map_width; x++) {
             if (y == 0 || y == state.map_height - 1 || x == 0 || x == state.map_width - 1) {
                 state.map_tiles[x + (y * state.map_width)] = 2;
             }
@@ -89,16 +89,37 @@ match_state_t match_init() {
     }
 
     // Init players
+    xy player_spawns[MAX_PLAYERS];
+    bool is_spawn_direction_used[DIRECTION_COUNT];
     uint8_t player_count = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
             continue;
         }
+        player_count++;
 
         state.player_gold[player_id] = 150;
-        player_count++;
+
+        // Find an unused spawn direction
+        int spawn_direction;
+        do {
+            spawn_direction = rand() % DIRECTION_COUNT;
+        } while (is_spawn_direction_used[spawn_direction]);
+        is_spawn_direction_used[spawn_direction] = true;
+
+        // Determine player spawn point
+        player_spawns[player_id] = xy(state.map_width / 2, state.map_height / 2) + 
+                                   xy(DIRECTION_XY[spawn_direction].x * ((state.map_width * 6) / 16), 
+                                      DIRECTION_XY[spawn_direction].y * ((state.map_height * 6) / 16));
+        log_info("player %u spawn %vi", player_id, &player_spawns[player_id]);
+
+        // Place player starting units
+        match_unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-1, -1));
+        match_unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(1, -1));
+        match_unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(0, 1));
     }
+    state.camera_offset = match_camera_clamp(match_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
 
     if (!network_is_server()) {
         network_client_toggle_ready();
@@ -232,12 +253,12 @@ void match_update(match_state_t& state) {
     }
     state.tick_timer--;
 
-    ivec2 mouse_pos = input_get_mouse_position();
-    ivec2 mouse_world_pos = mouse_pos + state.camera_offset;
+    xy mouse_pos = input_get_mouse_position();
+    xy mouse_world_pos = mouse_pos + state.camera_offset;
 
     // CAMERA DRAG
     if (state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
-        ivec2 camera_drag_direction = ivec2(0, 0);
+        xy camera_drag_direction = xy(0, 0);
         if (mouse_pos.x < CAMERA_DRAG_MARGIN) {
             camera_drag_direction.x = -1;
         } else if (mouse_pos.x > SCREEN_WIDTH - CAMERA_DRAG_MARGIN) {
@@ -266,8 +287,8 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
 
     switch (input.type) {
         case INPUT_MOVE: {
-            memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(ivec2));
-            out_buffer_length += sizeof(ivec2);
+            memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
+            out_buffer_length += sizeof(xy);
 
             out_buffer[out_buffer_length] = input.move.unit_count;
             out_buffer_length += 1;
@@ -306,8 +327,8 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
     switch (input.type) {
         case INPUT_MOVE: {
-            memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(ivec2));
-            in_buffer_head += sizeof(ivec2);
+            memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
+            in_buffer_head += sizeof(xy);
 
             input.move.unit_count = in_buffer[in_buffer_head];
             in_buffer_head++;
@@ -350,7 +371,7 @@ UiButton match_get_ui_button(const match_state_t& state, int index) {
 }
 
 int match_get_ui_button_hovered(const match_state_t& state) {
-    ivec2 mouse_pos = input_get_mouse_position();
+    xy mouse_pos = input_get_mouse_position();
     for (int i = 0; i < 6; i++) {
         if (match_get_ui_button(state, i) == UI_BUTTON_NONE) {
             continue;
@@ -369,17 +390,79 @@ const rect_t& match_get_ui_button_rect(int index) {
 }
 
 bool match_is_mouse_in_ui() {
-    ivec2 mouse_pos = input_get_mouse_position();
+    xy mouse_pos = input_get_mouse_position();
     return (mouse_pos.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
            (mouse_pos.x <= 136 && mouse_pos.y >= SCREEN_HEIGHT - 136) ||
            (mouse_pos.x >= SCREEN_WIDTH - 132 && mouse_pos.y >= SCREEN_HEIGHT - 106);
 }
 
-ivec2 match_camera_clamp(const ivec2& camera_offset, int map_width, int map_height) {
-    return ivec2(std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH),
+void match_ui_set_selection(match_state_t& state, selection_t& selection) {
+    state.selection = selection;
+
+    if (selection.type == SELECTION_TYPE_NONE) {
+        state.ui_buttonset = UI_BUTTONSET_NONE;
+    } else if (selection.type == SELECTION_TYPE_UNITS) {
+        if (selection.ids.size() == 1 && state.units[state.units.get_index_of(selection.ids[0])].type == UNIT_MINER) {
+            state.ui_buttonset = UI_BUTTONSET_MINER;
+        } else {
+            state.ui_buttonset = UI_BUTTONSET_UNIT;
+        }
+    } else if (selection.type == SELECTION_TYPE_BUILDINGS) {
+        /*
+        building_t& building = state.buildings[state.buildings.get_index_of(selection.ids[0])];
+        if (!building.is_finished) {
+            state.ui_buttonset = UI_BUTTONSET_CANCEL;
+        } else {
+            state.ui_buttonset = UI_BUTTONSET_NONE;
+        }
+        */
+    }
+}
+
+xy match_camera_clamp(xy camera_offset, int map_width, int map_height) {
+    return xy(std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH),
                  std::clamp(camera_offset.y, 0, (map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT));
 }
 
-ivec2 match_camera_centered_on_cell(const ivec2& cell) {
-    return ivec2((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
+xy match_camera_centered_on_cell(xy cell) {
+    return xy((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
+}
+
+// Map
+
+uint32_t match_map_get_cell_value(const match_state_t& state, xy cell) {
+    return state.map_cells[cell.x + (cell.y * state.map_height)];
+}
+
+uint32_t match_map_get_cell_type(const match_state_t& state, xy cell) {
+    return state.map_cells[cell.x + (cell.y * (state.map_height))] & CELL_TYPE_MASK;
+}
+
+entity_id match_map_get_cell_id(const match_state_t& state, xy cell) {
+    // explicit typecast to truncate the 32bit value and return only the 16 bits which represent the id
+    return (entity_id)state.map_cells[cell.x + (cell.y * (state.map_height))];
+}
+
+void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id) {
+    state.map_cells[cell.x + (cell.y * state.map_height)] = type | id;
+}
+
+// Unit
+
+void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell) {
+    unit_t unit;
+    unit.type = type;
+    unit.cell = cell;
+    unit.animation = animation_create(ANIMATION_UNIT_IDLE);
+
+    entity_id unit_id = state.units.push_back(unit);
+    match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
+}
+
+xy match_unit_get_position(const unit_t& unit) {
+    return (unit.cell * TILE_SIZE) + xy(TILE_SIZE / 2, TILE_SIZE / 2);
+}
+
+rect_t match_unit_get_rect(const unit_t& unit) {
+    return rect_t(match_unit_get_position(unit), xy(TILE_SIZE, TILE_SIZE));
 }
