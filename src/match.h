@@ -10,6 +10,9 @@
 #include <unordered_map>
 #include <string>
 
+#define MAX_UNITS 200
+#define MAX_PARTICLES 256
+
 const uint32_t CELL_EMPTY = 0;
 const uint32_t CELL_UNIT = 1 << 16;
 const uint32_t CELL_BUILDING = 1 << 17;
@@ -18,7 +21,6 @@ const uint32_t CELL_TYPE_MASK = 0xffff0000;
 const uint32_t CELL_ID_MASK = 0x0000ffff;
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
-const uint32_t MAX_UNITS = 200;
 
 // Input
 
@@ -108,6 +110,8 @@ struct unit_t {
     xy_fixed position;
     xy cell;
     std::vector<xy> path;
+
+    uint32_t timer;
 };
 
 struct unit_data_t {
@@ -122,6 +126,12 @@ extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;
 
 struct building_t {
     xy cell;
+};
+
+struct particle_t {
+    Sprite sprite;
+    animation_t animation;
+    xy position;
 };
 
 struct match_state_t {
@@ -149,6 +159,7 @@ struct match_state_t {
     // Entities
     id_array<unit_t> units;
     id_array<building_t> buildings;
+    circular_vector<particle_t, MAX_PARTICLES> particles;
 
     // Players
     uint32_t player_gold[MAX_PLAYERS];

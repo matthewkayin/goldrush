@@ -805,6 +805,13 @@ void render_match(const match_state_t& state) {
             SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
         }
     }
+
+    // Particles
+    for (uint32_t i = 0; i < state.particles.size(); i++) {
+        if (animation_is_playing(state.particles[i].animation)) {
+            render_sprite(state.particles[i].sprite, state.particles[i].animation.frame, state.particles[i].position - state.camera_offset, RENDER_SPRITE_CENTERED);
+        }
+    }
     
     // Begin Ysort
     std::vector<render_sprite_params_t> ysorted;

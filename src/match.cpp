@@ -346,8 +346,16 @@ void match_update(match_state_t& state) {
             input.move.unit_count = 0;
             memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
             input.move.unit_count = state.selection.ids.size();
+            // The unit count should be greater than 0 because the selection type is SELECTION_TYPE_UNITS
             GOLD_ASSERT(input.move.unit_count != 0);
             state.input_queue.push_back(input);
+
+            // Provide instant user feedback
+            state.particles.push_back((particle_t) {
+                .sprite = SPRITE_UI_MOVE,
+                .animation = animation_create(ANIMATION_UI_MOVE),
+                .position = mouse_world_pos
+            });
         }
     }
 
@@ -371,6 +379,16 @@ void match_update(match_state_t& state) {
     // Update UI status timer
     if (state.ui_status_timer != 0) {
         state.ui_status_timer--;
+    }
+
+    // Update particles
+    for (uint32_t i = 0; i < state.particles.size(); i++) {
+        if (animation_is_playing(state.particles[i].animation)) {
+            animation_update(state.particles[i].animation);
+        }
+    }
+    while (state.particles.size() > 0 && !animation_is_playing(state.particles[0].animation)) {
+        state.particles.pop_front();
     }
 
     match_unit_update(state);
@@ -639,7 +657,7 @@ xy match_camera_centered_on_cell(xy cell) {
 // Map
 
 xy_fixed match_cell_center(xy cell) {
-    return xy_fixed((cell * TILE_SIZE) - xy(TILE_SIZE / 2, TILE_SIZE / 2));
+    return xy_fixed((cell * TILE_SIZE) + xy(TILE_SIZE / 2, TILE_SIZE / 2));
 }
 
 bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell) {
@@ -676,6 +694,16 @@ std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
             return cost + distance;
         }
     };
+
+    // Don't bother pathfinding to the same cell
+    if (from == to) {
+        return std::vector<xy>();
+    }
+
+    // TODO: allow unit to path as close as possible to blocked cell
+    if (match_map_get_cell_value(state, to) != CELL_EMPTY) {
+        return std::vector<xy>();
+    }
 
     std::vector<node_t> frontier;
     std::vector<node_t> explored;
@@ -784,6 +812,8 @@ void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, c
     unit.cell = cell;
     unit.position = match_cell_center(unit.cell);
 
+    unit.timer = 0;
+
     entity_id unit_id = state.units.push_back(unit);
     match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
 }
@@ -802,8 +832,17 @@ void match_unit_update(match_state_t& state) {
         entity_id unit_id = state.units.get_id_of(unit_index);
         const unit_data_t& unit_data = UNIT_DATA.at(unit.type);
 
+        // BEHAVIOR TIMER
+        if (unit.timer != 0) {
+            unit.timer--;
+            // On Behavior timer finished
+            if (match_unit_is_moving(unit) && unit.timer == 0) {
+                unit.path = match_map_pathfind(state, unit.cell, unit.path[unit.path.size() - 1]);
+            }
+        }
+
         // MOVEMENT
-        if (match_unit_is_moving(unit)) {
+        if (match_unit_is_moving(unit) && unit.timer == 0) {
             fixed movement_left = unit_data.speed;
             while (movement_left.raw_value > 0) {
                 // If the unit is not moving between tiles, then pop the next cell off the path
@@ -811,6 +850,7 @@ void match_unit_update(match_state_t& state) {
                     unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
                     if (match_map_get_cell_value(state, unit.path[0]) != CELL_EMPTY) {
                         // Path is blocked, stop movement
+                        unit.timer = PATH_PAUSE_DURATION;
                         break;
                     }
 
@@ -845,7 +885,7 @@ void match_unit_update(match_state_t& state) {
 }
 
 AnimationName match_unit_get_expeected_animation(const unit_t& unit) {
-    if (match_unit_is_moving(unit)) {
+    if (match_unit_is_moving(unit) && unit.timer == 0) {
         return ANIMATION_UNIT_MOVE;
     }
 
