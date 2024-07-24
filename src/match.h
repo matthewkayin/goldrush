@@ -100,14 +100,20 @@ enum UnitType {
 struct unit_t {
     UnitType type;
     uint8_t player_id;
-    xy cell;
+
     animation_t animation;
     uint32_t health;
+
+    Direction direction;
+    xy_fixed position;
+    xy cell;
+    std::vector<xy> path;
 };
 
 struct unit_data_t {
     Sprite sprite;
     uint32_t max_health;
+    fixed speed;
 };
 
 extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;
@@ -154,6 +160,7 @@ void match_update(match_state_t& state);
 // Input
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
 input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
+void match_input_handle(match_state_t& state, const input_t& input);
 
 // UI
 void match_ui_show_status(match_state_t& state, const char* message);
@@ -167,12 +174,18 @@ xy match_camera_clamp(xy camera_offset, int map_width, int map_height);
 xy match_camera_centered_on_cell(xy cell);
 
 // Map
+xy_fixed match_cell_center(xy cell);
+bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell);
 uint32_t match_map_get_cell_value(const match_state_t& state, xy cell);
 uint32_t match_map_get_cell_type(const match_state_t& state, xy cell);
 entity_id match_map_get_cell_id(const match_state_t& state, xy cell);
 void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id = 0);
+std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to);
 
 // Unit
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
-xy match_unit_get_position(const unit_t& unit);
 rect_t match_unit_get_rect(const unit_t& unit);
+bool match_unit_is_moving(const unit_t& unit);
+void match_unit_update(match_state_t& state);
+AnimationName match_unit_get_expeected_animation(const unit_t& unit);
+int match_unit_get_animation_vframe(const unit_t& unit);

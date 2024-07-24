@@ -99,13 +99,13 @@ void logger_output(bool is_error, const char* message, ...) {
             case 'x': {
                 message++;
                 switch (*message) {
-                    case 'y': {
+                    case 'i': {
                         xy* v = va_arg(arg_ptr, xy*);
                         out_ptr += sprintf(out_ptr, "<%i, %i>", v->x, v->y);
                         break;
                     }
                     case 'f': {
-                        vec2* v = va_arg(arg_ptr, vec2*);
+                        xy_fixed* v = va_arg(arg_ptr, xy_fixed*);
                         out_ptr += sprintf(out_ptr, "<%i.%i, %i.%i>", v->x.integer_part(), v->x.fractional_value(), v->y.integer_part(), v->y.fractional_value());
                         break;
                     }

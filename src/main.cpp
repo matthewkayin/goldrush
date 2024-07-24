@@ -783,10 +783,10 @@ void render_match(const match_state_t& state) {
             }
             const unit_t& unit = state.units[index];
 
-            render_sprite(SPRITE_SELECT_RING, xy(0, 0), match_unit_get_position(unit) - state.camera_offset, RENDER_SPRITE_CENTERED);
+            xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
+            render_sprite(SPRITE_SELECT_RING, xy(0, 0), unit_render_pos, RENDER_SPRITE_CENTERED);
 
             // Determine healthbar rect
-            xy unit_render_pos = match_unit_get_position(unit) - state.camera_offset;
             xy unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
             SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
             SDL_Rect healthbar_subrect = healthbar_rect;
@@ -811,7 +811,7 @@ void render_match(const match_state_t& state) {
 
     // Units
     for (const unit_t& unit : state.units) {
-        xy unit_render_pos = match_unit_get_position(unit) - state.camera_offset;
+        xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
         xy unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
 
         // Cull the unit sprite

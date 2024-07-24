@@ -1,8 +1,12 @@
 #pragma once
 
+#include "asserts.h"
 #include <cstdint>
 #include <cstddef>
 #include <cmath>
+
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define max(a, b) ((a) > (b) ? (a) : (b))
 
 // from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
 // sqrt_i64 computes the squrare root of a 64bit integer and returns
@@ -31,7 +35,7 @@ struct fixed {
     static const size_t total_bits = integer_bits + fractional_bits;
     int32_t raw_value;
 
-    static fixed from_int(int32_t integer_value) {
+    static constexpr fixed from_int(int32_t integer_value) {
         return (fixed) { .raw_value = integer_value << fractional_bits };
     }
 
@@ -152,51 +156,51 @@ struct xy {
     xy operator/(int scaler) const {
         return xy(x / scaler, y / scaler);
     }
-    static int manhattan_distance(const xy& a, const xy& b) {
+    static uint32_t manhattan_distance(const xy& a, const xy& b) {
         return abs(a.x - b.x) + abs(a.y - b.y);
     }
 };
 
-struct vec2 {
+struct xy_fixed {
     fixed x;
     fixed y;
 
-    vec2() = default;
-    vec2(fixed x, fixed y) : x(x), y(y) {}
-    vec2(const xy& other) : x(fixed::from_int(other.x)), y(fixed::from_int(other.y)) {}
+    xy_fixed() = default;
+    xy_fixed(fixed x, fixed y) : x(x), y(y) {}
+    xy_fixed(const xy& other) : x(fixed::from_int(other.x)), y(fixed::from_int(other.y)) {}
     xy to_xy() const {
         return xy(x.integer_part(), y.integer_part());
     }
-    bool operator==(const vec2& other) const {
+    bool operator==(const xy_fixed& other) const {
         return this->x == other.x && this->y == other.y;
     }
-    bool operator!=(const vec2& other) const {
+    bool operator!=(const xy_fixed& other) const {
         return this->x != other.x || this->y != other.y;
     }
-    vec2 operator-() const {
-        return vec2(-x, -y);
+    xy_fixed operator-() const {
+        return xy_fixed(-x, -y);
     }
-    vec2 operator+(const vec2& other) const {
-        return vec2(x + other.x, y + other.y);
+    xy_fixed operator+(const xy_fixed& other) const {
+        return xy_fixed(x + other.x, y + other.y);
     }
-    vec2& operator+=(const vec2& other) {
+    xy_fixed& operator+=(const xy_fixed& other) {
         x += other.x;
         y += other.y;
         return *this;
     }
-    vec2 operator-(const vec2& other) const {
-        return vec2(x - other.x, y - other.y);
+    xy_fixed operator-(const xy_fixed& other) const {
+        return xy_fixed(x - other.x, y - other.y);
     }
-    vec2& operator-=(const vec2& other) {
+    xy_fixed& operator-=(const xy_fixed& other) {
         x -= other.x;
         y -= other.y;
         return *this;
     }
-    vec2 operator*(const fixed& scaler) const {
-        return vec2(x * scaler, y * scaler);
+    xy_fixed operator*(const fixed& scaler) const {
+        return xy_fixed(x * scaler, y * scaler);
     }
-    vec2 operator/(const fixed& scaler) const {
-        return vec2(x / scaler, y / scaler);
+    xy_fixed operator/(const fixed& scaler) const {
+        return xy_fixed(x / scaler, y / scaler);
     }
     fixed length() const {
         int64_t x64 = x.raw_value;
@@ -204,19 +208,19 @@ struct vec2 {
         uint64_t length_squared = (x64 * x64) + (y64 * y64);
         return fixed::from_raw((int32_t)sqrt_i64(length_squared));
     }
-    vec2 normalized() const {
+    xy_fixed normalized() const {
         fixed _length = length();
         // fixed _length = length();
         if (_length.raw_value == 0) {
-            return vec2(fixed::from_raw(0), fixed::from_raw(0));
+            return xy_fixed(fixed::from_raw(0), fixed::from_raw(0));
         }
-        vec2 result = vec2(x / _length, y / _length);
+        xy_fixed result = xy_fixed(x / _length, y / _length);
         return result;
     }
-    vec2 direction_to(const vec2& other) const {
+    xy_fixed direction_to(const xy_fixed& other) const {
         return (other - *this).normalized();
     }
-    fixed distance_to(const vec2& other) const {
+    fixed distance_to(const xy_fixed& other) const {
         return (other - *this).length();
     }
 };
@@ -260,18 +264,44 @@ const xy DIRECTION_XY[8] = {
     xy(-1, -1), // Northwest
 };
 
+inline Direction get_enum_direction_from_xy_direction(xy xy_direction) {
+    for (int enum_direction = 0; enum_direction < DIRECTION_COUNT; enum_direction++) {
+        if (DIRECTION_XY[enum_direction] == xy_direction) {
+            return (Direction)enum_direction;
+        }
+    }
+    GOLD_ASSERT_MESSAGE(false, "Tried to get direction enum but the passed in xy value is not a valid direction.");
+    return DIRECTION_COUNT;
+}
+
 /*
- * Quick note: vec2(1,1).normalized() in the diagonal direction would result in vec2(0.707,0.707)
+ * Quick note: xy_fixed(1,1).normalized() in the diagonal direction would result in vec2(0.707,0.707)
  * To create a fixed with value .707, we take the fractional scale 256 * .707 = 181
 */
 
-const vec2 DIRECTION_VEC2[8] = {
-    vec2(fixed::from_int(0), fixed::from_int(-1)), // North
-    vec2(fixed::from_raw(181), fixed::from_raw(-181)), // Northeast
-    vec2(fixed::from_int(1), fixed::from_int(0)), // East
-    vec2(fixed::from_raw(181), fixed::from_raw(181)), // Southeast
-    vec2(fixed::from_int(0), fixed::from_int(1)), // South
-    vec2(fixed::from_raw(-181), fixed::from_raw(181)), // Southwest
-    vec2(fixed::from_int(-1), fixed::from_int(0)), // West
-    vec2(fixed::from_raw(-181), fixed::from_raw(-181)) // Northwest
+const xy_fixed DIRECTION_XY_FIXED[8] = {
+    xy_fixed(fixed::from_int(0), fixed::from_int(-1)), // North
+    xy_fixed(fixed::from_raw(181), fixed::from_raw(-181)), // Northeast
+    xy_fixed(fixed::from_int(1), fixed::from_int(0)), // East
+    xy_fixed(fixed::from_raw(181), fixed::from_raw(181)), // Southeast
+    xy_fixed(fixed::from_int(0), fixed::from_int(1)), // South
+    xy_fixed(fixed::from_raw(-181), fixed::from_raw(181)), // Southwest
+    xy_fixed(fixed::from_int(-1), fixed::from_int(0)), // West
+    xy_fixed(fixed::from_raw(-181), fixed::from_raw(-181)) // Northwest
 };
+
+inline rect_t create_bounding_rect_for_points(xy* points, uint32_t point_count) {
+    xy point_min = points[0];
+    xy point_max = points[0];
+    for (uint32_t i = 1; i < point_count; i++) {
+        point_min.x = min(point_min.x, points[i].x);
+        point_min.y = min(point_min.y, points[i].y);
+        point_max.x = max(point_max.x, points[i].x);
+        point_max.y = max(point_max.y, points[i].y);
+    }
+
+    point_max.x++;
+    point_max.y++;
+    
+    return rect_t(point_min, point_max - point_min);
+}

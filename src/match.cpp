@@ -7,7 +7,6 @@
 #include <cstring>
 #include <unordered_map>
 #include <array>
-#include <algorithm>
 
 static const uint32_t TICK_DURATION = 4;
 static const uint32_t INPUT_MAX_SIZE = 256;
@@ -47,7 +46,8 @@ static const uint32_t BUILD_TICK_DURATION = 8;
 const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
     { UNIT_MINER, (unit_data_t) {
         .sprite = SPRITE_UNIT_MINER,
-        .max_health = 20
+        .max_health = 20,
+        .speed = fixed::from_int(1)
     }}
 };
 
@@ -217,7 +217,7 @@ void match_update(match_state_t& state) {
             }
 
             for (const input_t& input : state.inputs[player_id][0]) {
-                // TODO: actually handle the input
+                match_input_handle(state, input);
             } // End for each input in player queue
             state.inputs[player_id].erase(state.inputs[player_id].begin());
         } // End for each player
@@ -302,8 +302,8 @@ void match_update(match_state_t& state) {
     // SELECT RECT
     if (state.ui_mode == UI_MODE_SELECTING) {
         // Update select rect
-        state.select_rect.position = xy(std::min(state.select_origin.x, mouse_world_pos.x), std::min(state.select_origin.y, mouse_world_pos.y));
-        state.select_rect.size = xy(std::max(1, std::abs(state.select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(state.select_origin.y - mouse_world_pos.y)));
+        state.select_rect.position = xy(min(state.select_origin.x, mouse_world_pos.x), min(state.select_origin.y, mouse_world_pos.y));
+        state.select_rect.size = xy(max(1, std::abs(state.select_origin.x - mouse_world_pos.x)), max(1, std::abs(state.select_origin.y - mouse_world_pos.y)));
     } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
         /*
         ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
@@ -323,6 +323,31 @@ void match_update(match_state_t& state) {
             state.ui_mode = UI_MODE_NONE;
         } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
             state.ui_mode = UI_MODE_NONE;
+        }
+    }
+
+    // RIGHT MOUSE CLICK
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
+        if (state.ui_mode == UI_MODE_NONE && state.selection.type == SELECTION_TYPE_UNITS && 
+            (MINIMAP_RECT.has_point(mouse_pos) || !match_is_mouse_in_ui())) {
+            xy move_target;
+            if (match_is_mouse_in_ui()) {
+                xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
+                move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
+                                 (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+            } else {
+                move_target = mouse_world_pos;
+            }
+
+            // Create the move event
+            input_t input;
+            input.type = INPUT_MOVE;
+            input.move.target_cell = move_target / TILE_SIZE;
+            input.move.unit_count = 0;
+            memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
+            input.move.unit_count = state.selection.ids.size();
+            GOLD_ASSERT(input.move.unit_count != 0);
+            state.input_queue.push_back(input);
         }
     }
 
@@ -347,6 +372,8 @@ void match_update(match_state_t& state) {
     if (state.ui_status_timer != 0) {
         state.ui_status_timer--;
     }
+
+    match_unit_update(state);
 }
 
 // INPUT
@@ -427,6 +454,64 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
     }
 
     return input;
+}
+
+void match_input_handle(match_state_t& state, const input_t& input) {
+    switch (input.type) {
+        case INPUT_MOVE: {
+            bool should_move_as_group = true;
+            xy group_center;
+
+            if (should_move_as_group) {
+                // Collect a list of all the unit cells
+                std::vector<xy> unit_cells;
+                unit_cells.reserve(input.move.unit_count);
+                for (uint32_t i = 0; i < input.move.unit_count; i++) {
+                    uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
+                    if (unit_index == id_array<unit_t>::INVALID_INDEX) {
+                        continue;
+                    }
+
+                    unit_cells.push_back(state.units[unit_index].cell);
+                }
+
+                // Create a bounding rect around the cells
+                rect_t group_rect = create_bounding_rect_for_points(&unit_cells[0], unit_cells.size());
+
+                // Use the rect to determine the group center
+                group_center = group_rect.position + (group_rect.size / 2);
+                
+                // If the input target is inside the bounding rect, then don't move as a group.
+                // This allows the units to converge in on the target cell (otherwise they would just stay roughly where they are in this situation)
+                if (group_rect.has_point(input.move.target_cell)) {
+                    log_info("don't group move");
+                    should_move_as_group = false;
+                }
+            }
+
+            // Give each unit the move command
+            for (uint32_t i = 0; i < input.move.unit_count; i++) {
+                uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
+                if (unit_index == id_array<unit_t>::INVALID_INDEX) {
+                    continue;
+                }
+                unit_t& unit = state.units[unit_index];
+
+                // Determine the unit's target
+                xy unit_target = input.move.target_cell;
+                if (should_move_as_group) {
+                    xy group_move_target = input.move.target_cell + (unit.cell - group_center);
+                    if (match_map_is_cell_in_bounds(state, group_move_target) && xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3) {
+                        unit_target = group_move_target;
+                    }
+                }
+
+                unit.path = match_map_pathfind(state, unit.cell, unit_target);
+            }
+        }
+        default:
+            break;
+    }
 }
 
 // UI
@@ -553,6 +638,14 @@ xy match_camera_centered_on_cell(xy cell) {
 
 // Map
 
+xy_fixed match_cell_center(xy cell) {
+    return xy_fixed((cell * TILE_SIZE) - xy(TILE_SIZE / 2, TILE_SIZE / 2));
+}
+
+bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell) {
+    return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
+}
+
 uint32_t match_map_get_cell_value(const match_state_t& state, xy cell) {
     return state.map_cells[cell.x + (cell.y * state.map_height)];
 }
@@ -570,6 +663,111 @@ void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint
     state.map_cells[cell.x + (cell.y * state.map_height)] = type | id;
 }
 
+std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
+    struct node_t {
+        uint32_t cost;
+        uint32_t distance;
+        // The parent is the previous node stepped in the path to reach this node
+        // It should be an index in the explored list, or -1 if it is the start node
+        int parent; 
+        xy cell;
+
+        uint32_t score() const {
+            return cost + distance;
+        }
+    };
+
+    std::vector<node_t> frontier;
+    std::vector<node_t> explored;
+
+    frontier.push_back((node_t) {
+        .cost = 0,
+        .distance = xy::manhattan_distance(from, to),
+        .parent = -1,
+        .cell = from
+    });
+
+    while (!frontier.empty()) {
+        // Find the smallest path
+        uint32_t smallest_index = 0;
+        for (uint32_t i = 1; i < frontier.size(); i++) {
+            if (frontier[i].score() < frontier[smallest_index].score()) {
+                smallest_index = i;
+            }
+        }
+
+        // Pop the smallest path
+        node_t smallest = frontier[smallest_index];
+        frontier.erase(frontier.begin() + smallest_index);
+
+        // If it's the solution, return it
+        if (smallest.cell == to) {
+            // Backtrack to build the path
+            std::vector<xy> path;
+            path.reserve(smallest.cost);
+            node_t current = smallest;
+            while (current.parent != -1) {
+                path.insert(path.begin(), current.cell);
+                current = explored[current.parent];
+            }
+
+            return path;
+        }
+
+        // Otherwise, add this tile to the explored list
+        explored.push_back(smallest);
+
+        // Consider all children
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            node_t child = (node_t) {
+                .cost = smallest.cost + 1,
+                .distance = xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], to),
+                .parent = (int)explored.size() - 1,
+                .cell = smallest.cell + DIRECTION_XY[direction]
+            };
+            // Don't consider out of bounds children
+            if (child.cell.x < 0 || child.cell.x >= state.map_width || child.cell.y < 0 || child.cell.y >= state.map_height) {
+                continue;
+            }
+            // Don't consider blocked spaces
+            if (match_map_get_cell_value(state, child.cell) != CELL_EMPTY) {
+                continue;
+            }
+            // Don't consider already explored children
+            bool is_in_explored = false;
+            for (const node_t& explored_node : explored) {
+                if (explored_node.cell == child.cell) {
+                    is_in_explored = true;
+                    break;
+                }
+            }
+            if (is_in_explored) {
+                continue;
+            }
+            // Check if it's in the frontier
+            uint32_t frontier_index;
+            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                node_t& frontier_node = frontier[frontier_index];
+                if (frontier_node.cell == child.cell) {
+                    break;
+                }
+            }
+            // If it is in the frontier...
+            if (frontier_index < frontier.size()) {
+                // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
+                if (child.score() < frontier[frontier_index].score()) {
+                    frontier[frontier_index] = child;
+                }
+                continue;
+            }
+            // If it's not in the frontier, then add it to the frontier
+            frontier.push_back(child);
+        } // End for each child
+    } // End while !frontier.empty()
+
+    return std::vector<xy>();
+}
+
 // Unit
 
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell) {
@@ -579,18 +777,89 @@ void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, c
     unit_t unit;
     unit.type = type;
     unit.player_id = player_id;
-    unit.cell = cell;
     unit.animation = animation_create(ANIMATION_UNIT_IDLE);
     unit.health = it->second.max_health;
+
+    unit.direction = DIRECTION_SOUTH;
+    unit.cell = cell;
+    unit.position = match_cell_center(unit.cell);
 
     entity_id unit_id = state.units.push_back(unit);
     match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
 }
 
-xy match_unit_get_position(const unit_t& unit) {
-    return (unit.cell * TILE_SIZE) + xy(TILE_SIZE / 2, TILE_SIZE / 2);
+rect_t match_unit_get_rect(const unit_t& unit) {
+    return rect_t(unit.position.to_xy() - xy(TILE_SIZE / 2, TILE_SIZE / 2), xy(TILE_SIZE, TILE_SIZE));
 }
 
-rect_t match_unit_get_rect(const unit_t& unit) {
-    return rect_t(match_unit_get_position(unit), xy(TILE_SIZE, TILE_SIZE));
+bool match_unit_is_moving(const unit_t& unit) {
+    return unit.position != match_cell_center(unit.cell) || !unit.path.empty();
+}
+
+void match_unit_update(match_state_t& state) {
+    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+        unit_t& unit = state.units[unit_index];
+        entity_id unit_id = state.units.get_id_of(unit_index);
+        const unit_data_t& unit_data = UNIT_DATA.at(unit.type);
+
+        // MOVEMENT
+        if (match_unit_is_moving(unit)) {
+            fixed movement_left = unit_data.speed;
+            while (movement_left.raw_value > 0) {
+                // If the unit is not moving between tiles, then pop the next cell off the path
+                if (unit.position == match_cell_center(unit.cell)) {
+                    unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
+                    if (match_map_get_cell_value(state, unit.path[0]) != CELL_EMPTY) {
+                        // Path is blocked, stop movement
+                        break;
+                    }
+
+                    match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
+                    unit.cell = unit.path[0];
+                    match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
+                    unit.path.erase(unit.path.begin());
+                }
+
+                // Step unit along movement
+                if (unit.position.distance_to(match_cell_center(unit.cell)) > movement_left) {
+                    unit.position += DIRECTION_XY_FIXED[unit.direction] * movement_left;
+                    movement_left = fixed::from_raw(0);
+                } else {
+                    movement_left -= unit.position.distance_to(match_cell_center(unit.cell));
+                    unit.position = match_cell_center(unit.cell);
+                    if (unit.path.empty()) {
+                        movement_left = fixed::from_raw(0);
+                    }
+                }
+            } // End while movement_left > 0
+        } // End if unit is moving
+
+        // ANIMATION
+        AnimationName expected_animation = match_unit_get_expeected_animation(unit);
+        if (unit.animation.name != expected_animation || !animation_is_playing(unit.animation)) {
+            unit.animation = animation_create(expected_animation);
+        }
+        animation_update(unit.animation);
+        unit.animation.frame.y = match_unit_get_animation_vframe(unit);
+    } // End for each unit
+}
+
+AnimationName match_unit_get_expeected_animation(const unit_t& unit) {
+    if (match_unit_is_moving(unit)) {
+        return ANIMATION_UNIT_MOVE;
+    }
+
+    return ANIMATION_UNIT_IDLE;
+}
+
+int match_unit_get_animation_vframe(const unit_t& unit) {
+    if (unit.direction == DIRECTION_NORTH) {
+        return 1;
+    } else if (unit.direction == DIRECTION_SOUTH) {
+        return 0;
+    } else if (unit.direction > DIRECTION_SOUTH) {
+        return 3;
+    } else {
+        return 2;
+    }
 }
