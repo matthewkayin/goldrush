@@ -15,8 +15,11 @@
 
 const uint32_t CELL_EMPTY = 0;
 const uint32_t CELL_UNIT = 1 << 16;
-const uint32_t CELL_BUILDING = 1 << 17;
-const uint32_t CELL_GOLD = 1 << 18;
+const uint32_t CELL_BUILDING = 2 << 16;
+const uint32_t CELL_GOLD1 = 3 << 16;
+const uint32_t CELL_GOLD2 = 4 << 16;
+const uint32_t CELL_GOLD3 = 5 << 16;
+
 const uint32_t CELL_TYPE_MASK = 0xffff0000;
 const uint32_t CELL_ID_MASK = 0x0000ffff;
 const int UI_HEIGHT = 88;

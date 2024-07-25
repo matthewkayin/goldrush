@@ -743,6 +743,13 @@ void render_match(const match_state_t& state) {
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
+
+            uint32_t map_cell = match_map_get_cell_type(state, xy(base_coords.x + x, base_coords.y + y));
+            if (map_cell >= CELL_GOLD1 && map_cell <= CELL_GOLD3) {
+                tile_src_rect.x = (map_cell - CELL_GOLD1) * TILE_SIZE;
+                tile_src_rect.y = 0;
+                SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILE_GOLD].texture, &tile_src_rect, &tile_dst_rect);
+            }
         }
     }
 

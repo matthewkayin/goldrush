@@ -153,6 +153,51 @@ match_state_t match_init() {
     }
     state.camera_offset = match_camera_clamp(match_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
 
+    // Place gold on the map
+    int gold_target = 128;
+    int gold_count = 0;
+    while (gold_count < gold_target) {
+        // Randomly find the start of a gold cluster
+        xy cluster_cell = xy(rand() % state.map_width, rand() % state.map_height);
+        if (match_map_is_cell_blocked(state, cluster_cell)) {
+            continue;
+        }
+
+        // Check that it's not too close to the player spawns
+        bool is_cluster_too_close_to_player = false;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
+                xy::manhattan_distance(cluster_cell, player_spawns[player_id]) < 6) {
+                    is_cluster_too_close_to_player = true;
+                    break;
+            }
+        }
+        if (is_cluster_too_close_to_player) {
+            continue;
+        }
+
+        // Place gold on the map around the cluster
+        int cluster_size = std::min(3 + (rand() % 7), gold_target - gold_count);
+        for (int i = 0; i < cluster_size; i++) {
+            match_map_set_cell_value(state, cluster_cell, CELL_GOLD1 + (rand() % 3), 100);
+            gold_count++;
+        }
+
+        // Determine the position of the next gold cell
+        int guess_direction = rand() % DIRECTION_COUNT;
+        int direction = guess_direction;
+        do {
+            direction = (direction + 1) % DIRECTION_COUNT;
+        } while (direction != guess_direction && 
+                !match_map_is_cell_in_bounds(state, cluster_cell) && 
+                 match_map_is_cell_blocked(state, cluster_cell + DIRECTION_XY[direction]));
+        if (direction == guess_direction) {
+            // There are no free spaces to place gold in, so exit the loop for this cluster
+            break;
+        }
+        cluster_cell += DIRECTION_XY[direction];
+    }
+
     if (!network_is_server()) {
         network_client_toggle_ready();
     }
@@ -892,13 +937,13 @@ std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
         return std::vector<xy>();
     }
 
-    // TODO: allow unit to path as close as possible to blocked cell
-    if (match_map_is_cell_blocked(state, to)) {
-        return std::vector<xy>();
-    }
-
     std::vector<node_t> frontier;
     std::vector<node_t> explored;
+    int explored_indices[state.map_width * state.map_height];
+    memset(explored_indices, -1, state.map_width * state.map_height * sizeof(int));
+    uint32_t closest_explored = 0;
+    bool found_path = false;
+    node_t path_end;
 
     frontier.push_back((node_t) {
         .cost = 0,
@@ -922,20 +967,17 @@ std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
 
         // If it's the solution, return it
         if (smallest.cell == to) {
-            // Backtrack to build the path
-            std::vector<xy> path;
-            path.reserve(smallest.cost);
-            node_t current = smallest;
-            while (current.parent != -1) {
-                path.insert(path.begin(), current.cell);
-                current = explored[current.parent];
-            }
-
-            return path;
+            found_path = true;
+            path_end = smallest;
+            break;
         }
 
         // Otherwise, add this tile to the explored list
         explored.push_back(smallest);
+        explored_indices[smallest.cell.x + (smallest.cell.y * state.map_width)] = explored.size() - 1;
+        if (explored[explored.size() - 1].distance < explored[closest_explored].distance) {
+            closest_explored = explored.size() - 1;
+        }
 
         // Consider all children
         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
@@ -946,7 +988,7 @@ std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
                 .cell = smallest.cell + DIRECTION_XY[direction]
             };
             // Don't consider out of bounds children
-            if (child.cell.x < 0 || child.cell.x >= state.map_width || child.cell.y < 0 || child.cell.y >= state.map_height) {
+            if (!match_map_is_cell_in_bounds(state, child.cell)) {
                 continue;
             }
             // Don't consider blocked spaces
@@ -954,14 +996,7 @@ std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
                 continue;
             }
             // Don't consider already explored children
-            bool is_in_explored = false;
-            for (const node_t& explored_node : explored) {
-                if (explored_node.cell == child.cell) {
-                    is_in_explored = true;
-                    break;
-                }
-            }
-            if (is_in_explored) {
+            if (explored_indices[child.cell.x + (child.cell.y * state.map_width)] != -1) {
                 continue;
             }
             // Check if it's in the frontier
@@ -985,7 +1020,16 @@ std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
         } // End for each child
     } // End while !frontier.empty()
 
-    return std::vector<xy>();
+    // Backtrack to build the path
+    node_t current = found_path ? path_end : explored[closest_explored];
+    std::vector<xy> path;
+    path.reserve(current.cost);
+    while (current.parent != -1) {
+        path.insert(path.begin(), current.cell);
+        current = explored[current.parent];
+    }
+
+    return path;
 }
 
 // Unit
