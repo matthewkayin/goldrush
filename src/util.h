@@ -4,9 +4,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cmath>
-
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#define max(a, b) ((a) > (b) ? (a) : (b))
+#include <algorithm>
 
 // from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
 // sqrt_i64 computes the squrare root of a 64bit integer and returns
@@ -294,10 +292,10 @@ inline rect_t create_bounding_rect_for_points(xy* points, uint32_t point_count) 
     xy point_min = points[0];
     xy point_max = points[0];
     for (uint32_t i = 1; i < point_count; i++) {
-        point_min.x = min(point_min.x, points[i].x);
-        point_min.y = min(point_min.y, points[i].y);
-        point_max.x = max(point_max.x, points[i].x);
-        point_max.y = max(point_max.y, points[i].y);
+        point_min.x = std::min(point_min.x, points[i].x);
+        point_min.y = std::min(point_min.y, points[i].y);
+        point_max.x = std::max(point_max.x, points[i].x);
+        point_max.y = std::max(point_max.y, points[i].y);
     }
 
     point_max.x++;

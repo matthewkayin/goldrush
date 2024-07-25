@@ -35,12 +35,12 @@ enum InputType {
 struct input_move_t {
     xy target_cell;
     uint8_t unit_count;
-    uint16_t unit_ids[MAX_UNITS];
+    entity_id unit_ids[MAX_UNITS];
 };
 
 struct input_stop_t {
     uint8_t unit_count;
-    uint16_t unit_ids[MAX_UNITS];
+    entity_id unit_ids[MAX_UNITS];
 };
 
 struct input_build_t {
@@ -50,7 +50,7 @@ struct input_build_t {
 };
 
 struct input_build_cancel_t {
-    uint16_t building_id;
+    entity_id building_id;
 };
 
 struct input_t {
@@ -95,8 +95,13 @@ struct selection_t {
 // Unit
 
 enum UnitType {
-    UNIT_MINER,
-    UNIT_TYPE_COUNT
+    UNIT_MINER
+};
+
+enum BuildingType {
+    BUILDING_NONE,
+    BUILDING_HOUSE,
+    BUILDING_CAMP
 };
 
 struct unit_t {
@@ -110,6 +115,10 @@ struct unit_t {
     xy_fixed position;
     xy cell;
     std::vector<xy> path;
+
+    BuildingType building_type;
+    entity_id building_id;
+    xy building_cell;
 
     uint32_t timer;
 };
@@ -125,8 +134,26 @@ extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;
 // Building
 
 struct building_t {
+    uint8_t player_id;
+    BuildingType type;
+    uint32_t health;
+
     xy cell;
+
+    bool is_finished;
 };
+
+struct building_data_t {
+    int cell_width;
+    int cell_height;
+    uint32_t cost;
+    uint32_t max_health;
+    int builder_positions_x[3];
+    int builder_positions_y[3];
+    int builder_flip_h[3];
+};
+
+extern const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA;
 
 struct particle_t {
     Sprite sprite;
@@ -144,6 +171,7 @@ struct match_state_t {
     xy select_origin;
     rect_t select_rect;
     selection_t selection;
+    BuildingType ui_building_type;
 
     // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
@@ -171,14 +199,16 @@ void match_update(match_state_t& state);
 // Input
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
 input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
-void match_input_handle(match_state_t& state, const input_t& input);
+void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input);
 
 // UI
 void match_ui_show_status(match_state_t& state, const char* message);
 UiButton match_get_ui_button(const match_state_t& state, int index);
 int match_get_ui_button_hovered(const match_state_t& state);
 const rect_t& match_get_ui_button_rect(int index);
+void match_ui_handle_button_pressed(match_state_t& state, UiButton button);
 bool match_is_mouse_in_ui();
+xy match_ui_building_cell(const match_state_t& state);
 selection_t match_ui_create_selection_from_rect(const match_state_t& state);
 void match_ui_set_selection(match_state_t& state, selection_t& selection);
 xy match_camera_clamp(xy camera_offset, int map_width, int map_height);
@@ -186,17 +216,31 @@ xy match_camera_centered_on_cell(xy cell);
 
 // Map
 xy_fixed match_cell_center(xy cell);
+xy match_get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
+xy match_get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect);
 bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell);
+bool match_map_is_cell_blocked(const match_state_t& state, xy cell);
+bool match_map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
 uint32_t match_map_get_cell_value(const match_state_t& state, xy cell);
 uint32_t match_map_get_cell_type(const match_state_t& state, xy cell);
 entity_id match_map_get_cell_id(const match_state_t& state, xy cell);
 void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id = 0);
+void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id = 0);
 std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to);
 
 // Unit
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
 rect_t match_unit_get_rect(const unit_t& unit);
 bool match_unit_is_moving(const unit_t& unit);
+bool match_unit_is_building(const unit_t& unit);
 void match_unit_update(match_state_t& state);
-AnimationName match_unit_get_expeected_animation(const unit_t& unit);
+AnimationName match_unit_get_expected_animation(const unit_t& unit);
 int match_unit_get_animation_vframe(const unit_t& unit);
+void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building);
+
+// Building
+entity_id match_building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
+void match_building_destroy(match_state_t& state, entity_id building_id);
+xy match_building_cell_size(BuildingType type);
+rect_t match_building_get_rect(const building_t& building);
+bool match_building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);

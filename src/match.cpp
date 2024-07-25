@@ -7,6 +7,7 @@
 #include <cstring>
 #include <unordered_map>
 #include <array>
+#include <algorithm>
 
 static const uint32_t TICK_DURATION = 4;
 static const uint32_t INPUT_MAX_SIZE = 256;
@@ -19,7 +20,7 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
     { UI_BUTTONSET_MINER, { UI_BUTTON_MOVE, UI_BUTTON_STOP, UI_BUTTON_ATTACK,
                       UI_BUTTON_BUILD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_CAMP, UI_BUTTON_NONE,
-                      UI_BUTTON_BUILD, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
+                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }}
 };
@@ -43,11 +44,35 @@ static const int CAMERA_DRAG_SPEED = 8;
 static const uint32_t PATH_PAUSE_DURATION = 20;
 static const uint32_t BUILD_TICK_DURATION = 8;
 
+static const char* UI_STATUS_CANT_BUILD = "You can't build there.";
+static const char* UI_STATUS_NOT_ENOUGH_GOLD = "Not enough gold.";
+
 const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
     { UNIT_MINER, (unit_data_t) {
         .sprite = SPRITE_UNIT_MINER,
         .max_health = 20,
         .speed = fixed::from_int(1)
+    }}
+};
+
+const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
+    { BUILDING_HOUSE, (building_data_t) {
+        .cell_width = 2,
+        .cell_height = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_positions_x = { 3, 16, -4 },
+        .builder_positions_y = { 15, 15, 3 },
+        .builder_flip_h = { false, true, false }
+    }},
+    { BUILDING_CAMP, (building_data_t) {
+        .cell_width = 2,
+        .cell_height = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_positions_x = { 1, 15, 14 },
+        .builder_positions_y = { 13, 13, 2 },
+        .builder_flip_h = { false, true, true }
     }}
 };
 
@@ -217,7 +242,7 @@ void match_update(match_state_t& state) {
             }
 
             for (const input_t& input : state.inputs[player_id][0]) {
-                match_input_handle(state, input);
+                match_input_handle(state, player_id, input);
             } // End for each input in player queue
             state.inputs[player_id].erase(state.inputs[player_id].begin());
         } // End for each player
@@ -266,29 +291,21 @@ void match_update(match_state_t& state) {
     // LEFT MOUSE CLICK
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
         if (match_get_ui_button_hovered(state) != -1) {
-            // On UI button pressed
-            // ui_button_pressed = UI_BUTTONS.at(state.ui_buttonset)[state.ui_button_hovered];
+            match_ui_handle_button_pressed(state, match_get_ui_button(state, match_get_ui_button_hovered(state)));
         } else if (state.ui_mode == UI_MODE_BUILDING_PLACE && !match_is_mouse_in_ui()) {
-            /*
-            // On building place
-            ivec2 building_cell_size = BUILDING_DATA.at(state.ui_building_type).cell_size();
-            bool building_can_be_placed = state.ui_building_cell.x + building_cell_size.x < state.map.width + 1 && 
-                                            state.ui_building_cell.y + building_cell_size.y < state.map.height + 1 &&
-                                            !map_cells_are_blocked(state.map, state.ui_building_cell, building_cell_size);
-            if (building_can_be_placed) {
+            if (match_building_can_be_placed(state, state.ui_building_type, match_ui_building_cell(state))) {
                 input_t input;
                 input.type = INPUT_BUILD;
                 input.build.building_type = state.ui_building_type;
-                input.build.target_cell = state.ui_building_cell;
+                input.build.target_cell = match_ui_building_cell(state);
                 input.build.unit_id = state.selection.ids[0];
                 state.input_queue.push_back(input);
 
                 state.ui_buttonset = UI_BUTTONSET_MINER;
                 state.ui_mode = UI_MODE_NONE;
             } else {
-                ui_show_status(state, "You can't build there.");
+                match_ui_show_status(state, UI_STATUS_CANT_BUILD);
             }
-            */
         } else if (state.ui_mode == UI_MODE_NONE && MINIMAP_RECT.has_point(mouse_pos)) {
             // On begin minimap drag
             state.ui_mode = UI_MODE_MINIMAP_DRAG;
@@ -302,8 +319,8 @@ void match_update(match_state_t& state) {
     // SELECT RECT
     if (state.ui_mode == UI_MODE_SELECTING) {
         // Update select rect
-        state.select_rect.position = xy(min(state.select_origin.x, mouse_world_pos.x), min(state.select_origin.y, mouse_world_pos.y));
-        state.select_rect.size = xy(max(1, std::abs(state.select_origin.x - mouse_world_pos.x)), max(1, std::abs(state.select_origin.y - mouse_world_pos.y)));
+        state.select_rect.position = xy(std::min(state.select_origin.x, mouse_world_pos.x), std::min(state.select_origin.y, mouse_world_pos.y));
+        state.select_rect.size = xy(std::max(1, std::abs(state.select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(state.select_origin.y - mouse_world_pos.y)));
     } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
         /*
         ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
@@ -408,16 +425,16 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer[out_buffer_length] = input.move.unit_count;
             out_buffer_length += 1;
 
-            memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(uint16_t));
-            out_buffer_length += input.move.unit_count * sizeof(uint16_t);
+            memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(entity_id));
+            out_buffer_length += input.move.unit_count * sizeof(entity_id);
             break;
         }
         case INPUT_STOP: {
             out_buffer[out_buffer_length] = input.stop.unit_count;
             out_buffer_length += 1;
 
-            memcpy(out_buffer + out_buffer_length, input.stop.unit_ids, input.stop.unit_count * sizeof(uint16_t));
-            out_buffer_length += input.stop.unit_count * sizeof(uint16_t);
+            memcpy(out_buffer + out_buffer_length, input.stop.unit_ids, input.stop.unit_count * sizeof(entity_id));
+            out_buffer_length += input.stop.unit_count * sizeof(entity_id);
             break;
         }
         case INPUT_BUILD: {
@@ -447,15 +464,15 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             input.move.unit_count = in_buffer[in_buffer_head];
             in_buffer_head++;
-            memcpy(input.move.unit_ids, in_buffer + in_buffer_head, input.move.unit_count * sizeof(uint16_t));
-            in_buffer_head += input.move.unit_count * sizeof(uint16_t);
+            memcpy(input.move.unit_ids, in_buffer + in_buffer_head, input.move.unit_count * sizeof(entity_id));
+            in_buffer_head += input.move.unit_count * sizeof(entity_id);
             break;
         }
         case INPUT_STOP: {
             input.stop.unit_count = in_buffer[in_buffer_head];
             in_buffer_head++;
-            memcpy(input.stop.unit_ids, in_buffer + in_buffer_head, input.stop.unit_count * sizeof(uint16_t));
-            in_buffer_head += input.stop.unit_count * sizeof(uint16_t);
+            memcpy(input.stop.unit_ids, in_buffer + in_buffer_head, input.stop.unit_count * sizeof(entity_id));
+            in_buffer_head += input.stop.unit_count * sizeof(entity_id);
             break;
         }
         case INPUT_BUILD: {
@@ -474,7 +491,7 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
     return input;
 }
 
-void match_input_handle(match_state_t& state, const input_t& input) {
+void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input) {
     switch (input.type) {
         case INPUT_MOVE: {
             bool should_move_as_group = true;
@@ -486,7 +503,7 @@ void match_input_handle(match_state_t& state, const input_t& input) {
                 unit_cells.reserve(input.move.unit_count);
                 for (uint32_t i = 0; i < input.move.unit_count; i++) {
                     uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
-                    if (unit_index == id_array<unit_t>::INVALID_INDEX) {
+                    if (unit_index == INDEX_INVALID) {
                         continue;
                     }
 
@@ -502,7 +519,6 @@ void match_input_handle(match_state_t& state, const input_t& input) {
                 // If the input target is inside the bounding rect, then don't move as a group.
                 // This allows the units to converge in on the target cell (otherwise they would just stay roughly where they are in this situation)
                 if (group_rect.has_point(input.move.target_cell)) {
-                    log_info("don't group move");
                     should_move_as_group = false;
                 }
             }
@@ -510,7 +526,7 @@ void match_input_handle(match_state_t& state, const input_t& input) {
             // Give each unit the move command
             for (uint32_t i = 0; i < input.move.unit_count; i++) {
                 uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
-                if (unit_index == id_array<unit_t>::INVALID_INDEX) {
+                if (unit_index == INDEX_INVALID) {
                     continue;
                 }
                 unit_t& unit = state.units[unit_index];
@@ -526,6 +542,59 @@ void match_input_handle(match_state_t& state, const input_t& input) {
 
                 unit.path = match_map_pathfind(state, unit.cell, unit_target);
             }
+            break;
+        }
+        case INPUT_STOP: {
+            for (uint32_t i = 0; i < input.stop.unit_count; i++) {
+                uint32_t unit_index = state.units.get_index_of(input.stop.unit_ids[i]);
+                if (unit_index == INDEX_INVALID) {
+                    continue;
+                }
+                unit_t& unit = state.units[unit_index];
+
+                unit.path.clear();
+                unit.building_type = BUILDING_NONE;
+            }
+            break;
+        }
+        case INPUT_BUILD: {
+            uint32_t unit_index = state.units.get_index_of(input.build.unit_id);
+            if (unit_index == INDEX_INVALID) {
+                return;
+            }
+            unit_t& unit = state.units[unit_index];
+
+            // Determine the unit's target
+            xy unit_build_target = match_get_nearest_free_cell_within_rect(unit.cell, rect_t(input.build.target_cell, match_building_cell_size((BuildingType)input.build.building_type)));
+            unit.path = match_map_pathfind(state, unit.cell, unit_build_target);
+            if (unit.path.empty()) {
+                match_ui_show_status(state, UI_STATUS_CANT_BUILD);
+                return;
+            }
+
+            unit.building_type = (BuildingType)input.build.building_type;
+            unit.building_cell = input.build.target_cell;
+            unit.building_id = ID_NULL;
+            break;
+        }
+        case INPUT_BUILD_CANCEL: {
+            uint32_t building_index = state.buildings.get_index_of(input.build_cancel.building_id);
+            if (building_index == INDEX_INVALID) {
+                return;
+            }
+            building_t& building = state.buildings[building_index];
+
+            // Refund the player
+            state.player_gold[player_id] += BUILDING_DATA.at(building.type).cost;
+            // Tell the unit to stop building this building
+            for (unit_t& unit : state.units) {
+                if (unit.building_id == input.build_cancel.building_id) {
+                    match_unit_stop_building(state, unit, building);
+                }
+            }
+            // Destroy the building
+            match_building_destroy(state, input.build_cancel.building_id);
+            break;
         }
         default:
             break;
@@ -562,11 +631,70 @@ const rect_t& match_get_ui_button_rect(int index) {
     return UI_BUTTON_RECT[index];
 }
 
+void match_ui_handle_button_pressed(match_state_t& state, UiButton button) {
+    switch (button) {
+        case UI_BUTTON_STOP: {
+            if (state.selection.type == SELECTION_TYPE_UNITS) {
+                input_t input;
+                input.type = INPUT_STOP;
+                memcpy(input.stop.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(entity_id));
+                input.stop.unit_count = state.selection.ids.size();
+                state.input_queue.push_back(input);
+            }
+            break;
+        }
+        case UI_BUTTON_BUILD: {
+            state.ui_buttonset = UI_BUTTONSET_BUILD;
+            break;
+        }
+        case UI_BUTTON_CANCEL: {
+            if (state.ui_buttonset == UI_BUTTONSET_BUILD) {
+                state.ui_buttonset = UI_BUTTONSET_MINER;
+            } else if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
+                state.ui_mode = UI_MODE_NONE;
+                state.ui_buttonset = UI_BUTTONSET_BUILD;
+            } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+                input_t input;
+                input.type = INPUT_BUILD_CANCEL;
+                input.build_cancel.building_id = state.selection.ids[0];
+                state.input_queue.push_back(input);
+
+                // Clear the player's selection
+                selection_t empty_selection;
+                empty_selection.type = SELECTION_TYPE_NONE;
+                match_ui_set_selection(state, empty_selection);
+            }
+            break;
+        }
+        case UI_BUTTON_BUILD_HOUSE:
+        case UI_BUTTON_BUILD_CAMP: {
+            // Begin building placement
+            BuildingType building_type = (BuildingType)(BUILDING_HOUSE + (button - UI_BUTTON_BUILD_HOUSE));
+
+            if (state.player_gold[network_get_player_id()] < BUILDING_DATA.at(building_type).cost) {
+                match_ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
+            } else {
+                state.ui_mode = UI_MODE_BUILDING_PLACE;
+                state.ui_building_type = building_type;
+            }
+
+            break;
+        }
+        case UI_BUTTON_NONE:
+        default:
+            break;
+    }
+}
+
 bool match_is_mouse_in_ui() {
     xy mouse_pos = input_get_mouse_position();
     return (mouse_pos.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
            (mouse_pos.x <= 136 && mouse_pos.y >= SCREEN_HEIGHT - 136) ||
            (mouse_pos.x >= SCREEN_WIDTH - 132 && mouse_pos.y >= SCREEN_HEIGHT - 106);
+}
+
+xy match_ui_building_cell(const match_state_t& state) {
+    return (input_get_mouse_position() + state.camera_offset) / TILE_SIZE;
 }
 
 selection_t match_ui_create_selection_from_rect(const match_state_t& state) {
@@ -583,11 +711,9 @@ selection_t match_ui_create_selection_from_rect(const match_state_t& state) {
         }
 
         // Don't select units which are building
-        /*
-        if (unit.mode == UNIT_MODE_BUILD) {
+        if (match_unit_is_building(unit)) {
             continue;
         }
-        */
 
         if (match_unit_get_rect(unit).intersects(state.select_rect)) {
             selection.ids.push_back(state.units.get_id_of(index));
@@ -599,25 +725,23 @@ selection_t match_ui_create_selection_from_rect(const match_state_t& state) {
         return selection;
     }
 
-    /*
     // Otherwise, check the player's buildings
-    for (uint32_t index = 0; index < buildings.size(); index++) {
-        const building_t& building = buildings[index];
+    for (uint32_t index = 0; index < state.buildings.size(); index++) {
+        const building_t& building = state.buildings[index];
 
         // Don't select other player's buildings
         // TODO: remove this to allow enemy building selection
-        if (building.player_id != current_player_id) {
+        if (building.player_id != network_get_player_id()) {
             continue;
         }
 
-        if (building_rect(building).intersects(select_rect)) {
+        if (match_building_get_rect(building).intersects(state.select_rect)) {
             // Return here so that only one building can be selected at once
-            selection.ids.push_back(buildings.get_id_of(index));
+            selection.ids.push_back(state.buildings.get_id_of(index));
             selection.type = SELECTION_TYPE_BUILDINGS;
             return selection;
         }
     }
-    */
 
     return selection;
 }
@@ -634,14 +758,12 @@ void match_ui_set_selection(match_state_t& state, selection_t& selection) {
             state.ui_buttonset = UI_BUTTONSET_UNIT;
         }
     } else if (selection.type == SELECTION_TYPE_BUILDINGS) {
-        /*
         building_t& building = state.buildings[state.buildings.get_index_of(selection.ids[0])];
         if (!building.is_finished) {
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
         } else {
             state.ui_buttonset = UI_BUTTONSET_NONE;
         }
-        */
     }
 }
 
@@ -660,8 +782,70 @@ xy_fixed match_cell_center(xy cell) {
     return xy_fixed((cell * TILE_SIZE) + xy(TILE_SIZE / 2, TILE_SIZE / 2));
 }
 
+xy match_get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
+    xy nearest_cell = rect.position;
+    uint32_t nearest_cell_dist = xy::manhattan_distance(start_cell, nearest_cell);
+
+    for (int y = rect.position.y; y < rect.position.y + rect.size.y; y++) {
+        for (int x = rect.position.x; x < rect.position.x + rect.size.x; x++) {
+            uint32_t cell_dist = xy::manhattan_distance(start_cell, xy(x, y));
+            if (cell_dist < nearest_cell_dist) {
+                nearest_cell = xy(x, y);
+                nearest_cell_dist = cell_dist;
+            }
+        }
+    }
+
+    return nearest_cell;
+}
+
+xy match_get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect) {
+    xy cell = rect.position + xy(-1, 0);
+    int step_direction = DIRECTION_SOUTH;
+    int step_count = 0;
+    int x_step_amount = rect.size.x + 1;
+    int y_step_amount = rect.size.y;
+
+    while (match_map_is_cell_blocked(state, cell) || !match_map_is_cell_in_bounds(state, cell)) {
+        cell += DIRECTION_XY[step_direction];
+        step_count++;
+
+        bool is_y_stepping = step_direction == DIRECTION_SOUTH || step_direction == DIRECTION_NORTH;
+        int step_amount = is_y_stepping ? y_step_amount : x_step_amount;
+        if (step_count == step_amount) {
+            if (is_y_stepping) {
+                y_step_amount++;
+            } else {
+                x_step_amount++;
+            }
+            step_count = 0;
+
+            // change directions counterclockwise
+            step_direction = step_direction == DIRECTION_NORTH ? DIRECTION_WEST : step_direction - 2;
+        }
+    }
+
+    return cell;
+}
+
 bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell) {
     return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
+}
+
+bool match_map_is_cell_blocked(const match_state_t& state, xy cell) {
+    return state.map_cells[cell.x + (cell.y * state.map_width)] != CELL_EMPTY;
+}
+
+bool match_map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect) {
+    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
+        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
+            if (state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
 }
 
 uint32_t match_map_get_cell_value(const match_state_t& state, xy cell) {
@@ -679,6 +863,14 @@ entity_id match_map_get_cell_id(const match_state_t& state, xy cell) {
 
 void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id) {
     state.map_cells[cell.x + (cell.y * state.map_height)] = type | id;
+}
+
+void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id) {
+    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
+        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
+            state.map_cells[x + (y * state.map_height)] = type | id;
+        }
+    }
 }
 
 std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
@@ -701,7 +893,7 @@ std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
     }
 
     // TODO: allow unit to path as close as possible to blocked cell
-    if (match_map_get_cell_value(state, to) != CELL_EMPTY) {
+    if (match_map_is_cell_blocked(state, to)) {
         return std::vector<xy>();
     }
 
@@ -758,7 +950,7 @@ std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
                 continue;
             }
             // Don't consider blocked spaces
-            if (match_map_get_cell_value(state, child.cell) != CELL_EMPTY) {
+            if (match_map_is_cell_blocked(state, child.cell)) {
                 continue;
             }
             // Don't consider already explored children
@@ -812,6 +1004,9 @@ void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, c
     unit.cell = cell;
     unit.position = match_cell_center(unit.cell);
 
+    unit.building_id = ID_NULL;
+    unit.building_type = BUILDING_NONE;
+
     unit.timer = 0;
 
     entity_id unit_id = state.units.push_back(unit);
@@ -826,6 +1021,10 @@ bool match_unit_is_moving(const unit_t& unit) {
     return unit.position != match_cell_center(unit.cell) || !unit.path.empty();
 }
 
+bool match_unit_is_building(const unit_t& unit) {
+    return unit.building_id != ID_NULL;
+}
+
 void match_unit_update(match_state_t& state) {
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
         unit_t& unit = state.units[unit_index];
@@ -836,8 +1035,30 @@ void match_unit_update(match_state_t& state) {
         if (unit.timer != 0) {
             unit.timer--;
             // On Behavior timer finished
-            if (match_unit_is_moving(unit) && unit.timer == 0) {
-                unit.path = match_map_pathfind(state, unit.cell, unit.path[unit.path.size() - 1]);
+            if (unit.timer == 0) {
+                if (match_unit_is_moving(unit)) {
+                    // Re-pathfind
+                    unit.path = match_map_pathfind(state, unit.cell, unit.path[unit.path.size() - 1]);
+                } else if (match_unit_is_building(unit)) {
+                    // Building tick
+                    building_t& building = state.buildings[state.buildings.get_index_of(unit.building_id)];
+
+                    building.health++;
+                    if (building.health == BUILDING_DATA.at(building.type).max_health) {
+                        // On building finished
+                        building.is_finished = true;
+
+                        // If selecting the building
+                        if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == unit.building_id) {
+                            // Trigger a re-select so that UI buttons are updated correctly
+                            match_ui_set_selection(state, state.selection);
+                        }
+
+                        match_unit_stop_building(state, unit, building);
+                    } else {
+                        unit.timer = BUILD_TICK_DURATION;
+                    }
+                }
             }
         }
 
@@ -848,7 +1069,7 @@ void match_unit_update(match_state_t& state) {
                 // If the unit is not moving between tiles, then pop the next cell off the path
                 if (unit.position == match_cell_center(unit.cell)) {
                     unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
-                    if (match_map_get_cell_value(state, unit.path[0]) != CELL_EMPTY) {
+                    if (match_map_is_cell_blocked(state, unit.path[0])) {
                         // Path is blocked, stop movement
                         unit.timer = PATH_PAUSE_DURATION;
                         break;
@@ -872,10 +1093,41 @@ void match_unit_update(match_state_t& state) {
                     }
                 }
             } // End while movement_left > 0
+
+            // On movement finished
+            if (!match_unit_is_moving(unit) && unit.building_type != BUILDING_NONE) {
+                // Temporarily set cell to empty so that we can check if the space is clear for building
+                match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
+                if (match_map_is_cell_rect_blocked(state, rect_t(unit.building_cell, match_building_cell_size(unit.building_type)))) {
+                    // Set the cell back to filled
+                    match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
+                    unit.building_type = BUILDING_NONE;
+                    match_ui_show_status(state, "You can't build there.");
+                } else {
+                    state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
+                    unit.building_id = match_building_create(state, unit.player_id, unit.building_type, unit.building_cell);
+                    unit.timer = BUILD_TICK_DURATION;
+
+                    // De-select the unit if it is selected
+                    auto it = std::find(state.selection.ids.begin(), state.selection.ids.end(), unit_id);
+                    if (it != state.selection.ids.end()) {
+                        // De-select the unit
+                        state.selection.ids.erase(it);
+
+                        // If the selection is now empty, select the building instead
+                        if (state.selection.ids.empty()) {
+                            state.selection.type = SELECTION_TYPE_BUILDINGS;
+                            state.selection.ids.push_back(unit.building_id);
+                        }
+
+                        match_ui_set_selection(state, state.selection);
+                    }
+                }
+            }
         } // End if unit is moving
 
         // ANIMATION
-        AnimationName expected_animation = match_unit_get_expeected_animation(unit);
+        AnimationName expected_animation = match_unit_get_expected_animation(unit);
         if (unit.animation.name != expected_animation || !animation_is_playing(unit.animation)) {
             unit.animation = animation_create(expected_animation);
         }
@@ -884,15 +1136,20 @@ void match_unit_update(match_state_t& state) {
     } // End for each unit
 }
 
-AnimationName match_unit_get_expeected_animation(const unit_t& unit) {
+AnimationName match_unit_get_expected_animation(const unit_t& unit) {
     if (match_unit_is_moving(unit) && unit.timer == 0) {
         return ANIMATION_UNIT_MOVE;
+    } else if (match_unit_is_building(unit)) {
+        return ANIMATION_UNIT_BUILD;
     }
 
     return ANIMATION_UNIT_IDLE;
 }
 
 int match_unit_get_animation_vframe(const unit_t& unit) {
+    if (unit.animation.name == ANIMATION_UNIT_BUILD) {
+        return 0;
+    }
     if (unit.direction == DIRECTION_NORTH) {
         return 1;
     } else if (unit.direction == DIRECTION_SOUTH) {
@@ -902,4 +1159,53 @@ int match_unit_get_animation_vframe(const unit_t& unit) {
     } else {
         return 2;
     }
+}
+
+void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building) {
+    unit.cell = match_get_first_empty_cell_around_rect(state, rect_t(building.cell, match_building_cell_size(building.type)));
+    unit.position = match_cell_center(unit.cell);
+    unit.building_type = BUILDING_NONE;
+    unit.building_id = ID_NULL;
+}
+
+// Building
+
+entity_id match_building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell) {
+    const building_data_t& building_data = BUILDING_DATA.find(type)->second;
+
+    building_t building;
+    building.player_id = player_id;
+    building.type = type;
+    building.health = 3;
+
+    building.cell = cell;
+
+    building.is_finished = false;
+
+    entity_id building_id = state.buildings.push_back(building);
+    match_map_set_cell_rect_value(state, rect_t(cell, xy(building_data.cell_width, building_data.cell_height)), CELL_BUILDING, building_id);
+    return building_id;
+}
+
+void match_building_destroy(match_state_t& state, entity_id building_id) {
+    uint32_t building_index = state.buildings.get_index_of(building_id);
+    building_t& building = state.buildings[building_index];
+    const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
+
+    match_map_set_cell_rect_value(state, rect_t(building.cell, xy(building_data.cell_width, building_data.cell_height)), CELL_EMPTY);
+    state.buildings.remove_at(building_index);
+}
+
+xy match_building_cell_size(BuildingType type) {
+    const building_data_t& building_data = BUILDING_DATA.find(type)->second;
+    return xy(building_data.cell_width, building_data.cell_height);
+}
+
+rect_t match_building_get_rect(const building_t& building) {
+    return rect_t(building.cell * TILE_SIZE, match_building_cell_size(building.type) * TILE_SIZE);
+}
+
+bool match_building_can_be_placed(const match_state_t& state, BuildingType type, xy cell) {
+    rect_t building_rect = rect_t(cell, match_building_cell_size(type));
+    return match_map_is_cell_in_bounds(state, building_rect.position + building_rect.size) && !match_map_is_cell_rect_blocked(state, building_rect);
 }

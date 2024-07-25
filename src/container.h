@@ -8,14 +8,14 @@
 #include <unordered_map>
 
 typedef uint16_t entity_id;
+const entity_id ID_MAX = 4096;
+const entity_id ID_NULL = ID_MAX + 1;
+const uint32_t INDEX_INVALID = 65535;
 
 template <typename T>
 struct id_array {
     using iterator = typename std::vector<T>::iterator;
     using const_iterator = typename std::vector<T>::const_iterator;
-
-    static const entity_id ID_MAX = 4096;
-    static const uint32_t INVALID_INDEX = 65535;
 
     std::vector<T> data;
     std::vector<entity_id> ids;
@@ -29,18 +29,18 @@ struct id_array {
     }
 
     T& operator[](uint32_t index) { 
-        GOLD_ASSERT(index != INVALID_INDEX); 
+        GOLD_ASSERT(index != INDEX_INVALID); 
         return data[index]; 
     }
     const T& operator[](uint32_t index) const { 
-        GOLD_ASSERT(index != INVALID_INDEX);
+        GOLD_ASSERT(index != INDEX_INVALID);
         return data[index]; 
     }
 
     uint32_t get_index_of(entity_id id) const {
         auto index_it = id_to_index.find(id);
         if (index_it == id_to_index.end()) {
-            return INVALID_INDEX;
+            return INDEX_INVALID;
         }
         return index_it->second;
     }
