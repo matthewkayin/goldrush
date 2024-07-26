@@ -76,3 +76,4 @@ struct animation_t {
 animation_t animation_create(AnimationName name);
 bool animation_is_playing(const animation_t& animation);
 void animation_update(animation_t& animation);
+void animation_stop(animation_t& animation);

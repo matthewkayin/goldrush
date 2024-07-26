@@ -717,7 +717,7 @@ void ysort(render_sprite_params_t* params, int low, int high) {
 }
 
 void render_match(const match_state_t& state) {
-    uint8_t current_player_id = network_get_player_id();
+    std::vector<render_sprite_params_t> ysorted;
 
     // Render map
     SDL_Rect tile_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
@@ -746,9 +746,12 @@ void render_match(const match_state_t& state) {
 
             uint32_t map_cell = match_map_get_cell_type(state, xy(base_coords.x + x, base_coords.y + y));
             if (map_cell >= CELL_GOLD1 && map_cell <= CELL_GOLD3) {
-                tile_src_rect.x = (map_cell - CELL_GOLD1) * TILE_SIZE;
-                tile_src_rect.y = 0;
-                SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILE_GOLD].texture, &tile_src_rect, &tile_dst_rect);
+                ysorted.push_back((render_sprite_params_t) {
+                    .sprite = SPRITE_TILE_GOLD,
+                    .position = xy(tile_dst_rect.x, tile_dst_rect.y),
+                    .frame = xy(map_cell - CELL_GOLD1, 0),
+                    .options = RENDER_SPRITE_NO_CULL
+                });
             }
         }
     }
@@ -819,16 +822,40 @@ void render_match(const match_state_t& state) {
         }
     }
 
-    // Particles
-    for (uint32_t i = 0; i < state.particles.size(); i++) {
-        if (animation_is_playing(state.particles[i].animation)) {
-            render_sprite(state.particles[i].sprite, state.particles[i].animation.frame, state.particles[i].position - state.camera_offset, RENDER_SPRITE_CENTERED);
+    // UI move animation
+    if (animation_is_playing(state.ui_move_animation)) {
+        if (state.ui_move_value == CELL_EMPTY) {
+            render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
+        } else if (state.ui_move_animation.frame.x % 2 == 0) {
+            entity_id id = (entity_id)(state.ui_move_value & CELL_ID_MASK);
+            switch (state.ui_move_value & CELL_TYPE_MASK) {
+                case CELL_UNIT: {
+                    uint32_t unit_index = state.units.get_index_of(id);
+                    if (unit_index != INDEX_INVALID) {
+                        render_sprite(SPRITE_SELECT_RING, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
+                    }
+                    break;
+                }
+                case CELL_BUILDING: {
+                    uint32_t building_index = state.buildings.get_index_of(id);
+                    if (building_index != INDEX_INVALID) {
+                        rect_t building_rect = match_building_get_rect(state.buildings[building_index]);
+                        render_sprite(SPRITE_SELECT_RING_HOUSE, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                    }
+                    break;
+                }
+                case CELL_GOLD1:
+                case CELL_GOLD2:
+                case CELL_GOLD3: {
+                    render_sprite(SPRITE_SELECT_RING_GOLD, xy(0, 0), state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
+                    break;
+                }
+                default:
+                    break;
+            }
         }
     }
     
-    // Begin Ysort
-    std::vector<render_sprite_params_t> ysorted;
-
     // Buildings
     for (const building_t& building : state.buildings) {
         int sprite = SPRITE_BUILDING_HOUSE + (building.type - BUILDING_HOUSE);
@@ -961,7 +988,7 @@ void render_match(const match_state_t& state) {
 
     // Resource counters
     char gold_text[8];
-    sprintf(gold_text, "%u", state.player_gold[current_player_id]);
+    sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);
     render_text(FONT_WESTERN8, gold_text, COLOR_BLACK, xy(SCREEN_WIDTH - 64 + 18, 4));
     render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 64, 2));
 

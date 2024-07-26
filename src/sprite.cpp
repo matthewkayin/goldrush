@@ -63,7 +63,7 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
         .path = "sprite/select_ring_gold.png",
-        .hframes = 2,
+        .hframes = 1,
         .vframes = 1
     }},
     { SPRITE_MINER_BUILDING, (sprite_params_t) {
@@ -163,4 +163,8 @@ void animation_update(animation_t& animation) {
             }
         }
     }
+}
+
+void animation_stop(animation_t& animation) {
+    animation.loops_remaining = 0;
 }

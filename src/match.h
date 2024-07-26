@@ -107,6 +107,20 @@ enum BuildingType {
     BUILDING_CAMP
 };
 
+struct path_t {
+    std::vector<xy> points;
+    xy target;
+};
+
+enum UnitTargetType {
+    UNIT_TARGET_NONE,
+    UNIT_TARGET_CELL,
+    UNIT_TARGET_BUILD,
+    UNIT_TARGET_UNIT,
+    UNIT_TARGET_BUILDING,
+    UNIT_TARGET_GOLD
+};
+
 struct unit_t {
     UnitType type;
     uint8_t player_id;
@@ -117,6 +131,9 @@ struct unit_t {
     Direction direction;
     xy_fixed position;
     xy cell;
+    UnitTargetType target;
+    xy target_cell;
+    entity_id target_entity_id;
     std::vector<xy> path;
 
     BuildingType building_type;
@@ -158,12 +175,6 @@ struct building_data_t {
 
 extern const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA;
 
-struct particle_t {
-    Sprite sprite;
-    animation_t animation;
-    xy position;
-};
-
 struct match_state_t {
     // UI
     UiMode ui_mode;
@@ -175,6 +186,9 @@ struct match_state_t {
     rect_t select_rect;
     selection_t selection;
     BuildingType ui_building_type;
+    uint32_t ui_move_value;
+    animation_t ui_move_animation;
+    xy ui_move_position;
 
     // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
@@ -190,7 +204,6 @@ struct match_state_t {
     // Entities
     id_array<unit_t> units;
     id_array<building_t> buildings;
-    circular_vector<particle_t, MAX_PARTICLES> particles;
 
     // Players
     uint32_t player_gold[MAX_PLAYERS];
@@ -229,7 +242,6 @@ uint32_t match_map_get_cell_type(const match_state_t& state, xy cell);
 entity_id match_map_get_cell_id(const match_state_t& state, xy cell);
 void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id = 0);
 void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id = 0);
-std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to);
 
 // Unit
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
@@ -237,6 +249,7 @@ rect_t match_unit_get_rect(const unit_t& unit);
 bool match_unit_is_moving(const unit_t& unit);
 bool match_unit_is_building(const unit_t& unit);
 void match_unit_update(match_state_t& state);
+void match_unit_path_to_target(const match_state_t& state, unit_t& unit);
 AnimationName match_unit_get_expected_animation(const unit_t& unit);
 int match_unit_get_animation_vframe(const unit_t& unit);
 void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building);

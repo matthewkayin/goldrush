@@ -367,13 +367,11 @@ void match_update(match_state_t& state) {
         state.select_rect.position = xy(std::min(state.select_origin.x, mouse_world_pos.x), std::min(state.select_origin.y, mouse_world_pos.y));
         state.select_rect.size = xy(std::max(1, std::abs(state.select_origin.x - mouse_world_pos.x)), std::max(1, std::abs(state.select_origin.y - mouse_world_pos.y)));
     } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
-        /*
-        ivec2 minimap_pos = mouse_pos - MINIMAP_RECT.position;
+        xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
         minimap_pos.x = std::clamp(minimap_pos.x, 0, MINIMAP_RECT.size.x);
         minimap_pos.y = std::clamp(minimap_pos.y, 0, MINIMAP_RECT.size.y);
-        ivec2 map_pos = ivec2((state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+        xy map_pos = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
         state.camera_offset = match_camera_clamp(match_camera_centered_on_cell(map_pos / TILE_SIZE), state.map_width, state.map_height);
-        */
     }
 
     // LEFT MOUSE RELEASE
@@ -413,11 +411,14 @@ void match_update(match_state_t& state) {
             state.input_queue.push_back(input);
 
             // Provide instant user feedback
-            state.particles.push_back((particle_t) {
-                .sprite = SPRITE_UI_MOVE,
-                .animation = animation_create(ANIMATION_UI_MOVE),
-                .position = mouse_world_pos
-            });
+            state.ui_move_value = match_map_get_cell_value(state, input.move.target_cell);
+            if ((state.ui_move_value & CELL_TYPE_MASK) == CELL_EMPTY) {
+                state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
+                state.ui_move_position = mouse_world_pos;
+            } else {
+                state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_GOLD);
+                state.ui_move_position = match_cell_center(input.move.target_cell).to_xy();
+            }
         }
     }
 
@@ -444,13 +445,8 @@ void match_update(match_state_t& state) {
     }
 
     // Update particles
-    for (uint32_t i = 0; i < state.particles.size(); i++) {
-        if (animation_is_playing(state.particles[i].animation)) {
-            animation_update(state.particles[i].animation);
-        }
-    }
-    while (state.particles.size() > 0 && !animation_is_playing(state.particles[0].animation)) {
-        state.particles.pop_front();
+    if (animation_is_playing(state.ui_move_animation)) {
+        animation_update(state.ui_move_animation);
     }
 
     match_unit_update(state);
@@ -539,7 +535,7 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input) {
     switch (input.type) {
         case INPUT_MOVE: {
-            bool should_move_as_group = true;
+            bool should_move_as_group = input.move.unit_count > 1 && match_map_get_cell_value(state, input.move.target_cell) == CELL_EMPTY;
             xy group_center;
 
             if (should_move_as_group) {
@@ -585,7 +581,35 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     }
                 }
 
-                unit.path = match_map_pathfind(state, unit.cell, unit_target);
+                // Set the units target
+                switch (match_map_get_cell_type(state, unit_target)) {
+                    case CELL_EMPTY: {
+                        unit.target = UNIT_TARGET_CELL;
+                        unit.target_cell = unit_target;
+                        break;
+                    }
+                    case CELL_UNIT: {
+                        unit.target = UNIT_TARGET_UNIT;
+                        unit.target_entity_id = match_map_get_cell_id(state, unit_target);
+                        break;
+                    }
+                    case CELL_BUILDING: {
+                        unit.target = UNIT_TARGET_BUILDING;
+                        unit.target_entity_id = match_map_get_cell_id(state, unit_target);
+                        break;
+                    }
+                    case CELL_GOLD1:
+                    case CELL_GOLD2:
+                    case CELL_GOLD3: {
+                        unit.target = UNIT_TARGET_GOLD;
+                        unit.target_cell = unit_target;
+                        break;
+                    }
+                } // End switch unit target cell type
+                match_unit_path_to_target(state, unit);
+                if (unit.path.empty()) {
+                    unit.target = UNIT_TARGET_NONE;
+                }
             }
             break;
         }
@@ -598,6 +622,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 unit_t& unit = state.units[unit_index];
 
                 unit.path.clear();
+                unit.target = UNIT_TARGET_NONE;
                 unit.building_type = BUILDING_NONE;
             }
             break;
@@ -611,8 +636,11 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 
             // Determine the unit's target
             xy unit_build_target = match_get_nearest_free_cell_within_rect(unit.cell, rect_t(input.build.target_cell, match_building_cell_size((BuildingType)input.build.building_type)));
-            unit.path = match_map_pathfind(state, unit.cell, unit_build_target);
+            unit.target = UNIT_TARGET_BUILD;
+            unit.target_cell = unit_build_target;
+            match_unit_path_to_target(state, unit);
             if (unit.path.empty()) {
+                unit.target = UNIT_TARGET_NONE;
                 match_ui_show_status(state, UI_STATUS_CANT_BUILD);
                 return;
             }
@@ -918,120 +946,6 @@ void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint3
     }
 }
 
-std::vector<xy> match_map_pathfind(const match_state_t& state, xy from, xy to) {
-    struct node_t {
-        uint32_t cost;
-        uint32_t distance;
-        // The parent is the previous node stepped in the path to reach this node
-        // It should be an index in the explored list, or -1 if it is the start node
-        int parent; 
-        xy cell;
-
-        uint32_t score() const {
-            return cost + distance;
-        }
-    };
-
-    // Don't bother pathfinding to the same cell
-    if (from == to) {
-        return std::vector<xy>();
-    }
-
-    std::vector<node_t> frontier;
-    std::vector<node_t> explored;
-    int explored_indices[state.map_width * state.map_height];
-    memset(explored_indices, -1, state.map_width * state.map_height * sizeof(int));
-    uint32_t closest_explored = 0;
-    bool found_path = false;
-    node_t path_end;
-
-    frontier.push_back((node_t) {
-        .cost = 0,
-        .distance = xy::manhattan_distance(from, to),
-        .parent = -1,
-        .cell = from
-    });
-
-    while (!frontier.empty()) {
-        // Find the smallest path
-        uint32_t smallest_index = 0;
-        for (uint32_t i = 1; i < frontier.size(); i++) {
-            if (frontier[i].score() < frontier[smallest_index].score()) {
-                smallest_index = i;
-            }
-        }
-
-        // Pop the smallest path
-        node_t smallest = frontier[smallest_index];
-        frontier.erase(frontier.begin() + smallest_index);
-
-        // If it's the solution, return it
-        if (smallest.cell == to) {
-            found_path = true;
-            path_end = smallest;
-            break;
-        }
-
-        // Otherwise, add this tile to the explored list
-        explored.push_back(smallest);
-        explored_indices[smallest.cell.x + (smallest.cell.y * state.map_width)] = explored.size() - 1;
-        if (explored[explored.size() - 1].distance < explored[closest_explored].distance) {
-            closest_explored = explored.size() - 1;
-        }
-
-        // Consider all children
-        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-            node_t child = (node_t) {
-                .cost = smallest.cost + 1,
-                .distance = xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], to),
-                .parent = (int)explored.size() - 1,
-                .cell = smallest.cell + DIRECTION_XY[direction]
-            };
-            // Don't consider out of bounds children
-            if (!match_map_is_cell_in_bounds(state, child.cell)) {
-                continue;
-            }
-            // Don't consider blocked spaces
-            if (match_map_is_cell_blocked(state, child.cell)) {
-                continue;
-            }
-            // Don't consider already explored children
-            if (explored_indices[child.cell.x + (child.cell.y * state.map_width)] != -1) {
-                continue;
-            }
-            // Check if it's in the frontier
-            uint32_t frontier_index;
-            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                node_t& frontier_node = frontier[frontier_index];
-                if (frontier_node.cell == child.cell) {
-                    break;
-                }
-            }
-            // If it is in the frontier...
-            if (frontier_index < frontier.size()) {
-                // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
-                if (child.score() < frontier[frontier_index].score()) {
-                    frontier[frontier_index] = child;
-                }
-                continue;
-            }
-            // If it's not in the frontier, then add it to the frontier
-            frontier.push_back(child);
-        } // End for each child
-    } // End while !frontier.empty()
-
-    // Backtrack to build the path
-    node_t current = found_path ? path_end : explored[closest_explored];
-    std::vector<xy> path;
-    path.reserve(current.cost);
-    while (current.parent != -1) {
-        path.insert(path.begin(), current.cell);
-        current = explored[current.parent];
-    }
-
-    return path;
-}
-
 // Unit
 
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell) {
@@ -1047,6 +961,7 @@ void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, c
     unit.direction = DIRECTION_SOUTH;
     unit.cell = cell;
     unit.position = match_cell_center(unit.cell);
+    unit.target = UNIT_TARGET_NONE;
 
     unit.building_id = ID_NULL;
     unit.building_type = BUILDING_NONE;
@@ -1082,7 +997,7 @@ void match_unit_update(match_state_t& state) {
             if (unit.timer == 0) {
                 if (match_unit_is_moving(unit)) {
                     // Re-pathfind
-                    unit.path = match_map_pathfind(state, unit.cell, unit.path[unit.path.size() - 1]);
+                    match_unit_path_to_target(state, unit);
                 } else if (match_unit_is_building(unit)) {
                     // Building tick
                     building_t& building = state.buildings[state.buildings.get_index_of(unit.building_id)];
@@ -1139,32 +1054,36 @@ void match_unit_update(match_state_t& state) {
             } // End while movement_left > 0
 
             // On movement finished
-            if (!match_unit_is_moving(unit) && unit.building_type != BUILDING_NONE) {
-                // Temporarily set cell to empty so that we can check if the space is clear for building
-                match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
-                if (match_map_is_cell_rect_blocked(state, rect_t(unit.building_cell, match_building_cell_size(unit.building_type)))) {
-                    // Set the cell back to filled
-                    match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
-                    unit.building_type = BUILDING_NONE;
-                    match_ui_show_status(state, "You can't build there.");
-                } else {
-                    state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
-                    unit.building_id = match_building_create(state, unit.player_id, unit.building_type, unit.building_cell);
-                    unit.timer = BUILD_TICK_DURATION;
+            if (!match_unit_is_moving(unit)) {
+                if (unit.target == UNIT_TARGET_BUILD) {
+                    // Temporarily set cell to empty so that we can check if the space is clear for building
+                    match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
+                    bool can_build = unit.cell == unit.target_cell && 
+                                                  !match_map_is_cell_rect_blocked(state, rect_t(unit.building_cell, match_building_cell_size(unit.building_type)));
+                    if (!can_build) {
+                        // Set the cell back to filled
+                        match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
+                        match_ui_show_status(state, UI_STATUS_CANT_BUILD);
+                        unit.target = UNIT_TARGET_NONE;
+                    } else {
+                        state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
+                        unit.building_id = match_building_create(state, unit.player_id, unit.building_type, unit.building_cell);
+                        unit.timer = BUILD_TICK_DURATION;
 
-                    // De-select the unit if it is selected
-                    auto it = std::find(state.selection.ids.begin(), state.selection.ids.end(), unit_id);
-                    if (it != state.selection.ids.end()) {
-                        // De-select the unit
-                        state.selection.ids.erase(it);
+                        // De-select the unit if it is selected
+                        auto it = std::find(state.selection.ids.begin(), state.selection.ids.end(), unit_id);
+                        if (it != state.selection.ids.end()) {
+                            // De-select the unit
+                            state.selection.ids.erase(it);
 
-                        // If the selection is now empty, select the building instead
-                        if (state.selection.ids.empty()) {
-                            state.selection.type = SELECTION_TYPE_BUILDINGS;
-                            state.selection.ids.push_back(unit.building_id);
+                            // If the selection is now empty, select the building instead
+                            if (state.selection.ids.empty()) {
+                                state.selection.type = SELECTION_TYPE_BUILDINGS;
+                                state.selection.ids.push_back(unit.building_id);
+                            }
+
+                            match_ui_set_selection(state, state.selection);
                         }
-
-                        match_ui_set_selection(state, state.selection);
                     }
                 }
             }
@@ -1178,6 +1097,156 @@ void match_unit_update(match_state_t& state) {
         animation_update(unit.animation);
         unit.animation.frame.y = match_unit_get_animation_vframe(unit);
     } // End for each unit
+}
+
+void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
+    xy target_cell;
+
+    switch (unit.target) {
+        case UNIT_TARGET_NONE:
+            target_cell = unit.cell;
+            break;
+        case UNIT_TARGET_BUILD:
+        case UNIT_TARGET_CELL:
+        case UNIT_TARGET_GOLD:
+            // TODO: if unit target gold, but the gold does not exist anymore, find nearest gold
+            target_cell = unit.target_cell;
+            break;
+        case UNIT_TARGET_UNIT: {
+            uint32_t unit_index = state.units.get_index_of(unit.target_entity_id);
+            target_cell = unit_index == INDEX_INVALID ? unit.cell : state.units[unit_index].cell;
+            break;
+        }
+        case UNIT_TARGET_BUILDING: {
+            // TODO: if unit targets building, path to the nearest cell around the building
+            // possibly lump the pathing up into one function so that initial pathing and repathing can work off the same code?
+            // as well as unit finished but target invalid pathing?
+            // match_unit_path_to_target() ?
+            // also we can make the pathing more performant by temporarily unblocking the destination whenever it is blocked and thus allowing the unit to path while skipping the worst case
+            uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
+            target_cell = building_index == INDEX_INVALID ? unit.cell : state.buildings[building_index].cell;
+            break;
+        }
+    }
+
+    // Don't bother pathing to unit's cell
+    if (target_cell == unit.cell) {
+        unit.path.clear();
+        return;
+    }
+
+    struct node_t {
+        uint32_t cost;
+        uint32_t distance;
+        // The parent is the previous node stepped in the path to reach this node
+        // It should be an index in the explored list, or -1 if it is the start node
+        int parent; 
+        xy cell;
+
+        uint32_t score() const {
+            return cost + distance;
+        }
+    };
+
+    std::vector<node_t> frontier;
+    std::vector<node_t> explored;
+    int explored_indices[state.map_width * state.map_height];
+    memset(explored_indices, -1, state.map_width * state.map_height * sizeof(int));
+    uint32_t closest_explored = 0;
+    bool found_path = false;
+    node_t path_end;
+
+    frontier.push_back((node_t) {
+        .cost = 0,
+        .distance = xy::manhattan_distance(unit.cell, target_cell),
+        .parent = -1,
+        .cell = unit.cell
+    });
+
+    while (!frontier.empty()) {
+        // Find the smallest path
+        uint32_t smallest_index = 0;
+        for (uint32_t i = 1; i < frontier.size(); i++) {
+            if (frontier[i].score() < frontier[smallest_index].score()) {
+                smallest_index = i;
+            }
+        }
+
+        // Pop the smallest path
+        node_t smallest = frontier[smallest_index];
+        frontier.erase(frontier.begin() + smallest_index);
+
+        // If it's the solution, return it
+        if (smallest.cell == target_cell) {
+            found_path = true;
+            path_end = smallest;
+            break;
+        }
+
+        // Otherwise, add this tile to the explored list
+        explored.push_back(smallest);
+        explored_indices[smallest.cell.x + (smallest.cell.y * state.map_width)] = explored.size() - 1;
+        if (explored[explored.size() - 1].distance < explored[closest_explored].distance) {
+            closest_explored = explored.size() - 1;
+        }
+
+        // Consider all children
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            node_t child = (node_t) {
+                .cost = smallest.cost + 1,
+                .distance = xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], target_cell),
+                .parent = (int)explored.size() - 1,
+                .cell = smallest.cell + DIRECTION_XY[direction]
+            };
+            // Don't consider out of bounds children
+            if (!match_map_is_cell_in_bounds(state, child.cell)) {
+                continue;
+            }
+            // Don't consider blocked spaces
+            // ...except for the target cell. If the target is blocked we pretend that it isn't. 
+            // This allows us to fully path to the target and ignore worst-case pathfinding
+            if (match_map_is_cell_blocked(state, child.cell) && child.cell != target_cell) {
+                continue;
+            }
+            // Don't consider already explored children
+            if (explored_indices[child.cell.x + (child.cell.y * state.map_width)] != -1) {
+                continue;
+            }
+            // Check if it's in the frontier
+            uint32_t frontier_index;
+            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                node_t& frontier_node = frontier[frontier_index];
+                if (frontier_node.cell == child.cell) {
+                    break;
+                }
+            }
+            // If it is in the frontier...
+            if (frontier_index < frontier.size()) {
+                // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
+                if (child.score() < frontier[frontier_index].score()) {
+                    frontier[frontier_index] = child;
+                }
+                continue;
+            }
+            // If it's not in the frontier, then add it to the frontier
+            frontier.push_back(child);
+        } // End for each child
+    } // End while !frontier.empty()
+
+    // Backtrack to build the path
+    node_t current = found_path ? path_end : explored[closest_explored];
+    unit.path.clear();
+    unit.path.reserve(current.cost);
+    while (current.parent != -1) {
+        unit.path.insert(unit.path.begin(), current.cell);
+        current = explored[current.parent];
+    }
+    // Since earlier in the algorithm we treated the target_cell as if it was not blocked,
+    // now we have to consider whether or not it really is free, and if it's not, remove it
+    // from the path
+    if (match_map_is_cell_blocked(state, target_cell)) {
+        unit.path.pop_back();
+    }
 }
 
 AnimationName match_unit_get_expected_animation(const unit_t& unit) {
@@ -1208,7 +1277,7 @@ int match_unit_get_animation_vframe(const unit_t& unit) {
 void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building) {
     unit.cell = match_get_first_empty_cell_around_rect(state, rect_t(building.cell, match_building_cell_size(building.type)));
     unit.position = match_cell_center(unit.cell);
-    unit.building_type = BUILDING_NONE;
+    unit.target = UNIT_TARGET_NONE;
     unit.building_id = ID_NULL;
 }
 
