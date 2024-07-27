@@ -160,44 +160,44 @@ match_state_t match_init() {
     int gold_count = 0;
     while (gold_count < gold_target) {
         // Randomly find the start of a gold cluster
-        xy cluster_cell = xy(rand() % state.map_width, rand() % state.map_height);
-        if (match_map_is_cell_blocked(state, cluster_cell)) {
+        xy gold_cell = xy(rand() % state.map_width, rand() % state.map_height);
+        if (match_map_is_cell_blocked(state, gold_cell)) {
             continue;
         }
 
         // Check that it's not too close to the player spawns
-        bool is_cluster_too_close_to_player = false;
+        bool is_patch_too_close_to_player = false;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
-                xy::manhattan_distance(cluster_cell, player_spawns[player_id]) < 6) {
-                    is_cluster_too_close_to_player = true;
+                xy::manhattan_distance(gold_cell, player_spawns[player_id]) < 6) {
+                    is_patch_too_close_to_player = true;
                     break;
             }
         }
-        if (is_cluster_too_close_to_player) {
+        if (is_patch_too_close_to_player) {
             continue;
         }
 
         // Place gold on the map around the cluster
         int cluster_size = std::min(3 + (rand() % 7), gold_target - gold_count);
         for (int i = 0; i < cluster_size; i++) {
-            match_map_set_cell_value(state, cluster_cell, CELL_GOLD1 + (rand() % 3), 100);
+            match_map_set_cell_value(state, gold_cell, CELL_GOLD1 + (rand() % 3), 10);
             gold_count++;
-        }
 
-        // Determine the position of the next gold cell
-        int guess_direction = rand() % DIRECTION_COUNT;
-        int direction = guess_direction;
-        do {
-            direction = (direction + 1) % DIRECTION_COUNT;
-        } while (direction != guess_direction && 
-                !match_map_is_cell_in_bounds(state, cluster_cell) && 
-                 match_map_is_cell_blocked(state, cluster_cell + DIRECTION_XY[direction]));
-        if (direction == guess_direction) {
-            // There are no free spaces to place gold in, so exit the loop for this cluster
-            break;
+            // Determine the position of the next gold cell
+            int guess_direction = rand() % DIRECTION_COUNT;
+            int direction = guess_direction;
+            bool is_gold_cell_valid = false;
+            do {
+                direction = (direction + 1) % DIRECTION_COUNT;
+                is_gold_cell_valid = match_map_is_cell_in_bounds(state, gold_cell + DIRECTION_XY[direction]) && !match_map_is_cell_blocked(state, gold_cell + DIRECTION_XY[direction]);
+            } while (direction != guess_direction && !is_gold_cell_valid);
+            if (direction == guess_direction) {
+                // There are no free spaces to place gold in, so exit the loop for this cluster
+                break;
+            }
+            gold_cell += DIRECTION_XY[direction];
         }
-        cluster_cell += DIRECTION_XY[direction];
     }
 
     if (!network_is_server()) {
@@ -592,7 +592,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     }
                     case CELL_UNIT: {
                         entity_id target_entity_id = match_map_get_cell_id(state, unit_target);
-                        if (state.units.get_index_of(target_entity_id) != INDEX_INVALID) {
+                        if (target_entity_id != input.move.unit_ids[i] && state.units.get_index_of(target_entity_id) != INDEX_INVALID) {
                             unit.target = UNIT_TARGET_UNIT;
                             unit.target_entity_id = target_entity_id;
                         } else {
@@ -607,7 +607,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         if (building_index == INDEX_INVALID) {
                             unit.target = UNIT_TARGET_CELL;
                             unit.target_cell = unit_target;
-                        } else if (state.buildings[building_index].type == BUILDING_CAMP && unit.gold_held > 0) {
+                        } else if (state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].is_finished && unit.gold_held > 0) {
                             unit.target = UNIT_TARGET_CAMP;
                             unit.target_entity_id = match_map_get_cell_id(state, unit_target);
                         } else {
@@ -631,7 +631,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 } // End switch unit target cell type
                 match_unit_path_to_target(state, unit);
                 if (unit.path.empty()) {
-                    unit.target = UNIT_TARGET_NONE;
+                    match_unit_on_movement_finished(state, input.move.unit_ids[i]);
                 }
             }
             break;
@@ -930,30 +930,39 @@ xy match_get_nearest_free_cell_around_building(const match_state_t& state, xy st
     xy nearest_cell;
     int nearest_cell_dist = -1;
 
-    rect_t rect = rect_t(building.cell, match_building_cell_size(building.type));
-    log_info("start cell: %xi, checking around rect %xi / %xi", &start_cell, &rect.position, &rect.size);
+    xy building_size = match_building_cell_size(building.type);
 
-    xy cell = rect.position - xy(1, 1);
-    xy step = xy(0, 1);
-    do {
-        log_info("cell: %xi", &cell);
+    xy cell_begin[4] = { 
+        building.cell + xy(-1, 0),
+        building.cell + xy(0, building_size.y),
+        building.cell + xy(building_size.x, building_size.y - 1),
+        building.cell + xy(building_size.x - 1, -1)
+    };
+    xy cell_end[4] = { 
+        cell_begin[0] + xy(0, building_size.y - 1),
+        cell_begin[1] + xy(building_size.x - 1, 0),
+        cell_begin[2] - xy(0, building_size.y - 1),
+        cell_begin[3] - xy(building_size.x - 1, 0)
+    };
+    xy cell_step[4] = { xy(0, 1), xy(1, 0), xy(0, -1), xy(-1, 0) };
+    uint32_t index = 0;
+    xy cell = cell_begin[index];
+    while (index < 4) {
         if (match_map_is_cell_in_bounds(state, cell) && !match_map_is_cell_blocked(state, cell) &&
             (nearest_cell_dist == -1 || xy::manhattan_distance(start_cell, cell) < nearest_cell_dist)) {
 
             nearest_cell = cell;
             nearest_cell_dist = xy::manhattan_distance(start_cell, cell);
-            log_info("nearer");
         }
 
-        cell += step;
-        if (cell == rect.position + xy(-1, rect.size.y)) {
-            step = xy(1, 0);
-        } else if (cell == rect.position + rect.size) {
-            step = xy(0, -1);
-        } else if (cell == rect.position + xy(rect.size.x, -1)) {
-            step = xy(-1, 0);
+        cell += cell_step[index];
+        if (cell == cell_end[index]) {
+            index++;
+            if (index < 4) {
+                cell = cell_begin[index];
+            }
         }
-    } while (cell != rect.position - xy(1, 1));
+    }
 
     return nearest_cell_dist != -1 ? nearest_cell : start_cell;
 }
@@ -1003,6 +1012,45 @@ void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint3
     }
 }
 
+bool match_map_is_cell_gold(const match_state_t& state, xy cell) {
+    uint32_t cell_type = match_map_get_cell_type(state, cell);
+    return cell_type >= CELL_GOLD1 && cell_type <= CELL_GOLD3;
+}
+
+void match_map_decrement_gold(match_state_t& state, xy cell) {
+    state.map_cells[cell.x + (cell.y * state.map_width)]--;
+    uint32_t gold_left = state.map_cells[cell.x + (cell.y * state.map_width)] & CELL_ID_MASK;
+    if (gold_left > 0) {
+        return;
+    }
+
+    state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_EMPTY;
+    // Tell all the adjacent miners to stop mining the now empty cell
+    for (int direction = DIRECTION_NORTH; direction < DIRECTION_COUNT; direction += 2) {
+        xy adjacent_cell = cell + DIRECTION_XY[direction];
+        // Ignore out of bounds cells
+        if (!match_map_is_cell_in_bounds(state, adjacent_cell)) {
+            continue;
+        }
+        // Ignore non-unit cells
+        uint32_t adjacent_cell_type = match_map_get_cell_type(state, adjacent_cell);
+        if (adjacent_cell_type != CELL_UNIT) {
+            continue;
+        }
+
+        entity_id unit_id = match_map_get_cell_id(state, adjacent_cell);
+        GOLD_ASSERT(state.units.get_index_of(unit_id) != INDEX_INVALID);
+        unit_t& unit = state.units[state.units.get_index_of(unit_id)];
+
+        // Ignore units who aren't mining this gold
+        if (unit.type != UNIT_MINER || unit.target != UNIT_TARGET_GOLD || unit.target_cell != cell) {
+            continue;
+        }
+        unit.timer = 0;
+        match_unit_try_target_nearest_gold(state, unit);
+    }
+}
+
 // Unit
 
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell) {
@@ -1046,6 +1094,7 @@ void match_unit_update(match_state_t& state) {
                     case UNIT_MODE_MOVING: {
                         // Re-pathfind
                         match_unit_path_to_target(state, unit);
+                        // TODO: what happens if we repath and end up with nothing?
                         break;
                     }
                     case UNIT_MODE_BUILDING: {
@@ -1073,9 +1122,9 @@ void match_unit_update(match_state_t& state) {
                         if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
                             unit.gold_held++;
                             unit.timer = GOLD_TICK_DURATION;
+                            match_map_decrement_gold(state, unit.target_cell);
                         } else {
-                            // TODO: return the gold
-                            unit.target = UNIT_TARGET_NONE;
+                            match_unit_try_return_gold(state, unit);
                         }
                         break;
                     }
@@ -1119,63 +1168,7 @@ void match_unit_update(match_state_t& state) {
 
             // On movement finished
             if (match_unit_get_mode(unit) != UNIT_MODE_MOVING) {
-                if (unit.target == UNIT_TARGET_BUILD) {
-                    // Temporarily set cell to empty so that we can check if the space is clear for building
-                    match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
-                    bool can_build = unit.cell == unit.target_cell && 
-                                                  !match_map_is_cell_rect_blocked(state, rect_t(unit.building_cell, match_building_cell_size(unit.building_type)));
-                    if (!can_build) {
-                        // Set the cell back to filled
-                        match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
-                        match_ui_show_status(state, UI_STATUS_CANT_BUILD);
-                        unit.target = UNIT_TARGET_NONE;
-                    } else {
-                        state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
-                        unit.building_id = match_building_create(state, unit.player_id, unit.building_type, unit.building_cell);
-                        unit.timer = BUILD_TICK_DURATION;
-
-                        // De-select the unit if it is selected
-                        auto it = std::find(state.selection.ids.begin(), state.selection.ids.end(), unit_id);
-                        if (it != state.selection.ids.end()) {
-                            // De-select the unit
-                            state.selection.ids.erase(it);
-
-                            // If the selection is now empty, select the building instead
-                            if (state.selection.ids.empty()) {
-                                state.selection.type = SELECTION_TYPE_BUILDINGS;
-                                state.selection.ids.push_back(unit.building_id);
-                            }
-
-                            match_ui_set_selection(state, state.selection);
-                        }
-                    }
-                } else if (unit.target == UNIT_TARGET_GOLD) {
-                    if (xy::manhattan_distance(unit.cell, unit.target_cell) != 1) {
-                        // TODO make unit repath to find the gold
-                        unit.target = UNIT_TARGET_NONE;
-                    } else {
-                        // TODO if unit reaches here and already has full gold, return to mining camp
-                        unit.timer = GOLD_TICK_DURATION;
-                        unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
-                    }
-                } else if (unit.target == UNIT_TARGET_CAMP) {
-                    uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
-                    if (building_index == INDEX_INVALID) {
-                        unit.target = UNIT_TARGET_NONE;
-                    } else {
-                        building_t& building = state.buildings[building_index];
-                        bool is_unit_around_building = rect_t(building.cell - xy(1, 1), match_building_cell_size(building.type) + xy(2, 2)).has_point(unit.cell);
-                        log_info("is unit around building? %i", (int)is_unit_around_building);
-                        if (is_unit_around_building) {
-                            state.player_gold[unit.player_id] += unit.gold_held;
-                            unit.gold_held = 0;
-                        } else {
-                            match_unit_path_to_target(state, unit);
-                        }
-                    }
-                } else if (unit.target == UNIT_TARGET_CELL) {
-                    unit.target = UNIT_TARGET_NONE;
-                }
+                match_unit_on_movement_finished(state, unit_id);
             }
         } // End if unit is moving
 
@@ -1336,6 +1329,72 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
     }
 }
 
+void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
+    uint32_t unit_index = state.units.get_index_of(unit_id);
+    GOLD_ASSERT(unit_index != INDEX_INVALID);
+    unit_t& unit = state.units[unit_index];
+
+    if (unit.target == UNIT_TARGET_BUILD) {
+        // Temporarily set cell to empty so that we can check if the space is clear for building
+        match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
+        bool can_build = unit.cell == unit.target_cell && 
+                                        !match_map_is_cell_rect_blocked(state, rect_t(unit.building_cell, match_building_cell_size(unit.building_type)));
+        if (!can_build) {
+            // Set the cell back to filled
+            match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
+            match_ui_show_status(state, UI_STATUS_CANT_BUILD);
+            unit.target = UNIT_TARGET_NONE;
+        } else {
+            state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
+            unit.building_id = match_building_create(state, unit.player_id, unit.building_type, unit.building_cell);
+            unit.timer = BUILD_TICK_DURATION;
+
+            // De-select the unit if it is selected
+            auto it = std::find(state.selection.ids.begin(), state.selection.ids.end(), unit_id);
+            if (it != state.selection.ids.end()) {
+                // De-select the unit
+                state.selection.ids.erase(it);
+
+                // If the selection is now empty, select the building instead
+                if (state.selection.ids.empty()) {
+                    state.selection.type = SELECTION_TYPE_BUILDINGS;
+                    state.selection.ids.push_back(unit.building_id);
+                }
+
+                match_ui_set_selection(state, state.selection);
+            }
+        }
+    } else if (unit.target == UNIT_TARGET_GOLD) {
+        if (xy::manhattan_distance(unit.cell, unit.target_cell) != 1 || !match_map_is_cell_gold(state, unit.target_cell)) {
+            match_unit_try_target_nearest_gold(state, unit);
+        } else if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
+            unit.timer = GOLD_TICK_DURATION;
+            unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
+        } else {
+            match_unit_try_return_gold(state, unit);
+        }
+    } else if (unit.target == UNIT_TARGET_CAMP) {
+        uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
+        if (building_index == INDEX_INVALID) {
+            log_info("camp no longer exists");
+            unit.target = UNIT_TARGET_NONE;
+        } else {
+            building_t& building = state.buildings[building_index];
+            bool is_unit_around_building = rect_t(building.cell - xy(1, 1), match_building_cell_size(building.type) + xy(2, 2)).has_point(unit.cell);
+            if (is_unit_around_building) {
+                state.player_gold[unit.player_id] += unit.gold_held;
+                unit.gold_held = 0;
+                match_unit_try_target_nearest_gold(state, unit);
+            } else {
+                match_unit_path_to_target(state, unit);
+            }
+        }
+    } else if (unit.target == UNIT_TARGET_CELL) {
+        log_info("movement finished and target is cell");
+        unit.target = UNIT_TARGET_NONE;
+    }
+}
+
 rect_t match_unit_get_rect(const unit_t& unit) {
     return rect_t(unit.position.to_xy() - xy(TILE_SIZE / 2, TILE_SIZE / 2), xy(TILE_SIZE, TILE_SIZE));
 }
@@ -1390,6 +1449,73 @@ void match_unit_stop_building(match_state_t& state, unit_t& unit, const building
     unit.position = match_cell_center(unit.cell);
     unit.target = UNIT_TARGET_NONE;
     unit.building_id = ID_NULL;
+}
+
+void match_unit_try_return_gold(const match_state_t& state, unit_t& unit) {
+    // Find the nearest mining camp
+    entity_id nearest_camp_id = ID_NULL;
+    int nearest_camp_dist = -1;
+    for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
+        if (state.buildings[building_index].is_finished && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit.player_id) {
+            if (nearest_camp_dist == -1 || xy::manhattan_distance(unit.cell, state.buildings[building_index].cell) < nearest_camp_dist) {
+                nearest_camp_id = state.buildings.get_id_of(building_index);
+                nearest_camp_dist = xy::manhattan_distance(unit.cell, state.buildings[building_index].cell);
+            }
+        }
+    }
+
+    if (nearest_camp_id != ID_NULL) {
+        unit.target = UNIT_TARGET_CAMP;
+        unit.target_entity_id = nearest_camp_id;
+        match_unit_path_to_target(state, unit);
+    } else {
+        log_info("nearest camp not found");
+        unit.target = UNIT_TARGET_NONE;
+    }
+}
+
+void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit) {
+    xy nearest_gold_cell = unit.cell;
+    int nearest_gold_dist = -1;
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            xy gold_cell = xy(x, y);
+            // Check if the cell is gold
+            if (!match_map_is_cell_gold(state, gold_cell)) {
+                continue;
+            }
+
+            // Check if the gold can be mined around
+            bool is_gold_cell_free = false;
+            for (int direction = DIRECTION_NORTH; direction < DIRECTION_COUNT; direction += 2) {
+                xy adjacent_cell = gold_cell + DIRECTION_XY[direction];
+                if (match_map_is_cell_in_bounds(state, adjacent_cell) && !match_map_is_cell_blocked(state, adjacent_cell)) {
+                    is_gold_cell_free = true;
+                    break;
+                }
+            }
+
+            // Check if the cell is closer to the nearest cell
+            if (is_gold_cell_free && (nearest_gold_dist == -1 || xy::manhattan_distance(unit.cell, gold_cell) < nearest_gold_dist)) {
+                nearest_gold_cell = gold_cell;
+                nearest_gold_dist = xy::manhattan_distance(unit.cell, nearest_gold_cell);
+            }
+        }
+    }
+
+    if (nearest_gold_dist != -1) {
+        log_info("nearest gold %xi", &nearest_gold_cell);
+        unit.target = UNIT_TARGET_GOLD;
+        unit.target_cell = nearest_gold_cell;
+        match_unit_path_to_target(state, unit);
+        if (unit.path.empty()) {
+            unit.timer = GOLD_TICK_DURATION;
+            unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
+        }
+    } else {
+        log_info("nearest gold not found");
+        unit.target = UNIT_TARGET_NONE;
+    }
 }
 
 // Building

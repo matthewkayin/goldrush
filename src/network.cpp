@@ -368,7 +368,11 @@ void network_server_start_loading() {
 
     // Broadcast a match start message to all clients
     message_match_load_t match_load;
+#ifdef GOLD_RAND_SEED
+    match_load.random_seed = GOLD_RAND_SEED;
+#else
     match_load.random_seed = (uint32_t)time(NULL);
+#endif
     ENetPacket* packet = enet_packet_create(&match_load, sizeof(message_match_load_t), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);

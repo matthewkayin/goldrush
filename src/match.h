@@ -252,16 +252,21 @@ uint32_t match_map_get_cell_type(const match_state_t& state, xy cell);
 entity_id match_map_get_cell_id(const match_state_t& state, xy cell);
 void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id = 0);
 void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id = 0);
+bool match_map_is_cell_gold(const match_state_t& state, xy cell);
+void match_map_decrement_gold(match_state_t& state, xy cell);
 
 // Unit
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
 void match_unit_update(match_state_t& state);
 void match_unit_path_to_target(const match_state_t& state, unit_t& unit);
+void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id);
 rect_t match_unit_get_rect(const unit_t& unit);
 UnitMode match_unit_get_mode(const unit_t& unit);
 AnimationName match_unit_get_expected_animation(const unit_t& unit);
 int match_unit_get_animation_vframe(const unit_t& unit);
 void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building);
+void match_unit_try_return_gold(const match_state_t& state, unit_t& unit);
+void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit);
 
 // Building
 entity_id match_building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);

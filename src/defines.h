@@ -8,7 +8,7 @@
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 8
 #define TILE_SIZE 16
-// #define VDEBUG_PATHFINDING
+#define GOLD_RAND_SEED 1722091950
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1
