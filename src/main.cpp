@@ -893,7 +893,7 @@ void render_match(const match_state_t& state) {
             .frame = unit.animation.frame,
             .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
         };
-        if (match_unit_is_building(unit)) {
+        if (match_unit_get_mode(unit) == UNIT_MODE_BUILDING) {
             const building_t& building = state.buildings[state.buildings.get_index_of(unit.building_id)];
             const building_data_t& data = BUILDING_DATA.at(building.type);
             int hframe = ((3 * building.health) / data.max_health);

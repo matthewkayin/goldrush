@@ -43,6 +43,8 @@ static const int CAMERA_DRAG_SPEED = 8;
 
 static const uint32_t PATH_PAUSE_DURATION = 20;
 static const uint32_t BUILD_TICK_DURATION = 8;
+static const uint32_t GOLD_TICK_DURATION = 60;
+static const uint32_t UNIT_MAX_GOLD_HELD = 5;
 
 static const char* UI_STATUS_CANT_BUILD = "You can't build there.";
 static const char* UI_STATUS_NOT_ENOUGH_GOLD = "Not enough gold.";
@@ -784,7 +786,7 @@ selection_t match_ui_create_selection_from_rect(const match_state_t& state) {
         }
 
         // Don't select units which are building
-        if (match_unit_is_building(unit)) {
+        if (match_unit_get_mode(unit) == UNIT_MODE_BUILDING) {
             continue;
         }
 
@@ -966,22 +968,12 @@ void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, c
     unit.building_id = ID_NULL;
     unit.building_type = BUILDING_NONE;
 
+    unit.gold_held = 0;
+
     unit.timer = 0;
 
     entity_id unit_id = state.units.push_back(unit);
     match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
-}
-
-rect_t match_unit_get_rect(const unit_t& unit) {
-    return rect_t(unit.position.to_xy() - xy(TILE_SIZE / 2, TILE_SIZE / 2), xy(TILE_SIZE, TILE_SIZE));
-}
-
-bool match_unit_is_moving(const unit_t& unit) {
-    return unit.position != match_cell_center(unit.cell) || !unit.path.empty();
-}
-
-bool match_unit_is_building(const unit_t& unit) {
-    return unit.building_id != ID_NULL;
 }
 
 void match_unit_update(match_state_t& state) {
@@ -995,34 +987,51 @@ void match_unit_update(match_state_t& state) {
             unit.timer--;
             // On Behavior timer finished
             if (unit.timer == 0) {
-                if (match_unit_is_moving(unit)) {
-                    // Re-pathfind
-                    match_unit_path_to_target(state, unit);
-                } else if (match_unit_is_building(unit)) {
-                    // Building tick
-                    building_t& building = state.buildings[state.buildings.get_index_of(unit.building_id)];
-
-                    building.health++;
-                    if (building.health == BUILDING_DATA.at(building.type).max_health) {
-                        // On building finished
-                        building.is_finished = true;
-
-                        // If selecting the building
-                        if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == unit.building_id) {
-                            // Trigger a re-select so that UI buttons are updated correctly
-                            match_ui_set_selection(state, state.selection);
-                        }
-
-                        match_unit_stop_building(state, unit, building);
-                    } else {
-                        unit.timer = BUILD_TICK_DURATION;
+                switch (match_unit_get_mode(unit)) {
+                    case UNIT_MODE_MOVING: {
+                        // Re-pathfind
+                        match_unit_path_to_target(state, unit);
+                        break;
                     }
+                    case UNIT_MODE_BUILDING: {
+                        // Building tick
+                        building_t& building = state.buildings[state.buildings.get_index_of(unit.building_id)];
+
+                        building.health++;
+                        if (building.health == BUILDING_DATA.at(building.type).max_health) {
+                            // On building finished
+                            building.is_finished = true;
+
+                            // If selecting the building
+                            if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == unit.building_id) {
+                                // Trigger a re-select so that UI buttons are updated correctly
+                                match_ui_set_selection(state, state.selection);
+                            }
+
+                            match_unit_stop_building(state, unit, building);
+                        } else {
+                            unit.timer = BUILD_TICK_DURATION;
+                        }
+                        break;
+                    }
+                    case UNIT_MODE_MINING: {
+                        if (unit.gold_held < UNIT_MAX_GOLD_HELD - 1) {
+                            unit.gold_held++;
+                            unit.timer = GOLD_TICK_DURATION;
+                        } else {
+                            // TODO: return the gold
+                            unit.target = UNIT_TARGET_NONE;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
                 }
             }
         }
 
         // MOVEMENT
-        if (match_unit_is_moving(unit) && unit.timer == 0) {
+        if (match_unit_get_mode(unit) == UNIT_MODE_MOVING && unit.timer == 0) {
             fixed movement_left = unit_data.speed;
             while (movement_left.raw_value > 0) {
                 // If the unit is not moving between tiles, then pop the next cell off the path
@@ -1054,7 +1063,7 @@ void match_unit_update(match_state_t& state) {
             } // End while movement_left > 0
 
             // On movement finished
-            if (!match_unit_is_moving(unit)) {
+            if (match_unit_get_mode(unit) != UNIT_MODE_MOVING) {
                 if (unit.target == UNIT_TARGET_BUILD) {
                     // Temporarily set cell to empty so that we can check if the space is clear for building
                     match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
@@ -1085,6 +1094,17 @@ void match_unit_update(match_state_t& state) {
                             match_ui_set_selection(state, state.selection);
                         }
                     }
+                } else if (unit.target == UNIT_TARGET_GOLD) {
+                    if (xy::manhattan_distance(unit.cell, unit.target_cell) != 1) {
+                        // TODO make unit repath to find the gold
+                        unit.target = UNIT_TARGET_NONE;
+                    } else {
+                        // TODO if unit reaches here and already has full gold, return to mining camp
+                        unit.timer = GOLD_TICK_DURATION;
+                        unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
+                    }
+                } else if (unit.target == UNIT_TARGET_CELL) {
+                    unit.target = UNIT_TARGET_NONE;
                 }
             }
         } // End if unit is moving
@@ -1203,9 +1223,7 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
                 continue;
             }
             // Don't consider blocked spaces
-            // ...except for the target cell. If the target is blocked we pretend that it isn't. 
-            // This allows us to fully path to the target and ignore worst-case pathfinding
-            if (match_map_is_cell_blocked(state, child.cell) && child.cell != target_cell) {
+            if (match_map_is_cell_blocked(state, child.cell)) {
                 continue;
             }
             // Don't consider already explored children
@@ -1241,37 +1259,55 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
         unit.path.insert(unit.path.begin(), current.cell);
         current = explored[current.parent];
     }
-    // Since earlier in the algorithm we treated the target_cell as if it was not blocked,
-    // now we have to consider whether or not it really is free, and if it's not, remove it
-    // from the path
-    if (match_map_is_cell_blocked(state, target_cell)) {
-        unit.path.pop_back();
+}
+
+rect_t match_unit_get_rect(const unit_t& unit) {
+    return rect_t(unit.position.to_xy() - xy(TILE_SIZE / 2, TILE_SIZE / 2), xy(TILE_SIZE, TILE_SIZE));
+}
+
+UnitMode match_unit_get_mode(const unit_t& unit) {
+    if (unit.position != match_cell_center(unit.cell) || !unit.path.empty()) {
+        return UNIT_MODE_MOVING;
+    } else if (unit.building_id != ID_NULL) {
+        return UNIT_MODE_BUILDING;
+    } else if (unit.target == UNIT_TARGET_GOLD && xy::manhattan_distance(unit.cell, unit.target_cell) == 1) {
+        return UNIT_MODE_MINING;
+    } else {
+        return UNIT_MODE_NONE;
     }
 }
 
 AnimationName match_unit_get_expected_animation(const unit_t& unit) {
-    if (match_unit_is_moving(unit) && unit.timer == 0) {
-        return ANIMATION_UNIT_MOVE;
-    } else if (match_unit_is_building(unit)) {
-        return ANIMATION_UNIT_BUILD;
+    switch (match_unit_get_mode(unit)) {
+        case UNIT_MODE_MOVING:
+            return unit.timer == 0 ? ANIMATION_UNIT_MOVE : ANIMATION_UNIT_IDLE;
+        case UNIT_MODE_BUILDING:
+            return ANIMATION_UNIT_BUILD;
+        case UNIT_MODE_MINING:
+            return ANIMATION_UNIT_ATTACK;
+        default:
+            return ANIMATION_UNIT_IDLE;
     }
-
-    return ANIMATION_UNIT_IDLE;
 }
 
 int match_unit_get_animation_vframe(const unit_t& unit) {
     if (unit.animation.name == ANIMATION_UNIT_BUILD) {
         return 0;
     }
+    int vframe;
     if (unit.direction == DIRECTION_NORTH) {
-        return 1;
+        vframe = 1;
     } else if (unit.direction == DIRECTION_SOUTH) {
-        return 0;
+        vframe = 0;
     } else if (unit.direction > DIRECTION_SOUTH) {
-        return 3;
+        vframe = 3;
     } else {
-        return 2;
+        vframe = 2;
     }
+    if (unit.gold_held > 0 && (unit.animation.name == ANIMATION_UNIT_MOVE || unit.animation.name == ANIMATION_UNIT_IDLE)) {
+        vframe += 4;
+    }
+    return vframe;
 }
 
 void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building) {

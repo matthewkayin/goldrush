@@ -121,6 +121,13 @@ enum UnitTargetType {
     UNIT_TARGET_GOLD
 };
 
+enum UnitMode {
+    UNIT_MODE_NONE,
+    UNIT_MODE_MOVING,
+    UNIT_MODE_BUILDING,
+    UNIT_MODE_MINING
+};
+
 struct unit_t {
     UnitType type;
     uint8_t player_id;
@@ -139,6 +146,8 @@ struct unit_t {
     BuildingType building_type;
     entity_id building_id;
     xy building_cell;
+
+    uint32_t gold_held;
 
     uint32_t timer;
 };
@@ -245,11 +254,10 @@ void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint3
 
 // Unit
 void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
-rect_t match_unit_get_rect(const unit_t& unit);
-bool match_unit_is_moving(const unit_t& unit);
-bool match_unit_is_building(const unit_t& unit);
 void match_unit_update(match_state_t& state);
 void match_unit_path_to_target(const match_state_t& state, unit_t& unit);
+rect_t match_unit_get_rect(const unit_t& unit);
+UnitMode match_unit_get_mode(const unit_t& unit);
 AnimationName match_unit_get_expected_animation(const unit_t& unit);
 int match_unit_get_animation_vframe(const unit_t& unit);
 void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building);
