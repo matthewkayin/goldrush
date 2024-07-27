@@ -117,7 +117,7 @@ enum UnitTargetType {
     UNIT_TARGET_CELL,
     UNIT_TARGET_BUILD,
     UNIT_TARGET_UNIT,
-    UNIT_TARGET_BUILDING,
+    UNIT_TARGET_CAMP,
     UNIT_TARGET_GOLD
 };
 
@@ -243,6 +243,7 @@ xy match_camera_centered_on_cell(xy cell);
 xy_fixed match_cell_center(xy cell);
 xy match_get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
 xy match_get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect);
+xy match_get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building);
 bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool match_map_is_cell_blocked(const match_state_t& state, xy cell);
 bool match_map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);

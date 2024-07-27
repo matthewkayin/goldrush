@@ -71,7 +71,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .cell_width = 2,
         .cell_height = 2,
         .cost = 100,
-        .max_health = 100,
+        .max_health = 12,
         .builder_positions_x = { 1, 15, 14 },
         .builder_positions_y = { 13, 13, 2 },
         .builder_flip_h = { false, true, true }
@@ -591,20 +591,41 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         break;
                     }
                     case CELL_UNIT: {
-                        unit.target = UNIT_TARGET_UNIT;
-                        unit.target_entity_id = match_map_get_cell_id(state, unit_target);
+                        entity_id target_entity_id = match_map_get_cell_id(state, unit_target);
+                        if (state.units.get_index_of(target_entity_id) != INDEX_INVALID) {
+                            unit.target = UNIT_TARGET_UNIT;
+                            unit.target_entity_id = target_entity_id;
+                        } else {
+                            unit.target = UNIT_TARGET_CELL;
+                            unit.target_cell = unit_target;
+                        }
                         break;
                     }
                     case CELL_BUILDING: {
-                        unit.target = UNIT_TARGET_BUILDING;
-                        unit.target_entity_id = match_map_get_cell_id(state, unit_target);
+                        entity_id target_entity_id = match_map_get_cell_id(state, unit_target);
+                        uint32_t building_index = state.buildings.get_index_of(target_entity_id);
+                        if (building_index == INDEX_INVALID) {
+                            unit.target = UNIT_TARGET_CELL;
+                            unit.target_cell = unit_target;
+                        } else if (state.buildings[building_index].type == BUILDING_CAMP && unit.gold_held > 0) {
+                            unit.target = UNIT_TARGET_CAMP;
+                            unit.target_entity_id = match_map_get_cell_id(state, unit_target);
+                        } else {
+                            unit.target = UNIT_TARGET_CELL;
+                            unit.target_cell = match_get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index]);
+                        }
                         break;
                     }
                     case CELL_GOLD1:
                     case CELL_GOLD2:
                     case CELL_GOLD3: {
-                        unit.target = UNIT_TARGET_GOLD;
-                        unit.target_cell = unit_target;
+                        if (unit.type == UNIT_MINER) {
+                            unit.target = UNIT_TARGET_GOLD;
+                            unit.target_cell = unit_target;
+                        } else {
+                            unit.target = UNIT_TARGET_CELL;
+                            unit.target_cell = unit_target;
+                        }
                         break;
                     }
                 } // End switch unit target cell type
@@ -903,6 +924,40 @@ xy match_get_first_empty_cell_around_rect(const match_state_t& state, rect_t rec
     return cell;
 }
 
+// Returns the nearest cell around the rect relative to start_cell
+// If there are no free cells around the rect in a radius of 1, then this returns the start cell
+xy match_get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building) {
+    xy nearest_cell;
+    int nearest_cell_dist = -1;
+
+    rect_t rect = rect_t(building.cell, match_building_cell_size(building.type));
+    log_info("start cell: %xi, checking around rect %xi / %xi", &start_cell, &rect.position, &rect.size);
+
+    xy cell = rect.position - xy(1, 1);
+    xy step = xy(0, 1);
+    do {
+        log_info("cell: %xi", &cell);
+        if (match_map_is_cell_in_bounds(state, cell) && !match_map_is_cell_blocked(state, cell) &&
+            (nearest_cell_dist == -1 || xy::manhattan_distance(start_cell, cell) < nearest_cell_dist)) {
+
+            nearest_cell = cell;
+            nearest_cell_dist = xy::manhattan_distance(start_cell, cell);
+            log_info("nearer");
+        }
+
+        cell += step;
+        if (cell == rect.position + xy(-1, rect.size.y)) {
+            step = xy(1, 0);
+        } else if (cell == rect.position + rect.size) {
+            step = xy(0, -1);
+        } else if (cell == rect.position + xy(rect.size.x, -1)) {
+            step = xy(-1, 0);
+        }
+    } while (cell != rect.position - xy(1, 1));
+
+    return nearest_cell_dist != -1 ? nearest_cell : start_cell;
+}
+
 bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell) {
     return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
 }
@@ -1015,7 +1070,7 @@ void match_unit_update(match_state_t& state) {
                         break;
                     }
                     case UNIT_MODE_MINING: {
-                        if (unit.gold_held < UNIT_MAX_GOLD_HELD - 1) {
+                        if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
                             unit.gold_held++;
                             unit.timer = GOLD_TICK_DURATION;
                         } else {
@@ -1103,6 +1158,21 @@ void match_unit_update(match_state_t& state) {
                         unit.timer = GOLD_TICK_DURATION;
                         unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
                     }
+                } else if (unit.target == UNIT_TARGET_CAMP) {
+                    uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
+                    if (building_index == INDEX_INVALID) {
+                        unit.target = UNIT_TARGET_NONE;
+                    } else {
+                        building_t& building = state.buildings[building_index];
+                        bool is_unit_around_building = rect_t(building.cell - xy(1, 1), match_building_cell_size(building.type) + xy(2, 2)).has_point(unit.cell);
+                        log_info("is unit around building? %i", (int)is_unit_around_building);
+                        if (is_unit_around_building) {
+                            state.player_gold[unit.player_id] += unit.gold_held;
+                            unit.gold_held = 0;
+                        } else {
+                            match_unit_path_to_target(state, unit);
+                        }
+                    }
                 } else if (unit.target == UNIT_TARGET_CELL) {
                     unit.target = UNIT_TARGET_NONE;
                 }
@@ -1134,17 +1204,22 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
             break;
         case UNIT_TARGET_UNIT: {
             uint32_t unit_index = state.units.get_index_of(unit.target_entity_id);
-            target_cell = unit_index == INDEX_INVALID ? unit.cell : state.units[unit_index].cell;
+            target_cell = unit_index != INDEX_INVALID 
+                                    ? state.units[unit_index].cell 
+                                    : unit.cell;
             break;
         }
-        case UNIT_TARGET_BUILDING: {
+        case UNIT_TARGET_CAMP: {
             // TODO: if unit targets building, path to the nearest cell around the building
             // possibly lump the pathing up into one function so that initial pathing and repathing can work off the same code?
             // as well as unit finished but target invalid pathing?
             // match_unit_path_to_target() ?
             // also we can make the pathing more performant by temporarily unblocking the destination whenever it is blocked and thus allowing the unit to path while skipping the worst case
             uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
-            target_cell = building_index == INDEX_INVALID ? unit.cell : state.buildings[building_index].cell;
+            target_cell = building_index != INDEX_INVALID 
+                                ? match_get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index])
+                                : unit.cell;
+            log_info("nearest around building result: %xi", &target_cell);
             break;
         }
     }
