@@ -683,9 +683,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             // Refund the player
             state.player_gold[player_id] += BUILDING_DATA.at(building.type).cost;
             // Tell the unit to stop building this building
-            for (unit_t& unit : state.units) {
-                if (unit.building_id == input.build_cancel.building_id) {
-                    match_unit_stop_building(state, unit, building);
+            for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+                if (state.units[unit_index].building_id == input.build_cancel.building_id) {
+                    match_unit_stop_building(state, state.units.get_id_of(unit_index), building);
                 }
             }
             // Destroy the building
@@ -750,6 +750,7 @@ void match_ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+                GOLD_ASSERT(!state.buildings[state.buildings.get_index_of(state.selection.ids[0])].is_finished);
                 input_t input;
                 input.type = INPUT_BUILD_CANCEL;
                 input.build_cancel.building_id = state.selection.ids[0];
@@ -948,12 +949,14 @@ xy match_get_nearest_free_cell_around_building(const match_state_t& state, xy st
     uint32_t index = 0;
     xy cell = cell_begin[index];
     while (index < 4) {
-        if (match_map_is_cell_in_bounds(state, cell) && !match_map_is_cell_blocked(state, cell) &&
-            (nearest_cell_dist == -1 || xy::manhattan_distance(start_cell, cell) < nearest_cell_dist)) {
-
-            nearest_cell = cell;
-            nearest_cell_dist = xy::manhattan_distance(start_cell, cell);
-        }
+        if (match_map_is_cell_in_bounds(state, cell)) {
+            uint32_t cell_type = match_map_get_cell_type(state, cell);
+            bool is_cell_free = cell_type == CELL_EMPTY || (cell_type == CELL_UNIT && xy::manhattan_distance(start_cell, cell) > 3);
+            if (is_cell_free && (nearest_cell_dist == -1 || xy::manhattan_distance(start_cell, cell) < nearest_cell_dist)) {
+                nearest_cell = cell;
+                nearest_cell_dist = xy::manhattan_distance(start_cell, cell);
+            }
+        } 
 
         cell += cell_step[index];
         if (cell == cell_end[index]) {
@@ -1026,28 +1029,18 @@ void match_map_decrement_gold(match_state_t& state, xy cell) {
 
     state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_EMPTY;
     // Tell all the adjacent miners to stop mining the now empty cell
-    for (int direction = DIRECTION_NORTH; direction < DIRECTION_COUNT; direction += 2) {
-        xy adjacent_cell = cell + DIRECTION_XY[direction];
-        // Ignore out of bounds cells
-        if (!match_map_is_cell_in_bounds(state, adjacent_cell)) {
-            continue;
-        }
-        // Ignore non-unit cells
-        uint32_t adjacent_cell_type = match_map_get_cell_type(state, adjacent_cell);
-        if (adjacent_cell_type != CELL_UNIT) {
-            continue;
-        }
-
-        entity_id unit_id = match_map_get_cell_id(state, adjacent_cell);
-        GOLD_ASSERT(state.units.get_index_of(unit_id) != INDEX_INVALID);
-        unit_t& unit = state.units[state.units.get_index_of(unit_id)];
-
+    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+        unit_t& unit = state.units[unit_index];
         // Ignore units who aren't mining this gold
-        if (unit.type != UNIT_MINER || unit.target != UNIT_TARGET_GOLD || unit.target_cell != cell) {
+        if (unit.target != UNIT_TARGET_GOLD || unit.target_cell != cell) {
             continue;
         }
         unit.timer = 0;
-        match_unit_try_target_nearest_gold(state, unit);
+        if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
+            match_unit_try_target_nearest_gold(state, unit);
+        } else {
+            match_unit_try_return_gold(state, unit);
+        }
     }
 }
 
@@ -1094,6 +1087,9 @@ void match_unit_update(match_state_t& state) {
                     case UNIT_MODE_MOVING: {
                         // Re-pathfind
                         match_unit_path_to_target(state, unit);
+                        if (unit.path.empty()) {
+                            match_unit_on_movement_finished(state, unit_id);
+                        }
                         // TODO: what happens if we repath and end up with nothing?
                         break;
                     }
@@ -1112,7 +1108,7 @@ void match_unit_update(match_state_t& state) {
                                 match_ui_set_selection(state, state.selection);
                             }
 
-                            match_unit_stop_building(state, unit, building);
+                            match_unit_stop_building(state, unit_id, building);
                         } else {
                             unit.timer = BUILD_TICK_DURATION;
                         }
@@ -1143,8 +1139,13 @@ void match_unit_update(match_state_t& state) {
                     unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
                     if (match_map_is_cell_blocked(state, unit.path[0])) {
                         // Path is blocked, stop movement
-                        unit.timer = PATH_PAUSE_DURATION;
-                        break;
+                        // unit.timer = PATH_PAUSE_DURATION;
+                        match_unit_path_to_target(state, unit);
+                        if (unit.path.empty()) {
+                            match_unit_on_movement_finished(state, unit_id);
+                            break;
+                        }
+                        continue;
                     }
 
                     match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
@@ -1212,7 +1213,6 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
             target_cell = building_index != INDEX_INVALID 
                                 ? match_get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index])
                                 : unit.cell;
-            log_info("nearest around building result: %xi", &target_cell);
             break;
         }
     }
@@ -1224,14 +1224,14 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
     }
 
     struct node_t {
-        uint32_t cost;
-        uint32_t distance;
+        fixed cost;
+        fixed distance;
         // The parent is the previous node stepped in the path to reach this node
         // It should be an index in the explored list, or -1 if it is the start node
         int parent; 
         xy cell;
 
-        uint32_t score() const {
+        fixed score() const {
             return cost + distance;
         }
     };
@@ -1245,12 +1245,13 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
     node_t path_end;
 
     frontier.push_back((node_t) {
-        .cost = 0,
-        .distance = xy::manhattan_distance(unit.cell, target_cell),
+        .cost = fixed::from_raw(0),
+        .distance = fixed::from_int(xy::manhattan_distance(unit.cell, target_cell)),
         .parent = -1,
         .cell = unit.cell
     });
 
+    // TODO prevent unit from pathing through diagonal gaps
     while (!frontier.empty()) {
         // Find the smallest path
         uint32_t smallest_index = 0;
@@ -1280,9 +1281,10 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
 
         // Consider all children
         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            fixed cost_increase = direction % 2 == 0 ? fixed::from_int(1) : (fixed::from_int(3) / 2);
             node_t child = (node_t) {
-                .cost = smallest.cost + 1,
-                .distance = xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], target_cell),
+                .cost = smallest.cost + cost_increase,
+                .distance = fixed::from_int(xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], target_cell)),
                 .parent = (int)explored.size() - 1,
                 .cell = smallest.cell + DIRECTION_XY[direction]
             };
@@ -1291,7 +1293,9 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
                 continue;
             }
             // Don't consider blocked spaces
-            if (match_map_is_cell_blocked(state, child.cell)) {
+            uint32_t child_cell_type = match_map_get_cell_type(state, child.cell);
+            if (!(child_cell_type == CELL_EMPTY || 
+                (child_cell_type == CELL_UNIT && xy::manhattan_distance(unit.cell, child.cell) > 3))) {
                 continue;
             }
             // Don't consider already explored children
@@ -1322,7 +1326,7 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
     // Backtrack to build the path
     node_t current = found_path ? path_end : explored[closest_explored];
     unit.path.clear();
-    unit.path.reserve(current.cost);
+    unit.path.reserve(current.cost.integer_part());
     while (current.parent != -1) {
         unit.path.insert(unit.path.begin(), current.cell);
         current = explored[current.parent];
@@ -1376,7 +1380,6 @@ void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
     } else if (unit.target == UNIT_TARGET_CAMP) {
         uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
         if (building_index == INDEX_INVALID) {
-            log_info("camp no longer exists");
             unit.target = UNIT_TARGET_NONE;
         } else {
             building_t& building = state.buildings[building_index];
@@ -1390,7 +1393,6 @@ void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
             }
         }
     } else if (unit.target == UNIT_TARGET_CELL) {
-        log_info("movement finished and target is cell");
         unit.target = UNIT_TARGET_NONE;
     }
 }
@@ -1444,11 +1446,16 @@ int match_unit_get_animation_vframe(const unit_t& unit) {
     return vframe;
 }
 
-void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building) {
+void match_unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building) {
+    uint32_t unit_index = state.units.get_index_of(unit_id);
+    GOLD_ASSERT(unit_index != INDEX_INVALID);
+    unit_t& unit = state.units[unit_index];
+
     unit.cell = match_get_first_empty_cell_around_rect(state, rect_t(building.cell, match_building_cell_size(building.type)));
     unit.position = match_cell_center(unit.cell);
     unit.target = UNIT_TARGET_NONE;
     unit.building_id = ID_NULL;
+    match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
 }
 
 void match_unit_try_return_gold(const match_state_t& state, unit_t& unit) {
@@ -1469,12 +1476,13 @@ void match_unit_try_return_gold(const match_state_t& state, unit_t& unit) {
         unit.target_entity_id = nearest_camp_id;
         match_unit_path_to_target(state, unit);
     } else {
-        log_info("nearest camp not found");
         unit.target = UNIT_TARGET_NONE;
     }
 }
 
 void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit) {
+    unit.target = UNIT_TARGET_NONE;
+
     xy nearest_gold_cell = unit.cell;
     int nearest_gold_dist = -1;
     for (int x = 0; x < state.map_width; x++) {
@@ -1504,7 +1512,6 @@ void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit
     }
 
     if (nearest_gold_dist != -1) {
-        log_info("nearest gold %xi", &nearest_gold_cell);
         unit.target = UNIT_TARGET_GOLD;
         unit.target_cell = nearest_gold_cell;
         match_unit_path_to_target(state, unit);
@@ -1513,7 +1520,6 @@ void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit
             unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
         }
     } else {
-        log_info("nearest gold not found");
         unit.target = UNIT_TARGET_NONE;
     }
 }

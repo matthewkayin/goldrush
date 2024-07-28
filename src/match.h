@@ -264,7 +264,7 @@ rect_t match_unit_get_rect(const unit_t& unit);
 UnitMode match_unit_get_mode(const unit_t& unit);
 AnimationName match_unit_get_expected_animation(const unit_t& unit);
 int match_unit_get_animation_vframe(const unit_t& unit);
-void match_unit_stop_building(match_state_t& state, unit_t& unit, const building_t& building);
+void match_unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building);
 void match_unit_try_return_gold(const match_state_t& state, unit_t& unit);
 void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit);
 
