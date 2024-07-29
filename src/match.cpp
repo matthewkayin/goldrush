@@ -163,7 +163,9 @@ match_state_t match_init() {
     int gold_count = 0;
     while (gold_count < gold_target) {
         // Randomly find the start of a gold cluster
-        xy gold_cell = xy(lcg_rand() % state.map_width, lcg_rand() % state.map_height);
+        xy gold_cell;
+        gold_cell.x = lcg_rand() % state.map_width;
+        gold_cell.y = lcg_rand() % state.map_height;
         log_info("gold cell %xi", &gold_cell);
         if (match_map_is_cell_blocked(state, gold_cell)) {
             continue;
