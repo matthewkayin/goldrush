@@ -4,6 +4,7 @@
 #include "network.h"
 #include "logger.h"
 #include "input.h"
+#include "lcg.h"
 #include <cstring>
 #include <unordered_map>
 #include <array>
@@ -138,7 +139,7 @@ match_state_t match_init() {
         // Find an unused spawn direction
         int spawn_direction;
         do {
-            spawn_direction = rand() % DIRECTION_COUNT;
+            spawn_direction = lcg_rand() % DIRECTION_COUNT;
         } while (is_spawn_direction_used[spawn_direction]);
         is_spawn_direction_used[spawn_direction] = true;
 
@@ -160,7 +161,7 @@ match_state_t match_init() {
     int gold_count = 0;
     while (gold_count < gold_target) {
         // Randomly find the start of a gold cluster
-        xy gold_cell = xy(rand() % state.map_width, rand() % state.map_height);
+        xy gold_cell = xy(lcg_rand() % state.map_width, lcg_rand() % state.map_height);
         if (match_map_is_cell_blocked(state, gold_cell)) {
             continue;
         }
@@ -179,13 +180,13 @@ match_state_t match_init() {
         }
 
         // Place gold on the map around the cluster
-        int cluster_size = std::min(3 + (rand() % 7), gold_target - gold_count);
+        int cluster_size = std::min(3 + (lcg_rand() % 7), gold_target - gold_count);
         for (int i = 0; i < cluster_size; i++) {
-            match_map_set_cell_value(state, gold_cell, CELL_GOLD1 + (rand() % 3), 10);
+            match_map_set_cell_value(state, gold_cell, CELL_GOLD1 + (lcg_rand() % 3), 10);
             gold_count++;
 
             // Determine the position of the next gold cell
-            int guess_direction = rand() % DIRECTION_COUNT;
+            int guess_direction = lcg_rand() % DIRECTION_COUNT;
             int direction = guess_direction;
             bool is_gold_cell_valid = false;
             do {

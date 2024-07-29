@@ -9,6 +9,7 @@
 #include "platform.h"
 #include "input.h"
 #include "container.h"
+#include "lcg.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>

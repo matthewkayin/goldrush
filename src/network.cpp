@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "logger.h"
 #include "asserts.h"
+#include "lcg.h"
 #include <enet/enet.h>
 #include <cstdint>
 #include <string>
@@ -382,7 +383,7 @@ void network_server_start_loading() {
     event.type = NETWORK_EVENT_MATCH_LOAD;
     network_event_enqueue(event);
 
-    srand(match_load.random_seed);
+    lcg_srand(match_load.random_seed);
     log_info("Set random seed to %u", match_load.random_seed);
 }
 
@@ -461,7 +462,7 @@ void client_handle_message(uint8_t* data, size_t length) {
         case MESSAGE_MATCH_LOAD: {
             uint32_t random_seed;
             memcpy(&random_seed, data + 4, sizeof(uint32_t)); 
-            srand(random_seed);
+            lcg_srand(random_seed);
             log_info("Set random seed to %u", random_seed);
 
             network_event_t event;
