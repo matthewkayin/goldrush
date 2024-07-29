@@ -141,6 +141,7 @@ match_state_t match_init() {
         int spawn_direction;
         do {
             spawn_direction = lcg_rand() % DIRECTION_COUNT;
+            log_info("spawn direction: %i", spawn_direction);
         } while (is_spawn_direction_used[spawn_direction]);
         is_spawn_direction_used[spawn_direction] = true;
 
@@ -163,6 +164,7 @@ match_state_t match_init() {
     while (gold_count < gold_target) {
         // Randomly find the start of a gold cluster
         xy gold_cell = xy(lcg_rand() % state.map_width, lcg_rand() % state.map_height);
+        log_info("gold cell %xi", &gold_cell);
         if (match_map_is_cell_blocked(state, gold_cell)) {
             continue;
         }
@@ -182,12 +184,16 @@ match_state_t match_init() {
 
         // Place gold on the map around the cluster
         int cluster_size = std::min(3 + (lcg_rand() % 7), gold_target - gold_count);
+        log_info("cluster size %i", cluster_size);
         for (int i = 0; i < cluster_size; i++) {
-            match_map_set_cell_value(state, gold_cell, CELL_GOLD1 + (lcg_rand() % 3), 10);
+            int gold_offset = lcg_rand() % 3;
+            log_info("gold offset %i", gold_offset);
+            match_map_set_cell_value(state, gold_cell, CELL_GOLD1 + gold_offset, 10);
             gold_count++;
 
             // Determine the position of the next gold cell
             int guess_direction = lcg_rand() % DIRECTION_COUNT;
+            log_info("guess direction %i", guess_direction);
             int direction = guess_direction;
             bool is_gold_cell_valid = false;
             do {
