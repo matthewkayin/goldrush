@@ -73,7 +73,7 @@ struct message_ready_t {
 struct message_match_load_t {
     const uint8_t type = MESSAGE_MATCH_LOAD;
     uint8_t padding[3];
-    uint32_t random_seed;
+    int32_t random_seed;
 };
 
 struct message_match_start_t {
@@ -460,10 +460,10 @@ void client_handle_message(uint8_t* data, size_t length) {
             break;
         }
         case MESSAGE_MATCH_LOAD: {
-            uint32_t random_seed;
-            memcpy(&random_seed, data + 4, sizeof(uint32_t)); 
+            int32_t random_seed;
+            memcpy(&random_seed, data + 4, sizeof(int32_t)); 
             lcg_srand(random_seed);
-            log_info("Set random seed to %u", random_seed);
+            log_info("Set random seed to %i", random_seed);
 
             network_event_t event;
             event.type = NETWORK_EVENT_MATCH_LOAD;

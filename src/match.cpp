@@ -126,6 +126,7 @@ match_state_t match_init() {
     // Init players
     xy player_spawns[MAX_PLAYERS];
     bool is_spawn_direction_used[DIRECTION_COUNT];
+    memset(is_spawn_direction_used, 0, sizeof(is_spawn_direction_used));
     uint8_t player_count = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
