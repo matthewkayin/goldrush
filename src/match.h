@@ -37,7 +37,8 @@ enum InputType {
 
 struct input_move_t {
     xy target_cell;
-    uint8_t unit_count;
+    entity_id target_entity_id;
+    uint16_t unit_count;
     entity_id unit_ids[MAX_UNITS];
 };
 

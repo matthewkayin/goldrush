@@ -42,7 +42,6 @@ static const rect_t UI_BUTTON_RECT[6] = {
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
-static const uint32_t PATH_PAUSE_DURATION = 20;
 static const uint32_t BUILD_TICK_DURATION = 8;
 static const uint32_t GOLD_TICK_DURATION = 60;
 static const uint32_t UNIT_MAX_GOLD_HELD = 5;
@@ -409,6 +408,7 @@ void match_update(match_state_t& state) {
             input_t input;
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
+            input.move.target_entity_id = match_map_get_cell_type(state, input.move.target_cell) == CELL_UNIT ? match_map_get_cell_id(state, input.move.target_cell) : ID_NULL;
             input.move.unit_count = 0;
             memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
             input.move.unit_count = state.selection.ids.size();
@@ -418,7 +418,7 @@ void match_update(match_state_t& state) {
 
             // Provide instant user feedback
             state.ui_move_value = match_map_get_cell_value(state, input.move.target_cell);
-            if ((state.ui_move_value & CELL_TYPE_MASK) == CELL_EMPTY) {
+            if (match_map_get_cell_type(state, input.move.target_cell) == CELL_EMPTY) {
                 state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
                 state.ui_move_position = mouse_world_pos;
             } else {
@@ -469,8 +469,11 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
             out_buffer_length += sizeof(xy);
 
-            out_buffer[out_buffer_length] = input.move.unit_count;
-            out_buffer_length += 1;
+            memcpy(out_buffer + out_buffer_length, &input.move.target_entity_id, sizeof(entity_id));
+            out_buffer_length += sizeof(entity_id);
+
+            memcpy(out_buffer + out_buffer_length, &input.move.unit_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
 
             memcpy(out_buffer + out_buffer_length, input.move.unit_ids, input.move.unit_count * sizeof(entity_id));
             out_buffer_length += input.move.unit_count * sizeof(entity_id);
@@ -509,8 +512,12 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
 
-            input.move.unit_count = in_buffer[in_buffer_head];
-            in_buffer_head++;
+            memcpy(&input.move.target_entity_id, in_buffer + in_buffer_head, sizeof(entity_id));
+            in_buffer_head += sizeof(entity_id);
+
+            memcpy(&input.move.unit_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
             memcpy(input.move.unit_ids, in_buffer + in_buffer_head, input.move.unit_count * sizeof(entity_id));
             in_buffer_head += input.move.unit_count * sizeof(entity_id);
             break;
@@ -541,7 +548,10 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input) {
     switch (input.type) {
         case INPUT_MOVE: {
-            bool should_move_as_group = input.move.unit_count > 1 && match_map_get_cell_value(state, input.move.target_cell) == CELL_EMPTY;
+            // If we tried to move towards a unit, try and find the unit
+            uint32_t target_unit_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
+
+            bool should_move_as_group = target_unit_index == INDEX_INVALID && input.move.unit_count > 1 && match_map_get_cell_value(state, input.move.target_cell) == CELL_EMPTY;
             xy group_center;
 
             if (should_move_as_group) {
@@ -585,55 +595,51 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     if (match_map_is_cell_in_bounds(state, group_move_target) && xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3) {
                         unit_target = group_move_target;
                     }
+                } else if (target_unit_index != INDEX_INVALID) {
+                    unit_target = state.units[target_unit_index].cell;
                 }
 
                 // Set the units target
-                switch (match_map_get_cell_type(state, unit_target)) {
-                    case CELL_EMPTY: {
-                        unit.target = UNIT_TARGET_CELL;
-                        unit.target_cell = unit_target;
-                        break;
-                    }
-                    case CELL_UNIT: {
-                        entity_id target_entity_id = match_map_get_cell_id(state, unit_target);
-                        if (target_entity_id != input.move.unit_ids[i] && state.units.get_index_of(target_entity_id) != INDEX_INVALID) {
-                            unit.target = UNIT_TARGET_UNIT;
-                            unit.target_entity_id = target_entity_id;
-                        } else {
+                if (target_unit_index != INDEX_INVALID) {
+                    unit.target = UNIT_TARGET_UNIT;
+                    unit.target_entity_id = input.move.target_entity_id;
+                } else {
+                    switch (match_map_get_cell_type(state, unit_target)) {
+                        case CELL_EMPTY:
+                        case CELL_UNIT: {
                             unit.target = UNIT_TARGET_CELL;
                             unit.target_cell = unit_target;
+                            break;
                         }
-                        break;
-                    }
-                    case CELL_BUILDING: {
-                        entity_id target_entity_id = match_map_get_cell_id(state, unit_target);
-                        uint32_t building_index = state.buildings.get_index_of(target_entity_id);
-                        if (building_index == INDEX_INVALID) {
-                            unit.target = UNIT_TARGET_CELL;
-                            unit.target_cell = unit_target;
-                        } else if (state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].is_finished && unit.gold_held > 0) {
-                            unit.target = UNIT_TARGET_CAMP;
-                            unit.target_entity_id = match_map_get_cell_id(state, unit_target);
-                        } else {
-                            unit.target = UNIT_TARGET_CELL;
-                            unit.target_cell = match_get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index]);
+                        case CELL_BUILDING: {
+                            entity_id target_entity_id = match_map_get_cell_id(state, unit_target);
+                            uint32_t building_index = state.buildings.get_index_of(target_entity_id);
+                            if (building_index == INDEX_INVALID) {
+                                unit.target = UNIT_TARGET_CELL;
+                                unit.target_cell = unit_target;
+                            } else if (state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].is_finished && unit.gold_held > 0) {
+                                unit.target = UNIT_TARGET_CAMP;
+                                unit.target_entity_id = match_map_get_cell_id(state, unit_target);
+                            } else {
+                                unit.target = UNIT_TARGET_CELL;
+                                unit.target_cell = match_get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index]);
+                            }
+                            break;
                         }
-                        break;
-                    }
-                    case CELL_GOLD1:
-                    case CELL_GOLD2:
-                    case CELL_GOLD3: {
-                        if (unit.type == UNIT_MINER) {
-                            unit.target = UNIT_TARGET_GOLD;
-                            unit.target_cell = unit_target;
-                        } else {
-                            unit.target = UNIT_TARGET_CELL;
-                            unit.target_cell = unit_target;
+                        case CELL_GOLD1:
+                        case CELL_GOLD2:
+                        case CELL_GOLD3: {
+                            if (unit.type == UNIT_MINER) {
+                                unit.target = UNIT_TARGET_GOLD;
+                                unit.target_cell = unit_target;
+                            } else {
+                                unit.target = UNIT_TARGET_CELL;
+                                unit.target_cell = unit_target;
+                            }
+                            break;
                         }
-                        break;
-                    }
-                } // End switch unit target cell type
-                log_info("unit target is now %u", unit.target);
+                    } // End switch unit target cell type
+                } // End else (if not targeting unit)
                 match_unit_path_to_target(state, unit);
                 if (unit.path.empty()) {
                     log_info("on move path is empty. on unit finished...");
@@ -651,7 +657,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 unit_t& unit = state.units[unit_index];
 
                 unit.path.clear();
-                log_info("NONE because order stop");
                 unit.target = UNIT_TARGET_NONE;
                 unit.building_type = BUILDING_NONE;
             }
@@ -670,7 +675,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             unit.target_cell = unit_build_target;
             match_unit_path_to_target(state, unit);
             if (unit.path.empty()) {
-                log_info("NONE because can't build.");
                 unit.target = UNIT_TARGET_NONE;
                 match_ui_show_status(state, UI_STATUS_CANT_BUILD);
                 return;
@@ -1094,6 +1098,7 @@ void match_unit_update(match_state_t& state) {
                 switch (match_unit_get_mode(unit)) {
                     case UNIT_MODE_MOVING: {
                         // Re-pathfind
+                        log_info("repath?");
                         match_unit_path_to_target(state, unit);
                         if (unit.path.empty()) {
                             match_unit_on_movement_finished(state, unit_id);
@@ -1201,7 +1206,6 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
         case UNIT_TARGET_BUILD:
         case UNIT_TARGET_CELL:
         case UNIT_TARGET_GOLD:
-            // TODO: if unit target gold, but the gold does not exist anymore, find nearest gold
             target_cell = unit.target_cell;
             break;
         case UNIT_TARGET_UNIT: {
@@ -1378,27 +1382,28 @@ void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
             // Set the cell back to filled
             match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
             match_ui_show_status(state, UI_STATUS_CANT_BUILD);
-            log_info("NONE because can't build");
             unit.target = UNIT_TARGET_NONE;
-        } else {
-            state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
-            unit.building_id = match_building_create(state, unit.player_id, unit.building_type, unit.building_cell);
-            unit.timer = BUILD_TICK_DURATION;
+            return;
+        } 
 
-            // De-select the unit if it is selected
-            auto it = std::find(state.selection.ids.begin(), state.selection.ids.end(), unit_id);
-            if (it != state.selection.ids.end()) {
-                // De-select the unit
-                state.selection.ids.erase(it);
+        // Place building
+        state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
+        unit.building_id = match_building_create(state, unit.player_id, unit.building_type, unit.building_cell);
+        unit.timer = BUILD_TICK_DURATION;
 
-                // If the selection is now empty, select the building instead
-                if (state.selection.ids.empty()) {
-                    state.selection.type = SELECTION_TYPE_BUILDINGS;
-                    state.selection.ids.push_back(unit.building_id);
-                }
+        // De-select the unit if it is selected
+        auto it = std::find(state.selection.ids.begin(), state.selection.ids.end(), unit_id);
+        if (it != state.selection.ids.end()) {
+            // De-select the unit
+            state.selection.ids.erase(it);
 
-                match_ui_set_selection(state, state.selection);
+            // If the selection is now empty, select the building instead
+            if (state.selection.ids.empty()) {
+                state.selection.type = SELECTION_TYPE_BUILDINGS;
+                state.selection.ids.push_back(unit.building_id);
             }
+
+            match_ui_set_selection(state, state.selection);
         }
     } else if (unit.target == UNIT_TARGET_GOLD) {
         if (xy::manhattan_distance(unit.cell, unit.target_cell) != 1 || !match_map_is_cell_gold(state, unit.target_cell)) {
@@ -1413,21 +1418,42 @@ void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
     } else if (unit.target == UNIT_TARGET_CAMP) {
         uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
         if (building_index == INDEX_INVALID) {
-            log_info("NONE because unit target is CAMP but index of camp is invalid");
             unit.target = UNIT_TARGET_NONE;
+            return;
+        } 
+
+        // Return gold
+        building_t& building = state.buildings[building_index];
+        bool is_unit_around_building = rect_t(building.cell - xy(1, 1), match_building_cell_size(building.type) + xy(2, 2)).has_point(unit.cell);
+        if (is_unit_around_building) {
+            state.player_gold[unit.player_id] += unit.gold_held;
+            unit.gold_held = 0;
+            match_unit_try_target_nearest_gold(state, unit);
         } else {
-            building_t& building = state.buildings[building_index];
-            bool is_unit_around_building = rect_t(building.cell - xy(1, 1), match_building_cell_size(building.type) + xy(2, 2)).has_point(unit.cell);
-            if (is_unit_around_building) {
-                state.player_gold[unit.player_id] += unit.gold_held;
-                unit.gold_held = 0;
-                match_unit_try_target_nearest_gold(state, unit);
-            } else {
-                match_unit_path_to_target(state, unit);
-            }
+            match_unit_path_to_target(state, unit);
+        }
+    } else if (unit.target == UNIT_TARGET_UNIT) {
+        // If the target unit no longer exists, this unit should idle
+        uint32_t target_unit_index = state.units.get_index_of(unit.target_entity_id);
+        if (target_unit_index == INDEX_INVALID) {
+            unit.target = UNIT_TARGET_NONE;
+            return;
+        }
+
+        // If the unit is not adjacent to the target unit, then repath
+        xy target_cell = state.units[target_unit_index].cell;
+        if (xy::manhattan_distance(unit.cell, target_cell) != 1) {
+            match_unit_path_to_target(state, unit);
+            return;
+        }
+
+        // If we've reached an allied unit, we can stop moving
+        // Possible TODO? make unit keep following the ally? seems very not worth the effort
+        if (unit.player_id == state.units[target_unit_index].player_id) {
+            unit.target = UNIT_TARGET_NONE;
+            return;
         }
     } else if (unit.target == UNIT_TARGET_CELL) {
-        log_info("NONE because unit movement finished");
         unit.target = UNIT_TARGET_NONE;
     }
 }
@@ -1489,15 +1515,14 @@ void match_unit_stop_building(match_state_t& state, entity_id unit_id, const bui
     unit.cell = match_get_first_empty_cell_around_rect(state, rect_t(building.cell, match_building_cell_size(building.type)));
     unit.position = match_cell_center(unit.cell);
     unit.target = UNIT_TARGET_NONE;
-    log_info("NONE because unit stop building");
     unit.building_id = ID_NULL;
     match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
 }
 
-void match_unit_try_return_gold(const match_state_t& state, unit_t& unit) {
-    // Find the nearest mining camp
-    entity_id nearest_camp_id = ID_NULL;
+entity_id match_unit_find_nearest_camp(const match_state_t& state, unit_t& unit) {
     int nearest_camp_dist = -1;
+    entity_id nearest_camp_id = ID_NULL;
+
     for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
         if (state.buildings[building_index].is_finished && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit.player_id) {
             if (nearest_camp_dist == -1 || xy::manhattan_distance(unit.cell, state.buildings[building_index].cell) < nearest_camp_dist) {
@@ -1507,18 +1532,26 @@ void match_unit_try_return_gold(const match_state_t& state, unit_t& unit) {
         }
     }
 
+    return nearest_camp_id;
+}
+
+void match_unit_try_return_gold(const match_state_t& state, unit_t& unit) {
+    // Find the nearest mining camp
+    entity_id nearest_camp_id = match_unit_find_nearest_camp(state, unit);
     if (nearest_camp_id != ID_NULL) {
         unit.target = UNIT_TARGET_CAMP;
         unit.target_entity_id = nearest_camp_id;
         match_unit_path_to_target(state, unit);
     } else {
-        log_info("NONE because nearest_camp_id == ID_NULL");
         unit.target = UNIT_TARGET_NONE;
     }
 }
 
 void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit) {
     unit.target = UNIT_TARGET_NONE;
+
+    entity_id nearest_camp_id = match_unit_find_nearest_camp(state, unit);
+    xy start_cell = nearest_camp_id != ID_NULL ? state.buildings[state.buildings.get_index_of(nearest_camp_id)].cell : unit.cell;
 
     xy nearest_gold_cell = unit.cell;
     int nearest_gold_dist = -1;
@@ -1541,9 +1574,9 @@ void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit
             }
 
             // Check if the cell is closer to the nearest cell
-            if (is_gold_cell_free && (nearest_gold_dist == -1 || xy::manhattan_distance(unit.cell, gold_cell) < nearest_gold_dist)) {
+            if (is_gold_cell_free && (nearest_gold_dist == -1 || xy::manhattan_distance(start_cell, gold_cell) < nearest_gold_dist)) {
                 nearest_gold_cell = gold_cell;
-                nearest_gold_dist = xy::manhattan_distance(unit.cell, nearest_gold_cell);
+                nearest_gold_dist = xy::manhattan_distance(start_cell, nearest_gold_cell);
             }
         }
     }
@@ -1557,7 +1590,6 @@ void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit
             unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
         }
     } else {
-        log_info("NONE because nearest_gold_dist == -1");
         unit.target = UNIT_TARGET_NONE;
     }
 }
