@@ -141,7 +141,6 @@ match_state_t match_init() {
         int spawn_direction;
         do {
             spawn_direction = lcg_rand() % DIRECTION_COUNT;
-            log_info("spawn direction: %i", spawn_direction);
         } while (is_spawn_direction_used[spawn_direction]);
         is_spawn_direction_used[spawn_direction] = true;
 
@@ -149,7 +148,6 @@ match_state_t match_init() {
         player_spawns[player_id] = xy(state.map_width / 2, state.map_height / 2) + 
                                    xy(DIRECTION_XY[spawn_direction].x * ((state.map_width * 6) / 16), 
                                       DIRECTION_XY[spawn_direction].y * ((state.map_height * 6) / 16));
-        log_info("player %u spawn %vi", player_id, &player_spawns[player_id]);
 
         // Place player starting units
         match_unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-1, -1));
@@ -166,7 +164,6 @@ match_state_t match_init() {
         xy gold_cell;
         gold_cell.x = lcg_rand() % state.map_width;
         gold_cell.y = lcg_rand() % state.map_height;
-        log_info("gold cell %xi", &gold_cell);
         if (match_map_is_cell_blocked(state, gold_cell)) {
             continue;
         }
@@ -186,16 +183,13 @@ match_state_t match_init() {
 
         // Place gold on the map around the cluster
         int cluster_size = std::min(3 + (lcg_rand() % 7), gold_target - gold_count);
-        log_info("cluster size %i", cluster_size);
         for (int i = 0; i < cluster_size; i++) {
             int gold_offset = lcg_rand() % 3;
-            log_info("gold offset %i", gold_offset);
             match_map_set_cell_value(state, gold_cell, CELL_GOLD1 + gold_offset, 10);
             gold_count++;
 
             // Determine the position of the next gold cell
             int guess_direction = lcg_rand() % DIRECTION_COUNT;
-            log_info("guess direction %i", guess_direction);
             int direction = guess_direction;
             bool is_gold_cell_valid = false;
             do {
@@ -639,8 +633,10 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         break;
                     }
                 } // End switch unit target cell type
+                log_info("unit target is now %u", unit.target);
                 match_unit_path_to_target(state, unit);
                 if (unit.path.empty()) {
+                    log_info("on move path is empty. on unit finished...");
                     match_unit_on_movement_finished(state, input.move.unit_ids[i]);
                 }
             }
@@ -655,6 +651,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 unit_t& unit = state.units[unit_index];
 
                 unit.path.clear();
+                log_info("NONE because order stop");
                 unit.target = UNIT_TARGET_NONE;
                 unit.building_type = BUILDING_NONE;
             }
@@ -673,6 +670,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             unit.target_cell = unit_build_target;
             match_unit_path_to_target(state, unit);
             if (unit.path.empty()) {
+                log_info("NONE because can't build.");
                 unit.target = UNIT_TARGET_NONE;
                 match_ui_show_status(state, UI_STATUS_CANT_BUILD);
                 return;
@@ -1290,7 +1288,12 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
         }
 
         // Consider all children
-        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+        // Adjacent cells are considered first so that we can use information about them to inform whether or not a diagonal movement is allowed
+        bool is_adjacent_direction_blocked[4] = { true, true, true, true };
+        const int CHILD_DIRECTIONS[DIRECTION_COUNT] = { DIRECTION_NORTH, DIRECTION_EAST, DIRECTION_SOUTH, DIRECTION_WEST, 
+                                                        DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST, DIRECTION_NORTHWEST };
+        for (int i = 0; i < DIRECTION_COUNT; i++) {
+            int direction = CHILD_DIRECTIONS[i];
             fixed cost_increase = direction % 2 == 0 ? fixed::from_int(1) : (fixed::from_int(3) / 2);
             node_t child = (node_t) {
                 .cost = smallest.cost + cost_increase,
@@ -1302,11 +1305,24 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
             if (!match_map_is_cell_in_bounds(state, child.cell)) {
                 continue;
             }
-            // Don't consider blocked spaces
+            // Don't consider blocked spaces, unless:
+            // 1. the blocked space is a unit that is very far away. we pretend such spaces are blocked since the unit will probably move by the time we get there
+            // 2. the blocked space is the target_cell. by allowing the path to go here we can avoid worst-case pathfinding even when the target_cell is blocked
             uint32_t child_cell_type = match_map_get_cell_type(state, child.cell);
             if (!(child_cell_type == CELL_EMPTY || 
-                (child_cell_type == CELL_UNIT && xy::manhattan_distance(unit.cell, child.cell) > 3))) {
+                (child_cell_type == CELL_UNIT && xy::manhattan_distance(unit.cell, child.cell) > 3) || 
+                (child.cell == unit.target_cell && xy::manhattan_distance(smallest.cell, child.cell) == 1))) {
                 continue;
+            }
+            // Don't allow diagonal movement through cracks
+            if (direction % 2 == 0) {
+                is_adjacent_direction_blocked[direction / 2] = false;
+            } else {
+                int next_direction = direction + 1 == DIRECTION_COUNT ? 0 : direction + 1;
+                int prev_direction = direction - 1;
+                if (is_adjacent_direction_blocked[next_direction / 2] && is_adjacent_direction_blocked[prev_direction / 2]) {
+                    continue;
+                }
             }
             // Don't consider already explored children
             if (explored_indices[child.cell.x + (child.cell.y * state.map_width)] != -1) {
@@ -1341,6 +1357,11 @@ void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
         unit.path.insert(unit.path.begin(), current.cell);
         current = explored[current.parent];
     }
+    // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,
+    // but if the target_cell really is blocked, we need to remove it from the path. The unit will path as close as they can.
+    if (unit.path[unit.path.size() - 1] == unit.target_cell && match_map_is_cell_blocked(state, unit.target_cell)) {
+        unit.path.pop_back();
+    }
 }
 
 void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
@@ -1357,6 +1378,7 @@ void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
             // Set the cell back to filled
             match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
             match_ui_show_status(state, UI_STATUS_CANT_BUILD);
+            log_info("NONE because can't build");
             unit.target = UNIT_TARGET_NONE;
         } else {
             state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
@@ -1380,6 +1402,7 @@ void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
         }
     } else if (unit.target == UNIT_TARGET_GOLD) {
         if (xy::manhattan_distance(unit.cell, unit.target_cell) != 1 || !match_map_is_cell_gold(state, unit.target_cell)) {
+            log_info("movement finished but we're not near gold");
             match_unit_try_target_nearest_gold(state, unit);
         } else if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
             unit.timer = GOLD_TICK_DURATION;
@@ -1390,6 +1413,7 @@ void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
     } else if (unit.target == UNIT_TARGET_CAMP) {
         uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
         if (building_index == INDEX_INVALID) {
+            log_info("NONE because unit target is CAMP but index of camp is invalid");
             unit.target = UNIT_TARGET_NONE;
         } else {
             building_t& building = state.buildings[building_index];
@@ -1403,6 +1427,7 @@ void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
             }
         }
     } else if (unit.target == UNIT_TARGET_CELL) {
+        log_info("NONE because unit movement finished");
         unit.target = UNIT_TARGET_NONE;
     }
 }
@@ -1464,6 +1489,7 @@ void match_unit_stop_building(match_state_t& state, entity_id unit_id, const bui
     unit.cell = match_get_first_empty_cell_around_rect(state, rect_t(building.cell, match_building_cell_size(building.type)));
     unit.position = match_cell_center(unit.cell);
     unit.target = UNIT_TARGET_NONE;
+    log_info("NONE because unit stop building");
     unit.building_id = ID_NULL;
     match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
 }
@@ -1486,6 +1512,7 @@ void match_unit_try_return_gold(const match_state_t& state, unit_t& unit) {
         unit.target_entity_id = nearest_camp_id;
         match_unit_path_to_target(state, unit);
     } else {
+        log_info("NONE because nearest_camp_id == ID_NULL");
         unit.target = UNIT_TARGET_NONE;
     }
 }
@@ -1530,6 +1557,7 @@ void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit
             unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
         }
     } else {
+        log_info("NONE because nearest_gold_dist == -1");
         unit.target = UNIT_TARGET_NONE;
     }
 }
