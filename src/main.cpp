@@ -745,7 +745,7 @@ void render_match(const match_state_t& state) {
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
 
-            uint32_t map_cell = match_map_get_cell_type(state, xy(base_coords.x + x, base_coords.y + y));
+            uint32_t map_cell = map_get_cell_type(state, xy(base_coords.x + x, base_coords.y + y));
             if (map_cell >= CELL_GOLD1 && map_cell <= CELL_GOLD3) {
                 ysorted.push_back((render_sprite_params_t) {
                     .sprite = SPRITE_TILE_GOLD,
@@ -765,7 +765,7 @@ void render_match(const match_state_t& state) {
         uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
         if (building_index != INDEX_INVALID) {
             const building_t& building = state.buildings[building_index];
-            rect_t building_rect = match_building_get_rect(building);
+            rect_t building_rect = building_get_rect(building);
             render_sprite(SPRITE_SELECT_RING_HOUSE, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
             // Determine healthbar rect
@@ -840,7 +840,7 @@ void render_match(const match_state_t& state) {
                 case CELL_BUILDING: {
                     uint32_t building_index = state.buildings.get_index_of(id);
                     if (building_index != INDEX_INVALID) {
-                        rect_t building_rect = match_building_get_rect(state.buildings[building_index]);
+                        rect_t building_rect = building_get_rect(state.buildings[building_index]);
                         render_sprite(SPRITE_SELECT_RING_HOUSE, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
                     break;
@@ -894,8 +894,8 @@ void render_match(const match_state_t& state) {
             .frame = unit.animation.frame,
             .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
         };
-        if (match_unit_get_mode(unit) == UNIT_MODE_BUILDING) {
-            const building_t& building = state.buildings[state.buildings.get_index_of(unit.building_id)];
+        if (unit.mode == UNIT_MODE_BUILD) {
+            const building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
             const building_data_t& data = BUILDING_DATA.at(building.type);
             int hframe = ((3 * building.health) / data.max_health);
             unit_params.sprite = SPRITE_MINER_BUILDING;
@@ -920,22 +920,22 @@ void render_match(const match_state_t& state) {
     }
 
     // Building placement
-    if (state.ui_mode == UI_MODE_BUILDING_PLACE && !match_is_mouse_in_ui()) {
+    if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
         int sprite = SPRITE_BUILDING_HOUSE + (state.ui_building_type - BUILDING_HOUSE);
         GOLD_ASSERT(sprite < SPRITE_COUNT);
-        render_sprite((Sprite)(sprite), xy(3, 0), (match_ui_building_cell(state) * TILE_SIZE) - state.camera_offset);
+        render_sprite((Sprite)(sprite), xy(3, 0), (ui_get_building_cell(state) * TILE_SIZE) - state.camera_offset);
 
         const building_data_t& data = BUILDING_DATA.at(state.ui_building_type);
-        bool is_placement_out_of_bounds = match_ui_building_cell(state).x + data.cell_width > state.map_width || 
-                                          match_ui_building_cell(state).y + data.cell_height > state.map_height;
+        bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_width > state.map_width || 
+                                          ui_get_building_cell(state).y + data.cell_height > state.map_height;
         SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
-        for (int y = match_ui_building_cell(state).y; y < match_ui_building_cell(state).y + data.cell_height; y++) {
-            for (int x = match_ui_building_cell(state).x; x < match_ui_building_cell(state).x + data.cell_width; x++) {
+        for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_height; y++) {
+            for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_width; x++) {
                 bool is_cell_green;
                 if (is_placement_out_of_bounds) {
                     is_cell_green = false;
                 } else {
-                    is_cell_green = !match_map_is_cell_blocked(state, xy(x, y));
+                    is_cell_green = !map_is_cell_blocked(state, xy(x, y));
                 }
 
                 SDL_Color cell_color = is_cell_green ? COLOR_GREEN : COLOR_RED;
@@ -970,16 +970,16 @@ void render_match(const match_state_t& state) {
 
     // UI Buttons
     for (int i = 0; i < 6; i++) {
-        UiButton ui_button = match_get_ui_button(state, i);
+        UiButton ui_button = ui_get_ui_button(state, i);
         if (ui_button == UI_BUTTON_NONE) {
             continue;
         }
 
-        bool is_button_hovered = match_get_ui_button_hovered(state) == i;
+        bool is_button_hovered = ui_get_ui_button_hovered(state) == i;
         bool is_button_pressed = is_button_hovered && input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT);
         xy offset = is_button_pressed ? xy(1, 1) : (is_button_hovered ? xy(0, -1) : xy(0, 0));
-        render_sprite(SPRITE_UI_BUTTON, xy(is_button_hovered && !is_button_pressed ? 1 : 0, 0), match_get_ui_button_rect(i).position + offset);
-        render_sprite(SPRITE_UI_BUTTON_ICON, xy(ui_button - 1, is_button_hovered && !is_button_pressed ? 1 : 0), match_get_ui_button_rect(i).position + offset);
+        render_sprite(SPRITE_UI_BUTTON, xy(is_button_hovered && !is_button_pressed ? 1 : 0, 0), ui_get_ui_button_rect(i).position + offset);
+        render_sprite(SPRITE_UI_BUTTON_ICON, xy(ui_button - 1, is_button_hovered && !is_button_pressed ? 1 : 0), ui_get_ui_button_rect(i).position + offset);
     }
 
     // UI Status message

@@ -13,6 +13,9 @@
 #define MAX_UNITS 200
 #define MAX_PARTICLES 256
 
+#define UI_STATUS_CANT_BUILD "You can't build there."
+#define  UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
+
 const uint32_t CELL_EMPTY = 0;
 const uint32_t CELL_UNIT = 1 << 16;
 const uint32_t CELL_BUILDING = 2 << 16;
@@ -24,6 +27,11 @@ const uint32_t CELL_TYPE_MASK = 0xffff0000;
 const uint32_t CELL_ID_MASK = 0x0000ffff;
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
+
+const uint32_t UNIT_PATH_PAUSE_DURATION = 60;
+const uint32_t UNIT_BUILD_TICK_DURATION = 8;
+const uint32_t UNIT_MINE_TICK_DURATION = 60;
+const uint32_t UNIT_MAX_GOLD_HELD = 5;
 
 // Input
 
@@ -117,49 +125,66 @@ enum UnitTargetType {
     UNIT_TARGET_NONE,
     UNIT_TARGET_CELL,
     UNIT_TARGET_BUILD,
-    UNIT_TARGET_UNIT,
+    UNIT_TARGET_ENEMY,
+    UNIT_TARGET_ENEMY_BUILDING,
     UNIT_TARGET_CAMP,
     UNIT_TARGET_GOLD
 };
 
 enum UnitMode {
-    UNIT_MODE_NONE,
-    UNIT_MODE_MOVING,
-    UNIT_MODE_BUILDING,
-    UNIT_MODE_MINING
+    UNIT_MODE_IDLE,
+    UNIT_MODE_MOVE,
+    UNIT_MODE_MOVE_BLOCKED,
+    UNIT_MODE_BUILD,
+    UNIT_MODE_MINE,
+    UNIT_MODE_ATTACK_WINDUP,
+    UNIT_MODE_ATTACK_COOLDOWN
+};
+
+struct unit_target_build_t {
+    xy unit_cell;
+    xy building_cell;
+    BuildingType building_type;
+    entity_id building_id;
+};
+
+struct unit_target_t {
+    UnitTargetType type;
+    union {
+        xy cell;
+        entity_id id;
+        unit_target_build_t build;
+    };
 };
 
 struct unit_t {
     UnitType type;
+    UnitMode mode;
     uint8_t player_id;
 
     animation_t animation;
-    uint32_t health;
+    int health;
 
     Direction direction;
     xy_fixed position;
     xy cell;
-    UnitTargetType target;
-    xy target_cell;
-    entity_id target_entity_id;
+
+    unit_target_t target;
     std::vector<xy> path;
 
-    BuildingType building_type;
-    entity_id building_id;
-    xy building_cell;
-
     uint32_t gold_held;
-
     uint32_t timer;
 };
 
 struct unit_data_t {
     Sprite sprite;
-    uint32_t max_health;
+    int max_health;
+    int damage;
+    int armor;
+    int range;
+    int attack_cooldown;
     fixed speed;
 };
-
-extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;
 
 // Building
 
@@ -182,8 +207,6 @@ struct building_data_t {
     int builder_positions_y[3];
     int builder_flip_h[3];
 };
-
-extern const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA;
 
 struct match_state_t {
     // UI
@@ -227,51 +250,60 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
 input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input);
 
+// Misc
+xy_fixed cell_center(xy cell);
+xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
+xy get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect);
+xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building);
+
 // UI
-void match_ui_show_status(match_state_t& state, const char* message);
-UiButton match_get_ui_button(const match_state_t& state, int index);
-int match_get_ui_button_hovered(const match_state_t& state);
-const rect_t& match_get_ui_button_rect(int index);
-void match_ui_handle_button_pressed(match_state_t& state, UiButton button);
-bool match_is_mouse_in_ui();
-xy match_ui_building_cell(const match_state_t& state);
-selection_t match_ui_create_selection_from_rect(const match_state_t& state);
-void match_ui_set_selection(match_state_t& state, selection_t& selection);
-xy match_camera_clamp(xy camera_offset, int map_width, int map_height);
-xy match_camera_centered_on_cell(xy cell);
+void ui_show_status(match_state_t& state, const char* message);
+UiButton ui_get_ui_button(const match_state_t& state, int index);
+int ui_get_ui_button_hovered(const match_state_t& state);
+const rect_t& ui_get_ui_button_rect(int index);
+void ui_handle_button_pressed(match_state_t& state, UiButton button);
+bool ui_is_mouse_in_ui();
+xy ui_get_building_cell(const match_state_t& state);
+selection_t ui_create_selection_from_rect(const match_state_t& state);
+void ui_set_selection(match_state_t& state, selection_t& selection);
+xy ui_camera_clamp(xy camera_offset, int map_width, int map_height);
+xy ui_camera_centered_on_cell(xy cell);
 
 // Map
-xy_fixed match_cell_center(xy cell);
-xy match_get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
-xy match_get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect);
-xy match_get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building);
-bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell);
-bool match_map_is_cell_blocked(const match_state_t& state, xy cell);
-bool match_map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
-uint32_t match_map_get_cell_value(const match_state_t& state, xy cell);
-uint32_t match_map_get_cell_type(const match_state_t& state, xy cell);
-entity_id match_map_get_cell_id(const match_state_t& state, xy cell);
-void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id = 0);
-void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id = 0);
-bool match_map_is_cell_gold(const match_state_t& state, xy cell);
-void match_map_decrement_gold(match_state_t& state, xy cell);
+bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
+bool map_is_cell_blocked(const match_state_t& state, xy cell);
+bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
+uint32_t map_get_cell_value(const match_state_t& state, xy cell);
+uint32_t map_get_cell_type(const match_state_t& state, xy cell);
+entity_id map_get_cell_id(const match_state_t& state, xy cell);
+void map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id = 0);
+void map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id = 0);
+bool map_is_cell_gold(const match_state_t& state, xy cell);
+void map_decrement_gold(match_state_t& state, xy cell);
+void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* path);
 
 // Unit
-void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
-void match_unit_update(match_state_t& state);
-void match_unit_path_to_target(const match_state_t& state, unit_t& unit);
-void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id);
-rect_t match_unit_get_rect(const unit_t& unit);
-UnitMode match_unit_get_mode(const unit_t& unit);
-AnimationName match_unit_get_expected_animation(const unit_t& unit);
-int match_unit_get_animation_vframe(const unit_t& unit);
-void match_unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building);
-void match_unit_try_return_gold(const match_state_t& state, unit_t& unit);
-void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit);
+void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
+void unit_update(match_state_t& state, uint32_t unit_index);
+rect_t unit_get_rect(const unit_t& unit);
+bool unit_is_enemy_in_range(const match_state_t& state, const unit_t& unit);
+void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t target);
+xy unit_get_target_cell(const match_state_t& state, const unit_t& unit);
+int unit_get_damage(const match_state_t& state, const unit_t& unit);
+int unit_get_armor(const match_state_t& state, const unit_t& unit);
+AnimationName unit_get_expected_animation(const unit_t& unit);
+int unit_get_animation_vframe(const unit_t& unit);
+void unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building);
+entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit);
+unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);
+unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit);
 
 // Building
-entity_id match_building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
-void match_building_destroy(match_state_t& state, entity_id building_id);
-xy match_building_cell_size(BuildingType type);
-rect_t match_building_get_rect(const building_t& building);
-bool match_building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);
+entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
+void building_destroy(match_state_t& state, entity_id building_id);
+xy building_cell_size(BuildingType type);
+rect_t building_get_rect(const building_t& building);
+bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);
+
+extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;
+extern const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA;

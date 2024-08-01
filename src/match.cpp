@@ -12,50 +12,9 @@
 
 static const uint32_t TICK_DURATION = 4;
 static const uint32_t INPUT_MAX_SIZE = 256;
-static const uint32_t UI_STATUS_DURATION = 60;
-const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
-    { UI_BUTTONSET_NONE, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_UNIT, { UI_BUTTON_MOVE, UI_BUTTON_STOP, UI_BUTTON_ATTACK,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_MINER, { UI_BUTTON_MOVE, UI_BUTTON_STOP, UI_BUTTON_ATTACK,
-                      UI_BUTTON_BUILD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_CAMP, UI_BUTTON_NONE,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
-    { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }}
-};
-static const xy UI_BUTTON_SIZE = xy(32, 32);
-static const xy UI_BUTTON_PADDING = xy(4, 6);
-static const xy UI_BUTTON_TOP_LEFT = xy(SCREEN_WIDTH - 132 + 14, SCREEN_HEIGHT - UI_HEIGHT + 10);
-static const xy UI_BUTTON_POSITIONS[6] = { UI_BUTTON_TOP_LEFT, UI_BUTTON_TOP_LEFT + xy(UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x, 0), UI_BUTTON_TOP_LEFT + xy(2 * (UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x), 0),
-                                              UI_BUTTON_TOP_LEFT + xy(0, UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y), UI_BUTTON_TOP_LEFT + xy(UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x, UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y), UI_BUTTON_TOP_LEFT + xy(2 * (UI_BUTTON_SIZE.x + UI_BUTTON_PADDING.x), UI_BUTTON_SIZE.y + UI_BUTTON_PADDING.y) };
-static const rect_t UI_BUTTON_RECT[6] = {
-    rect_t(UI_BUTTON_POSITIONS[0], UI_BUTTON_SIZE),
-    rect_t(UI_BUTTON_POSITIONS[1], UI_BUTTON_SIZE),
-    rect_t(UI_BUTTON_POSITIONS[2], UI_BUTTON_SIZE),
-    rect_t(UI_BUTTON_POSITIONS[3], UI_BUTTON_SIZE),
-    rect_t(UI_BUTTON_POSITIONS[4], UI_BUTTON_SIZE),
-    rect_t(UI_BUTTON_POSITIONS[5], UI_BUTTON_SIZE),
-};
 
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
-
-static const uint32_t BUILD_TICK_DURATION = 8;
-static const uint32_t GOLD_TICK_DURATION = 60;
-static const uint32_t UNIT_MAX_GOLD_HELD = 5;
-
-static const char* UI_STATUS_CANT_BUILD = "You can't build there.";
-static const char* UI_STATUS_NOT_ENOUGH_GOLD = "Not enough gold.";
-
-const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
-    { UNIT_MINER, (unit_data_t) {
-        .sprite = SPRITE_UNIT_MINER,
-        .max_health = 20,
-        .speed = fixed::from_int(1)
-    }}
-};
 
 const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     { BUILDING_HOUSE, (building_data_t) {
@@ -149,11 +108,11 @@ match_state_t match_init() {
                                       DIRECTION_XY[spawn_direction].y * ((state.map_height * 6) / 16));
 
         // Place player starting units
-        match_unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-1, -1));
-        match_unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(1, -1));
-        match_unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(0, 1));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-1, -1));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(1, -1));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(0, 1));
     }
-    state.camera_offset = match_camera_clamp(match_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
+    state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
 
     // Place gold on the map
     int gold_target = 128;
@@ -163,7 +122,7 @@ match_state_t match_init() {
         xy gold_cell;
         gold_cell.x = lcg_rand() % state.map_width;
         gold_cell.y = lcg_rand() % state.map_height;
-        if (match_map_is_cell_blocked(state, gold_cell)) {
+        if (map_is_cell_blocked(state, gold_cell)) {
             continue;
         }
 
@@ -184,7 +143,7 @@ match_state_t match_init() {
         int cluster_size = std::min(3 + (lcg_rand() % 7), gold_target - gold_count);
         for (int i = 0; i < cluster_size; i++) {
             int gold_offset = lcg_rand() % 3;
-            match_map_set_cell_value(state, gold_cell, CELL_GOLD1 + gold_offset, 10);
+            map_set_cell_value(state, gold_cell, CELL_GOLD1 + gold_offset, 10);
             gold_count++;
 
             // Determine the position of the next gold cell
@@ -193,7 +152,7 @@ match_state_t match_init() {
             bool is_gold_cell_valid = false;
             do {
                 direction = (direction + 1) % DIRECTION_COUNT;
-                is_gold_cell_valid = match_map_is_cell_in_bounds(state, gold_cell + DIRECTION_XY[direction]) && !match_map_is_cell_blocked(state, gold_cell + DIRECTION_XY[direction]);
+                is_gold_cell_valid = map_is_cell_in_bounds(state, gold_cell + DIRECTION_XY[direction]) && !map_is_cell_blocked(state, gold_cell + DIRECTION_XY[direction]);
             } while (direction != guess_direction && !is_gold_cell_valid);
             if (direction == guess_direction) {
                 // There are no free spaces to place gold in, so exit the loop for this cluster
@@ -340,26 +299,26 @@ void match_update(match_state_t& state) {
 
     // LEFT MOUSE CLICK
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
-        if (match_get_ui_button_hovered(state) != -1) {
-            match_ui_handle_button_pressed(state, match_get_ui_button(state, match_get_ui_button_hovered(state)));
-        } else if (state.ui_mode == UI_MODE_BUILDING_PLACE && !match_is_mouse_in_ui()) {
-            if (match_building_can_be_placed(state, state.ui_building_type, match_ui_building_cell(state))) {
+        if (ui_get_ui_button_hovered(state) != -1) {
+            ui_handle_button_pressed(state, ui_get_ui_button(state, ui_get_ui_button_hovered(state)));
+        } else if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
+            if (building_can_be_placed(state, state.ui_building_type, ui_get_building_cell(state))) {
                 input_t input;
                 input.type = INPUT_BUILD;
                 input.build.building_type = state.ui_building_type;
-                input.build.target_cell = match_ui_building_cell(state);
+                input.build.target_cell = ui_get_building_cell(state);
                 input.build.unit_id = state.selection.ids[0];
                 state.input_queue.push_back(input);
 
                 state.ui_buttonset = UI_BUTTONSET_MINER;
                 state.ui_mode = UI_MODE_NONE;
             } else {
-                match_ui_show_status(state, UI_STATUS_CANT_BUILD);
+                ui_show_status(state, UI_STATUS_CANT_BUILD);
             }
         } else if (state.ui_mode == UI_MODE_NONE && MINIMAP_RECT.has_point(mouse_pos)) {
             // On begin minimap drag
             state.ui_mode = UI_MODE_MINIMAP_DRAG;
-        } else if (state.ui_mode == UI_MODE_NONE && !match_is_mouse_in_ui()) {
+        } else if (state.ui_mode == UI_MODE_NONE && !ui_is_mouse_in_ui()) {
             // On begin selecting
             state.ui_mode = UI_MODE_SELECTING;
             state.select_origin = mouse_world_pos;
@@ -376,15 +335,15 @@ void match_update(match_state_t& state) {
         minimap_pos.x = std::clamp(minimap_pos.x, 0, MINIMAP_RECT.size.x);
         minimap_pos.y = std::clamp(minimap_pos.y, 0, MINIMAP_RECT.size.y);
         xy map_pos = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
-        state.camera_offset = match_camera_clamp(match_camera_centered_on_cell(map_pos / TILE_SIZE), state.map_width, state.map_height);
+        state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(map_pos / TILE_SIZE), state.map_width, state.map_height);
     }
 
     // LEFT MOUSE RELEASE
     if (input_is_mouse_button_just_released(MOUSE_BUTTON_LEFT)) {
         // On finished selecting
         if (state.ui_mode == UI_MODE_SELECTING) {
-            selection_t selection = match_ui_create_selection_from_rect(state);
-            match_ui_set_selection(state, selection);
+            selection_t selection = ui_create_selection_from_rect(state);
+            ui_set_selection(state, selection);
             state.ui_mode = UI_MODE_NONE;
         } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {
             state.ui_mode = UI_MODE_NONE;
@@ -394,9 +353,9 @@ void match_update(match_state_t& state) {
     // RIGHT MOUSE CLICK
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
         if (state.ui_mode == UI_MODE_NONE && state.selection.type == SELECTION_TYPE_UNITS && 
-            (MINIMAP_RECT.has_point(mouse_pos) || !match_is_mouse_in_ui())) {
+            (MINIMAP_RECT.has_point(mouse_pos) || !ui_is_mouse_in_ui())) {
             xy move_target;
-            if (match_is_mouse_in_ui()) {
+            if (ui_is_mouse_in_ui()) {
                 xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
                 move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
                                  (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
@@ -408,7 +367,7 @@ void match_update(match_state_t& state) {
             input_t input;
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
-            input.move.target_entity_id = match_map_get_cell_type(state, input.move.target_cell) == CELL_UNIT ? match_map_get_cell_id(state, input.move.target_cell) : ID_NULL;
+            input.move.target_entity_id = map_get_cell_type(state, input.move.target_cell) == CELL_UNIT ? map_get_cell_id(state, input.move.target_cell) : ID_NULL;
             input.move.unit_count = 0;
             memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
             input.move.unit_count = state.selection.ids.size();
@@ -417,13 +376,13 @@ void match_update(match_state_t& state) {
             state.input_queue.push_back(input);
 
             // Provide instant user feedback
-            state.ui_move_value = match_map_get_cell_value(state, input.move.target_cell);
-            if (match_map_get_cell_type(state, input.move.target_cell) == CELL_EMPTY) {
+            state.ui_move_value = map_get_cell_value(state, input.move.target_cell);
+            if (map_get_cell_type(state, input.move.target_cell) == CELL_EMPTY) {
                 state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
                 state.ui_move_position = mouse_world_pos;
             } else {
                 state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_GOLD);
-                state.ui_move_position = match_cell_center(input.move.target_cell).to_xy();
+                state.ui_move_position = cell_center(input.move.target_cell).to_xy();
             }
         }
     }
@@ -442,7 +401,7 @@ void match_update(match_state_t& state) {
             camera_drag_direction.y = 1;
         }
         state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
-        state.camera_offset = match_camera_clamp(state.camera_offset, state.map_width, state.map_height);
+        state.camera_offset = ui_camera_clamp(state.camera_offset, state.map_width, state.map_height);
     }
 
     // Update UI status timer
@@ -455,7 +414,16 @@ void match_update(match_state_t& state) {
         animation_update(state.ui_move_animation);
     }
 
-    match_unit_update(state);
+    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+        unit_update(state, unit_index);
+
+        AnimationName expected_animation = unit_get_expected_animation(state.units[unit_index]);
+        if (state.units[unit_index].animation.name != expected_animation || !animation_is_playing(state.units[unit_index].animation)) {
+            state.units[unit_index].animation = animation_create(expected_animation);
+        }
+        animation_update(state.units[unit_index].animation);
+        state.units[unit_index].animation.frame.y = unit_get_animation_vframe(state.units[unit_index]);
+    }
 }
 
 // INPUT
@@ -551,7 +519,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             // If we tried to move towards a unit, try and find the unit
             uint32_t target_unit_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
 
-            bool should_move_as_group = target_unit_index == INDEX_INVALID && input.move.unit_count > 1 && match_map_get_cell_value(state, input.move.target_cell) == CELL_EMPTY;
+            bool should_move_as_group = target_unit_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell_value(state, input.move.target_cell) == CELL_EMPTY;
             xy group_center;
 
             if (should_move_as_group) {
@@ -592,7 +560,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 xy unit_target = input.move.target_cell;
                 if (should_move_as_group) {
                     xy group_move_target = input.move.target_cell + (unit.cell - group_center);
-                    if (match_map_is_cell_in_bounds(state, group_move_target) && xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3) {
+                    if (map_is_cell_in_bounds(state, group_move_target) && xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3) {
                         unit_target = group_move_target;
                     }
                 } else if (target_unit_index != INDEX_INVALID) {
@@ -600,51 +568,60 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
 
                 // Set the units target
-                if (target_unit_index != INDEX_INVALID) {
-                    unit.target = UNIT_TARGET_UNIT;
-                    unit.target_entity_id = input.move.target_entity_id;
+                if (target_unit_index != INDEX_INVALID && state.units[target_unit_index].player_id != unit.player_id) {
+                    unit_set_target(state, unit, (unit_target_t) {
+                        .type = UNIT_TARGET_ENEMY,
+                        .id = input.move.target_entity_id
+                    });
                 } else {
-                    switch (match_map_get_cell_type(state, unit_target)) {
+                    switch (map_get_cell_type(state, unit_target)) {
                         case CELL_EMPTY:
                         case CELL_UNIT: {
-                            unit.target = UNIT_TARGET_CELL;
-                            unit.target_cell = unit_target;
+                            unit_set_target(state, unit, (unit_target_t) {
+                                .type = UNIT_TARGET_CELL,
+                                .cell = unit_target
+                            });
                             break;
                         }
                         case CELL_BUILDING: {
-                            entity_id target_entity_id = match_map_get_cell_id(state, unit_target);
+                            entity_id target_entity_id = map_get_cell_id(state, unit_target);
                             uint32_t building_index = state.buildings.get_index_of(target_entity_id);
                             if (building_index == INDEX_INVALID) {
-                                unit.target = UNIT_TARGET_CELL;
-                                unit.target_cell = unit_target;
+                                unit_set_target(state, unit, (unit_target_t) {
+                                    .type = UNIT_TARGET_CELL,
+                                    .cell = unit_target
+                                });
                             } else if (state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].is_finished && unit.gold_held > 0) {
-                                unit.target = UNIT_TARGET_CAMP;
-                                unit.target_entity_id = match_map_get_cell_id(state, unit_target);
+                                unit_set_target(state, unit, (unit_target_t) {
+                                    .type = UNIT_TARGET_CAMP,
+                                    .id = map_get_cell_id(state, unit_target)
+                                });
                             } else {
-                                unit.target = UNIT_TARGET_CELL;
-                                unit.target_cell = match_get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index]);
+                                unit_set_target(state, unit, (unit_target_t) {
+                                    .type = UNIT_TARGET_CELL,
+                                    .cell = get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index])
+                                });
                             }
                             break;
                         }
                         case CELL_GOLD1:
                         case CELL_GOLD2:
                         case CELL_GOLD3: {
-                            if (unit.type == UNIT_MINER) {
-                                unit.target = UNIT_TARGET_GOLD;
-                                unit.target_cell = unit_target;
+                            if (unit.type == UNIT_MINER && !should_move_as_group) {
+                                unit_set_target(state, unit, (unit_target_t) {
+                                    .type = UNIT_TARGET_GOLD,
+                                    .cell = unit_target
+                                });
                             } else {
-                                unit.target = UNIT_TARGET_CELL;
-                                unit.target_cell = unit_target;
+                                unit_set_target(state, unit, (unit_target_t) {
+                                    .type = UNIT_TARGET_CELL,
+                                    .cell = unit_target
+                                });
                             }
                             break;
                         }
                     } // End switch unit target cell type
                 } // End else (if not targeting unit)
-                match_unit_path_to_target(state, unit);
-                if (unit.path.empty()) {
-                    log_info("on move path is empty. on unit finished...");
-                    match_unit_on_movement_finished(state, input.move.unit_ids[i]);
-                }
             }
             break;
         }
@@ -657,8 +634,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 unit_t& unit = state.units[unit_index];
 
                 unit.path.clear();
-                unit.target = UNIT_TARGET_NONE;
-                unit.building_type = BUILDING_NONE;
+                unit_set_target(state, unit, (unit_target_t) {
+                    .type = UNIT_TARGET_NONE
+                });
             }
             break;
         }
@@ -670,19 +648,16 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             unit_t& unit = state.units[unit_index];
 
             // Determine the unit's target
-            xy unit_build_target = match_get_nearest_free_cell_within_rect(unit.cell, rect_t(input.build.target_cell, match_building_cell_size((BuildingType)input.build.building_type)));
-            unit.target = UNIT_TARGET_BUILD;
-            unit.target_cell = unit_build_target;
-            match_unit_path_to_target(state, unit);
-            if (unit.path.empty()) {
-                unit.target = UNIT_TARGET_NONE;
-                match_ui_show_status(state, UI_STATUS_CANT_BUILD);
-                return;
-            }
-
-            unit.building_type = (BuildingType)input.build.building_type;
-            unit.building_cell = input.build.target_cell;
-            unit.building_id = ID_NULL;
+            xy unit_build_target = get_nearest_free_cell_within_rect(unit.cell, rect_t(input.build.target_cell, building_cell_size((BuildingType)input.build.building_type)));
+            unit_set_target(state, unit, (unit_target_t) {
+                .type = UNIT_TARGET_BUILD,
+                .build = (unit_target_build_t) {
+                    .unit_cell = unit_build_target,
+                    .building_cell = input.build.target_cell,
+                    .building_type = (BuildingType)input.build.building_type,
+                    .building_id = ID_NULL
+                }
+            });
             break;
         }
         case INPUT_BUILD_CANCEL: {
@@ -696,12 +671,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             state.player_gold[player_id] += BUILDING_DATA.at(building.type).cost;
             // Tell the unit to stop building this building
             for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
-                if (state.units[unit_index].building_id == input.build_cancel.building_id) {
-                    match_unit_stop_building(state, state.units.get_id_of(unit_index), building);
+                if (state.units[unit_index].target.type == UNIT_TARGET_BUILD && state.units[unit_index].target.build.building_id == input.build_cancel.building_id) {
+                    unit_stop_building(state, state.units.get_id_of(unit_index), building);
                 }
             }
             // Destroy the building
-            match_building_destroy(state, input.build_cancel.building_id);
+            building_destroy(state, input.build_cancel.building_id);
             break;
         }
         default:
@@ -709,189 +684,13 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
     }
 }
 
-// UI
+// MISC
 
-void match_ui_show_status(match_state_t& state, const char* message) {
-    state.ui_status_message = std::string(message);
-    state.ui_status_timer = UI_STATUS_DURATION;
-}
-
-UiButton match_get_ui_button(const match_state_t& state, int index) {
-    return UI_BUTTONS.at(state.ui_buttonset)[index];
-}
-
-int match_get_ui_button_hovered(const match_state_t& state) {
-    xy mouse_pos = input_get_mouse_position();
-    for (int i = 0; i < 6; i++) {
-        if (match_get_ui_button(state, i) == UI_BUTTON_NONE) {
-            continue;
-        }
-
-        if (UI_BUTTON_RECT[i].has_point(mouse_pos)) {
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-const rect_t& match_get_ui_button_rect(int index) {
-    return UI_BUTTON_RECT[index];
-}
-
-void match_ui_handle_button_pressed(match_state_t& state, UiButton button) {
-    switch (button) {
-        case UI_BUTTON_STOP: {
-            if (state.selection.type == SELECTION_TYPE_UNITS) {
-                input_t input;
-                input.type = INPUT_STOP;
-                memcpy(input.stop.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(entity_id));
-                input.stop.unit_count = state.selection.ids.size();
-                state.input_queue.push_back(input);
-            }
-            break;
-        }
-        case UI_BUTTON_BUILD: {
-            state.ui_buttonset = UI_BUTTONSET_BUILD;
-            break;
-        }
-        case UI_BUTTON_CANCEL: {
-            if (state.ui_buttonset == UI_BUTTONSET_BUILD) {
-                state.ui_buttonset = UI_BUTTONSET_MINER;
-            } else if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
-                state.ui_mode = UI_MODE_NONE;
-                state.ui_buttonset = UI_BUTTONSET_BUILD;
-            } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
-                GOLD_ASSERT(!state.buildings[state.buildings.get_index_of(state.selection.ids[0])].is_finished);
-                input_t input;
-                input.type = INPUT_BUILD_CANCEL;
-                input.build_cancel.building_id = state.selection.ids[0];
-                state.input_queue.push_back(input);
-
-                // Clear the player's selection
-                selection_t empty_selection;
-                empty_selection.type = SELECTION_TYPE_NONE;
-                match_ui_set_selection(state, empty_selection);
-            }
-            break;
-        }
-        case UI_BUTTON_BUILD_HOUSE:
-        case UI_BUTTON_BUILD_CAMP: {
-            // Begin building placement
-            BuildingType building_type = (BuildingType)(BUILDING_HOUSE + (button - UI_BUTTON_BUILD_HOUSE));
-
-            if (state.player_gold[network_get_player_id()] < BUILDING_DATA.at(building_type).cost) {
-                match_ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
-            } else {
-                state.ui_mode = UI_MODE_BUILDING_PLACE;
-                state.ui_building_type = building_type;
-            }
-
-            break;
-        }
-        case UI_BUTTON_NONE:
-        default:
-            break;
-    }
-}
-
-bool match_is_mouse_in_ui() {
-    xy mouse_pos = input_get_mouse_position();
-    return (mouse_pos.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
-           (mouse_pos.x <= 136 && mouse_pos.y >= SCREEN_HEIGHT - 136) ||
-           (mouse_pos.x >= SCREEN_WIDTH - 132 && mouse_pos.y >= SCREEN_HEIGHT - 106);
-}
-
-xy match_ui_building_cell(const match_state_t& state) {
-    return (input_get_mouse_position() + state.camera_offset) / TILE_SIZE;
-}
-
-selection_t match_ui_create_selection_from_rect(const match_state_t& state) {
-    selection_t selection;
-    selection.type = SELECTION_TYPE_NONE;
-
-    // Check all the current player's units
-    for (uint32_t index = 0; index < state.units.size(); index++) {
-        const unit_t& unit = state.units[index];
-
-        // Don't select other player's units
-        if (unit.player_id != network_get_player_id()) {
-            continue;
-        }
-
-        // Don't select units which are building
-        if (match_unit_get_mode(unit) == UNIT_MODE_BUILDING) {
-            continue;
-        }
-
-        if (match_unit_get_rect(unit).intersects(state.select_rect)) {
-            selection.ids.push_back(state.units.get_id_of(index));
-        }
-    }
-    // If we're selecting units, then return the unit selection
-    if (!selection.ids.empty()) {
-        selection.type = SELECTION_TYPE_UNITS;
-        return selection;
-    }
-
-    // Otherwise, check the player's buildings
-    for (uint32_t index = 0; index < state.buildings.size(); index++) {
-        const building_t& building = state.buildings[index];
-
-        // Don't select other player's buildings
-        // TODO: remove this to allow enemy building selection
-        if (building.player_id != network_get_player_id()) {
-            continue;
-        }
-
-        if (match_building_get_rect(building).intersects(state.select_rect)) {
-            // Return here so that only one building can be selected at once
-            selection.ids.push_back(state.buildings.get_id_of(index));
-            selection.type = SELECTION_TYPE_BUILDINGS;
-            return selection;
-        }
-    }
-
-    return selection;
-}
-
-void match_ui_set_selection(match_state_t& state, selection_t& selection) {
-    state.selection = selection;
-
-    if (selection.type == SELECTION_TYPE_NONE) {
-        state.ui_buttonset = UI_BUTTONSET_NONE;
-    } else if (selection.type == SELECTION_TYPE_UNITS) {
-        if (selection.ids.size() == 1 && state.units[state.units.get_index_of(selection.ids[0])].type == UNIT_MINER) {
-            state.ui_buttonset = UI_BUTTONSET_MINER;
-        } else {
-            state.ui_buttonset = UI_BUTTONSET_UNIT;
-        }
-    } else if (selection.type == SELECTION_TYPE_BUILDINGS) {
-        building_t& building = state.buildings[state.buildings.get_index_of(selection.ids[0])];
-        if (!building.is_finished) {
-            state.ui_buttonset = UI_BUTTONSET_CANCEL;
-        } else {
-            state.ui_buttonset = UI_BUTTONSET_NONE;
-        }
-    }
-}
-
-xy match_camera_clamp(xy camera_offset, int map_width, int map_height) {
-    return xy(std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH),
-                 std::clamp(camera_offset.y, 0, (map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT));
-}
-
-xy match_camera_centered_on_cell(xy cell) {
-    return xy((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
-}
-
-// Map
-
-xy_fixed match_cell_center(xy cell) {
+xy_fixed cell_center(xy cell) {
     return xy_fixed((cell * TILE_SIZE) + xy(TILE_SIZE / 2, TILE_SIZE / 2));
 }
 
-xy match_get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
+xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     xy nearest_cell = rect.position;
     uint32_t nearest_cell_dist = xy::manhattan_distance(start_cell, nearest_cell);
 
@@ -908,14 +707,14 @@ xy match_get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
-xy match_get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect) {
+xy get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect) {
     xy cell = rect.position + xy(-1, 0);
     int step_direction = DIRECTION_SOUTH;
     int step_count = 0;
     int x_step_amount = rect.size.x + 1;
     int y_step_amount = rect.size.y;
 
-    while (match_map_is_cell_blocked(state, cell) || !match_map_is_cell_in_bounds(state, cell)) {
+    while (map_is_cell_blocked(state, cell) || !map_is_cell_in_bounds(state, cell)) {
         cell += DIRECTION_XY[step_direction];
         step_count++;
 
@@ -939,11 +738,11 @@ xy match_get_first_empty_cell_around_rect(const match_state_t& state, rect_t rec
 
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
-xy match_get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building) {
+xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building) {
     xy nearest_cell;
     int nearest_cell_dist = -1;
 
-    xy building_size = match_building_cell_size(building.type);
+    xy building_size = building_cell_size(building.type);
 
     xy cell_begin[4] = { 
         building.cell + xy(-1, 0),
@@ -961,8 +760,8 @@ xy match_get_nearest_free_cell_around_building(const match_state_t& state, xy st
     uint32_t index = 0;
     xy cell = cell_begin[index];
     while (index < 4) {
-        if (match_map_is_cell_in_bounds(state, cell)) {
-            uint32_t cell_type = match_map_get_cell_type(state, cell);
+        if (map_is_cell_in_bounds(state, cell)) {
+            uint32_t cell_type = map_get_cell_type(state, cell);
             bool is_cell_free = cell_type == CELL_EMPTY || (cell_type == CELL_UNIT && xy::manhattan_distance(start_cell, cell) > 3);
             if (is_cell_free && (nearest_cell_dist == -1 || xy::manhattan_distance(start_cell, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
@@ -980,658 +779,4 @@ xy match_get_nearest_free_cell_around_building(const match_state_t& state, xy st
     }
 
     return nearest_cell_dist != -1 ? nearest_cell : start_cell;
-}
-
-bool match_map_is_cell_in_bounds(const match_state_t& state, xy cell) {
-    return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
-}
-
-bool match_map_is_cell_blocked(const match_state_t& state, xy cell) {
-    return state.map_cells[cell.x + (cell.y * state.map_width)] != CELL_EMPTY;
-}
-
-bool match_map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect) {
-    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
-        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
-            if (state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
-                return true;
-            }
-        }
-    }
-    
-    return false;
-}
-
-uint32_t match_map_get_cell_value(const match_state_t& state, xy cell) {
-    return state.map_cells[cell.x + (cell.y * state.map_height)];
-}
-
-uint32_t match_map_get_cell_type(const match_state_t& state, xy cell) {
-    return state.map_cells[cell.x + (cell.y * (state.map_height))] & CELL_TYPE_MASK;
-}
-
-entity_id match_map_get_cell_id(const match_state_t& state, xy cell) {
-    // explicit typecast to truncate the 32bit value and return only the 16 bits which represent the id
-    return (entity_id)state.map_cells[cell.x + (cell.y * (state.map_height))];
-}
-
-void match_map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id) {
-    state.map_cells[cell.x + (cell.y * state.map_height)] = type | id;
-}
-
-void match_map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id) {
-    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
-        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
-            state.map_cells[x + (y * state.map_height)] = type | id;
-        }
-    }
-}
-
-bool match_map_is_cell_gold(const match_state_t& state, xy cell) {
-    uint32_t cell_type = match_map_get_cell_type(state, cell);
-    return cell_type >= CELL_GOLD1 && cell_type <= CELL_GOLD3;
-}
-
-void match_map_decrement_gold(match_state_t& state, xy cell) {
-    state.map_cells[cell.x + (cell.y * state.map_width)]--;
-    uint32_t gold_left = state.map_cells[cell.x + (cell.y * state.map_width)] & CELL_ID_MASK;
-    if (gold_left > 0) {
-        return;
-    }
-
-    state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_EMPTY;
-    // Tell all the adjacent miners to stop mining the now empty cell
-    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
-        unit_t& unit = state.units[unit_index];
-        // Ignore units who aren't mining this gold
-        if (unit.target != UNIT_TARGET_GOLD || unit.target_cell != cell) {
-            continue;
-        }
-        unit.timer = 0;
-        if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
-            match_unit_try_target_nearest_gold(state, unit);
-        } else {
-            match_unit_try_return_gold(state, unit);
-        }
-    }
-}
-
-// Unit
-
-void match_unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell) {
-    auto it = UNIT_DATA.find(type);
-    GOLD_ASSERT(it != UNIT_DATA.end());
-
-    unit_t unit;
-    unit.type = type;
-    unit.player_id = player_id;
-    unit.animation = animation_create(ANIMATION_UNIT_IDLE);
-    unit.health = it->second.max_health;
-
-    unit.direction = DIRECTION_SOUTH;
-    unit.cell = cell;
-    unit.position = match_cell_center(unit.cell);
-    unit.target = UNIT_TARGET_NONE;
-
-    unit.building_id = ID_NULL;
-    unit.building_type = BUILDING_NONE;
-
-    unit.gold_held = 0;
-
-    unit.timer = 0;
-
-    entity_id unit_id = state.units.push_back(unit);
-    match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
-}
-
-void match_unit_update(match_state_t& state) {
-    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
-        unit_t& unit = state.units[unit_index];
-        entity_id unit_id = state.units.get_id_of(unit_index);
-        const unit_data_t& unit_data = UNIT_DATA.at(unit.type);
-
-        // BEHAVIOR TIMER
-        if (unit.timer != 0) {
-            unit.timer--;
-            // On Behavior timer finished
-            if (unit.timer == 0) {
-                switch (match_unit_get_mode(unit)) {
-                    case UNIT_MODE_MOVING: {
-                        // Re-pathfind
-                        log_info("repath?");
-                        match_unit_path_to_target(state, unit);
-                        if (unit.path.empty()) {
-                            match_unit_on_movement_finished(state, unit_id);
-                        }
-                        // TODO: what happens if we repath and end up with nothing?
-                        break;
-                    }
-                    case UNIT_MODE_BUILDING: {
-                        // Building tick
-                        building_t& building = state.buildings[state.buildings.get_index_of(unit.building_id)];
-
-                        building.health++;
-                        if (building.health == BUILDING_DATA.at(building.type).max_health) {
-                            // On building finished
-                            building.is_finished = true;
-
-                            // If selecting the building
-                            if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == unit.building_id) {
-                                // Trigger a re-select so that UI buttons are updated correctly
-                                match_ui_set_selection(state, state.selection);
-                            }
-
-                            match_unit_stop_building(state, unit_id, building);
-                        } else {
-                            unit.timer = BUILD_TICK_DURATION;
-                        }
-                        break;
-                    }
-                    case UNIT_MODE_MINING: {
-                        if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
-                            unit.gold_held++;
-                            unit.timer = GOLD_TICK_DURATION;
-                            match_map_decrement_gold(state, unit.target_cell);
-                        } else {
-                            match_unit_try_return_gold(state, unit);
-                        }
-                        break;
-                    }
-                    default:
-                        break;
-                }
-            }
-        }
-
-        // MOVEMENT
-        if (match_unit_get_mode(unit) == UNIT_MODE_MOVING && unit.timer == 0) {
-            fixed movement_left = unit_data.speed;
-            while (movement_left.raw_value > 0) {
-                // If the unit is not moving between tiles, then pop the next cell off the path
-                if (unit.position == match_cell_center(unit.cell)) {
-                    unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
-                    if (match_map_is_cell_blocked(state, unit.path[0])) {
-                        // Path is blocked, stop movement
-                        // unit.timer = PATH_PAUSE_DURATION;
-                        match_unit_path_to_target(state, unit);
-                        if (unit.path.empty()) {
-                            match_unit_on_movement_finished(state, unit_id);
-                            break;
-                        }
-                        continue;
-                    }
-
-                    match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
-                    unit.cell = unit.path[0];
-                    match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
-                    unit.path.erase(unit.path.begin());
-                }
-
-                // Step unit along movement
-                if (unit.position.distance_to(match_cell_center(unit.cell)) > movement_left) {
-                    unit.position += DIRECTION_XY_FIXED[unit.direction] * movement_left;
-                    movement_left = fixed::from_raw(0);
-                } else {
-                    movement_left -= unit.position.distance_to(match_cell_center(unit.cell));
-                    unit.position = match_cell_center(unit.cell);
-                    if (unit.path.empty()) {
-                        movement_left = fixed::from_raw(0);
-                    }
-                }
-            } // End while movement_left > 0
-
-            // On movement finished
-            if (match_unit_get_mode(unit) != UNIT_MODE_MOVING) {
-                match_unit_on_movement_finished(state, unit_id);
-            }
-        } // End if unit is moving
-
-        // ANIMATION
-        AnimationName expected_animation = match_unit_get_expected_animation(unit);
-        if (unit.animation.name != expected_animation || !animation_is_playing(unit.animation)) {
-            unit.animation = animation_create(expected_animation);
-        }
-        animation_update(unit.animation);
-        unit.animation.frame.y = match_unit_get_animation_vframe(unit);
-    } // End for each unit
-}
-
-void match_unit_path_to_target(const match_state_t& state, unit_t& unit) {
-    xy target_cell;
-
-    switch (unit.target) {
-        case UNIT_TARGET_NONE:
-            target_cell = unit.cell;
-            break;
-        case UNIT_TARGET_BUILD:
-        case UNIT_TARGET_CELL:
-        case UNIT_TARGET_GOLD:
-            target_cell = unit.target_cell;
-            break;
-        case UNIT_TARGET_UNIT: {
-            uint32_t unit_index = state.units.get_index_of(unit.target_entity_id);
-            target_cell = unit_index != INDEX_INVALID 
-                                    ? state.units[unit_index].cell 
-                                    : unit.cell;
-            break;
-        }
-        case UNIT_TARGET_CAMP: {
-            // TODO: if unit targets building, path to the nearest cell around the building
-            // possibly lump the pathing up into one function so that initial pathing and repathing can work off the same code?
-            // as well as unit finished but target invalid pathing?
-            // match_unit_path_to_target() ?
-            // also we can make the pathing more performant by temporarily unblocking the destination whenever it is blocked and thus allowing the unit to path while skipping the worst case
-            uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
-            target_cell = building_index != INDEX_INVALID 
-                                ? match_get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index])
-                                : unit.cell;
-            break;
-        }
-    }
-
-    // Don't bother pathing to unit's cell
-    if (target_cell == unit.cell) {
-        unit.path.clear();
-        return;
-    }
-
-    struct node_t {
-        fixed cost;
-        fixed distance;
-        // The parent is the previous node stepped in the path to reach this node
-        // It should be an index in the explored list, or -1 if it is the start node
-        int parent; 
-        xy cell;
-
-        fixed score() const {
-            return cost + distance;
-        }
-    };
-
-    std::vector<node_t> frontier;
-    std::vector<node_t> explored;
-    int explored_indices[state.map_width * state.map_height];
-    memset(explored_indices, -1, state.map_width * state.map_height * sizeof(int));
-    uint32_t closest_explored = 0;
-    bool found_path = false;
-    node_t path_end;
-
-    frontier.push_back((node_t) {
-        .cost = fixed::from_raw(0),
-        .distance = fixed::from_int(xy::manhattan_distance(unit.cell, target_cell)),
-        .parent = -1,
-        .cell = unit.cell
-    });
-
-    // TODO prevent unit from pathing through diagonal gaps
-    while (!frontier.empty()) {
-        // Find the smallest path
-        uint32_t smallest_index = 0;
-        for (uint32_t i = 1; i < frontier.size(); i++) {
-            if (frontier[i].score() < frontier[smallest_index].score()) {
-                smallest_index = i;
-            }
-        }
-
-        // Pop the smallest path
-        node_t smallest = frontier[smallest_index];
-        frontier.erase(frontier.begin() + smallest_index);
-
-        // If it's the solution, return it
-        if (smallest.cell == target_cell) {
-            found_path = true;
-            path_end = smallest;
-            break;
-        }
-
-        // Otherwise, add this tile to the explored list
-        explored.push_back(smallest);
-        explored_indices[smallest.cell.x + (smallest.cell.y * state.map_width)] = explored.size() - 1;
-        if (explored[explored.size() - 1].distance < explored[closest_explored].distance) {
-            closest_explored = explored.size() - 1;
-        }
-
-        // Consider all children
-        // Adjacent cells are considered first so that we can use information about them to inform whether or not a diagonal movement is allowed
-        bool is_adjacent_direction_blocked[4] = { true, true, true, true };
-        const int CHILD_DIRECTIONS[DIRECTION_COUNT] = { DIRECTION_NORTH, DIRECTION_EAST, DIRECTION_SOUTH, DIRECTION_WEST, 
-                                                        DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST, DIRECTION_NORTHWEST };
-        for (int i = 0; i < DIRECTION_COUNT; i++) {
-            int direction = CHILD_DIRECTIONS[i];
-            fixed cost_increase = direction % 2 == 0 ? fixed::from_int(1) : (fixed::from_int(3) / 2);
-            node_t child = (node_t) {
-                .cost = smallest.cost + cost_increase,
-                .distance = fixed::from_int(xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], target_cell)),
-                .parent = (int)explored.size() - 1,
-                .cell = smallest.cell + DIRECTION_XY[direction]
-            };
-            // Don't consider out of bounds children
-            if (!match_map_is_cell_in_bounds(state, child.cell)) {
-                continue;
-            }
-            // Don't consider blocked spaces, unless:
-            // 1. the blocked space is a unit that is very far away. we pretend such spaces are blocked since the unit will probably move by the time we get there
-            // 2. the blocked space is the target_cell. by allowing the path to go here we can avoid worst-case pathfinding even when the target_cell is blocked
-            uint32_t child_cell_type = match_map_get_cell_type(state, child.cell);
-            if (!(child_cell_type == CELL_EMPTY || 
-                (child_cell_type == CELL_UNIT && xy::manhattan_distance(unit.cell, child.cell) > 3) || 
-                (child.cell == unit.target_cell && xy::manhattan_distance(smallest.cell, child.cell) == 1))) {
-                continue;
-            }
-            // Don't allow diagonal movement through cracks
-            if (direction % 2 == 0) {
-                is_adjacent_direction_blocked[direction / 2] = false;
-            } else {
-                int next_direction = direction + 1 == DIRECTION_COUNT ? 0 : direction + 1;
-                int prev_direction = direction - 1;
-                if (is_adjacent_direction_blocked[next_direction / 2] && is_adjacent_direction_blocked[prev_direction / 2]) {
-                    continue;
-                }
-            }
-            // Don't consider already explored children
-            if (explored_indices[child.cell.x + (child.cell.y * state.map_width)] != -1) {
-                continue;
-            }
-            // Check if it's in the frontier
-            uint32_t frontier_index;
-            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                node_t& frontier_node = frontier[frontier_index];
-                if (frontier_node.cell == child.cell) {
-                    break;
-                }
-            }
-            // If it is in the frontier...
-            if (frontier_index < frontier.size()) {
-                // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
-                if (child.score() < frontier[frontier_index].score()) {
-                    frontier[frontier_index] = child;
-                }
-                continue;
-            }
-            // If it's not in the frontier, then add it to the frontier
-            frontier.push_back(child);
-        } // End for each child
-    } // End while !frontier.empty()
-
-    // Backtrack to build the path
-    node_t current = found_path ? path_end : explored[closest_explored];
-    unit.path.clear();
-    unit.path.reserve(current.cost.integer_part());
-    while (current.parent != -1) {
-        unit.path.insert(unit.path.begin(), current.cell);
-        current = explored[current.parent];
-    }
-    // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,
-    // but if the target_cell really is blocked, we need to remove it from the path. The unit will path as close as they can.
-    if (unit.path[unit.path.size() - 1] == unit.target_cell && match_map_is_cell_blocked(state, unit.target_cell)) {
-        unit.path.pop_back();
-    }
-}
-
-void match_unit_on_movement_finished(match_state_t& state, entity_id unit_id) {
-    uint32_t unit_index = state.units.get_index_of(unit_id);
-    GOLD_ASSERT(unit_index != INDEX_INVALID);
-    unit_t& unit = state.units[unit_index];
-
-    if (unit.target == UNIT_TARGET_BUILD) {
-        // Temporarily set cell to empty so that we can check if the space is clear for building
-        match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
-        bool can_build = unit.cell == unit.target_cell && 
-                                        !match_map_is_cell_rect_blocked(state, rect_t(unit.building_cell, match_building_cell_size(unit.building_type)));
-        if (!can_build) {
-            // Set the cell back to filled
-            match_map_set_cell_value(state, unit.cell, CELL_EMPTY);
-            match_ui_show_status(state, UI_STATUS_CANT_BUILD);
-            unit.target = UNIT_TARGET_NONE;
-            return;
-        } 
-
-        // Place building
-        state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.building_type).cost;
-        unit.building_id = match_building_create(state, unit.player_id, unit.building_type, unit.building_cell);
-        unit.timer = BUILD_TICK_DURATION;
-
-        // De-select the unit if it is selected
-        auto it = std::find(state.selection.ids.begin(), state.selection.ids.end(), unit_id);
-        if (it != state.selection.ids.end()) {
-            // De-select the unit
-            state.selection.ids.erase(it);
-
-            // If the selection is now empty, select the building instead
-            if (state.selection.ids.empty()) {
-                state.selection.type = SELECTION_TYPE_BUILDINGS;
-                state.selection.ids.push_back(unit.building_id);
-            }
-
-            match_ui_set_selection(state, state.selection);
-        }
-    } else if (unit.target == UNIT_TARGET_GOLD) {
-        if (xy::manhattan_distance(unit.cell, unit.target_cell) != 1 || !match_map_is_cell_gold(state, unit.target_cell)) {
-            log_info("movement finished but we're not near gold");
-            match_unit_try_target_nearest_gold(state, unit);
-        } else if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
-            unit.timer = GOLD_TICK_DURATION;
-            unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
-        } else {
-            match_unit_try_return_gold(state, unit);
-        }
-    } else if (unit.target == UNIT_TARGET_CAMP) {
-        uint32_t building_index = state.buildings.get_index_of(unit.target_entity_id);
-        if (building_index == INDEX_INVALID) {
-            unit.target = UNIT_TARGET_NONE;
-            return;
-        } 
-
-        // Return gold
-        building_t& building = state.buildings[building_index];
-        bool is_unit_around_building = rect_t(building.cell - xy(1, 1), match_building_cell_size(building.type) + xy(2, 2)).has_point(unit.cell);
-        if (is_unit_around_building) {
-            state.player_gold[unit.player_id] += unit.gold_held;
-            unit.gold_held = 0;
-            match_unit_try_target_nearest_gold(state, unit);
-        } else {
-            match_unit_path_to_target(state, unit);
-        }
-    } else if (unit.target == UNIT_TARGET_UNIT) {
-        // If the target unit no longer exists, this unit should idle
-        uint32_t target_unit_index = state.units.get_index_of(unit.target_entity_id);
-        if (target_unit_index == INDEX_INVALID) {
-            unit.target = UNIT_TARGET_NONE;
-            return;
-        }
-
-        // If the unit is not adjacent to the target unit, then repath
-        xy target_cell = state.units[target_unit_index].cell;
-        if (xy::manhattan_distance(unit.cell, target_cell) != 1) {
-            match_unit_path_to_target(state, unit);
-            return;
-        }
-
-        // If we've reached an allied unit, we can stop moving
-        // Possible TODO? make unit keep following the ally? seems very not worth the effort
-        if (unit.player_id == state.units[target_unit_index].player_id) {
-            unit.target = UNIT_TARGET_NONE;
-            return;
-        }
-    } else if (unit.target == UNIT_TARGET_CELL) {
-        unit.target = UNIT_TARGET_NONE;
-    }
-}
-
-rect_t match_unit_get_rect(const unit_t& unit) {
-    return rect_t(unit.position.to_xy() - xy(TILE_SIZE / 2, TILE_SIZE / 2), xy(TILE_SIZE, TILE_SIZE));
-}
-
-UnitMode match_unit_get_mode(const unit_t& unit) {
-    if (unit.position != match_cell_center(unit.cell) || !unit.path.empty()) {
-        return UNIT_MODE_MOVING;
-    } else if (unit.building_id != ID_NULL) {
-        return UNIT_MODE_BUILDING;
-    } else if (unit.target == UNIT_TARGET_GOLD && xy::manhattan_distance(unit.cell, unit.target_cell) == 1) {
-        return UNIT_MODE_MINING;
-    } else {
-        return UNIT_MODE_NONE;
-    }
-}
-
-AnimationName match_unit_get_expected_animation(const unit_t& unit) {
-    switch (match_unit_get_mode(unit)) {
-        case UNIT_MODE_MOVING:
-            return unit.timer == 0 ? ANIMATION_UNIT_MOVE : ANIMATION_UNIT_IDLE;
-        case UNIT_MODE_BUILDING:
-            return ANIMATION_UNIT_BUILD;
-        case UNIT_MODE_MINING:
-            return ANIMATION_UNIT_ATTACK;
-        default:
-            return ANIMATION_UNIT_IDLE;
-    }
-}
-
-int match_unit_get_animation_vframe(const unit_t& unit) {
-    if (unit.animation.name == ANIMATION_UNIT_BUILD) {
-        return 0;
-    }
-    int vframe;
-    if (unit.direction == DIRECTION_NORTH) {
-        vframe = 1;
-    } else if (unit.direction == DIRECTION_SOUTH) {
-        vframe = 0;
-    } else if (unit.direction > DIRECTION_SOUTH) {
-        vframe = 3;
-    } else {
-        vframe = 2;
-    }
-    if (unit.gold_held > 0 && (unit.animation.name == ANIMATION_UNIT_MOVE || unit.animation.name == ANIMATION_UNIT_IDLE)) {
-        vframe += 4;
-    }
-    return vframe;
-}
-
-void match_unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building) {
-    uint32_t unit_index = state.units.get_index_of(unit_id);
-    GOLD_ASSERT(unit_index != INDEX_INVALID);
-    unit_t& unit = state.units[unit_index];
-
-    unit.cell = match_get_first_empty_cell_around_rect(state, rect_t(building.cell, match_building_cell_size(building.type)));
-    unit.position = match_cell_center(unit.cell);
-    unit.target = UNIT_TARGET_NONE;
-    unit.building_id = ID_NULL;
-    match_map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
-}
-
-entity_id match_unit_find_nearest_camp(const match_state_t& state, unit_t& unit) {
-    int nearest_camp_dist = -1;
-    entity_id nearest_camp_id = ID_NULL;
-
-    for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
-        if (state.buildings[building_index].is_finished && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit.player_id) {
-            if (nearest_camp_dist == -1 || xy::manhattan_distance(unit.cell, state.buildings[building_index].cell) < nearest_camp_dist) {
-                nearest_camp_id = state.buildings.get_id_of(building_index);
-                nearest_camp_dist = xy::manhattan_distance(unit.cell, state.buildings[building_index].cell);
-            }
-        }
-    }
-
-    return nearest_camp_id;
-}
-
-void match_unit_try_return_gold(const match_state_t& state, unit_t& unit) {
-    // Find the nearest mining camp
-    entity_id nearest_camp_id = match_unit_find_nearest_camp(state, unit);
-    if (nearest_camp_id != ID_NULL) {
-        unit.target = UNIT_TARGET_CAMP;
-        unit.target_entity_id = nearest_camp_id;
-        match_unit_path_to_target(state, unit);
-    } else {
-        unit.target = UNIT_TARGET_NONE;
-    }
-}
-
-void match_unit_try_target_nearest_gold(const match_state_t& state, unit_t& unit) {
-    unit.target = UNIT_TARGET_NONE;
-
-    entity_id nearest_camp_id = match_unit_find_nearest_camp(state, unit);
-    xy start_cell = nearest_camp_id != ID_NULL ? state.buildings[state.buildings.get_index_of(nearest_camp_id)].cell : unit.cell;
-
-    xy nearest_gold_cell = unit.cell;
-    int nearest_gold_dist = -1;
-    for (int x = 0; x < state.map_width; x++) {
-        for (int y = 0; y < state.map_height; y++) {
-            xy gold_cell = xy(x, y);
-            // Check if the cell is gold
-            if (!match_map_is_cell_gold(state, gold_cell)) {
-                continue;
-            }
-
-            // Check if the gold can be mined around
-            bool is_gold_cell_free = false;
-            for (int direction = DIRECTION_NORTH; direction < DIRECTION_COUNT; direction += 2) {
-                xy adjacent_cell = gold_cell + DIRECTION_XY[direction];
-                if (match_map_is_cell_in_bounds(state, adjacent_cell) && !match_map_is_cell_blocked(state, adjacent_cell)) {
-                    is_gold_cell_free = true;
-                    break;
-                }
-            }
-
-            // Check if the cell is closer to the nearest cell
-            if (is_gold_cell_free && (nearest_gold_dist == -1 || xy::manhattan_distance(start_cell, gold_cell) < nearest_gold_dist)) {
-                nearest_gold_cell = gold_cell;
-                nearest_gold_dist = xy::manhattan_distance(start_cell, nearest_gold_cell);
-            }
-        }
-    }
-
-    if (nearest_gold_dist != -1) {
-        unit.target = UNIT_TARGET_GOLD;
-        unit.target_cell = nearest_gold_cell;
-        match_unit_path_to_target(state, unit);
-        if (unit.path.empty()) {
-            unit.timer = GOLD_TICK_DURATION;
-            unit.direction = get_enum_direction_from_xy_direction(unit.target_cell - unit.cell);
-        }
-    } else {
-        unit.target = UNIT_TARGET_NONE;
-    }
-}
-
-// Building
-
-entity_id match_building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell) {
-    const building_data_t& building_data = BUILDING_DATA.find(type)->second;
-
-    building_t building;
-    building.player_id = player_id;
-    building.type = type;
-    building.health = 3;
-
-    building.cell = cell;
-
-    building.is_finished = false;
-
-    entity_id building_id = state.buildings.push_back(building);
-    match_map_set_cell_rect_value(state, rect_t(cell, xy(building_data.cell_width, building_data.cell_height)), CELL_BUILDING, building_id);
-    return building_id;
-}
-
-void match_building_destroy(match_state_t& state, entity_id building_id) {
-    uint32_t building_index = state.buildings.get_index_of(building_id);
-    building_t& building = state.buildings[building_index];
-    const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
-
-    match_map_set_cell_rect_value(state, rect_t(building.cell, xy(building_data.cell_width, building_data.cell_height)), CELL_EMPTY);
-    state.buildings.remove_at(building_index);
-}
-
-xy match_building_cell_size(BuildingType type) {
-    const building_data_t& building_data = BUILDING_DATA.find(type)->second;
-    return xy(building_data.cell_width, building_data.cell_height);
-}
-
-rect_t match_building_get_rect(const building_t& building) {
-    return rect_t(building.cell * TILE_SIZE, match_building_cell_size(building.type) * TILE_SIZE);
-}
-
-bool match_building_can_be_placed(const match_state_t& state, BuildingType type, xy cell) {
-    rect_t building_rect = rect_t(cell, match_building_cell_size(type));
-    return match_map_is_cell_in_bounds(state, building_rect.position + building_rect.size) && !match_map_is_cell_rect_blocked(state, building_rect);
 }

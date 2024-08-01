@@ -272,6 +272,16 @@ inline Direction get_enum_direction_from_xy_direction(xy xy_direction) {
     return DIRECTION_COUNT;
 }
 
+inline Direction get_enum_direction_to(xy from, xy to) {
+    xy direction = to - from;
+    if (abs(direction.x) >= abs(direction.y)) {
+        direction = xy(direction.x < 0 ? -1 : 1, 0);
+    } else {
+        direction = xy(0, direction.y < 0 ? -1 : 1);
+    }
+    return get_enum_direction_from_xy_direction(direction);
+}
+
 /*
  * Quick note: xy_fixed(1,1).normalized() in the diagonal direction would result in vec2(0.707,0.707)
  * To create a fixed with value .707, we take the fractional scale 256 * .707 = 181
