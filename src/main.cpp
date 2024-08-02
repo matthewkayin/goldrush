@@ -734,6 +734,7 @@ void render_match(const match_state_t& state) {
     }
     rect_t screen_rect = rect_t(xy(0, 0), xy(SCREEN_WIDTH, SCREEN_HEIGHT));
 
+    SDL_SetRenderDrawColor(engine.renderer, 255, 0, 0, 255);
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map_width);
@@ -744,6 +745,10 @@ void render_match(const match_state_t& state) {
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
+            // DEBUG
+            if (map_is_cell_blocked(state, xy(base_coords.x + x, base_coords.y + y))) {
+                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+            }
 
             uint32_t map_cell = map_get_cell_type(state, xy(base_coords.x + x, base_coords.y + y));
             if (map_cell >= CELL_GOLD1 && map_cell <= CELL_GOLD3) {
@@ -919,6 +924,21 @@ void render_match(const match_state_t& state) {
         render_sprite(params.sprite, params.frame, params.position, params.options);
     }
 
+    // DEBUG
+    // Unit paths
+    SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+    for (const unit_t& unit : state.units) {
+        if (unit.path.empty()) {
+            continue;
+        }
+        xy start = unit.position.to_xy();
+        for (uint32_t i = 0; i < unit.path.size(); i++) {
+            xy end = cell_center(unit.path[i]).to_xy();
+            SDL_RenderDrawLine(engine.renderer, start.x, start.y, end.x, end.y);
+            start = end;
+        }
+    }
+
     // Building placement
     if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
         int sprite = SPRITE_BUILDING_HOUSE + (state.ui_building_type - BUILDING_HOUSE);
@@ -1033,4 +1053,30 @@ void render_match(const match_state_t& state) {
     SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
+
+    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+        const unit_t& unit = state.units[unit_index];
+        char unit_debug_text[128];
+        static const char* MODE_STR[UNIT_MODE_ATTACK_COOLDOWN + 1] = {
+            "idle",
+            "move",
+            "blocked",
+            "mv_finsh",
+            "build",
+            "mine",
+            "windup",
+            "cooldown"
+        };
+        static const char* TARGET_STR[UNIT_TARGET_GOLD + 1] = {
+            "none",
+            "cell",
+            "build",
+            "enemy",
+            "e build",
+            "camp",
+            "gold"
+        };
+        sprintf(unit_debug_text, "%u: mode = %s target = %s", unit_index, MODE_STR[unit.mode], TARGET_STR[unit.target.type]);
+        render_text(FONT_HACK, unit_debug_text, COLOR_BLACK, xy(0, 24 + (12 * unit_index)));
+    }
 }

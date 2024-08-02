@@ -135,6 +135,7 @@ enum UnitMode {
     UNIT_MODE_IDLE,
     UNIT_MODE_MOVE,
     UNIT_MODE_MOVE_BLOCKED,
+    UNIT_MODE_MOVE_FINISHED,
     UNIT_MODE_BUILD,
     UNIT_MODE_MINE,
     UNIT_MODE_ATTACK_WINDUP,
@@ -255,6 +256,7 @@ xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
 xy get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect);
 xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building);
+bool is_unit_adjacent_to_building(const unit_t& unit, const building_t& building);
 
 // UI
 void ui_show_status(match_state_t& state, const char* message);
@@ -286,9 +288,9 @@ void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* p
 void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
 void unit_update(match_state_t& state, uint32_t unit_index);
 rect_t unit_get_rect(const unit_t& unit);
-bool unit_is_enemy_in_range(const match_state_t& state, const unit_t& unit);
 void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t target);
 xy unit_get_target_cell(const match_state_t& state, const unit_t& unit);
+bool unit_has_reached_target(const match_state_t& state, const unit_t& unit);
 int unit_get_damage(const match_state_t& state, const unit_t& unit);
 int unit_get_armor(const match_state_t& state, const unit_t& unit);
 AnimationName unit_get_expected_animation(const unit_t& unit);
