@@ -353,13 +353,6 @@ void network_server_broadcast_playerlist() {
 }
 
 void network_server_start_loading() {
-    // Check that all the players are ready
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state.players[player_id].status == PLAYER_STATUS_NOT_READY) {
-            return;
-        }
-    }
-
     // Set them to not ready so that they can re-ready themselves once they enter the match state
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.players[player_id].status == PLAYER_STATUS_READY) {
@@ -377,11 +370,6 @@ void network_server_start_loading() {
     ENetPacket* packet = enet_packet_create(&match_load, sizeof(message_match_load_t), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
-
-    // Send a match start even to the menu
-    network_event_t event;
-    event.type = NETWORK_EVENT_MATCH_LOAD;
-    network_event_enqueue(event);
 
     lcg_srand(match_load.random_seed);
     log_info("Set random seed to %u", match_load.random_seed);

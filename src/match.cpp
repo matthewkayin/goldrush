@@ -167,6 +167,9 @@ match_state_t match_init() {
         network_client_toggle_ready();
     } else {
         log_info("Server in match.");
+        if (network_are_all_players_ready()) {
+            log_error("Clients all readied before server. This shouldn't be possible.");
+        }
     }
     if (network_is_server() && player_count == 1) {
         log_info("Beginning singleplayer game");
@@ -457,6 +460,35 @@ void match_update(match_state_t& state) {
             building_index++;
         }
     }
+
+    // Check the player's selection for dead units / buildings
+    if (state.selection.type == SELECTION_TYPE_UNITS) {
+        uint32_t index = 0;
+        while (index < state.selection.ids.size()) {
+            uint32_t unit_index = state.units.get_index_of(state.selection.ids[index]);
+            if (unit_index == INDEX_INVALID) {
+                state.selection.ids.erase(state.selection.ids.begin() + index);
+            } else {
+                index++;
+            }
+        }
+        if (state.selection.ids.size() == 0) {
+            selection_t selection_empty = (selection_t) {
+                .type = SELECTION_TYPE_NONE,
+                .ids = std::vector<entity_id>()
+            };
+            ui_set_selection(state, selection_empty);
+        }
+    } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+        uint32_t index = state.buildings.get_index_of(state.selection.ids[0]);
+        if (index == INDEX_INVALID) {
+            selection_t selection_empty = (selection_t) {
+                .type = SELECTION_TYPE_NONE,
+                .ids = std::vector<entity_id>()
+            };
+            ui_set_selection(state, selection_empty);
+        }
+    }
 }
 
 // INPUT
@@ -623,6 +655,11 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                                 unit_set_target(state, unit, (unit_target_t) {
                                     .type = UNIT_TARGET_CELL,
                                     .cell = unit_target
+                                });
+                            } else if (state.buildings[building_index].player_id != unit.player_id) {
+                                unit_set_target(state, unit, (unit_target_t) {
+                                    .type = UNIT_TARGET_BUILDING,
+                                    .id = map_get_cell_id(state, unit_target)
                                 });
                             } else if (state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].is_finished && unit.gold_held > 0) {
                                 unit_set_target(state, unit, (unit_target_t) {

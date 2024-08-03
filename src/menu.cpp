@@ -231,9 +231,13 @@ void menu_update(menu_state_t& state) {
             case MENU_BUTTON_LOBBY_READY:
                 network_client_toggle_ready();
                 break;
-            case MENU_BUTTON_LOBBY_START:
-                network_server_start_loading();
+            case MENU_BUTTON_LOBBY_START: {
+                if (network_are_all_players_ready()) {
+                    network_server_start_loading();
+                    menu_set_mode(state, MENU_MODE_MATCH_START);
+                }
                 break;
+            }
             default:
                 break;
         }

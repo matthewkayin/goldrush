@@ -235,7 +235,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
                         break;
                     }
-                    case UNIT_TARGET_UNIT: {
+                    case UNIT_TARGET_UNIT: 
+                    case UNIT_TARGET_BUILDING: {
                         if (unit_is_target_dead(state, unit)) {
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
@@ -246,20 +247,28 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                         if (!unit_has_reached_target(state, unit)) {
                             // This will trigger a repath
+                            log_info("has not reached target");
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
 
-                        uint32_t target_index = state.units.get_index_of(unit.target.id);
+                        uint32_t target_index = unit.target.type == UNIT_TARGET_UNIT 
+                                                    ? state.units.get_index_of(unit.target.id)
+                                                    : state.buildings.get_index_of(unit.target.id);
                         GOLD_ASSERT(target_index != INDEX_INVALID);
-                        unit_t& target_unit = state.units[target_index];
 
-                        if (unit.player_id == target_unit.player_id) {
+                        uint8_t target_player_id = unit.target.type == UNIT_TARGET_UNIT
+                                            ? state.units[target_index].player_id
+                                            : state.buildings[target_index].player_id;
+                        if (unit.player_id == target_player_id) {
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
 
-                        unit.direction = get_enum_direction_to(unit.cell, target_unit.cell);
+                        xy target_cell = unit.target.type == UNIT_TARGET_UNIT 
+                                            ? state.units[target_index].cell
+                                            : state.buildings[target_index].cell;
+                        unit.direction = get_enum_direction_to(unit.cell, target_cell);
                         unit.mode = UNIT_MODE_ATTACK_WINDUP;
                         break;
                     }
@@ -424,8 +433,12 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
                                     ? state.units[target_unit_index].cell 
                                     : unit.cell;
         }
-        case UNIT_TARGET_BUILDING:
-            return unit.cell;
+        case UNIT_TARGET_BUILDING: {
+            uint32_t target_building_index = state.buildings.get_index_of(unit.target.id);
+            return target_building_index != INDEX_INVALID
+                                    ? get_nearest_free_cell_around_building(state, unit.cell, state.buildings[target_building_index])
+                                    : unit.cell;
+        }
         case UNIT_TARGET_CAMP: {
             uint32_t building_index = state.buildings.get_index_of(unit.target.id);
             return building_index != INDEX_INVALID 
@@ -451,8 +464,11 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             int range = state.units[target_unit_index].player_id == unit.player_id ? 1 : UNIT_DATA.at(unit.type).range;
             return xy::manhattan_distance(unit.cell, state.units[target_unit_index].cell) <= range; 
         }
-        case UNIT_TARGET_BUILDING: 
-            return true;
+        case UNIT_TARGET_BUILDING: {
+            uint32_t target_building_index = state.buildings.get_index_of(unit.target.id);
+            GOLD_ASSERT(target_building_index != INDEX_INVALID);
+            return is_unit_adjacent_to_building(unit, state.buildings[target_building_index]);
+        }
         case UNIT_TARGET_CAMP: {
             uint32_t camp_index = state.buildings.get_index_of(unit.target.id);
             GOLD_ASSERT(camp_index != INDEX_INVALID);

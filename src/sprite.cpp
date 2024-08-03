@@ -56,8 +56,18 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 1,
         .vframes = 1
     }},
+    { SPRITE_SELECT_RING_ATTACK, (sprite_params_t) {
+        .path = "sprite/select_ring_attack.png",
+        .hframes = 1,
+        .vframes = 1
+    }},
     { SPRITE_SELECT_RING_HOUSE, (sprite_params_t) {
         .path = "sprite/select_ring_house.png",
+        .hframes = 1,
+        .vframes = 1
+    }},
+    { SPRITE_SELECT_RING_HOUSE_ATTACK, (sprite_params_t) {
+        .path = "sprite/select_ring_house_attack.png",
         .hframes = 1,
         .vframes = 1
     }},

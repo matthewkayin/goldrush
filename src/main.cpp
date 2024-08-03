@@ -838,7 +838,8 @@ void render_match(const match_state_t& state) {
                 case CELL_UNIT: {
                     uint32_t unit_index = state.units.get_index_of(id);
                     if (unit_index != INDEX_INVALID) {
-                        render_sprite(SPRITE_SELECT_RING, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
+                        Sprite sprite = state.units[unit_index].player_id == network_get_player_id() ? SPRITE_SELECT_RING : SPRITE_SELECT_RING_ATTACK;
+                        render_sprite(sprite, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
                     break;
                 }
@@ -846,7 +847,8 @@ void render_match(const match_state_t& state) {
                     uint32_t building_index = state.buildings.get_index_of(id);
                     if (building_index != INDEX_INVALID) {
                         rect_t building_rect = building_get_rect(state.buildings[building_index]);
-                        render_sprite(SPRITE_SELECT_RING_HOUSE, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                        Sprite sprite = state.buildings[building_index].player_id == network_get_player_id() ? SPRITE_SELECT_RING_HOUSE : SPRITE_SELECT_RING_HOUSE_ATTACK;
+                        render_sprite(sprite, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
                     break;
                 }
