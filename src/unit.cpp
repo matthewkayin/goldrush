@@ -30,15 +30,20 @@ void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const x
     unit.direction = DIRECTION_SOUTH;
     unit.cell = cell;
     unit.position = cell_center(unit.cell);
-    unit_set_target(state, unit, (unit_target_t) {
+    unit.target = (unit_target_t) {
         .type = UNIT_TARGET_NONE
-    });
+    };
 
     unit.gold_held = 0;
     unit.timer = 0;
 
     entity_id unit_id = state.units.push_back(unit);
     map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
+}
+
+void unit_destroy(match_state_t& state, uint32_t unit_index) {
+    map_set_cell_value(state, state.units[unit_index].cell, CELL_EMPTY);
+    state.units.remove_at(unit_index);
 }
 
 void unit_update(match_state_t& state, uint32_t unit_index) {
@@ -54,6 +59,11 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 if (unit.target.type == UNIT_TARGET_NONE) {
                     unit_update_finished = true;
                     break;
+                } else if ((unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING) && unit_is_target_dead(state, unit)) {
+                    unit.target = (unit_target_t) {
+                        .type = UNIT_TARGET_NONE
+                    };
+                    break;
                 } else if (unit_has_reached_target(state, unit)) {
                     unit.mode = UNIT_MODE_MOVE_FINISHED;
                     break;
@@ -65,9 +75,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     } else {
                         if (unit.target.type == UNIT_TARGET_BUILD) {
                             ui_show_status(state, UI_STATUS_CANT_BUILD);
-                            unit_set_target(state, unit, (unit_target_t) {
+                            unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
-                            });
+                            };
                             unit_update_finished = true;
                             break;
                         }
@@ -143,9 +153,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             case UNIT_MODE_MOVE_FINISHED: {
                 switch (unit.target.type) {
                     case UNIT_TARGET_CELL: {
-                        unit_set_target(state, unit, (unit_target_t) {
+                        unit.target = (unit_target_t) {
                             .type = UNIT_TARGET_NONE
-                        });
+                        };
                         unit.mode = UNIT_MODE_IDLE;
                         break;
                     }
@@ -158,9 +168,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             // Set the cell back to filled
                             map_set_cell_value(state, unit.cell, CELL_EMPTY);
                             ui_show_status(state, UI_STATUS_CANT_BUILD);
-                            unit_set_target(state, unit, (unit_target_t) {
+                            unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
-                            });
+                            };
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         } 
@@ -204,9 +214,10 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     case UNIT_TARGET_CAMP: {
                         uint32_t building_index = state.buildings.get_index_of(unit.target.id);
                         if (building_index == INDEX_INVALID) {
-                            unit_set_target(state, unit, (unit_target_t) { 
+                            unit.target = (unit_target_t) { 
                                 .type = UNIT_TARGET_NONE
-                            });
+                            };
+                            unit.mode = UNIT_MODE_IDLE;
                             break;
                         } 
 
@@ -224,23 +235,32 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
                         break;
                     }
-                    case UNIT_TARGET_ENEMY: {
-                        uint32_t enemy_index = state.units.get_index_of(unit.target.id);
-                        if (enemy_index == INDEX_INVALID) {
-                            unit_set_target(state, unit, (unit_target_t) {
+                    case UNIT_TARGET_UNIT: {
+                        if (unit_is_target_dead(state, unit)) {
+                            unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
-                            });
+                            };
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
 
-                        if (unit_has_reached_target(state, unit)) {
-                            unit.direction = get_enum_direction_to(unit.cell, state.units[enemy_index].cell);
-                            unit.mode = UNIT_MODE_ATTACK_WINDUP;
-                        } else {
+                        if (!unit_has_reached_target(state, unit)) {
                             // This will trigger a repath
                             unit.mode = UNIT_MODE_IDLE;
+                            break;
                         }
+
+                        uint32_t target_index = state.units.get_index_of(unit.target.id);
+                        GOLD_ASSERT(target_index != INDEX_INVALID);
+                        unit_t& target_unit = state.units[target_index];
+
+                        if (unit.player_id == target_unit.player_id) {
+                            unit.mode = UNIT_MODE_IDLE;
+                            break;
+                        }
+
+                        unit.direction = get_enum_direction_to(unit.cell, target_unit.cell);
+                        unit.mode = UNIT_MODE_ATTACK_WINDUP;
                         break;
                     }
                     default: {
@@ -277,6 +297,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 break;
             }
             case UNIT_MODE_MINE: {
+                // Handles case where this unit was mining has ran out
                 if (!map_is_cell_gold(state, unit.target.cell)) {
                     log_info("gold ran out on me!");
                     unit.timer = 0;
@@ -287,18 +308,21 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                 unit.timer--;
                 if (unit.timer == 0) {
+                    // Collect a gold
                     unit.gold_held++;
                     map_decrement_gold(state, unit.target.cell);
+
                     if (unit.gold_held == UNIT_MAX_GOLD_HELD) {
-                        unit_set_target(state, unit, unit_target_nearest_camp(state, unit));
+                        // Return to mining camp
+                        unit.target = unit_target_nearest_camp(state, unit);
                         unit.mode = UNIT_MODE_IDLE;
                     } else if (!map_is_cell_gold(state, unit.target.cell)) {
-                        unit.target = unit.gold_held < UNIT_MAX_GOLD_HELD 
-                                        ? unit_target_nearest_gold(state, unit)
-                                        : unit_target_nearest_camp(state, unit);
+                        // Gold ran out, find a new gold cell to mine
+                        unit.target = unit_target_nearest_gold(state, unit);
                         log_info("unit gold %u unit target %u", unit.gold_held, unit.target.type);
                         unit.mode = UNIT_MODE_IDLE;
                     } else {
+                        // Continue mining
                         unit.timer = UNIT_MINE_TICK_DURATION;
                     }
                 }
@@ -306,56 +330,60 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 break;
             }
             case UNIT_MODE_ATTACK_WINDUP: {
+                if (unit_is_target_dead(state, unit)) {
+                    unit.target = (unit_target_t) {
+                        .type = UNIT_TARGET_NONE
+                    };
+                    unit.mode = UNIT_MODE_IDLE;
+                    break;
+                }
+
                 if (!animation_is_playing(unit.animation)) {
-                    if (unit.target.type == UNIT_TARGET_ENEMY) {
+                    if (unit.target.type == UNIT_TARGET_UNIT) {
                         uint32_t enemy_index = state.units.get_index_of(unit.target.id);
-                        if (enemy_index == INDEX_INVALID) {
-                            unit_set_target(state, unit, (unit_target_t) {
-                                .type = UNIT_TARGET_NONE
-                            });
-                            unit.mode = UNIT_MODE_IDLE;
-                            unit_update_finished = true;
-                            break;
-                        }
-
-                        if (!unit_has_reached_target(state, unit)) {
-                            // Triggers a repath
-                            unit.mode = UNIT_MODE_IDLE;
-                            break;
-                        }
-
+                        GOLD_ASSERT(enemy_index != INDEX_INVALID);
                         unit_t& enemy = state.units[enemy_index];
+
                         int damage = std::min(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
                         enemy.health = std::max(0, enemy.health - damage);
+                    } else if (unit.target.type == UNIT_TARGET_BUILDING) {
+                        uint32_t enemy_index = state.buildings.get_index_of(unit.target.id);
+                        GOLD_ASSERT(enemy_index != INDEX_INVALID);
+                        building_t& enemy = state.buildings[enemy_index];
 
-                        unit.timer = unit_data.attack_cooldown;
-                        unit.mode = UNIT_MODE_ATTACK_COOLDOWN;
+                        // NOTE: Building armor is hard-coded to 1
+                        int damage = std::min(1, unit_get_damage(state, unit) - 1);
+                        enemy.health = std::max(0, enemy.health - damage);
+                    }
 
-                    } // End if target type == ENEMY
+                    unit.timer = unit_data.attack_cooldown;
+                    unit.mode = UNIT_MODE_ATTACK_COOLDOWN;
                 } // End if animation not playing
 
                 unit_update_finished = true;
                 break;
             } // End case UNIT_MODE_ATTACK_WINDUP
             case UNIT_MODE_ATTACK_COOLDOWN: {
+                if (unit_is_target_dead(state, unit)) {
+                    // TODO target nearest enemy
+                    unit.timer = 0;
+                    unit.target = (unit_target_t) {
+                        .type = UNIT_TARGET_NONE
+                    };
+                    unit.mode = UNIT_MODE_IDLE;
+                    break;
+                }
+
+                if (!unit_has_reached_target(state, unit)) {
+                    // Unit needs to repath to the target
+                    unit.timer = 0;
+                    unit.mode = UNIT_MODE_IDLE;
+                    break;
+                }
+
                 unit.timer--;
                 if (unit.timer == 0) {
-                    if (unit.target.type == UNIT_TARGET_ENEMY) {
-                        uint32_t enemy_index = state.units.get_index_of(unit.target.id);
-                        if (enemy_index == INDEX_INVALID) {
-                            // TOOD: try to target a different nearby enemy
-                            unit_set_target(state, unit, (unit_target_t) {
-                                .type = UNIT_TARGET_NONE
-                            });
-                            unit.mode = UNIT_MODE_IDLE;
-                        } else if (!unit_has_reached_target(state, unit)) {
-                            // Triggers a repath
-                            unit.mode = UNIT_MODE_IDLE;
-                            break;
-                        } else {
-                            unit.mode = UNIT_MODE_ATTACK_WINDUP;
-                        }
-                    }
+                    unit.mode = UNIT_MODE_ATTACK_WINDUP;
                 }
 
                 unit_update_finished = true;
@@ -370,8 +398,15 @@ rect_t unit_get_rect(const unit_t& unit) {
 }
 
 void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t target) {
+    GOLD_ASSERT(unit.mode != UNIT_MODE_BUILD);
     unit.target = target;
     unit.path.clear();
+
+    if (unit.mode != UNIT_MODE_MOVE) {
+        // Abandon current behavior in favor of new order
+        unit.timer = 0;
+        unit.mode = UNIT_MODE_IDLE;
+    }
 }
 
 xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
@@ -383,13 +418,13 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
         case UNIT_TARGET_CELL:
         case UNIT_TARGET_GOLD:
             return unit.target.cell;
-        case UNIT_TARGET_ENEMY: {
-            uint32_t enemy_index = state.units.get_index_of(unit.target.id);
-            return enemy_index != INDEX_INVALID 
-                                    ? state.units[enemy_index].cell 
+        case UNIT_TARGET_UNIT: {
+            uint32_t target_unit_index = state.units.get_index_of(unit.target.id);
+            return target_unit_index != INDEX_INVALID 
+                                    ? state.units[target_unit_index].cell 
                                     : unit.cell;
         }
-        case UNIT_TARGET_ENEMY_BUILDING:
+        case UNIT_TARGET_BUILDING:
             return unit.cell;
         case UNIT_TARGET_CAMP: {
             uint32_t building_index = state.buildings.get_index_of(unit.target.id);
@@ -410,12 +445,13 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             return unit.cell == unit.target.cell;
         case UNIT_TARGET_GOLD:
             return xy::manhattan_distance(unit.cell, unit.target.cell) == 1;
-        case UNIT_TARGET_ENEMY: {
+        case UNIT_TARGET_UNIT: {
             uint32_t target_unit_index = state.units.get_index_of(unit.target.id);
             GOLD_ASSERT(target_unit_index != INDEX_INVALID);
-            return xy::manhattan_distance(unit.cell, state.units[target_unit_index].cell) <= UNIT_DATA.at(unit.type).range;
+            int range = state.units[target_unit_index].player_id == unit.player_id ? 1 : UNIT_DATA.at(unit.type).range;
+            return xy::manhattan_distance(unit.cell, state.units[target_unit_index].cell) <= range; 
         }
-        case UNIT_TARGET_ENEMY_BUILDING: 
+        case UNIT_TARGET_BUILDING: 
             return true;
         case UNIT_TARGET_CAMP: {
             uint32_t camp_index = state.buildings.get_index_of(unit.target.id);
@@ -423,6 +459,12 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             return is_unit_adjacent_to_building(unit, state.buildings[camp_index]);
         }
     }
+}
+
+bool unit_is_target_dead(const match_state_t& state, const unit_t& unit) {
+    GOLD_ASSERT(unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING);
+    uint32_t target_index = unit.target.type == UNIT_TARGET_UNIT ? state.units.get_index_of(unit.target.id) : state.buildings.get_index_of(unit.target.id);
+    return target_index == INDEX_INVALID;
 }
 
 int unit_get_damage(const match_state_t& state, const unit_t& unit) {

@@ -125,8 +125,8 @@ enum UnitTargetType {
     UNIT_TARGET_NONE,
     UNIT_TARGET_CELL,
     UNIT_TARGET_BUILD,
-    UNIT_TARGET_ENEMY,
-    UNIT_TARGET_ENEMY_BUILDING,
+    UNIT_TARGET_UNIT,
+    UNIT_TARGET_BUILDING,
     UNIT_TARGET_CAMP,
     UNIT_TARGET_GOLD
 };
@@ -192,7 +192,7 @@ struct unit_data_t {
 struct building_t {
     uint8_t player_id;
     BuildingType type;
-    uint32_t health;
+    int health;
 
     xy cell;
 
@@ -203,7 +203,7 @@ struct building_data_t {
     int cell_width;
     int cell_height;
     uint32_t cost;
-    uint32_t max_health;
+    int max_health;
     int builder_positions_x[3];
     int builder_positions_y[3];
     int builder_flip_h[3];
@@ -286,11 +286,13 @@ void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* p
 
 // Unit
 void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
+void unit_destroy(match_state_t& state, uint32_t unit_index);
 void unit_update(match_state_t& state, uint32_t unit_index);
 rect_t unit_get_rect(const unit_t& unit);
 void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t target);
 xy unit_get_target_cell(const match_state_t& state, const unit_t& unit);
 bool unit_has_reached_target(const match_state_t& state, const unit_t& unit);
+bool unit_is_target_dead(const match_state_t& state, const unit_t& unit);
 int unit_get_damage(const match_state_t& state, const unit_t& unit);
 int unit_get_armor(const match_state_t& state, const unit_t& unit);
 AnimationName unit_get_expected_animation(const unit_t& unit);

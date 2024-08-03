@@ -931,9 +931,9 @@ void render_match(const match_state_t& state) {
         if (unit.path.empty()) {
             continue;
         }
-        xy start = unit.position.to_xy();
+        xy start = unit.position.to_xy() - state.camera_offset;
         for (uint32_t i = 0; i < unit.path.size(); i++) {
-            xy end = cell_center(unit.path[i]).to_xy();
+            xy end = cell_center(unit.path[i]).to_xy() - state.camera_offset;
             SDL_RenderDrawLine(engine.renderer, start.x, start.y, end.x, end.y);
             start = end;
         }

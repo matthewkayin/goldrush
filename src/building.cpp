@@ -21,6 +21,7 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
 
 void building_destroy(match_state_t& state, entity_id building_id) {
     uint32_t building_index = state.buildings.get_index_of(building_id);
+    GOLD_ASSERT(building_index != INDEX_INVALID);
     building_t& building = state.buildings[building_index];
     const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
 

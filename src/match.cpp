@@ -163,9 +163,13 @@ match_state_t match_init() {
     }
 
     if (!network_is_server()) {
+        log_info("Client in match.");
         network_client_toggle_ready();
+    } else {
+        log_info("Server in match.");
     }
     if (network_is_server() && player_count == 1) {
+        log_info("Beginning singleplayer game");
         state.ui_mode = UI_MODE_NONE;
     }
 
@@ -181,7 +185,9 @@ void match_update(match_state_t& state) {
         network_event_t network_event;
         while (network_poll_events(&network_event)) {
             if (network_is_server() && (network_event.type == NETWORK_EVENT_CLIENT_READY || network_event.type == NETWORK_EVENT_CLIENT_DISCONNECTED)) {
+                log_info("Checking if all players are ready...");
                 if (network_are_all_players_ready()) {
+                    log_info("Starting match.");
                     network_server_start_match();
                     state.ui_mode = UI_MODE_NONE;
                 }
@@ -414,7 +420,12 @@ void match_update(match_state_t& state) {
         animation_update(state.ui_move_animation);
     }
 
+    // Update units
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+        if (state.units[unit_index].health == 0) {
+            continue;
+        }
+
         unit_update(state, unit_index);
 
         AnimationName expected_animation = unit_get_expected_animation(state.units[unit_index]);
@@ -423,6 +434,28 @@ void match_update(match_state_t& state) {
         }
         animation_update(state.units[unit_index].animation);
         state.units[unit_index].animation.frame.y = unit_get_animation_vframe(state.units[unit_index]);
+    }
+
+    // Remove any dead units
+    uint32_t unit_index = 0;
+    while (unit_index < state.units.size()) {
+        if (state.units[unit_index].health == 0) {
+            // TODO play death animation
+            unit_destroy(state, unit_index);
+        } else {
+            unit_index++;
+        }
+    }
+
+    // Remove any dead buildings
+    uint32_t building_index = 0;
+    while (building_index < state.buildings.size()) {
+        if (state.buildings[building_index].health == 0) {
+            // TODO: play death animation
+            building_destroy(state, state.buildings.get_id_of(building_index));
+        } else {
+            building_index++;
+        }
     }
 }
 
@@ -568,9 +601,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
 
                 // Set the units target
-                if (target_unit_index != INDEX_INVALID && state.units[target_unit_index].player_id != unit.player_id) {
+                if (target_unit_index != INDEX_INVALID) {
                     unit_set_target(state, unit, (unit_target_t) {
-                        .type = UNIT_TARGET_ENEMY,
+                        .type = UNIT_TARGET_UNIT,
                         .id = input.move.target_entity_id
                     });
                 } else {
@@ -784,9 +817,9 @@ xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_ce
 
 bool is_unit_adjacent_to_building(const unit_t& unit, const building_t& building) {
     if (unit.cell.x >= building.cell.x && unit.cell.x < building.cell.x + building_cell_size(building.type).x) {
-        return unit.cell.y == building.cell.y - 1 || unit.cell.y == building.cell.y + building_cell_size(building.type).y - 1;
+        return unit.cell.y == building.cell.y - 1 || unit.cell.y == building.cell.y + building_cell_size(building.type).y;
     } else if (unit.cell.y >= building.cell.y && unit.cell.y < building.cell.y + building_cell_size(building.type).y) {
-        return unit.cell.x == building.cell.x - 1 || unit.cell.x == building.cell.x + building_cell_size(building.type).x - 1;
+        return unit.cell.x == building.cell.x - 1 || unit.cell.x == building.cell.x + building_cell_size(building.type).x;
     } else {
         return false;
     }
