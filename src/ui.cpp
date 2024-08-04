@@ -2,6 +2,7 @@
 
 #include "network.h"
 #include "input.h"
+#include "logger.h"
 #include <unordered_map>
 #include <array>
 
@@ -82,6 +83,7 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             } else if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
                 state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
+                log_info("cancel ui mode %u", state.ui_mode);
             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
                 GOLD_ASSERT(!state.buildings[state.buildings.get_index_of(state.selection.ids[0])].is_finished);
                 input_t input;
@@ -105,6 +107,7 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
             } else {
                 state.ui_mode = UI_MODE_BUILDING_PLACE;
+                state.ui_buttonset = UI_BUTTONSET_CANCEL;
                 state.ui_building_type = building_type;
             }
 

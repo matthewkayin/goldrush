@@ -6,7 +6,7 @@
 #define APP_VERSION "0.1"
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
-#define MAX_PLAYERS 8
+#define MAX_PLAYERS 6
 #define TILE_SIZE 16
 #define GOLD_RAND_SEED 1722091950
 

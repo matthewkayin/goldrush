@@ -34,6 +34,7 @@ enum TextAnchor {
 const int RENDER_TEXT_CENTERED = -1;
 
 const SDL_Color COLOR_BLACK = (SDL_Color) { .r = 0, .g = 0, .b = 0, .a = 255 };
+const SDL_Color COLOR_OFFBLACK = (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 255 };
 const SDL_Color COLOR_WHITE = (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 };
 const SDL_Color COLOR_SAND = (SDL_Color) { .r = 226, .g = 179, .b = 152, .a = 255 };
 const SDL_Color COLOR_SAND_DARK = (SDL_Color) { .r = 204, .g = 162, .b = 139, .a = 255 };
@@ -963,31 +964,10 @@ void render_match(const match_state_t& state) {
                 continue;
             }
 
-            xy frame_coords[4];
-            xy subtile_offset[4] = { xy(0, 0), xy(TILE_SIZE / 2, 0), xy(0, TILE_SIZE / 2), xy(TILE_SIZE / 2, TILE_SIZE / 2) };
-
-            uint8_t neighbors = 0;
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                xy adjacent_cell = fog_cell + DIRECTION_XY[direction];
-                if (!map_is_cell_in_bounds(state, adjacent_cell) ||
-                    state.map_fog[adjacent_cell.x + (adjacent_cell.y * state.map_width)] != FOG_REVEALED) {
-                    neighbors |= DIRECTION_BITMASK[direction];
-                }
-            }
-
-            if (neighbors == 0) {
-                // Isolated tile
-                frame_coords[0] = xy(0, 0);
-                frame_coords[1] = xy(1, 0);
-                frame_coords[2] = xy(0, 1);
-                frame_coords[3] = xy(1, 1);
-            } else {
-
-            }
-
-            for (int i = 0; i < 4; i++) {
-                render_sprite(SPRITE_FOG_OF_WAR, frame_coords[i], base_pos + xy(x * TILE_SIZE, y * TILE_SIZE) + subtile_offset[i], RENDER_SPRITE_NO_CULL);
-            }
+            tile_dst_rect.x = base_pos.x + x * TILE_SIZE;
+            tile_dst_rect.y = base_pos.y + y * TILE_SIZE;
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog_value == FOG_HIDDEN ? 255 : 128);
+            SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
@@ -1005,7 +985,7 @@ void render_match(const match_state_t& state) {
         for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_height; y++) {
             for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_width; x++) {
                 bool is_cell_green;
-                if (is_placement_out_of_bounds) {
+                if (is_placement_out_of_bounds || state.map_fog[x + (state.map_width * y)] == FOG_HIDDEN) {
                     is_cell_green = false;
                 } else {
                     is_cell_green = !map_is_cell_blocked(state, xy(x, y));
@@ -1122,7 +1102,7 @@ void render_match(const match_state_t& state) {
 
             fog_rect.x = (x * MINIMAP_RECT.size.x) / (int)state.map_width;
             fog_rect.y = (y * MINIMAP_RECT.size.y) / (int)state.map_height;
-            SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, fog_value == FOG_HIDDEN ? 255 : 128);
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog_value == FOG_HIDDEN ? 255 : 128);
             SDL_RenderFillRect(engine.renderer, &fog_rect);
         }
     }

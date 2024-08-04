@@ -40,5 +40,18 @@ rect_t building_get_rect(const building_t& building) {
 
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell) {
     rect_t building_rect = rect_t(cell, building_cell_size(type));
-    return map_is_cell_in_bounds(state, building_rect.position + building_rect.size) && !map_is_cell_rect_blocked(state, building_rect);
+    if (!map_is_cell_in_bounds(state, building_rect.position + building_rect.size)) {
+        return false;
+    }
+
+    // Check that all cells in the rect are explored
+    for (int x = building_rect.position.x; x < building_rect.position.x + building_rect.size.x; x++) {
+        for (int y = building_rect.position.y; y < building_rect.position.y + building_rect.size.y; y++) {
+            if (state.map_fog[x + (y * state.map_width)] == FOG_HIDDEN) {
+                return false;
+            }
+        }
+    }
+
+    return !map_is_cell_rect_blocked(state, building_rect);
 }

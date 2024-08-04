@@ -203,12 +203,12 @@ void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* p
     }
 }
 
-void map_fog_reveal(match_state_t& state, xy cell, int sight) {
+void map_fog_reveal(match_state_t& state, xy cell, xy size, int sight) {
     int xmin = std::max(0, cell.x - sight);
-    int xmax = std::min((int)state.map_width, cell.x + sight + 1);
+    int xmax = std::min((int)state.map_width, cell.x + size.x + sight);
     for (int x = xmin; x < xmax; x++) {
         int ymin = std::max(0, cell.y - sight);
-        int ymax = std::min((int)state.map_height, cell.y + sight + 1);
+        int ymax = std::min((int)state.map_height, cell.y + size.y + sight);
         if (x == xmin || x == xmax - 1) {
             ymin++;
             ymax--;
@@ -234,13 +234,15 @@ void map_update_fog(match_state_t& state) {
             continue;
         }
 
-        map_fog_reveal(state, unit.cell, UNIT_DATA.at(unit.type).sight);
+        map_fog_reveal(state, unit.cell, xy(1, 1), UNIT_DATA.at(unit.type).sight);
     }
 
     for (const building_t& building : state.buildings) {
         if (building.player_id != network_get_player_id()) {
             continue;
         }
+
+        map_fog_reveal(state, building.cell, building_cell_size(building.type), 4);
     }
 
     state.is_fog_dirty = false;
