@@ -4,102 +4,122 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     { SPRITE_TILES, (sprite_params_t) {
         .path = "sprite/tiles.png",
         .hframes = -1,
-        .vframes = -1
+        .vframes = -1,
+        .recolor = false
     }},
     { SPRITE_TILE_GOLD, (sprite_params_t) {
         .path = "sprite/tile_gold.png",
         .hframes = -1,
-        .vframes = -1
+        .vframes = -1,
+        .recolor = false
     }},
     { SPRITE_UI_FRAME, (sprite_params_t) {
         .path = "sprite/frame.png",
         .hframes = 3,
-        .vframes = 3
+        .vframes = 3,
+        .recolor = false
     }},
     { SPRITE_UI_FRAME_BOTTOM, (sprite_params_t) {
         .path = "sprite/ui_frame_bottom.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_UI_FRAME_BUTTONS, (sprite_params_t) {
         .path = "sprite/ui_frame_buttons.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_UI_MINIMAP, (sprite_params_t) {
         .path = "sprite/ui_minimap.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_UI_BUTTON, (sprite_params_t) {
         .path = "sprite/ui_button.png",
         .hframes = 2,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_UI_BUTTON_ICON, (sprite_params_t) {
         .path = "sprite/ui_button_icon.png",
         .hframes = UI_BUTTON_COUNT - 1,
-        .vframes = 2
+        .vframes = 2,
+        .recolor = false
     }},
     { SPRITE_UI_GOLD, (sprite_params_t) {
         .path = "sprite/ui_gold.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_UI_MOVE, (sprite_params_t) {
         .path = "sprite/ui_move.png",
         .hframes = 5,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_SELECT_RING_ATTACK, (sprite_params_t) {
         .path = "sprite/select_ring_attack.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_SELECT_RING_HOUSE, (sprite_params_t) {
         .path = "sprite/select_ring_house.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_SELECT_RING_HOUSE_ATTACK, (sprite_params_t) {
         .path = "sprite/select_ring_house_attack.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
         .path = "sprite/select_ring_gold.png",
         .hframes = 1,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_MINER_BUILDING, (sprite_params_t) {
         .path = "sprite/unit_miner_building.png",
         .hframes = 2,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = true
     }},
     { SPRITE_UNIT_MINER, (sprite_params_t) {
         .path = "sprite/unit_miner.png",
         .hframes = 8,
-        .vframes = 8
+        .vframes = 8,
+        .recolor = true
     }},
     { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
         .path = "sprite/building_house.png",
         .hframes = 4,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = true
     }},
     { SPRITE_BUILDING_CAMP, (sprite_params_t) {
         .path = "sprite/building_camp.png",
         .hframes = 4,
-        .vframes = 1
+        .vframes = 1,
+        .recolor = true
     }},
     { SPRITE_FOG_OF_WAR, (sprite_params_t) {
         .path = "sprite/fog_of_war.png",
         .hframes = 8,
-        .vframes = 6
+        .vframes = 6,
+        .recolor = false
     }}  
 };
 

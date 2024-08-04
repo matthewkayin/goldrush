@@ -44,6 +44,7 @@ struct sprite_params_t {
     const char* path;
     int hframes;
     int vframes;
+    bool recolor;
 };
 
 extern const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS;

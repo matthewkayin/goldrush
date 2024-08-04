@@ -42,6 +42,29 @@ const SDL_Color COLOR_RED = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }
 const SDL_Color COLOR_GREEN = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
 const SDL_Color COLOR_GOLD = (SDL_Color) { .r = 238, .g = 209, .b = 158, .a = 255 };
 
+enum RecolorName {
+    RECOLOR_BLUE,
+    RECOLOR_RED,
+    RECOLOR_GREEN,
+    RECOLOR_ORANGE,
+    RECOLOR_TURQUOISE,
+    RECOLOR_PURPLE,
+    RECOLOR_BLACK,
+    RECOLOR_WHITE,
+    RECOLOR_NONE
+};
+const std::unordered_map<uint32_t, SDL_Color> COLOR_PLAYER = {
+    { RECOLOR_BLUE, (SDL_Color) { .r = 64, .g = 74, .b = 94, .a = 255 } },
+    { RECOLOR_RED, (SDL_Color) { .r = 158, .g = 83, .b = 82, .a = 255 } },
+    { RECOLOR_GREEN, (SDL_Color) { .r = 63, .g = 112, .b = 95, .a = 255 } },
+    { RECOLOR_ORANGE, (SDL_Color) { .r = 191, .g = 136, .b = 112, .a = 255 } },
+    { RECOLOR_TURQUOISE, (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 } },
+    { RECOLOR_PURPLE, (SDL_Color) { .r = 91, .g = 75, .b = 97, .a = 255 } },
+    { RECOLOR_BLACK, (SDL_Color) { .r = 61, .g = 57, .b = 69, .a = 255 } },
+    { RECOLOR_WHITE, (SDL_Color) { .r = 196, .g = 194, .b = 173, .a = 255 } }
+};
+const SDL_Color RECOLOR_REF = (SDL_Color) { .r = 255, .g = 0, .b = 255, .a = 255 };
+
 // FONT
 
 enum Font {
@@ -79,7 +102,10 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
 // SPRITE
 
 struct sprite_t {
-    SDL_Texture* texture;
+    union {
+        SDL_Texture* texture;
+        SDL_Texture* colored_texture[MAX_PLAYERS];
+    };
     xy frame_size;
     int hframes;
     int vframes;
@@ -412,10 +438,39 @@ bool engine_init(xy window_size) {
             return false;
         }
 
-        sprite.texture = SDL_CreateTextureFromSurface(engine.renderer, sprite_surface);
-        if (sprite.texture == NULL) {
-            log_error("Error creating texture for sprite %s: %s", sprite_params_it->second.path, SDL_GetError());
-            return false;
+        if (sprite_params_it->second.recolor) {
+            // Re-color texture creation
+            uint32_t* sprite_pixels = (uint32_t*)sprite_surface->pixels;
+            uint32_t reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_REF.r, RECOLOR_REF.g, RECOLOR_REF.b, RECOLOR_REF.a);
+
+            for (uint32_t player_color = 0; player_color < MAX_PLAYERS; player_color++) {
+                SDL_Surface* recolored_surface = SDL_CreateRGBSurfaceWithFormat(0, sprite_surface->w, sprite_surface->h, 32, sprite_surface->format->format);
+                uint32_t* recolor_pixels = (uint32_t*)recolored_surface->pixels;
+                SDL_LockSurface(recolored_surface);
+
+                const SDL_Color& color_player = COLOR_PLAYER.at(player_color);
+                uint32_t replace_pixel = SDL_MapRGBA(recolored_surface->format, color_player.r, color_player.g, color_player.b, color_player.a);
+
+                for (uint32_t pixel_index = 0; pixel_index < recolored_surface->w * recolored_surface->h; pixel_index++) {
+                    recolor_pixels[pixel_index] = sprite_pixels[pixel_index] == reference_pixel ? replace_pixel : sprite_pixels[pixel_index];
+                }
+
+                sprite.colored_texture[player_color] = SDL_CreateTextureFromSurface(engine.renderer, recolored_surface);
+                if (sprite.texture == NULL) {
+                    log_error("Error creating colored texture for sprite %s: %s", sprite_params_it->second.path, SDL_GetError());
+                    return false;
+                }
+
+                SDL_UnlockSurface(recolored_surface);
+                SDL_FreeSurface(recolored_surface);
+            }
+        } else {
+            // Non-recolor texture creation
+            sprite.texture = SDL_CreateTextureFromSurface(engine.renderer, sprite_surface);
+            if (sprite.texture == NULL) {
+                log_error("Error creating texture for sprite %s: %s", sprite_params_it->second.path, SDL_GetError());
+                return false;
+            }
         }
 
         if (sprite_params_it->second.hframes == -1) {
@@ -659,12 +714,13 @@ struct render_sprite_params_t {
     xy position;
     xy frame;
     uint32_t options;
+    RecolorName recolor_name;
 };
 const uint32_t RENDER_SPRITE_FLIP_H = 1;
 const uint32_t RENDER_SPRITE_CENTERED = 1 << 1;
 const uint32_t RENDER_SPRITE_NO_CULL = 1 << 2;
 
-void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0) {
+void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, RecolorName recolor_name = RECOLOR_NONE) {
     GOLD_ASSERT(frame.x < engine.sprites[sprite].hframes && frame.y < engine.sprites[sprite].vframes);
 
     bool flip_h = (options & RENDER_SPRITE_FLIP_H) == RENDER_SPRITE_FLIP_H;
@@ -688,7 +744,15 @@ void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t 
         dst_rect.y -= (dst_rect.h / 2);
     }
 
-    SDL_RenderCopyEx(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect, 0.0, NULL, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+    SDL_Texture* texture;
+    if (recolor_name == RECOLOR_NONE) {
+        GOLD_ASSERT(SPRITE_PARAMS.at(sprite).recolor == false);
+        texture = engine.sprites[sprite].texture;
+    } else {
+        GOLD_ASSERT(SPRITE_PARAMS.at(sprite).recolor == true);
+        texture = engine.sprites[sprite].colored_texture[recolor_name];
+    }
+    SDL_RenderCopyEx(engine.renderer, texture, &src_rect, &dst_rect, 0.0, NULL, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 }
 
 int ysort_partition(render_sprite_params_t* params, int low, int high) {
@@ -760,13 +824,15 @@ void render_match(const match_state_t& state) {
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
 
+            // Render gold
             uint32_t map_cell = map_get_cell(state, xy(base_coords.x + x, base_coords.y + y)).type;
             if (map_cell >= CELL_GOLD1 && map_cell <= CELL_GOLD3) {
                 ysorted.push_back((render_sprite_params_t) {
                     .sprite = SPRITE_TILE_GOLD,
                     .position = xy(tile_dst_rect.x, tile_dst_rect.y),
                     .frame = xy(map_cell - CELL_GOLD1, 0),
-                    .options = RENDER_SPRITE_NO_CULL
+                    .options = RENDER_SPRITE_NO_CULL,
+                    .recolor_name = RECOLOR_NONE
                 });
             }
         }
@@ -891,7 +957,8 @@ void render_match(const match_state_t& state) {
             .sprite = (Sprite)sprite,
             .position = building_render_pos,
             .frame = xy(hframe, 0),
-            .options = RENDER_SPRITE_NO_CULL
+            .options = RENDER_SPRITE_NO_CULL,
+            .recolor_name = (RecolorName)building.player_id
         });
     }
 
@@ -912,7 +979,8 @@ void render_match(const match_state_t& state) {
             .sprite = UNIT_DATA.at(unit.type).sprite, 
             .position = unit_render_pos, 
             .frame = unit.animation.frame,
-            .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL
+            .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL,
+            .recolor_name = (RecolorName)unit.player_id
         };
         if (unit.mode == UNIT_MODE_BUILD) {
             const building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
@@ -936,7 +1004,7 @@ void render_match(const match_state_t& state) {
     ysort(&ysorted[0], 0, ysorted.size() - 1);
     for (uint32_t i = 0; i < ysorted.size(); i++) {
         const render_sprite_params_t& params= ysorted[i];
-        render_sprite(params.sprite, params.frame, params.position, params.options);
+        render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_name);
     }
 
     // DEBUG
@@ -976,7 +1044,7 @@ void render_match(const match_state_t& state) {
     if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
         int sprite = SPRITE_BUILDING_HOUSE + (state.ui_building_type - BUILDING_HOUSE);
         GOLD_ASSERT(sprite < SPRITE_COUNT);
-        render_sprite((Sprite)(sprite), xy(3, 0), (ui_get_building_cell(state) * TILE_SIZE) - state.camera_offset);
+        render_sprite((Sprite)(sprite), xy(3, 0), (ui_get_building_cell(state) * TILE_SIZE) - state.camera_offset, 0, (RecolorName)network_get_player_id());
 
         const building_data_t& data = BUILDING_DATA.at(state.ui_building_type);
         bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_width > state.map_width || 
