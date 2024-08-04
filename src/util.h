@@ -261,6 +261,16 @@ const xy DIRECTION_XY[8] = {
     xy(-1, 0), // West
     xy(-1, -1), // Northwest
 };
+const uint8_t DIRECTION_BITMASK[8] = {
+    1, // N
+    2, // NE
+    4, // E
+    8, // SE
+    16, // S
+    32, // SW
+    64, // W
+    128 // NW
+};
 
 inline Direction get_enum_direction_from_xy_direction(xy xy_direction) {
     for (int enum_direction = 0; enum_direction < DIRECTION_COUNT; enum_direction++) {

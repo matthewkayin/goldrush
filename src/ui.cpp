@@ -2,6 +2,8 @@
 
 #include "network.h"
 #include "input.h"
+#include <unordered_map>
+#include <array>
 
 static const uint32_t UI_STATUS_DURATION = 60;
 const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {

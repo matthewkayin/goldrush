@@ -957,17 +957,37 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
-            tile_dst_rect.x = base_pos.x + (x * TILE_SIZE);
-            tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
-
             xy fog_cell = base_coords + xy(x, y);
             Fog fog_value = state.map_fog[fog_cell.x + (fog_cell.y * state.map_width)];
             if (fog_value == FOG_REVEALED) {
                 continue;
             }
 
-            SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, fog_value == FOG_HIDDEN ? 255 : 128);
-            SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+            xy frame_coords[4];
+            xy subtile_offset[4] = { xy(0, 0), xy(TILE_SIZE / 2, 0), xy(0, TILE_SIZE / 2), xy(TILE_SIZE / 2, TILE_SIZE / 2) };
+
+            uint8_t neighbors = 0;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                xy adjacent_cell = fog_cell + DIRECTION_XY[direction];
+                if (!map_is_cell_in_bounds(state, adjacent_cell) ||
+                    state.map_fog[adjacent_cell.x + (adjacent_cell.y * state.map_width)] != FOG_REVEALED) {
+                    neighbors |= DIRECTION_BITMASK[direction];
+                }
+            }
+
+            if (neighbors == 0) {
+                // Isolated tile
+                frame_coords[0] = xy(0, 0);
+                frame_coords[1] = xy(1, 0);
+                frame_coords[2] = xy(0, 1);
+                frame_coords[3] = xy(1, 1);
+            } else {
+
+            }
+
+            for (int i = 0; i < 4; i++) {
+                render_sprite(SPRITE_FOG_OF_WAR, frame_coords[i], base_pos + xy(x * TILE_SIZE, y * TILE_SIZE) + subtile_offset[i], RENDER_SPRITE_NO_CULL);
+            }
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
