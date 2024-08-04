@@ -1,17 +1,19 @@
 #include "match.h"
 
+#include "network.h"
+
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {
     return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
 }
 
 bool map_is_cell_blocked(const match_state_t& state, xy cell) {
-    return state.map_cells[cell.x + (cell.y * state.map_width)] != CELL_EMPTY;
+    return state.map_cells[cell.x + (cell.y * state.map_width)].type != CELL_EMPTY;
 }
 
 bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect) {
     for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
         for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
-            if (state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
+            if (state.map_cells[x + (y * state.map_width)].type != CELL_EMPTY) {
                 return true;
             }
         }
@@ -20,42 +22,45 @@ bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect) {
     return false;
 }
 
-uint32_t map_get_cell_value(const match_state_t& state, xy cell) {
+cell_t map_get_cell(const match_state_t& state, xy cell) {
     return state.map_cells[cell.x + (cell.y * state.map_height)];
 }
 
-uint32_t map_get_cell_type(const match_state_t& state, xy cell) {
-    return state.map_cells[cell.x + (cell.y * (state.map_height))] & CELL_TYPE_MASK;
+void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value) {
+    state.map_cells[cell.x + (cell.y * state.map_height)] = (cell_t) {
+        .type = type,
+        .value = value
+    };
+    state.is_fog_dirty = true;
 }
 
-entity_id map_get_cell_id(const match_state_t& state, xy cell) {
-    // explicit typecast to truncate the 32bit value and return only the 16 bits which represent the id
-    return (entity_id)state.map_cells[cell.x + (cell.y * (state.map_height))];
-}
-
-void map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id) {
-    state.map_cells[cell.x + (cell.y * state.map_height)] = type | id;
-}
-
-void map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id) {
+void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t value) {
     for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
         for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
-            state.map_cells[x + (y * state.map_height)] = type | id;
+            state.map_cells[x + (y * state.map_height)] = (cell_t) {
+                .type = type,
+                .value = value
+            };
         }
     }
+    state.is_fog_dirty = true;
 }
 
 bool map_is_cell_gold(const match_state_t& state, xy cell) {
-    uint32_t cell_type = map_get_cell_type(state, cell);
+    uint32_t cell_type = map_get_cell(state, cell).type;
     return cell_type >= CELL_GOLD1 && cell_type <= CELL_GOLD3;
 }
 
 void map_decrement_gold(match_state_t& state, xy cell) {
-    state.map_cells[cell.x + (cell.y * state.map_width)]--;
-    uint32_t gold_left = state.map_cells[cell.x + (cell.y * state.map_width)] & CELL_ID_MASK;
+    state.map_cells[cell.x + (cell.y * state.map_width)].value--;
+    uint16_t gold_left = state.map_cells[cell.x + (cell.y * state.map_width)].value;
     if (gold_left <= 0) {
-        state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_EMPTY;
+        state.map_cells[cell.x + (cell.y * state.map_width)] = (cell_t) {
+            .type = CELL_EMPTY,
+            .value = 0
+        };
     }
+    state.is_fog_dirty = true;
 }
 
 void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* path) {
@@ -142,7 +147,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* p
             // Don't consider blocked spaces, unless:
             // 1. the blocked space is a unit that is very far away. we pretend such spaces are blocked since the unit will probably move by the time we get there
             // 2. the blocked space is the target_cell. by allowing the path to go here we can avoid worst-case pathfinding even when the target_cell is blocked
-            uint32_t child_cell_type = map_get_cell_type(state, child.cell);
+            CellType child_cell_type = map_get_cell(state, child.cell).type;
             if (!(child_cell_type == CELL_EMPTY || 
                 (child_cell_type == CELL_UNIT && xy::manhattan_distance(from, child.cell) > 3) || 
                 (child.cell == to && xy::manhattan_distance(smallest.cell, child.cell) == 1))) {
@@ -196,4 +201,47 @@ void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* p
     if ((*path)[path->size() - 1] == to && map_is_cell_blocked(state, to)) {
         path->pop_back();
     }
+}
+
+void map_fog_reveal(match_state_t& state, xy cell, int sight) {
+    int xmin = std::max(0, cell.x - sight);
+    int xmax = std::min((int)state.map_width, cell.x + sight + 1);
+    for (int x = xmin; x < xmax; x++) {
+        int ymin = std::max(0, cell.y - sight);
+        int ymax = std::min((int)state.map_height, cell.y + sight + 1);
+        if (x == xmin || x == xmax - 1) {
+            ymin++;
+            ymax--;
+        }
+        
+        for (int y = ymin; y < ymax; y++) {
+            state.map_fog[x + (state.map_width * y)] = FOG_REVEALED;
+        }
+    }
+}
+
+void map_update_fog(match_state_t& state) {
+    // First dim anything that is revealed
+    for (uint32_t i = 0; i < state.map_width * state.map_height; i++) {
+        if (state.map_fog[i] == FOG_REVEALED) {
+            state.map_fog[i] = FOG_EXPLORED;
+        }
+    }
+
+    // Reveal based on unit vision
+    for (const unit_t& unit : state.units) {
+        if (unit.player_id != network_get_player_id()) {
+            continue;
+        }
+
+        map_fog_reveal(state, unit.cell, UNIT_DATA.at(unit.type).sight);
+    }
+
+    for (const building_t& building : state.buildings) {
+        if (building.player_id != network_get_player_id()) {
+            continue;
+        }
+    }
+
+    state.is_fog_dirty = false;
 }

@@ -68,7 +68,12 @@ match_state_t match_init() {
     state.map_width = 64;
     state.map_height = 64;
     state.map_tiles = std::vector<uint32_t>(state.map_width * state.map_height);
-    state.map_cells = std::vector<uint32_t>(state.map_width * state.map_height, CELL_EMPTY);
+    state.map_cells = std::vector<cell_t>(state.map_width * state.map_height, (cell_t) {
+        .type = CELL_EMPTY,
+        .value = 0
+    });
+    state.map_fog = std::vector<Fog>(state.map_width * state.map_height, FOG_HIDDEN);
+    state.is_fog_dirty = true;
 
     for (uint32_t i = 0; i < state.map_width * state.map_height; i += 3) {
         state.map_tiles[i] = 1;
@@ -143,7 +148,7 @@ match_state_t match_init() {
         int cluster_size = std::min(3 + (lcg_rand() % 7), gold_target - gold_count);
         for (int i = 0; i < cluster_size; i++) {
             int gold_offset = lcg_rand() % 3;
-            map_set_cell_value(state, gold_cell, CELL_GOLD1 + gold_offset, 10);
+            map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), 10);
             gold_count++;
 
             // Determine the position of the next gold cell
@@ -162,12 +167,14 @@ match_state_t match_init() {
         }
     }
 
+    map_update_fog(state);
+
     if (!network_is_server()) {
         log_info("Client in match.");
         network_client_toggle_ready();
     } else {
         log_info("Server in match.");
-        if (network_are_all_players_ready()) {
+        if (network_are_all_players_ready() && player_count > 1) {
             log_error("Clients all readied before server. This shouldn't be possible.");
         }
     }
@@ -376,7 +383,7 @@ void match_update(match_state_t& state) {
             input_t input;
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
-            input.move.target_entity_id = map_get_cell_type(state, input.move.target_cell) == CELL_UNIT ? map_get_cell_id(state, input.move.target_cell) : ID_NULL;
+            input.move.target_entity_id = map_get_cell(state, input.move.target_cell).type == CELL_UNIT ? map_get_cell(state, input.move.target_cell).value : ID_NULL;
             input.move.unit_count = 0;
             memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
             input.move.unit_count = state.selection.ids.size();
@@ -385,8 +392,8 @@ void match_update(match_state_t& state) {
             state.input_queue.push_back(input);
 
             // Provide instant user feedback
-            state.ui_move_value = map_get_cell_value(state, input.move.target_cell);
-            if (map_get_cell_type(state, input.move.target_cell) == CELL_EMPTY) {
+            state.ui_move_cell = map_get_cell(state, input.move.target_cell);
+            if (map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
                 state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
                 state.ui_move_position = mouse_world_pos;
             } else {
@@ -489,6 +496,11 @@ void match_update(match_state_t& state) {
             ui_set_selection(state, selection_empty);
         }
     }
+
+    // Update Fog of War
+    if (state.is_fog_dirty) {
+        map_update_fog(state);
+    }
 }
 
 // INPUT
@@ -584,7 +596,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             // If we tried to move towards a unit, try and find the unit
             uint32_t target_unit_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
 
-            bool should_move_as_group = target_unit_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell_value(state, input.move.target_cell) == CELL_EMPTY;
+            bool should_move_as_group = target_unit_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell(state, input.move.target_cell).type == CELL_EMPTY;
             xy group_center;
 
             if (should_move_as_group) {
@@ -639,7 +651,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         .id = input.move.target_entity_id
                     });
                 } else {
-                    switch (map_get_cell_type(state, unit_target)) {
+                    switch (map_get_cell(state, unit_target).type) {
                         case CELL_EMPTY:
                         case CELL_UNIT: {
                             unit_set_target(state, unit, (unit_target_t) {
@@ -649,7 +661,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                             break;
                         }
                         case CELL_BUILDING: {
-                            entity_id target_entity_id = map_get_cell_id(state, unit_target);
+                            entity_id target_entity_id = map_get_cell(state, unit_target).value;
                             uint32_t building_index = state.buildings.get_index_of(target_entity_id);
                             if (building_index == INDEX_INVALID) {
                                 unit_set_target(state, unit, (unit_target_t) {
@@ -659,12 +671,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                             } else if (state.buildings[building_index].player_id != unit.player_id) {
                                 unit_set_target(state, unit, (unit_target_t) {
                                     .type = UNIT_TARGET_BUILDING,
-                                    .id = map_get_cell_id(state, unit_target)
+                                    .id = map_get_cell(state, unit_target).value
                                 });
                             } else if (state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].is_finished && unit.gold_held > 0) {
                                 unit_set_target(state, unit, (unit_target_t) {
                                     .type = UNIT_TARGET_CAMP,
-                                    .id = map_get_cell_id(state, unit_target)
+                                    .id = map_get_cell(state, unit_target).value
                                 });
                             } else {
                                 unit_set_target(state, unit, (unit_target_t) {
@@ -832,7 +844,7 @@ xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_ce
     xy cell = cell_begin[index];
     while (index < 4) {
         if (map_is_cell_in_bounds(state, cell)) {
-            uint32_t cell_type = map_get_cell_type(state, cell);
+            uint32_t cell_type = map_get_cell(state, cell).type;
             bool is_cell_free = cell_type == CELL_EMPTY || (cell_type == CELL_UNIT && xy::manhattan_distance(start_cell, cell) > 3);
             if (is_cell_free && (nearest_cell_dist == -1 || xy::manhattan_distance(start_cell, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;

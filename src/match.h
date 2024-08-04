@@ -16,15 +16,6 @@
 #define UI_STATUS_CANT_BUILD "You can't build there."
 #define  UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
 
-const uint32_t CELL_EMPTY = 0;
-const uint32_t CELL_UNIT = 1 << 16;
-const uint32_t CELL_BUILDING = 2 << 16;
-const uint32_t CELL_GOLD1 = 3 << 16;
-const uint32_t CELL_GOLD2 = 4 << 16;
-const uint32_t CELL_GOLD3 = 5 << 16;
-
-const uint32_t CELL_TYPE_MASK = 0xffff0000;
-const uint32_t CELL_ID_MASK = 0x0000ffff;
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 
@@ -32,6 +23,26 @@ const uint32_t UNIT_PATH_PAUSE_DURATION = 60;
 const uint32_t UNIT_BUILD_TICK_DURATION = 8;
 const uint32_t UNIT_MINE_TICK_DURATION = 60;
 const uint32_t UNIT_MAX_GOLD_HELD = 5;
+
+enum CellType: uint16_t {
+    CELL_EMPTY,
+    CELL_UNIT,
+    CELL_BUILDING,
+    CELL_GOLD1,
+    CELL_GOLD2,
+    CELL_GOLD3
+};
+
+struct cell_t {
+    CellType type;
+    uint16_t value;
+};
+
+enum Fog {
+    FOG_HIDDEN,
+    FOG_EXPLORED,
+    FOG_REVEALED
+};
 
 // Input
 
@@ -185,6 +196,7 @@ struct unit_data_t {
     int range;
     int attack_cooldown;
     fixed speed;
+    int sight;
 };
 
 // Building
@@ -220,7 +232,7 @@ struct match_state_t {
     rect_t select_rect;
     selection_t selection;
     BuildingType ui_building_type;
-    uint32_t ui_move_value;
+    cell_t ui_move_cell;
     animation_t ui_move_animation;
     xy ui_move_position;
 
@@ -231,9 +243,11 @@ struct match_state_t {
 
     // Map
     std::vector<uint32_t> map_tiles;
-    std::vector<uint32_t> map_cells;
+    std::vector<cell_t> map_cells;
+    std::vector<Fog> map_fog;
     uint32_t map_width;
     uint32_t map_height;
+    bool is_fog_dirty;
 
     // Entities
     id_array<unit_t> units;
@@ -275,14 +289,13 @@ xy ui_camera_centered_on_cell(xy cell);
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_blocked(const match_state_t& state, xy cell);
 bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
-uint32_t map_get_cell_value(const match_state_t& state, xy cell);
-uint32_t map_get_cell_type(const match_state_t& state, xy cell);
-entity_id map_get_cell_id(const match_state_t& state, xy cell);
-void map_set_cell_value(match_state_t& state, xy cell, uint32_t type, uint32_t id = 0);
-void map_set_cell_rect_value(match_state_t& state, rect_t cell_rect, uint32_t type, uint32_t id = 0);
+cell_t map_get_cell(const match_state_t& state, xy cell);
+void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value = 0);
+void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
 bool map_is_cell_gold(const match_state_t& state, xy cell);
 void map_decrement_gold(match_state_t& state, xy cell);
 void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* path);
+void map_update_fog(match_state_t& state);
 
 // Unit
 void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);

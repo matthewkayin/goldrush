@@ -39,6 +39,7 @@ const SDL_Color COLOR_SAND = (SDL_Color) { .r = 226, .g = 179, .b = 152, .a = 25
 const SDL_Color COLOR_SAND_DARK = (SDL_Color) { .r = 204, .g = 162, .b = 139, .a = 255 };
 const SDL_Color COLOR_RED = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 };
 const SDL_Color COLOR_GREEN = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
+const SDL_Color COLOR_GOLD = (SDL_Color) { .r = 238, .g = 209, .b = 158, .a = 255 };
 
 // FONT
 
@@ -319,8 +320,8 @@ int main(int argc, char** argv) {
         sprintf(fps_text, "FPS: %u", fps);
         char ups_text[16];
         sprintf(ups_text, "UPS: %u", ups);
-        render_text(FONT_HACK, fps_text, COLOR_BLACK, xy(0, 0));
-        render_text(FONT_HACK, ups_text, COLOR_BLACK, xy(0, 12));
+        render_text(FONT_HACK, fps_text, COLOR_WHITE, xy(0, 0));
+        render_text(FONT_HACK, ups_text, COLOR_WHITE, xy(0, 12));
 
         SDL_RenderPresent(engine.renderer);
     } // End while running
@@ -717,6 +718,18 @@ void ysort(render_sprite_params_t* params, int low, int high) {
     }
 }
 
+bool is_cell_revealed(const match_state_t& state, xy cell, xy size) {
+    for (int x = cell.x; x < cell.x + size.x; x++) {
+        for (int y = cell.y; y < cell.y + size.y; y++) {
+            if (state.map_fog[x + (state.map_width * y)] == FOG_REVEALED) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void render_match(const match_state_t& state) {
     std::vector<render_sprite_params_t> ysorted;
 
@@ -745,12 +758,8 @@ void render_match(const match_state_t& state) {
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
-            // DEBUG
-            if (map_is_cell_blocked(state, xy(base_coords.x + x, base_coords.y + y))) {
-                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
-            }
 
-            uint32_t map_cell = map_get_cell_type(state, xy(base_coords.x + x, base_coords.y + y));
+            uint32_t map_cell = map_get_cell(state, xy(base_coords.x + x, base_coords.y + y)).type;
             if (map_cell >= CELL_GOLD1 && map_cell <= CELL_GOLD3) {
                 ysorted.push_back((render_sprite_params_t) {
                     .sprite = SPRITE_TILE_GOLD,
@@ -830,11 +839,11 @@ void render_match(const match_state_t& state) {
 
     // UI move animation
     if (animation_is_playing(state.ui_move_animation)) {
-        if (state.ui_move_value == CELL_EMPTY) {
+        if (state.ui_move_cell.type == CELL_EMPTY) {
             render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
         } else if (state.ui_move_animation.frame.x % 2 == 0) {
-            entity_id id = (entity_id)(state.ui_move_value & CELL_ID_MASK);
-            switch (state.ui_move_value & CELL_TYPE_MASK) {
+            entity_id id = (entity_id)(state.ui_move_cell.value);
+            switch (state.ui_move_cell.type) {
                 case CELL_UNIT: {
                     uint32_t unit_index = state.units.get_index_of(id);
                     if (unit_index != INDEX_INVALID) {
@@ -894,6 +903,9 @@ void render_match(const match_state_t& state) {
         if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
             continue;
         }
+        if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, xy(1, 1))) {
+            continue;
+        }
 
         render_sprite_params_t unit_params = (render_sprite_params_t) { 
             .sprite = UNIT_DATA.at(unit.type).sprite, 
@@ -940,6 +952,25 @@ void render_match(const match_state_t& state) {
             start = end;
         }
     }
+
+    // Fog of War
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+    for (int y = 0; y < max_visible_tiles.y; y++) {
+        for (int x = 0; x < max_visible_tiles.x; x++) {
+            tile_dst_rect.x = base_pos.x + (x * TILE_SIZE);
+            tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
+
+            xy fog_cell = base_coords + xy(x, y);
+            Fog fog_value = state.map_fog[fog_cell.x + (fog_cell.y * state.map_width)];
+            if (fog_value == FOG_REVEALED) {
+                continue;
+            }
+
+            SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, fog_value == FOG_HIDDEN ? 255 : 128);
+            SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+        }
+    }
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
     // Building placement
     if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
@@ -1012,7 +1043,7 @@ void render_match(const match_state_t& state) {
     // Resource counters
     char gold_text[8];
     sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);
-    render_text(FONT_WESTERN8, gold_text, COLOR_BLACK, xy(SCREEN_WIDTH - 64 + 18, 4));
+    render_text(FONT_WESTERN8, gold_text, COLOR_WHITE, xy(SCREEN_WIDTH - 64 + 18, 4));
     render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 64, 2));
 
     // Render minimap
@@ -1020,6 +1051,21 @@ void render_match(const match_state_t& state) {
 
     SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND_DARK.r, COLOR_SAND_DARK.g, COLOR_SAND_DARK.b, COLOR_SAND_DARK.a);
     SDL_RenderClear(engine.renderer);
+
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, COLOR_GOLD.a);
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            if (map_is_cell_gold(state, xy(x, y))) {
+                SDL_Rect gold_rect = (SDL_Rect) {
+                    .x = (x * MINIMAP_RECT.size.x) / (int)state.map_width,
+                    .y = (y * MINIMAP_RECT.size.y) / (int)state.map_height,
+                    .w = 2,
+                    .h = 2
+                };
+                SDL_RenderFillRect(engine.renderer, &gold_rect);
+            }
+        }
+    }
 
     SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, COLOR_GREEN.a);
     for (const building_t& building : state.buildings) {
@@ -1033,6 +1079,10 @@ void render_match(const match_state_t& state) {
     }
 
     for (const unit_t& unit : state.units) {
+        if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, xy(1, 1))) {
+            continue;
+        }
+
         SDL_Rect unit_rect = (SDL_Rect) { 
             .x = (unit.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width, 
             .y = (unit.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
@@ -1040,6 +1090,23 @@ void render_match(const match_state_t& state) {
             .h = 2 };
         SDL_RenderFillRect(engine.renderer, &unit_rect);
     }
+
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+    SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 2, .h = 2 };
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            Fog fog_value = state.map_fog[x + (y * state.map_width)];
+            if (fog_value == FOG_REVEALED) {
+                continue;
+            }
+
+            fog_rect.x = (x * MINIMAP_RECT.size.x) / (int)state.map_width;
+            fog_rect.y = (y * MINIMAP_RECT.size.y) / (int)state.map_height;
+            SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, fog_value == FOG_HIDDEN ? 255 : 128);
+            SDL_RenderFillRect(engine.renderer, &fog_rect);
+        }
+    }
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
     SDL_Rect camera_rect = (SDL_Rect) { 
         .x = ((state.camera_offset.x / TILE_SIZE) * MINIMAP_RECT.size.x) / (int)state.map_width, 
@@ -1079,6 +1146,6 @@ void render_match(const match_state_t& state) {
             "gold"
         };
         sprintf(unit_debug_text, "%u: mode = %s target = %s", unit_index, MODE_STR[unit.mode], TARGET_STR[unit.target.type]);
-        render_text(FONT_HACK, unit_debug_text, COLOR_BLACK, xy(0, 24 + (12 * unit_index)));
+        render_text(FONT_HACK, unit_debug_text, COLOR_WHITE, xy(0, 24 + (12 * unit_index)));
     }
 }

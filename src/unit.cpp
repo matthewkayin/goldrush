@@ -10,7 +10,8 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .armor = 0,
         .range = 1,
         .attack_cooldown = 16,
-        .speed = fixed::from_int(1)
+        .speed = fixed::from_int(1),
+        .sight = 3
     }}
 };
 
@@ -38,11 +39,11 @@ void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const x
     unit.timer = 0;
 
     entity_id unit_id = state.units.push_back(unit);
-    map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
+    map_set_cell(state, unit.cell, CELL_UNIT, unit_id);
 }
 
 void unit_destroy(match_state_t& state, uint32_t unit_index) {
-    map_set_cell_value(state, state.units[unit_index].cell, CELL_EMPTY);
+    map_set_cell(state, state.units[unit_index].cell, CELL_EMPTY);
     state.units.remove_at(unit_index);
 }
 
@@ -111,9 +112,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             break;
                         }
 
-                        map_set_cell_value(state, unit.cell, CELL_EMPTY);
+                        map_set_cell(state, unit.cell, CELL_EMPTY);
                         unit.cell = unit.path[0];
-                        map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
+                        map_set_cell(state, unit.cell, CELL_UNIT, unit_id);
                         unit.path.erase(unit.path.begin());
                     }
 
@@ -161,12 +162,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
                     case UNIT_TARGET_BUILD: {
                         // Temporarily set cell to empty so that we can check if the space is clear for building
-                        map_set_cell_value(state, unit.cell, CELL_EMPTY);
+                        map_set_cell(state, unit.cell, CELL_EMPTY);
                         bool can_build = unit.cell == unit.target.build.unit_cell && 
                                                         !map_is_cell_rect_blocked(state, rect_t(unit.target.build.building_cell, building_cell_size(unit.target.build.building_type)));
                         if (!can_build) {
                             // Set the cell back to filled
-                            map_set_cell_value(state, unit.cell, CELL_EMPTY);
+                            map_set_cell(state, unit.cell, CELL_EMPTY);
                             ui_show_status(state, UI_STATUS_CANT_BUILD);
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
@@ -538,7 +539,7 @@ void unit_stop_building(match_state_t& state, entity_id unit_id, const building_
         .type = UNIT_TARGET_NONE
     };
     unit.mode = UNIT_MODE_IDLE;
-    map_set_cell_value(state, unit.cell, CELL_UNIT, unit_id);
+    map_set_cell(state, unit.cell, CELL_UNIT, unit_id);
 }
 
 entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit) {

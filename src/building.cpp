@@ -8,14 +8,14 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     building_t building;
     building.player_id = player_id;
     building.type = type;
-    building.health = 3;
+    building.health = building_data.max_health / 10;
 
     building.cell = cell;
 
     building.is_finished = false;
 
     entity_id building_id = state.buildings.push_back(building);
-    map_set_cell_rect_value(state, rect_t(cell, xy(building_data.cell_width, building_data.cell_height)), CELL_BUILDING, building_id);
+    map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_width, building_data.cell_height)), CELL_BUILDING, building_id);
     return building_id;
 }
 
@@ -25,7 +25,7 @@ void building_destroy(match_state_t& state, entity_id building_id) {
     building_t& building = state.buildings[building_index];
     const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
 
-    map_set_cell_rect_value(state, rect_t(building.cell, xy(building_data.cell_width, building_data.cell_height)), CELL_EMPTY);
+    map_set_cell_rect(state, rect_t(building.cell, xy(building_data.cell_width, building_data.cell_height)), CELL_EMPTY);
     state.buildings.remove_at(building_index);
 }
 
