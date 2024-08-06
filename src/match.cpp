@@ -383,7 +383,9 @@ void match_update(match_state_t& state) {
             input_t input;
             input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
-            input.move.target_entity_id = map_get_cell(state, input.move.target_cell).type == CELL_UNIT ? map_get_cell(state, input.move.target_cell).value : ID_NULL;
+            input.move.target_entity_id = state.map_fog[input.move.target_cell.x + (input.move.target_cell.y * state.map_width)] == FOG_REVEALED && 
+                                          map_get_cell(state, input.move.target_cell).type == CELL_UNIT 
+                                            ? map_get_cell(state, input.move.target_cell).value : ID_NULL;
             input.move.unit_count = 0;
             memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
             input.move.unit_count = state.selection.ids.size();
@@ -393,7 +395,7 @@ void match_update(match_state_t& state) {
 
             // Provide instant user feedback
             state.ui_move_cell = map_get_cell(state, input.move.target_cell);
-            if (map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
+            if (state.map_fog[input.move.target_cell.x + (input.move.target_cell.y * state.map_width)] == FOG_HIDDEN || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
                 state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
                 state.ui_move_position = mouse_world_pos;
             } else {

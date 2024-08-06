@@ -11,7 +11,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .range = 1,
         .attack_cooldown = 16,
         .speed = fixed::from_int(1),
-        .sight = 3
+        .sight = 7
     }}
 };
 
@@ -341,9 +341,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             }
             case UNIT_MODE_ATTACK_WINDUP: {
                 if (unit_is_target_dead(state, unit)) {
-                    unit.target = (unit_target_t) {
-                        .type = UNIT_TARGET_NONE
-                    };
+                    unit.target = unit_target_nearest_insight_enemy(state, unit);
                     unit.mode = UNIT_MODE_IDLE;
                     break;
                 }
@@ -356,6 +354,14 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                         int damage = std::min(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
                         enemy.health = std::max(0, enemy.health - damage);
+
+                        // Make the enemy attack back
+                        if (enemy.mode == UNIT_MODE_IDLE && enemy.target.type == UNIT_TARGET_NONE && unit_can_see_rect(enemy, rect_t(unit.cell, xy(1, 1)))) {
+                            enemy.target = (unit_target_t) {
+                                .type = UNIT_TARGET_UNIT,
+                                .id = unit_id
+                            };
+                        }
                     } else if (unit.target.type == UNIT_TARGET_BUILDING) {
                         uint32_t enemy_index = state.buildings.get_index_of(unit.target.id);
                         GOLD_ASSERT(enemy_index != INDEX_INVALID);
@@ -377,9 +383,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 if (unit_is_target_dead(state, unit)) {
                     // TODO target nearest enemy
                     unit.timer = 0;
-                    unit.target = (unit_target_t) {
-                        .type = UNIT_TARGET_NONE
-                    };
+                    unit.target = unit_target_nearest_insight_enemy(state, unit);
                     unit.mode = UNIT_MODE_IDLE;
                     break;
                 }
@@ -482,6 +486,12 @@ bool unit_is_target_dead(const match_state_t& state, const unit_t& unit) {
     GOLD_ASSERT(unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING);
     uint32_t target_index = unit.target.type == UNIT_TARGET_UNIT ? state.units.get_index_of(unit.target.id) : state.buildings.get_index_of(unit.target.id);
     return target_index == INDEX_INVALID;
+}
+
+bool unit_can_see_rect(const unit_t& unit, rect_t rect) {
+    int unit_sight = UNIT_DATA.at(unit.type).sight;
+    rect_t unit_sight_rect = rect_t(unit.cell - xy(unit_sight, unit_sight), xy((2 * unit_sight) + 1, (2 * unit_sight) + 1));
+    return unit_sight_rect.intersects(rect);
 }
 
 int unit_get_damage(const match_state_t& state, const unit_t& unit) {
@@ -614,6 +624,54 @@ unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t&
     }
 
     log_info("no nearest gold cell found");
+    return (unit_target_t) {
+        .type = UNIT_TARGET_NONE
+    };
+}
+
+unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const unit_t& unit) {
+    entity_id nearest_enemy_index = INDEX_INVALID;
+
+    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+        const unit_t& other_unit = state.units[unit_index];
+        if (unit.player_id == other_unit.player_id) {
+            continue;
+        }
+        if (!unit_can_see_rect(unit, rect_t(other_unit.cell, xy(1, 1)))) {
+            continue;
+        }
+        if (nearest_enemy_index == INDEX_INVALID || xy::manhattan_distance(unit.cell, other_unit.cell) < xy::manhattan_distance(unit.cell, state.units[nearest_enemy_index].cell)) {
+            nearest_enemy_index = unit_index;
+        }
+    }
+
+    if (nearest_enemy_index != INDEX_INVALID) {
+        return (unit_target_t) {
+            .type = UNIT_TARGET_UNIT,
+            .id = state.units.get_id_of(nearest_enemy_index)
+        };
+    }
+
+    for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
+        const building_t& building = state.buildings[building_index];
+        if (building.player_id == unit.player_id) {
+            continue;
+        }
+        if (!unit_can_see_rect(unit, rect_t(building.cell, building_cell_size(building.type)))) {
+            continue;
+        }
+        if (nearest_enemy_index == INDEX_INVALID || xy::manhattan_distance(unit.cell, building.cell) < xy::manhattan_distance(unit.cell, state.buildings[nearest_enemy_index].cell)) {
+            nearest_enemy_index = building_index;
+        }
+    }
+
+    if (nearest_enemy_index != INDEX_INVALID) {
+        return (unit_target_t) {
+            .type = UNIT_TARGET_BUILDING,
+            .id = state.buildings.get_id_of(nearest_enemy_index)
+        };
+    }
+
     return (unit_target_t) {
         .type = UNIT_TARGET_NONE
     };

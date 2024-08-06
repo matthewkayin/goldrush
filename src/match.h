@@ -49,6 +49,7 @@ enum Fog {
 enum InputType {
     INPUT_NONE,
     INPUT_MOVE,
+    INPUT_ATTACK_MOVE,
     INPUT_STOP,
     INPUT_BUILD,
     INPUT_BUILD_CANCEL
@@ -306,6 +307,7 @@ void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t tar
 xy unit_get_target_cell(const match_state_t& state, const unit_t& unit);
 bool unit_has_reached_target(const match_state_t& state, const unit_t& unit);
 bool unit_is_target_dead(const match_state_t& state, const unit_t& unit);
+bool unit_can_see_rect(const unit_t& unit, rect_t rect);
 int unit_get_damage(const match_state_t& state, const unit_t& unit);
 int unit_get_armor(const match_state_t& state, const unit_t& unit);
 AnimationName unit_get_expected_animation(const unit_t& unit);
@@ -314,6 +316,7 @@ void unit_stop_building(match_state_t& state, entity_id unit_id, const building_
 entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit);
+unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const unit_t& unit);
 
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
