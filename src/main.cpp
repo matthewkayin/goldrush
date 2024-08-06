@@ -905,7 +905,7 @@ void render_match(const match_state_t& state) {
     }
 
     // UI move animation
-    if (animation_is_playing(state.ui_move_animation)) {
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, state.ui_move_position / TILE_SIZE) != FOG_HIDDEN) {
         if (state.ui_move_cell.type == CELL_EMPTY) {
             render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
         } else if (state.ui_move_animation.frame.x % 2 == 0) {
@@ -1039,6 +1039,11 @@ void render_match(const match_state_t& state) {
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
+
+    // UI move animation (for blind moves)
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, state.ui_move_position / TILE_SIZE) == FOG_HIDDEN) {
+        render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
+    }
 
     // Building placement
     if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {

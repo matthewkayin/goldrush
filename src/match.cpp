@@ -381,8 +381,8 @@ void match_update(match_state_t& state) {
 
             // Create the move event
             input_t input;
-            input.type = INPUT_MOVE;
             input.move.target_cell = move_target / TILE_SIZE;
+            input.type = map_get_fog(state, input.move.target_cell) == FOG_HIDDEN ? INPUT_BLIND_MOVE : INPUT_MOVE;
             input.move.target_entity_id = state.map_fog[input.move.target_cell.x + (input.move.target_cell.y * state.map_width)] == FOG_REVEALED && 
                                           map_get_cell(state, input.move.target_cell).type == CELL_UNIT 
                                             ? map_get_cell(state, input.move.target_cell).value : ID_NULL;
@@ -395,7 +395,7 @@ void match_update(match_state_t& state) {
 
             // Provide instant user feedback
             state.ui_move_cell = map_get_cell(state, input.move.target_cell);
-            if (state.map_fog[input.move.target_cell.x + (input.move.target_cell.y * state.map_width)] == FOG_HIDDEN || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
+            if (input.type == INPUT_BLIND_MOVE || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
                 state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
                 state.ui_move_position = mouse_world_pos;
             } else {
@@ -512,6 +512,8 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
     out_buffer_length++;
 
     switch (input.type) {
+        case INPUT_ATTACK_MOVE:
+        case INPUT_BLIND_MOVE:
         case INPUT_MOVE: {
             memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
             out_buffer_length += sizeof(xy);
@@ -555,6 +557,8 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
     in_buffer_head++;
 
     switch (input.type) {
+        case INPUT_ATTACK_MOVE:
+        case INPUT_BLIND_MOVE:
         case INPUT_MOVE: {
             memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
@@ -594,6 +598,7 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input) {
     switch (input.type) {
+        case INPUT_BLIND_MOVE:
         case INPUT_MOVE: {
             // If we tried to move towards a unit, try and find the unit
             uint32_t target_unit_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
@@ -647,7 +652,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
 
                 // Set the units target
-                if (target_unit_index != INDEX_INVALID) {
+                if (input.type == INPUT_BLIND_MOVE) {
+                    unit_set_target(state, unit, (unit_target_t) {
+                        .type = UNIT_TARGET_CELL,
+                        .cell = unit_target
+                    });
+                } else if (target_unit_index != INDEX_INVALID) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_UNIT,
                         .id = input.move.target_entity_id
