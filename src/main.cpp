@@ -124,6 +124,11 @@ const std::unordered_map<uint32_t, cursor_params_t> cursor_params = {
         .path = "sprite/ui_cursor.png",
         .hot_x = 0,
         .hot_y = 0
+    }},
+    { CURSOR_TARGET, (cursor_params_t) {
+        .path = "sprite/ui_cursor_target.png",
+        .hot_x = 9,
+        .hot_y = 9
     }}
 };
 
@@ -132,6 +137,7 @@ struct engine_t {
     SDL_Renderer* renderer;
     bool is_running = false;
     bool is_fullscreen = false;
+    Cursor current_cursor;
 
     // Input state
     bool mouse_button_state[INPUT_MOUSE_BUTTON_COUNT];
@@ -514,6 +520,7 @@ bool engine_init(xy window_size) {
         SDL_FreeSurface(cursor_image);
     }
 
+    engine.current_cursor = CURSOR_DEFAULT;
     SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
 
     engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 128, 128);
@@ -796,6 +803,15 @@ bool is_cell_revealed(const match_state_t& state, xy cell, xy size) {
 }
 
 void render_match(const match_state_t& state) {
+    Cursor expected_cursor = CURSOR_DEFAULT;
+    if (state.ui_mode == UI_MODE_ATTACK_MOVE && (!ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
+        expected_cursor = CURSOR_TARGET;
+    }
+    if (engine.current_cursor != expected_cursor) {
+        engine.current_cursor = expected_cursor;
+        SDL_SetCursor(engine.cursors[engine.current_cursor]);
+    }
+
     std::vector<render_sprite_params_t> ysorted;
 
     // Render map
@@ -1007,21 +1023,6 @@ void render_match(const match_state_t& state) {
         render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_name);
     }
 
-    // DEBUG
-    // Unit paths
-    SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
-    for (const unit_t& unit : state.units) {
-        if (unit.path.empty()) {
-            continue;
-        }
-        xy start = unit.position.to_xy() - state.camera_offset;
-        for (uint32_t i = 0; i < unit.path.size(); i++) {
-            xy end = cell_center(unit.path[i]).to_xy() - state.camera_offset;
-            SDL_RenderDrawLine(engine.renderer, start.x, start.y, end.x, end.y);
-            start = end;
-        }
-    }
-
     // Fog of War
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     for (int y = 0; y < max_visible_tiles.y; y++) {
@@ -1195,30 +1196,4 @@ void render_match(const match_state_t& state) {
     SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
-
-    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
-        const unit_t& unit = state.units[unit_index];
-        char unit_debug_text[128];
-        static const char* MODE_STR[UNIT_MODE_ATTACK_COOLDOWN + 1] = {
-            "idle",
-            "move",
-            "blocked",
-            "mv_finsh",
-            "build",
-            "mine",
-            "windup",
-            "cooldown"
-        };
-        static const char* TARGET_STR[UNIT_TARGET_GOLD + 1] = {
-            "none",
-            "cell",
-            "build",
-            "enemy",
-            "e build",
-            "camp",
-            "gold"
-        };
-        sprintf(unit_debug_text, "%u: mode = %s target = %s", unit_index, MODE_STR[unit.mode], TARGET_STR[unit.target.type]);
-        render_text(FONT_HACK, unit_debug_text, COLOR_WHITE, xy(0, 24 + (12 * unit_index)));
-    }
 }

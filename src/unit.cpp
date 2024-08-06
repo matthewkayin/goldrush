@@ -125,6 +125,15 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     } else {
                         movement_left -= unit.position.distance_to(cell_center(unit.cell));
                         unit.position = cell_center(unit.cell);
+                        // On step finished
+                        if (unit.target.type == UNIT_TARGET_ATTACK) {
+                            unit_target_t attack_target = unit_target_nearest_insight_enemy(state, unit);
+                            if (attack_target.type != UNIT_TARGET_NONE) {
+                                // breaks out of while movement_left > 0
+                                unit_set_target(state, unit, attack_target);
+                                break;
+                            }
+                        }
                         if (unit.path.empty()) {
                             // breaks out of while movement_left > 0
                             break;
@@ -153,6 +162,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             } // End case UNIT_MODE_MOVE
             case UNIT_MODE_MOVE_FINISHED: {
                 switch (unit.target.type) {
+                    case UNIT_TARGET_ATTACK:
                     case UNIT_TARGET_CELL: {
                         unit.target = (unit_target_t) {
                             .type = UNIT_TARGET_NONE
@@ -429,6 +439,7 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
             return unit.cell;
         case UNIT_TARGET_BUILD:
             return unit.target.build.unit_cell;
+        case UNIT_TARGET_ATTACK:
         case UNIT_TARGET_CELL:
         case UNIT_TARGET_GOLD:
             return unit.target.cell;
@@ -459,6 +470,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             return true;
         case UNIT_TARGET_BUILD:
             return unit.cell == unit.target.build.unit_cell;
+        case UNIT_TARGET_ATTACK:
         case UNIT_TARGET_CELL:
             return unit.cell == unit.target.cell;
         case UNIT_TARGET_GOLD:

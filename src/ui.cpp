@@ -84,6 +84,9 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
                 log_info("cancel ui mode %u", state.ui_mode);
+            } else if (state.ui_mode == UI_MODE_ATTACK_MOVE) {
+                state.ui_mode = UI_MODE_NONE;
+                ui_set_selection(state, state.selection);
             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
                 GOLD_ASSERT(!state.buildings[state.buildings.get_index_of(state.selection.ids[0])].is_finished);
                 input_t input;
@@ -96,6 +99,11 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 empty_selection.type = SELECTION_TYPE_NONE;
                 ui_set_selection(state, empty_selection);
             }
+            break;
+        }
+        case UI_BUTTON_ATTACK: {
+            state.ui_mode = UI_MODE_ATTACK_MOVE;
+            state.ui_buttonset = UI_BUTTONSET_CANCEL;
             break;
         }
         case UI_BUTTON_BUILD_HOUSE:

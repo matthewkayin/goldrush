@@ -148,7 +148,7 @@ match_state_t match_init() {
         int cluster_size = std::min(3 + (lcg_rand() % 7), gold_target - gold_count);
         for (int i = 0; i < cluster_size; i++) {
             int gold_offset = lcg_rand() % 3;
-            map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), 10);
+            map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), 100);
             gold_count++;
 
             // Determine the position of the next gold cell
@@ -366,42 +366,55 @@ void match_update(match_state_t& state) {
         }
     }
 
-    // RIGHT MOUSE CLICK
-    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT)) {
-        if (state.ui_mode == UI_MODE_NONE && state.selection.type == SELECTION_TYPE_UNITS && 
-            (MINIMAP_RECT.has_point(mouse_pos) || !ui_is_mouse_in_ui())) {
-            xy move_target;
-            if (ui_is_mouse_in_ui()) {
-                xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
-                move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
-                                 (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
-            } else {
-                move_target = mouse_world_pos;
-            }
+    // ORDER MOVEMENT
+    bool is_player_ordering_move = (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT) && state.ui_mode == UI_MODE_NONE) ||
+                                       (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && state.ui_mode == UI_MODE_ATTACK_MOVE) ;
+    if (is_player_ordering_move && state.selection.type == SELECTION_TYPE_UNITS && (MINIMAP_RECT.has_point(mouse_pos) || !ui_is_mouse_in_ui())) {
+        xy move_target;
+        if (ui_is_mouse_in_ui()) {
+            xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
+            move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
+                                (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+        } else {
+            move_target = mouse_world_pos;
+        }
 
-            // Create the move event
-            input_t input;
-            input.move.target_cell = move_target / TILE_SIZE;
-            input.type = map_get_fog(state, input.move.target_cell) == FOG_HIDDEN ? INPUT_BLIND_MOVE : INPUT_MOVE;
-            input.move.target_entity_id = state.map_fog[input.move.target_cell.x + (input.move.target_cell.y * state.map_width)] == FOG_REVEALED && 
-                                          map_get_cell(state, input.move.target_cell).type == CELL_UNIT 
-                                            ? map_get_cell(state, input.move.target_cell).value : ID_NULL;
-            input.move.unit_count = 0;
-            memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
-            input.move.unit_count = state.selection.ids.size();
-            // The unit count should be greater than 0 because the selection type is SELECTION_TYPE_UNITS
-            GOLD_ASSERT(input.move.unit_count != 0);
-            state.input_queue.push_back(input);
+        // Create the move event
+        input_t input;
+        input.move.target_cell = move_target / TILE_SIZE;
+        input.move.target_entity_id = state.map_fog[input.move.target_cell.x + (input.move.target_cell.y * state.map_width)] == FOG_REVEALED && 
+                                        map_get_cell(state, input.move.target_cell).type == CELL_UNIT 
+                                        ? map_get_cell(state, input.move.target_cell).value : ID_NULL;
 
-            // Provide instant user feedback
-            state.ui_move_cell = map_get_cell(state, input.move.target_cell);
-            if (input.type == INPUT_BLIND_MOVE || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
-                state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
-                state.ui_move_position = mouse_world_pos;
-            } else {
-                state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_GOLD);
-                state.ui_move_position = cell_center(input.move.target_cell).to_xy();
-            }
+        //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
+        if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state, input.move.target_cell) == FOG_HIDDEN)) {
+            input.type = INPUT_ATTACK_MOVE;
+        } else if (map_get_fog(state, input.move.target_cell) == FOG_HIDDEN) {
+            input.type = INPUT_BLIND_MOVE;
+        } else {
+            input.type = INPUT_MOVE;
+        }
+
+        input.move.unit_count = 0;
+        memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
+        input.move.unit_count = state.selection.ids.size();
+        // The unit count should be greater than 0 because the selection type is SELECTION_TYPE_UNITS
+        GOLD_ASSERT(input.move.unit_count != 0);
+        state.input_queue.push_back(input);
+
+        // Provide instant user feedback
+        state.ui_move_cell = map_get_cell(state, input.move.target_cell);
+        if (input.type == INPUT_BLIND_MOVE || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
+            state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
+            state.ui_move_position = mouse_world_pos;
+        } else {
+            state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_GOLD);
+            state.ui_move_position = cell_center(input.move.target_cell).to_xy();
+        }
+
+        if (state.ui_mode == UI_MODE_ATTACK_MOVE) {
+            state.ui_mode = UI_MODE_NONE;
+            ui_set_selection(state, state.selection);
         }
     }
 
@@ -487,6 +500,9 @@ void match_update(match_state_t& state) {
                 .ids = std::vector<entity_id>()
             };
             ui_set_selection(state, selection_empty);
+            if (state.ui_mode == UI_MODE_ATTACK_MOVE) {
+                state.ui_mode = UI_MODE_NONE;
+            }
         }
     } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         uint32_t index = state.buildings.get_index_of(state.selection.ids[0]);
@@ -599,6 +615,7 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input) {
     switch (input.type) {
         case INPUT_BLIND_MOVE:
+        case INPUT_ATTACK_MOVE:
         case INPUT_MOVE: {
             // If we tried to move towards a unit, try and find the unit
             uint32_t target_unit_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
@@ -655,6 +672,11 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 if (input.type == INPUT_BLIND_MOVE) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_CELL,
+                        .cell = unit_target
+                    });
+                } else if (input.type == INPUT_ATTACK_MOVE) {
+                    unit_set_target(state, unit, (unit_target_t) {
+                        .type = UNIT_TARGET_ATTACK,
                         .cell = unit_target
                     });
                 } else if (target_unit_index != INDEX_INVALID) {

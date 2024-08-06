@@ -8,6 +8,7 @@ const uint8_t MOUSE_BUTTON_RIGHT = 3;
 
 enum Cursor {
     CURSOR_DEFAULT,
+    CURSOR_TARGET,
     CURSOR_COUNT
 };
 
