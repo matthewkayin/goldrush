@@ -1167,8 +1167,13 @@ void render_match(const match_state_t& state) {
     // Resource counters
     char gold_text[8];
     sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);
-    render_text(FONT_WESTERN8, gold_text, COLOR_WHITE, xy(SCREEN_WIDTH - 64 + 18, 4));
-    render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 64, 2));
+    render_text(FONT_WESTERN8, gold_text, COLOR_WHITE, xy(SCREEN_WIDTH - 172 + 18, 4));
+    render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 172, 2));
+
+    char population_text[8];
+    sprintf(population_text, "%u/%u", match_get_player_population(state, network_get_player_id()), match_get_player_max_population(state, network_get_player_id()));
+    render_text(FONT_WESTERN8, population_text, COLOR_WHITE, xy(SCREEN_WIDTH - 88 + 22, 4));
+    render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0));
 
     // Render minimap
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);

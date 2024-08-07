@@ -535,6 +535,28 @@ void match_update(match_state_t& state) {
     }
 }
 
+uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id) {
+    uint32_t population = 0;
+    for (const unit_t& unit : state.units) {
+        if (unit.player_id == player_id) {
+            population++;
+        }
+    }
+    
+    return population;
+}
+
+uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id) {
+    uint32_t max_population = 5;
+    for (const building_t& building : state.buildings) {
+        if (building.player_id == player_id && building.type == BUILDING_HOUSE && building.is_finished) {
+            max_population += 10;
+        }
+    }
+
+    return max_population;
+}
+
 // INPUT
 
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input) {

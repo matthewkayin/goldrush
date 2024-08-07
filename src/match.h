@@ -266,6 +266,9 @@ struct match_state_t {
 match_state_t match_init();
 void match_update(match_state_t& state);
 
+uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id);
+uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id);
+
 // Input
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
 input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);

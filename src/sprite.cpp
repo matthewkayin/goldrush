@@ -55,6 +55,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .recolor = false
     }},
+    { SPRITE_UI_HOUSE, (sprite_params_t) {
+        .path = "sprite/ui_house.png",
+        .hframes = 1,
+        .vframes = 1,
+        .recolor = false
+    }},
     { SPRITE_UI_MOVE, (sprite_params_t) {
         .path = "sprite/ui_move.png",
         .hframes = 5,
