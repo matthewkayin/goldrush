@@ -132,6 +132,20 @@ const std::unordered_map<uint32_t, cursor_params_t> cursor_params = {
     }}
 };
 
+// Hotkeys
+
+const std::unordered_map<UiButton, SDL_Keycode> keymap = {
+    { UI_BUTTON_MOVE, SDLK_v },
+    { UI_BUTTON_STOP, SDLK_s },
+    { UI_BUTTON_ATTACK, SDLK_a },
+    { UI_BUTTON_BUILD, SDLK_b },
+    { UI_BUTTON_CANCEL, SDLK_ESCAPE },
+    { UI_BUTTON_BUILD_HOUSE, SDLK_e },
+    { UI_BUTTON_BUILD_CAMP, SDLK_c },
+    { UI_BUTTON_UNIT_MINER, SDLK_r }
+};
+std::unordered_map<SDL_Keycode, std::vector<UiButton>> hotkeys;
+
 struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -143,6 +157,8 @@ struct engine_t {
     bool mouse_button_state[INPUT_MOUSE_BUTTON_COUNT];
     bool mouse_button_previous_state[INPUT_MOUSE_BUTTON_COUNT];
     xy mouse_position;
+    bool hotkey_state[UI_BUTTON_COUNT];
+    bool hotkey_state_previous[UI_BUTTON_COUNT];
     std::string input_text;
     size_t input_length_limit;
 
@@ -253,6 +269,7 @@ int main(int argc, char** argv) {
 
         // INPUT
         memcpy(engine.mouse_button_previous_state, engine.mouse_button_state, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
+        memcpy(engine.hotkey_state_previous, engine.hotkey_state, UI_BUTTON_COUNT * sizeof(bool));
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -281,7 +298,7 @@ int main(int argc, char** argv) {
                 break;
             }
             // Release mouse
-            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_TAB) {
                 log_info("release mouse.");
                 SDL_SetWindowGrab(engine.window, SDL_FALSE);
                 break;
@@ -309,6 +326,16 @@ int main(int argc, char** argv) {
             if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {
                 if (engine.input_text.length() > 0) {
                     engine.input_text.pop_back();
+                }
+                break;
+            }
+            if (mode == MODE_MATCH && (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)) {
+                auto hotkey_it = hotkeys.find(event.key.keysym.sym);
+                if (hotkey_it == hotkeys.end()) {
+                    continue;
+                }
+                for (UiButton button : hotkey_it->second) {
+                    engine.hotkey_state[button] = event.type == SDL_KEYDOWN;
                 }
                 break;
             }
@@ -405,6 +432,25 @@ bool engine_init(xy window_size) {
     memset(engine.mouse_button_state, 0, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
     memset(engine.mouse_button_previous_state, 0, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
     engine.mouse_position = xy(0, 0);
+    memset(engine.hotkey_state, 0, UI_BUTTON_COUNT * sizeof(bool));
+    memset(engine.hotkey_state_previous, 0, UI_BUTTON_COUNT * sizeof(bool));
+
+    // Init hotkey sets
+    for (int buttonset = 0; buttonset < UI_BUTTONSET_COUNT; buttonset++) {
+        for (int button_index = 0; button_index < 6; button_index++) {
+            UiButton button = UI_BUTTONS.at((UiButtonset)buttonset)[button_index];
+            if (button == UI_BUTTON_NONE) {
+                continue;
+            }
+
+            SDL_Keycode key = keymap.at(button);
+            auto it = hotkeys.find(key);
+            if (it == hotkeys.end()) {
+                hotkeys[key] = std::vector<UiButton>();
+            }
+            hotkeys[key].push_back(button);
+        }
+    }
 
     // Load fonts
     std::string resource_base_path = std::string(RESOURCE_BASE_PATH);
@@ -572,6 +618,10 @@ bool input_is_mouse_button_just_released(uint8_t button) {
 
 xy input_get_mouse_position() {
     return engine.mouse_position;
+}
+
+bool input_is_ui_hotkey_just_pressed(UiButton button) {
+    return engine.hotkey_state[button] && !engine.hotkey_state_previous[button];
 }
 
 void input_start_text_input(const rect_t& text_input_rect, size_t input_length_limit) {

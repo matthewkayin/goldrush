@@ -8,6 +8,7 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <array>
 #include <string>
 
 #define MAX_UNITS 200
@@ -104,7 +105,8 @@ enum UiButtonset {
     UI_BUTTONSET_UNIT,
     UI_BUTTONSET_MINER,
     UI_BUTTONSET_BUILD,
-    UI_BUTTONSET_CANCEL
+    UI_BUTTONSET_CANCEL,
+    UI_BUTTONSET_COUNT
 };
 
 enum SelectionType {
@@ -329,5 +331,6 @@ xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);
 
+extern const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS;
 extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;
 extern const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA;

@@ -341,6 +341,20 @@ void match_update(match_state_t& state) {
         } 
     } 
 
+    if (!input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
+        for (int button_index = 0; button_index < 6; button_index++) {
+            UiButton button = ui_get_ui_button(state, button_index);
+            if (button == UI_BUTTON_NONE) {
+                continue;
+            }
+
+            if (input_is_ui_hotkey_just_pressed(button)) {
+                ui_handle_button_pressed(state, button);
+                break;
+            }
+        }
+    }
+
     // SELECT RECT
     if (state.ui_mode == UI_MODE_SELECTING) {
         // Update select rect
