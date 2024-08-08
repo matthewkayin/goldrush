@@ -276,10 +276,23 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             break;
                         }
 
-                        xy target_cell = unit.target.type == UNIT_TARGET_UNIT 
-                                            ? state.units[target_index].cell
-                                            : state.buildings[target_index].cell;
-                        unit.direction = get_enum_direction_to(unit.cell, target_cell);
+                        // If target is building a building, attack that building instead
+                        if (unit.target.type == UNIT_TARGET_UNIT && state.units[target_index].mode == UNIT_MODE_BUILD) {
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_BUILDING,
+                                .id = state.units[target_index].target.build.building_id
+                            };
+
+                            if (!unit_has_reached_target(state, unit)) {
+                                unit.mode = UNIT_MODE_IDLE;
+                                break;
+                            }
+                        }
+
+                        rect_t target_rect = unit.target.type == UNIT_TARGET_UNIT
+                                            ? rect_t(state.units[target_index].cell, xy(1, 1))
+                                            : rect_t(state.buildings[target_index].cell, building_cell_size(state.buildings[target_index].type));
+                        unit.direction = get_enum_direction_to_rect(unit.cell, target_rect);
                         unit.mode = UNIT_MODE_ATTACK_WINDUP;
                         break;
                     }

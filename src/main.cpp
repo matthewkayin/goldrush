@@ -134,7 +134,20 @@ const std::unordered_map<uint32_t, cursor_params_t> cursor_params = {
 
 // Hotkeys
 
-const std::unordered_map<UiButton, SDL_Keycode> keymap = {
+const std::unordered_map<SDL_Keycode, Key> keymap = {
+    { SDLK_1, KEY_1 },
+    { SDLK_2, KEY_2 },
+    { SDLK_3, KEY_3 },
+    { SDLK_4, KEY_4 },
+    { SDLK_5, KEY_5 },
+    { SDLK_6, KEY_6 },
+    { SDLK_7, KEY_7 },
+    { SDLK_8, KEY_8 },
+    { SDLK_9, KEY_9 },
+    { SDLK_LCTRL, KEY_CTRL },
+    { SDLK_LSHIFT, KEY_SHIFT }
+};
+const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_MOVE, SDLK_v },
     { UI_BUTTON_STOP, SDLK_s },
     { UI_BUTTON_ATTACK, SDLK_a },
@@ -160,6 +173,8 @@ struct engine_t {
     xy mouse_position;
     bool hotkey_state[UI_BUTTON_COUNT];
     bool hotkey_state_previous[UI_BUTTON_COUNT];
+    bool key_state[KEY_COUNT];
+    bool key_state_previous[KEY_COUNT];
     std::string input_text;
     size_t input_length_limit;
 
@@ -271,6 +286,7 @@ int main(int argc, char** argv) {
         // INPUT
         memcpy(engine.mouse_button_previous_state, engine.mouse_button_state, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
         memcpy(engine.hotkey_state_previous, engine.hotkey_state, UI_BUTTON_COUNT * sizeof(bool));
+        memcpy(engine.key_state_previous, engine.key_state, KEY_COUNT * sizeof(bool));
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -331,6 +347,12 @@ int main(int argc, char** argv) {
                 break;
             }
             if (mode == MODE_MATCH && (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)) {
+                auto keymap_it = keymap.find(event.key.keysym.sym);
+                if (keymap_it != keymap.end()) {
+                    engine.key_state[keymap_it->second] = event.type == SDL_KEYDOWN;
+                    break;
+                }
+
                 auto hotkey_it = hotkeys.find(event.key.keysym.sym);
                 if (hotkey_it == hotkeys.end()) {
                     continue;
@@ -435,6 +457,8 @@ bool engine_init(xy window_size) {
     engine.mouse_position = xy(0, 0);
     memset(engine.hotkey_state, 0, UI_BUTTON_COUNT * sizeof(bool));
     memset(engine.hotkey_state_previous, 0, UI_BUTTON_COUNT * sizeof(bool));
+    memset(engine.key_state, 0, KEY_COUNT * sizeof(bool));
+    memset(engine.key_state_previous, 0, KEY_COUNT * sizeof(bool));
 
     // Init hotkey sets
     for (int buttonset = 0; buttonset < UI_BUTTONSET_COUNT; buttonset++) {
@@ -444,7 +468,7 @@ bool engine_init(xy window_size) {
                 continue;
             }
 
-            SDL_Keycode key = keymap.at(button);
+            SDL_Keycode key = hotkey_keymap.at(button);
             auto it = hotkeys.find(key);
             if (it == hotkeys.end()) {
                 hotkeys[key] = std::vector<UiButton>();
@@ -623,6 +647,14 @@ xy input_get_mouse_position() {
 
 bool input_is_ui_hotkey_just_pressed(UiButton button) {
     return engine.hotkey_state[button] && !engine.hotkey_state_previous[button];
+}
+
+bool input_is_key_just_pressed(Key key) {
+    return engine.key_state[key] && !engine.key_state_previous[key];
+}
+
+bool input_is_key_pressed(Key key) {
+    return engine.key_state[key];
 }
 
 void input_start_text_input(const rect_t& text_input_rect, size_t input_length_limit) {

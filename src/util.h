@@ -282,14 +282,28 @@ inline Direction get_enum_direction_from_xy_direction(xy xy_direction) {
     return DIRECTION_COUNT;
 }
 
-inline Direction get_enum_direction_to(xy from, xy to) {
-    xy direction = to - from;
-    if (abs(direction.x) >= abs(direction.y)) {
-        direction = xy(direction.x < 0 ? -1 : 1, 0);
+inline Direction get_enum_direction_to_rect(xy from, rect_t rect) {
+    if (from.y < rect.position.y) {
+        if (from.x < rect.position.x) {
+            return DIRECTION_SOUTHEAST;
+        } else if (from.x >= rect.position.x + rect.size.x) {
+            return DIRECTION_SOUTHWEST;
+        } else {
+            return DIRECTION_SOUTH;
+        }
+    } else if (from.y >= rect.position.y + rect.size.y) {
+        if (from.x < rect.position.x) {
+            return DIRECTION_NORTHEAST;
+        } else if (from.x >= rect.position.x + rect.size.x) {
+            return DIRECTION_NORTHWEST;
+        } else {
+            return DIRECTION_NORTH;
+        }
+    } else if (from.x < rect.position.x) {
+        return DIRECTION_EAST;
     } else {
-        direction = xy(0, direction.y < 0 ? -1 : 1);
+        return DIRECTION_WEST;
     }
-    return get_enum_direction_from_xy_direction(direction);
 }
 
 /*

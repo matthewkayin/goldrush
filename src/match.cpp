@@ -16,6 +16,8 @@ static const uint32_t INPUT_MAX_SIZE = 256;
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
+static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
+
 match_state_t match_init() {
     match_state_t state;
 
@@ -24,6 +26,12 @@ match_state_t match_init() {
     state.ui_buttonset = UI_BUTTONSET_NONE;
     state.camera_offset = xy(0, 0);
     state.ui_status_timer = 0;
+    for (uint32_t i = 0; i < 9; i++) {
+        state.control_groups[i] = (selection_t) {
+            .type = SELECTION_TYPE_NONE
+        };
+    }
+    state.control_group_double_click_timer = 0;
 
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -320,7 +328,62 @@ void match_update(match_state_t& state) {
         } 
     } 
 
+    // KEY PRESS
     if (!input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
+        for (uint32_t key = KEY_1; key < KEY_9 + 1; key++) {
+            if (input_is_key_just_pressed((Key)key)) {
+                // Set control group
+                if (input_is_key_pressed(KEY_CTRL)) {
+                    if (state.selection.type != SELECTION_TYPE_NONE) {
+                        state.control_groups[key] = state.selection;
+                    }
+                // Append control group
+                } else if (input_is_key_pressed(KEY_SHIFT)) {
+                    if (state.selection.type != SELECTION_TYPE_NONE && state.selection.type == state.control_groups[key].type) {
+                        std::unordered_map<entity_id, bool> ids_in_control_group;
+                        for (entity_id id : state.control_groups[key].ids) {
+                            ids_in_control_group[id] = true;
+                        }
+                        for (entity_id id : state.selection.ids) {
+                            if (ids_in_control_group.find(id) == ids_in_control_group.end()) {
+                                state.control_groups[key].ids.push_back(id);
+                                ids_in_control_group[id] = true;
+                            }
+                        }
+                    }
+                // Switch to control group
+                } else {
+                    if (state.control_group_double_click_key == key && state.control_group_double_click_timer > 0) {
+                        std::vector<xy> selection_cells;
+                        for (entity_id id : state.selection.ids) {
+                            if (state.selection.type == SELECTION_TYPE_UNITS) {
+                                uint32_t unit_index = state.units.get_index_of(id);
+                                if (unit_index != INDEX_INVALID) {
+                                    selection_cells.push_back(state.units[unit_index].cell);
+                                }
+                            } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+                                uint32_t building_index = state.buildings.get_index_of(id);
+                                if (building_index != INDEX_INVALID) {
+                                    selection_cells.push_back(state.units[building_index].cell);
+                                }
+                            }
+                        }
+
+                        rect_t selection_rect = create_bounding_rect_for_points(&selection_cells[0], selection_cells.size());
+                        xy selection_center = selection_rect.position + (selection_rect.size / 2);
+                        state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(selection_center), state.map_width, state.map_height);
+                        state.control_group_double_click_timer = 0;
+                    } else if (state.control_groups[key].type != SELECTION_TYPE_NONE) {
+                        ui_set_selection(state, state.control_groups[key]);
+                        state.control_group_double_click_timer = CONTROL_GROUP_DOUBLE_CLICK_DURATION;
+                        state.control_group_double_click_key = key;
+                    }
+                }
+
+                break;
+            }
+        }
+
         for (int button_index = 0; button_index < 6; button_index++) {
             UiButton button = ui_get_ui_button(state, button_index);
             if (button == UI_BUTTON_NONE) {
@@ -428,9 +491,12 @@ void match_update(match_state_t& state) {
         state.camera_offset = ui_camera_clamp(state.camera_offset, state.map_width, state.map_height);
     }
 
-    // Update UI status timer
+    // Update timers
     if (state.ui_status_timer != 0) {
         state.ui_status_timer--;
+    }
+    if (state.control_group_double_click_timer != 0) {
+        state.control_group_double_click_timer--;
     }
 
     // Update particles

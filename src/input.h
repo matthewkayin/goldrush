@@ -13,6 +13,21 @@ enum Cursor {
     CURSOR_COUNT
 };
 
+enum Key {
+    KEY_1,
+    KEY_2,
+    KEY_3,
+    KEY_4,
+    KEY_5,
+    KEY_6,
+    KEY_7,
+    KEY_8,
+    KEY_9,
+    KEY_CTRL,
+    KEY_SHIFT,
+    KEY_COUNT
+};
+
 bool input_is_mouse_button_pressed(uint8_t button);
 bool input_is_mouse_button_just_pressed(uint8_t button);
 bool input_is_mouse_button_just_released(uint8_t button);
@@ -20,6 +35,8 @@ bool input_is_mouse_button_just_released(uint8_t button);
 xy input_get_mouse_position();
 
 bool input_is_ui_hotkey_just_pressed(UiButton button);
+bool input_is_key_just_pressed(Key key);
+bool input_is_key_pressed(Key key);
 
 void input_start_text_input(const rect_t& text_input_rect, size_t input_length_limit);
 void input_stop_text_input();

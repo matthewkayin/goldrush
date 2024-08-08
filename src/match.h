@@ -242,6 +242,9 @@ struct match_state_t {
     cell_t ui_move_cell;
     animation_t ui_move_animation;
     xy ui_move_position;
+    selection_t control_groups[9];
+    uint32_t control_group_double_click_timer;
+    uint32_t control_group_double_click_key;
 
     // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];

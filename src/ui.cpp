@@ -193,16 +193,45 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
 void ui_set_selection(match_state_t& state, selection_t& selection) {
     state.selection = selection;
 
-    if (selection.type == SELECTION_TYPE_NONE) {
+    if (state.selection.type == SELECTION_TYPE_UNITS) {
+        for (uint32_t id_index = 0; id_index < state.selection.ids.size(); id_index++) {
+            uint32_t unit_index = state.units.get_index_of(state.selection.ids[id_index]);
+            if (unit_index == INDEX_INVALID) {
+                state.selection.ids.erase(state.selection.ids.begin() + id_index);
+                id_index--;
+                continue;
+            }
+            if (state.units[unit_index].mode == UNIT_MODE_BUILD) {
+                state.selection.ids.erase(state.selection.ids.begin() + id_index);
+                id_index--;
+                continue;
+            }
+        }
+    } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+        for (uint32_t id_index = 0; id_index < state.selection.ids.size(); id_index++) {
+            uint32_t building_index = state.units.get_index_of(state.selection.ids[id_index]);
+            if (building_index == INDEX_INVALID) {
+                state.selection.ids.erase(state.selection.ids.begin() + id_index);
+                id_index--;
+                continue;
+            }
+        }
+    }
+
+    if (state.selection.ids.size() == 0) {
+        state.selection.type = SELECTION_TYPE_NONE;
+    }
+
+    if (state.selection.type == SELECTION_TYPE_NONE) {
         state.ui_buttonset = UI_BUTTONSET_NONE;
-    } else if (selection.type == SELECTION_TYPE_UNITS) {
-        if (selection.ids.size() == 1 && state.units[state.units.get_index_of(selection.ids[0])].type == UNIT_MINER) {
+    } else if (state.selection.type == SELECTION_TYPE_UNITS) {
+        if (state.selection.ids.size() == 1 && state.units[state.units.get_index_of(state.selection.ids[0])].type == UNIT_MINER) {
             state.ui_buttonset = UI_BUTTONSET_MINER;
         } else {
             state.ui_buttonset = UI_BUTTONSET_UNIT;
         }
-    } else if (selection.type == SELECTION_TYPE_BUILDINGS) {
-        building_t& building = state.buildings[state.buildings.get_index_of(selection.ids[0])];
+    } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+        building_t& building = state.buildings[state.buildings.get_index_of(state.selection.ids[0])];
         if (!building.is_finished) {
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
         } else {
