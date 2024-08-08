@@ -210,15 +210,16 @@ Fog map_get_fog(const match_state_t& state, xy cell) {
 void map_fog_reveal(match_state_t& state, xy cell, xy size, int sight) {
     int xmin = std::max(0, cell.x - sight);
     int xmax = std::min((int)state.map_width, cell.x + size.x + sight);
+    int ymin = std::max(0, cell.y - sight);
+    int ymax = std::min((int)state.map_height, cell.y + size.y + sight);
     for (int x = xmin; x < xmax; x++) {
-        int ymin = std::max(0, cell.y - sight);
-        int ymax = std::min((int)state.map_height, cell.y + size.y + sight);
-        if (x == xmin || x == xmax - 1) {
-            ymin++;
-            ymax--;
-        }
-        
         for (int y = ymin; y < ymax; y++) {
+            bool is_x_edge = x == cell.x - sight || x == (cell.x + size.x + sight) - 1;
+            bool is_y_edge = y == cell.y - sight || y == (cell.y + size.y + sight) - 1;
+            if (is_x_edge && is_y_edge) {
+                continue;
+            }
+
             state.map_fog[x + (state.map_width * y)] = FOG_REVEALED;
         }
     }

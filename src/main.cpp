@@ -142,6 +142,7 @@ const std::unordered_map<UiButton, SDL_Keycode> keymap = {
     { UI_BUTTON_CANCEL, SDLK_ESCAPE },
     { UI_BUTTON_BUILD_HOUSE, SDLK_e },
     { UI_BUTTON_BUILD_CAMP, SDLK_c },
+    { UI_BUTTON_BUILD_SALOON, SDLK_s },
     { UI_BUTTON_UNIT_MINER, SDLK_r }
 };
 std::unordered_map<SDL_Keycode, std::vector<UiButton>> hotkeys;
@@ -913,7 +914,7 @@ void render_match(const match_state_t& state) {
         if (building_index != INDEX_INVALID) {
             const building_t& building = state.buildings[building_index];
             rect_t building_rect = building_get_rect(building);
-            render_sprite(SPRITE_SELECT_RING_HOUSE, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+            render_sprite(building_get_select_ring(building.type), xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
             // Determine healthbar rect
             xy building_render_pos = building_rect.position - state.camera_offset;
@@ -989,7 +990,10 @@ void render_match(const match_state_t& state) {
                     uint32_t building_index = state.buildings.get_index_of(id);
                     if (building_index != INDEX_INVALID) {
                         rect_t building_rect = building_get_rect(state.buildings[building_index]);
-                        Sprite sprite = state.buildings[building_index].player_id == network_get_player_id() ? SPRITE_SELECT_RING_HOUSE : SPRITE_SELECT_RING_HOUSE_ATTACK;
+                        Sprite sprite = building_get_select_ring(state.buildings[building_index].type);
+                        if (state.buildings[building_index].player_id != network_get_player_id()) {
+                            sprite = (Sprite)(sprite + 1);
+                        }
                         render_sprite(sprite, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
                     break;

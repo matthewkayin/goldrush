@@ -79,14 +79,26 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .recolor = false
     }},
-    { SPRITE_SELECT_RING_HOUSE, (sprite_params_t) {
-        .path = "sprite/select_ring_house.png",
+    { SPRITE_SELECT_RING_BUILDING_2X2, (sprite_params_t) {
+        .path = "sprite/select_ring_building2x2.png",
         .hframes = 1,
         .vframes = 1,
         .recolor = false
     }},
-    { SPRITE_SELECT_RING_HOUSE_ATTACK, (sprite_params_t) {
-        .path = "sprite/select_ring_house_attack.png",
+    { SPRITE_SELECT_RING_BUILDING_2X2_ATTACK, (sprite_params_t) {
+        .path = "sprite/select_ring_building2x2_attack.png",
+        .hframes = 1,
+        .vframes = 1,
+        .recolor = false
+    }},
+    { SPRITE_SELECT_RING_BUILDING_3X3, (sprite_params_t) {
+        .path = "sprite/select_ring_building3x3.png",
+        .hframes = 1,
+        .vframes = 1,
+        .recolor = false
+    }},
+    { SPRITE_SELECT_RING_BUILDING_3X3_ATTACK, (sprite_params_t) {
+        .path = "sprite/select_ring_building3x3_attack.png",
         .hframes = 1,
         .vframes = 1,
         .recolor = false
@@ -117,6 +129,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_BUILDING_CAMP, (sprite_params_t) {
         .path = "sprite/building_camp.png",
+        .hframes = 4,
+        .vframes = 1,
+        .recolor = true
+    }},
+    { SPRITE_BUILDING_SALOON, (sprite_params_t) {
+        .path = "sprite/building_saloon.png",
         .hframes = 4,
         .vframes = 1,
         .recolor = true

@@ -129,7 +129,8 @@ enum UnitType {
 enum BuildingType {
     BUILDING_NONE,
     BUILDING_HOUSE,
-    BUILDING_CAMP
+    BUILDING_CAMP,
+    BUILDING_SALOON
 };
 
 struct path_t {
@@ -333,6 +334,7 @@ void building_destroy(match_state_t& state, entity_id building_id);
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);
+Sprite building_get_select_ring(BuildingType type);
 
 extern const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS;
 extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;

@@ -1,6 +1,35 @@
 #include "match.h"
 
-// Building
+const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
+    { BUILDING_HOUSE, (building_data_t) {
+        .cell_width = 2,
+        .cell_height = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_positions_x = { 3, 16, -4 },
+        .builder_positions_y = { 15, 15, 3 },
+        .builder_flip_h = { false, true, false }
+    }},
+    { BUILDING_CAMP, (building_data_t) {
+        .cell_width = 2,
+        .cell_height = 2,
+        .cost = 100,
+        .max_health = 12,
+        .builder_positions_x = { 1, 15, 14 },
+        .builder_positions_y = { 13, 13, 2 },
+        .builder_flip_h = { false, true, true }
+    }},
+    { BUILDING_SALOON, (building_data_t) {
+        .cell_width = 3,
+        .cell_height = 3,
+        .cost = 200,
+        .max_health = 200,
+        .builder_positions_x = { 6, 27, 9 },
+        .builder_positions_y = { 32, 27, 9 },
+        .builder_flip_h = { false, true, false }
+    }}
+};
+
 
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell) {
     const building_data_t& building_data = BUILDING_DATA.find(type)->second;
@@ -54,4 +83,12 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
     }
 
     return !map_is_cell_rect_blocked(state, building_rect);
+}
+
+Sprite building_get_select_ring(BuildingType type) {
+    if (building_cell_size(type) == xy(2, 2)) {
+        return SPRITE_SELECT_RING_BUILDING_2X2;
+    } else {
+        return SPRITE_SELECT_RING_BUILDING_3X3;
+    }
 }

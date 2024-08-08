@@ -12,7 +12,7 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_MINER, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_BUILD,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_CAMP, UI_BUTTON_NONE,
+    { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_CAMP, UI_BUTTON_BUILD_SALOON,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }}
@@ -105,7 +105,8 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_BUILD_HOUSE:
-        case UI_BUTTON_BUILD_CAMP: {
+        case UI_BUTTON_BUILD_CAMP: 
+        case UI_BUTTON_BUILD_SALOON: {
             // Begin building placement
             BuildingType building_type = (BuildingType)(BUILDING_HOUSE + (button - UI_BUTTON_BUILD_HOUSE));
 
@@ -133,7 +134,11 @@ bool ui_is_mouse_in_ui() {
 }
 
 xy ui_get_building_cell(const match_state_t& state) {
-    return (input_get_mouse_position() + state.camera_offset) / TILE_SIZE;
+    xy offset = building_cell_size(state.ui_building_type) - xy(2, 2);
+    xy building_cell = ((input_get_mouse_position() + state.camera_offset) / TILE_SIZE) - offset;
+    building_cell.x = std::max(0, building_cell.x);
+    building_cell.y = std::max(0, building_cell.y);
+    return building_cell;
 }
 
 selection_t ui_create_selection_from_rect(const match_state_t& state) {

@@ -16,27 +16,6 @@ static const uint32_t INPUT_MAX_SIZE = 256;
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
-const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
-    { BUILDING_HOUSE, (building_data_t) {
-        .cell_width = 2,
-        .cell_height = 2,
-        .cost = 100,
-        .max_health = 100,
-        .builder_positions_x = { 3, 16, -4 },
-        .builder_positions_y = { 15, 15, 3 },
-        .builder_flip_h = { false, true, false }
-    }},
-    { BUILDING_CAMP, (building_data_t) {
-        .cell_width = 2,
-        .cell_height = 2,
-        .cost = 100,
-        .max_health = 12,
-        .builder_positions_x = { 1, 15, 14 },
-        .builder_positions_y = { 13, 13, 2 },
-        .builder_flip_h = { false, true, true }
-    }}
-};
-
 match_state_t match_init() {
     match_state_t state;
 
@@ -98,7 +77,7 @@ match_state_t match_init() {
         }
         player_count++;
 
-        state.player_gold[player_id] = 150;
+        state.player_gold[player_id] = 200;
 
         // Find an unused spawn direction
         int spawn_direction;
