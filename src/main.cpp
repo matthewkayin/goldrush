@@ -1203,20 +1203,20 @@ void render_match(const match_state_t& state) {
         const building_t& building = state.buildings[building_index];
 
         if (!building.queue.empty()) {
-            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(12, 12));
-            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[0]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(12, 12));
+            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12));
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[0]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12));
 
             for (uint32_t building_queue_index = 1; building_queue_index < building.queue.size(); building_queue_index++) {
-                int icon_x_position = 12 + (33 * (building_queue_index - 1));
+                int icon_x_position = 12 + 16 + (36 * (building_queue_index - 1));
                 render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, 12 + 33));
                 render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, 12 + 33));
             }
 
             static const SDL_Rect BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT = (SDL_Rect) {
-                .x = UI_FRAME_BOTTOM_POSITION.x + 12 + 32 + 8,
-                .y = UI_FRAME_BOTTOM_POSITION.y + 12 + 32 - 4,
-                .w = 96,
-                .h = 4
+                .x = UI_FRAME_BOTTOM_POSITION.x + 12 + 48 + 4,
+                .y = UI_FRAME_BOTTOM_POSITION.y + 12 + 32 - 8,
+                .w = 32 * 3 + (4 * 2),
+                .h = 6
             };
             SDL_Rect building_queue_progress_bar_rect = (SDL_Rect) {
                 .x = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x,
