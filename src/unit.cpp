@@ -11,7 +11,10 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .range = 1,
         .attack_cooldown = 16,
         .speed = fixed::from_int(1),
-        .sight = 7
+        .sight = 7,
+        .cost = 50,
+        .population_cost = 1,
+        .train_duration = 300
     }}
 };
 
@@ -310,7 +313,11 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     // Building tick
                     building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
 
+#ifdef DEBUG_FAST_BUILD
+                    building.health = std::min(building.health + 20, BUILDING_DATA.at(building.type).max_health);
+#else
                     building.health++;
+#endif
                     if (building.health == BUILDING_DATA.at(building.type).max_health) {
                         // On building finished
                         building.is_finished = true;

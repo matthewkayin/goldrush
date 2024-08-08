@@ -18,6 +18,8 @@ static const int CAMERA_DRAG_SPEED = 8;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
+static const uint32_t PLAYER_STARTING_GOLD = 1000;
+
 match_state_t match_init() {
     match_state_t state;
 
@@ -88,7 +90,7 @@ match_state_t match_init() {
         }
         player_count++;
 
-        state.player_gold[player_id] = 200;
+        state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
         // Find an unused spawn direction
         int spawn_direction;
@@ -342,7 +344,7 @@ void match_update(match_state_t& state) {
                     }
                 // Append control group
                 } else if (input_is_key_pressed(KEY_SHIFT)) {
-                    if (state.selection.type != SELECTION_TYPE_NONE && state.selection.type == state.control_groups[key].type) {
+                    if (state.selection.type == SELECTION_TYPE_UNITS && state.selection.type == state.control_groups[key].type) {
                         std::unordered_map<entity_id, bool> ids_in_control_group;
                         for (entity_id id : state.control_groups[key].ids) {
                             ids_in_control_group[id] = true;
@@ -534,14 +536,34 @@ void match_update(match_state_t& state) {
         }
     }
 
+    // Update buildings
+    for (building_t& building : state.buildings) {
+        if (building.health == 0) {
+            continue;
+        }
+
+        building_update(state, building);
+    }
+
     // Remove any dead buildings
     uint32_t building_index = 0;
     while (building_index < state.buildings.size()) {
         if (state.buildings[building_index].health == 0) {
-            // TODO: play death animation
-            building_destroy(state, state.buildings.get_id_of(building_index));
+            // TODO play death animation
+            building_destroy(state, building_index);
         } else {
             building_index++;
+        }
+    }
+
+    // Remove any dead buildings
+    uint32_t remove_building_index = 0;
+    while (remove_building_index < state.buildings.size()) {
+        if (state.buildings[remove_building_index].health == 0) {
+            // TODO: play death animation
+            building_destroy(state, state.buildings.get_id_of(remove_building_index));
+        } else {
+            remove_building_index++;
         }
     }
 
@@ -587,7 +609,7 @@ uint32_t match_get_player_population(const match_state_t& state, uint8_t player_
     uint32_t population = 0;
     for (const unit_t& unit : state.units) {
         if (unit.player_id == player_id) {
-            population++;
+            population += UNIT_DATA.at(unit.type).population_cost;
         }
     }
     

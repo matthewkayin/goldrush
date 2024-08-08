@@ -15,7 +15,9 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
     { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_CAMP, UI_BUTTON_BUILD_SALOON,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }}
+                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
+    { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_MINER, UI_BUTTON_NONE, UI_BUTTON_NONE,
+                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }}
 };
 static const xy UI_BUTTON_SIZE = xy(32, 32);
 static const xy UI_BUTTON_PADDING = xy(4, 6);
@@ -37,6 +39,10 @@ void ui_show_status(match_state_t& state, const char* message) {
 }
 
 UiButton ui_get_ui_button(const match_state_t& state, int index) {
+    if (state.ui_buttonset == UI_BUTTONSET_SALOON && index == 5 && !state.buildings[state.buildings.get_index_of(state.selection.ids[0])].queue.empty()) {
+        return UI_BUTTON_CANCEL;
+    }
+
     return UI_BUTTONS.at(state.ui_buttonset)[index];
 }
 
@@ -82,6 +88,12 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
                 log_info("cancel ui mode %u", state.ui_mode);
+            } else if (state.ui_buttonset == UI_BUTTONSET_SALOON) {
+                uint32_t selected_building_index = state.buildings.get_index_of(state.selection.ids[0]);
+                GOLD_ASSERT(selected_building_index != INDEX_INVALID);
+                building_t& building = state.buildings[selected_building_index];
+                state.player_gold[network_get_player_id()] += building_queue_item_cost(building.queue[0]);
+                building_dequeue(building);
             } else if (state.ui_mode == UI_MODE_ATTACK_MOVE) {
                 state.ui_mode = UI_MODE_NONE;
                 ui_set_selection(state, state.selection);
@@ -116,6 +128,30 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 state.ui_mode = UI_MODE_BUILDING_PLACE;
                 state.ui_buttonset = UI_BUTTONSET_CANCEL;
                 state.ui_building_type = building_type;
+            }
+
+            break;
+        }
+        case UI_BUTTON_UNIT_MINER: {
+            // Begin unit training
+            UnitType unit_type = (UnitType)(UNIT_MINER + (button - UI_BUTTON_UNIT_MINER));
+
+            uint32_t selected_building_index = state.buildings.get_index_of(state.selection.ids[0]);
+            GOLD_ASSERT(selected_building_index != INDEX_INVALID);
+            building_t& building = state.buildings[selected_building_index];
+
+            building_queue_item_t item = (building_queue_item_t) {
+                .type = BUILDING_QUEUE_ITEM_UNIT,
+                .unit_type = unit_type
+            };
+
+            if (building.queue.size() == BUILDING_QUEUE_MAX) {
+                ui_show_status(state, UI_STATUS_BUILDING_QUEUE_FULL);
+            } else if (state.player_gold[network_get_player_id()] < building_queue_item_cost(item)) {
+                ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
+            } else {
+                building_enqueue(building, item);
+                state.player_gold[network_get_player_id()] -= building_queue_item_cost(item);
             }
 
             break;
@@ -234,6 +270,8 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
         building_t& building = state.buildings[state.buildings.get_index_of(state.selection.ids[0])];
         if (!building.is_finished) {
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
+        } else if (building.type == BUILDING_SALOON) {
+            state.ui_buttonset = UI_BUTTONSET_SALOON;
         } else {
             state.ui_buttonset = UI_BUTTONSET_NONE;
         }

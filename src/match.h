@@ -15,7 +15,9 @@
 #define MAX_PARTICLES 256
 
 #define UI_STATUS_CANT_BUILD "You can't build there."
-#define  UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
+#define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
+#define UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."
+#define UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
 
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
@@ -24,6 +26,9 @@ const uint32_t UNIT_PATH_PAUSE_DURATION = 60;
 const uint32_t UNIT_BUILD_TICK_DURATION = 8;
 const uint32_t UNIT_MINE_TICK_DURATION = 60;
 const uint32_t UNIT_MAX_GOLD_HELD = 5;
+
+const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
+const uint32_t BUILDING_QUEUE_MAX = 5;
 
 enum CellType: uint16_t {
     CELL_EMPTY,
@@ -113,6 +118,7 @@ enum UiButtonset {
     UI_BUTTONSET_MINER,
     UI_BUTTONSET_BUILD,
     UI_BUTTONSET_CANCEL,
+    UI_BUTTONSET_SALOON,
     UI_BUTTONSET_COUNT
 };
 
@@ -211,9 +217,23 @@ struct unit_data_t {
     int attack_cooldown;
     fixed speed;
     int sight;
+    uint32_t cost;
+    uint32_t population_cost;
+    uint32_t train_duration;
 };
 
 // Building
+
+enum BuildingQueueItemType {
+    BUILDING_QUEUE_ITEM_UNIT
+};
+
+struct building_queue_item_t {
+    BuildingQueueItemType type;
+    union {
+        UnitType unit_type;
+    };
+};
 
 struct building_t {
     uint8_t player_id;
@@ -223,6 +243,9 @@ struct building_t {
     xy cell;
 
     bool is_finished;
+
+    std::vector<building_queue_item_t> queue;
+    uint32_t queue_timer;
 };
 
 struct building_data_t {
@@ -341,10 +364,16 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
 void building_destroy(match_state_t& state, entity_id building_id);
+void building_update(match_state_t& state, building_t& building);
+void building_enqueue(building_t& building, building_queue_item_t item);
+void building_dequeue(building_t& building);
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);
 Sprite building_get_select_ring(BuildingType type);
+uint32_t building_queue_item_duration(const building_queue_item_t& item);
+UiButton building_queue_item_icon(const building_queue_item_t& item);
+uint32_t building_queue_item_cost(const building_queue_item_t& item);
 
 extern const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS;
 extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;

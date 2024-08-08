@@ -1177,8 +1177,9 @@ void render_match(const match_state_t& state) {
     }
 
     // UI frames
+    static const xy UI_FRAME_BOTTOM_POSITION = xy(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT);
     render_sprite(SPRITE_UI_MINIMAP, xy(0, 0), xy(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
-    render_sprite(SPRITE_UI_FRAME_BOTTOM, xy(0, 0), xy(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT));
+    render_sprite(SPRITE_UI_FRAME_BOTTOM, xy(0, 0), UI_FRAME_BOTTOM_POSITION);
     render_sprite(SPRITE_UI_FRAME_BUTTONS, xy(0, 0), xy(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x + engine.sprites[SPRITE_UI_FRAME_BOTTOM].frame_size.x, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y));
 
     // UI Buttons
@@ -1193,6 +1194,43 @@ void render_match(const match_state_t& state) {
         xy offset = is_button_pressed ? xy(1, 1) : (is_button_hovered ? xy(0, -1) : xy(0, 0));
         render_sprite(SPRITE_UI_BUTTON, xy(is_button_hovered && !is_button_pressed ? 1 : 0, 0), ui_get_ui_button_rect(i).position + offset);
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(ui_button - 1, is_button_hovered && !is_button_pressed ? 1 : 0), ui_get_ui_button_rect(i).position + offset);
+    }
+
+    // UI Building queues
+    if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+        uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
+        GOLD_ASSERT(building_index != INDEX_INVALID);
+        const building_t& building = state.buildings[building_index];
+
+        if (!building.queue.empty()) {
+            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(12, 12));
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[0]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(12, 12));
+
+            for (uint32_t building_queue_index = 1; building_queue_index < building.queue.size(); building_queue_index++) {
+                int icon_x_position = 12 + (33 * (building_queue_index - 1));
+                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, 12 + 33));
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, 12 + 33));
+            }
+
+            static const SDL_Rect BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT = (SDL_Rect) {
+                .x = UI_FRAME_BOTTOM_POSITION.x + 12 + 32 + 8,
+                .y = UI_FRAME_BOTTOM_POSITION.y + 12 + 32 - 4,
+                .w = 96,
+                .h = 4
+            };
+            SDL_Rect building_queue_progress_bar_rect = (SDL_Rect) {
+                .x = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x,
+                .y = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y,
+                .w = building.queue_timer == BUILDING_QUEUE_BLOCKED
+                        ? BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.w
+                        : (BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.w * (int)(building_queue_item_duration(building.queue[0]) - building.queue_timer)) / (int)building_queue_item_duration(building.queue[0]),
+                .h = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.h,
+            };
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_WHITE.r, COLOR_WHITE.g, COLOR_WHITE.b, COLOR_WHITE.a);
+            SDL_RenderFillRect(engine.renderer, &building_queue_progress_bar_rect);
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_BLACK.r, COLOR_BLACK.g, COLOR_BLACK.b, COLOR_BLACK.a);
+            SDL_RenderDrawRect(engine.renderer, &BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT);
+        }
     }
 
     // UI Status message
