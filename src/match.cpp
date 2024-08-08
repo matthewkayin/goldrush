@@ -59,7 +59,10 @@ match_state_t match_init() {
         .type = CELL_EMPTY,
         .value = 0
     });
-    state.map_fog = std::vector<Fog>(state.map_width * state.map_height, FOG_HIDDEN);
+    state.map_fog = std::vector<fog_t>(state.map_width * state.map_height, (fog_t) {
+        .type = FOG_HIDDEN,
+        .value = FOG_VALUE_NONE
+    });
     state.is_fog_dirty = true;
 
     for (uint32_t i = 0; i < state.map_width * state.map_height; i += 3) {
@@ -438,14 +441,14 @@ void match_update(match_state_t& state) {
         // Create the move event
         input_t input;
         input.move.target_cell = move_target / TILE_SIZE;
-        input.move.target_entity_id = state.map_fog[input.move.target_cell.x + (input.move.target_cell.y * state.map_width)] == FOG_REVEALED && 
+        input.move.target_entity_id = map_get_fog(state, input.move.target_cell).type == FOG_REVEALED && 
                                         map_get_cell(state, input.move.target_cell).type == CELL_UNIT 
                                         ? map_get_cell(state, input.move.target_cell).value : ID_NULL;
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
-        if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state, input.move.target_cell) == FOG_HIDDEN)) {
+        if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state, input.move.target_cell).type == FOG_HIDDEN)) {
             input.type = INPUT_ATTACK_MOVE;
-        } else if (map_get_fog(state, input.move.target_cell) == FOG_HIDDEN) {
+        } else if (map_get_fog(state, input.move.target_cell).type == FOG_HIDDEN) {
             input.type = INPUT_BLIND_MOVE;
         } else {
             input.type = INPUT_MOVE;

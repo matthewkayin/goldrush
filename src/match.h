@@ -39,10 +39,17 @@ struct cell_t {
     uint16_t value;
 };
 
-enum Fog {
+enum FogType: uint16_t {
     FOG_HIDDEN,
     FOG_EXPLORED,
     FOG_REVEALED
+};
+
+const uint16_t FOG_VALUE_NONE = UINT16_MAX;
+
+struct fog_t {
+    FogType type;
+    uint16_t value;
 };
 
 // Input
@@ -254,7 +261,7 @@ struct match_state_t {
     // Map
     std::vector<uint32_t> map_tiles;
     std::vector<cell_t> map_cells;
-    std::vector<Fog> map_fog;
+    std::vector<fog_t> map_fog;
     uint32_t map_width;
     uint32_t map_height;
     bool is_fog_dirty;
@@ -308,7 +315,7 @@ void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, ui
 bool map_is_cell_gold(const match_state_t& state, xy cell);
 void map_decrement_gold(match_state_t& state, xy cell);
 void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* path);
-Fog map_get_fog(const match_state_t& state, xy cell);
+fog_t map_get_fog(const match_state_t& state, xy cell);
 void map_update_fog(match_state_t& state);
 
 // Unit

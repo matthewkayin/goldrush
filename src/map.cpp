@@ -203,7 +203,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* p
     }
 }
 
-Fog map_get_fog(const match_state_t& state, xy cell) {
+fog_t map_get_fog(const match_state_t& state, xy cell) {
     return state.map_fog[cell.x + (state.map_width * cell.y)];
 }
 
@@ -220,7 +220,10 @@ void map_fog_reveal(match_state_t& state, xy cell, xy size, int sight) {
                 continue;
             }
 
-            state.map_fog[x + (state.map_width * y)] = FOG_REVEALED;
+            state.map_fog[x + (state.map_width * y)] = (fog_t) {
+                .type = FOG_REVEALED,
+                .value = FOG_VALUE_NONE
+            };
         }
     }
 }
@@ -228,8 +231,27 @@ void map_fog_reveal(match_state_t& state, xy cell, xy size, int sight) {
 void map_update_fog(match_state_t& state) {
     // First dim anything that is revealed
     for (uint32_t i = 0; i < state.map_width * state.map_height; i++) {
-        if (state.map_fog[i] == FOG_REVEALED) {
-            state.map_fog[i] = FOG_EXPLORED;
+        if (state.map_fog[i].type == FOG_REVEALED) {
+            if (state.map_cells[i].type == CELL_BUILDING) {
+                uint32_t cell_value_index = state.buildings.get_index_of(state.map_cells[i].value);
+                GOLD_ASSERT(cell_value_index != INDEX_INVALID);
+                uint8_t cell_value_player_id = state.buildings[cell_value_index].player_id;
+                xy cell_value_size = building_cell_size(state.buildings[cell_value_index].type);
+                xy cell_value_origin = xy(i % state.map_width, i / state.map_width);
+                for (uint32_t x = cell_value_origin.x; x < cell_value_origin.x + cell_value_size.x; x++) {
+                    for (uint32_t y = cell_value_origin.y; y < cell_value_origin.y + cell_value_size.y; y++) {
+                        state.map_fog[x + (y * state.map_width)] = (fog_t) {
+                            .type = FOG_EXPLORED,
+                            .value = (uint16_t)cell_value_player_id
+                        };
+                    }
+                }
+            } else {
+                state.map_fog[i] = (fog_t) {
+                    .type = FOG_EXPLORED,
+                    .value = FOG_VALUE_NONE
+                };
+            }
         }
     }
 

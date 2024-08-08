@@ -876,7 +876,7 @@ void ysort(render_sprite_params_t* params, int low, int high) {
 bool is_cell_revealed(const match_state_t& state, xy cell, xy size) {
     for (int x = cell.x; x < cell.x + size.x; x++) {
         for (int y = cell.y; y < cell.y + size.y; y++) {
-            if (state.map_fog[x + (state.map_width * y)] == FOG_REVEALED) {
+            if (map_get_fog(state, xy(x, y)).type == FOG_REVEALED) {
                 return true;
             }
         }
@@ -1004,7 +1004,7 @@ void render_match(const match_state_t& state) {
     }
 
     // UI move animation
-    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, state.ui_move_position / TILE_SIZE) != FOG_HIDDEN) {
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, state.ui_move_position / TILE_SIZE).type != FOG_HIDDEN) {
         if (state.ui_move_cell.type == CELL_EMPTY) {
             render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
         } else if (state.ui_move_animation.frame.x % 2 == 0) {
@@ -1114,21 +1114,21 @@ void render_match(const match_state_t& state) {
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             xy fog_cell = base_coords + xy(x, y);
-            Fog fog_value = state.map_fog[fog_cell.x + (fog_cell.y * state.map_width)];
-            if (fog_value == FOG_REVEALED) {
+            fog_t fog = state.map_fog[fog_cell.x + (fog_cell.y * state.map_width)];
+            if (fog.type == FOG_REVEALED) {
                 continue;
             }
 
             tile_dst_rect.x = base_pos.x + x * TILE_SIZE;
             tile_dst_rect.y = base_pos.y + y * TILE_SIZE;
-            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog_value == FOG_HIDDEN ? 255 : 128);
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog.type == FOG_HIDDEN ? 255 : 128);
             SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
     // UI move animation (for blind moves)
-    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, state.ui_move_position / TILE_SIZE) == FOG_HIDDEN) {
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, state.ui_move_position / TILE_SIZE).type == FOG_HIDDEN) {
         render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
@@ -1145,7 +1145,7 @@ void render_match(const match_state_t& state) {
         for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_height; y++) {
             for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_width; x++) {
                 bool is_cell_green;
-                if (is_placement_out_of_bounds || state.map_fog[x + (state.map_width * y)] == FOG_HIDDEN) {
+                if (is_placement_out_of_bounds || map_get_fog(state, xy(x, y)).type == FOG_HIDDEN) {
                     is_cell_green = false;
                 } else {
                     is_cell_green = !map_is_cell_blocked(state, xy(x, y));
@@ -1232,15 +1232,40 @@ void render_match(const match_state_t& state) {
         }
     }
 
-    SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, COLOR_GREEN.a);
     for (const building_t& building : state.buildings) {
+        if (building.player_id != network_get_player_id() && !is_cell_revealed(state, building.cell, building_cell_size(building.type))) {
+            continue;
+        }
+
         SDL_Rect building_rect = (SDL_Rect) { 
             .x = (building.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width,
             .y = (building.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
             .w = 2 * BUILDING_DATA.at(building.type).cell_width,
             .h = 2 * BUILDING_DATA.at(building.type).cell_height
         };
+        SDL_Color color = building.player_id == network_get_player_id() 
+                            ? COLOR_GREEN 
+                            : COLOR_PLAYER.at((RecolorName)building.player_id);
+        SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &building_rect);
+    }
+
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            fog_t fog = map_get_fog(state, xy(x, y));
+            if (fog.type == FOG_EXPLORED && fog.value != FOG_VALUE_NONE) {
+                GOLD_ASSERT(fog.value != network_get_player_id());
+                SDL_Rect remembered_building_rect = (SDL_Rect) {
+                    .x = (x * MINIMAP_RECT.size.x) / (int)state.map_width,
+                    .y = (y * MINIMAP_RECT.size.y) / (int)state.map_height,
+                    .w = 2,
+                    .h = 2
+                };
+                SDL_Color color = COLOR_PLAYER.at((RecolorName)fog.value);
+                SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+                SDL_RenderFillRect(engine.renderer, &remembered_building_rect);
+            }
+        }
     }
 
     for (const unit_t& unit : state.units) {
@@ -1252,7 +1277,12 @@ void render_match(const match_state_t& state) {
             .x = (unit.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width, 
             .y = (unit.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
             .w = 2, 
-            .h = 2 };
+            .h = 2 
+        };
+        SDL_Color color = unit.player_id == network_get_player_id() 
+                            ? COLOR_GREEN 
+                            : COLOR_PLAYER.at((RecolorName)unit.player_id);
+        SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &unit_rect);
     }
 
@@ -1260,14 +1290,14 @@ void render_match(const match_state_t& state) {
     SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 2, .h = 2 };
     for (int x = 0; x < state.map_width; x++) {
         for (int y = 0; y < state.map_height; y++) {
-            Fog fog_value = state.map_fog[x + (y * state.map_width)];
-            if (fog_value == FOG_REVEALED) {
+            fog_t fog = state.map_fog[x + (y * state.map_width)];
+            if (fog.type == FOG_REVEALED) {
                 continue;
             }
 
             fog_rect.x = (x * MINIMAP_RECT.size.x) / (int)state.map_width;
             fog_rect.y = (y * MINIMAP_RECT.size.y) / (int)state.map_height;
-            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog_value == FOG_HIDDEN ? 255 : 128);
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog.type == FOG_HIDDEN ? 255 : 128);
             SDL_RenderFillRect(engine.renderer, &fog_rect);
         }
     }
