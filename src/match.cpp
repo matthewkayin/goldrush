@@ -668,6 +668,16 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += sizeof(input_build_cancel_t);
             break;
         }
+        case INPUT_BUILDING_ENQUEUE: {
+            memcpy(out_buffer + out_buffer_length, &input.building_enqueue, sizeof(input_building_enqueue_t));
+            out_buffer_length += sizeof(input_building_enqueue_t);
+            break;
+        }
+        case INPUT_BUILDING_DEQUEUE: {
+            memcpy(out_buffer + out_buffer_length, &input.building_dequeue, sizeof(input_building_dequeue_t));
+            out_buffer_length += sizeof(input_building_dequeue_t);
+            break;
+        }
         default:
             break;
     }
@@ -710,6 +720,17 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
         case INPUT_BUILD_CANCEL: {
             memcpy(&input.build_cancel, in_buffer + in_buffer_head, sizeof(input_build_cancel_t));
             in_buffer_head += sizeof(input_build_cancel_t);
+            break;
+        }
+        case INPUT_BUILDING_ENQUEUE: {
+            memcpy(&input.building_enqueue, in_buffer + in_buffer_head, sizeof(input_building_enqueue_t));
+            in_buffer_head += sizeof(input_building_enqueue_t);
+            break;
+        }
+        case INPUT_BUILDING_DEQUEUE: {
+            memcpy(&input.building_dequeue, in_buffer + in_buffer_head, sizeof(input_building_dequeue_t));
+            in_buffer_head += sizeof(input_building_dequeue_t);
+            break;
         }
         default:
             break;
@@ -899,6 +920,33 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             }
             // Destroy the building
             building_destroy(state, input.build_cancel.building_id);
+            break;
+        }
+        case INPUT_BUILDING_ENQUEUE: {
+            uint32_t building_index = state.buildings.get_index_of(input.building_enqueue.building_id);
+            if (building_index == INDEX_INVALID) {
+                return;
+            }
+            if (state.player_gold[player_id] < building_queue_item_cost(input.building_enqueue.item)) {
+                return;
+            }
+
+            state.player_gold[player_id] -= building_queue_item_cost(input.building_enqueue.item);
+            building_enqueue(state.buildings[building_index], input.building_enqueue.item);
+            break;
+        }
+        case INPUT_BUILDING_DEQUEUE: {
+            uint32_t building_index = state.buildings.get_index_of(input.building_dequeue.building_id);
+            if (building_index == INDEX_INVALID) {
+                return;
+            }
+            if (state.buildings[building_index].queue.empty()) {
+                return;
+            }
+
+            state.player_gold[player_id] += building_queue_item_cost(state.buildings[building_index].queue[0]);
+            building_dequeue(state.buildings[building_index]);
+
             break;
         }
         default:

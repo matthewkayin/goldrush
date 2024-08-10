@@ -15,6 +15,19 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .cost = 50,
         .population_cost = 1,
         .train_duration = 300
+    }},
+    { UNIT_COWBOY, (unit_data_t) {
+        .sprite = SPRITE_UNIT_COWBOY,
+        .max_health = 40,
+        .damage = 8,
+        .armor = 1,
+        .range = 5,
+        .attack_cooldown = 30,
+        .speed = fixed::from_int(1),
+        .sight = 7,
+        .cost = 50,
+        .population_cost = 1,
+        .train_duration = 300
     }}
 };
 
@@ -58,6 +71,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
     bool unit_update_finished = false;
     fixed movement_left = unit_data.speed;
     while (!unit_update_finished) {
+        log_info("unit update, index %u mode %u target type %u", unit_index, unit.mode, unit.target.type);
         switch (unit.mode) {
             case UNIT_MODE_IDLE: {
                 if (unit.target.type == UNIT_TARGET_NONE) {
@@ -153,14 +167,15 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     break;
                 }
 
-                // On movement finished
-                if (unit.position == cell_center(unit.cell) && unit.path.empty()) {
-                    if (unit.cell == unit_get_target_cell(state, unit)) {
+                // On cell movement finished
+                if (unit.position == cell_center(unit.cell)) {
+                    if (unit_has_reached_target(state, unit)) {
                         unit.mode = UNIT_MODE_MOVE_FINISHED;
-                    } else {
+                        break;
+                    } else if (unit.path.empty()) {
                         unit.mode = UNIT_MODE_IDLE;
+                        break;
                     }
-                    break;
                 } 
 
                 unit_update_finished = true;
@@ -194,6 +209,15 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         } 
+
+                        if (state.player_gold[unit.player_id] < BUILDING_DATA.at(unit.target.build.building_type).cost) {
+                            ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_NONE
+                            };
+                            unit.mode = UNIT_MODE_IDLE;
+                            break;
+                        }
 
                         // Place building
                         state.player_gold[unit.player_id] -= BUILDING_DATA.at(unit.target.build.building_type).cost;
@@ -384,7 +408,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         GOLD_ASSERT(enemy_index != INDEX_INVALID);
                         unit_t& enemy = state.units[enemy_index];
 
-                        int damage = std::min(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
+                        int damage = std::max(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
                         enemy.health = std::max(0, enemy.health - damage);
 
                         // Make the enemy attack back

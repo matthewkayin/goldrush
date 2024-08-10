@@ -16,7 +16,7 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
-    { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_MINER, UI_BUTTON_NONE, UI_BUTTON_NONE,
+    { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_MINER, UI_BUTTON_UNIT_COWBOY, UI_BUTTON_NONE,
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }}
 };
 static const xy UI_BUTTON_SIZE = xy(32, 32);
@@ -89,11 +89,13 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
                 log_info("cancel ui mode %u", state.ui_mode);
             } else if (state.ui_buttonset == UI_BUTTONSET_SALOON) {
-                uint32_t selected_building_index = state.buildings.get_index_of(state.selection.ids[0]);
-                GOLD_ASSERT(selected_building_index != INDEX_INVALID);
-                building_t& building = state.buildings[selected_building_index];
-                state.player_gold[network_get_player_id()] += building_queue_item_cost(building.queue[0]);
-                building_dequeue(building);
+                input_t input = (input_t) {
+                    .type = INPUT_BUILDING_DEQUEUE,
+                    .building_dequeue = (input_building_dequeue_t) {
+                        .building_id = state.selection.ids[0]
+                    }
+                };
+                state.input_queue.push_back(input);
             } else if (state.ui_mode == UI_MODE_ATTACK_MOVE) {
                 state.ui_mode = UI_MODE_NONE;
                 ui_set_selection(state, state.selection);
@@ -132,7 +134,8 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
 
             break;
         }
-        case UI_BUTTON_UNIT_MINER: {
+        case UI_BUTTON_UNIT_MINER: 
+        case UI_BUTTON_UNIT_COWBOY: {
             // Begin unit training
             UnitType unit_type = (UnitType)(UNIT_MINER + (button - UI_BUTTON_UNIT_MINER));
 
@@ -150,15 +153,22 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             } else if (state.player_gold[network_get_player_id()] < building_queue_item_cost(item)) {
                 ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
             } else {
-                building_enqueue(building, item);
-                state.player_gold[network_get_player_id()] -= building_queue_item_cost(item);
+                input_t input = (input_t) {
+                    .type = INPUT_BUILDING_ENQUEUE,
+                    .building_enqueue = (input_building_enqueue_t) {
+                        .building_id = state.selection.ids[0],
+                        .item = item
+                    }
+                };
+                state.input_queue.push_back(input);
             }
 
             break;
         }
         case UI_BUTTON_NONE:
-        default:
             break;
+        default:
+            GOLD_ASSERT_MESSAGE(false, "Unhandled UI button press");
     }
 }
 

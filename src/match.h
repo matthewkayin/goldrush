@@ -57,50 +57,6 @@ struct fog_t {
     uint16_t value;
 };
 
-// Input
-
-enum InputType {
-    INPUT_NONE,
-    INPUT_MOVE,
-    INPUT_BLIND_MOVE,
-    INPUT_ATTACK_MOVE,
-    INPUT_STOP,
-    INPUT_BUILD,
-    INPUT_BUILD_CANCEL
-};
-
-struct input_move_t {
-    xy target_cell;
-    entity_id target_entity_id;
-    uint16_t unit_count;
-    entity_id unit_ids[MAX_UNITS];
-};
-
-struct input_stop_t {
-    uint8_t unit_count;
-    entity_id unit_ids[MAX_UNITS];
-};
-
-struct input_build_t {
-    uint16_t unit_id;
-    uint8_t building_type;
-    xy target_cell;
-};
-
-struct input_build_cancel_t {
-    entity_id building_id;
-};
-
-struct input_t {
-    uint8_t type;
-    union {
-        input_move_t move;
-        input_stop_t stop;
-        input_build_t build;
-        input_build_cancel_t build_cancel;
-    };
-};
-
 // UI
 
 enum UiMode {
@@ -135,8 +91,9 @@ struct selection_t {
 
 // Unit
 
-enum UnitType {
-    UNIT_MINER
+enum UnitType: uint8_t {
+    UNIT_MINER,
+    UNIT_COWBOY
 };
 
 enum BuildingType {
@@ -224,7 +181,7 @@ struct unit_data_t {
 
 // Building
 
-enum BuildingQueueItemType {
+enum BuildingQueueItemType: uint8_t {
     BUILDING_QUEUE_ITEM_UNIT
 };
 
@@ -256,6 +213,63 @@ struct building_data_t {
     int builder_positions_x[3];
     int builder_positions_y[3];
     int builder_flip_h[3];
+};
+
+// Input
+
+enum InputType {
+    INPUT_NONE,
+    INPUT_MOVE,
+    INPUT_BLIND_MOVE,
+    INPUT_ATTACK_MOVE,
+    INPUT_STOP,
+    INPUT_BUILD,
+    INPUT_BUILD_CANCEL,
+    INPUT_BUILDING_ENQUEUE,
+    INPUT_BUILDING_DEQUEUE
+};
+
+struct input_move_t {
+    xy target_cell;
+    entity_id target_entity_id;
+    uint16_t unit_count;
+    entity_id unit_ids[MAX_UNITS];
+};
+
+struct input_stop_t {
+    uint8_t unit_count;
+    entity_id unit_ids[MAX_UNITS];
+};
+
+struct input_build_t {
+    uint16_t unit_id;
+    uint8_t building_type;
+    xy target_cell;
+};
+
+struct input_build_cancel_t {
+    entity_id building_id;
+};
+
+struct input_building_enqueue_t {
+    entity_id building_id;
+    building_queue_item_t item;
+};
+
+struct input_building_dequeue_t {
+    entity_id building_id;
+};
+
+struct input_t {
+    uint8_t type;
+    union {
+        input_move_t move;
+        input_stop_t stop;
+        input_build_t build;
+        input_build_cancel_t build_cancel;
+        input_building_enqueue_t building_enqueue;
+        input_building_dequeue_t building_dequeue;
+    };
 };
 
 struct match_state_t {
