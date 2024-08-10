@@ -121,11 +121,13 @@ void logger_output(bool is_error, const char* message, ...) {
     char log_message[MESSAGE_LENGTH];
     sprintf(log_message, "%s\n", out_message);
 
+#ifdef DEBUG_LOGGER_CONSOLE_ENABLED
     if (is_error) {
         platform_console_write_error(log_message);
     } else {
         platform_console_write(log_message);
     }
+#endif
 
     fprintf(logfile, "%s", log_message);
     fflush(logfile);

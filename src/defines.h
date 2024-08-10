@@ -3,15 +3,17 @@
 #include <cstdint>
 
 #define APP_NAME "GOLD RUSH"
-#define APP_VERSION "0.1"
+#define APP_VERSION "0.2"
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
-#define MAX_PLAYERS 6
+#define MAX_PLAYERS 8
 #define TILE_SIZE 16
-#define GOLD_RAND_SEED 1722091950
-#define DEBUG_FAST_BUILD 1
-#define DEBUG_SHOW_UNIT_PATHS 1
-#define DEBUG_SHOW_UNIT_STATE 1
+// #define GOLD_RAND_SEED 1722091950
+// #define DEBUG_FAST_BUILD 1
+// #define DEBUG_SHOW_UNIT_PATHS 1
+// #define DEBUG_SHOW_UNIT_STATE 1
+// #define DEBUG_LOGGER_CONSOLE_ENABLED 1
+// #define DEBUG_MOUSE 1
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1

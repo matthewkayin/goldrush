@@ -7,7 +7,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .cell_width = 2,
         .cell_height = 2,
         .cost = 100,
-        .max_health = 100,
+        .max_health = 150,
         .builder_positions_x = { 3, 16, -4 },
         .builder_positions_y = { 15, 15, 3 },
         .builder_flip_h = { false, true, false }
@@ -15,7 +15,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     { BUILDING_CAMP, (building_data_t) {
         .cell_width = 2,
         .cell_height = 2,
-        .cost = 100,
+        .cost = 75,
         .max_health = 100,
         .builder_positions_x = { 1, 15, 14 },
         .builder_positions_y = { 13, 13, 2 },

@@ -18,7 +18,7 @@ static const int CAMERA_DRAG_SPEED = 8;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 1000;
+static const uint32_t PLAYER_STARTING_GOLD = 75;
 
 match_state_t match_init() {
     match_state_t state;

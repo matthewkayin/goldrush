@@ -25,9 +25,9 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .attack_cooldown = 30,
         .speed = fixed::from_int(1),
         .sight = 7,
-        .cost = 50,
-        .population_cost = 1,
-        .train_duration = 300
+        .cost = 100,
+        .population_cost = 2,
+        .train_duration = 400
     }}
 };
 

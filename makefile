@@ -13,10 +13,13 @@ DIR := $(subst /,\,${CURDIR})
 LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
-COMPILER_FLAGS := -g -std=c++17 -Wall -O0 
+# COMPILER_FLAGS := -g -std=c++17 -Wall -O0 
+COMPILER_FLAGS := -std=c++17 -Wall -O3
 INCLUDE_FLAGS := -Isrc -Ivendor
-LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image
-DEFINES := -D_CRT_SECURE_NO_WARNINGS -DGOLD_DEBUG
+# LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image
+LINKER_FLAGS := -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image
+DEFINES := -D_CRT_SECURE_NO_WARNINGS
+# DEFINES := -D_CRT_SECURE_NO_WARNINGS -DGOLD_DEBUG
 
 # Use -Wno-deprecated-declarations on OSX because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 ifeq ($(PLATFORM),OSX)

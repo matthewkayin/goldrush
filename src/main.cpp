@@ -205,7 +205,7 @@ enum Mode {
 
 int main(int argc, char** argv) {
     std::string logfile_path = "goldrush.log";
-    xy window_size = xy(SCREEN_WIDTH, SCREEN_HEIGHT);
+    xy window_size = xy(SCREEN_WIDTH * 2, SCREEN_HEIGHT * 2);
     for (int argn = 1; argn < argc; argn++) {
         std::string arg = std::string(argv[argn]);
         if (arg == "--logfile" && argn + 1 < argc) {
@@ -598,6 +598,10 @@ bool engine_init(xy window_size) {
     engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 128, 128);
     SDL_StopTextInput();
     engine.is_running = true;
+
+#ifndef DEBUG_MOUSE
+    SDL_SetWindowGrab(engine.window, SDL_TRUE);
+#endif
 
     log_info("%s initialized.", APP_NAME);
     return true;
