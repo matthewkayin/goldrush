@@ -10,6 +10,9 @@
 #define TILE_SIZE 16
 #define GOLD_RAND_SEED 1722091950
 #define DEBUG_FAST_BUILD 1
+#define DEBUG_FAST_TRAIN 1
+#define DEBUG_SHOW_UNIT_PATHS 1
+#define DEBUG_SHOW_UNIT_STATE 1
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1

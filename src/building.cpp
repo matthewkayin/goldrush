@@ -1,5 +1,7 @@
 #include "match.h"
 
+#include <algorithm>
+
 const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     { BUILDING_HOUSE, (building_data_t) {
         .cell_width = 2,
@@ -61,7 +63,11 @@ void building_destroy(match_state_t& state, entity_id building_id) {
 void building_update(match_state_t& state, building_t& building) {
     if (building.queue_timer != 0) {
         if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
+#ifdef DEBUG_FAST_TRAIN
+            building.queue_timer = std::max((int)building.queue_timer - 50, 0);
+#else
             building.queue_timer--;
+#endif
         }
         
         // On queue item finish

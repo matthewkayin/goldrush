@@ -84,7 +84,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             };
                             unit_update_finished = true;
                             break;
-                        }
+                        } 
 
                         unit.timer = UNIT_PATH_PAUSE_DURATION;
                         unit.mode = UNIT_MODE_MOVE_BLOCKED;
@@ -146,6 +146,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                 if (is_path_blocked) {
                     // Trigger repath
+                    if (unit.target.type == UNIT_TARGET_GOLD) {
+                        unit.target = unit_target_nearest_gold(state, unit);
+                    }
                     unit.mode = UNIT_MODE_IDLE;
                     break;
                 }
@@ -165,6 +168,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             } // End case UNIT_MODE_MOVE
             case UNIT_MODE_MOVE_FINISHED: {
                 switch (unit.target.type) {
+                    case UNIT_TARGET_NONE:
+                        unit.mode = UNIT_MODE_IDLE;
+                        break;
                     case UNIT_TARGET_ATTACK:
                     case UNIT_TARGET_CELL: {
                         unit.target = (unit_target_t) {
@@ -297,10 +303,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                             : rect_t(state.buildings[target_index].cell, building_cell_size(state.buildings[target_index].type));
                         unit.direction = get_enum_direction_to_rect(unit.cell, target_rect);
                         unit.mode = UNIT_MODE_ATTACK_WINDUP;
-                        break;
-                    }
-                    default: {
-                        log_info("On movement finished: unhandled target type %u", unit.target.type);
                         break;
                     }
                 } // End switch unit target type
@@ -616,8 +618,7 @@ unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t&
 }
 
 unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit) {
-    entity_id nearest_camp_id = unit_find_nearest_camp(state, unit);
-    xy start_cell = nearest_camp_id != ID_NULL ? state.buildings[state.buildings.get_index_of(nearest_camp_id)].cell : unit.cell;
+    xy start_cell = unit.cell;
 
     xy nearest_gold_cell = unit.cell;
     int nearest_gold_dist = -1;
@@ -633,7 +634,7 @@ unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t&
             bool is_gold_cell_free = false;
             for (int direction = DIRECTION_NORTH; direction < DIRECTION_COUNT; direction += 2) {
                 xy adjacent_cell = gold_cell + DIRECTION_XY[direction];
-                if (map_is_cell_in_bounds(state, adjacent_cell) && !map_is_cell_blocked(state, adjacent_cell)) {
+                if (map_is_cell_in_bounds(state, adjacent_cell) && (adjacent_cell == start_cell || !map_is_cell_blocked(state, adjacent_cell))) {
                     is_gold_cell_free = true;
                     break;
                 }
@@ -648,7 +649,6 @@ unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t&
     }
 
     if (nearest_gold_dist != -1) {
-        log_info("nearest gold cell is %xi", &nearest_gold_cell);
         return (unit_target_t) {
             .type = UNIT_TARGET_GOLD,
             .cell = nearest_gold_cell

@@ -22,7 +22,7 @@
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 
-const uint32_t UNIT_PATH_PAUSE_DURATION = 60;
+const uint32_t UNIT_PATH_PAUSE_DURATION = 30;
 const uint32_t UNIT_BUILD_TICK_DURATION = 8;
 const uint32_t UNIT_MINE_TICK_DURATION = 60;
 const uint32_t UNIT_MAX_GOLD_HELD = 5;
