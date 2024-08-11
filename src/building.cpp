@@ -145,11 +145,15 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
     return !map_is_cell_rect_blocked(state, building_rect);
 }
 
-Sprite building_get_select_ring(BuildingType type) {
+Sprite building_get_select_ring(BuildingType type, bool is_enemy) {
     if (building_cell_size(type) == xy(2, 2)) {
-        return SPRITE_SELECT_RING_BUILDING_2X2;
+        return is_enemy 
+                    ? SPRITE_SELECT_RING_BUILDING_2X2_ATTACK
+                    : SPRITE_SELECT_RING_BUILDING_2X2;
     } else {
-        return SPRITE_SELECT_RING_BUILDING_3X3;
+        return is_enemy
+                    ? SPRITE_SELECT_RING_BUILDING_3X3_ATTACK
+                    : SPRITE_SELECT_RING_BUILDING_3X3;
     }
 }
 

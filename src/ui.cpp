@@ -233,6 +233,36 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
         }
     }
 
+    // Otherwise, check for enemy units
+    for (uint32_t index = 0; index < state.units.size(); index++) {
+        const unit_t& unit = state.units[index];
+
+        if (unit.player_id == network_get_player_id()) {
+            continue;
+        }
+
+        if (unit_get_rect(unit).intersects(state.select_rect)) {
+            selection.ids.push_back(state.units.get_id_of(index));
+            selection.type = SELECTION_TYPE_ENEMY_UNIT;
+            return selection;
+        }
+    }
+
+    // Otherwise, check for enemy buildings
+    for (uint32_t index = 0; index < state.buildings.size(); index++) {
+        const building_t& building = state.buildings[index];
+
+        if (building.player_id == network_get_player_id()) {
+            continue;
+        }
+
+        if (building_get_rect(building).intersects(state.select_rect)) {
+            selection.ids.push_back(state.buildings.get_id_of(index));
+            selection.type = SELECTION_TYPE_ENEMY_BUILDING;
+            return selection;
+        }
+    }
+
     return selection;
 }
 
@@ -268,7 +298,7 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
         state.selection.type = SELECTION_TYPE_NONE;
     }
 
-    if (state.selection.type == SELECTION_TYPE_NONE) {
+    if (state.selection.type == SELECTION_TYPE_NONE || state.selection.type == SELECTION_TYPE_ENEMY_UNIT || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
         state.ui_buttonset = UI_BUTTONSET_NONE;
     } else if (state.selection.type == SELECTION_TYPE_UNITS) {
         if (state.selection.ids.size() == 1 && state.units[state.units.get_index_of(state.selection.ids[0])].type == UNIT_MINER) {

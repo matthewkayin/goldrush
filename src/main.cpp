@@ -949,12 +949,12 @@ void render_match(const match_state_t& state) {
     static const int HEALTHBAR_HEIGHT = 4;
     static const int HEALTHBAR_PADDING = 2;
     static const int BUILDING_HEALTHBAR_PADDING = 5;
-    if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+    if (state.selection.type == SELECTION_TYPE_BUILDINGS || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
         uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
         if (building_index != INDEX_INVALID) {
             const building_t& building = state.buildings[building_index];
             rect_t building_rect = building_get_rect(building);
-            render_sprite(building_get_select_ring(building.type), xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+            render_sprite(building_get_select_ring(building.type, state.selection.type == SELECTION_TYPE_ENEMY_BUILDING), xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
             // Determine healthbar rect
             xy building_render_pos = building_rect.position - state.camera_offset;
@@ -980,7 +980,7 @@ void render_match(const match_state_t& state) {
                 SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
             }
         }
-    } else {
+    } else if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_ENEMY_UNIT) {
         for (entity_id unit_id : state.selection.ids) {
             uint32_t index = state.units.get_index_of(unit_id);
             if (index == INDEX_INVALID) {
@@ -989,7 +989,7 @@ void render_match(const match_state_t& state) {
             const unit_t& unit = state.units[index];
 
             xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
-            render_sprite(SPRITE_SELECT_RING, xy(0, 0), unit_render_pos, RENDER_SPRITE_CENTERED);
+            render_sprite(state.selection.type == SELECTION_TYPE_UNITS ? SPRITE_SELECT_RING : SPRITE_SELECT_RING_ATTACK, xy(0, 0), unit_render_pos, RENDER_SPRITE_CENTERED);
 
             // Determine healthbar rect
             xy unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
@@ -1030,10 +1030,7 @@ void render_match(const match_state_t& state) {
                     uint32_t building_index = state.buildings.get_index_of(id);
                     if (building_index != INDEX_INVALID) {
                         rect_t building_rect = building_get_rect(state.buildings[building_index]);
-                        Sprite sprite = building_get_select_ring(state.buildings[building_index].type);
-                        if (state.buildings[building_index].player_id != network_get_player_id()) {
-                            sprite = (Sprite)(sprite + 1);
-                        }
+                        Sprite sprite = building_get_select_ring(state.buildings[building_index].type, state.buildings[building_index].player_id != network_get_player_id());
                         render_sprite(sprite, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
                     break;

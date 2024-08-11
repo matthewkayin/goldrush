@@ -81,7 +81,9 @@ enum UiButtonset {
 enum SelectionType {
     SELECTION_TYPE_NONE,
     SELECTION_TYPE_UNITS,
-    SELECTION_TYPE_BUILDINGS
+    SELECTION_TYPE_BUILDINGS,
+    SELECTION_TYPE_ENEMY_UNIT,
+    SELECTION_TYPE_ENEMY_BUILDING
 };
 
 struct selection_t {
@@ -384,7 +386,7 @@ void building_dequeue(building_t& building);
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);
-Sprite building_get_select_ring(BuildingType type);
+Sprite building_get_select_ring(BuildingType type, bool is_enemy);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);
 UiButton building_queue_item_icon(const building_queue_item_t& item);
 uint32_t building_queue_item_cost(const building_queue_item_t& item);

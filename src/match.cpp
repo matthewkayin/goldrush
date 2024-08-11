@@ -20,6 +20,7 @@ static const int CAMERA_DRAG_SPEED = 8;
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
 static const uint32_t PLAYER_STARTING_GOLD = 75;
+static const uint32_t MAP_GOLD_CELL_AMOUNT = 300;
 
 match_state_t match_init() {
     match_state_t state;
@@ -141,7 +142,7 @@ match_state_t match_init() {
         int cluster_size = std::min(3 + (lcg_rand() % 7), gold_target - gold_count);
         for (int i = 0; i < cluster_size; i++) {
             int gold_offset = lcg_rand() % 3;
-            map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), 100);
+            map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), MAP_GOLD_CELL_AMOUNT);
             gold_count++;
 
             // Determine the position of the next gold cell
@@ -343,7 +344,7 @@ void match_update(match_state_t& state) {
             if (input_is_key_just_pressed((Key)key)) {
                 // Set control group
                 if (input_is_key_pressed(KEY_CTRL)) {
-                    if (state.selection.type != SELECTION_TYPE_NONE) {
+                    if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_BUILDINGS) {
                         state.control_groups[key] = state.selection;
                     }
                 // Append control group
