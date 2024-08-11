@@ -121,7 +121,7 @@ void logger_output(bool is_error, const char* message, ...) {
     char log_message[MESSAGE_LENGTH];
     sprintf(log_message, "%s\n", out_message);
 
-#ifdef DEBUG_LOGGER_CONSOLE_ENABLED
+#ifdef GOLD_DEBUG_CONSOLE
     if (is_error) {
         platform_console_write_error(log_message);
     } else {

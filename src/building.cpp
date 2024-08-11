@@ -63,7 +63,7 @@ void building_destroy(match_state_t& state, entity_id building_id) {
 void building_update(match_state_t& state, building_t& building) {
     if (building.queue_timer != 0) {
         if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
-#ifdef DEBUG_FAST_TRAIN
+#ifdef GOLD_DEBUG_FAST_TRAIN
             building.queue_timer = std::max((int)building.queue_timer - 50, 0);
 #else
             building.queue_timer--;

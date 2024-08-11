@@ -9,11 +9,14 @@
 #define MAX_PLAYERS 8
 #define TILE_SIZE 16
 // #define GOLD_RAND_SEED 1722091950
-// #define DEBUG_FAST_BUILD 1
-// #define DEBUG_SHOW_UNIT_PATHS 1
-// #define DEBUG_SHOW_UNIT_STATE 1
-// #define DEBUG_LOGGER_CONSOLE_ENABLED 1
-// #define DEBUG_MOUSE 1
+#ifdef GOLD_DEBUG
+    #define GOLD_DEBUG_FAST_BUILD
+    #define GOLD_DEBUG_FAST_TRAIN
+    #define GOLD_DEBUG_UNIT_PATHS
+    #define GOLD_DEBUG_UNIT_STATE
+    #define GOLD_DEBUG_CONSOLE
+    #define GOLD_DEBUG_MOUSE
+#endif
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1

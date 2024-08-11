@@ -339,7 +339,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     // Building tick
                     building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
 
-#ifdef DEBUG_FAST_BUILD
+#ifdef GOLD_DEBUG_FAST_BUILD
                     building.health = std::min(building.health + 20, BUILDING_DATA.at(building.type).max_health);
 #else
                     building.health++;

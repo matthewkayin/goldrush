@@ -602,7 +602,7 @@ bool engine_init(xy window_size) {
     SDL_StopTextInput();
     engine.is_running = true;
 
-#ifndef DEBUG_MOUSE
+#ifndef GOLD_DEBUG_MOUSE
     SDL_SetWindowGrab(engine.window, SDL_TRUE);
 #endif
 
@@ -1140,7 +1140,7 @@ void render_match(const match_state_t& state) {
         render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
-#ifdef DEBUG_SHOW_UNIT_PATHS
+#ifdef GOLD_DEBUG_UNIT_PATHS
     // Unit paths
     SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
     for (const unit_t& unit : state.units) {
@@ -1380,7 +1380,7 @@ void render_match(const match_state_t& state) {
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
 
-#ifdef DEBUG_SHOW_UNIT_STATE
+#ifdef GOLD_DEBUG_UNIT_STATE
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
         const unit_t& unit = state.units[unit_index];
         char unit_debug_text[128];
