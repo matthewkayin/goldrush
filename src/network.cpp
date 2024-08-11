@@ -217,7 +217,9 @@ void network_service() {
                 break;
             }
             case ENET_EVENT_TYPE_RECEIVE: {
-                log_info("received message %b", event.packet->data, event.packet->dataLength);
+                if (!(event.packet->data[0] == MESSAGE_INPUT && event.packet->data[2] == 0)) {
+                    log_info("received message %b", event.packet->data, event.packet->dataLength);
+                }
 
                 // Implicit: don't handle / throw away any events if status CONNECTING or DISCONNECTING
                 if (state.status == NETWORK_STATUS_SERVER) {

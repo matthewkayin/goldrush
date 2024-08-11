@@ -11,6 +11,7 @@
 #include <algorithm>
 
 static const uint32_t TICK_DURATION = 4;
+static const uint8_t TICK_OFFSET = 4;
 static const uint32_t INPUT_MAX_SIZE = 256;
 
 static const int CAMERA_DRAG_MARGIN = 8;
@@ -47,9 +48,9 @@ match_state_t match_init() {
         input_t empty_input;
         empty_input.type = INPUT_NONE;
         std::vector<input_t> empty_input_list = { empty_input };
-        state.inputs[player_id].push_back(empty_input_list);
-        state.inputs[player_id].push_back(empty_input_list);
-        state.inputs[player_id].push_back(empty_input_list);
+        for (uint8_t i = 0; i < TICK_OFFSET - 1; i++) {
+            state.inputs[player_id].push_back(empty_input_list);
+        }
     }
     state.tick_timer = 0;
 
@@ -195,6 +196,7 @@ void match_update(match_state_t& state) {
                 }
             } else if (!network_is_server() && network_event.type == NETWORK_EVENT_MATCH_START) {
                 state.ui_mode = UI_MODE_NONE;
+                break;
             }
         }
         
@@ -238,7 +240,7 @@ void match_update(match_state_t& state) {
                 continue;
             }
 
-            if (state.inputs[player_id].empty()) {
+            if (state.inputs[player_id].empty() || state.inputs[player_id][0].empty()) {
                 has_all_inputs = false;
                 break;
             }
@@ -258,7 +260,10 @@ void match_update(match_state_t& state) {
                 continue;
             }
 
+            char input_str[32];
+            char* input_str_ptr = input_str;
             for (const input_t& input : state.inputs[player_id][0]) {
+                input_str_ptr += sprintf(input_str_ptr, "%u, ", input.type);
                 match_input_handle(state, player_id, input);
             } // End for each input in player queue
             state.inputs[player_id].erase(state.inputs[player_id].begin());
@@ -281,10 +286,9 @@ void match_update(match_state_t& state) {
         // Assert that the out buffer is big enough
         GOLD_ASSERT((INPUT_BUFFER_SIZE - 3) >= (INPUT_MAX_SIZE * state.input_queue.size()));
 
-        // Leave a space in the buffer for the network message type
         uint8_t current_player_id = network_get_player_id();
         out_buffer[1] = current_player_id;
-        out_buffer_length = 2;
+        out_buffer_length = 2; // Leaves space in buffer for <network message type><player_id>
 
         // Serialize the inputs
         for (const input_t& input : state.input_queue) {

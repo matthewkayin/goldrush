@@ -71,7 +71,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
     bool unit_update_finished = false;
     fixed movement_left = unit_data.speed;
     while (!unit_update_finished) {
-        log_info("unit update, index %u mode %u target type %u", unit_index, unit.mode, unit.target.type);
         switch (unit.mode) {
             case UNIT_MODE_IDLE: {
                 if (unit.target.type == UNIT_TARGET_NONE) {
