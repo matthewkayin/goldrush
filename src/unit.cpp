@@ -4,6 +4,7 @@
 
 const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
     { UNIT_MINER, (unit_data_t) {
+        .name = "Miner",
         .sprite = SPRITE_UNIT_MINER,
         .max_health = 20,
         .damage = 5,
@@ -17,6 +18,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .train_duration = 300
     }},
     { UNIT_COWBOY, (unit_data_t) {
+        .name = "Cowboy",
         .sprite = SPRITE_UNIT_COWBOY,
         .max_health = 40,
         .damage = 8,

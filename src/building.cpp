@@ -4,6 +4,7 @@
 
 const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     { BUILDING_HOUSE, (building_data_t) {
+        .name = "House",
         .cell_width = 2,
         .cell_height = 2,
         .cost = 100,
@@ -13,6 +14,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .builder_flip_h = { false, true, false }
     }},
     { BUILDING_CAMP, (building_data_t) {
+        .name = "Mining Camp",
         .cell_width = 2,
         .cell_height = 2,
         .cost = 75,
@@ -22,6 +24,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .builder_flip_h = { false, true, true }
     }},
     { BUILDING_SALOON, (building_data_t) {
+        .name = "Saloon",
         .cell_width = 3,
         .cell_height = 3,
         .cost = 200,

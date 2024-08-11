@@ -194,6 +194,7 @@ SDL_Rect rect_to_sdl(const rect_t& r) {
 
 bool engine_init(xy window_size);
 void engine_quit();
+int sdlk_to_str(char* str, SDL_Keycode key);
 void render_text(Font font, const char* text, SDL_Color color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
 void render_menu(const menu_state_t& menu);
 void render_match(const match_state_t& state);
@@ -630,6 +631,18 @@ void engine_quit() {
 
     log_info("Application quit gracefully.");
     logger_quit();
+}
+
+int sdlk_to_str(char* str, SDL_Keycode key) {
+    if (key >= SDLK_a && key <= SDLK_z) {
+        return sprintf(str, "%c", (char)(key - 32));
+    } else if (key == SDLK_ESCAPE) {
+        return sprintf(str, "ESC");
+    } else {
+        log_error("Unhandled key %u in sdlk_to_str()", key);
+        GOLD_ASSERT(false);
+        return 0;
+    }
 }
 
 // INPUT
@@ -1254,6 +1267,105 @@ void render_match(const match_state_t& state) {
         }
     }
 
+    // UI Tooltip
+    if (ui_get_ui_button_hovered(state) != -1) {
+        uint32_t tooltip_gold_cost = 0;
+        uint32_t tooltip_population_cost = 0;
+
+        char tooltip_text[64];
+        char* tooltip_text_ptr = tooltip_text;
+
+        UiButton button = ui_get_ui_button(state, ui_get_ui_button_hovered(state));
+        GOLD_ASSERT(button != UI_BUTTON_NONE && button != UI_BUTTON_MOVE);
+        if (button == UI_BUTTON_ATTACK) {
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Attack");
+        } else if (button == UI_BUTTON_STOP) {
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Stop");
+        } else if (button == UI_BUTTON_BUILD) {
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Build");
+        } else if (button == UI_BUTTON_CANCEL) {
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Cancel");
+        } else if (button >= UI_BUTTON_UNIT_MINER && button < UI_BUTTON_UNIT_MINER + UNIT_DATA.size()) {
+            UnitType unit_type = (UnitType)(UNIT_MINER + (button - UI_BUTTON_UNIT_MINER));
+            const unit_data_t& unit_data = UNIT_DATA.at(unit_type);
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Hire %s", unit_data.name);
+            tooltip_gold_cost = unit_data.cost;
+            tooltip_population_cost = unit_data.population_cost;
+        } else if (button >= UI_BUTTON_BUILD_HOUSE && button < UI_BUTTON_BUILD_HOUSE + BUILDING_DATA.size()) {
+            BuildingType building_type = (BuildingType)(BUILDING_HOUSE + (button - UI_BUTTON_BUILD_HOUSE));
+            const building_data_t& building_data = BUILDING_DATA.at(building_type);
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Build %s", building_data.name);
+            tooltip_gold_cost = building_data.cost;
+        }
+
+        tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
+        tooltip_text_ptr += sdlk_to_str(tooltip_text_ptr, hotkey_keymap.at(button));
+        tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
+
+        SDL_Surface* tooltip_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_WESTERN8], tooltip_text, COLOR_OFFBLACK);
+        if (tooltip_text_surface == NULL) {
+            log_error("Unable to create tooltip text surface: %s", TTF_GetError());
+            return;
+        }
+
+        int tooltip_min_width = 10 + tooltip_text_surface->w;
+        int tooltip_cell_width = tooltip_min_width / 8;
+        int tooltip_cell_height = tooltip_gold_cost != 0 ? 5 : 3;
+        if (tooltip_min_width % 8 != 0) {
+            tooltip_cell_width++;
+        }
+        xy tooltip_top_left = xy(SCREEN_WIDTH - (tooltip_cell_width * 8) - 2, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y - (tooltip_cell_height * 8) - 2);
+        for (int tooltip_x_index = 0; tooltip_x_index < tooltip_cell_width; tooltip_x_index++) {
+            for (int tooltip_y_index = 0; tooltip_y_index < tooltip_cell_height; tooltip_y_index++) {
+                xy tooltip_frame;
+                if (tooltip_x_index == 0) {
+                    tooltip_frame.x = 0;
+                } else if (tooltip_x_index == tooltip_cell_width - 1) {
+                    tooltip_frame.x = 2;
+                } else {
+                    tooltip_frame.x = 1;
+                }
+                if (tooltip_y_index == 0) {
+                    tooltip_frame.y = 0;
+                } else if (tooltip_y_index == tooltip_cell_height - 1) {
+                    tooltip_frame.y = 2;
+                } else {
+                    tooltip_frame.y = 1;
+                }
+                render_sprite(SPRITE_UI_TOOLTIP_FRAME, tooltip_frame, tooltip_top_left + (xy(tooltip_x_index * 8, tooltip_y_index * 8)), RENDER_SPRITE_NO_CULL);
+            }
+        }
+
+        SDL_Texture* tooltip_text_texture = SDL_CreateTextureFromSurface(engine.renderer, tooltip_text_surface);
+        if (tooltip_text_texture == NULL) {
+            log_error("Unable to create texture from tooltip text surface: %s", SDL_GetError());
+            return;
+        }
+        SDL_Rect tooltip_text_rect = (SDL_Rect) {
+            .x = tooltip_top_left.x + 5,
+            .y = tooltip_top_left.y + 5,
+            .w = tooltip_text_surface->w,
+            .h = tooltip_text_surface->h
+        };
+        SDL_RenderCopy(engine.renderer, tooltip_text_texture, NULL, &tooltip_text_rect);
+
+        SDL_DestroyTexture(tooltip_text_texture);
+        SDL_FreeSurface(tooltip_text_surface);
+
+        if (tooltip_gold_cost != 0) {
+            render_sprite(SPRITE_UI_GOLD, xy(0, 0), tooltip_top_left + xy(5, 21), RENDER_SPRITE_NO_CULL);
+            char gold_text[4];
+            sprintf(gold_text, "%u", tooltip_gold_cost);
+            render_text(FONT_WESTERN8, gold_text, COLOR_OFFBLACK, tooltip_top_left + xy(5 + 18, 23));
+        }
+        if (tooltip_population_cost != 0) {
+            render_sprite(SPRITE_UI_HOUSE, xy(0, 0), tooltip_top_left + xy(5 + 18 + 32, 19), RENDER_SPRITE_NO_CULL);
+            char population_text[4];
+            sprintf(population_text, "%u", tooltip_population_cost);
+            render_text(FONT_WESTERN8, population_text, COLOR_OFFBLACK, tooltip_top_left + xy(5 + 18 + 32 + 22, 23));
+        }
+    }
+
     // UI Status message
     if (state.ui_status_timer != 0) {
         render_text(FONT_HACK, state.ui_status_message.c_str(), COLOR_WHITE, xy(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 128));
@@ -1263,12 +1375,12 @@ void render_match(const match_state_t& state) {
     char gold_text[8];
     sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);
     render_text(FONT_WESTERN8, gold_text, COLOR_WHITE, xy(SCREEN_WIDTH - 172 + 18, 4));
-    render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 172, 2));
+    render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 172, 2), RENDER_SPRITE_NO_CULL);
 
     char population_text[8];
     sprintf(population_text, "%u/%u", match_get_player_population(state, network_get_player_id()), match_get_player_max_population(state, network_get_player_id()));
     render_text(FONT_WESTERN8, population_text, COLOR_WHITE, xy(SCREEN_WIDTH - 88 + 22, 4));
-    render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0));
+    render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL);
 
     // Render minimap
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);

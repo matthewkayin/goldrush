@@ -168,6 +168,7 @@ struct unit_t {
 };
 
 struct unit_data_t {
+    const char* name;
     Sprite sprite;
     int max_health;
     int damage;
@@ -208,6 +209,7 @@ struct building_t {
 };
 
 struct building_data_t {
+    const char* name;
     int cell_width;
     int cell_height;
     uint32_t cost;
