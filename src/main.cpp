@@ -285,85 +285,88 @@ int main(int argc, char** argv) {
         frames++;
 
         // INPUT
-        memcpy(engine.mouse_button_previous_state, engine.mouse_button_state, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
-        memcpy(engine.hotkey_state_previous, engine.hotkey_state, UI_BUTTON_COUNT * sizeof(bool));
-        memcpy(engine.key_state_previous, engine.key_state, KEY_COUNT * sizeof(bool));
+        // Note that input is not processed unless we are about to update during this iteration
+        if (update_accumulator >= UPDATE_TIME) {
+            memcpy(engine.mouse_button_previous_state, engine.mouse_button_state, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
+            memcpy(engine.hotkey_state_previous, engine.hotkey_state, UI_BUTTON_COUNT * sizeof(bool));
+            memcpy(engine.key_state_previous, engine.key_state, KEY_COUNT * sizeof(bool));
 
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            // Handle quit
-            if (event.type == SDL_QUIT) {
-                engine.is_running = false;
-            }
-            // Toggle fullscreen
-            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
-                engine.is_fullscreen = !engine.is_fullscreen;
-                if (engine.is_fullscreen) {
-                    SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-                    SDL_SetWindowGrab(engine.window, SDL_TRUE);
-                } else {
-                    SDL_SetWindowFullscreen(engine.window, 0);
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                // Handle quit
+                if (event.type == SDL_QUIT) {
+                    engine.is_running = false;
                 }
-                break;
-            }
-            // Capture mouse
-            if (SDL_GetWindowGrab(engine.window) == SDL_FALSE) {
-                if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-                    log_info("catch mouse.");
-                    SDL_SetWindowGrab(engine.window, SDL_TRUE);
-                }
-                // If the mouse is not captured, don't handle any other input
-                break;
-            }
-            // Release mouse
-            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_TAB) {
-                log_info("release mouse.");
-                SDL_SetWindowGrab(engine.window, SDL_FALSE);
-                break;
-            }
-            // Update mouse position
-            if (event.type == SDL_MOUSEMOTION) {
-                engine.mouse_position = xy(event.motion.x, event.motion.y);
-                break;
-            }
-            // Handle mouse button
-            if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)  {
-                if (event.button.button - 1 < INPUT_MOUSE_BUTTON_COUNT) {
-                    engine.mouse_button_state[event.button.button - 1] = event.type == SDL_MOUSEBUTTONDOWN;
-                }
-                break;
-            }
-            // Text input
-            if (event.type == SDL_TEXTINPUT) {
-                engine.input_text += std::string(event.text.text);
-                if (engine.input_text.length() > engine.input_length_limit) {
-                    engine.input_text = engine.input_text.substr(0, engine.input_length_limit);
-                }
-                break;
-            }
-            if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {
-                if (engine.input_text.length() > 0) {
-                    engine.input_text.pop_back();
-                }
-                break;
-            }
-            if (mode == MODE_MATCH && (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)) {
-                auto keymap_it = keymap.find(event.key.keysym.sym);
-                if (keymap_it != keymap.end()) {
-                    engine.key_state[keymap_it->second] = event.type == SDL_KEYDOWN;
+                // Toggle fullscreen
+                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
+                    engine.is_fullscreen = !engine.is_fullscreen;
+                    if (engine.is_fullscreen) {
+                        SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+                        SDL_SetWindowGrab(engine.window, SDL_TRUE);
+                    } else {
+                        SDL_SetWindowFullscreen(engine.window, 0);
+                    }
                     break;
                 }
+                // Capture mouse
+                if (SDL_GetWindowGrab(engine.window) == SDL_FALSE) {
+                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+                        log_info("catch mouse.");
+                        SDL_SetWindowGrab(engine.window, SDL_TRUE);
+                    }
+                    // If the mouse is not captured, don't handle any other input
+                    break;
+                }
+                // Release mouse
+                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_TAB) {
+                    log_info("release mouse.");
+                    SDL_SetWindowGrab(engine.window, SDL_FALSE);
+                    break;
+                }
+                // Update mouse position
+                if (event.type == SDL_MOUSEMOTION) {
+                    engine.mouse_position = xy(event.motion.x, event.motion.y);
+                    break;
+                }
+                // Handle mouse button
+                if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)  {
+                    if (event.button.button - 1 < INPUT_MOUSE_BUTTON_COUNT) {
+                        engine.mouse_button_state[event.button.button - 1] = event.type == SDL_MOUSEBUTTONDOWN;
+                    }
+                    break;
+                }
+                // Text input
+                if (event.type == SDL_TEXTINPUT) {
+                    engine.input_text += std::string(event.text.text);
+                    if (engine.input_text.length() > engine.input_length_limit) {
+                        engine.input_text = engine.input_text.substr(0, engine.input_length_limit);
+                    }
+                    break;
+                }
+                if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {
+                    if (engine.input_text.length() > 0) {
+                        engine.input_text.pop_back();
+                    }
+                    break;
+                }
+                if (mode == MODE_MATCH && (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)) {
+                    auto keymap_it = keymap.find(event.key.keysym.sym);
+                    if (keymap_it != keymap.end()) {
+                        engine.key_state[keymap_it->second] = event.type == SDL_KEYDOWN;
+                        break;
+                    }
 
-                auto hotkey_it = hotkeys.find(event.key.keysym.sym);
-                if (hotkey_it == hotkeys.end()) {
-                    continue;
+                    auto hotkey_it = hotkeys.find(event.key.keysym.sym);
+                    if (hotkey_it == hotkeys.end()) {
+                        continue;
+                    }
+                    for (UiButton button : hotkey_it->second) {
+                        engine.hotkey_state[button] = event.type == SDL_KEYDOWN;
+                    }
+                    break;
                 }
-                for (UiButton button : hotkey_it->second) {
-                    engine.hotkey_state[button] = event.type == SDL_KEYDOWN;
-                }
-                break;
-            }
-        } // End while SDL_PollEvent()
+            } // End while SDL_PollEvent()
+        } // End if update_accumulator >= UPDATE_TIME
 
         // UPDATE
         while (update_accumulator >= UPDATE_TIME) {
