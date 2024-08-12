@@ -154,8 +154,11 @@ struct xy {
     xy operator/(int scaler) const {
         return xy(x / scaler, y / scaler);
     }
-    static uint32_t manhattan_distance(const xy& a, const xy& b) {
+    static int manhattan_distance(const xy& a, const xy& b) {
         return abs(a.x - b.x) + abs(a.y - b.y);
+    }
+    static int euclidean_distance_squared(const xy& a, const xy& b) {
+        return (abs(a.x - b.x) * abs(a.x - b.x)) + (abs(a.y - b.y) * abs(a.y - b.y));
     }
 };
 

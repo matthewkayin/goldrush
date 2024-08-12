@@ -147,12 +147,21 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         if (unit.target.type == UNIT_TARGET_ATTACK) {
                             unit_target_t attack_target = unit_target_nearest_insight_enemy(state, unit);
                             if (attack_target.type != UNIT_TARGET_NONE) {
+                                unit.target = attack_target;
+                                unit.path.clear();
+                                unit.mode = unit_has_reached_target(state, unit) ? UNIT_MODE_MOVE_FINISHED : UNIT_MODE_IDLE;
                                 // breaks out of while movement_left > 0
-                                unit_set_target(state, unit, attack_target);
                                 break;
                             }
                         }
+                        if (unit_has_reached_target(state, unit)) {
+                            unit.mode = UNIT_MODE_MOVE_FINISHED;
+                            unit.path.clear();
+                            // breaks out of while movement_left > 0
+                            break;
+                        }
                         if (unit.path.empty()) {
+                            unit.mode = UNIT_MODE_IDLE;
                             // breaks out of while movement_left > 0
                             break;
                         }
@@ -168,18 +177,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     break;
                 }
 
-                // On cell movement finished
-                if (unit.position == cell_center(unit.cell)) {
-                    if (unit_has_reached_target(state, unit)) {
-                        unit.mode = UNIT_MODE_MOVE_FINISHED;
-                        break;
-                    } else if (unit.path.empty()) {
-                        unit.mode = UNIT_MODE_IDLE;
-                        break;
-                    }
-                } 
-
-                unit_update_finished = true;
+                unit_update_finished = unit.mode != UNIT_MODE_MOVE_FINISHED;
                 break;
             } // End case UNIT_MODE_MOVE
             case UNIT_MODE_MOVE_FINISHED: {
@@ -525,18 +523,20 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
         case UNIT_TARGET_UNIT: {
             uint32_t target_unit_index = state.units.get_index_of(unit.target.id);
             GOLD_ASSERT(target_unit_index != INDEX_INVALID);
-            int range = state.units[target_unit_index].player_id == unit.player_id ? 1 : UNIT_DATA.at(unit.type).range;
-            return xy::manhattan_distance(unit.cell, state.units[target_unit_index].cell) <= range; 
+            return state.units[target_unit_index].player_id == unit.player_id
+                        ? xy::manhattan_distance(unit.cell, state.units[target_unit_index].cell) == 1
+                        : xy::euclidean_distance_squared(unit.cell, state.units[target_unit_index].cell) <= (UNIT_DATA.at(unit.type).range * UNIT_DATA.at(unit.type).range);
         }
         case UNIT_TARGET_BUILDING: {
             uint32_t target_building_index = state.buildings.get_index_of(unit.target.id);
             GOLD_ASSERT(target_building_index != INDEX_INVALID);
-            return is_unit_adjacent_to_building(unit, state.buildings[target_building_index]);
+            const building_t& target_building = state.buildings[target_building_index];
+            return unit.player_id == target_building.player_id ? unit_is_adjacent_to_building(unit, target_building) : unit_is_in_range_of_building(unit, target_building);
         }
         case UNIT_TARGET_CAMP: {
             uint32_t camp_index = state.buildings.get_index_of(unit.target.id);
             GOLD_ASSERT(camp_index != INDEX_INVALID);
-            return is_unit_adjacent_to_building(unit, state.buildings[camp_index]);
+            return unit_is_adjacent_to_building(unit, state.buildings[camp_index]);
         }
     }
 }
@@ -732,4 +732,26 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const
     return (unit_target_t) {
         .type = UNIT_TARGET_NONE
     };
+}
+
+bool unit_is_adjacent_to_building(const unit_t& unit, const building_t& building) {
+    if (unit.cell.x >= building.cell.x && unit.cell.x < building.cell.x + building_cell_size(building.type).x) {
+        return unit.cell.y == building.cell.y - 1 || unit.cell.y == building.cell.y + building_cell_size(building.type).y;
+    } else if (unit.cell.y >= building.cell.y && unit.cell.y < building.cell.y + building_cell_size(building.type).y) {
+        return unit.cell.x == building.cell.x - 1 || unit.cell.x == building.cell.x + building_cell_size(building.type).x;
+    } else {
+        return false;
+    }
+}
+
+bool unit_is_in_range_of_building(const unit_t& unit, const building_t& building) {
+    for (int x = building.cell.x; x < building.cell.x + building_cell_size(building.type).x; x++) {
+        for (int y = building.cell.y; y < building.cell.y + building_cell_size(building.type).y; y++) {
+            if (xy::euclidean_distance_squared(unit.cell, xy(x, y)) <= (UNIT_DATA.at(unit.type).range * UNIT_DATA.at(unit.type).range)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

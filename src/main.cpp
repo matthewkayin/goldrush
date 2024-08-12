@@ -1033,7 +1033,7 @@ void render_match(const match_state_t& state) {
             switch (state.ui_move_cell.type) {
                 case CELL_UNIT: {
                     uint32_t unit_index = state.units.get_index_of(id);
-                    if (unit_index != INDEX_INVALID) {
+                    if (unit_index != INDEX_INVALID && is_cell_revealed(state, state.units[unit_index].cell, xy(1, 1))) {
                         Sprite sprite = state.units[unit_index].player_id == network_get_player_id() ? SPRITE_SELECT_RING : SPRITE_SELECT_RING_ATTACK;
                         render_sprite(sprite, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }

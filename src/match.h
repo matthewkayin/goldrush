@@ -331,7 +331,6 @@ xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
 xy get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect);
 xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building);
-bool is_unit_adjacent_to_building(const unit_t& unit, const building_t& building);
 
 // UI
 void ui_show_status(match_state_t& state, const char* message);
@@ -378,6 +377,8 @@ entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit)
 unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const unit_t& unit);
+bool unit_is_adjacent_to_building(const unit_t& unit, const building_t& building);
+bool unit_is_in_range_of_building(const unit_t& unit, const building_t& building);
 
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);

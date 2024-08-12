@@ -1057,13 +1057,3 @@ xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_ce
 
     return nearest_cell_dist != -1 ? nearest_cell : start_cell;
 }
-
-bool is_unit_adjacent_to_building(const unit_t& unit, const building_t& building) {
-    if (unit.cell.x >= building.cell.x && unit.cell.x < building.cell.x + building_cell_size(building.type).x) {
-        return unit.cell.y == building.cell.y - 1 || unit.cell.y == building.cell.y + building_cell_size(building.type).y;
-    } else if (unit.cell.y >= building.cell.y && unit.cell.y < building.cell.y + building_cell_size(building.type).y) {
-        return unit.cell.x == building.cell.x - 1 || unit.cell.x == building.cell.x + building_cell_size(building.type).x;
-    } else {
-        return false;
-    }
-}
