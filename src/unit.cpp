@@ -20,7 +20,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
     { UNIT_COWBOY, (unit_data_t) {
         .name = "Cowboy",
         .sprite = SPRITE_UNIT_COWBOY,
-        .max_health = 40,
+        .max_health = 60,
         .damage = 8,
         .armor = 1,
         .range = 5,

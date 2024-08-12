@@ -392,6 +392,7 @@ Sprite building_get_select_ring(BuildingType type, bool is_enemy);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);
 UiButton building_queue_item_icon(const building_queue_item_t& item);
 uint32_t building_queue_item_cost(const building_queue_item_t& item);
+uint32_t building_queue_population_cost(const building_queue_item_t& item);
 
 extern const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS;
 extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;

@@ -152,6 +152,8 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 ui_show_status(state, UI_STATUS_BUILDING_QUEUE_FULL);
             } else if (state.player_gold[network_get_player_id()] < building_queue_item_cost(item)) {
                 ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
+            } else if (match_get_player_population(state, network_get_player_id()) + building_queue_population_cost(item) > match_get_player_max_population(state, network_get_player_id())) {
+                ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
             } else {
                 input_t input = (input_t) {
                     .type = INPUT_BUILDING_ENQUEUE,

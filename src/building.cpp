@@ -1,5 +1,6 @@
 #include "match.h"
 
+#include "network.h"
 #include <algorithm>
 
 const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
@@ -81,7 +82,7 @@ void building_update(match_state_t& state, building_t& building) {
                 case BUILDING_QUEUE_ITEM_UNIT: {
                     uint32_t required_population = match_get_player_population(state, building.player_id) + UNIT_DATA.at(item.unit_type).population_cost;
                     if (match_get_player_max_population(state, building.player_id) < required_population) {
-                        if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
+                        if (building.queue_timer != BUILDING_QUEUE_BLOCKED && building.player_id == network_get_player_id()) {
                             ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
                         }
                         building.queue_timer = BUILDING_QUEUE_BLOCKED;
@@ -180,6 +181,14 @@ uint32_t building_queue_item_cost(const building_queue_item_t& item) {
     switch (item.type) {
         case BUILDING_QUEUE_ITEM_UNIT: {
             return UNIT_DATA.at(item.unit_type).cost;
+        }
+    }
+}
+
+uint32_t building_queue_population_cost(const building_queue_item_t& item) {
+    switch (item.type) {
+        case BUILDING_QUEUE_ITEM_UNIT: {
+            return UNIT_DATA.at(item.unit_type).population_cost;
         }
     }
 }
