@@ -224,6 +224,8 @@ struct building_data_t {
 enum InputType {
     INPUT_NONE,
     INPUT_MOVE,
+    INPUT_MOVE_UNIT,
+    INPUT_MOVE_BUILDING,
     INPUT_BLIND_MOVE,
     INPUT_ATTACK_MOVE,
     INPUT_STOP,

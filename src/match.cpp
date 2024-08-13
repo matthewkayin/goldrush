@@ -449,15 +449,22 @@ void match_update(match_state_t& state) {
         // Create the move event
         input_t input;
         input.move.target_cell = move_target / TILE_SIZE;
-        input.move.target_entity_id = map_get_fog(state, input.move.target_cell).type == FOG_REVEALED && 
-                                        map_get_cell(state, input.move.target_cell).type == CELL_UNIT 
-                                        ? map_get_cell(state, input.move.target_cell).value : ID_NULL;
+        input.move.target_entity_id = ID_NULL;
+        if (map_get_fog(state, input.move.target_cell).type == FOG_REVEALED) {
+            if (map_get_cell(state, input.move.target_cell).type == CELL_UNIT || map_get_cell(state, input.move.target_cell).type == CELL_BUILDING) {
+                input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
+            }
+        }
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
         if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state, input.move.target_cell).type == FOG_HIDDEN)) {
             input.type = INPUT_ATTACK_MOVE;
         } else if (map_get_fog(state, input.move.target_cell).type == FOG_HIDDEN) {
             input.type = INPUT_BLIND_MOVE;
+        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_UNIT) {
+            input.type = INPUT_MOVE_UNIT;
+        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_BUILDING) {
+            input.type = INPUT_MOVE_BUILDING;
         } else {
             input.type = INPUT_MOVE;
         }
@@ -642,6 +649,8 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
     switch (input.type) {
         case INPUT_ATTACK_MOVE:
         case INPUT_BLIND_MOVE:
+        case INPUT_MOVE_UNIT:
+        case INPUT_MOVE_BUILDING:
         case INPUT_MOVE: {
             memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
             out_buffer_length += sizeof(xy);
@@ -697,6 +706,8 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
     switch (input.type) {
         case INPUT_ATTACK_MOVE:
         case INPUT_BLIND_MOVE:
+        case INPUT_MOVE_UNIT:
+        case INPUT_MOVE_BUILDING:
         case INPUT_MOVE: {
             memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
@@ -749,11 +760,13 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
     switch (input.type) {
         case INPUT_BLIND_MOVE:
         case INPUT_ATTACK_MOVE:
+        case INPUT_MOVE_UNIT:
+        case INPUT_MOVE_BUILDING:
         case INPUT_MOVE: {
             // If we tried to move towards a unit, try and find the unit
-            uint32_t target_unit_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
+            uint32_t target_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
 
-            bool should_move_as_group = target_unit_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell(state, input.move.target_cell).type == CELL_EMPTY;
+            bool should_move_as_group = target_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell(state, input.move.target_cell).type == CELL_EMPTY;
             xy group_center;
 
             if (should_move_as_group) {
@@ -797,8 +810,8 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     if (map_is_cell_in_bounds(state, group_move_target) && xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3) {
                         unit_target = group_move_target;
                     }
-                } else if (target_unit_index != INDEX_INVALID) {
-                    unit_target = state.units[target_unit_index].cell;
+                } else if (target_index != INDEX_INVALID) {
+                    unit_target = input.move.target_cell;
                 }
 
                 // Set the units target
@@ -812,65 +825,41 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         .type = UNIT_TARGET_ATTACK,
                         .cell = unit_target
                     });
-                } else if (target_unit_index != INDEX_INVALID) {
+                } else if (input.type == INPUT_MOVE_UNIT && target_index != INDEX_INVALID) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_UNIT,
                         .id = input.move.target_entity_id
                     });
+                } else if (input.type == INPUT_MOVE_BUILDING && target_index != INDEX_INVALID) {
+                    if (state.buildings[target_index].type == BUILDING_CAMP && state.buildings[target_index].is_finished && unit.gold_held > 0) {
+                        unit_set_target(state, unit, (unit_target_t) {
+                            .type = UNIT_TARGET_CAMP,
+                            .id = input.move.target_entity_id
+                        });
+                    } else if (state.buildings[target_index].player_id != unit.player_id) {
+                        unit_set_target(state, unit, (unit_target_t) {
+                            .type = UNIT_TARGET_BUILDING,
+                            .id = input.move.target_entity_id
+                        });
+                    } else {
+                        unit_set_target(state, unit, (unit_target_t) {
+                            .type = UNIT_TARGET_CELL,
+                            .cell = get_nearest_free_cell_around_building(state, unit.cell, state.buildings[target_index])
+                        });
+                    }
+                } else if (map_get_cell(state, unit_target).type >= CELL_GOLD1 && map_get_cell(state, unit_target).type <= CELL_GOLD3 && 
+                            unit.type == UNIT_MINER && !should_move_as_group) {
+                    unit_set_target(state, unit, (unit_target_t) {
+                        .type = UNIT_TARGET_GOLD,
+                        .cell = unit_target
+                    });
                 } else {
-                    switch (map_get_cell(state, unit_target).type) {
-                        case CELL_EMPTY:
-                        case CELL_UNIT: {
-                            unit_set_target(state, unit, (unit_target_t) {
-                                .type = UNIT_TARGET_CELL,
-                                .cell = unit_target
-                            });
-                            break;
-                        }
-                        case CELL_BUILDING: {
-                            entity_id target_entity_id = map_get_cell(state, unit_target).value;
-                            uint32_t building_index = state.buildings.get_index_of(target_entity_id);
-                            if (building_index == INDEX_INVALID) {
-                                unit_set_target(state, unit, (unit_target_t) {
-                                    .type = UNIT_TARGET_CELL,
-                                    .cell = unit_target
-                                });
-                            } else if (state.buildings[building_index].player_id != unit.player_id) {
-                                unit_set_target(state, unit, (unit_target_t) {
-                                    .type = UNIT_TARGET_BUILDING,
-                                    .id = map_get_cell(state, unit_target).value
-                                });
-                            } else if (state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].is_finished && unit.gold_held > 0) {
-                                unit_set_target(state, unit, (unit_target_t) {
-                                    .type = UNIT_TARGET_CAMP,
-                                    .id = map_get_cell(state, unit_target).value
-                                });
-                            } else {
-                                unit_set_target(state, unit, (unit_target_t) {
-                                    .type = UNIT_TARGET_CELL,
-                                    .cell = get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index])
-                                });
-                            }
-                            break;
-                        }
-                        case CELL_GOLD1:
-                        case CELL_GOLD2:
-                        case CELL_GOLD3: {
-                            if (unit.type == UNIT_MINER && !should_move_as_group) {
-                                unit_set_target(state, unit, (unit_target_t) {
-                                    .type = UNIT_TARGET_GOLD,
-                                    .cell = unit_target
-                                });
-                            } else {
-                                unit_set_target(state, unit, (unit_target_t) {
-                                    .type = UNIT_TARGET_CELL,
-                                    .cell = unit_target
-                                });
-                            }
-                            break;
-                        }
-                    } // End switch unit target cell type
-                } // End else (if not targeting unit)
+                    unit_set_target(state, unit, (unit_target_t) {
+                        .type = UNIT_TARGET_CELL,
+                        .cell = unit_target
+                    });
+                }
+                // End determine unit target
             }
             break;
         }
