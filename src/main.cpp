@@ -958,6 +958,19 @@ void render_match(const match_state_t& state) {
         }
     }
 
+    // Render destroyed buildings
+    for (const building_t& building : state.buildings) {
+        if (building.mode == BUILDING_MODE_DESTROYED) {
+            Sprite destroyed_sprite;
+            if (building_cell_size(building.type) == xy(3, 3)) {
+                destroyed_sprite = SPRITE_BUILDING_DESTROYED3X3;
+            } else {
+                destroyed_sprite = SPRITE_BUILDING_DESTROYED2X2;
+            }
+            render_sprite(destroyed_sprite, xy(0, 0), (building.cell * TILE_SIZE) - state.camera_offset);
+        }
+    }
+
     // Select rings and healthbars
     static const int HEALTHBAR_HEIGHT = 4;
     static const int HEALTHBAR_PADDING = 2;
@@ -1059,9 +1072,13 @@ void render_match(const match_state_t& state) {
             }
         }
     }
-    
+
     // Buildings
     for (const building_t& building : state.buildings) {
+        if (building.mode == BUILDING_MODE_DESTROYED) {
+            continue;
+        }
+
         int sprite = SPRITE_BUILDING_HOUSE + (building.type - BUILDING_HOUSE);
         GOLD_ASSERT(sprite < SPRITE_COUNT);
 
@@ -1072,7 +1089,7 @@ void render_match(const match_state_t& state) {
             continue;
         }
 
-        int hframe = building.is_finished ? 3 : ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
+        int hframe = building.mode == BUILDING_MODE_FINISHED ? 3 : ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
         ysorted.push_back((render_sprite_params_t) {
             .sprite = (Sprite)sprite,
             .position = building_render_pos,
@@ -1102,6 +1119,9 @@ void render_match(const match_state_t& state) {
             .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL,
             .recolor_name = (RecolorName)unit.player_id
         };
+        if (unit.mode != UNIT_MODE_BUILD && unit_sprite_should_flip_h(unit)) {
+            unit_params.options |= RENDER_SPRITE_FLIP_H;
+        }
         if (unit.mode == UNIT_MODE_BUILD) {
             const building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
             const building_data_t& data = BUILDING_DATA.at(building.type);
@@ -1117,7 +1137,11 @@ void render_match(const match_state_t& state) {
                 unit_params.options |= RENDER_SPRITE_FLIP_H;
             }
         }
-        ysorted.push_back(unit_params);
+        if (unit.mode == UNIT_MODE_DEATH_FADE) {
+            render_sprite(unit_params.sprite, unit_params.frame, unit_params.position, unit_params.options, unit_params.recolor_name);
+        } else {
+            ysorted.push_back(unit_params);
+        }
     }
 
     // End Ysort
@@ -1493,7 +1517,7 @@ void render_match(const match_state_t& state) {
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
         const unit_t& unit = state.units[unit_index];
         char unit_debug_text[128];
-        static const char* MODE_STR[UNIT_MODE_ATTACK_COOLDOWN + 1] = {
+        static const char* MODE_STR[UNIT_MODE_DEATH_FADE + 1] = {
             "idle",
             "move",
             "blocked",
@@ -1501,7 +1525,9 @@ void render_match(const match_state_t& state) {
             "build",
             "mine",
             "windup",
-            "cooldown"
+            "cooldown",
+            "death",
+            "fade"
         };
         static const char* TARGET_STR[UNIT_TARGET_GOLD + 1] = {
             "none",

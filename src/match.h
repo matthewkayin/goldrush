@@ -25,10 +25,11 @@ const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 const uint32_t UNIT_PATH_PAUSE_DURATION = 30;
 const uint32_t UNIT_BUILD_TICK_DURATION = 8;
 const uint32_t UNIT_MINE_TICK_DURATION = 60;
-const uint32_t UNIT_MAX_GOLD_HELD = 5;
+const uint32_t UNIT_MAX_GOLD_HELD = 10;
 
 const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_MAX = 5;
+const uint32_t BUILDING_FADE_DURATION = 300;
 
 enum CellType: uint16_t {
     CELL_EMPTY,
@@ -129,7 +130,9 @@ enum UnitMode {
     UNIT_MODE_BUILD,
     UNIT_MODE_MINE,
     UNIT_MODE_ATTACK_WINDUP,
-    UNIT_MODE_ATTACK_COOLDOWN
+    UNIT_MODE_ATTACK_COOLDOWN,
+    UNIT_MODE_DEATH,
+    UNIT_MODE_DEATH_FADE
 };
 
 struct unit_target_build_t {
@@ -195,14 +198,19 @@ struct building_queue_item_t {
     };
 };
 
+enum BuildingMode {
+    BUILDING_MODE_IN_PROGRESS,
+    BUILDING_MODE_FINISHED,
+    BUILDING_MODE_DESTROYED
+};
+
 struct building_t {
     uint8_t player_id;
     BuildingType type;
     int health;
 
     xy cell;
-
-    bool is_finished;
+    BuildingMode mode;
 
     std::vector<building_queue_item_t> queue;
     uint32_t queue_timer;
@@ -374,6 +382,7 @@ int unit_get_damage(const match_state_t& state, const unit_t& unit);
 int unit_get_armor(const match_state_t& state, const unit_t& unit);
 AnimationName unit_get_expected_animation(const unit_t& unit);
 int unit_get_animation_vframe(const unit_t& unit);
+bool unit_sprite_should_flip_h(const unit_t& unit);
 void unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building);
 entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);
@@ -384,7 +393,7 @@ bool unit_is_in_range_of_building(const unit_t& unit, const building_t& building
 
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
-void building_destroy(match_state_t& state, entity_id building_id);
+void building_destroy(match_state_t& state, uint32_t building_index);
 void building_update(match_state_t& state, building_t& building);
 void building_enqueue(building_t& building, building_queue_item_t item);
 void building_dequeue(building_t& building);

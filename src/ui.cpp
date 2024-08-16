@@ -100,7 +100,7 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 state.ui_mode = UI_MODE_NONE;
                 ui_set_selection(state, state.selection);
             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
-                GOLD_ASSERT(!state.buildings[state.buildings.get_index_of(state.selection.ids[0])].is_finished);
+                GOLD_ASSERT(state.buildings[state.buildings.get_index_of(state.selection.ids[0])].mode == BUILDING_MODE_IN_PROGRESS);
                 input_t input;
                 input.type = INPUT_BUILD_CANCEL;
                 input.build_cancel.building_id = state.selection.ids[0];
@@ -274,12 +274,7 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
     if (state.selection.type == SELECTION_TYPE_UNITS) {
         for (uint32_t id_index = 0; id_index < state.selection.ids.size(); id_index++) {
             uint32_t unit_index = state.units.get_index_of(state.selection.ids[id_index]);
-            if (unit_index == INDEX_INVALID) {
-                state.selection.ids.erase(state.selection.ids.begin() + id_index);
-                id_index--;
-                continue;
-            }
-            if (state.units[unit_index].mode == UNIT_MODE_BUILD) {
+            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0 || state.units[unit_index].mode == UNIT_MODE_BUILD) {
                 state.selection.ids.erase(state.selection.ids.begin() + id_index);
                 id_index--;
                 continue;
@@ -287,8 +282,8 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
         }
     } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         for (uint32_t id_index = 0; id_index < state.selection.ids.size(); id_index++) {
-            uint32_t building_index = state.units.get_index_of(state.selection.ids[id_index]);
-            if (building_index == INDEX_INVALID) {
+            uint32_t building_index = state.buildings.get_index_of(state.selection.ids[id_index]);
+            if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
                 state.selection.ids.erase(state.selection.ids.begin() + id_index);
                 id_index--;
                 continue;
@@ -310,7 +305,7 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
         }
     } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         building_t& building = state.buildings[state.buildings.get_index_of(state.selection.ids[0])];
-        if (!building.is_finished) {
+        if (building.mode == BUILDING_MODE_IN_PROGRESS) {
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
         } else if (building.type == BUILDING_SALOON) {
             state.ui_buttonset = UI_BUTTONSET_SALOON;

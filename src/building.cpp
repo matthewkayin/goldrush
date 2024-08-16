@@ -46,7 +46,7 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
 
     building.cell = cell;
 
-    building.is_finished = false;
+    building.mode = BUILDING_MODE_IN_PROGRESS;
     building.queue_timer = 0;
 
     entity_id building_id = state.buildings.push_back(building);
@@ -54,17 +54,26 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     return building_id;
 }
 
-void building_destroy(match_state_t& state, entity_id building_id) {
-    uint32_t building_index = state.buildings.get_index_of(building_id);
-    GOLD_ASSERT(building_index != INDEX_INVALID);
-    building_t& building = state.buildings[building_index];
-    const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
-
-    map_set_cell_rect(state, rect_t(building.cell, xy(building_data.cell_width, building_data.cell_height)), CELL_EMPTY);
+void building_destroy(match_state_t& state, uint32_t building_index) {
     state.buildings.remove_at(building_index);
 }
 
 void building_update(match_state_t& state, building_t& building) {
+    if (building.health == 0 && building.mode != BUILDING_MODE_DESTROYED) {
+        const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
+        map_set_cell_rect(state, rect_t(building.cell, xy(building_data.cell_width, building_data.cell_height)), CELL_EMPTY);
+        building.mode = BUILDING_MODE_DESTROYED;
+        building.queue.clear();
+        building.queue_timer = BUILDING_FADE_DURATION;
+    }
+
+    if (building.health == 0) {
+        if (building.queue_timer != 0) {
+            building.queue_timer--;
+        }
+        return;
+    }
+
     if (building.queue_timer != 0) {
         if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
 #ifdef GOLD_DEBUG_FAST_TRAIN

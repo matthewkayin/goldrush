@@ -240,6 +240,9 @@ void map_update_fog(match_state_t& state) {
                 xy cell_value_origin = xy(i % state.map_width, i / state.map_width);
                 for (uint32_t x = cell_value_origin.x; x < cell_value_origin.x + cell_value_size.x; x++) {
                     for (uint32_t y = cell_value_origin.y; y < cell_value_origin.y + cell_value_size.y; y++) {
+                        if (map_get_fog(state, xy(x, y)).type == FOG_HIDDEN) {
+                            continue;
+                        }
                         state.map_fog[x + (y * state.map_width)] = (fog_t) {
                             .type = FOG_EXPLORED,
                             .value = (uint16_t)cell_value_player_id

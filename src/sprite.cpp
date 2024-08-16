@@ -123,14 +123,14 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_UNIT_MINER, (sprite_params_t) {
         .path = "sprite/unit_miner.png",
-        .hframes = 8,
-        .vframes = 8,
+        .hframes = 15,
+        .vframes = 6,
         .recolor = true
     }},
     { SPRITE_UNIT_COWBOY, (sprite_params_t) {
         .path = "sprite/unit_cowboy.png",
-        .hframes = 8,
-        .vframes = 4,
+        .hframes = 15,
+        .vframes = 3,
         .recolor = true
     }},
     { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
@@ -150,6 +150,18 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 4,
         .vframes = 1,
         .recolor = true
+    }},
+    { SPRITE_BUILDING_DESTROYED2X2, (sprite_params_t) {
+        .path = "sprite/building_destroyed2x2.png",
+        .hframes = 1,
+        .vframes = 1,
+        .recolor = false
+    }},
+    { SPRITE_BUILDING_DESTROYED3X3, (sprite_params_t) {
+        .path = "sprite/building_destroyed3x3.png",
+        .hframes = 1,
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_FOG_OF_WAR, (sprite_params_t) {
         .path = "sprite/fog_of_war.png",
@@ -195,6 +207,18 @@ const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
         .hframe_start = 0, .hframe_end = 1,
         .frame_duration = 8,
         .loops = ANIMATION_LOOPS_INDEFINITELY
+    }},
+    { ANIMATION_UNIT_DEATH, (animation_data_t) {
+        .vframe = -1,
+        .hframe_start = 8, .hframe_end = 11,
+        .frame_duration = 4,
+        .loops = 1
+    }},
+    { ANIMATION_UNIT_DEATH_FADE, (animation_data_t) {
+        .vframe = -1,
+        .hframe_start = 12, .hframe_end = 14,
+        .frame_duration = 180,
+        .loops = 1
     }}
 };
 

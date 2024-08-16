@@ -362,8 +362,8 @@ void match_update(match_state_t& state) {
                             }
                         }
                     }
-                // Switch to control group
                 } else {
+                    // Snap to control group location
                     if (state.control_group_double_click_key == key && state.control_group_double_click_timer > 0) {
                         std::vector<xy> selection_cells;
                         for (entity_id id : state.selection.ids) {
@@ -384,6 +384,7 @@ void match_update(match_state_t& state) {
                         xy selection_center = selection_rect.position + (selection_rect.size / 2);
                         state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(selection_center), state.map_width, state.map_height);
                         state.control_group_double_click_timer = 0;
+                    // Switch to control group
                     } else if (state.control_groups[key].type != SELECTION_TYPE_NONE) {
                         ui_set_selection(state, state.control_groups[key]);
                         state.control_group_double_click_timer = CONTROL_GROUP_DOUBLE_CLICK_DURATION;
@@ -524,10 +525,6 @@ void match_update(match_state_t& state) {
 
     // Update units
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
-        if (state.units[unit_index].health == 0) {
-            continue;
-        }
-
         unit_update(state, unit_index);
 
         AnimationName expected_animation = unit_get_expected_animation(state.units[unit_index]);
@@ -541,8 +538,7 @@ void match_update(match_state_t& state) {
     // Remove any dead units
     uint32_t unit_index = 0;
     while (unit_index < state.units.size()) {
-        if (state.units[unit_index].health == 0) {
-            // TODO play death animation
+        if (state.units[unit_index].mode == UNIT_MODE_DEATH_FADE && !animation_is_playing(state.units[unit_index].animation)) {
             unit_destroy(state, unit_index);
         } else {
             unit_index++;
@@ -551,17 +547,13 @@ void match_update(match_state_t& state) {
 
     // Update buildings
     for (building_t& building : state.buildings) {
-        if (building.health == 0) {
-            continue;
-        }
-
         building_update(state, building);
     }
 
     // Remove any dead buildings
     uint32_t building_index = 0;
     while (building_index < state.buildings.size()) {
-        if (state.buildings[building_index].health == 0) {
+        if (state.buildings[building_index].mode == BUILDING_MODE_DESTROYED && state.buildings[building_index].queue_timer == 0) {
             // TODO play death animation
             building_destroy(state, building_index);
         } else {
@@ -569,23 +561,12 @@ void match_update(match_state_t& state) {
         }
     }
 
-    // Remove any dead buildings
-    uint32_t remove_building_index = 0;
-    while (remove_building_index < state.buildings.size()) {
-        if (state.buildings[remove_building_index].health == 0) {
-            // TODO: play death animation
-            building_destroy(state, state.buildings.get_id_of(remove_building_index));
-        } else {
-            remove_building_index++;
-        }
-    }
-
     // Check the player's selection for dead units / buildings
-    if (state.selection.type == SELECTION_TYPE_UNITS) {
+    if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_ENEMY_UNIT) {
         uint32_t index = 0;
         while (index < state.selection.ids.size()) {
             uint32_t unit_index = state.units.get_index_of(state.selection.ids[index]);
-            if (unit_index == INDEX_INVALID) {
+            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
                 state.selection.ids.erase(state.selection.ids.begin() + index);
             } else {
                 index++;
@@ -601,9 +582,9 @@ void match_update(match_state_t& state) {
                 state.ui_mode = UI_MODE_NONE;
             }
         }
-    } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+    } else if (state.selection.type == SELECTION_TYPE_BUILDINGS || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
         uint32_t index = state.buildings.get_index_of(state.selection.ids[0]);
-        if (index == INDEX_INVALID) {
+        if (index == INDEX_INVALID || state.buildings[index].health == 0) {
             selection_t selection_empty = (selection_t) {
                 .type = SELECTION_TYPE_NONE,
                 .ids = std::vector<entity_id>()
@@ -632,7 +613,7 @@ uint32_t match_get_player_population(const match_state_t& state, uint8_t player_
 uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id) {
     uint32_t max_population = 5;
     for (const building_t& building : state.buildings) {
-        if (building.player_id == player_id && building.type == BUILDING_HOUSE && building.is_finished) {
+        if (building.player_id == player_id && building.type == BUILDING_HOUSE && building.mode == BUILDING_MODE_FINISHED) {
             max_population += 10;
         }
     }
@@ -765,6 +746,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         case INPUT_MOVE: {
             // If we tried to move towards a unit, try and find the unit
             uint32_t target_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
+            if (target_index != INDEX_INVALID && state.units[target_index].health == 0) {
+                target_index = INDEX_INVALID;
+            }
 
             bool should_move_as_group = target_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell(state, input.move.target_cell).type == CELL_EMPTY;
             xy group_center;
@@ -775,7 +759,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 unit_cells.reserve(input.move.unit_count);
                 for (uint32_t i = 0; i < input.move.unit_count; i++) {
                     uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
-                    if (unit_index == INDEX_INVALID) {
+                    if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
                         continue;
                     }
 
@@ -798,7 +782,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             // Give each unit the move command
             for (uint32_t i = 0; i < input.move.unit_count; i++) {
                 uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
-                if (unit_index == INDEX_INVALID) {
+                if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
                     continue;
                 }
                 unit_t& unit = state.units[unit_index];
@@ -831,7 +815,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         .id = input.move.target_entity_id
                     });
                 } else if (input.type == INPUT_MOVE_BUILDING && target_index != INDEX_INVALID) {
-                    if (state.buildings[target_index].type == BUILDING_CAMP && state.buildings[target_index].is_finished && unit.gold_held > 0) {
+                    if (state.buildings[target_index].type == BUILDING_CAMP && state.buildings[target_index].mode == BUILDING_MODE_FINISHED && unit.gold_held > 0) {
                         unit_set_target(state, unit, (unit_target_t) {
                             .type = UNIT_TARGET_CAMP,
                             .id = input.move.target_entity_id
@@ -866,7 +850,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         case INPUT_STOP: {
             for (uint32_t i = 0; i < input.stop.unit_count; i++) {
                 uint32_t unit_index = state.units.get_index_of(input.stop.unit_ids[i]);
-                if (unit_index == INDEX_INVALID) {
+                if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
                     continue;
                 }
                 unit_t& unit = state.units[unit_index];
@@ -880,7 +864,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         }
         case INPUT_BUILD: {
             uint32_t unit_index = state.units.get_index_of(input.build.unit_id);
-            if (unit_index == INDEX_INVALID) {
+            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
                 return;
             }
             unit_t& unit = state.units[unit_index];
@@ -900,7 +884,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         }
         case INPUT_BUILD_CANCEL: {
             uint32_t building_index = state.buildings.get_index_of(input.build_cancel.building_id);
-            if (building_index == INDEX_INVALID) {
+            if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
                 return;
             }
             building_t& building = state.buildings[building_index];
@@ -914,12 +898,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
             }
             // Destroy the building
-            building_destroy(state, input.build_cancel.building_id);
+            building.health = 0;
             break;
         }
         case INPUT_BUILDING_ENQUEUE: {
             uint32_t building_index = state.buildings.get_index_of(input.building_enqueue.building_id);
-            if (building_index == INDEX_INVALID) {
+            if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
                 return;
             }
             if (state.player_gold[player_id] < building_queue_item_cost(input.building_enqueue.item)) {
@@ -932,7 +916,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         }
         case INPUT_BUILDING_DEQUEUE: {
             uint32_t building_index = state.buildings.get_index_of(input.building_dequeue.building_id);
-            if (building_index == INDEX_INVALID) {
+            if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
                 return;
             }
             if (state.buildings[building_index].queue.empty()) {

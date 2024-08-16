@@ -25,7 +25,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .armor = 1,
         .range = 5,
         .attack_cooldown = 30,
-        .speed = fixed::from_int(1),
+        .speed = fixed::from_int_and_raw_decimal(0, 225),
         .sight = 7,
         .cost = 100,
         .population_cost = 2,
@@ -61,7 +61,6 @@ void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const x
 }
 
 void unit_destroy(match_state_t& state, uint32_t unit_index) {
-    map_set_cell(state, state.units[unit_index].cell, CELL_EMPTY);
     state.units.remove_at(unit_index);
 }
 
@@ -69,6 +68,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
     entity_id unit_id = state.units.get_id_of(unit_index);
     unit_t& unit = state.units[unit_index];
     const unit_data_t& unit_data = UNIT_DATA.at(unit.type);
+
+    if (unit.health == 0 && !(unit.mode == UNIT_MODE_DEATH || unit.mode == UNIT_MODE_DEATH_FADE)) {
+        unit.mode = UNIT_MODE_DEATH;
+        unit.animation = animation_create(unit_get_expected_animation(unit));
+        return;
+    }
 
     bool unit_update_finished = false;
     fixed movement_left = unit_data.speed;
@@ -256,7 +261,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
                     case UNIT_TARGET_CAMP: {
                         uint32_t building_index = state.buildings.get_index_of(unit.target.id);
-                        if (building_index == INDEX_INVALID) {
+                        if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
                             unit.target = (unit_target_t) { 
                                 .type = UNIT_TARGET_NONE
                             };
@@ -304,6 +309,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                             ? state.units[target_index].player_id
                                             : state.buildings[target_index].player_id;
                         if (unit.player_id == target_player_id) {
+                            log_info("target is ally, stopping");
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
@@ -321,6 +327,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             }
                         }
 
+                        log_info("attack windup");
                         rect_t target_rect = unit.target.type == UNIT_TARGET_UNIT
                                             ? rect_t(state.units[target_index].cell, xy(1, 1))
                                             : rect_t(state.buildings[target_index].cell, building_cell_size(state.buildings[target_index].type));
@@ -345,7 +352,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 #endif
                     if (building.health == BUILDING_DATA.at(building.type).max_health) {
                         // On building finished
-                        building.is_finished = true;
+                        building.mode = BUILDING_MODE_FINISHED;
 
                         // If selecting the building
                         if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == unit.target.build.building_id) {
@@ -364,7 +371,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             case UNIT_MODE_MINE: {
                 // Handles case where this unit was mining has ran out
                 if (!map_is_cell_gold(state, unit.target.cell)) {
-                    log_info("gold ran out on me!");
                     unit.timer = 0;
                     unit.target = unit_target_nearest_gold(state, unit);
                     unit.mode = UNIT_MODE_IDLE;
@@ -458,6 +464,19 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 unit_update_finished = true;
                 break;
             }
+            case UNIT_MODE_DEATH: {
+                if (!animation_is_playing(unit.animation)) {
+                    map_set_cell(state, unit.cell, CELL_EMPTY);
+                    unit.mode = UNIT_MODE_DEATH_FADE;
+                }
+                unit_update_finished = true;
+                break;
+            }
+            case UNIT_MODE_DEATH_FADE: {
+                // Removing the unit is handled in match_update()
+                unit_update_finished = true;
+                break;
+            }
         }
     }
 }
@@ -490,21 +509,18 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
             return unit.target.cell;
         case UNIT_TARGET_UNIT: {
             uint32_t target_unit_index = state.units.get_index_of(unit.target.id);
-            return target_unit_index != INDEX_INVALID 
-                                    ? state.units[target_unit_index].cell 
-                                    : unit.cell;
+            if (target_unit_index == INDEX_INVALID || state.units[target_unit_index].health == 0) {
+                return unit.cell;
+            }
+            return state.units[target_unit_index].cell;
         }
-        case UNIT_TARGET_BUILDING: {
-            uint32_t target_building_index = state.buildings.get_index_of(unit.target.id);
-            return target_building_index != INDEX_INVALID
-                                    ? get_nearest_free_cell_around_building(state, unit.cell, state.buildings[target_building_index])
-                                    : unit.cell;
-        }
+        case UNIT_TARGET_BUILDING:
         case UNIT_TARGET_CAMP: {
-            uint32_t building_index = state.buildings.get_index_of(unit.target.id);
-            return building_index != INDEX_INVALID 
-                                ? get_nearest_free_cell_around_building(state, unit.cell, state.buildings[building_index])
-                                : unit.cell;
+            uint32_t target_building_index = state.buildings.get_index_of(unit.target.id);
+            if (target_building_index == INDEX_INVALID || state.buildings[target_building_index].health == 0) {
+                return unit.cell;
+            }
+            return get_nearest_free_cell_around_building(state, unit.cell, state.buildings[target_building_index]);
         }
     }
 }
@@ -544,7 +560,14 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
 bool unit_is_target_dead(const match_state_t& state, const unit_t& unit) {
     GOLD_ASSERT(unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING);
     uint32_t target_index = unit.target.type == UNIT_TARGET_UNIT ? state.units.get_index_of(unit.target.id) : state.buildings.get_index_of(unit.target.id);
-    return target_index == INDEX_INVALID;
+    if (target_index == INDEX_INVALID) {
+        return true;
+    }
+    int target_health = unit.target.type == UNIT_TARGET_UNIT ? state.units[target_index].health : state.buildings[target_index].health;
+    if (target_health == 0) {
+        return true;
+    }
+    return false;
 }
 
 bool unit_can_see_rect(const unit_t& unit, rect_t rect) {
@@ -570,6 +593,10 @@ AnimationName unit_get_expected_animation(const unit_t& unit) {
         case UNIT_MODE_MINE:
         case UNIT_MODE_ATTACK_WINDUP:
             return ANIMATION_UNIT_ATTACK;
+        case UNIT_MODE_DEATH:
+            return ANIMATION_UNIT_DEATH;
+        case UNIT_MODE_DEATH_FADE:
+            return ANIMATION_UNIT_DEATH_FADE;
         case UNIT_MODE_ATTACK_COOLDOWN:
         case UNIT_MODE_IDLE:
         default:
@@ -581,20 +608,27 @@ int unit_get_animation_vframe(const unit_t& unit) {
     if (unit.animation.name == ANIMATION_UNIT_BUILD) {
         return 0;
     }
+    
+    if (unit.animation.name == ANIMATION_UNIT_DEATH || unit.animation.name == ANIMATION_UNIT_DEATH_FADE) {
+        return unit.direction == DIRECTION_NORTH ? 1 : 0;
+    }
+
     int vframe;
     if (unit.direction == DIRECTION_NORTH) {
         vframe = 1;
     } else if (unit.direction == DIRECTION_SOUTH) {
         vframe = 0;
-    } else if (unit.direction > DIRECTION_SOUTH) {
-        vframe = 3;
     } else {
         vframe = 2;
-    }
+    } 
     if (unit.gold_held > 0 && (unit.animation.name == ANIMATION_UNIT_MOVE || unit.animation.name == ANIMATION_UNIT_IDLE)) {
         vframe += 4;
     }
     return vframe;
+}
+
+bool unit_sprite_should_flip_h(const unit_t& unit) {
+    return unit.direction > DIRECTION_SOUTH; 
 }
 
 void unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building) {
@@ -616,7 +650,7 @@ entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit)
     entity_id nearest_camp_id = ID_NULL;
 
     for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
-        if (state.buildings[building_index].is_finished && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit.player_id) {
+        if (state.buildings[building_index].mode == BUILDING_MODE_FINISHED && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit.player_id) {
             if (nearest_camp_dist == -1 || xy::manhattan_distance(unit.cell, state.buildings[building_index].cell) < nearest_camp_dist) {
                 nearest_camp_id = state.buildings.get_id_of(building_index);
                 nearest_camp_dist = xy::manhattan_distance(unit.cell, state.buildings[building_index].cell);
@@ -694,6 +728,9 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const
         if (unit.player_id == other_unit.player_id) {
             continue;
         }
+        if (other_unit.health == 0) {
+            continue;
+        }
         if (!unit_can_see_rect(unit, rect_t(other_unit.cell, xy(1, 1)))) {
             continue;
         }
@@ -712,6 +749,9 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const
     for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
         const building_t& building = state.buildings[building_index];
         if (building.player_id == unit.player_id) {
+            continue;
+        }
+        if (building.health == 0) {
             continue;
         }
         if (!unit_can_see_rect(unit, rect_t(building.cell, building_cell_size(building.type)))) {
