@@ -235,14 +235,53 @@ struct rect_t {
 
     rect_t() = default;
     rect_t(const xy& position, const xy& size): position(position), size(size) {}
+
     bool has_point(const xy& point) const {
         return !(point.x < position.x || point.x >= position.x + size.x || point.y < position.y || point.y >= position.y + size.y);
     }
+
     bool intersects(const rect_t& other) const {
         return !(position.x > other.position.x + other.size.x ||
                  other.position.x > position.x + size.x ||
                  position.y > other.position.y + other.size.y ||
                  other.position.y > position.y + size.y);
+    }
+
+    bool is_adjacent_to(const rect_t& other) const {
+        if (position.x + size.x == other.position.x || other.position.x + other.size.x == position.x) {
+            return (position.y >= other.position.y && position.y + size.y <= other.position.y + other.size.y) ||
+                   (other.position.y >= position.y && other.position.y + other.size.y <= position.y + size.y);
+        } else if (position.y + size.y == other.position.y || other.position.y + other.size.y == position.y) {
+            return (position.x >= other.position.x && position.x + size.x <= other.position.x + other.size.x) ||
+                   (other.position.x >= position.x && other.position.x + other.size.x <= position.x + size.x);
+        }
+        return false;
+    }
+
+    xy get_cell_closest_to(const rect_t& other) const {
+        xy cell;
+        if (position.y > other.position.y) {
+            cell.y = position.y;
+        } else if (position.y + size.y <= other.position.y) {
+            cell.y = position.y + size.y - 1;
+        } else {
+            cell.y = other.position.y;
+        }
+        if (position.x > other.position.x) {
+            cell.x = position.x;
+        } else if (position.x + size.x <= other.position.x) {
+            cell.x = position.x + size.x - 1;
+        } else {
+            cell.x = other.position.x;
+        }
+
+        return cell;
+    }
+
+    int euclidean_distance_squared_to(const rect_t& other) const {
+        xy cell = get_cell_closest_to(other);
+        xy other_cell = other.get_cell_closest_to(*this);
+        return xy::euclidean_distance_squared(cell, other_cell);
     }
 };
 

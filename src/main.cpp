@@ -963,9 +963,9 @@ void render_match(const match_state_t& state) {
         if (building.mode == BUILDING_MODE_DESTROYED) {
             Sprite destroyed_sprite;
             if (building_cell_size(building.type) == xy(3, 3)) {
-                destroyed_sprite = SPRITE_BUILDING_DESTROYED3X3;
+                destroyed_sprite = SPRITE_BUILDING_DESTROYED_3;
             } else {
-                destroyed_sprite = SPRITE_BUILDING_DESTROYED2X2;
+                destroyed_sprite = SPRITE_BUILDING_DESTROYED_2;
             }
             render_sprite(destroyed_sprite, xy(0, 0), (building.cell * TILE_SIZE) - state.camera_offset);
         }
@@ -1102,13 +1102,13 @@ void render_match(const match_state_t& state) {
     // Units
     for (const unit_t& unit : state.units) {
         xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
-        xy unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
+        xy unit_render_size = engine.sprites[UNIT_DATA.at(unit.type).sprite].frame_size;
 
         // Cull the unit sprite
         if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
             continue;
         }
-        if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, xy(1, 1))) {
+        if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, unit_cell_size(unit.type))) {
             continue;
         }
 
@@ -1197,11 +1197,11 @@ void render_match(const match_state_t& state) {
         render_sprite((Sprite)(sprite), xy(3, 0), (ui_get_building_cell(state) * TILE_SIZE) - state.camera_offset, 0, (RecolorName)network_get_player_id());
 
         const building_data_t& data = BUILDING_DATA.at(state.ui_building_type);
-        bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_width > state.map_width || 
-                                          ui_get_building_cell(state).y + data.cell_height > state.map_height;
+        bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_size > state.map_width || 
+                                          ui_get_building_cell(state).y + data.cell_size > state.map_height;
         SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
-        for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_height; y++) {
-            for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_width; x++) {
+        for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_size; y++) {
+            for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_size; x++) {
                 bool is_cell_green;
                 if (is_placement_out_of_bounds || map_get_fog(state, xy(x, y)).type == FOG_HIDDEN) {
                     is_cell_green = false;
@@ -1435,8 +1435,8 @@ void render_match(const match_state_t& state) {
         SDL_Rect building_rect = (SDL_Rect) { 
             .x = (building.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width,
             .y = (building.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
-            .w = 2 * BUILDING_DATA.at(building.type).cell_width,
-            .h = 2 * BUILDING_DATA.at(building.type).cell_height
+            .w = 2 * BUILDING_DATA.at(building.type).cell_size,
+            .h = 2 * BUILDING_DATA.at(building.type).cell_size
         };
         SDL_Color color = building.player_id == network_get_player_id() 
                             ? COLOR_GREEN 
@@ -1464,15 +1464,15 @@ void render_match(const match_state_t& state) {
     }
 
     for (const unit_t& unit : state.units) {
-        if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, xy(1, 1))) {
+        if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, unit_cell_size(unit.type))) {
             continue;
         }
 
         SDL_Rect unit_rect = (SDL_Rect) { 
             .x = (unit.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width, 
             .y = (unit.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
-            .w = 2, 
-            .h = 2 
+            .w = 2 * UNIT_DATA.at(unit.type).cell_size, 
+            .h = 2 * UNIT_DATA.at(unit.type).cell_size
         };
         SDL_Color color = unit.player_id == network_get_player_id() 
                             ? COLOR_GREEN 

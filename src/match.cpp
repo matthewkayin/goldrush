@@ -451,10 +451,10 @@ void match_update(match_state_t& state) {
         input_t input;
         input.move.target_cell = move_target / TILE_SIZE;
         input.move.target_entity_id = ID_NULL;
-        if (map_get_fog(state, input.move.target_cell).type == FOG_REVEALED) {
-            if (map_get_cell(state, input.move.target_cell).type == CELL_UNIT || map_get_cell(state, input.move.target_cell).type == CELL_BUILDING) {
-                input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
-            }
+        CellType cell_type = map_get_cell(state, input.move.target_cell).type;
+        FogType fog_type = map_get_fog(state, input.move.target_cell).type;
+        if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || (cell_type == CELL_BUILDING && fog_type != FOG_HIDDEN)) {
+            input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
         }
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
@@ -820,17 +820,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                             .type = UNIT_TARGET_CAMP,
                             .id = input.move.target_entity_id
                         });
-                    } else if (state.buildings[target_index].player_id != unit.player_id) {
+                    } else {
                         unit_set_target(state, unit, (unit_target_t) {
                             .type = UNIT_TARGET_BUILDING,
                             .id = input.move.target_entity_id
                         });
-                    } else {
-                        unit_set_target(state, unit, (unit_target_t) {
-                            .type = UNIT_TARGET_CELL,
-                            .cell = get_nearest_free_cell_around_building(state, unit.cell, state.buildings[target_index])
-                        });
-                    }
+                    } 
                 } else if (map_get_cell(state, unit_target).type >= CELL_GOLD1 && map_get_cell(state, unit_target).type <= CELL_GOLD3 && 
                             unit.type == UNIT_MINER && !should_move_as_group) {
                     unit_set_target(state, unit, (unit_target_t) {
@@ -956,24 +951,24 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
-xy get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect) {
-    xy cell = rect.position + xy(-1, 0);
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect) {
+    rect_t cell_rect = rect_t(rect.position + xy(-cell_size.x, 0), cell_size);
     int step_direction = DIRECTION_SOUTH;
     int step_count = 0;
-    int x_step_amount = rect.size.x + 1;
+    int x_step_amount = rect.size.x + cell_size.x;
     int y_step_amount = rect.size.y;
 
-    while (map_is_cell_blocked(state, cell) || !map_is_cell_in_bounds(state, cell)) {
-        cell += DIRECTION_XY[step_direction];
+    while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect)) {
+        cell_rect.position += DIRECTION_XY[step_direction];
         step_count++;
 
         bool is_y_stepping = step_direction == DIRECTION_SOUTH || step_direction == DIRECTION_NORTH;
         int step_amount = is_y_stepping ? y_step_amount : x_step_amount;
         if (step_count == step_amount) {
             if (is_y_stepping) {
-                y_step_amount++;
+                y_step_amount += cell_size.y;
             } else {
-                x_step_amount++;
+                x_step_amount += cell_size.x;
             }
             step_count = 0;
 
@@ -982,51 +977,52 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect) {
         }
     }
 
-    return cell;
+    return cell_rect.position;
 }
 
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
-xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building) {
-
+xy get_nearest_free_cell_around_building(const match_state_t& state, rect_t start, const building_t& building) {
     xy nearest_cell;
     int nearest_cell_dist = -1;
 
     xy building_size = building_cell_size(building.type);
 
     xy cell_begin[4] = { 
-        building.cell + xy(-1, 0),
+        building.cell + xy(-start.size.x, 0),
         building.cell + xy(0, building_size.y),
-        building.cell + xy(building_size.x, building_size.y - 1),
-        building.cell + xy(building_size.x - 1, -1)
+        building.cell + xy(building_size.x, building_size.y - start.size.y),
+        building.cell + xy(building_size.x - start.size.x, -start.size.y)
     };
     xy cell_end[4] = { 
-        cell_begin[0] + xy(0, building_size.y - 1),
-        cell_begin[1] + xy(building_size.x - 1, 0),
-        cell_begin[2] - xy(0, building_size.y - 1),
-        cell_begin[3] - xy(building_size.x - 1, 0)
+        cell_begin[0] + xy(0, building_size.y - start.size.y),
+        cell_begin[1] + xy(building_size.x - start.size.x, 0),
+        cell_begin[2] - xy(0, building_size.y - start.size.y),
+        cell_begin[3] - xy(building_size.x - start.size.x, 0)
     };
     xy cell_step[4] = { xy(0, 1), xy(1, 0), xy(0, -1), xy(-1, 0) };
     uint32_t index = 0;
     xy cell = cell_begin[index];
+    rect_t building_rect = rect_t(building.cell, building_size);
+    log_info("beginning for start rect %r and building rect %r", &start, &building_rect);
     while (index < 4) {
-        if (map_is_cell_in_bounds(state, cell)) {
-            uint32_t cell_type = map_get_cell(state, cell).type;
-            bool is_cell_free = cell_type == CELL_EMPTY || (cell_type == CELL_UNIT && xy::manhattan_distance(start_cell, cell) > 3);
-            if (is_cell_free && (nearest_cell_dist == -1 || xy::manhattan_distance(start_cell, cell) < nearest_cell_dist)) {
+        log_info("checking cell %xi...", &cell);
+        if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {
+            if (!map_is_cell_rect_blocked(state, rect_t(cell, start.size)) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
-                nearest_cell_dist = xy::manhattan_distance(start_cell, cell);
+                nearest_cell_dist = xy::manhattan_distance(start.position, cell);
             }
         } 
 
-        cell += cell_step[index];
         if (cell == cell_end[index]) {
             index++;
             if (index < 4) {
                 cell = cell_begin[index];
             }
+        } else {
+            cell += cell_step[index];
         }
     }
 
-    return nearest_cell_dist != -1 ? nearest_cell : start_cell;
+    return nearest_cell_dist != -1 ? nearest_cell : start.position;
 }

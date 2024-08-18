@@ -6,6 +6,18 @@ bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {
     return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
 }
 
+bool map_is_cell_rect_in_bounds(const match_state_t& state, rect_t cell_rect) {
+    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
+        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
+            if (x < 0 || y < 0 || x >= state.map_width || y >= state.map_height) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 bool map_is_cell_blocked(const match_state_t& state, xy cell) {
     return state.map_cells[cell.x + (cell.y * state.map_width)].type != CELL_EMPTY;
 }
@@ -19,6 +31,29 @@ bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect) {
         }
     }
     
+    return false;
+}
+
+bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect) {
+    entity_id origin_id = state.map_cells[origin.x + (origin.y * state.map_width)].value;
+    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
+        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
+            cell_t cell = state.map_cells[x + (y * state.map_width)];
+            if (cell.type == CELL_EMPTY) {
+                continue;
+            }
+            if (cell.type == CELL_UNIT) {
+                if (cell.value == origin_id) {
+                    continue;
+                }
+                if (xy::manhattan_distance(origin, xy(x, y)) > 3) {
+                    continue;
+                }
+            }
+            return true;
+        }
+    }
+
     return false;
 }
 
@@ -63,7 +98,7 @@ void map_decrement_gold(match_state_t& state, xy cell) {
     state.is_fog_dirty = true;
 }
 
-void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* path) {
+void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path) {
     struct node_t {
         fixed cost;
         fixed distance;
@@ -141,16 +176,16 @@ void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* p
                 .cell = smallest.cell + DIRECTION_XY[direction]
             };
             // Don't consider out of bounds children
-            if (!map_is_cell_in_bounds(state, child.cell)) {
+            if (!map_is_cell_rect_in_bounds(state, rect_t(child.cell, cell_size))) {
                 continue;
             }
             // Don't consider blocked spaces, unless:
             // 1. the blocked space is a unit that is very far away. we pretend such spaces are blocked since the unit will probably move by the time we get there
             // 2. the blocked space is the target_cell. by allowing the path to go here we can avoid worst-case pathfinding even when the target_cell is blocked
-            CellType child_cell_type = map_get_cell(state, child.cell).type;
-            if (!(child_cell_type == CELL_EMPTY || 
-                (child_cell_type == CELL_UNIT && xy::manhattan_distance(from, child.cell) > 3) || 
-                (child.cell == to && xy::manhattan_distance(smallest.cell, child.cell) == 1))) {
+            if (child.cell == to && xy::manhattan_distance(smallest.cell, child.cell) == 1) {
+                continue;
+            }
+            if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(child.cell, cell_size))) {
                 continue;
             }
             // Don't allow diagonal movement through cracks
@@ -264,7 +299,7 @@ void map_update_fog(match_state_t& state) {
             continue;
         }
 
-        map_fog_reveal(state, unit.cell, xy(1, 1), UNIT_DATA.at(unit.type).sight);
+        map_fog_reveal(state, unit.cell, unit_cell_size(unit.type), UNIT_DATA.at(unit.type).sight);
     }
 
     for (const building_t& building : state.buildings) {

@@ -6,8 +6,7 @@
 const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     { BUILDING_HOUSE, (building_data_t) {
         .name = "House",
-        .cell_width = 2,
-        .cell_height = 2,
+        .cell_size = 2,
         .cost = 100,
         .max_health = 150,
         .builder_positions_x = { 3, 16, -4 },
@@ -16,8 +15,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     }},
     { BUILDING_CAMP, (building_data_t) {
         .name = "Mining Camp",
-        .cell_width = 2,
-        .cell_height = 2,
+        .cell_size = 2,
         .cost = 75,
         .max_health = 100,
         .builder_positions_x = { 1, 15, 14 },
@@ -26,8 +24,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     }},
     { BUILDING_SALOON, (building_data_t) {
         .name = "Saloon",
-        .cell_width = 3,
-        .cell_height = 3,
+        .cell_size = 3,
         .cost = 200,
         .max_health = 200,
         .builder_positions_x = { 6, 27, 9 },
@@ -50,7 +47,7 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     building.queue_timer = 0;
 
     entity_id building_id = state.buildings.push_back(building);
-    map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_width, building_data.cell_height)), CELL_BUILDING, building_id);
+    map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_size, building_data.cell_size)), CELL_BUILDING, building_id);
     return building_id;
 }
 
@@ -61,7 +58,7 @@ void building_destroy(match_state_t& state, uint32_t building_index) {
 void building_update(match_state_t& state, building_t& building) {
     if (building.health == 0 && building.mode != BUILDING_MODE_DESTROYED) {
         const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
-        map_set_cell_rect(state, rect_t(building.cell, xy(building_data.cell_width, building_data.cell_height)), CELL_EMPTY);
+        map_set_cell_rect(state, rect_t(building.cell, xy(building_data.cell_size, building_data.cell_size)), CELL_EMPTY);
         building.mode = BUILDING_MODE_DESTROYED;
         building.queue.clear();
         building.queue_timer = BUILDING_FADE_DURATION;
@@ -98,7 +95,7 @@ void building_update(match_state_t& state, building_t& building) {
                         break;
                     }
 
-                    xy unit_spawn_cell = get_first_empty_cell_around_rect(state, rect_t(building.cell, building_cell_size(building.type)));
+                    xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)));
                     unit_create(state, building.player_id, item.unit_type, unit_spawn_cell);
                     item_should_dequeue = true;
 
@@ -133,7 +130,7 @@ void building_dequeue(building_t& building) {
 
 xy building_cell_size(BuildingType type) {
     const building_data_t& building_data = BUILDING_DATA.find(type)->second;
-    return xy(building_data.cell_width, building_data.cell_height);
+    return xy(building_data.cell_size, building_data.cell_size);
 }
 
 rect_t building_get_rect(const building_t& building) {
@@ -161,12 +158,12 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
 Sprite building_get_select_ring(BuildingType type, bool is_enemy) {
     if (building_cell_size(type) == xy(2, 2)) {
         return is_enemy 
-                    ? SPRITE_SELECT_RING_BUILDING_2X2_ATTACK
-                    : SPRITE_SELECT_RING_BUILDING_2X2;
+                    ? SPRITE_SELECT_RING_BUILDING_2_ATTACK
+                    : SPRITE_SELECT_RING_BUILDING_2;
     } else {
         return is_enemy
-                    ? SPRITE_SELECT_RING_BUILDING_3X3_ATTACK
-                    : SPRITE_SELECT_RING_BUILDING_3X3;
+                    ? SPRITE_SELECT_RING_BUILDING_3_ATTACK
+                    : SPRITE_SELECT_RING_BUILDING_3;
     }
 }
 

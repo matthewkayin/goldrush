@@ -96,7 +96,8 @@ struct selection_t {
 
 enum UnitType: uint8_t {
     UNIT_MINER,
-    UNIT_COWBOY
+    UNIT_COWBOY,
+    UNIT_WAGON
 };
 
 enum BuildingType {
@@ -173,10 +174,11 @@ struct unit_t {
 struct unit_data_t {
     const char* name;
     Sprite sprite;
+    int cell_size;
     int max_health;
     int damage;
     int armor;
-    int range;
+    int range_squared;
     int attack_cooldown;
     fixed speed;
     int sight;
@@ -218,8 +220,7 @@ struct building_t {
 
 struct building_data_t {
     const char* name;
-    int cell_width;
-    int cell_height;
+    int cell_size;
     uint32_t cost;
     int max_health;
     int builder_positions_x[3];
@@ -339,8 +340,8 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 // Misc
 xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
-xy get_first_empty_cell_around_rect(const match_state_t& state, rect_t rect);
-xy get_nearest_free_cell_around_building(const match_state_t& state, xy start_cell, const building_t& building);
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect);
+xy get_nearest_free_cell_around_building(const match_state_t& state, rect_t start, const building_t& building);
 
 // UI
 void ui_show_status(match_state_t& state, const char* message);
@@ -357,14 +358,16 @@ xy ui_camera_centered_on_cell(xy cell);
 
 // Map
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
+bool map_is_cell_rect_in_bounds(const match_state_t& state, rect_t cell_rect);
 bool map_is_cell_blocked(const match_state_t& state, xy cell);
 bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
+bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect);
 cell_t map_get_cell(const match_state_t& state, xy cell);
 void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value = 0);
 void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
 bool map_is_cell_gold(const match_state_t& state, xy cell);
 void map_decrement_gold(match_state_t& state, xy cell);
-void map_pathfind(const match_state_t& state, xy from, xy to, std::vector<xy>* path);
+void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path);
 fog_t map_get_fog(const match_state_t& state, xy cell);
 void map_update_fog(match_state_t& state);
 
@@ -372,9 +375,11 @@ void map_update_fog(match_state_t& state);
 void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
 void unit_destroy(match_state_t& state, uint32_t unit_index);
 void unit_update(match_state_t& state, uint32_t unit_index);
+xy unit_cell_size(UnitType type);
 rect_t unit_get_rect(const unit_t& unit);
 void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t target);
 xy unit_get_target_cell(const match_state_t& state, const unit_t& unit);
+xy_fixed unit_get_target_position(const unit_t& unit);
 bool unit_has_reached_target(const match_state_t& state, const unit_t& unit);
 bool unit_is_target_dead(const match_state_t& state, const unit_t& unit);
 bool unit_can_see_rect(const unit_t& unit, rect_t rect);
@@ -388,8 +393,6 @@ entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit)
 unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const unit_t& unit);
-bool unit_is_adjacent_to_building(const unit_t& unit, const building_t& building);
-bool unit_is_in_range_of_building(const unit_t& unit, const building_t& building);
 
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);

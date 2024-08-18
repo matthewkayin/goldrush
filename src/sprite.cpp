@@ -85,25 +85,25 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .recolor = false
     }},
-    { SPRITE_SELECT_RING_BUILDING_2X2, (sprite_params_t) {
+    { SPRITE_SELECT_RING_BUILDING_2, (sprite_params_t) {
         .path = "sprite/select_ring_building2x2.png",
         .hframes = 1,
         .vframes = 1,
         .recolor = false
     }},
-    { SPRITE_SELECT_RING_BUILDING_2X2_ATTACK, (sprite_params_t) {
+    { SPRITE_SELECT_RING_BUILDING_2_ATTACK, (sprite_params_t) {
         .path = "sprite/select_ring_building2x2_attack.png",
         .hframes = 1,
         .vframes = 1,
         .recolor = false
     }},
-    { SPRITE_SELECT_RING_BUILDING_3X3, (sprite_params_t) {
+    { SPRITE_SELECT_RING_BUILDING_3, (sprite_params_t) {
         .path = "sprite/select_ring_building3x3.png",
         .hframes = 1,
         .vframes = 1,
         .recolor = false
     }},
-    { SPRITE_SELECT_RING_BUILDING_3X3_ATTACK, (sprite_params_t) {
+    { SPRITE_SELECT_RING_BUILDING_3_ATTACK, (sprite_params_t) {
         .path = "sprite/select_ring_building3x3_attack.png",
         .hframes = 1,
         .vframes = 1,
@@ -133,6 +133,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 3,
         .recolor = true
     }},
+    { SPRITE_UNIT_WAGON, (sprite_params_t) {
+        .path = "sprite/unit_wagon.png",
+        .hframes = 15,
+        .vframes = 3,
+        .recolor = true
+    }},
     { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
         .path = "sprite/building_house.png",
         .hframes = 4,
@@ -151,13 +157,13 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .recolor = true
     }},
-    { SPRITE_BUILDING_DESTROYED2X2, (sprite_params_t) {
+    { SPRITE_BUILDING_DESTROYED_2, (sprite_params_t) {
         .path = "sprite/building_destroyed2x2.png",
         .hframes = 1,
         .vframes = 1,
         .recolor = false
     }},
-    { SPRITE_BUILDING_DESTROYED3X3, (sprite_params_t) {
+    { SPRITE_BUILDING_DESTROYED_3, (sprite_params_t) {
         .path = "sprite/building_destroyed3x3.png",
         .hframes = 1,
         .vframes = 1,
