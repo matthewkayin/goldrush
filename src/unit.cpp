@@ -32,6 +32,21 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .cost = 100,
         .population_cost = 2,
         .train_duration = 400
+    }},
+    { UNIT_WAGON, (unit_data_t) {
+        .name = "Wagon",
+        .sprite = SPRITE_UNIT_WAGON,
+        .cell_size = 2,
+        .max_health = 100,
+        .damage = 0,
+        .armor = 2,
+        .range_squared = 1,
+        .attack_cooldown = 0,
+        .speed = fixed::from_int(1),
+        .sight = 10,
+        .cost = 200,
+        .population_cost = 2,
+        .train_duration = 500
     }}
 };
 
@@ -118,6 +133,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             case UNIT_MODE_MOVE_BLOCKED: {
                 unit.timer--;
                 if (unit.timer == 0) {
+                    log_info("path pause timeout. unit gives up");
                     unit.mode = UNIT_MODE_IDLE;
                     break;
                 }
@@ -313,8 +329,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         uint8_t target_player_id = unit.target.type == UNIT_TARGET_UNIT
                                             ? state.units[target_index].player_id
                                             : state.buildings[target_index].player_id;
-                        if (unit.player_id == target_player_id) {
-                            log_info("target is ally, stopping");
+                        if (unit.player_id == target_player_id || UNIT_DATA.at(unit.type).damage == 0) {
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
@@ -332,11 +347,11 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             }
                         }
 
-                        log_info("attack windup");
                         rect_t target_rect = unit.target.type == UNIT_TARGET_UNIT
-                                            ? rect_t(state.units[target_index].cell, unit_cell_size(unit.type))
+                                            ? rect_t(state.units[target_index].cell, unit_cell_size(state.units[target_index].type))
                                             : rect_t(state.buildings[target_index].cell, building_cell_size(state.buildings[target_index].type));
                         unit.direction = get_enum_direction_to_rect(unit.cell, target_rect);
+                        log_info("unit cell %xi vs target rect %r results in direction %i", &unit.cell, &target_rect, unit.direction);
                         unit.mode = UNIT_MODE_ATTACK_WINDUP;
                         break;
                     }
@@ -395,7 +410,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     } else if (!map_is_cell_gold(state, unit.target.cell)) {
                         // Gold ran out, find a new gold cell to mine
                         unit.target = unit_target_nearest_gold(state, unit);
-                        log_info("unit gold %u unit target %u", unit.gold_held, unit.target.type);
                         unit.mode = UNIT_MODE_IDLE;
                     } else {
                         // Continue mining
@@ -422,7 +436,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         enemy.health = std::max(0, enemy.health - damage);
 
                         // Make the enemy attack back
-                        if (enemy.mode == UNIT_MODE_IDLE && enemy.target.type == UNIT_TARGET_NONE && unit_can_see_rect(enemy, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+                        if (enemy.mode == UNIT_MODE_IDLE && enemy.target.type == UNIT_TARGET_NONE && UNIT_DATA.at(enemy.type).damage != 0 && unit_can_see_rect(enemy, rect_t(unit.cell, unit_cell_size(unit.type)))) {
                             enemy.target = (unit_target_t) {
                                 .type = UNIT_TARGET_UNIT,
                                 .id = unit_id
@@ -652,6 +666,14 @@ int unit_get_animation_vframe(const unit_t& unit) {
 
 bool unit_sprite_should_flip_h(const unit_t& unit) {
     return unit.direction > DIRECTION_SOUTH; 
+}
+
+Sprite unit_get_select_ring(UnitType type, bool is_enemy) {
+    if (UNIT_DATA.at(type).cell_size == 2) {
+        return is_enemy ? SPRITE_SELECT_RING_WAGON_ATTACK : SPRITE_SELECT_RING_WAGON;
+    } else {
+        return is_enemy ? SPRITE_SELECT_RING_ATTACK : SPRITE_SELECT_RING;
+    }
 }
 
 void unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building) {

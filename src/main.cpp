@@ -944,6 +944,10 @@ void render_match(const match_state_t& state) {
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
 
+            if (map_is_cell_rect_blocked_pathfind(state, state.units[0].cell, rect_t(base_coords + xy(x, y), xy(1, 1)))) {
+                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+            }
+
             // Render gold
             uint32_t map_cell = map_get_cell(state, xy(base_coords.x + x, base_coords.y + y)).type;
             if (map_cell >= CELL_GOLD1 && map_cell <= CELL_GOLD3) {
@@ -1015,10 +1019,11 @@ void render_match(const match_state_t& state) {
             const unit_t& unit = state.units[index];
 
             xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
-            render_sprite(state.selection.type == SELECTION_TYPE_UNITS ? SPRITE_SELECT_RING : SPRITE_SELECT_RING_ATTACK, xy(0, 0), unit_render_pos, RENDER_SPRITE_CENTERED);
+            Sprite select_ring_sprite = unit_get_select_ring(unit.type, state.selection.type == SELECTION_TYPE_ENEMY_UNIT);
+            render_sprite(select_ring_sprite, xy(0, 0), unit_render_pos, RENDER_SPRITE_CENTERED);
 
             // Determine healthbar rect
-            xy unit_render_size = engine.sprites[SPRITE_UNIT_MINER].frame_size;
+            xy unit_render_size = engine.sprites[UNIT_DATA.at(unit.type).sprite].frame_size;
             SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
             SDL_Rect healthbar_subrect = healthbar_rect;
             healthbar_subrect.w = (healthbar_rect.w * unit.health) / UNIT_DATA.at(unit.type).max_health;
@@ -1047,7 +1052,7 @@ void render_match(const match_state_t& state) {
                 case CELL_UNIT: {
                     uint32_t unit_index = state.units.get_index_of(id);
                     if (unit_index != INDEX_INVALID && is_cell_revealed(state, state.units[unit_index].cell, xy(1, 1))) {
-                        Sprite sprite = state.units[unit_index].player_id == network_get_player_id() ? SPRITE_SELECT_RING : SPRITE_SELECT_RING_ATTACK;
+                        Sprite sprite = unit_get_select_ring(state.units[unit_index].type, state.units[unit_index].player_id != network_get_player_id());
                         render_sprite(sprite, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
                     break;

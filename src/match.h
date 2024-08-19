@@ -388,6 +388,7 @@ int unit_get_armor(const match_state_t& state, const unit_t& unit);
 AnimationName unit_get_expected_animation(const unit_t& unit);
 int unit_get_animation_vframe(const unit_t& unit);
 bool unit_sprite_should_flip_h(const unit_t& unit);
+Sprite unit_get_select_ring(UnitType type, bool is_enemy);
 void unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building);
 entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);

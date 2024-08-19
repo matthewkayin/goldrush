@@ -109,7 +109,7 @@ match_state_t match_init() {
 
         // Place player starting units
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-1, -1));
-        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(1, -1));
+        unit_create(state, player_id, UNIT_WAGON, player_spawns[player_id] + xy(1, -1));
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(0, 1));
     }
     state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);

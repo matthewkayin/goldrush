@@ -98,6 +98,7 @@ void map_decrement_gold(match_state_t& state, xy cell) {
     state.is_fog_dirty = true;
 }
 
+#include "logger.h"
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path) {
     struct node_t {
         fixed cost;
@@ -116,6 +117,32 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
     if (from == to) {
         path->clear();
         return;
+    }
+
+    if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(to, cell_size))) {
+        xy nearest_alternate;
+        int nearest_alternate_distance = -1;
+        for (int x = 0; x < cell_size.x; x++) {
+            for (int y = 0; y < cell_size.y; y++) {
+                if (x == 0 && y == 0) {
+                    continue;
+                }
+                xy alternate = to - xy(x, y);
+                if (map_is_cell_rect_in_bounds(state, rect_t(alternate, cell_size)) && !map_is_cell_rect_blocked_pathfind(state, from, rect_t(alternate, cell_size))) {
+                    if (nearest_alternate_distance == -1 || xy::manhattan_distance(from, alternate) < nearest_alternate_distance) {
+                        nearest_alternate = alternate;
+                        nearest_alternate_distance = xy::manhattan_distance(from, alternate);
+                    }
+                }
+            }
+        }
+
+        if (nearest_alternate_distance == -1) {
+            path->clear();
+            return;
+        }
+
+        to = nearest_alternate;
     }
 
     std::vector<node_t> frontier;
@@ -182,11 +209,10 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
             // Don't consider blocked spaces, unless:
             // 1. the blocked space is a unit that is very far away. we pretend such spaces are blocked since the unit will probably move by the time we get there
             // 2. the blocked space is the target_cell. by allowing the path to go here we can avoid worst-case pathfinding even when the target_cell is blocked
-            if (child.cell == to && xy::manhattan_distance(smallest.cell, child.cell) == 1) {
-                continue;
-            }
-            if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(child.cell, cell_size))) {
-                continue;
+            if (!(child.cell == to && xy::manhattan_distance(smallest.cell, child.cell) == 1)) {
+                if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(child.cell, cell_size))) {
+                    continue;
+                }
             }
             // Don't allow diagonal movement through cracks
             if (direction % 2 == 0) {
