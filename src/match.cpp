@@ -538,7 +538,8 @@ void match_update(match_state_t& state) {
     // Remove any dead units
     uint32_t unit_index = 0;
     while (unit_index < state.units.size()) {
-        if (state.units[unit_index].mode == UNIT_MODE_DEATH_FADE && !animation_is_playing(state.units[unit_index].animation)) {
+        if ((state.units[unit_index].mode == UNIT_MODE_DEATH_FADE && !animation_is_playing(state.units[unit_index].animation)) ||
+            (state.units[unit_index].mode == UNIT_MODE_FERRY && state.units[unit_index].health == 0)) {
             unit_destroy(state, unit_index);
         } else {
             unit_index++;
@@ -602,7 +603,7 @@ void match_update(match_state_t& state) {
 uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id) {
     uint32_t population = 0;
     for (const unit_t& unit : state.units) {
-        if (unit.player_id == player_id) {
+        if (unit.player_id == player_id && unit.health != 0) {
             population += UNIT_DATA.at(unit.type).population_cost;
         }
     }
@@ -674,6 +675,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += sizeof(input_building_dequeue_t);
             break;
         }
+        case INPUT_UNLOAD_ALL: {
+            memcpy(out_buffer + out_buffer_length, &input.unload_all.unit_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+
+            memcpy(out_buffer + out_buffer_length, input.unload_all.unit_ids, input.unload_all.unit_count * sizeof(entity_id));
+            out_buffer_length += input.unload_all.unit_count * sizeof(entity_id);
+            break;
+        }
         default:
             break;
     }
@@ -728,6 +737,14 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
         case INPUT_BUILDING_DEQUEUE: {
             memcpy(&input.building_dequeue, in_buffer + in_buffer_head, sizeof(input_building_dequeue_t));
             in_buffer_head += sizeof(input_building_dequeue_t);
+            break;
+        }
+        case INPUT_UNLOAD_ALL: {
+            memcpy(&input.unload_all.unit_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(input.unload_all.unit_ids, in_buffer + in_buffer_head, input.unload_all.unit_count * sizeof(entity_id));
+            in_buffer_head += input.unload_all.unit_count * sizeof(entity_id);
             break;
         }
         default:
@@ -923,6 +940,47 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 
             break;
         }
+        case INPUT_UNLOAD_ALL: {
+            log_info("handling unloading. unit count %u", input.unload_all.unit_count);
+            for (uint16_t i = 0; i < input.unload_all.unit_count; i++) {
+                entity_id id = input.unload_all.unit_ids[i];
+
+                uint32_t unit_index = state.units.get_index_of(id);
+                log_info("unloading for id of %u with index of %u", id, unit_index);
+                if (unit_index == INDEX_INVALID) {
+                    continue;
+                }
+
+                unit_t& unit = state.units[unit_index];
+                log_info("units to unload: %z", unit.ferried_units.size());
+                if (unit.ferried_units.empty()) {
+                    continue;
+                }
+
+                log_info("unit cell is %xi", &unit.cell);
+                for (uint32_t ferried_id_index = 0; ferried_id_index < unit.ferried_units.size(); ferried_id_index++) {
+                    entity_id ferried_id = unit.ferried_units[ferried_id_index];
+                    log_info("attempt unload for unit ferried id index %u ferried id %u", ferried_id_index, ferried_id);
+                    unit_t& ferried_unit = state.units.get_by_id(ferried_id);
+                    xy dropoff_cell = unit_get_best_unload_cell(state, unit, unit_cell_size(ferried_unit.type));
+                    log_info("dropoff cell %xi", &dropoff_cell);
+                    // If this is true, then no free spaces are available to unload
+                    if (dropoff_cell == xy(-1, -1)) {
+                        log_info("no free cells!");
+                        break;
+                    }
+
+                    ferried_unit.cell = dropoff_cell;
+                    ferried_unit.position = unit_get_target_position(ferried_unit.type, ferried_unit.cell);
+                    map_set_cell_rect(state, rect_t(ferried_unit.cell, unit_cell_size(ferried_unit.type)), CELL_UNIT, ferried_id);
+                    ferried_unit.mode = UNIT_MODE_IDLE;
+                    ferried_unit.target = (unit_target_t) { .type = UNIT_TARGET_NONE };
+                    unit.ferried_units.erase(unit.ferried_units.begin() + ferried_id_index);
+                    ferried_id_index--;
+                }
+            }
+            break;
+        }
         default:
             break;
     }
@@ -982,29 +1040,26 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
 
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
-xy get_nearest_free_cell_around_building(const match_state_t& state, rect_t start, const building_t& building) {
+xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect) {
     xy nearest_cell;
     int nearest_cell_dist = -1;
 
-    xy building_size = building_cell_size(building.type);
-
     xy cell_begin[4] = { 
-        building.cell + xy(-start.size.x, 0),
-        building.cell + xy(0, building_size.y),
-        building.cell + xy(building_size.x, building_size.y - start.size.y),
-        building.cell + xy(building_size.x - start.size.x, -start.size.y)
+        rect.position + xy(-start.size.x, -(start.size.y - 1)),
+        rect.position + xy(-(start.size.x - 1), rect.size.y),
+        rect.position + xy(rect.size.x, rect.size.y - 1),
+        rect.position + xy(rect.size.x - 1, -start.size.y)
     };
     xy cell_end[4] = { 
-        cell_begin[0] + xy(0, building_size.y - start.size.y),
-        cell_begin[1] + xy(building_size.x - start.size.x, 0),
-        cell_begin[2] - xy(0, building_size.y - start.size.y),
-        cell_begin[3] - xy(building_size.x - start.size.x, 0)
+        xy(cell_begin[0].x, rect.position.y + rect.size.y - 1),
+        xy(rect.position.x + rect.size.x - 1, cell_begin[1].y),
+        xy(cell_begin[2].x, cell_begin[0].y),
+        xy(cell_begin[0].x + 1, cell_begin[3].y)
     };
     xy cell_step[4] = { xy(0, 1), xy(1, 0), xy(0, -1), xy(-1, 0) };
     uint32_t index = 0;
     xy cell = cell_begin[index];
-    rect_t building_rect = rect_t(building.cell, building_size);
-    log_info("beginning for start rect %r and building rect %r", &start, &building_rect);
+    log_info("beginning for start rect %r and building rect %r", &start, &rect);
     while (index < 4) {
         log_info("checking cell %xi...", &cell);
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {

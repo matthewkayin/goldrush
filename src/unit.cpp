@@ -16,7 +16,9 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .sight = 7,
         .cost = 50,
         .population_cost = 1,
-        .train_duration = 300
+        .train_duration = 300,
+        .ferry_capacity = 0,
+        .ferry_size = 1
     }},
     { UNIT_COWBOY, (unit_data_t) {
         .name = "Cowboy",
@@ -31,7 +33,9 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .sight = 7,
         .cost = 100,
         .population_cost = 2,
-        .train_duration = 400
+        .train_duration = 400,
+        .ferry_capacity = 0,
+        .ferry_size = 1
     }},
     { UNIT_WAGON, (unit_data_t) {
         .name = "Wagon",
@@ -46,7 +50,9 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .sight = 10,
         .cost = 200,
         .population_cost = 2,
-        .train_duration = 500
+        .train_duration = 500,
+        .ferry_capacity = 4,
+        .ferry_size = UNIT_CANT_BE_FERRIED
     }}
 };
 
@@ -65,7 +71,7 @@ void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const x
 
     unit.direction = DIRECTION_SOUTH;
     unit.cell = cell;
-    unit.position = unit_get_target_position(unit);
+    unit.position = unit_get_target_position(unit.type, unit.cell);
     unit.target = (unit_target_t) {
         .type = UNIT_TARGET_NONE
     };
@@ -86,9 +92,15 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
     unit_t& unit = state.units[unit_index];
     const unit_data_t& unit_data = UNIT_DATA.at(unit.type);
 
-    if (unit.health == 0 && !(unit.mode == UNIT_MODE_DEATH || unit.mode == UNIT_MODE_DEATH_FADE)) {
+                                                                                                   // Don't play death animation for ferried units
+    if (unit.health == 0 && !(unit.mode == UNIT_MODE_DEATH || unit.mode == UNIT_MODE_DEATH_FADE || unit.mode == UNIT_MODE_FERRY)) {
         unit.mode = UNIT_MODE_DEATH;
         unit.animation = animation_create(unit_get_expected_animation(unit));
+
+        for (entity_id ferried_id : unit.ferried_units) {
+            state.units.get_by_id(ferried_id).health = 0;
+        }
+
         return;
     }
 
@@ -100,7 +112,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 if (unit.target.type == UNIT_TARGET_NONE) {
                     unit_update_finished = true;
                     break;
-                } else if ((unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING) && unit_is_target_dead(state, unit)) {
+                } else if ((unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING) && unit_is_target_dead_or_ferried(state, unit)) {
                     unit.target = (unit_target_t) {
                         .type = UNIT_TARGET_NONE
                     };
@@ -145,7 +157,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 bool is_path_blocked = false;
                 while (movement_left.raw_value > 0) {
                     // If the unit is not moving between tiles, then pop the next cell off the path
-                    if (unit.position == unit_get_target_position(unit) && !unit.path.empty()) {
+                    if (unit.position == unit_get_target_position(unit.type, unit.cell) && !unit.path.empty()) {
                         unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
                         // Clear the unit's rect so that the unit does not block itself from moving
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
@@ -163,12 +175,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
 
                     // Step unit along movement
-                    if (unit.position.distance_to(unit_get_target_position(unit)) > movement_left) {
+                    if (unit.position.distance_to(unit_get_target_position(unit.type, unit.cell)) > movement_left) {
                         unit.position += DIRECTION_XY_FIXED[unit.direction] * movement_left;
                         movement_left = fixed::from_raw(0);
                     } else {
-                        movement_left -= unit.position.distance_to(unit_get_target_position(unit));
-                        unit.position = unit_get_target_position(unit);
+                        movement_left -= unit.position.distance_to(unit_get_target_position(unit.type, unit.cell));
+                        unit.position = unit_get_target_position(unit.type, unit.cell);
                         // On step finished
                         if (unit.target.type == UNIT_TARGET_ATTACK) {
                             unit_target_t attack_target = unit_target_nearest_insight_enemy(state, unit);
@@ -306,7 +318,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
                     case UNIT_TARGET_UNIT: 
                     case UNIT_TARGET_BUILDING: {
-                        if (unit_is_target_dead(state, unit)) {
+                        if (unit_is_target_dead_or_ferried(state, unit)) {
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
                             };
@@ -329,8 +341,45 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         uint8_t target_player_id = unit.target.type == UNIT_TARGET_UNIT
                                             ? state.units[target_index].player_id
                                             : state.buildings[target_index].player_id;
-                        if (unit.player_id == target_player_id || UNIT_DATA.at(unit.type).damage == 0) {
+                        if (unit.player_id == target_player_id && unit.target.type == UNIT_TARGET_UNIT) {
+                            uint32_t target_ferry_capacity = UNIT_DATA.at(state.units[target_index].type).ferry_capacity;
+                            if (target_ferry_capacity != 0) {
+                                for (entity_id ferried_unit_id : state.units[target_index].ferried_units) {
+                                    target_ferry_capacity -= UNIT_DATA.at(state.units.get_by_id(ferried_unit_id).type).ferry_size;
+                                }
+
+                                if (target_ferry_capacity >= UNIT_DATA.at(unit.type).ferry_size) {
+                                    state.units[target_index].ferried_units.push_back(state.units.get_id_of(unit_index));
+                                    unit.mode = UNIT_MODE_FERRY;
+                                    unit_update_finished = true;
+                                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
+                                    // Force re-select so that unit is deselected if needed and so that ferry unload button pops up if needed
+                                    ui_set_selection(state, state.selection);
+                                    break;
+                                }
+                            }
                             unit.mode = UNIT_MODE_IDLE;
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_NONE
+                            };
+                            unit_update_finished = true;
+                            break;
+                        }
+                        
+                        // Don't attack allied units
+                        if (unit.player_id == target_player_id) {
+                            unit.mode = UNIT_MODE_IDLE;
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_NONE
+                            };
+                            unit_update_finished = true;
+                            break;
+                        }
+
+                        // Don't attack if this is a non-violent unit
+                        if (UNIT_DATA.at(unit.type).damage == 0) {
+                            unit.mode = UNIT_MODE_IDLE;
+                            unit_update_finished = true;
                             break;
                         }
 
@@ -351,7 +400,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                             ? rect_t(state.units[target_index].cell, unit_cell_size(state.units[target_index].type))
                                             : rect_t(state.buildings[target_index].cell, building_cell_size(state.buildings[target_index].type));
                         unit.direction = get_enum_direction_to_rect(unit.cell, target_rect);
-                        log_info("unit cell %xi vs target rect %r results in direction %i", &unit.cell, &target_rect, unit.direction);
                         unit.mode = UNIT_MODE_ATTACK_WINDUP;
                         break;
                     }
@@ -420,7 +468,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 break;
             }
             case UNIT_MODE_ATTACK_WINDUP: {
-                if (unit_is_target_dead(state, unit)) {
+                if (unit_is_target_dead_or_ferried(state, unit)) {
                     unit.target = unit_target_nearest_insight_enemy(state, unit);
                     unit.mode = UNIT_MODE_IDLE;
                     break;
@@ -460,7 +508,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 break;
             } // End case UNIT_MODE_ATTACK_WINDUP
             case UNIT_MODE_ATTACK_COOLDOWN: {
-                if (unit_is_target_dead(state, unit)) {
+                if (unit_is_target_dead_or_ferried(state, unit)) {
                     // TODO target nearest enemy
                     unit.timer = 0;
                     unit.target = unit_target_nearest_insight_enemy(state, unit);
@@ -483,6 +531,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 unit_update_finished = true;
                 break;
             }
+            case UNIT_MODE_FERRY:
+                unit_update_finished = true;
+                break;
             case UNIT_MODE_DEATH: {
                 if (!animation_is_playing(unit.animation)) {
                     map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
@@ -536,7 +587,7 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
             if (target_unit_index == INDEX_INVALID || state.units[target_unit_index].health == 0) {
                 return unit.cell;
             }
-            return state.units[target_unit_index].cell;
+            return get_nearest_free_cell_around_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), rect_t(state.units[target_unit_index].cell, unit_cell_size(state.units[target_unit_index].type)));
         }
         case UNIT_TARGET_BUILDING:
         case UNIT_TARGET_CAMP: {
@@ -544,14 +595,14 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
             if (target_building_index == INDEX_INVALID || state.buildings[target_building_index].health == 0) {
                 return unit.cell;
             }
-            return get_nearest_free_cell_around_building(state, rect_t(unit.cell, unit_cell_size(unit.type)), state.buildings[target_building_index]);
+            return get_nearest_free_cell_around_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), rect_t(state.buildings[target_building_index].cell, building_cell_size(state.buildings[target_building_index].type)));
         }
     }
 }
 
-xy_fixed unit_get_target_position(const unit_t& unit) {
-    int unit_size = UNIT_DATA.at(unit.type).cell_size * TILE_SIZE;
-    return xy_fixed((unit.cell * TILE_SIZE) + xy(unit_size / 2, unit_size / 2));
+xy_fixed unit_get_target_position(UnitType type, xy cell) {
+    int unit_size = UNIT_DATA.at(type).cell_size * TILE_SIZE;
+    return xy_fixed((cell * TILE_SIZE) + xy(unit_size / 2, unit_size / 2));
 }
 
 bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
@@ -594,7 +645,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
     }
 }
 
-bool unit_is_target_dead(const match_state_t& state, const unit_t& unit) {
+bool unit_is_target_dead_or_ferried(const match_state_t& state, const unit_t& unit) {
     GOLD_ASSERT(unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING);
     uint32_t target_index = unit.target.type == UNIT_TARGET_UNIT ? state.units.get_index_of(unit.target.id) : state.buildings.get_index_of(unit.target.id);
     if (target_index == INDEX_INVALID) {
@@ -602,6 +653,9 @@ bool unit_is_target_dead(const match_state_t& state, const unit_t& unit) {
     }
     int target_health = unit.target.type == UNIT_TARGET_UNIT ? state.units[target_index].health : state.buildings[target_index].health;
     if (target_health == 0) {
+        return true;
+    }
+    if (unit.target.type == UNIT_TARGET_UNIT && state.units[target_index].mode == UNIT_MODE_FERRY) {
         return true;
     }
     return false;
@@ -765,7 +819,7 @@ unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t&
     };
 }
 
-unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const unit_t& unit) {
+unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, const unit_t& unit) {
     entity_id nearest_enemy_index = INDEX_INVALID;
 
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
@@ -817,4 +871,66 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const
     return (unit_target_t) {
         .type = UNIT_TARGET_NONE
     };
+}
+
+xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy cell_size) {
+    xy target_position = unit_get_target_position(unit.type, unit.cell).to_xy();
+    xy dropoff_origin = unit.cell;
+    xy unit_size = unit_cell_size(unit.type);
+    std::vector<Direction> dropoff_directions;
+
+    if (unit.position != target_position) {
+        xy previous_target_position = unit_get_target_position(unit.type, unit.cell + DIRECTION_XY[(unit.direction + 4) % DIRECTION_COUNT]).to_xy();
+        if (xy::manhattan_distance(unit.position.to_xy(), previous_target_position) < xy::manhattan_distance(unit.position.to_xy(), target_position)) {
+            dropoff_origin = unit.cell + DIRECTION_XY[(unit.direction + 4) % DIRECTION_COUNT];
+        }
+    }
+
+    Direction facing_direction = unit.direction;
+    if (unit.position == target_position) {
+        if (facing_direction > DIRECTION_SOUTH) {
+            facing_direction = DIRECTION_WEST;
+        } else if (facing_direction > DIRECTION_NORTH && facing_direction < DIRECTION_SOUTH) {
+            facing_direction = DIRECTION_EAST;
+        }
+    }
+
+    if (facing_direction % 2 == 1) {
+        // Diagonal directions
+        int opposite_direction = (facing_direction + 4) % DIRECTION_COUNT;
+        dropoff_directions.push_back((Direction)((opposite_direction + 1) % DIRECTION_COUNT)); // next direction
+        dropoff_directions.push_back((Direction)(opposite_direction == 0 ? DIRECTION_COUNT - 1 : opposite_direction - 1)); // previous direction
+    } else {
+        // Adjacent directions
+        int dropoff_direction = (facing_direction + 2) % DIRECTION_COUNT;
+        while (dropoff_direction != facing_direction) {
+            dropoff_directions.push_back((Direction)dropoff_direction);
+            dropoff_direction = (dropoff_direction + 2) % DIRECTION_COUNT;
+        }
+    }
+
+    for (Direction direction : dropoff_directions) {
+        if (direction == DIRECTION_EAST || direction == DIRECTION_WEST) {
+            int dropoff_x = direction == DIRECTION_EAST
+                                ? dropoff_origin.x - cell_size.x
+                                : dropoff_origin.x + unit_size.x;
+            for (int dropoff_y = dropoff_origin.y; dropoff_y < dropoff_origin.y + unit_size.y; dropoff_y++) {
+                if (map_is_cell_rect_in_bounds(state, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state, rect_t(xy(dropoff_x, dropoff_y), cell_size))) {
+                    return xy(dropoff_x, dropoff_y);
+                }
+            }
+        } else {
+            GOLD_ASSERT(direction == DIRECTION_SOUTH || direction == DIRECTION_NORTH);
+            int dropoff_y = direction == DIRECTION_NORTH
+                                ? dropoff_origin.y - cell_size.y
+                                : dropoff_origin.y + unit_size.y;
+            for (int dropoff_x = dropoff_origin.x; dropoff_x < dropoff_origin.x + unit_size.x; dropoff_x++) {
+                if (map_is_cell_rect_in_bounds(state, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state, rect_t(xy(dropoff_x, dropoff_y), cell_size))) {
+                    return xy(dropoff_x, dropoff_y);
+                }
+            }
+        }
+    }
+
+    return xy(-1, -1);
 }

@@ -36,6 +36,16 @@ struct id_array {
         GOLD_ASSERT(index != INDEX_INVALID);
         return data[index]; 
     }
+    T& get_by_id(entity_id id) {
+        uint32_t index = get_index_of(id);
+        GOLD_ASSERT(index != INDEX_INVALID);
+        return data[index];
+    }
+    T& get_by_id(entity_id id) const {
+        uint32_t index = get_index_of(id);
+        GOLD_ASSERT(index != INDEX_INVALID);
+        return data[index];
+    }
 
     uint32_t get_index_of(entity_id id) const {
         auto index_it = id_to_index.find(id);

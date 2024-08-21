@@ -17,7 +17,9 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_MINER, UI_BUTTON_UNIT_COWBOY, UI_BUTTON_NONE,
-                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }}
+                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
+    { UI_BUTTONSET_WAGON, { UI_BUTTON_STOP, UI_BUTTON_UNLOAD, UI_BUTTON_NONE,
+                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
 };
 static const xy UI_BUTTON_SIZE = xy(32, 32);
 static const xy UI_BUTTON_PADDING = xy(4, 6);
@@ -118,6 +120,20 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
             break;
         }
+        case UI_BUTTON_UNLOAD: {
+            input_t input;
+            input.type = INPUT_UNLOAD_ALL;
+            input.unload_all.unit_count = 0;
+            for (entity_id id : state.selection.ids) {
+                if (state.units.get_by_id(id).ferried_units.empty()) {
+                    continue;
+                }
+                input.unload_all.unit_ids[input.unload_all.unit_count] = id;
+                input.unload_all.unit_count++;
+            }
+            state.input_queue.push_back(input);
+            break;
+        }
         case UI_BUTTON_BUILD_HOUSE:
         case UI_BUTTON_BUILD_CAMP: 
         case UI_BUTTON_BUILD_SALOON: {
@@ -203,7 +219,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
         }
 
         // Don't select units which are building
-        if (unit.mode == UNIT_MODE_BUILD) {
+        if (unit.mode == UNIT_MODE_BUILD || unit.mode == UNIT_MODE_FERRY) {
             continue;
         }
 
@@ -274,7 +290,7 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
     if (state.selection.type == SELECTION_TYPE_UNITS) {
         for (uint32_t id_index = 0; id_index < state.selection.ids.size(); id_index++) {
             uint32_t unit_index = state.units.get_index_of(state.selection.ids[id_index]);
-            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0 || state.units[unit_index].mode == UNIT_MODE_BUILD) {
+            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0 || state.units[unit_index].mode == UNIT_MODE_BUILD || state.units[unit_index].mode == UNIT_MODE_FERRY) {
                 state.selection.ids.erase(state.selection.ids.begin() + id_index);
                 id_index--;
                 continue;
@@ -298,8 +314,23 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
     if (state.selection.type == SELECTION_TYPE_NONE || state.selection.type == SELECTION_TYPE_ENEMY_UNIT || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
         state.ui_buttonset = UI_BUTTONSET_NONE;
     } else if (state.selection.type == SELECTION_TYPE_UNITS) {
-        if (state.selection.ids.size() == 1 && state.units[state.units.get_index_of(state.selection.ids[0])].type == UNIT_MINER) {
+        bool all_unit_types_are_same = true;
+        bool at_least_one_selected_unit_is_ferrying = false;
+        UnitType selected_unit_type = state.units.get_by_id(state.selection.ids[0]).type;
+        for (entity_id id : state.selection.ids) {
+            const unit_t& id_unit = state.units.get_by_id(id);
+            if (id_unit.type != selected_unit_type) {
+                all_unit_types_are_same = false;
+            }
+            if (!id_unit.ferried_units.empty()) {
+                at_least_one_selected_unit_is_ferrying = true;
+            }
+        }
+
+        if (all_unit_types_are_same && selected_unit_type == UNIT_MINER) {
             state.ui_buttonset = UI_BUTTONSET_MINER;
+        } else if (all_unit_types_are_same && at_least_one_selected_unit_is_ferrying) {
+            state.ui_buttonset = UI_BUTTONSET_WAGON;
         } else {
             state.ui_buttonset = UI_BUTTONSET_UNIT;
         }

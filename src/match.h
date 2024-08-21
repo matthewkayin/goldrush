@@ -26,6 +26,7 @@ const uint32_t UNIT_PATH_PAUSE_DURATION = 30;
 const uint32_t UNIT_BUILD_TICK_DURATION = 8;
 const uint32_t UNIT_MINE_TICK_DURATION = 60;
 const uint32_t UNIT_MAX_GOLD_HELD = 10;
+const uint32_t UNIT_CANT_BE_FERRIED = 0;
 
 const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_MAX = 5;
@@ -76,6 +77,7 @@ enum UiButtonset {
     UI_BUTTONSET_BUILD,
     UI_BUTTONSET_CANCEL,
     UI_BUTTONSET_SALOON,
+    UI_BUTTONSET_WAGON,
     UI_BUTTONSET_COUNT
 };
 
@@ -132,6 +134,7 @@ enum UnitMode {
     UNIT_MODE_MINE,
     UNIT_MODE_ATTACK_WINDUP,
     UNIT_MODE_ATTACK_COOLDOWN,
+    UNIT_MODE_FERRY,
     UNIT_MODE_DEATH,
     UNIT_MODE_DEATH_FADE
 };
@@ -167,6 +170,7 @@ struct unit_t {
     unit_target_t target;
     std::vector<xy> path;
 
+    std::vector<entity_id> ferried_units;
     uint32_t gold_held;
     uint32_t timer;
 };
@@ -185,6 +189,8 @@ struct unit_data_t {
     uint32_t cost;
     uint32_t population_cost;
     uint32_t train_duration;
+    uint32_t ferry_capacity;
+    uint32_t ferry_size;
 };
 
 // Building
@@ -241,7 +247,8 @@ enum InputType {
     INPUT_BUILD,
     INPUT_BUILD_CANCEL,
     INPUT_BUILDING_ENQUEUE,
-    INPUT_BUILDING_DEQUEUE
+    INPUT_BUILDING_DEQUEUE,
+    INPUT_UNLOAD_ALL
 };
 
 struct input_move_t {
@@ -275,6 +282,11 @@ struct input_building_dequeue_t {
     entity_id building_id;
 };
 
+struct input_unload_all_t {
+    uint16_t unit_count;
+    entity_id unit_ids[MAX_UNITS];
+};
+
 struct input_t {
     uint8_t type;
     union {
@@ -284,6 +296,7 @@ struct input_t {
         input_build_cancel_t build_cancel;
         input_building_enqueue_t building_enqueue;
         input_building_dequeue_t building_dequeue;
+        input_unload_all_t unload_all;
     };
 };
 
@@ -341,7 +354,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
 xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect);
-xy get_nearest_free_cell_around_building(const match_state_t& state, rect_t start, const building_t& building);
+xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect);
 
 // UI
 void ui_show_status(match_state_t& state, const char* message);
@@ -379,9 +392,9 @@ xy unit_cell_size(UnitType type);
 rect_t unit_get_rect(const unit_t& unit);
 void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t target);
 xy unit_get_target_cell(const match_state_t& state, const unit_t& unit);
-xy_fixed unit_get_target_position(const unit_t& unit);
+xy_fixed unit_get_target_position(UnitType type, xy cell);
 bool unit_has_reached_target(const match_state_t& state, const unit_t& unit);
-bool unit_is_target_dead(const match_state_t& state, const unit_t& unit);
+bool unit_is_target_dead_or_ferried(const match_state_t& state, const unit_t& unit);
 bool unit_can_see_rect(const unit_t& unit, rect_t rect);
 int unit_get_damage(const match_state_t& state, const unit_t& unit);
 int unit_get_armor(const match_state_t& state, const unit_t& unit);
@@ -393,7 +406,8 @@ void unit_stop_building(match_state_t& state, entity_id unit_id, const building_
 entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit);
-unit_target_t unit_target_nearest_insight_enemy(const match_state_t state, const unit_t& unit);
+unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, const unit_t& unit);
+xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy cell_size);
 
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);

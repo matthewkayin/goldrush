@@ -153,6 +153,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_ATTACK, SDLK_a },
     { UI_BUTTON_BUILD, SDLK_b },
     { UI_BUTTON_CANCEL, SDLK_ESCAPE },
+    { UI_BUTTON_UNLOAD, SDLK_d },
     { UI_BUTTON_BUILD_HOUSE, SDLK_e },
     { UI_BUTTON_BUILD_CAMP, SDLK_c },
     { UI_BUTTON_BUILD_SALOON, SDLK_s },
@@ -1106,6 +1107,10 @@ void render_match(const match_state_t& state) {
 
     // Units
     for (const unit_t& unit : state.units) {
+        if (unit.mode == UNIT_MODE_FERRY) {
+            continue;
+        }
+
         xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
         xy unit_render_size = engine.sprites[UNIT_DATA.at(unit.type).sprite].frame_size;
 
@@ -1314,6 +1319,8 @@ void render_match(const match_state_t& state) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Build");
         } else if (button == UI_BUTTON_CANCEL) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Cancel");
+        } else if (button == UI_BUTTON_UNLOAD) {
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Unload");
         } else if (button >= UI_BUTTON_UNIT_MINER && button < UI_BUTTON_UNIT_MINER + UNIT_DATA.size()) {
             UnitType unit_type = (UnitType)(UNIT_MINER + (button - UI_BUTTON_UNIT_MINER));
             const unit_data_t& unit_data = UNIT_DATA.at(unit_type);
