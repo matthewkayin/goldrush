@@ -234,6 +234,19 @@ struct building_data_t {
     int builder_flip_h[3];
 };
 
+// More UI
+
+enum UiButtonRequirementsType {
+    UI_BUTTON_REQUIRES_BUILDING
+};
+
+struct ui_button_requirements_t {
+    UiButtonRequirementsType type;
+    union {
+        BuildingType building_type;
+    };
+};
+
 // Input
 
 enum InputType {
@@ -361,6 +374,7 @@ void ui_show_status(match_state_t& state, const char* message);
 UiButton ui_get_ui_button(const match_state_t& state, int index);
 int ui_get_ui_button_hovered(const match_state_t& state);
 const rect_t& ui_get_ui_button_rect(int index);
+bool ui_button_requirements_met(const match_state_t& state, UiButton button);
 void ui_handle_button_pressed(match_state_t& state, UiButton button);
 bool ui_is_mouse_in_ui();
 xy ui_get_building_cell(const match_state_t& state);
@@ -425,5 +439,6 @@ uint32_t building_queue_item_cost(const building_queue_item_t& item);
 uint32_t building_queue_population_cost(const building_queue_item_t& item);
 
 extern const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS;
+extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
 extern const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA;
 extern const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA;

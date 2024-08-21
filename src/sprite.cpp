@@ -39,14 +39,14 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_UI_BUTTON, (sprite_params_t) {
         .path = "sprite/ui_button.png",
-        .hframes = 2,
+        .hframes = 3,
         .vframes = 1,
         .recolor = false
     }},
     { SPRITE_UI_BUTTON_ICON, (sprite_params_t) {
         .path = "sprite/ui_button_icon.png",
         .hframes = UI_BUTTON_COUNT - 1,
-        .vframes = 2,
+        .vframes = 3,
         .recolor = false
     }},
     { SPRITE_UI_TOOLTIP_FRAME, (sprite_params_t) {

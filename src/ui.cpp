@@ -12,7 +12,7 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_MINER, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_BUILD,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_CAMP, UI_BUTTON_BUILD_SALOON,
+    { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_CAMP, UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_SALOON,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
@@ -33,6 +33,16 @@ static const rect_t UI_BUTTON_RECT[6] = {
     rect_t(UI_BUTTON_POSITIONS[3], UI_BUTTON_SIZE),
     rect_t(UI_BUTTON_POSITIONS[4], UI_BUTTON_SIZE),
     rect_t(UI_BUTTON_POSITIONS[5], UI_BUTTON_SIZE),
+};
+const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS = {
+    { UI_BUTTON_BUILD_HOUSE, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = BUILDING_CAMP
+    }},
+    { UI_BUTTON_BUILD_SALOON, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = BUILDING_CAMP
+    }}
 };
 
 void ui_show_status(match_state_t& state, const char* message) {
@@ -67,7 +77,31 @@ const rect_t& ui_get_ui_button_rect(int index) {
     return UI_BUTTON_RECT[index];
 }
 
+bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
+    auto ui_button_requirements_it = UI_BUTTON_REQUIREMENTS.find(button);
+
+    // Buttons with no defined requirements are enabled by default
+    if (ui_button_requirements_it == UI_BUTTON_REQUIREMENTS.end()) {
+        return true;
+    }
+
+    switch (ui_button_requirements_it->second.type) {
+        case UI_BUTTON_REQUIRES_BUILDING: {
+            for (const building_t& building : state.buildings) {
+                if (building.player_id == network_get_player_id() && building.mode == BUILDING_MODE_FINISHED && building.type == ui_button_requirements_it->second.building_type) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+}
+
 void ui_handle_button_pressed(match_state_t& state, UiButton button) {
+    if (!ui_button_requirements_met(state, button)) {
+        return;
+    }
+
     switch (button) {
         case UI_BUTTON_STOP: {
             if (state.selection.type == SELECTION_TYPE_UNITS) {

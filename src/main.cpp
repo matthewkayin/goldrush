@@ -1257,11 +1257,17 @@ void render_match(const match_state_t& state) {
             continue;
         }
 
-        bool is_button_hovered = ui_get_ui_button_hovered(state) == i;
+        bool is_button_hovered = ui_get_ui_button_hovered(state) == i && ui_button_requirements_met(state, ui_button);
         bool is_button_pressed = is_button_hovered && input_is_mouse_button_pressed(MOUSE_BUTTON_LEFT);
         xy offset = is_button_pressed ? xy(1, 1) : (is_button_hovered ? xy(0, -1) : xy(0, 0));
-        render_sprite(SPRITE_UI_BUTTON, xy(is_button_hovered && !is_button_pressed ? 1 : 0, 0), ui_get_ui_button_rect(i).position + offset);
-        render_sprite(SPRITE_UI_BUTTON_ICON, xy(ui_button - 1, is_button_hovered && !is_button_pressed ? 1 : 0), ui_get_ui_button_rect(i).position + offset);
+        int button_state = 0;
+        if (!ui_button_requirements_met(state, ui_button)) {
+            button_state = 2;
+        } else if (is_button_hovered && !is_button_pressed) {
+            button_state = 1;
+        }
+        render_sprite(SPRITE_UI_BUTTON, xy(button_state, 0), ui_get_ui_button_rect(i).position + offset);
+        render_sprite(SPRITE_UI_BUTTON_ICON, xy(ui_button - 1, button_state), ui_get_ui_button_rect(i).position + offset);
     }
 
     // UI Building queues
@@ -1311,7 +1317,18 @@ void render_match(const match_state_t& state) {
 
         UiButton button = ui_get_ui_button(state, ui_get_ui_button_hovered(state));
         GOLD_ASSERT(button != UI_BUTTON_NONE && button != UI_BUTTON_MOVE);
-        if (button == UI_BUTTON_ATTACK) {
+        if (!ui_button_requirements_met(state, button)) {
+            auto ui_button_requirements_it = UI_BUTTON_REQUIREMENTS.find(button);
+            GOLD_ASSERT(ui_button_requirements_it != UI_BUTTON_REQUIREMENTS.end());
+
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Requires ");
+            switch (ui_button_requirements_it->second.type) {
+                case UI_BUTTON_REQUIRES_BUILDING: {
+                    tooltip_text_ptr += sprintf(tooltip_text_ptr, "%s", BUILDING_DATA.at(ui_button_requirements_it->second.building_type).name);
+                    break;
+                }
+            }
+        } else if (button == UI_BUTTON_ATTACK) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Attack");
         } else if (button == UI_BUTTON_STOP) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Stop");
@@ -1334,9 +1351,11 @@ void render_match(const match_state_t& state) {
             tooltip_gold_cost = building_data.cost;
         }
 
-        tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
-        tooltip_text_ptr += sdlk_to_str(tooltip_text_ptr, hotkey_keymap.at(button));
-        tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
+        if (ui_button_requirements_met(state, button)) {
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
+            tooltip_text_ptr += sdlk_to_str(tooltip_text_ptr, hotkey_keymap.at(button));
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
+        }
 
         SDL_Surface* tooltip_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_WESTERN8], tooltip_text, COLOR_OFFBLACK);
         if (tooltip_text_surface == NULL) {
