@@ -137,12 +137,9 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
             }
         }
 
-        if (nearest_alternate_distance == -1) {
-            path->clear();
-            return;
+        if (nearest_alternate_distance != -1) {
+            to = nearest_alternate;
         }
-
-        to = nearest_alternate;
     }
 
     std::vector<node_t> frontier;
@@ -209,7 +206,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
             // Don't consider blocked spaces, unless:
             // 1. the blocked space is a unit that is very far away. we pretend such spaces are blocked since the unit will probably move by the time we get there
             // 2. the blocked space is the target_cell. by allowing the path to go here we can avoid worst-case pathfinding even when the target_cell is blocked
-            if (!(child.cell == to && xy::manhattan_distance(smallest.cell, child.cell) == 1)) {
+            if (child.cell != to || xy::manhattan_distance(smallest.cell, child.cell) != 1) {
                 if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(child.cell, cell_size))) {
                     continue;
                 }
