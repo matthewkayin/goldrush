@@ -975,16 +975,23 @@ void render_match(const match_state_t& state) {
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map_width);
-            tile_src_rect.x = (state.map_tiles[map_index] % engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
-            tile_src_rect.y = (state.map_tiles[map_index] / engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
+            tile_src_rect.x = ((int)state.map_tiles[map_index].base % engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
+            tile_src_rect.y = ((int)state.map_tiles[map_index].base / engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
 
             tile_dst_rect.x = base_pos.x + (x * TILE_SIZE);
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
 
-            if (map_is_cell_rect_blocked_pathfind(state, state.units[0].cell, rect_t(base_coords + xy(x, y), xy(1, 1)))) {
-                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+            // Render decorations
+            if (state.map_tiles[map_index].decoration != 0) {
+                ysorted.push_back((render_sprite_params_t) {
+                    .sprite = SPRITE_TILE_DECORATION,
+                    .position = xy(tile_dst_rect.x, tile_dst_rect.y),
+                    .frame = xy(state.map_tiles[map_index].decoration - 1, 0),
+                    .options = RENDER_SPRITE_NO_CULL,
+                    .recolor_name = RECOLOR_NONE
+                });
             }
 
             // Render gold

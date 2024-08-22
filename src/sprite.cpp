@@ -13,6 +13,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = -1,
         .recolor = false
     }},
+    { SPRITE_TILE_DECORATION, (sprite_params_t) {
+        .path = "sprite/tile_decorations.png",
+        .hframes = -1,
+        .vframes = -1,
+        .recolor = false
+    }},
     { SPRITE_UI_FRAME, (sprite_params_t) {
         .path = "sprite/frame.png",
         .hframes = 3,

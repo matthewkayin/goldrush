@@ -153,7 +153,7 @@ rect_t building_get_rect(const building_t& building) {
 
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell) {
     rect_t building_rect = rect_t(cell, building_cell_size(type));
-    if (!map_is_cell_in_bounds(state, building_rect.position + building_rect.size)) {
+    if (!map_is_cell_in_bounds(state, building_rect.position + building_rect.size - xy(1, 1))) {
         return false;
     }
 

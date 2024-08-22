@@ -32,8 +32,14 @@ const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_MAX = 5;
 const uint32_t BUILDING_FADE_DURATION = 300;
 
+struct tile_t {
+    uint16_t base;
+    uint16_t decoration;
+};
+
 enum CellType: uint16_t {
     CELL_EMPTY,
+    CELL_BLOCKED,
     CELL_UNIT,
     CELL_BUILDING,
     CELL_GOLD1,
@@ -347,7 +353,7 @@ struct match_state_t {
     uint32_t tick_timer;
 
     // Map
-    std::vector<uint32_t> map_tiles;
+    std::vector<tile_t> map_tiles;
     std::vector<cell_t> map_cells;
     std::vector<fog_t> map_fog;
     uint32_t map_width;

@@ -60,7 +60,10 @@ match_state_t match_init() {
     // Init map
     state.map_width = 64;
     state.map_height = 64;
-    state.map_tiles = std::vector<uint32_t>(state.map_width * state.map_height);
+    state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
+        .base = 0,
+        .decoration = 0
+    });
     state.map_cells = std::vector<cell_t>(state.map_width * state.map_height, (cell_t) {
         .type = CELL_EMPTY,
         .value = 0
@@ -71,14 +74,10 @@ match_state_t match_init() {
     });
     state.is_fog_dirty = true;
 
-    for (uint32_t i = 0; i < state.map_width * state.map_height; i += 3) {
-        state.map_tiles[i] = 1;
-    }
-    for (uint32_t y = 0; y < state.map_height; y++) {
-        for (uint32_t x = 0; x < state.map_width; x++) {
-            if (y == 0 || y == state.map_height - 1 || x == 0 || x == state.map_width - 1) {
-                state.map_tiles[x + (y * state.map_width)] = 2;
-            }
+    for (uint32_t i = 0; i < state.map_width * state.map_height; i++) {
+        int new_base = lcg_rand() % 7;
+        if (new_base < 4 && i % 3 == 0) {
+            state.map_tiles[i].base = new_base == 1 ? 2 : 1; 
         }
     }
 
@@ -160,6 +159,30 @@ match_state_t match_init() {
                 break;
             }
             gold_cell += DIRECTION_XY[direction];
+        }
+    }
+
+    // Place decorations on the map
+    for (int i = 0; i < state.map_width * state.map_height; i++) {
+        if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map_cells[i].type == CELL_EMPTY) {
+            bool is_gold_nearby = false;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                xy cell = xy(i % state.map_width, i / state.map_height) + DIRECTION_XY[direction];
+                if (map_is_cell_in_bounds(state, cell) && map_get_cell(state, cell).type != CELL_EMPTY) {
+                    is_gold_nearby = true;
+                    break;
+                }
+            }
+
+            if (is_gold_nearby) {
+                continue;
+            }
+
+            state.map_tiles[i] = (tile_t) {
+                .base = 0,
+                .decoration = (uint16_t)(1 + (rand() % 5))
+            };
+            state.map_cells[i].type = CELL_BLOCKED;
         }
     }
 
