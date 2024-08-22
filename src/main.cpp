@@ -1117,6 +1117,20 @@ void render_match(const match_state_t& state) {
         }
     }
 
+    // Rally points
+    if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+        const building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
+        if (building.mode == BUILDING_MODE_FINISHED && building.rally_point.x != -1) {
+            ysorted.push_back((render_sprite_params_t) {
+                .sprite = SPRITE_RALLY_FLAG,
+                .position = building.rally_point - xy(4, 15) - state.camera_offset,
+                .frame = state.ui_rally_animation.frame,
+                .options = 0,
+                .recolor_name = (RecolorName)network_get_player_id()
+            });
+        }
+    }
+
     // Buildings
     for (const building_t& building : state.buildings) {
         if (building.mode == BUILDING_MODE_DESTROYED) {

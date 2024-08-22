@@ -11,7 +11,8 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .max_health = 150,
         .builder_positions_x = { 3, 16, -4 },
         .builder_positions_y = { 15, 15, 3 },
-        .builder_flip_h = { false, true, false }
+        .builder_flip_h = { false, true, false },
+        .can_rally = false
     }},
     { BUILDING_CAMP, (building_data_t) {
         .name = "Mining Camp",
@@ -20,7 +21,8 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .max_health = 100,
         .builder_positions_x = { 1, 15, 14 },
         .builder_positions_y = { 13, 13, 2 },
-        .builder_flip_h = { false, true, true }
+        .builder_flip_h = { false, true, true },
+        .can_rally = false
     }},
     { BUILDING_SALOON, (building_data_t) {
         .name = "Saloon",
@@ -29,7 +31,8 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .max_health = 200,
         .builder_positions_x = { 6, 27, 9 },
         .builder_positions_y = { 32, 27, 9 },
-        .builder_flip_h = { false, true, false }
+        .builder_flip_h = { false, true, false },
+        .can_rally = true
     }}
 };
 
@@ -45,6 +48,7 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
 
     building.mode = BUILDING_MODE_IN_PROGRESS;
     building.queue_timer = 0;
+    building.rally_point = xy(-1, -1);
 
     entity_id building_id = state.buildings.push_back(building);
     map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_size, building_data.cell_size)), CELL_BUILDING, building_id);
@@ -96,7 +100,17 @@ void building_update(match_state_t& state, building_t& building) {
                     }
 
                     xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)));
-                    unit_create(state, building.player_id, item.unit_type, unit_spawn_cell);
+                    entity_id unit_id = unit_create(state, building.player_id, item.unit_type, unit_spawn_cell);
+                    if (building.rally_point.x != -1) {
+                        xy rally_cell = building.rally_point / TILE_SIZE;
+                        unit_t& unit = state.units.get_by_id(unit_id);
+                        unit.target = (unit_target_t) {
+                            .type = map_is_cell_gold(state, rally_cell) && unit.type == UNIT_MINER
+                                        ? UNIT_TARGET_GOLD 
+                                        : UNIT_TARGET_CELL,
+                            .cell = rally_cell
+                        };
+                    }
                     item_should_dequeue = true;
 
                     break;

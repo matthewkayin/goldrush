@@ -58,7 +58,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
 
 // Unit
 
-void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell) {
+entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell) {
     auto it = UNIT_DATA.find(type);
     GOLD_ASSERT(it != UNIT_DATA.end());
 
@@ -81,6 +81,7 @@ void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const x
 
     entity_id unit_id = state.units.push_back(unit);
     map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
+    return unit_id;
 }
 
 void unit_destroy(match_state_t& state, uint32_t unit_index) {

@@ -198,6 +198,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 8,
         .vframes = 6,
         .recolor = false
+    }},
+    { SPRITE_RALLY_FLAG, (sprite_params_t) {
+        .path = "sprite/rally_flag.png",
+        .hframes = 6,
+        .vframes = 1,
+        .recolor = true
     }}  
 };
 
@@ -249,6 +255,12 @@ const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
         .hframe_start = 12, .hframe_end = 14,
         .frame_duration = 180,
         .loops = 1
+    }},
+    { ANIMATION_RALLY_FLAG, (animation_data_t) {
+        .vframe = 0,
+        .hframe_start = 0, .hframe_end = 5,
+        .frame_duration = 6,
+        .loops = ANIMATION_LOOPS_INDEFINITELY
     }}
 };
 

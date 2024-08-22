@@ -31,6 +31,7 @@ match_state_t match_init() {
     state.ui_buttonset = UI_BUTTONSET_NONE;
     state.camera_offset = xy(0, 0);
     state.ui_status_timer = 0;
+    state.ui_rally_animation = animation_create(ANIMATION_RALLY_FLAG);
     for (uint32_t i = 0; i < 9; i++) {
         state.control_groups[i] = (selection_t) {
             .type = SELECTION_TYPE_NONE
@@ -493,6 +494,31 @@ void match_update(match_state_t& state) {
         }
     }
 
+    // RALLY POINT
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT) && 
+        state.selection.type == SELECTION_TYPE_BUILDINGS && 
+        (MINIMAP_RECT.has_point(mouse_pos) || !ui_is_mouse_in_ui())) {
+        building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
+        if (building.mode == BUILDING_MODE_FINISHED && BUILDING_DATA.at(building.type).can_rally) {
+            xy move_target;
+            if (ui_is_mouse_in_ui()) {
+                xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
+                move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
+                                    (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+            } else {
+                move_target = mouse_world_pos;
+            }
+
+            input_t input;
+            input.type = INPUT_RALLY;
+            input.rally = (input_rally_t) {
+                .building_id = state.selection.ids[0],
+                .rally_point = move_target
+            };
+            state.input_queue.push_back(input);
+        }
+    }
+
     // CAMERA DRAG
     if (state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
         xy camera_drag_direction = xy(0, 0);
@@ -522,6 +548,7 @@ void match_update(match_state_t& state) {
     if (animation_is_playing(state.ui_move_animation)) {
         animation_update(state.ui_move_animation);
     }
+    animation_update(state.ui_rally_animation);
 
     // Update units
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
@@ -683,6 +710,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.unload_all.unit_count * sizeof(entity_id);
             break;
         }
+        case INPUT_RALLY: {
+            memcpy(out_buffer + out_buffer_length, &input.rally.building_id, sizeof(entity_id));
+            out_buffer_length += sizeof(entity_id);
+
+            memcpy(out_buffer + out_buffer_length, &input.rally.rally_point, sizeof(xy));
+            out_buffer_length += sizeof(xy);
+            break;
+        }
         default:
             break;
     }
@@ -746,6 +781,13 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             memcpy(input.unload_all.unit_ids, in_buffer + in_buffer_head, input.unload_all.unit_count * sizeof(entity_id));
             in_buffer_head += input.unload_all.unit_count * sizeof(entity_id);
             break;
+        }
+        case INPUT_RALLY: {
+            memcpy(&input.rally.building_id, in_buffer + in_buffer_head, sizeof(entity_id));
+            in_buffer_head += sizeof(entity_id);
+
+            memcpy(&input.rally.rally_point, in_buffer + in_buffer_head, sizeof(xy));
+            in_buffer_head += sizeof(xy);
         }
         default:
             break;
@@ -983,6 +1025,13 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
             }
             break;
+        }
+        case INPUT_RALLY: {
+            uint32_t building_index = state.buildings.get_index_of(input.rally.building_id);
+            if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
+                return;
+            }
+            state.buildings[building_index].rally_point = input.rally.rally_point;
         }
         default:
             break;

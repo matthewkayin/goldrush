@@ -222,6 +222,7 @@ struct building_t {
 
     std::vector<building_queue_item_t> queue;
     uint32_t queue_timer;
+    xy rally_point;
 };
 
 struct building_data_t {
@@ -232,6 +233,7 @@ struct building_data_t {
     int builder_positions_x[3];
     int builder_positions_y[3];
     int builder_flip_h[3];
+    bool can_rally;
 };
 
 // More UI
@@ -261,7 +263,8 @@ enum InputType {
     INPUT_BUILD_CANCEL,
     INPUT_BUILDING_ENQUEUE,
     INPUT_BUILDING_DEQUEUE,
-    INPUT_UNLOAD_ALL
+    INPUT_UNLOAD_ALL,
+    INPUT_RALLY
 };
 
 struct input_move_t {
@@ -300,6 +303,11 @@ struct input_unload_all_t {
     entity_id unit_ids[MAX_UNITS];
 };
 
+struct input_rally_t {
+    entity_id building_id;
+    xy rally_point;
+};
+
 struct input_t {
     uint8_t type;
     union {
@@ -310,6 +318,7 @@ struct input_t {
         input_building_enqueue_t building_enqueue;
         input_building_dequeue_t building_dequeue;
         input_unload_all_t unload_all;
+        input_rally_t rally;
     };
 };
 
@@ -326,6 +335,7 @@ struct match_state_t {
     BuildingType ui_building_type;
     cell_t ui_move_cell;
     animation_t ui_move_animation;
+    animation_t ui_rally_animation;
     xy ui_move_position;
     selection_t control_groups[9];
     uint32_t control_group_double_click_timer;
@@ -399,7 +409,7 @@ fog_t map_get_fog(const match_state_t& state, xy cell);
 void map_update_fog(match_state_t& state);
 
 // Unit
-void unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
+entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
 void unit_destroy(match_state_t& state, uint32_t unit_index);
 void unit_update(match_state_t& state, uint32_t unit_index);
 xy unit_cell_size(UnitType type);
