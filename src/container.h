@@ -41,7 +41,7 @@ struct id_array {
         GOLD_ASSERT(index != INDEX_INVALID);
         return data[index];
     }
-    T& get_by_id(entity_id id) const {
+    const T& get_by_id(entity_id id) const {
         uint32_t index = get_index_of(id);
         GOLD_ASSERT(index != INDEX_INVALID);
         return data[index];

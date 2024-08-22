@@ -921,6 +921,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             if (state.player_gold[player_id] < building_queue_item_cost(input.building_enqueue.item)) {
                 return;
             }
+            if (state.buildings[building_index].queue.size() == BUILDING_QUEUE_MAX) {
+                return;
+            }
 
             state.player_gold[player_id] -= building_queue_item_cost(input.building_enqueue.item);
             building_enqueue(state.buildings[building_index], input.building_enqueue.item);

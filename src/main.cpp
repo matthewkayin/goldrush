@@ -193,10 +193,23 @@ SDL_Rect rect_to_sdl(const rect_t& r) {
     return (SDL_Rect) { .x = r.position.x, .y = r.position.y, .w = r.size.x, .h = r.size.y };
 }
 
+struct render_sprite_params_t {
+    Sprite sprite;
+    xy position;
+    xy frame;
+    uint32_t options;
+    RecolorName recolor_name;
+};
+const uint32_t RENDER_SPRITE_FLIP_H = 1;
+const uint32_t RENDER_SPRITE_CENTERED = 1 << 1;
+const uint32_t RENDER_SPRITE_NO_CULL = 1 << 2;
+
 bool engine_init(xy window_size);
 void engine_quit();
 int sdlk_to_str(char* str, SDL_Keycode key);
 void render_text(Font font, const char* text, SDL_Color color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
+void render_text_with_text_frame(const char* text, xy position);
+void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, RecolorName recolor_name = RECOLOR_NONE);
 void render_menu(const menu_state_t& menu);
 void render_match(const match_state_t& state);
 
@@ -743,6 +756,42 @@ void render_text(Font font, const char* text, SDL_Color color, xy position, Text
     SDL_DestroyTexture(text_texture);
 }
 
+void render_text_with_text_frame(const char* text, xy position) {
+    SDL_Surface* text_surface = TTF_RenderText_Solid(engine.fonts[FONT_WESTERN8], text, COLOR_OFFBLACK);
+    if (text_surface == NULL) {
+        log_error("Unable to render text to surface: %s", TTF_GetError());
+        return;
+    }
+
+    int frame_width = (text_surface->w / 15) + 1;
+    if (text_surface->w % 15 != 0) {
+        frame_width++;
+    }
+    for (int frame_x = 0; frame_x < frame_width; frame_x++) {
+        int x_frame = 1;
+        if (frame_x == 0) {
+            x_frame = 0;
+        } else if (frame_x == frame_width - 1) {
+            x_frame = 2;
+        }
+        render_sprite(SPRITE_UI_TEXT_FRAME, xy(x_frame, 0), position + xy(frame_x * 15, 0), RENDER_SPRITE_NO_CULL);
+    }
+
+    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(engine.renderer, text_surface);
+    if (text_texture == NULL) {
+        log_error("Unable to creature texture from text surface: %s", SDL_GetError());
+        return;
+    }
+
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, . y = 0, .w = text_surface->w, .h = text_surface->h };
+    SDL_Rect dst_rect = (SDL_Rect) { .x = position.x + ((frame_width * 15) / 2) - (text_surface->w / 2), .y = position.y + 2, .w = src_rect.w, .h = src_rect.h };
+
+    SDL_RenderCopy(engine.renderer, text_texture, &src_rect, &dst_rect);
+
+    SDL_DestroyTexture(text_texture);
+    SDL_FreeSurface(text_surface);
+}
+
 void render_menu(const menu_state_t& menu) {
     if (menu.mode == MENU_MODE_MATCH_START) {
         return;
@@ -821,18 +870,7 @@ void render_menu(const menu_state_t& menu) {
     }
 }
 
-struct render_sprite_params_t {
-    Sprite sprite;
-    xy position;
-    xy frame;
-    uint32_t options;
-    RecolorName recolor_name;
-};
-const uint32_t RENDER_SPRITE_FLIP_H = 1;
-const uint32_t RENDER_SPRITE_CENTERED = 1 << 1;
-const uint32_t RENDER_SPRITE_NO_CULL = 1 << 2;
-
-void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, RecolorName recolor_name = RECOLOR_NONE) {
+void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options, RecolorName recolor_name) {
     GOLD_ASSERT(frame.x < engine.sprites[sprite].hframes && frame.y < engine.sprites[sprite].vframes);
 
     bool flip_h = (options & RENDER_SPRITE_FLIP_H) == RENDER_SPRITE_FLIP_H;
@@ -1270,25 +1308,98 @@ void render_match(const match_state_t& state) {
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(ui_button - 1, button_state), ui_get_ui_button_rect(i).position + offset);
     }
 
+    // UI Selection list
+    static const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
+    if (!state.selection.ids.empty()) {
+        for (int i = 0; i < state.selection.ids.size(); i++) {
+            const char* name;
+            int selected_icon;
+            int selected_health;
+            int selected_max_health;
+            if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_ENEMY_UNIT) {
+                const unit_t& unit = state.units.get_by_id(state.selection.ids[i]);
+                name = UNIT_DATA.at(unit.type).name;
+                selected_icon = UI_BUTTON_UNIT_MINER + unit.type - 1;
+                selected_health = unit.health;
+                selected_max_health = UNIT_DATA.at(unit.type).max_health;
+            } else {
+                const building_t& building = state.buildings.get_by_id(state.selection.ids[i]);
+                name = BUILDING_DATA.at(building.type).name;
+                selected_icon = UI_BUTTON_BUILD_HOUSE + (building.type - BUILDING_HOUSE) - 1;
+                selected_health = building.health;
+                selected_max_health = BUILDING_DATA.at(building.type).max_health;
+            }
+
+            if (state.selection.ids.size() != 1) {
+                xy offset = xy(((i % 10) * 34) - 12, (i / 10) * 34);
+                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + offset, RENDER_SPRITE_NO_CULL);
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(selected_icon, 0), SELECTION_LIST_TOP_LEFT + offset, RENDER_SPRITE_NO_CULL);
+            } else {
+                render_text_with_text_frame(name, SELECTION_LIST_TOP_LEFT);
+
+                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(selected_icon, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
+
+                SDL_Rect healthbar_rect = (SDL_Rect) {
+                    .x = SELECTION_LIST_TOP_LEFT.x,
+                    .y = SELECTION_LIST_TOP_LEFT.y + 18 + 35,
+                    .w = 64,
+                    .h = 12
+                };
+                SDL_Rect healthbar_subrect = healthbar_rect;
+                healthbar_subrect.w = (healthbar_rect.w * selected_health) / selected_max_health;
+                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+
+                char health_text[10];        
+                sprintf(health_text, "%i/%i", selected_health, selected_max_health);
+                SDL_Surface* health_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_HACK], health_text, COLOR_WHITE);
+                if (health_text_surface == NULL) {
+                    log_error("Unable to render text to surface: %s", TTF_GetError());
+                    return;
+                }
+                SDL_Texture* health_text_texture = SDL_CreateTextureFromSurface(engine.renderer, health_text_surface);
+                if (health_text_texture == NULL) {
+                    log_error("Unable to create text texture from surface: %s", SDL_GetError());
+                    return;
+                }
+                SDL_Rect health_text_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = health_text_surface->w, .h = health_text_surface->h };
+                SDL_Rect health_text_dst_rect = (SDL_Rect) { 
+                    .x = healthbar_rect.x + (healthbar_rect.w / 2) - (health_text_surface->w / 2), 
+                    .y = healthbar_rect.y + (healthbar_rect.h / 2) - (health_text_surface->h / 2),
+                    .w = health_text_src_rect.w,
+                    .h = health_text_src_rect.h
+                };
+                SDL_RenderCopy(engine.renderer, health_text_texture, &health_text_src_rect, &health_text_dst_rect);
+                SDL_DestroyTexture(health_text_texture);
+                SDL_FreeSurface(health_text_surface);
+            } // End if selection size is 1
+        } // End for each selected unit
+    } // End render selection list
+
     // UI Building queues
     if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
         GOLD_ASSERT(building_index != INDEX_INVALID);
         const building_t& building = state.buildings[building_index];
+        static const xy BUILDING_QUEUE_TOP_LEFT = xy(128, 12);
 
         if (!building.queue.empty()) {
-            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12));
-            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[0]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12));
+            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[0]) - 1, 0), UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT);
 
             for (uint32_t building_queue_index = 1; building_queue_index < building.queue.size(); building_queue_index++) {
-                int icon_x_position = 12 + 16 + (36 * (building_queue_index - 1));
-                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, 12 + 33));
-                render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, 12 + 33));
+                int icon_x_position = BUILDING_QUEUE_TOP_LEFT.x + (36 * (building_queue_index - 1));
+                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, BUILDING_QUEUE_TOP_LEFT.y + 33));
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, BUILDING_QUEUE_TOP_LEFT.y + 33));
             }
 
             static const SDL_Rect BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT = (SDL_Rect) {
-                .x = UI_FRAME_BOTTOM_POSITION.x + 12 + 48 + 4,
-                .y = UI_FRAME_BOTTOM_POSITION.y + 12 + 32 - 8,
+                .x = UI_FRAME_BOTTOM_POSITION.x + BUILDING_QUEUE_TOP_LEFT.x + 32 + 4,
+                .y = UI_FRAME_BOTTOM_POSITION.y + BUILDING_QUEUE_TOP_LEFT.y + 32 - 8,
                 .w = 32 * 3 + (4 * 2),
                 .h = 6
             };
