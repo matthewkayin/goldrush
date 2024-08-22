@@ -1345,9 +1345,23 @@ void render_match(const match_state_t& state) {
             }
 
             if (state.selection.ids.size() != 1) {
-                xy offset = xy(((i % 10) * 34) - 12, (i / 10) * 34);
-                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + offset, RENDER_SPRITE_NO_CULL);
-                render_sprite(SPRITE_UI_BUTTON_ICON, xy(selected_icon, 0), SELECTION_LIST_TOP_LEFT + offset, RENDER_SPRITE_NO_CULL);
+                xy icon_position = SELECTION_LIST_TOP_LEFT + xy(((i % 10) * 34) - 12, (i / 10) * 34);
+                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), icon_position, RENDER_SPRITE_NO_CULL);
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(selected_icon, 0), icon_position, RENDER_SPRITE_NO_CULL);
+
+                SDL_Rect healthbar_rect = (SDL_Rect) {
+                    .x = icon_position.x + 1,
+                    .y = icon_position.y + 32 - 5,
+                    .w = 32 - 2,
+                    .h = 4
+                };
+                SDL_Rect healthbar_subrect = healthbar_rect;
+                healthbar_subrect.w = (healthbar_rect.w * selected_health) / selected_max_health;
+                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
             } else {
                 render_text_with_text_frame(name, SELECTION_LIST_TOP_LEFT);
 
@@ -1395,20 +1409,20 @@ void render_match(const match_state_t& state) {
     } // End render selection list
 
     // UI Building queues
+    static const xy BUILDING_QUEUE_TOP_LEFT = xy(128, 12);
     if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
         GOLD_ASSERT(building_index != INDEX_INVALID);
         const building_t& building = state.buildings[building_index];
-        static const xy BUILDING_QUEUE_TOP_LEFT = xy(128, 12);
 
         if (!building.queue.empty()) {
-            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT);
-            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[0]) - 1, 0), UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT);
+            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT, RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[0]) - 1, 0), UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT, RENDER_SPRITE_NO_CULL);
 
             for (uint32_t building_queue_index = 1; building_queue_index < building.queue.size(); building_queue_index++) {
                 int icon_x_position = BUILDING_QUEUE_TOP_LEFT.x + (36 * (building_queue_index - 1));
-                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, BUILDING_QUEUE_TOP_LEFT.y + 33));
-                render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, BUILDING_QUEUE_TOP_LEFT.y + 33));
+                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, BUILDING_QUEUE_TOP_LEFT.y + 33), RENDER_SPRITE_NO_CULL);
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, BUILDING_QUEUE_TOP_LEFT.y + 33), RENDER_SPRITE_NO_CULL);
             }
 
             static const SDL_Rect BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT = (SDL_Rect) {
@@ -1429,6 +1443,31 @@ void render_match(const match_state_t& state) {
             SDL_RenderFillRect(engine.renderer, &building_queue_progress_bar_rect);
             SDL_SetRenderDrawColor(engine.renderer, COLOR_BLACK.r, COLOR_BLACK.g, COLOR_BLACK.b, COLOR_BLACK.a);
             SDL_RenderDrawRect(engine.renderer, &BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT);
+        }
+    }
+
+    // UI Ferried units
+    if (state.selection.type == SELECTION_TYPE_UNITS && state.selection.ids.size() == 1) {
+        const unit_t& unit = state.units.get_by_id(state.selection.ids[0]);
+        for (int i = 0; i < unit.ferried_units.size(); i++) {
+            const unit_t& ferried_unit = state.units.get_by_id(unit.ferried_units[i]);
+            xy icon_position = UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy((i % 4) * 34, (i / 4) * 33);
+            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(UI_BUTTON_UNIT_MINER + ferried_unit.type - 1, 0), icon_position, RENDER_SPRITE_NO_CULL);
+
+            SDL_Rect healthbar_rect = (SDL_Rect) {
+                .x = icon_position.x + 1,
+                .y = icon_position.y + 32 - 5,
+                .w = 32 - 2,
+                .h = 4
+            };
+            SDL_Rect healthbar_subrect = healthbar_rect;
+            healthbar_subrect.w = (healthbar_rect.w * ferried_unit.health) / UNIT_DATA.at(ferried_unit.type).max_health;
+            SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+            SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+            SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+            SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
         }
     }
 
