@@ -8,7 +8,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .name = "House",
         .cell_size = 2,
         .cost = 100,
-        .max_health = 150,
+        .max_health = 400,
         .builder_positions_x = { 3, 16, -4 },
         .builder_positions_y = { 15, 15, 3 },
         .builder_flip_h = { false, true, false },
@@ -18,7 +18,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .name = "Mining Camp",
         .cell_size = 2,
         .cost = 75,
-        .max_health = 100,
+        .max_health = 300,
         .builder_positions_x = { 1, 15, 14 },
         .builder_positions_y = { 13, 13, 2 },
         .builder_flip_h = { false, true, true },
@@ -28,7 +28,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .name = "Saloon",
         .cell_size = 3,
         .cost = 200,
-        .max_health = 200,
+        .max_health = 800,
         .builder_positions_x = { 6, 27, 9 },
         .builder_positions_y = { 32, 27, 9 },
         .builder_flip_h = { false, true, false },
@@ -184,7 +184,7 @@ Sprite building_get_select_ring(BuildingType type, bool is_enemy) {
 uint32_t building_queue_item_duration(const building_queue_item_t& item) {
     switch (item.type) {
         case BUILDING_QUEUE_ITEM_UNIT: {
-            return UNIT_DATA.at(item.unit_type).train_duration;
+            return UNIT_DATA.at(item.unit_type).train_duration * 60;
         }
     }
 }

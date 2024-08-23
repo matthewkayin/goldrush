@@ -8,15 +8,15 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .sprite = SPRITE_UNIT_MINER,
         .cell_size = 1,
         .max_health = 20,
-        .damage = 5,
+        .damage = 3,
         .armor = 0,
         .range_squared = 1,
         .attack_cooldown = 16,
-        .speed = fixed::from_int(1),
+        .speed = fixed::from_int_and_raw_decimal(0, 200),
         .sight = 7,
         .cost = 50,
         .population_cost = 1,
-        .train_duration = 300,
+        .train_duration = 20,
         .ferry_capacity = 0,
         .ferry_size = 1
     }},
@@ -24,16 +24,16 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .name = "Cowboy",
         .sprite = SPRITE_UNIT_COWBOY,
         .cell_size = 1,
-        .max_health = 60,
-        .damage = 8,
+        .max_health = 40,
+        .damage = 4,
         .armor = 1,
         .range_squared = 25,
         .attack_cooldown = 30,
-        .speed = fixed::from_int_and_raw_decimal(0, 225),
+        .speed = fixed::from_int_and_raw_decimal(0, 200),
         .sight = 7,
-        .cost = 100,
-        .population_cost = 2,
-        .train_duration = 400,
+        .cost = 75,
+        .population_cost = 1,
+        .train_duration = 25,
         .ferry_capacity = 0,
         .ferry_size = 1
     }},
@@ -41,16 +41,16 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .name = "Wagon",
         .sprite = SPRITE_UNIT_WAGON,
         .cell_size = 2,
-        .max_health = 100,
+        .max_health = 80,
         .damage = 0,
-        .armor = 2,
+        .armor = 1,
         .range_squared = 1,
         .attack_cooldown = 0,
-        .speed = fixed::from_int(1),
+        .speed = fixed::from_int_and_raw_decimal(1, 80),
         .sight = 10,
-        .cost = 200,
+        .cost = 100,
         .population_cost = 2,
-        .train_duration = 500,
+        .train_duration = 30,
         .ferry_capacity = 4,
         .ferry_size = UNIT_CANT_BE_FERRIED
     }}
@@ -496,8 +496,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         GOLD_ASSERT(enemy_index != INDEX_INVALID);
                         building_t& enemy = state.buildings[enemy_index];
 
-                        // NOTE: Building armor is hard-coded to 1
-                        int damage = std::min(1, unit_get_damage(state, unit) - 1);
+                        // NOTE: Buildings have no armor 
+                        int damage = std::min(1, unit_get_damage(state, unit));
                         enemy.health = std::max(0, enemy.health - damage);
                     }
 
