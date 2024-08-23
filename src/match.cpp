@@ -19,8 +19,8 @@ static const int CAMERA_DRAG_SPEED = 8;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
-// static const uint32_t PLAYER_STARTING_GOLD = 275;
-static const uint32_t PLAYER_STARTING_GOLD = 1000;
+static const uint32_t PLAYER_STARTING_GOLD = 275;
+// static const uint32_t PLAYER_STARTING_GOLD = 1000;
 static const uint32_t MAP_GOLD_CELL_AMOUNT = 300;
 
 match_state_t match_init() {
@@ -58,8 +58,8 @@ match_state_t match_init() {
     state.tick_timer = 0;
 
     // Init map
-    state.map_width = 64;
-    state.map_height = 64;
+    state.map_width = 128;
+    state.map_height = 128;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
         .base = 0,
         .decoration = 0
@@ -117,11 +117,18 @@ match_state_t match_init() {
     // Place gold on the map
     int gold_target = 128;
     int gold_count = 0;
+    int gold_margin = state.map_width / 4;
     while (gold_count < gold_target) {
         // Randomly find the start of a gold cluster
         xy gold_cell;
-        gold_cell.x = lcg_rand() % state.map_width;
-        gold_cell.y = lcg_rand() % state.map_height;
+        gold_cell.x = lcg_rand() % state.map_width; 
+        gold_cell.y = lcg_rand() % state.map_height; 
+        if (gold_cell.x < gold_margin || gold_cell.x > state.map_width - gold_margin || gold_cell.y < gold_margin || gold_cell.y > state.map_height - gold_margin) {
+            if (lcg_rand() % 3 == 0) {
+                gold_cell.x = gold_margin + (lcg_rand() % (state.map_width - (gold_margin * 2)));
+                gold_cell.y = gold_margin + (lcg_rand() % (state.map_height - (gold_margin * 2))); 
+            }
+        }
         if (map_is_cell_blocked(state, gold_cell)) {
             continue;
         }
@@ -130,7 +137,7 @@ match_state_t match_init() {
         bool is_patch_too_close_to_player = false;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
-                xy::manhattan_distance(gold_cell, player_spawns[player_id]) < 6) {
+                xy::manhattan_distance(gold_cell, player_spawns[player_id]) < 24) {
                     is_patch_too_close_to_player = true;
                     break;
             }
@@ -140,7 +147,11 @@ match_state_t match_init() {
         }
 
         // Place gold on the map around the cluster
-        int cluster_size = std::min(3 + (lcg_rand() % 7), gold_target - gold_count);
+        int cluster_max = 7;
+        if (gold_cell.x < gold_margin || gold_cell.x > state.map_width - gold_margin || gold_cell.y < gold_margin || gold_cell.y > state.map_height - gold_margin) {
+            cluster_max = 3;
+        }
+        int cluster_size = std::min(2 + (lcg_rand() % cluster_max), gold_target - gold_count);
         for (int i = 0; i < cluster_size; i++) {
             int gold_offset = lcg_rand() % 3;
             map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), MAP_GOLD_CELL_AMOUNT);

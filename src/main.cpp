@@ -1233,7 +1233,9 @@ void render_match(const match_state_t& state) {
             tile_dst_rect.x = base_pos.x + x * TILE_SIZE;
             tile_dst_rect.y = base_pos.y + y * TILE_SIZE;
             SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog.type == FOG_HIDDEN ? 255 : 128);
+#ifndef GOLD_DEBUG_FOG_DISABLED
             SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+#endif
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
@@ -1695,7 +1697,9 @@ void render_match(const match_state_t& state) {
             fog_rect.x = (x * MINIMAP_RECT.size.x) / (int)state.map_width;
             fog_rect.y = (y * MINIMAP_RECT.size.y) / (int)state.map_height;
             SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog.type == FOG_HIDDEN ? 255 : 128);
+#ifndef GOLD_DEBUG_FOG_DISABLED
             SDL_RenderFillRect(engine.renderer, &fog_rect);
+#endif
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
