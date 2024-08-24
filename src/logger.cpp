@@ -124,7 +124,7 @@ void logger_output(LogLevel log_level, const char* message, ...) {
     static const char* LOG_LEVEL_PREFIXES[4] = { "ERROR", "WARN", "INFO", "TRACE" };
     sprintf(log_message, "[%f - %s]: %s\n", (platform_get_absolute_time() - logger_start_time), LOG_LEVEL_PREFIXES[log_level], out_message);
 
-#ifdef GOLD_DEBUG_CONSOLE
+#ifdef GOLD_DEBUG
     platform_console_write(log_message, log_level);
 #endif
 

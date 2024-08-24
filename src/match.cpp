@@ -10,6 +10,9 @@
 #include <array>
 #include <algorithm>
 
+// This is a define because otherwise the compiler will whine that it's an unused var on release builds
+#define INPUT_MAX_SIZE 256
+
 static const uint32_t TICK_DURATION = 4;
 static const uint8_t TICK_OFFSET = 4;
 
@@ -21,6 +24,7 @@ static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 static const uint32_t PLAYER_STARTING_GOLD = 200;
 // static const uint32_t PLAYER_STARTING_GOLD = 1000;
 static const uint32_t MAP_GOLD_CELL_AMOUNT = 300;
+static const uint32_t WINNING_GOLD_AMOUNT = 5000;
 
 match_state_t match_init() {
     match_state_t state;
@@ -262,6 +266,19 @@ void match_update(match_state_t& state) {
         if (state.ui_mode == UI_MODE_NOT_STARTED) {
             return;
         }
+    }
+
+    // Wait for player to leave the match
+    if (state.ui_mode == UI_MODE_MATCH_OVER) {
+        if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
+            network_disconnect();
+            state.ui_mode = UI_MODE_LEAVE_MATCH;
+        }
+        return;
+    }
+
+    if (state.ui_mode == UI_MODE_MATCH_OVER) {
+        return;
     }
 
     // Poll network events
@@ -679,6 +696,22 @@ void match_update(match_state_t& state) {
     // Update Fog of War
     if (state.is_fog_dirty) {
         map_update_fog(state);
+    }
+
+    // Check for winners
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        if (state.player_gold[player_id] >= WINNING_GOLD_AMOUNT) {
+            state.ui_mode = UI_MODE_MATCH_OVER;
+            if (player_id == network_get_player_id()) {
+                ui_show_status(state, "You win!");
+            } else {
+                ui_show_status(state, "You lose...");
+            }
+            break;
+        }
     }
 }
 

@@ -257,10 +257,6 @@ int gold_main(int argc, char** argv) {
     }
 
     logger_init(logfile_path.c_str());
-    log_error("test log");
-    log_warn("test log");
-    log_info("test log");
-    log_trace("test log");
     log_info("opened with window size %vi", &window_size);
 
     if (!engine_init(window_size)) {
@@ -404,6 +400,10 @@ int gold_main(int argc, char** argv) {
                 }
                 case MODE_MATCH: {
                     match_update(match_state);
+                    if (match_state.ui_mode == UI_MODE_LEAVE_MATCH) {
+                        menu_state = menu_init();
+                        mode = MODE_MENU;
+                    }
                     break;
                 }
             }
