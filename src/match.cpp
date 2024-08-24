@@ -892,8 +892,18 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         case INPUT_MOVE_BUILDING:
         case INPUT_MOVE: {
             // If we tried to move towards a unit, try and find the unit
-            uint32_t target_index = input.move.target_entity_id == ID_NULL ? INDEX_INVALID : state.units.get_index_of(input.move.target_entity_id);
-            if (target_index != INDEX_INVALID && state.units[target_index].health == 0) {
+            uint32_t target_index;
+            if (input.type == INPUT_MOVE_UNIT) {
+                target_index = state.units.get_index_of(input.move.target_entity_id);
+                if (target_index != INDEX_INVALID && state.units[target_index].health == 0) {
+                    target_index = INDEX_INVALID;
+                }
+            } else if (input.type == INPUT_MOVE_BUILDING) {
+                target_index = state.buildings.get_index_of(input.move.target_entity_id);
+                if (target_index != INDEX_INVALID && state.buildings[target_index].health == 0) {
+                    target_index = INDEX_INVALID;
+                }
+            } else {
                 target_index = INDEX_INVALID;
             }
 

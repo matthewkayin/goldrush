@@ -123,7 +123,7 @@ void building_enqueue(match_state_t& state, building_t& building, building_queue
     building.queue.push_back(item);
     if (building.queue.size() == 1) {
         if (building_is_supply_blocked(state, building)) {
-            if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
+            if (building.player_id == network_get_player_id() && building.queue_timer != BUILDING_QUEUE_BLOCKED) {
                 ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
             }
             building.queue_timer = BUILDING_QUEUE_BLOCKED;
@@ -140,7 +140,7 @@ void building_dequeue(match_state_t& state, building_t& building) {
         building.queue_timer = 0;
     } else {
         if (building_is_supply_blocked(state, building)) {
-            if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
+            if (building.player_id == network_get_player_id() && building.queue_timer != BUILDING_QUEUE_BLOCKED) {
                 ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
             }
             building.queue_timer = BUILDING_QUEUE_BLOCKED;
