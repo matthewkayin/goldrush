@@ -1673,6 +1673,9 @@ void render_match(const match_state_t& state) {
         if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, unit_cell_size(unit.type))) {
             continue;
         }
+        if (unit.mode == UNIT_MODE_FERRY) {
+            continue;
+        }
 
         SDL_Rect unit_rect = (SDL_Rect) { 
             .x = (unit.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width, 

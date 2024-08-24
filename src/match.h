@@ -24,8 +24,8 @@ const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 
 const uint32_t UNIT_PATH_PAUSE_DURATION = 30;
 const uint32_t UNIT_BUILD_TICK_DURATION = 6;
-const uint32_t UNIT_MINE_TICK_DURATION = 60;
-const uint32_t UNIT_MAX_GOLD_HELD = 10;
+const uint32_t UNIT_MINE_TICK_DURATION = 40;
+const uint32_t UNIT_MAX_GOLD_HELD = 7;
 const uint32_t UNIT_CANT_BE_FERRIED = 0;
 
 const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;

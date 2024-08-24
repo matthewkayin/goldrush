@@ -148,6 +148,13 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 if (unit.timer == 0) {
                     log_info("path pause timeout. unit gives up");
                     unit.mode = UNIT_MODE_IDLE;
+                    if (unit.target.type == UNIT_TARGET_GOLD) {
+                        unit.target = unit_target_nearest_gold(state, unit);
+                    } else {
+                        unit.target = (unit_target_t) {
+                            .type = UNIT_TARGET_NONE
+                        };
+                    }
                     break;
                 }
 

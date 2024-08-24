@@ -318,7 +318,7 @@ void map_update_fog(match_state_t& state) {
 
     // Reveal based on unit vision
     for (const unit_t& unit : state.units) {
-        if (unit.player_id != network_get_player_id()) {
+        if (unit.player_id != network_get_player_id() || unit.mode == UNIT_MODE_FERRY) {
             continue;
         }
 

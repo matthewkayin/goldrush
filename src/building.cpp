@@ -9,7 +9,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .name = "House",
         .cell_size = 2,
         .cost = 100,
-        .max_health = 400,
+        .max_health = 300,
         .builder_positions_x = { 3, 16, -4 },
         .builder_positions_y = { 15, 15, 3 },
         .builder_flip_h = { false, true, false },
@@ -18,12 +18,12 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     { BUILDING_CAMP, (building_data_t) {
         .name = "Mining Camp",
         .cell_size = 2,
-        .cost = 200,
+        .cost = 150,
         .max_health = 300,
         .builder_positions_x = { 1, 15, 14 },
         .builder_positions_y = { 13, 13, 2 },
         .builder_flip_h = { false, true, true },
-        .can_rally = false
+        .can_rally = true
     }},
     { BUILDING_SALOON, (building_data_t) {
         .name = "Saloon",
