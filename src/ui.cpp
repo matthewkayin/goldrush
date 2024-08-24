@@ -16,7 +16,9 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
-    { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_MINER, UI_BUTTON_UNIT_COWBOY, UI_BUTTON_NONE,
+    { UI_BUTTONSET_CAMP, { UI_BUTTON_UNIT_MINER, UI_BUTTON_NONE, UI_BUTTON_NONE,
+                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
+    { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_COWBOY, UI_BUTTON_NONE, UI_BUTTON_NONE,
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_WAGON, { UI_BUTTON_STOP, UI_BUTTON_UNLOAD, UI_BUTTON_NONE,
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
@@ -51,7 +53,7 @@ void ui_show_status(match_state_t& state, const char* message) {
 }
 
 UiButton ui_get_ui_button(const match_state_t& state, int index) {
-    if (state.ui_buttonset == UI_BUTTONSET_SALOON && index == 5 && !state.buildings[state.buildings.get_index_of(state.selection.ids[0])].queue.empty()) {
+    if (index == 5 && state.selection.type == SELECTION_TYPE_BUILDINGS && !state.buildings[state.buildings.get_index_of(state.selection.ids[0])].queue.empty()) {
         return UI_BUTTON_CANCEL;
     }
 
@@ -124,7 +126,7 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
                 log_info("cancel ui mode %u", state.ui_mode);
-            } else if (state.ui_buttonset == UI_BUTTONSET_SALOON) {
+            } else if (state.selection.type == SELECTION_TYPE_BUILDINGS && !state.buildings.get_by_id(state.selection.ids[0]).queue.empty()) {
                 input_t input = (input_t) {
                     .type = INPUT_BUILDING_DEQUEUE,
                     .building_dequeue = (input_building_dequeue_t) {
@@ -202,8 +204,6 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 ui_show_status(state, UI_STATUS_BUILDING_QUEUE_FULL);
             } else if (state.player_gold[network_get_player_id()] < building_queue_item_cost(item)) {
                 ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
-            } else if (match_get_player_population(state, network_get_player_id()) + building_queue_population_cost(item) > match_get_player_max_population(state, network_get_player_id())) {
-                ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
             } else {
                 input_t input = (input_t) {
                     .type = INPUT_BUILDING_ENQUEUE,
@@ -372,6 +372,8 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
         building_t& building = state.buildings[state.buildings.get_index_of(state.selection.ids[0])];
         if (building.mode == BUILDING_MODE_IN_PROGRESS) {
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
+        } else if (building.type == BUILDING_CAMP) {
+            state.ui_buttonset = UI_BUTTONSET_CAMP;
         } else if (building.type == BUILDING_SALOON) {
             state.ui_buttonset = UI_BUTTONSET_SALOON;
         } else {

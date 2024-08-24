@@ -1418,7 +1418,7 @@ void render_match(const match_state_t& state) {
     } // End render selection list
 
     // UI Building queues
-    static const xy BUILDING_QUEUE_TOP_LEFT = xy(128, 12);
+    static const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
     if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
         GOLD_ASSERT(building_index != INDEX_INVALID);
@@ -1440,18 +1440,20 @@ void render_match(const match_state_t& state) {
                 .w = 32 * 3 + (4 * 2),
                 .h = 6
             };
-            SDL_Rect building_queue_progress_bar_rect = (SDL_Rect) {
-                .x = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x,
-                .y = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y,
-                .w = building.queue_timer == BUILDING_QUEUE_BLOCKED
-                        ? BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.w
-                        : (BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.w * (int)(building_queue_item_duration(building.queue[0]) - building.queue_timer)) / (int)building_queue_item_duration(building.queue[0]),
-                .h = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.h,
-            };
-            SDL_SetRenderDrawColor(engine.renderer, COLOR_WHITE.r, COLOR_WHITE.g, COLOR_WHITE.b, COLOR_WHITE.a);
-            SDL_RenderFillRect(engine.renderer, &building_queue_progress_bar_rect);
-            SDL_SetRenderDrawColor(engine.renderer, COLOR_BLACK.r, COLOR_BLACK.g, COLOR_BLACK.b, COLOR_BLACK.a);
-            SDL_RenderDrawRect(engine.renderer, &BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT);
+            if (building.queue_timer == BUILDING_QUEUE_BLOCKED) {
+                render_text(FONT_WESTERN8, "Build more houses.", COLOR_WHITE, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
+            } else {
+                SDL_Rect building_queue_progress_bar_rect = (SDL_Rect) {
+                    .x = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x,
+                    .y = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y,
+                    .w = (BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.w * (int)(building_queue_item_duration(building.queue[0]) - building.queue_timer)) / (int)building_queue_item_duration(building.queue[0]),
+                    .h = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.h,
+                };
+                SDL_SetRenderDrawColor(engine.renderer, COLOR_WHITE.r, COLOR_WHITE.g, COLOR_WHITE.b, COLOR_WHITE.a);
+                SDL_RenderFillRect(engine.renderer, &building_queue_progress_bar_rect);
+                SDL_SetRenderDrawColor(engine.renderer, COLOR_BLACK.r, COLOR_BLACK.g, COLOR_BLACK.b, COLOR_BLACK.a);
+                SDL_RenderDrawRect(engine.renderer, &BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT);
+            }
         }
     }
 

@@ -19,8 +19,8 @@ static const int CAMERA_DRAG_SPEED = 8;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 275;
-// static const uint32_t PLAYER_STARTING_GOLD = 1000;
+// static const uint32_t PLAYER_STARTING_GOLD = 250;
+static const uint32_t PLAYER_STARTING_GOLD = 1000;
 static const uint32_t MAP_GOLD_CELL_AMOUNT = 300;
 
 match_state_t match_init() {
@@ -108,9 +108,10 @@ match_state_t match_init() {
                                       DIRECTION_XY[spawn_direction].y * ((state.map_height * 6) / 16));
 
         // Place player starting units
-        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-1, -1));
-        unit_create(state, player_id, UNIT_WAGON, player_spawns[player_id] + xy(1, -1));
-        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(0, 1));
+        unit_create(state, player_id, UNIT_WAGON, player_spawns[player_id] + xy(0, 0));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-2, -1));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-2, 0));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(2, 2));
     }
     state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
 
@@ -410,7 +411,7 @@ void match_update(match_state_t& state) {
                             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
                                 uint32_t building_index = state.buildings.get_index_of(id);
                                 if (building_index != INDEX_INVALID) {
-                                    selection_cells.push_back(state.units[building_index].cell);
+                                    selection_cells.push_back(state.buildings[building_index].cell);
                                 }
                             }
                         }
@@ -673,7 +674,7 @@ uint32_t match_get_player_population(const match_state_t& state, uint8_t player_
 }
 
 uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id) {
-    uint32_t max_population = 5;
+    uint32_t max_population = 10;
     for (const building_t& building : state.buildings) {
         if (building.player_id == player_id && building.type == BUILDING_HOUSE && building.mode == BUILDING_MODE_FINISHED) {
             max_population += 10;
@@ -902,7 +903,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         .type = UNIT_TARGET_ATTACK,
                         .cell = unit_target
                     });
-                } else if (input.type == INPUT_MOVE_UNIT && target_index != INDEX_INVALID) {
+                } else if (input.type == INPUT_MOVE_UNIT && target_index != INDEX_INVALID && unit_index != target_index) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_UNIT,
                         .id = input.move.target_entity_id
@@ -1002,7 +1003,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             }
 
             state.player_gold[player_id] -= building_queue_item_cost(input.building_enqueue.item);
-            building_enqueue(state.buildings[building_index], input.building_enqueue.item);
+            building_enqueue(state, state.buildings[building_index], input.building_enqueue.item);
             break;
         }
         case INPUT_BUILDING_DEQUEUE: {
@@ -1015,7 +1016,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             }
 
             state.player_gold[player_id] += building_queue_item_cost(state.buildings[building_index].queue[0]);
-            building_dequeue(state.buildings[building_index]);
+            building_dequeue(state, state.buildings[building_index]);
 
             break;
         }

@@ -82,6 +82,7 @@ enum UiButtonset {
     UI_BUTTONSET_MINER,
     UI_BUTTONSET_BUILD,
     UI_BUTTONSET_CANCEL,
+    UI_BUTTONSET_CAMP,
     UI_BUTTONSET_SALOON,
     UI_BUTTONSET_WAGON,
     UI_BUTTONSET_COUNT
@@ -443,8 +444,9 @@ xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy 
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
 void building_destroy(match_state_t& state, uint32_t building_index);
 void building_update(match_state_t& state, building_t& building);
-void building_enqueue(building_t& building, building_queue_item_t item);
-void building_dequeue(building_t& building);
+void building_enqueue(match_state_t& state, building_t& building, building_queue_item_t item);
+void building_dequeue(match_state_t& state, building_t& building);
+bool building_is_supply_blocked(const match_state_t& state, const building_t& building);
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);

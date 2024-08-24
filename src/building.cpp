@@ -1,6 +1,7 @@
 #include "match.h"
 
 #include "network.h"
+#include "logger.h"
 #include <algorithm>
 
 const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
@@ -17,7 +18,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
     { BUILDING_CAMP, (building_data_t) {
         .name = "Mining Camp",
         .cell_size = 2,
-        .cost = 75,
+        .cost = 200,
         .max_health = 300,
         .builder_positions_x = { 1, 15, 14 },
         .builder_positions_y = { 13, 13, 2 },
@@ -68,6 +69,7 @@ void building_update(match_state_t& state, building_t& building) {
         building.queue_timer = BUILDING_FADE_DURATION;
     }
 
+    // This code uses the queue_timer in order to handle building decay
     if (building.health == 0) {
         if (building.queue_timer != 0) {
             building.queue_timer--;
@@ -76,29 +78,25 @@ void building_update(match_state_t& state, building_t& building) {
     }
 
     if (building.queue_timer != 0) {
+        if (building.queue_timer == BUILDING_QUEUE_BLOCKED && !building_is_supply_blocked(state, building)) {
+            building.queue_timer = building_queue_item_duration(building.queue[0]);
+        } else if (building.queue_timer != BUILDING_QUEUE_BLOCKED && building_is_supply_blocked(state, building)) {
+            building.queue_timer = BUILDING_QUEUE_BLOCKED;
+        }
+
         if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
 #ifdef GOLD_DEBUG_FAST_TRAIN
-            building.queue_timer = std::max((int)building.queue_timer - 50, 0);
+            building.queue_timer = std::max((int)building.queue_timer - 10, 0);
 #else
             building.queue_timer--;
 #endif
         }
         
         // On queue item finish
-        if (building.queue_timer == 0 || building.queue_timer == BUILDING_QUEUE_BLOCKED) {
+        if (building.queue_timer == 0) {
             building_queue_item_t& item = building.queue[0];
-            bool item_should_dequeue = false;
             switch (item.type) {
                 case BUILDING_QUEUE_ITEM_UNIT: {
-                    uint32_t required_population = match_get_player_population(state, building.player_id) + UNIT_DATA.at(item.unit_type).population_cost;
-                    if (match_get_player_max_population(state, building.player_id) < required_population) {
-                        if (building.queue_timer != BUILDING_QUEUE_BLOCKED && building.player_id == network_get_player_id()) {
-                            ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
-                        }
-                        building.queue_timer = BUILDING_QUEUE_BLOCKED;
-                        break;
-                    }
-
                     xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)));
                     entity_id unit_id = unit_create(state, building.player_id, item.unit_type, unit_spawn_cell);
                     if (building.rally_point.x != -1) {
@@ -111,35 +109,56 @@ void building_update(match_state_t& state, building_t& building) {
                             .cell = rally_cell
                         };
                     }
-                    item_should_dequeue = true;
-
                     break;
                 }
             }
 
-            if (item_should_dequeue) {
-                building_dequeue(building);
-            }
+            building_dequeue(state, building);
         }
     }
 }
 
-void building_enqueue(building_t& building, building_queue_item_t item) {
+void building_enqueue(match_state_t& state, building_t& building, building_queue_item_t item) {
     GOLD_ASSERT(building.queue.size() < BUILDING_QUEUE_MAX);
-    if (building.queue.empty()) {
-        building.queue_timer = building_queue_item_duration(item);
-    }
     building.queue.push_back(item);
+    if (building.queue.size() == 1) {
+        if (building_is_supply_blocked(state, building)) {
+            if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
+                ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
+            }
+            building.queue_timer = BUILDING_QUEUE_BLOCKED;
+        } else {
+            building.queue_timer = building_queue_item_duration(item);
+        }
+    }
 }
 
-void building_dequeue(building_t& building) {
+void building_dequeue(match_state_t& state, building_t& building) {
     GOLD_ASSERT(!building.queue.empty());
     building.queue.erase(building.queue.begin());
     if (building.queue.empty()) {
         building.queue_timer = 0;
     } else {
-        building.queue_timer = building_queue_item_duration(building.queue[0]);
+        if (building_is_supply_blocked(state, building)) {
+            if (building.queue_timer != BUILDING_QUEUE_BLOCKED) {
+                ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
+            }
+            building.queue_timer = BUILDING_QUEUE_BLOCKED;
+        } else {
+            building.queue_timer = building_queue_item_duration(building.queue[0]);
+        }
     }
+}
+
+bool building_is_supply_blocked(const match_state_t& state, const building_t& building) {
+    const building_queue_item_t& item = building.queue[0];
+    if (item.type == BUILDING_QUEUE_ITEM_UNIT) {
+        uint32_t required_population = match_get_player_population(state, building.player_id) + UNIT_DATA.at(item.unit_type).population_cost;
+        if (match_get_player_max_population(state, building.player_id) < required_population) {
+            return true;
+        }
+    }
+    return false;
 }
 
 xy building_cell_size(BuildingType type) {
@@ -210,5 +229,7 @@ uint32_t building_queue_population_cost(const building_queue_item_t& item) {
         case BUILDING_QUEUE_ITEM_UNIT: {
             return UNIT_DATA.at(item.unit_type).population_cost;
         }
+        default:
+            return 0;
     }
 }
