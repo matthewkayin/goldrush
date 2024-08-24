@@ -10,6 +10,7 @@
 #include <cstdio>
 
 static FILE* logfile;
+static double logger_start_time;
 
 bool logger_init(const char* logfile_path) {
     logfile = fopen(logfile_path, "w");
@@ -17,6 +18,7 @@ bool logger_init(const char* logfile_path) {
         log_error("Unable to open log file for writing.");
         return false;
     }
+    logger_start_time = platform_get_absolute_time();
 
     return true;
 }
@@ -25,7 +27,7 @@ void logger_quit() {
     fclose(logfile);
 }
 
-void logger_output(bool is_error, const char* message, ...) {
+void logger_output(LogLevel log_level, const char* message, ...) {
     const int MESSAGE_LENGTH = 32000;
     char out_message[MESSAGE_LENGTH];
     memset(out_message, 0, sizeof(out_message));
@@ -119,14 +121,11 @@ void logger_output(bool is_error, const char* message, ...) {
     va_end(arg_ptr);
 
     char log_message[MESSAGE_LENGTH];
-    sprintf(log_message, "%s\n", out_message);
+    static const char* LOG_LEVEL_PREFIXES[4] = { "ERROR", "WARN", "INFO", "TRACE" };
+    sprintf(log_message, "[%f - %s]: %s\n", (platform_get_absolute_time() - logger_start_time), LOG_LEVEL_PREFIXES[log_level], out_message);
 
 #ifdef GOLD_DEBUG_CONSOLE
-    if (is_error) {
-        platform_console_write_error(log_message);
-    } else {
-        platform_console_write(log_message);
-    }
+    platform_console_write(log_message, log_level);
 #endif
 
     fprintf(logfile, "%s", log_message);
@@ -135,5 +134,5 @@ void logger_output(bool is_error, const char* message, ...) {
 
 // Definition of function declared in asserts.h
 void report_assertion_failure(const char* expression, const char* message, const char* file, int line) {
-    logger_output(true, "Assertion failure: %s, message: '%s', in file: %s, line %d\n", expression, message, file, line);
+    logger_output(LOG_LEVEL_ERROR, "Assertion failure: %s, message: '%s', in file: %s, line %d\n", expression, message, file, line);
 }

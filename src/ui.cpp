@@ -125,7 +125,6 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             } else if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
                 state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
-                log_info("cancel ui mode %u", state.ui_mode);
             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS && !state.buildings.get_by_id(state.selection.ids[0]).queue.empty()) {
                 input_t input = (input_t) {
                     .type = INPUT_BUILDING_DEQUEUE,

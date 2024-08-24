@@ -218,7 +218,7 @@ enum Mode {
     MODE_MATCH
 };
 
-int main(int argc, char** argv) {
+int gold_main(int argc, char** argv) {
     std::string logfile_path = "goldrush.log";
     xy window_size = xy(SCREEN_WIDTH * 2, SCREEN_HEIGHT * 2);
     for (int argn = 1; argn < argc; argn++) {
@@ -257,6 +257,10 @@ int main(int argc, char** argv) {
     }
 
     logger_init(logfile_path.c_str());
+    log_error("test log");
+    log_warn("test log");
+    log_info("test log");
+    log_trace("test log");
     log_info("opened with window size %vi", &window_size);
 
     if (!engine_init(window_size)) {
@@ -434,6 +438,17 @@ int main(int argc, char** argv) {
 
     return 0;
 }
+
+#if defined PLATFORM_WIN32 && !defined GOLD_DEBUG
+#include <windows.h>
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    return gold_main(0, NULL);
+}
+#else
+int main(int argc, char** argv) {
+    return gold_main(argc, argv);
+}
+#endif
 
 bool engine_init(xy window_size) {
     // Init SDL

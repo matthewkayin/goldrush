@@ -107,7 +107,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
     bool unit_update_finished = false;
     fixed movement_left = unit_data.speed;
+    log_trace("beginning unit update. unit index: %u", unit_index);
     while (!unit_update_finished) {
+        log_trace("unit mode is %u", unit.mode);
         switch (unit.mode) {
             case UNIT_MODE_IDLE: {
                 if (unit.target.type == UNIT_TARGET_NONE) {
@@ -146,14 +148,15 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             case UNIT_MODE_MOVE_BLOCKED: {
                 unit.timer--;
                 if (unit.timer == 0) {
-                    log_info("path pause timeout. unit gives up");
                     unit.mode = UNIT_MODE_IDLE;
                     if (unit.target.type == UNIT_TARGET_GOLD) {
                         unit.target = unit_target_nearest_gold(state, unit);
+                        log_trace("path pause timeout. unit finds new gold cell to mine");
                     } else {
                         unit.target = (unit_target_t) {
                             .type = UNIT_TARGET_NONE
                         };
+                        log_trace("path pause timeout. unit gives up");
                     }
                     break;
                 }
@@ -336,7 +339,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                         if (!unit_has_reached_target(state, unit)) {
                             // This will trigger a repath
-                            log_info("has not reached target");
+                            log_trace("has not reached target");
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
@@ -556,7 +559,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 break;
             }
         }
-    }
+    } // End while !unit_update_finished
+    log_trace("end unit update");
 }
 
 xy unit_cell_size(UnitType type) {
@@ -786,6 +790,15 @@ unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t&
 unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit) {
     xy start_cell = unit.cell;
 
+    std::unordered_map<uint32_t, bool> reserved_gold_cells;
+    for (const unit_t& other_unit : state.units) {
+        if (other_unit.player_id == unit.player_id || other_unit.target.type != UNIT_TARGET_GOLD || other_unit.path.empty()) {
+            continue;
+        }
+        xy other_unit_target_cell = other_unit.path[other_unit.path.size() - 1];
+        reserved_gold_cells[other_unit_target_cell.x + (other_unit_target_cell.y * state.map_width)] = true;
+    }
+
     xy nearest_gold_cell = unit.cell;
     int nearest_gold_dist = -1;
     for (int x = 0; x < state.map_width; x++) {
@@ -800,7 +813,9 @@ unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t&
             bool is_gold_cell_free = false;
             for (int direction = DIRECTION_NORTH; direction < DIRECTION_COUNT; direction += 2) {
                 xy adjacent_cell = gold_cell + DIRECTION_XY[direction];
-                if (map_is_cell_in_bounds(state, adjacent_cell) && (adjacent_cell == start_cell || !map_is_cell_blocked(state, adjacent_cell))) {
+                if (map_is_cell_in_bounds(state, adjacent_cell) && 
+                        reserved_gold_cells.find(adjacent_cell.x + (adjacent_cell.y * state.map_width)) == reserved_gold_cells.end() && 
+                        (adjacent_cell == start_cell || !map_is_cell_blocked(state, adjacent_cell))) {
                     is_gold_cell_free = true;
                     break;
                 }
@@ -821,7 +836,7 @@ unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t&
         };
     }
 
-    log_info("no nearest gold cell found");
+    log_trace("no nearest gold cell found");
     return (unit_target_t) {
         .type = UNIT_TARGET_NONE
     };

@@ -7,6 +7,7 @@ else
 	endif
 endif
 
+IS_DEBUG := false
 ASSEMBLY := gold
 EXTENSION :=
 DIR := $(subst /,\,${CURDIR})
@@ -14,12 +15,16 @@ LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
-COMPILER_FLAGS := -g -std=c++17 -Wall -O0 
-LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image
-DEFINES := -D_CRT_SECURE_NO_WARNINGS -DGOLD_DEBUG
-# COMPILER_FLAGS := -std=c++17 -Wall -O3
-# LINKER_FLAGS := -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image
-# DEFINES := -D_CRT_SECURE_NO_WARNINGS
+COMPILER_FLAGS := -std=c++17 -Wall -O0 
+LINKER_FLAGS := -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image
+DEFINES := -D_CRT_SECURE_NO_WARNINGS
+ifeq ($(IS_DEBUG),true)
+	COMPILER_FLAGS += -g -O0
+	LINKER_FLAGS += -g
+	DEFINES += -DGOLD_DEBUG
+else
+	COMPILER_FLAGS += -O3
+endif
 
 # Use -Wno-deprecated-declarations on OSX because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 ifeq ($(PLATFORM),OSX)

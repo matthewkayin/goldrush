@@ -12,7 +12,6 @@
 
 static const uint32_t TICK_DURATION = 4;
 static const uint8_t TICK_OFFSET = 4;
-static const uint32_t INPUT_MAX_SIZE = 256;
 
 static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
@@ -148,29 +147,50 @@ match_state_t match_init() {
         }
 
         // Place gold on the map around the cluster
-        int cluster_max = 7;
-        if (gold_cell.x < gold_margin || gold_cell.x > state.map_width - gold_margin || gold_cell.y < gold_margin || gold_cell.y > state.map_height - gold_margin) {
-            cluster_max = 3;
-        }
-        int cluster_size = std::min(2 + (lcg_rand() % cluster_max), gold_target - gold_count);
-        for (int i = 0; i < cluster_size; i++) {
+        struct cluster_t {
+            xy cell;
+            int children;
+        };
+        std::vector<cluster_t> clusters;
+        clusters.push_back((cluster_t) {
+            .cell = gold_cell,
+            .children = 3
+        });
+        while (!clusters.empty()) {
+            cluster_t next = clusters[0];
+            clusters.erase(clusters.begin());
+
             int gold_offset = lcg_rand() % 3;
-            map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), MAP_GOLD_CELL_AMOUNT);
+            map_set_cell(state, next.cell, (CellType)(CELL_GOLD1 + gold_offset), MAP_GOLD_CELL_AMOUNT);
             gold_count++;
 
-            // Determine the position of the next gold cell
-            int guess_direction = lcg_rand() % DIRECTION_COUNT;
-            int direction = guess_direction;
-            bool is_gold_cell_valid = false;
-            do {
-                direction = (direction + 1) % DIRECTION_COUNT;
-                is_gold_cell_valid = map_is_cell_in_bounds(state, gold_cell + DIRECTION_XY[direction]) && !map_is_cell_blocked(state, gold_cell + DIRECTION_XY[direction]);
-            } while (direction != guess_direction && !is_gold_cell_valid);
-            if (direction == guess_direction) {
-                // There are no free spaces to place gold in, so exit the loop for this cluster
-                break;
+            for (int i = 0; i < next.children; i++) {
+                // more likely to skip child if gold cell in the margins
+                int chance_to_skip_this_child = (gold_cell.x < gold_margin || gold_cell.x > state.map_width - gold_margin || gold_cell.y < gold_margin || gold_cell.y > state.map_height - gold_margin)
+                                    ? 2
+                                    : 4;
+                if (lcg_rand() % chance_to_skip_this_child == 0) {
+                    continue;
+                }
+
+                int guess_direction = lcg_rand() % DIRECTION_COUNT;
+                int direction = guess_direction;
+                bool is_gold_cell_valid = false;
+                do {
+                    direction = (direction + 1) % DIRECTION_COUNT;
+                    xy child_cell = next.cell + DIRECTION_XY[direction];
+                    is_gold_cell_valid = xy::manhattan_distance(gold_cell, child_cell) >= xy::manhattan_distance(gold_cell, next.cell) && map_is_cell_in_bounds(state, child_cell) && !map_is_cell_blocked(state, child_cell);
+                } while (direction != guess_direction && !is_gold_cell_valid);
+                if (direction == guess_direction) {
+                    // There are no free spaces to place gold in, so exit the loop for this cluster
+                    break;
+                }
+
+                clusters.push_back((cluster_t) {
+                    .cell = next.cell + DIRECTION_XY[direction],
+                    .children = next.children - 1
+                });
             }
-            gold_cell += DIRECTION_XY[direction];
         }
     }
 
@@ -1021,32 +1041,32 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             break;
         }
         case INPUT_UNLOAD_ALL: {
-            log_info("handling unloading. unit count %u", input.unload_all.unit_count);
+            log_trace("handling unloading. unit count %u", input.unload_all.unit_count);
             for (uint16_t i = 0; i < input.unload_all.unit_count; i++) {
                 entity_id id = input.unload_all.unit_ids[i];
 
                 uint32_t unit_index = state.units.get_index_of(id);
-                log_info("unloading for id of %u with index of %u", id, unit_index);
+                log_trace("unloading for id of %u with index of %u", id, unit_index);
                 if (unit_index == INDEX_INVALID) {
                     continue;
                 }
 
                 unit_t& unit = state.units[unit_index];
-                log_info("units to unload: %z", unit.ferried_units.size());
+                log_trace("units to unload: %z", unit.ferried_units.size());
                 if (unit.ferried_units.empty()) {
                     continue;
                 }
 
-                log_info("unit cell is %xi", &unit.cell);
+                log_trace("unit cell is %xi", &unit.cell);
                 for (uint32_t ferried_id_index = 0; ferried_id_index < unit.ferried_units.size(); ferried_id_index++) {
                     entity_id ferried_id = unit.ferried_units[ferried_id_index];
-                    log_info("attempt unload for unit ferried id index %u ferried id %u", ferried_id_index, ferried_id);
+                    log_trace("attempt unload for unit ferried id index %u ferried id %u", ferried_id_index, ferried_id);
                     unit_t& ferried_unit = state.units.get_by_id(ferried_id);
                     xy dropoff_cell = unit_get_best_unload_cell(state, unit, unit_cell_size(ferried_unit.type));
-                    log_info("dropoff cell %xi", &dropoff_cell);
+                    log_trace("dropoff cell %xi", &dropoff_cell);
                     // If this is true, then no free spaces are available to unload
                     if (dropoff_cell == xy(-1, -1)) {
-                        log_info("no free cells!");
+                        log_trace("no free cells!");
                         break;
                     }
 
@@ -1146,9 +1166,7 @@ xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, r
     xy cell_step[4] = { xy(0, 1), xy(1, 0), xy(0, -1), xy(-1, 0) };
     uint32_t index = 0;
     xy cell = cell_begin[index];
-    log_info("beginning for start rect %r and building rect %r", &start, &rect);
     while (index < 4) {
-        log_info("checking cell %xi...", &cell);
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {
             if (!map_is_cell_rect_blocked(state, rect_t(cell, start.size)) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;

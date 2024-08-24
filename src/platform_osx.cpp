@@ -14,12 +14,18 @@ double platform_get_absolute_time() {
     return nanos / 1.0e9;
 }
 
-void platform_console_write(const char* message) {
-    printf("\x1B[0m%s", message);
-}
-
-void platform_console_write_error(const char* message) {
-    fprintf(stderr, "\x1B[31m%s", message);
+void platform_console_write(const char* message, int log_level) {
+    static const char* TEXT_COLORS[4] = { 
+        "31", // ERROR
+        "33", // WARN
+        "32", // INFO
+        "0"  // TRACE
+    }
+    if (log_level == 0) {
+        fprintf(stderr, "\x1B[%sm%s", TEXT_COLORS[log_level], message);
+    } else {
+        printf("\x1B[%sm%s", TEXT_COLORS[log_leve], message);
+    }
 }
 
 #endif

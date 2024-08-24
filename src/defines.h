@@ -14,9 +14,9 @@
     // #define GOLD_DEBUG_FAST_TRAIN
     // #define GOLD_DEBUG_UNIT_PATHS
     // #define GOLD_DEBUG_UNIT_STATE
-    #define GOLD_DEBUG_CONSOLE
+    // #define GOLD_DEBUG_CONSOLE
     #define GOLD_DEBUG_MOUSE
-    // #define GOLD_DEBUG_FOG_DISABLED
+    #define GOLD_DEBUG_FOG_DISABLED
 #endif
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)

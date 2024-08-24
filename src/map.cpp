@@ -1,6 +1,7 @@
 #include "match.h"
 
 #include "network.h"
+#include "logger.h"
 
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {
     return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
@@ -98,7 +99,6 @@ void map_decrement_gold(match_state_t& state, xy cell) {
     state.is_fog_dirty = true;
 }
 
-#include "logger.h"
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path) {
     struct node_t {
         fixed cost;
@@ -113,13 +113,17 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         }
     };
 
+    log_trace("beginning pathfind...");
+
     // Don't bother pathing to unit's cell
     if (from == to) {
+        log_trace("from == to, end pathfind");
         path->clear();
         return;
     }
 
     if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(to, cell_size))) {
+        log_trace("finding alternate cell");
         xy nearest_alternate;
         int nearest_alternate_distance = -1;
         for (int x = 0; x < cell_size.x; x++) {
@@ -138,6 +142,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         }
 
         if (nearest_alternate_distance != -1) {
+            log_trace("found alternate cell");
             to = nearest_alternate;
         }
     }
@@ -183,6 +188,12 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         explored_indices[smallest.cell.x + (smallest.cell.y * state.map_width)] = explored.size() - 1;
         if (explored[explored.size() - 1].distance < explored[closest_explored].distance) {
             closest_explored = explored.size() - 1;
+        }
+
+        if (explored.size() > 1999) {
+            log_warn("pathfinding too long, aborting...");
+            path->clear();
+            return;
         }
 
         // Consider all children
@@ -259,6 +270,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
     if ((*path)[path->size() - 1] == to && map_is_cell_blocked(state, to)) {
         path->pop_back();
     }
+
+    log_trace("pathfind finished. path size: %z explored size: %z", path->size(), explored.size());
 }
 
 fog_t map_get_fog(const match_state_t& state, xy cell) {
