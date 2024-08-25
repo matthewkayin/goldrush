@@ -21,8 +21,8 @@ static const int CAMERA_DRAG_SPEED = 8;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 200;
-// static const uint32_t PLAYER_STARTING_GOLD = 1000;
+// static const uint32_t PLAYER_STARTING_GOLD = 200;
+static const uint32_t PLAYER_STARTING_GOLD = 1000;
 static const uint32_t MAP_GOLD_CELL_AMOUNT = 300;
 static const uint32_t WINNING_GOLD_AMOUNT = 5000;
 
@@ -119,7 +119,7 @@ match_state_t match_init() {
     state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
 
     // Place gold on the map
-    int gold_target = 128;
+    int gold_target = 64;
     int gold_count = 0;
     int gold_margin = state.map_width / 4;
     while (gold_count < gold_target) {
@@ -158,7 +158,9 @@ match_state_t match_init() {
         std::vector<cluster_t> clusters;
         clusters.push_back((cluster_t) {
             .cell = gold_cell,
-            .children = 3
+            .children = (gold_cell.x < gold_margin || gold_cell.x > state.map_width - gold_margin || gold_cell.y < gold_margin || gold_cell.y > state.map_height - gold_margin)
+                            ? 1
+                            : 4
         });
         while (!clusters.empty()) {
             cluster_t next = clusters[0];
@@ -169,11 +171,7 @@ match_state_t match_init() {
             gold_count++;
 
             for (int i = 0; i < next.children; i++) {
-                // more likely to skip child if gold cell in the margins
-                int chance_to_skip_this_child = (gold_cell.x < gold_margin || gold_cell.x > state.map_width - gold_margin || gold_cell.y < gold_margin || gold_cell.y > state.map_height - gold_margin)
-                                    ? 2
-                                    : 4;
-                if (lcg_rand() % chance_to_skip_this_child == 0) {
+                if (lcg_rand() % 4 == 0) {
                     continue;
                 }
 

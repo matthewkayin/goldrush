@@ -209,6 +209,7 @@ void engine_quit();
 int sdlk_to_str(char* str, SDL_Keycode key);
 void render_text(Font font, const char* text, SDL_Color color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
 void render_text_with_text_frame(const char* text, xy position);
+void render_ui_frame(rect_t rect);
 void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, RecolorName recolor_name = RECOLOR_NONE);
 void render_menu(const menu_state_t& menu);
 void render_match(const match_state_t& state);
@@ -807,14 +808,86 @@ void render_text_with_text_frame(const char* text, xy position) {
     SDL_FreeSurface(text_surface);
 }
 
+void render_ui_frame(rect_t rect) {
+    GOLD_ASSERT(rect.size.x > 32 && rect.size.y > 32);
+
+    SDL_Rect src_rect = (SDL_Rect) {
+        .x = 0,
+        .y = 0,
+        .w = 16,
+        .h = 16
+    };
+    SDL_Rect dst_rect = (SDL_Rect) {
+        .x = rect.position.x, 
+        .y = rect.position.y,
+        .w = 16,
+        .h = 16
+    };
+
+    // Top left
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+
+    // Top right
+    src_rect.x = 32;
+    dst_rect.x = rect.position.x + rect.size.x - 16;
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+
+    // Bottom right
+    src_rect.y = 32;
+    dst_rect.y = rect.position.y + rect.size.y - 16;
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    
+    // Bottom left
+    src_rect.x = 0;
+    dst_rect.x = rect.position.x;
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+
+    // Top edge
+    src_rect.x = 16;
+    src_rect.y = 0;
+    dst_rect.x = rect.position.x + 16;
+    dst_rect.y = rect.position.y;
+    dst_rect.w = rect.size.x - 32;
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+
+    // Bottom edge
+    src_rect.y = 32;
+    dst_rect.y = rect.position.y + rect.size.y - 16;
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+
+    // Left edge
+    src_rect.x = 0;
+    src_rect.y = 16;
+    dst_rect.x = rect.position.x;
+    dst_rect.y = rect.position.y + 16;
+    dst_rect.w = 16;
+    dst_rect.h = rect.size.y - 32;
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+
+    // Right edge
+    src_rect.x = 32;
+    dst_rect.x = rect.position.x + rect.size.x - 16;
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+
+    // Center
+    src_rect.x = 16;
+    src_rect.y = 16;
+    dst_rect.x = rect.position.x + 16;
+    dst_rect.y = rect.position.y + 16;
+    dst_rect.w = rect.size.x - 32;
+    dst_rect.h = rect.size.y - 32;
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+}
+
 void render_menu(const menu_state_t& menu) {
     if (menu.mode == MENU_MODE_MATCH_START) {
         return;
     }
 
-    SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND.r, COLOR_SAND.g, COLOR_SAND.b, COLOR_SAND.a);
     SDL_Rect background_rect = (SDL_Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND.r, COLOR_SAND.g, COLOR_SAND.b, COLOR_SAND.a);
     SDL_RenderFillRect(engine.renderer, &background_rect);
+    render_ui_frame(rect_t(xy(16, 16), xy(SCREEN_WIDTH - 32, SCREEN_HEIGHT - 32)));
 
     if (menu.mode != MENU_MODE_LOBBY) {
         render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, xy(RENDER_TEXT_CENTERED, 24));

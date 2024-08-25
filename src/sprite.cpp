@@ -20,7 +20,7 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .recolor = false
     }},
     { SPRITE_UI_FRAME, (sprite_params_t) {
-        .path = "sprite/frame.png",
+        .path = "sprite/ui_frame.png",
         .hframes = 3,
         .vframes = 3,
         .recolor = false
