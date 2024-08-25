@@ -20,11 +20,11 @@ void platform_console_write(const char* message, int log_level) {
         "33", // WARN
         "32", // INFO
         "0"  // TRACE
-    }
+    };
     if (log_level == 0) {
         fprintf(stderr, "\x1B[%sm%s", TEXT_COLORS[log_level], message);
     } else {
-        printf("\x1B[%sm%s", TEXT_COLORS[log_leve], message);
+        printf("\x1B[%sm%s", TEXT_COLORS[log_level], message);
     }
 }
 
