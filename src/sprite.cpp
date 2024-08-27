@@ -91,6 +91,18 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .recolor = false
     }},
+    { SPRITE_UI_PARCHMENT_BUTTONS, (sprite_params_t) {
+        .path = "sprite/ui_parchment_buttons.png",
+        .hframes = 2,
+        .vframes = 2,
+        .recolor = false
+    }},
+    { SPRITE_UI_OPTIONS_DROPDOWN, (sprite_params_t) {
+        .path = "sprite/ui_options_dropdown.png",
+        .hframes = 1,
+        .vframes = 5,
+        .recolor = false
+    }},
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .hframes = 1,
@@ -210,6 +222,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 6,
         .vframes = 1,
         .recolor = true
+    }},
+    { SPRITE_MENU_CLOUDS, (sprite_params_t) {
+        .path = "sprite/menu_clouds.png",
+        .hframes = 3,
+        .vframes = 1,
+        .recolor = false
     }}  
 };
 
@@ -236,6 +254,12 @@ const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
         .vframe = -1,
         .hframe_start = 1, .hframe_end = 4,
         .frame_duration = 8,
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    }},
+    { ANIMATION_UNIT_MOVE_HALF_SPEED, (animation_data_t) {
+        .vframe = -1,
+        .hframe_start = 1, .hframe_end = 4,
+        .frame_duration = 10,
         .loops = ANIMATION_LOOPS_INDEFINITELY
     }},
     { ANIMATION_UNIT_ATTACK, (animation_data_t) {

@@ -62,6 +62,11 @@ menu_state_t menu_init() {
     state.ip_address = GOLD_DEFAULT_JOIN_IP;
     input_set_text_input_value("");
     menu_set_mode(state, MENU_MODE_MAIN);
+    state.wagon_animation = animation_create(ANIMATION_UNIT_MOVE_HALF_SPEED);
+    state.parallax_x = 0;
+    state.parallax_cloud_x = 0;
+    state.parallax_timer = PARALLAX_TIMER_DURATION;
+    state.parallax_cactus_offset = 0;
     return state;
 }
 
@@ -79,9 +84,16 @@ void menu_set_mode(menu_state_t& state, MenuMode mode) {
     // Set buttons
     state.buttons.clear();
     switch(mode) {
+        case MENU_MODE_OPTIONS:
         case MENU_MODE_MAIN:
+            state.buttons[MENU_BUTTON_PLAY] = (menu_button_t) { .text = "PLAY", .rect = PLAY_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_OPTIONS] = (menu_button_t) { .text = "OPTIONS", .rect = OPTIONS_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_EXIT] = (menu_button_t) { .text = "EXIT", .rect = EXIT_BUTTON_RECT };
+            break;
+        case MENU_MODE_PLAY:
             state.buttons[MENU_BUTTON_HOST] = (menu_button_t) { .text = "HOST", .rect = HOST_BUTTON_RECT };
             state.buttons[MENU_BUTTON_JOIN] = (menu_button_t) { .text = "JOIN", .rect = JOIN_BUTTON_RECT };
+            state.buttons[MENU_BUTTON_PLAY_BACK] = (menu_button_t) { .text = "BACK", .rect = PLAY_BACK_BUTTON_RECT };
             input_set_text_input_value(state.username.c_str());
             break;
         case MENU_MODE_JOIN_IP:
@@ -159,13 +171,13 @@ void menu_update(menu_state_t& state) {
     xy mouse_position = input_get_mouse_position();
     state.button_hovered = MENU_BUTTON_NONE;
     for (auto it : state.buttons) {
-        if (it.second.rect.has_point(mouse_position)) {
+        if (it.second.rect.has_point(mouse_position) && state.mode != MENU_MODE_OPTIONS) {
             state.button_hovered = it.first;
         }
     }
 
     // Mouse pressed
-    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
+    if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && state.mode != MENU_MODE_OPTIONS) {
         // Text input focus
         if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_JOIN_IP) {
             bool input_text_focused = TEXT_INPUT_RECT.has_point(mouse_position);
@@ -238,8 +250,43 @@ void menu_update(menu_state_t& state) {
                 }
                 break;
             }
+            case MENU_BUTTON_EXIT: {
+                menu_set_mode(state, MENU_MODE_EXIT);
+                break;
+            }
+            case MENU_BUTTON_PLAY: {
+                menu_set_mode(state, MENU_MODE_PLAY);
+                break;
+            }
+            case MENU_BUTTON_OPTIONS: {
+                state.option_menu_state = option_menu_init();
+                menu_set_mode(state, MENU_MODE_OPTIONS);
+                break;
+            }
+            case MENU_BUTTON_PLAY_BACK: {
+                menu_set_mode(state, MENU_MODE_MAIN);
+                break;
+            }
             default:
                 break;
+        }
+    }
+
+    animation_update(state.wagon_animation);
+    state.parallax_timer--;
+    state.parallax_x = (state.parallax_x + 1) % (SCREEN_WIDTH * 2);
+    if (state.parallax_timer == 0) {
+        state.parallax_cloud_x = (state.parallax_cloud_x + 1) % (SCREEN_WIDTH * 2);
+        if (state.parallax_x == 0) {
+            state.parallax_cactus_offset = (state.parallax_cactus_offset + 1) % 5;
+        }
+        state.parallax_timer = PARALLAX_TIMER_DURATION;
+    }
+
+    if (state.mode == MENU_MODE_OPTIONS) {
+        option_menu_update(state.option_menu_state);
+        if (state.option_menu_state.mode == OPTION_MENU_CLOSED) {
+            menu_set_mode(state, MENU_MODE_MAIN);
         }
     }
 }

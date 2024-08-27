@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "util.h"
 #include "menu.h"
+#include "options.h"
 #include "match.h"
 #include "sprite.h"
 #include "network.h"
@@ -29,14 +30,16 @@ const double UPDATE_TIME = 1.0 / 60.0;
 const uint8_t INPUT_MOUSE_BUTTON_COUNT = 3;
 enum TextAnchor {
     TEXT_ANCHOR_TOP_LEFT,
-    TEXT_ANCHOR_BOTTOM_LEFT
+    TEXT_ANCHOR_BOTTOM_LEFT,
+    TEXT_ANCHOR_TOP_RIGHT,
+    TEXT_ANCHOR_BOTTOM_RIGHT
 };
 const int RENDER_TEXT_CENTERED = -1;
 
 const SDL_Color COLOR_BLACK = (SDL_Color) { .r = 0, .g = 0, .b = 0, .a = 255 };
 const SDL_Color COLOR_OFFBLACK = (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 255 };
 const SDL_Color COLOR_WHITE = (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 };
-const SDL_Color COLOR_SAND = (SDL_Color) { .r = 226, .g = 179, .b = 152, .a = 255 };
+const SDL_Color COLOR_SKY_BLUE = (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 };
 const SDL_Color COLOR_SAND_DARK = (SDL_Color) { .r = 204, .g = 162, .b = 139, .a = 255 };
 const SDL_Color COLOR_RED = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 };
 const SDL_Color COLOR_GREEN = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
@@ -95,7 +98,7 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
     }},
     { FONT_WESTERN32, (font_params_t) {
         .path = "font/western.ttf",
-        .size = 24 
+        .size = 32
     }}
 };
 
@@ -206,12 +209,16 @@ const uint32_t RENDER_SPRITE_NO_CULL = 1 << 2;
 
 bool engine_init(xy window_size);
 void engine_quit();
+bool engine_create_renderer();
+void engine_destroy_renderer();
+void engine_set_window_fullscreen(OptionDisplayValue display_value);
 int sdlk_to_str(char* str, SDL_Keycode key);
 void render_text(Font font, const char* text, SDL_Color color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
 void render_text_with_text_frame(const char* text, xy position);
-void render_ui_frame(rect_t rect);
+void render_ninepatch(Sprite sprite, rect_t rect, int patch_margin);
 void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, RecolorName recolor_name = RECOLOR_NONE);
 void render_menu(const menu_state_t& menu);
+void render_options_menu(const option_menu_state_t& state);
 void render_match(const match_state_t& state);
 
 enum Mode {
@@ -259,6 +266,27 @@ int gold_main(int argc, char** argv) {
 
     logger_init(logfile_path.c_str());
     log_info("opened with window size %vi", &window_size);
+
+    options_init();
+
+    // Init SDL
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        log_error("SDL failed to initialize: %s", SDL_GetError());
+        return false;
+    }
+
+    // Init TTF
+    if (TTF_Init() == -1) {
+        log_error("SDL_ttf failed to initialize: %s", TTF_GetError());
+        return false;
+    }
+
+    // Init IMG
+    int img_flags = IMG_INIT_PNG;
+    if (!(IMG_Init(img_flags) & img_flags)) {
+        log_error("SDL_image failed to initialize: %s", IMG_GetError());
+        return false;
+    }
 
     if (!engine_init(window_size)) {
         log_info("Closing logger...");
@@ -315,7 +343,12 @@ int gold_main(int argc, char** argv) {
                 }
                 // Toggle fullscreen
                 if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
-                    engine.is_fullscreen = !engine.is_fullscreen;
+                    if (options[OPTION_DISPLAY] == DISPLAY_WINDOWED) {
+                        options[OPTION_DISPLAY] = DISPLAY_BORDERLESS;
+                    } else {
+                        options[OPTION_DISPLAY] = DISPLAY_WINDOWED;
+                    }
+                    engine_set_window_fullscreen((OptionDisplayValue)options[OPTION_DISPLAY]);
                     if (engine.is_fullscreen) {
                         SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
                         SDL_SetWindowGrab(engine.window, SDL_TRUE);
@@ -396,6 +429,20 @@ int gold_main(int argc, char** argv) {
                     if (menu_state.mode == MENU_MODE_MATCH_START) {
                         match_state = match_init();
                         mode = MODE_MATCH;
+                    } else if (menu_state.mode == MENU_MODE_EXIT) {
+                        engine.is_running = false;
+                        break;
+                    } else if (menu_state.mode == MENU_MODE_OPTIONS && menu_state.option_menu_state.mode == OPTION_MENU_REQUEST_CHANGES) {
+                        if ((menu_state.option_menu_state.requested_changes & REQUEST_REINIT_RENDERER) == REQUEST_REINIT_RENDERER) {
+                            engine_destroy_renderer();
+                            if (!engine_create_renderer()) {
+                                return 1;
+                            }
+                        }
+                        if ((menu_state.option_menu_state.requested_changes & REQUEST_UPDATE_FULLSCREEN) == REQUEST_UPDATE_FULLSCREEN) {
+                            engine_set_window_fullscreen((OptionDisplayValue)options[OPTION_DISPLAY]);
+                        }
+                        menu_state.option_menu_state.mode = OPTION_MENU_OPEN;
                     }
                     break;
                 }
@@ -435,6 +482,8 @@ int gold_main(int argc, char** argv) {
 
     network_quit();
     engine_quit();
+    TTF_Quit();
+    SDL_Quit();
     logger_quit();
 
     return 0;
@@ -452,40 +501,6 @@ int main(int argc, char** argv) {
 #endif
 
 bool engine_init(xy window_size) {
-    // Init SDL
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        log_error("SDL failed to initialize: %s", SDL_GetError());
-        return false;
-    }
-
-    // Create window
-    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, SDL_WINDOW_SHOWN);
-    if (engine.window == NULL) {
-        log_error("Error creating window: %s", SDL_GetError());
-        return false;
-    }
-
-    // Create renderer
-    engine.renderer = SDL_CreateRenderer(engine.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (engine.renderer == NULL) {
-        log_error("Error creating renderer: %s", SDL_GetError());
-        return false;
-    }
-    SDL_RenderSetLogicalSize(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    // Init TTF
-    if (TTF_Init() == -1) {
-        log_error("SDL_ttf failed to initialize: %s", TTF_GetError());
-        return false;
-    }
-
-    // Init IMG
-    int img_flags = IMG_INIT_PNG;
-    if (!(IMG_Init(img_flags) & img_flags)) {
-        log_error("SDL_image failed to initialize: %s", IMG_GetError());
-        return false;
-    }
-
     // Init input
     memset(engine.mouse_button_state, 0, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
     memset(engine.mouse_button_previous_state, 0, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
@@ -494,6 +509,55 @@ bool engine_init(xy window_size) {
     memset(engine.hotkey_state_previous, 0, UI_BUTTON_COUNT * sizeof(bool));
     memset(engine.key_state, 0, KEY_COUNT * sizeof(bool));
     memset(engine.key_state_previous, 0, KEY_COUNT * sizeof(bool));
+
+    // Create window
+    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, SDL_WINDOW_SHOWN);
+    if (engine.window == NULL) {
+        log_error("Error creating window: %s", SDL_GetError());
+        return false;
+    }
+
+    if (!engine_create_renderer()) {
+        return false;
+    }
+
+    SDL_StopTextInput();
+    engine.is_running = true;
+
+#ifndef GOLD_DEBUG_MOUSE
+    SDL_SetWindowGrab(engine.window, SDL_TRUE);
+#endif
+
+    engine_set_window_fullscreen((OptionDisplayValue)options[OPTION_DISPLAY]);
+
+    log_info("%s initialized.", APP_NAME);
+    return true;
+}
+
+void engine_set_window_fullscreen(OptionDisplayValue display_value) {
+    if (display_value == DISPLAY_WINDOWED) {
+        SDL_SetWindowFullscreen(engine.window, 0);
+    } else if (display_value == DISPLAY_BORDERLESS) {
+        SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        SDL_SetWindowGrab(engine.window, SDL_TRUE);
+    } else {
+        SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN);
+        SDL_SetWindowGrab(engine.window, SDL_TRUE);
+    }
+}
+
+bool engine_create_renderer() {
+    // Create renderer
+    uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
+    if (options[OPTION_VSYNC] == VSYNC_ENABLED) {
+        renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
+    }
+    engine.renderer = SDL_CreateRenderer(engine.window, -1, renderer_flags);
+    if (engine.renderer == NULL) {
+        log_error("Error creating renderer: %s", SDL_GetError());
+        return false;
+    }
+    SDL_RenderSetLogicalSize(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // Init hotkey sets
     for (int buttonset = 0; buttonset < UI_BUTTONSET_COUNT; buttonset++) {
@@ -630,37 +694,34 @@ bool engine_init(xy window_size) {
     SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
 
     engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 128, 128);
-    SDL_StopTextInput();
-    engine.is_running = true;
-
-#ifndef GOLD_DEBUG_MOUSE
-    SDL_SetWindowGrab(engine.window, SDL_TRUE);
-#endif
-
-    log_info("%s initialized.", APP_NAME);
+    log_info("created renderer");
     return true;
 }
 
 void engine_quit() {
+    SDL_DestroyWindow(engine.window);
+
+    log_info("%s deinitialized.", APP_NAME);
+}
+
+void engine_destroy_renderer() {
     for (TTF_Font* font : engine.fonts) {
         TTF_CloseFont(font);
     }
+    engine.fonts.clear();
     for (sprite_t sprite : engine.sprites) {
         SDL_DestroyTexture(sprite.texture);
     }
+    engine.sprites.clear();
     for (SDL_Cursor* cursor : engine.cursors) {
         SDL_FreeCursor(cursor);
     }
+    engine.cursors.clear();
     SDL_DestroyTexture(engine.minimap_texture);
 
     SDL_DestroyRenderer(engine.renderer);
-    SDL_DestroyWindow(engine.window);
 
-    TTF_Quit();
-    SDL_Quit();
-
-    log_info("Application quit gracefully.");
-    logger_quit();
+    log_info("destroyed renderer");
 }
 
 int sdlk_to_str(char* str, SDL_Keycode key) {
@@ -763,8 +824,11 @@ void render_text(Font font, const char* text, SDL_Color color, xy position, Text
         .w = text_surface->w, 
         .h = text_surface->h 
     };
-    if (anchor == TEXT_ANCHOR_BOTTOM_LEFT) {
+    if (anchor == TEXT_ANCHOR_BOTTOM_LEFT || anchor == TEXT_ANCHOR_BOTTOM_RIGHT) {
         dst_rect.y -= dst_rect.h;
+    } 
+    if (anchor == TEXT_ANCHOR_TOP_RIGHT || anchor == TEXT_ANCHOR_BOTTOM_RIGHT) {
+        dst_rect.x -= dst_rect.w;
     }
     SDL_RenderCopy(engine.renderer, text_texture, &src_rect, &dst_rect);
 
@@ -808,75 +872,75 @@ void render_text_with_text_frame(const char* text, xy position) {
     SDL_FreeSurface(text_surface);
 }
 
-void render_ui_frame(rect_t rect) {
-    GOLD_ASSERT(rect.size.x > 32 && rect.size.y > 32);
+void render_ninepatch(Sprite sprite, rect_t rect, int patch_margin) {
+    GOLD_ASSERT(rect.size.x > patch_margin * 2 && rect.size.y > patch_margin * 2);
 
     SDL_Rect src_rect = (SDL_Rect) {
         .x = 0,
         .y = 0,
-        .w = 16,
-        .h = 16
+        .w = patch_margin,
+        .h = patch_margin
     };
     SDL_Rect dst_rect = (SDL_Rect) {
         .x = rect.position.x, 
         .y = rect.position.y,
-        .w = 16,
-        .h = 16
+        .w = patch_margin,
+        .h = patch_margin
     };
 
     // Top left
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 
     // Top right
-    src_rect.x = 32;
-    dst_rect.x = rect.position.x + rect.size.x - 16;
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    src_rect.x = patch_margin * 2;
+    dst_rect.x = rect.position.x + rect.size.x - patch_margin;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 
     // Bottom right
-    src_rect.y = 32;
-    dst_rect.y = rect.position.y + rect.size.y - 16;
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    src_rect.y = patch_margin * 2;
+    dst_rect.y = rect.position.y + rect.size.y - patch_margin;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
     
     // Bottom left
     src_rect.x = 0;
     dst_rect.x = rect.position.x;
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 
     // Top edge
-    src_rect.x = 16;
+    src_rect.x = patch_margin;
     src_rect.y = 0;
-    dst_rect.x = rect.position.x + 16;
+    dst_rect.x = rect.position.x + patch_margin;
     dst_rect.y = rect.position.y;
-    dst_rect.w = rect.size.x - 32;
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    dst_rect.w = rect.size.x - (patch_margin * 2);
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 
     // Bottom edge
-    src_rect.y = 32;
-    dst_rect.y = rect.position.y + rect.size.y - 16;
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    src_rect.y = patch_margin * 2;
+    dst_rect.y = rect.position.y + rect.size.y - patch_margin;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 
     // Left edge
     src_rect.x = 0;
-    src_rect.y = 16;
+    src_rect.y = patch_margin;
     dst_rect.x = rect.position.x;
-    dst_rect.y = rect.position.y + 16;
-    dst_rect.w = 16;
-    dst_rect.h = rect.size.y - 32;
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    dst_rect.y = rect.position.y + patch_margin;
+    dst_rect.w = patch_margin;
+    dst_rect.h = rect.size.y - (patch_margin * 2);
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 
     // Right edge
-    src_rect.x = 32;
-    dst_rect.x = rect.position.x + rect.size.x - 16;
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    src_rect.x = patch_margin * 2;
+    dst_rect.x = rect.position.x + rect.size.x - patch_margin;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 
     // Center
-    src_rect.x = 16;
-    src_rect.y = 16;
-    dst_rect.x = rect.position.x + 16;
-    dst_rect.y = rect.position.y + 16;
-    dst_rect.w = rect.size.x - 32;
-    dst_rect.h = rect.size.y - 32;
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UI_FRAME].texture, &src_rect, &dst_rect);
+    src_rect.x = patch_margin;
+    src_rect.y = patch_margin;
+    dst_rect.x = rect.position.x + patch_margin;
+    dst_rect.y = rect.position.y + patch_margin;
+    dst_rect.w = rect.size.x - (patch_margin * 2);
+    dst_rect.h = rect.size.y - (patch_margin * 2);
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
 }
 
 void render_menu(const menu_state_t& menu) {
@@ -885,34 +949,116 @@ void render_menu(const menu_state_t& menu) {
     }
 
     SDL_Rect background_rect = (SDL_Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
-    SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND.r, COLOR_SAND.g, COLOR_SAND.b, COLOR_SAND.a);
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_SKY_BLUE.r, COLOR_SKY_BLUE.g, COLOR_SKY_BLUE.b, COLOR_SKY_BLUE.a);
     SDL_RenderFillRect(engine.renderer, &background_rect);
-    render_ui_frame(rect_t(xy(16, 16), xy(SCREEN_WIDTH - 32, SCREEN_HEIGHT - 32)));
 
+    // Render tiles
+    static const int menu_tile_width = (SCREEN_WIDTH / TILE_SIZE) * 2;
+    static const int menu_tile_height = 3;
+    for (int x = 0; x < menu_tile_width; x++) {
+        for (int y = 0; y < menu_tile_height; y++) {
+            SDL_Rect src_rect = (SDL_Rect) {
+                .x = (y == 0 || y == 2) && (x + y) % 10 == 0 ? 32 : 0,
+                .y = 0,
+                .w = TILE_SIZE,
+                .h = TILE_SIZE
+            };
+            SDL_Rect dst_rect = (SDL_Rect) {
+                .x = (x * TILE_SIZE * 2) - menu.parallax_x,
+                .y = SCREEN_HEIGHT - ((menu_tile_height - y) * TILE_SIZE * 2),
+                .w = TILE_SIZE * 2,
+                .h = TILE_SIZE * 2
+            };
+            if (dst_rect.x > SCREEN_WIDTH || dst_rect.x + (TILE_SIZE * 2) < 0) {
+                continue;
+            }
+            SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &src_rect, &dst_rect);
+
+        }
+    }
+    // Render tile decorations
+    static const xy tile_decoration_coords[3] = { xy(680, TILE_SIZE / 4), xy(920, 2 * (TILE_SIZE * 2)), xy(1250, TILE_SIZE / 4) };
+    for (int i = 0; i < 3; i++) {
+            SDL_Rect src_rect = (SDL_Rect) {
+                .x = (((i * 2) + menu.parallax_cactus_offset) % 5) * TILE_SIZE,
+                .y = 0,
+                .w = TILE_SIZE,
+                .h = TILE_SIZE
+            };
+            SDL_Rect dst_rect = (SDL_Rect) {
+                .x = tile_decoration_coords[i].x - menu.parallax_x,
+                .y = SCREEN_HEIGHT - (menu_tile_height * TILE_SIZE * 2) + tile_decoration_coords[i].y,
+                .w = TILE_SIZE * 2,
+                .h = TILE_SIZE * 2
+            };
+            if (dst_rect.x > SCREEN_WIDTH || dst_rect.x + (TILE_SIZE * 2) < 0) {
+                continue;
+            }
+            SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILE_DECORATION].texture, &src_rect, &dst_rect);
+    }
+    // Render wagon animation
+    SDL_Rect src_rect = (SDL_Rect) {
+        .x = engine.sprites[SPRITE_UNIT_WAGON].frame_size.x * menu.wagon_animation.frame.x,
+        .y = engine.sprites[SPRITE_UNIT_WAGON].frame_size.y * 2,
+        .w = engine.sprites[SPRITE_UNIT_WAGON].frame_size.x,
+        .h = engine.sprites[SPRITE_UNIT_WAGON].frame_size.y
+    };
+    SDL_Rect dst_rect = (SDL_Rect) {
+        .x = 380,
+        .y = SCREEN_HEIGHT - (6 * TILE_SIZE),
+        .w = src_rect.w * 2,
+        .h = src_rect.h * 2
+    };
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UNIT_WAGON].colored_texture[RECOLOR_BLUE], &src_rect, &dst_rect);
+
+    // Render clouds
+    static const int cloud_count = 6;
+    static const xy cloud_coords[cloud_count] = { xy(640, 16), xy(950, 64), xy(1250, 48), xy(-30, 48), xy(320, 32), xy(1600, 32) };
+    static const int cloud_frame_x[cloud_count] = { 0, 1, 2, 2, 1, 1};
+    for (int i = 0; i < cloud_count; i++) {
+        SDL_Rect src_rect = (SDL_Rect) {
+            .x = cloud_frame_x[i] * engine.sprites[SPRITE_MENU_CLOUDS].frame_size.x,
+            .y = 0,
+            .w = engine.sprites[SPRITE_MENU_CLOUDS].frame_size.x,
+            .h = engine.sprites[SPRITE_MENU_CLOUDS].frame_size.y,
+        };
+        SDL_Rect dst_rect = (SDL_Rect) {
+            .x = cloud_coords[i].x - menu.parallax_cloud_x,
+            .y = cloud_coords[i].y,
+            .w = engine.sprites[SPRITE_MENU_CLOUDS].frame_size.x * 2,
+            .h = engine.sprites[SPRITE_MENU_CLOUDS].frame_size.y * 2,
+        };
+        if (dst_rect.x > SCREEN_WIDTH || dst_rect.x + dst_rect.w < 0) {
+            continue;
+        }
+        SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_MENU_CLOUDS].texture, &src_rect, &dst_rect);
+    }
+
+    // Render title
     if (menu.mode != MENU_MODE_LOBBY) {
-        render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_BLACK, xy(RENDER_TEXT_CENTERED, 24));
+        render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_OFFBLACK, xy(24, 24));
     }
 
     char version_string[16];
     sprintf(version_string, "Version %s", APP_VERSION);
-    render_text(FONT_WESTERN8, version_string, COLOR_BLACK, xy(4, SCREEN_HEIGHT - 14));
+    render_text(FONT_WESTERN8, version_string, COLOR_OFFBLACK, xy(4, SCREEN_HEIGHT - 14));
 
     if (menu.status_timer > 0) {
-        render_text(FONT_WESTERN8, menu.status_text.c_str(), COLOR_RED, xy(RENDER_TEXT_CENTERED, TEXT_INPUT_RECT.position.y - 38));
+        render_text(FONT_WESTERN8, menu.status_text.c_str(), COLOR_RED, xy(48, TEXT_INPUT_RECT.position.y - 38));
     }
 
-    if (menu.mode == MENU_MODE_MAIN || menu.mode == MENU_MODE_JOIN_IP) {
-        const char* prompt = menu.mode == MENU_MODE_MAIN ? "USERNAME" : "IP ADDRESS";
-        render_text(FONT_WESTERN8, prompt, COLOR_BLACK, TEXT_INPUT_RECT.position + xy(1, -13));
+    if (menu.mode == MENU_MODE_PLAY || menu.mode == MENU_MODE_JOIN_IP) {
+        const char* prompt = menu.mode == MENU_MODE_PLAY ? "USERNAME" : "IP ADDRESS";
+        render_text(FONT_WESTERN8, prompt, COLOR_OFFBLACK, TEXT_INPUT_RECT.position + xy(1, -13));
         SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
         SDL_Rect text_input_rect = rect_to_sdl(TEXT_INPUT_RECT);
         SDL_RenderDrawRect(engine.renderer, &text_input_rect);
 
-        render_text(FONT_WESTERN16, input_get_text_input_value(), COLOR_BLACK, TEXT_INPUT_RECT.position + xy(2, TEXT_INPUT_RECT.size.y - 4), TEXT_ANCHOR_BOTTOM_LEFT);
+        render_text(FONT_WESTERN16, input_get_text_input_value(), COLOR_OFFBLACK, TEXT_INPUT_RECT.position + xy(2, TEXT_INPUT_RECT.size.y - 4), TEXT_ANCHOR_BOTTOM_LEFT);
     }
 
     if (menu.mode == MENU_MODE_JOIN_CONNECTING) {
-        render_text(FONT_WESTERN16, "Connecting...", COLOR_BLACK, xy(RENDER_TEXT_CENTERED, RENDER_TEXT_CENTERED));
+        render_text(FONT_WESTERN16, "Connecting...", COLOR_OFFBLACK, xy(48, BUTTON_Y - 42));
     }
 
     if (menu.mode == MENU_MODE_LOBBY) {
@@ -950,11 +1096,52 @@ void render_menu(const menu_state_t& menu) {
     }
 
     for (auto it : menu.buttons) {
-        SDL_Color button_color = menu.button_hovered == it.first ? COLOR_WHITE : COLOR_BLACK;
+        SDL_Color button_color = menu.button_hovered == it.first ? COLOR_WHITE : COLOR_OFFBLACK;
         render_text(FONT_WESTERN16, it.second.text, button_color, it.second.rect.position + xy(4, 4));
         SDL_SetRenderDrawColor(engine.renderer, button_color.r, button_color.g, button_color.b, button_color.a);
         SDL_Rect button_rect = rect_to_sdl(it.second.rect);
         SDL_RenderDrawRect(engine.renderer, &button_rect);
+    }
+
+    if (menu.mode == MENU_MODE_OPTIONS) {
+        render_options_menu(menu.option_menu_state);
+    }
+}
+
+void render_options_menu(const option_menu_state_t& state) {
+    SDL_Rect screen_rect = (SDL_Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 128);
+    SDL_RenderFillRect(engine.renderer, &screen_rect);
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
+    render_ninepatch(SPRITE_UI_FRAME, OPTIONS_FRAME_RECT, 16);
+    render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(1, state.hover == OPTION_HOVER_APPLY ? 1 : 0), APPLY_BUTTON_POSITION + (state.hover == OPTION_HOVER_APPLY ? xy(0, -1) : xy(0, 0)), RENDER_SPRITE_NO_CULL);
+    render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(0, state.hover == OPTION_HOVER_BACK ? 1 : 0), BACK_BUTTON_POSITION + (state.hover == OPTION_HOVER_BACK ? xy(0, -1) : xy(0, 0)), RENDER_SPRITE_NO_CULL);
+
+    for (int i = 0; i < OPTION_COUNT; i++) {
+        xy dropdown_position = OPTIONS_DROPDOWN_POSITION + xy(0, i * (OPTIONS_DROPDOWN_SIZE.y + OPTIONS_DROPDOWN_PADDING));
+        xy dropdown_offset = xy(0, 0);
+        int dropdown_y_frame = 0;
+        if (state.hover == OPTION_HOVER_DROPDOWN && state.hover_subindex == i) {
+            dropdown_y_frame = 1;
+            dropdown_offset.y = -1;
+        } else if (state.mode == OPTION_MENU_DROPDOWN && state.dropdown_chosen == (Option)i) {
+            dropdown_y_frame = 2;
+        }
+        render_sprite(SPRITE_UI_OPTIONS_DROPDOWN, xy(0, dropdown_y_frame), dropdown_position + dropdown_offset, RENDER_SPRITE_NO_CULL);
+        render_text(FONT_WESTERN8, option_value_string((Option)i, state.pending_changes.at((Option)i)), dropdown_y_frame == 1 ? COLOR_WHITE : COLOR_OFFBLACK, dropdown_position + dropdown_offset + xy(5, 5));
+        render_text(FONT_WESTERN8, option_string((Option)i), COLOR_GOLD, dropdown_position + xy(-12, 5), TEXT_ANCHOR_TOP_RIGHT);
+    }
+
+    if (state.mode == OPTION_MENU_DROPDOWN) {
+        for (int i = 0; i < OPTION_DATA.at(state.dropdown_chosen).max_value; i++) {
+            xy dropdown_item_position = OPTIONS_DROPDOWN_POSITION + 
+                xy(0, (int)state.dropdown_chosen * (OPTIONS_DROPDOWN_SIZE.y + OPTIONS_DROPDOWN_PADDING)) +
+                xy(0, (i + 1) * OPTIONS_DROPDOWN_SIZE.y);
+            bool is_hovered = state.hover == OPTION_HOVER_DROPDOWN_ITEM && state.hover_subindex == i;
+            render_sprite(SPRITE_UI_OPTIONS_DROPDOWN, xy(0, is_hovered ? 4 : 3), dropdown_item_position, RENDER_SPRITE_NO_CULL);
+            render_text(FONT_WESTERN8, option_value_string(state.dropdown_chosen, i), is_hovered ? COLOR_WHITE : COLOR_OFFBLACK, dropdown_item_position + xy(5, 5));
+        }
     }
 }
 
