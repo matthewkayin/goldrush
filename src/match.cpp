@@ -320,7 +320,7 @@ void match_update(match_state_t& state) {
         }
 
         if (!has_all_inputs) {
-            log_info("missing inputs for this frame. waiting...");
+            log_info("Missing inputs for this frame. waiting...");
             return;
         }
 
@@ -1082,32 +1082,32 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             break;
         }
         case INPUT_UNLOAD_ALL: {
-            log_trace("handling unloading. unit count %u", input.unload_all.unit_count);
+            log_trace("Handling unloading. unit count %u", input.unload_all.unit_count);
             for (uint16_t i = 0; i < input.unload_all.unit_count; i++) {
                 entity_id id = input.unload_all.unit_ids[i];
 
                 uint32_t unit_index = state.units.get_index_of(id);
-                log_trace("unloading for id of %u with index of %u", id, unit_index);
+                log_trace("Unloading for id of %u with index of %u", id, unit_index);
                 if (unit_index == INDEX_INVALID) {
                     continue;
                 }
 
                 unit_t& unit = state.units[unit_index];
-                log_trace("units to unload: %z", unit.ferried_units.size());
+                log_trace("Units to unload: %z", unit.ferried_units.size());
                 if (unit.ferried_units.empty()) {
                     continue;
                 }
 
-                log_trace("unit cell is %xi", &unit.cell);
+                log_trace("Unit cell is %xi", &unit.cell);
                 for (uint32_t ferried_id_index = 0; ferried_id_index < unit.ferried_units.size(); ferried_id_index++) {
                     entity_id ferried_id = unit.ferried_units[ferried_id_index];
-                    log_trace("attempt unload for unit ferried id index %u ferried id %u", ferried_id_index, ferried_id);
+                    log_trace("Attempt unload for unit ferried id index %u ferried id %u", ferried_id_index, ferried_id);
                     unit_t& ferried_unit = state.units.get_by_id(ferried_id);
                     xy dropoff_cell = unit_get_best_unload_cell(state, unit, unit_cell_size(ferried_unit.type));
-                    log_trace("dropoff cell %xi", &dropoff_cell);
+                    log_trace("Dropoff cell %xi", &dropoff_cell);
                     // If this is true, then no free spaces are available to unload
                     if (dropoff_cell == xy(-1, -1)) {
-                        log_trace("no free cells!");
+                        log_trace("No free cells!");
                         break;
                     }
 

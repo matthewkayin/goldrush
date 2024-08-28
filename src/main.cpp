@@ -19,6 +19,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <filesystem>
 
 #ifdef GOLD_DEBUG
     #define RESOURCE_BASE_PATH "../res/"
@@ -227,13 +228,21 @@ enum Mode {
 };
 
 int gold_main(int argc, char** argv) {
-    std::string logfile_path = "goldrush.log";
-    xy window_size = xy(SCREEN_WIDTH * 2, SCREEN_HEIGHT * 2);
+    xy window_size = xy(SCREEN_WIDTH, SCREEN_HEIGHT);
+    char logfile_path[128];
+
+    if (!std::filesystem::exists("./logs")) {
+        std::filesystem::create_directory("./logs");
+    }
+
+#ifdef GOLD_DEBUG
+    strcpy(logfile_path, "./logs/debug.log");
+    window_size = xy(SCREEN_WIDTH * 2, SCREEN_HEIGHT * 2);
     for (int argn = 1; argn < argc; argn++) {
         std::string arg = std::string(argv[argn]);
         if (arg == "--logfile" && argn + 1 < argc) {
             argn++;
-            logfile_path = std::string(argv[argn]);
+            strcpy(logfile_path, argv[argn]);
         } else if (arg == "--resolution" && argn + 1 < argc) {
             argn++;
             std::string resolution_string = std::string(argv[argn]);
@@ -263,10 +272,14 @@ int gold_main(int argc, char** argv) {
             window_size = xy(std::stoi(width_string.c_str()), std::stoi(height_string.c_str()));
         }
     }
+#else
+    time_t _time = time(NULL);
+    tm _tm = *localtime(&_time);
+    sprintf(logfile_path, "./logs/%d-%02d-%02dT%02d%02d%02d.log", _tm.tm_year + 1900, _tm.tm_mon + 1, _tm.tm_mday, _tm.tm_hour, _tm.tm_min, _tm.tm_sec);
+    printf("%s\n", logfile_path);
+#endif
 
-    logger_init(logfile_path.c_str());
-    log_info("opened with window size %vi", &window_size);
-
+    logger_init(logfile_path);
     options_init();
 
     // Init SDL
@@ -360,7 +373,6 @@ int gold_main(int argc, char** argv) {
                 // Capture mouse
                 if (SDL_GetWindowGrab(engine.window) == SDL_FALSE) {
                     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-                        log_info("catch mouse.");
                         SDL_SetWindowGrab(engine.window, SDL_TRUE);
                     }
                     // If the mouse is not captured, don't handle any other input
@@ -368,7 +380,6 @@ int gold_main(int argc, char** argv) {
                 }
                 // Release mouse
                 if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_TAB) {
-                    log_info("release mouse.");
                     SDL_SetWindowGrab(engine.window, SDL_FALSE);
                     break;
                 }
@@ -695,7 +706,7 @@ bool engine_create_renderer() {
     SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
 
     engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 128, 128);
-    log_info("created renderer");
+    log_info("Created renderer.");
     return true;
 }
 
@@ -722,7 +733,7 @@ void engine_destroy_renderer() {
 
     SDL_DestroyRenderer(engine.renderer);
 
-    log_info("destroyed renderer");
+    log_info("Destroyed renderer");
 }
 
 int sdlk_to_str(char* str, SDL_Keycode key) {

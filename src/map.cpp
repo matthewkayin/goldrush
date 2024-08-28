@@ -113,7 +113,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         }
     };
 
-    log_trace("beginning pathfind...");
+    log_trace("Beginning pathfind...");
 
     // Don't bother pathing to unit's cell
     if (from == to) {
@@ -123,7 +123,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
     }
 
     if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(to, cell_size))) {
-        log_trace("finding alternate cell");
+        log_trace("Finding alternate cell");
         xy nearest_alternate;
         int nearest_alternate_distance = -1;
         for (int x = 0; x < cell_size.x; x++) {
@@ -142,7 +142,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         }
 
         if (nearest_alternate_distance != -1) {
-            log_trace("found alternate cell");
+            log_trace("Found alternate cell");
             to = nearest_alternate;
         }
     }
@@ -271,7 +271,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         path->pop_back();
     }
 
-    log_trace("pathfind finished. path size: %z explored size: %z", path->size(), explored.size());
+    log_trace("Pathfind finished. path size: %z explored size: %z", path->size(), explored.size());
 }
 
 fog_t map_get_fog(const match_state_t& state, xy cell) {

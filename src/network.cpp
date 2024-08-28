@@ -174,7 +174,7 @@ void network_service() {
             case ENET_EVENT_TYPE_CONNECT: {
                 if (state.status == NETWORK_STATUS_CONNECTING) {
                     // On server connected to client
-                    log_info("connected to server. Sending greeting...");
+                    log_info("Connected to server. Sending greeting...");
                     message_greet_t greet;
                     strncpy(greet.username, state.client_username, MAX_USERNAME_LENGTH + 1);
                     strncpy(greet.app_version, APP_VERSION, sizeof(APP_VERSION));
@@ -187,7 +187,7 @@ void network_service() {
             case ENET_EVENT_TYPE_DISCONNECT: {
                 if (state.status == NETWORK_STATUS_SERVER) {
                     // On client disconnected
-                    log_info("player %u disconnected.", event.peer->incomingPeerID + 1);
+                    log_info("Player %u disconnected.", event.peer->incomingPeerID + 1);
                     state.players[event.peer->incomingPeerID + 1].status = PLAYER_STATUS_NONE;
                     network_server_broadcast_playerlist();
 
@@ -201,7 +201,7 @@ void network_service() {
                     state.status = NETWORK_STATUS_OFFLINE;
                 } else {
                     // On server disconnected
-                    log_info("server disconnected.");
+                    log_info("Server disconnected.");
 
                     network_event_t event;
                     event.type = state.status == NETWORK_STATUS_CONNECTING ? NETWORK_EVENT_CONNECTION_FAILED : NETWORK_EVENT_SERVER_DISCONNECTED;
@@ -218,7 +218,7 @@ void network_service() {
             }
             case ENET_EVENT_TYPE_RECEIVE: {
                 if (!(event.packet->data[0] == MESSAGE_INPUT && event.packet->data[2] == 0)) {
-                    log_info("received message %b", event.packet->data, event.packet->dataLength);
+                    log_info("Received message %b", event.packet->data, event.packet->dataLength);
                 }
 
                 // Implicit: don't handle / throw away any events if status CONNECTING or DISCONNECTING
@@ -428,17 +428,17 @@ void client_handle_message(uint8_t* data, size_t length) {
 
             network_event_t event;
             state.status = NETWORK_STATUS_CONNECTED;
-            log_info("setting status to connected.")
+            log_info("Setting status to connected.")
             if (greet_response.status == GREET_RESPONSE_ACCEPTED) {
-                log_info("server accepted client");
+                log_info("Server accepted client");
                 state.player_id = greet_response.player_id;
                 event.type = NETWORK_EVENT_JOINED_LOBBY;
             } else if (greet_response.status == GREET_RESPONSE_LOBBY_FULL) {
-                log_info("server lobby is full");
+                log_info("Server lobby is full");
                 event.type = NETWORK_EVENT_LOBBY_FULL;
                 network_disconnect();
             } else if (greet_response.status == GREET_RESPONSE_INVALID_VERSION) {
-                log_info("client version invalid");
+                log_info("Client version invalid");
                 event.type = NETWORK_EVENT_INVALID_VERSION;
                 network_disconnect();
             }

@@ -107,9 +107,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
     bool unit_update_finished = false;
     fixed movement_left = unit_data.speed;
-    log_trace("beginning unit update. unit index: %u", unit_index);
+    log_trace("Beginning unit update. unit index: %u", unit_index);
     while (!unit_update_finished) {
-        log_trace("unit mode is %u", unit.mode);
+        log_trace("Unit mode is %u", unit.mode);
         switch (unit.mode) {
             case UNIT_MODE_IDLE: {
                 if (unit.target.type == UNIT_TARGET_NONE) {
@@ -151,12 +151,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     unit.mode = UNIT_MODE_IDLE;
                     if (unit.target.type == UNIT_TARGET_GOLD) {
                         unit.target = unit_target_nearest_gold(state, unit);
-                        log_trace("path pause timeout. unit finds new gold cell to mine");
+                        log_trace("Path pause timeout. unit finds new gold cell to mine");
                     } else {
                         unit.target = (unit_target_t) {
                             .type = UNIT_TARGET_NONE
                         };
-                        log_trace("path pause timeout. unit gives up");
+                        log_trace("Path pause timeout. unit gives up");
                     }
                     break;
                 }
@@ -339,7 +339,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                         if (!unit_has_reached_target(state, unit)) {
                             // This will trigger a repath
-                            log_trace("has not reached target");
+                            log_trace("Has not reached target");
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
@@ -560,7 +560,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             }
         }
     } // End while !unit_update_finished
-    log_trace("end unit update");
+    log_trace("End unit update");
 }
 
 xy unit_cell_size(UnitType type) {
@@ -836,7 +836,7 @@ unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t&
         };
     }
 
-    log_trace("no nearest gold cell found");
+    log_trace("No nearest gold cell found");
     return (unit_target_t) {
         .type = UNIT_TARGET_NONE
     };
