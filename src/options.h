@@ -109,6 +109,8 @@ struct option_menu_state_t {
 
 void options_init();
 std::unordered_map<Option, int> options_create_from_defaults();
+void options_save_to_file();
+bool options_load_from_file();
 
 option_menu_state_t option_menu_init();
 void option_menu_update(option_menu_state_t& state);

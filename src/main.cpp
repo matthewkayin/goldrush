@@ -484,6 +484,7 @@ int gold_main(int argc, char** argv) {
     engine_quit();
     TTF_Quit();
     SDL_Quit();
+    options_save_to_file();
     logger_quit();
 
     return 0;
