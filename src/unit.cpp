@@ -107,9 +107,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
     bool unit_update_finished = false;
     fixed movement_left = unit_data.speed;
-    log_trace("Beginning unit update. unit index: %u", unit_index);
     while (!unit_update_finished) {
-        log_trace("Unit mode is %u", unit.mode);
         switch (unit.mode) {
             case UNIT_MODE_IDLE: {
                 if (unit.target.type == UNIT_TARGET_NONE) {
@@ -149,15 +147,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 unit.timer--;
                 if (unit.timer == 0) {
                     unit.mode = UNIT_MODE_IDLE;
-                    if (unit.target.type == UNIT_TARGET_GOLD) {
-                        unit.target = unit_target_nearest_gold(state, unit);
-                        log_trace("Path pause timeout. unit finds new gold cell to mine");
-                    } else {
-                        unit.target = (unit_target_t) {
-                            .type = UNIT_TARGET_NONE
-                        };
-                        log_trace("Path pause timeout. unit gives up");
-                    }
+                    log_trace("Path pause timeout. Going to idle in an attempt to repath.");
                     break;
                 }
 
@@ -219,10 +209,15 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                 if (is_path_blocked) {
                     // Trigger repath
+                    /*
                     if (unit.target.type == UNIT_TARGET_GOLD) {
                         unit.target = unit_target_nearest_gold(state, unit);
                     }
-                    unit.mode = UNIT_MODE_IDLE;
+                    */
+                    // unit.mode = UNIT_MODE_IDLE;
+                    unit.mode = UNIT_MODE_MOVE_BLOCKED;
+                    unit.timer = UNIT_PATH_PAUSE_DURATION;
+                    unit_update_finished = true;
                     break;
                 }
 
@@ -560,7 +555,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             }
         }
     } // End while !unit_update_finished
-    log_trace("End unit update");
 }
 
 xy unit_cell_size(UnitType type) {

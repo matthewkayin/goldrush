@@ -10,7 +10,11 @@ std::unordered_map<Option, int> options;
 std::unordered_map<Option, option_data_t> OPTION_DATA = {
     { OPTION_DISPLAY, (option_data_t) {
         .max_value = DISPLAY_COUNT,
+#ifdef GOLD_DEBUG
         .default_value = DISPLAY_WINDOWED,
+#else
+        .default_value = DISPLAY_BORDERLESS,
+#endif
         .confirm_required = true
     }},
     { OPTION_VSYNC, (option_data_t) {
