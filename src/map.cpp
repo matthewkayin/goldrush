@@ -82,23 +82,6 @@ void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, ui
     state.is_fog_dirty = true;
 }
 
-bool map_is_cell_gold(const match_state_t& state, xy cell) {
-    uint32_t cell_type = map_get_cell(state, cell).type;
-    return cell_type >= CELL_GOLD1 && cell_type <= CELL_GOLD3;
-}
-
-void map_decrement_gold(match_state_t& state, xy cell) {
-    state.map_cells[cell.x + (cell.y * state.map_width)].value--;
-    uint16_t gold_left = state.map_cells[cell.x + (cell.y * state.map_width)].value;
-    if (gold_left <= 0) {
-        state.map_cells[cell.x + (cell.y * state.map_width)] = (cell_t) {
-            .type = CELL_EMPTY,
-            .value = 0
-        };
-    }
-    state.is_fog_dirty = true;
-}
-
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path) {
     struct node_t {
         fixed cost;

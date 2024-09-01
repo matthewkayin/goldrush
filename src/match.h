@@ -27,6 +27,7 @@ const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 const uint32_t UNIT_MINE_TICK_DURATION = 40;
 const uint32_t UNIT_MAX_GOLD_HELD = 7;
 const uint32_t UNIT_CANT_BE_FERRIED = 0;
+const uint32_t UNIT_IN_DURATION = 20;
 
 const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_MAX = 5;
@@ -42,9 +43,7 @@ enum CellType: uint16_t {
     CELL_BLOCKED,
     CELL_UNIT,
     CELL_BUILDING,
-    CELL_GOLD1,
-    CELL_GOLD2,
-    CELL_GOLD3
+    CELL_MINE
 };
 
 struct cell_t {
@@ -130,7 +129,7 @@ enum UnitTargetType {
     UNIT_TARGET_UNIT,
     UNIT_TARGET_BUILDING,
     UNIT_TARGET_CAMP,
-    UNIT_TARGET_GOLD,
+    UNIT_TARGET_MINE,
     UNIT_TARGET_ATTACK
 };
 
@@ -140,7 +139,8 @@ enum UnitMode {
     UNIT_MODE_MOVE_BLOCKED,
     UNIT_MODE_MOVE_FINISHED,
     UNIT_MODE_BUILD,
-    UNIT_MODE_MINE,
+    UNIT_MODE_IN_MINE,
+    UNIT_MODE_IN_CAMP,
     UNIT_MODE_ATTACK_WINDUP,
     UNIT_MODE_ATTACK_COOLDOWN,
     UNIT_MODE_FERRY,
@@ -179,6 +179,7 @@ struct unit_t {
     unit_target_t target;
     std::vector<xy> path;
 
+    entity_id garrison_id;
     std::vector<entity_id> ferried_units;
     uint32_t gold_held;
     uint32_t timer;
@@ -245,6 +246,12 @@ struct building_data_t {
     bool can_rally;
 };
 
+struct mine_t {
+    xy cell;
+    int gold_left;
+    bool is_occupied;
+};
+
 // More UI
 
 enum UiButtonRequirementsType {
@@ -265,6 +272,7 @@ enum InputType {
     INPUT_MOVE,
     INPUT_MOVE_UNIT,
     INPUT_MOVE_BUILDING,
+    INPUT_MOVE_MINE,
     INPUT_BLIND_MOVE,
     INPUT_ATTACK_MOVE,
     INPUT_STOP,
@@ -366,6 +374,7 @@ struct match_state_t {
     // Entities
     id_array<unit_t> units;
     id_array<building_t> buildings;
+    id_array<mine_t> mines;
 
     // Players
     uint32_t player_gold[MAX_PLAYERS];
@@ -385,7 +394,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 // Misc
 xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect);
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction = DIRECTION_SOUTH);
 xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect);
 
 // UI
@@ -411,8 +420,6 @@ bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, re
 cell_t map_get_cell(const match_state_t& state, xy cell);
 void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value = 0);
 void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
-bool map_is_cell_gold(const match_state_t& state, xy cell);
-void map_decrement_gold(match_state_t& state, xy cell);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path);
 fog_t map_get_fog(const match_state_t& state, xy cell);
 void map_update_fog(match_state_t& state);

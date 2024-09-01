@@ -103,10 +103,10 @@ void building_update(match_state_t& state, building_t& building) {
                         xy rally_cell = building.rally_point / TILE_SIZE;
                         unit_t& unit = state.units.get_by_id(unit_id);
                         unit.target = (unit_target_t) {
-                            .type = map_is_cell_gold(state, rally_cell) && unit.type == UNIT_MINER
-                                        ? UNIT_TARGET_GOLD 
+                            .type = map_get_cell(state, rally_cell).type == CELL_MINE && unit.type == UNIT_MINER
+                                        ? UNIT_TARGET_MINE
                                         : UNIT_TARGET_CELL,
-                            .cell = rally_cell
+                            .id = map_get_cell(state, rally_cell).value
                         };
                     }
                     break;

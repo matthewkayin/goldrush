@@ -145,16 +145,12 @@ match_state_t match_init() {
             }
 
             // Now that we've found the cluster origin the actual gold on the map
-            int cluster_direction = ((lcg_rand() >> 4) % 4) * 2;
-            int cluster_size = 8 + (lcg_rand() % 4);
-            int cluster_zigzag = -1;
-            log_trace("Region rect %r and patch start %xi and cluster direction %i", &region_rect, &gold_patch_cell, cluster_direction);
-            for (int gold_index = 0; gold_index < cluster_size; gold_index++) {
-                xy gold_cell = gold_patch_cell + (DIRECTION_XY[cluster_direction] * gold_index) + (DIRECTION_XY[(cluster_direction + 2) % DIRECTION_COUNT] * cluster_zigzag);
-                int gold_offset = lcg_rand() % 3;
-                map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), MAP_GOLD_CELL_AMOUNT);
-                cluster_zigzag = std::clamp(cluster_zigzag + ((lcg_rand() % 3) - 1), -1, 2);
-            }
+            entity_id mine_id = state.mines.push_back((mine_t) {
+                .cell = gold_patch_cell,
+                .gold_left = 2500,
+                .is_occupied = false
+            });
+            map_set_cell_rect(state, rect_t(gold_patch_cell, xy(3, 3)), CELL_MINE, mine_id);
         }
     }
 
@@ -708,6 +704,7 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
         case INPUT_BLIND_MOVE:
         case INPUT_MOVE_UNIT:
         case INPUT_MOVE_BUILDING:
+        case INPUT_MOVE_MINE:
         case INPUT_MOVE: {
             memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
             out_buffer_length += sizeof(xy);
@@ -781,6 +778,7 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
         case INPUT_BLIND_MOVE:
         case INPUT_MOVE_UNIT:
         case INPUT_MOVE_BUILDING:
+        case INPUT_MOVE_MINE:
         case INPUT_MOVE: {
             memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
@@ -850,6 +848,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         case INPUT_ATTACK_MOVE:
         case INPUT_MOVE_UNIT:
         case INPUT_MOVE_BUILDING:
+        case INPUT_MOVE_MINE:
         case INPUT_MOVE: {
             // If we tried to move towards a unit, try and find the unit
             uint32_t target_index;
@@ -863,6 +862,8 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 if (target_index != INDEX_INVALID && state.buildings[target_index].health == 0) {
                     target_index = INDEX_INVALID;
                 }
+            } else if (input.type == INPUT_MOVE_MINE) {
+                target_index = state.mines.get_index_of(input.move.target_entity_id);
             } else {
                 target_index = INDEX_INVALID;
             }
@@ -943,11 +944,10 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                             .id = input.move.target_entity_id
                         });
                     } 
-                } else if (map_get_cell(state, unit_target).type >= CELL_GOLD1 && map_get_cell(state, unit_target).type <= CELL_GOLD3 && 
-                            unit.type == UNIT_MINER && !should_move_as_group) {
+                } else if (map_get_cell(state, unit_target).type == CELL_MINE && unit.type == UNIT_MINER) {
                     unit_set_target(state, unit, (unit_target_t) {
-                        .type = UNIT_TARGET_GOLD,
-                        .cell = unit_target
+                        .type = UNIT_TARGET_MINE,
+                        .id = input.move.target_entity_id
                     });
                 } else {
                     unit_set_target(state, unit, (unit_target_t) {
@@ -1119,9 +1119,25 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect) {
-    rect_t cell_rect = rect_t(rect.position + xy(-cell_size.x, 0), cell_size);
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction) {
+    rect_t cell_rect = rect_t(rect.position, cell_size);
     int step_direction = DIRECTION_SOUTH;
+    if (exit_direction == DIRECTION_SOUTH) {
+        cell_rect.position.y += rect.size.y;
+        step_direction = DIRECTION_EAST;
+    } else if (exit_direction == DIRECTION_NORTH) {
+        cell_rect.position.y -= cell_size.y;
+        step_direction = DIRECTION_WEST;
+    } else if (exit_direction == DIRECTION_WEST) {
+        cell_rect.position.x -= cell_size.x;
+        step_direction = DIRECTION_SOUTH;
+    } else if (exit_direction == DIRECTION_EAST) {
+        cell_rect.position.x += rect.size.x;
+        step_direction = DIRECTION_NORTH;
+    } else {
+        log_error("Unhandled exit direction of %u in get_first_empty_cell_around_rect()", (uint32_t)exit_direction);
+        GOLD_ASSERT_MESSAGE(false, "Unhandled exit direction in get_first_empty_cell_around_rect()");
+    }
     int step_count = 0;
     int x_step_amount = rect.size.x + cell_size.x;
     int y_step_amount = rect.size.y;

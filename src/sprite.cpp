@@ -189,7 +189,7 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_BUILDING_CAMP, (sprite_params_t) {
         .path = "sprite/building_camp.png",
-        .hframes = 4,
+        .hframes = 5,
         .vframes = 1,
         .recolor = true
     }},
@@ -198,6 +198,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 4,
         .vframes = 1,
         .recolor = true
+    }},
+    { SPRITE_BUILDING_MINE, (sprite_params_t) {
+        .path = "sprite/building_mine.png",
+        .hframes = 2,
+        .vframes = 1,
+        .recolor = false
     }},
     { SPRITE_BUILDING_DESTROYED_2, (sprite_params_t) {
         .path = "sprite/building_destroyed2x2.png",

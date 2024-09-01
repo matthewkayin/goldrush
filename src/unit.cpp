@@ -284,18 +284,31 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
                         break;
                     } // End case UNIT_TARGET_BUILD
-                    case UNIT_TARGET_GOLD: {
-                        if (xy::manhattan_distance(unit.cell, unit.target.cell) != 1 || !map_is_cell_gold(state, unit.target.cell)) {
-                            unit.target = unit_target_nearest_gold(state, unit);
+                    case UNIT_TARGET_MINE: {
+                        uint32_t mine_index = state.mines.get_index_of(unit.target.id);
+                        if (mine_index == INDEX_INVALID) {
                             unit.mode = UNIT_MODE_IDLE;
-                        } else if (unit.gold_held < UNIT_MAX_GOLD_HELD) {
-                            unit.timer = UNIT_MINE_TICK_DURATION;
-                            unit.direction = get_enum_direction_from_xy_direction(unit.target.cell - unit.cell);
-                            unit.mode = UNIT_MODE_MINE;
-                        } else {
-                            unit.target = unit_target_nearest_camp(state, unit);
-                            unit.mode = UNIT_MODE_IDLE;
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_NONE
+                            };
+                            break;
                         }
+
+                        if (!unit_has_reached_target(state, unit)) {
+                            unit.mode = UNIT_MODE_IDLE;
+                            break;
+                        } 
+
+                        if (state.mines[mine_index].is_occupied) {
+                            unit.mode = UNIT_MODE_IDLE;
+                            break;
+                        }
+                        
+                        unit.gold_held = UNIT_MAX_GOLD_HELD;
+                        map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
+                        unit.mode = UNIT_MODE_IN_MINE;
+                        unit.timer = UNIT_IN_DURATION;
+                        state.mines[mine_index].is_occupied = true;
                         break;
                     }
                     case UNIT_TARGET_CAMP: {
@@ -308,18 +321,30 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             break;
                         } 
 
-                        // Return gold
                         building_t& building = state.buildings[building_index];
                         bool is_unit_around_building = rect_t(building.cell - xy(1, 1), building_cell_size(building.type) + xy(2, 2)).intersects(rect_t(unit.cell, unit_cell_size(unit.type)));
-                        if (is_unit_around_building) {
-                            state.player_gold[unit.player_id] += unit.gold_held;
-                            unit.gold_held = 0;
-                            unit.target = unit_target_nearest_gold(state, unit);
-                            unit.mode = UNIT_MODE_IDLE;
-                        } else {
+                        if (!is_unit_around_building) {
                             // This will trigger a repath
                             unit.mode = UNIT_MODE_IDLE;
+                            break;
                         }
+
+                        if (building.is_occupied) {
+                            unit.mode = UNIT_MODE_IDLE;
+                            break;
+                        }
+
+                        // Return gold
+                        state.player_gold[unit.player_id] += unit.gold_held;
+                        unit.gold_held = 0;
+                        map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
+                        unit.mode = UNIT_MODE_IN_CAMP;
+                        unit.timer = UNIT_IN_DURATION;
+                        // Clearing the unit's target to prevent weirdness if the camp gets destroyed while unit is inside
+                        unit.target = (unit_target_t) {
+                            .type = UNIT_TARGET_NONE
+                        };
+                        building.is_occupied = true;
                         break;
                     }
                     case UNIT_TARGET_UNIT: 
@@ -442,7 +467,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 unit_update_finished = true;
                 break;
             }
-            case UNIT_MODE_MINE: {
+            case UNIT_MODE_IN_MINE: 
+            case UNIT_MODE_IN_CAMP: {
+                unit.timer--;
+                if (unit.timer == 0) {
+                    unit.cell = get_first_empty_cell_around_rect()
+                }
                 // Handles case where this unit was mining has ran out
                 if (!map_is_cell_gold(state, unit.target.cell)) {
                     unit.timer = 0;
