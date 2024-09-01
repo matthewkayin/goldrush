@@ -61,8 +61,8 @@ match_state_t match_init() {
     state.tick_timer = 0;
 
     // Init map
-    state.map_width = 128;
-    state.map_height = 128;
+    state.map_width = 192;
+    state.map_height = 192;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
         .base = 0,
         .decoration = 0
@@ -119,79 +119,41 @@ match_state_t match_init() {
     state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
 
     // Place gold on the map
-    int gold_target = 64;
-    int gold_count = 0;
-    int gold_margin = state.map_width / 4;
-    while (gold_count < gold_target) {
-        // Randomly find the start of a gold cluster
-        xy gold_cell;
-        gold_cell.x = lcg_rand() % state.map_width; 
-        gold_cell.y = lcg_rand() % state.map_height; 
-        if (gold_cell.x < gold_margin || gold_cell.x > state.map_width - gold_margin || gold_cell.y < gold_margin || gold_cell.y > state.map_height - gold_margin) {
-            if (lcg_rand() % 3 == 0) {
-                gold_cell.x = gold_margin + (lcg_rand() % (state.map_width - (gold_margin * 2)));
-                gold_cell.y = gold_margin + (lcg_rand() % (state.map_height - (gold_margin * 2))); 
-            }
-        }
-        if (map_is_cell_blocked(state, gold_cell)) {
-            continue;
-        }
+    int gold_patch_x_regions = 3;
+    int gold_patch_y_regions = 2;
+    int region_width = state.map_width / gold_patch_x_regions;
+    int region_height = state.map_height / gold_patch_y_regions;
+    int region_padding = 12;
+    for (int region_x = 0; region_x < gold_patch_x_regions; region_x++) {
+        for (int region_y = 0; region_y < gold_patch_y_regions; region_y++) {
+            rect_t region_rect = rect_t(xy(region_x * region_width, region_y * region_height) + xy(region_padding, region_padding), xy(region_width, region_height) - xy(2 * region_padding, 2 * region_padding));
+            xy gold_patch_cell;
+            bool gold_patch_cell_is_valid = false;
+            while (!gold_patch_cell_is_valid) {
+                gold_patch_cell.x = region_rect.position.x + (lcg_rand() % region_rect.size.x);
+                gold_patch_cell.y = region_rect.position.y + (lcg_rand() % region_rect.size.y);
+                gold_patch_cell_is_valid = true;
 
-        // Check that it's not too close to the player spawns
-        bool is_patch_too_close_to_player = false;
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
-                xy::manhattan_distance(gold_cell, player_spawns[player_id]) < 24) {
-                    is_patch_too_close_to_player = true;
-                    break;
-            }
-        }
-        if (is_patch_too_close_to_player) {
-            continue;
-        }
-
-        // Place gold on the map around the cluster
-        struct cluster_t {
-            xy cell;
-            int children;
-        };
-        std::vector<cluster_t> clusters;
-        clusters.push_back((cluster_t) {
-            .cell = gold_cell,
-            .children = (gold_cell.x < gold_margin || gold_cell.x > state.map_width - gold_margin || gold_cell.y < gold_margin || gold_cell.y > state.map_height - gold_margin)
-                            ? 1
-                            : 4
-        });
-        while (!clusters.empty()) {
-            cluster_t next = clusters[0];
-            clusters.erase(clusters.begin());
-
-            int gold_offset = lcg_rand() % 3;
-            map_set_cell(state, next.cell, (CellType)(CELL_GOLD1 + gold_offset), MAP_GOLD_CELL_AMOUNT);
-            gold_count++;
-
-            for (int i = 0; i < next.children; i++) {
-                if (lcg_rand() % 4 == 0) {
-                    continue;
+                // Check that it's not too close to the player spawns
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
+                        xy::manhattan_distance(gold_patch_cell, player_spawns[player_id]) < 48) {
+                            gold_patch_cell_is_valid = false;
+                            break;
+                    }
                 }
+            }
 
-                int guess_direction = lcg_rand() % DIRECTION_COUNT;
-                int direction = guess_direction;
-                bool is_gold_cell_valid = false;
-                do {
-                    direction = (direction + 1) % DIRECTION_COUNT;
-                    xy child_cell = next.cell + DIRECTION_XY[direction];
-                    is_gold_cell_valid = xy::manhattan_distance(gold_cell, child_cell) >= xy::manhattan_distance(gold_cell, next.cell) && map_is_cell_in_bounds(state, child_cell) && !map_is_cell_blocked(state, child_cell);
-                } while (direction != guess_direction && !is_gold_cell_valid);
-                if (direction == guess_direction) {
-                    // There are no free spaces to place gold in, so exit the loop for this cluster
-                    break;
-                }
-
-                clusters.push_back((cluster_t) {
-                    .cell = next.cell + DIRECTION_XY[direction],
-                    .children = next.children - 1
-                });
+            // Now that we've found the cluster origin the actual gold on the map
+            int cluster_direction = ((lcg_rand() >> 4) % 4) * 2;
+            int cluster_size = 8 + (lcg_rand() % 4);
+            int cluster_zigzag = -1;
+            log_trace("Region rect %r and patch start %xi and cluster direction %i", &region_rect, &gold_patch_cell, cluster_direction);
+            for (int gold_index = 0; gold_index < cluster_size; gold_index++) {
+                xy gold_cell = gold_patch_cell + (DIRECTION_XY[cluster_direction] * gold_index) + (DIRECTION_XY[(cluster_direction + 2) % DIRECTION_COUNT] * cluster_zigzag);
+                int gold_offset = lcg_rand() % 3;
+                map_set_cell(state, gold_cell, (CellType)(CELL_GOLD1 + gold_offset), MAP_GOLD_CELL_AMOUNT);
+                cluster_zigzag = std::clamp(cluster_zigzag + ((lcg_rand() % 3) - 1), -1, 2);
             }
         }
     }

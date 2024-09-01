@@ -6,17 +6,20 @@
 #include <windows.h>
 #include <cstdint>
 
-double platform_get_absolute_time() {
-    static double clock_frequency = 0.0;
-    if (!clock_frequency) {
-        LARGE_INTEGER frequency;
-        QueryPerformanceFrequency(&frequency);
-        clock_frequency = 1.0 / (double)frequency.QuadPart;
-    }
+static double clock_frequency;
+static LARGE_INTEGER clock_start_time;
 
+void platform_clock_init() {
+    LARGE_INTEGER frequency;
+    QueryPerformanceFrequency(&frequency);
+    clock_frequency = 1.0 / (double)frequency.QuadPart;
+    QueryPerformanceCounter(&clock_start_time);
+}
+
+double platform_get_absolute_time() {
     LARGE_INTEGER current_time;
     QueryPerformanceCounter(&current_time);
-    return (double)current_time.QuadPart * clock_frequency;
+    return (double)(current_time.QuadPart - clock_start_time.QuadPart) * clock_frequency;
 }
 
 void platform_console_write(const char* message, int log_level) {

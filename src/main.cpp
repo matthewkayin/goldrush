@@ -21,13 +21,18 @@
 #include <vector>
 #include <filesystem>
 
+#ifdef PLATFORM_WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #ifdef GOLD_DEBUG
     #define RESOURCE_BASE_PATH "../res/"
 #else
     #define RESOURCE_BASE_PATH "./res/"
 #endif
 
-const double UPDATE_TIME = 1.0 / 60.0;
+const double UPDATE_TIME = 1.0 / 60;
 const uint8_t INPUT_MOUSE_BUTTON_COUNT = 3;
 enum TextAnchor {
     TEXT_ANCHOR_TOP_LEFT,
@@ -280,9 +285,9 @@ int gold_main(int argc, char** argv) {
 #endif
 
     logger_init(logfile_path);
+    platform_clock_init();
     options_init();
 
-    // Init SDL
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
         return false;
@@ -320,11 +325,13 @@ int gold_main(int argc, char** argv) {
 
     double last_time = platform_get_absolute_time();
     double last_second = last_time;
-    double update_accumulator = 0.0;
+    double update_accumulator = 0;
     uint32_t frames = 0;
     uint32_t fps = 0;
     uint32_t updates = 0;
     uint32_t ups = 0;
+
+    // Init SDL
 
     while (engine.is_running) {
         // TIMEKEEP
@@ -502,7 +509,6 @@ int gold_main(int argc, char** argv) {
 }
 
 #if defined PLATFORM_WIN32 && !defined GOLD_DEBUG
-#include <windows.h>
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     return gold_main(0, NULL);
 }

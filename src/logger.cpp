@@ -10,7 +10,6 @@
 #include <cstdio>
 
 static FILE* logfile;
-static double logger_start_time;
 
 bool logger_init(const char* logfile_path) {
     logfile = fopen(logfile_path, "w");
@@ -18,7 +17,6 @@ bool logger_init(const char* logfile_path) {
         log_error("Unable to open log file for writing.");
         return false;
     }
-    logger_start_time = platform_get_absolute_time();
 
     return true;
 }
@@ -122,7 +120,7 @@ void logger_output(LogLevel log_level, const char* message, ...) {
 
     char log_message[MESSAGE_LENGTH];
     static const char* LOG_LEVEL_PREFIXES[4] = { "ERROR", "WARN", "INFO", "TRACE" };
-    sprintf(log_message, "[%f - %s]: %s\n", (platform_get_absolute_time() - logger_start_time), LOG_LEVEL_PREFIXES[log_level], out_message);
+    sprintf(log_message, "[%f - %s]: %s\n", platform_get_absolute_time(), LOG_LEVEL_PREFIXES[log_level], out_message);
 
 #ifdef GOLD_DEBUG
     platform_console_write(log_message, log_level);
