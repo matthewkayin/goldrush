@@ -1276,24 +1276,21 @@ void render_match(const match_state_t& state) {
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
 
+            if (map_get_cell(state, base_coords + xy(x, y)).type == CELL_MINE) {
+                SDL_SetRenderDrawColor(engine.renderer, 255, 0, 0, 255);
+                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+            }
+            if (animation_is_playing(state.ui_move_animation) && base_coords + xy(x, y) == state.ui_move_position / TILE_SIZE) {
+                SDL_SetRenderDrawColor(engine.renderer, 0, 255, 0, 255);
+                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+            }
+
             // Render decorations
             if (state.map_tiles[map_index].decoration != 0) {
                 ysorted.push_back((render_sprite_params_t) {
                     .sprite = SPRITE_TILE_DECORATION,
                     .position = xy(tile_dst_rect.x, tile_dst_rect.y),
                     .frame = xy(state.map_tiles[map_index].decoration - 1, 0),
-                    .options = RENDER_SPRITE_NO_CULL,
-                    .recolor_name = RECOLOR_NONE
-                });
-            }
-
-            // Render gold
-            uint32_t map_cell = map_get_cell(state, xy(base_coords.x + x, base_coords.y + y)).type;
-            if (map_cell >= CELL_GOLD1 && map_cell <= CELL_GOLD3) {
-                ysorted.push_back((render_sprite_params_t) {
-                    .sprite = SPRITE_TILE_GOLD,
-                    .position = xy(tile_dst_rect.x, tile_dst_rect.y),
-                    .frame = xy(map_cell - CELL_GOLD1, 0),
                     .options = RENDER_SPRITE_NO_CULL,
                     .recolor_name = RECOLOR_NONE
                 });
@@ -1356,6 +1353,9 @@ void render_match(const match_state_t& state) {
                 continue;
             }
             const unit_t& unit = state.units[index];
+            if (unit.mode == UNIT_MODE_IN_CAMP || unit.mode == UNIT_MODE_IN_MINE) {
+                continue;
+            }
 
             xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
             Sprite select_ring_sprite = unit_get_select_ring(unit.type, state.selection.type == SELECTION_TYPE_ENEMY_UNIT);
@@ -1405,10 +1405,8 @@ void render_match(const match_state_t& state) {
                     }
                     break;
                 }
-                case CELL_GOLD1:
-                case CELL_GOLD2:
-                case CELL_GOLD3: {
-                    render_sprite(SPRITE_SELECT_RING_GOLD, xy(0, 0), state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
+                case CELL_MINE: {
+                    render_sprite(SPRITE_SELECT_RING_BUILDING_3, xy(0, 0), (state.mines.get_by_id(id).cell * TILE_SIZE) + (xy(3 * TILE_SIZE, 3 * TILE_SIZE) / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     break;
                 }
                 default:
@@ -1420,7 +1418,7 @@ void render_match(const match_state_t& state) {
     // Rally points
     if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         const building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
-        if (building.mode == BUILDING_MODE_FINISHED && building.rally_point.x != -1) {
+        if (building_is_finished(building) && building.rally_point.x != -1) {
             ysorted.push_back((render_sprite_params_t) {
                 .sprite = SPRITE_RALLY_FLAG,
                 .position = building.rally_point - xy(4, 15) - state.camera_offset,
@@ -1429,6 +1427,22 @@ void render_match(const match_state_t& state) {
                 .recolor_name = (RecolorName)network_get_player_id()
             });
         }
+    }
+
+    // Mines
+    for (const mine_t& mine : state.mines) {
+        rect_t mine_render_rect = mine_get_rect(mine);
+        mine_render_rect.position -= state.camera_offset;
+        if (mine_render_rect.position.x + mine_render_rect.size.x < 0 || mine_render_rect.position.x > SCREEN_WIDTH || mine_render_rect.position.y + mine_render_rect.size.y < 0 || mine_render_rect.position.y > SCREEN_HEIGHT) {
+            continue;
+        }
+        ysorted.push_back((render_sprite_params_t) {
+            .sprite = SPRITE_BUILDING_MINE,
+            .position = mine_render_rect.position,
+            .frame = xy(mine.is_occupied ? 1 : 0, 0),
+            .options = RENDER_SPRITE_NO_CULL,
+            .recolor_name = RECOLOR_NONE
+        });
     }
 
     // Buildings
@@ -1447,7 +1461,14 @@ void render_match(const match_state_t& state) {
             continue;
         }
 
-        int hframe = building.mode == BUILDING_MODE_FINISHED ? 3 : ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
+        int hframe;
+        if (building.mode == BUILDING_MODE_OCCUPIED) {
+            hframe = 4;
+        } else if (building.mode == BUILDING_MODE_OCCUPIED) {
+            hframe = 3;
+        } else {
+            hframe = ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
+        }
         ysorted.push_back((render_sprite_params_t) {
             .sprite = (Sprite)sprite,
             .position = building_render_pos,
@@ -1471,6 +1492,9 @@ void render_match(const match_state_t& state) {
             continue;
         }
         if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, unit_cell_size(unit.type))) {
+            continue;
+        }
+        if (unit.mode == UNIT_MODE_IN_MINE || unit.mode == UNIT_MODE_IN_CAMP) {
             continue;
         }
 
@@ -1566,11 +1590,19 @@ void render_match(const match_state_t& state) {
         SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
         for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_size; y++) {
             for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_size; x++) {
-                bool is_cell_green;
+                bool is_cell_green = true;
                 if (is_placement_out_of_bounds || map_get_fog(state, xy(x, y)).type == FOG_HIDDEN) {
                     is_cell_green = false;
                 } else {
-                    is_cell_green = !map_is_cell_blocked(state, xy(x, y));
+                    for (const mine_t& mine : state.mines) {
+                        if (rect_t(xy(x, y), xy(1, 1)).intersects(mine_get_block_building_rect(mine))) {
+                            is_cell_green = false;
+                            break;
+                        }
+                    }
+                    if (is_cell_green) {
+                        is_cell_green = !map_is_cell_blocked(state, xy(x, y));
+                    }
                 }
 
                 SDL_Color cell_color = is_cell_green ? COLOR_GREEN : COLOR_RED;
@@ -1912,18 +1944,14 @@ void render_match(const match_state_t& state) {
     SDL_RenderClear(engine.renderer);
 
     SDL_SetRenderDrawColor(engine.renderer, COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, COLOR_GOLD.a);
-    for (int x = 0; x < state.map_width; x++) {
-        for (int y = 0; y < state.map_height; y++) {
-            if (map_is_cell_gold(state, xy(x, y))) {
-                SDL_Rect gold_rect = (SDL_Rect) {
-                    .x = (x * MINIMAP_RECT.size.x) / (int)state.map_width,
-                    .y = (y * MINIMAP_RECT.size.y) / (int)state.map_height,
-                    .w = 2,
-                    .h = 2
-                };
-                SDL_RenderFillRect(engine.renderer, &gold_rect);
-            }
-        }
+    for (const mine_t& mine : state.mines) {
+        SDL_Rect mine_rect = (SDL_Rect) {
+            .x = (mine.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width,
+            .y = (mine.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height,
+            .w = 6,
+            .h = 6
+        };
+        SDL_RenderFillRect(engine.renderer, &mine_rect);
     }
 
     for (const building_t& building : state.buildings) {
@@ -2025,22 +2053,24 @@ void render_match(const match_state_t& state) {
             "idle",
             "move",
             "blocked",
-            "mv_finsh",
+            "move_finshed",
             "build",
-            "mine",
-            "windup",
-            "cooldown",
+            "in_mine",
+            "in_camp",
+            "attack_windup",
+            "attack_cooldown",
             "death",
-            "fade"
+            "death_fade"
         };
-        static const char* TARGET_STR[UNIT_TARGET_GOLD + 1] = {
+        static const char* TARGET_STR[UNIT_TARGET_ATTACK + 1] = {
             "none",
             "cell",
             "build",
-            "enemy",
-            "e build",
+            "unit",
+            "building",
             "camp",
-            "gold"
+            "mine",
+            "a_move"
         };
         sprintf(unit_debug_text, "%u: mode = %s target = %s", unit_index, MODE_STR[unit.mode], TARGET_STR[unit.target.type]);
         render_text(FONT_HACK, unit_debug_text, COLOR_BLACK, xy(0, 24 + (12 * unit_index)));

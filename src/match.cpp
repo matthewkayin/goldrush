@@ -145,12 +145,14 @@ match_state_t match_init() {
             }
 
             // Now that we've found the cluster origin the actual gold on the map
-            entity_id mine_id = state.mines.push_back((mine_t) {
+            mine_t mine = (mine_t) {
                 .cell = gold_patch_cell,
                 .gold_left = 2500,
                 .is_occupied = false
-            });
+            };
+            entity_id mine_id = state.mines.push_back(mine);
             map_set_cell_rect(state, rect_t(gold_patch_cell, xy(3, 3)), CELL_MINE, mine_id);
+            log_info("mine id %u has cell %xi", mine_id, &state.mines.get_by_id(mine_id).cell);
         }
     }
 
@@ -160,7 +162,10 @@ match_state_t match_init() {
             bool is_gold_nearby = false;
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                 xy cell = xy(i % state.map_width, i / state.map_height) + DIRECTION_XY[direction];
-                if (map_is_cell_in_bounds(state, cell) && map_get_cell(state, cell).type != CELL_EMPTY) {
+                if (!map_is_cell_in_bounds(state, cell)) {
+                    continue;
+                }
+                if (map_get_cell(state, cell).type != CELL_EMPTY) {
                     is_gold_nearby = true;
                     break;
                 }
@@ -482,9 +487,10 @@ void match_update(match_state_t& state) {
         input.move.target_entity_id = ID_NULL;
         CellType cell_type = map_get_cell(state, input.move.target_cell).type;
         FogType fog_type = map_get_fog(state, input.move.target_cell).type;
-        if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || (cell_type == CELL_BUILDING && fog_type != FOG_HIDDEN)) {
+        if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || ((cell_type == CELL_BUILDING || cell_type == CELL_MINE) && fog_type != FOG_HIDDEN)) {
             input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
         }
+        log_trace("move target cell %xi target entity id %u", &input.move.target_cell, input.move.target_entity_id);
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
         if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state, input.move.target_cell).type == FOG_HIDDEN)) {
@@ -495,9 +501,12 @@ void match_update(match_state_t& state) {
             input.type = INPUT_MOVE_UNIT;
         } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_BUILDING) {
             input.type = INPUT_MOVE_BUILDING;
+        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_MINE) {
+            input.type = INPUT_MOVE_MINE;
         } else {
             input.type = INPUT_MOVE;
         }
+        log_trace("move input type %u", input.type);
 
         input.move.unit_count = 0;
         memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
@@ -527,7 +536,7 @@ void match_update(match_state_t& state) {
         state.selection.type == SELECTION_TYPE_BUILDINGS && 
         (MINIMAP_RECT.has_point(mouse_pos) || !ui_is_mouse_in_ui())) {
         building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
-        if (building.mode == BUILDING_MODE_FINISHED && BUILDING_DATA.at(building.type).can_rally) {
+        if (building_is_finished(building) && BUILDING_DATA.at(building.type).can_rally) {
             xy move_target;
             if (ui_is_mouse_in_ui()) {
                 xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
@@ -685,7 +694,7 @@ uint32_t match_get_player_population(const match_state_t& state, uint8_t player_
 uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id) {
     uint32_t max_population = 10;
     for (const building_t& building : state.buildings) {
-        if (building.player_id == player_id && building.type == BUILDING_HOUSE && building.mode == BUILDING_MODE_FINISHED) {
+        if (building.player_id == player_id && building.type == BUILDING_HOUSE && building_is_finished(building)) {
             max_population += 10;
         }
     }
@@ -933,7 +942,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         .id = input.move.target_entity_id
                     });
                 } else if (input.type == INPUT_MOVE_BUILDING && target_index != INDEX_INVALID) {
-                    if (state.buildings[target_index].type == BUILDING_CAMP && state.buildings[target_index].mode == BUILDING_MODE_FINISHED && unit.gold_held > 0) {
+                    if (state.buildings[target_index].type == BUILDING_CAMP && building_is_finished(state.buildings[target_index]) && unit.gold_held > 0) {
                         unit_set_target(state, unit, (unit_target_t) {
                             .type = UNIT_TARGET_CAMP,
                             .id = input.move.target_entity_id
@@ -944,11 +953,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                             .id = input.move.target_entity_id
                         });
                     } 
-                } else if (map_get_cell(state, unit_target).type == CELL_MINE && unit.type == UNIT_MINER) {
+                } else if (input.type == INPUT_MOVE_MINE && unit.type == UNIT_MINER) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_MINE,
                         .id = input.move.target_entity_id
                     });
+                    log_trace("set unit target to %u id %u", unit.target.type, unit.target.id);
                 } else {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_CELL,
@@ -1121,43 +1131,43 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
 
 xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction) {
     rect_t cell_rect = rect_t(rect.position, cell_size);
+    xy start_cell = cell_rect.position;
+    xy search_corners[4] = { 
+        rect.position - cell_size,
+        rect.position + xy(rect.size.x, -cell_size.y),
+        rect.position + rect.size,
+        rect.position + xy(-cell_size.x, rect.position.y)
+    };
     int step_direction = DIRECTION_SOUTH;
     if (exit_direction == DIRECTION_SOUTH) {
         cell_rect.position.y += rect.size.y;
-        step_direction = DIRECTION_EAST;
+        step_direction = DIRECTION_WEST;
     } else if (exit_direction == DIRECTION_NORTH) {
         cell_rect.position.y -= cell_size.y;
-        step_direction = DIRECTION_WEST;
+        cell_rect.position.x++;
+        step_direction = DIRECTION_EAST;
     } else if (exit_direction == DIRECTION_WEST) {
         cell_rect.position.x -= cell_size.x;
-        step_direction = DIRECTION_SOUTH;
+        step_direction = DIRECTION_NORTH;
     } else if (exit_direction == DIRECTION_EAST) {
         cell_rect.position.x += rect.size.x;
-        step_direction = DIRECTION_NORTH;
+        step_direction = DIRECTION_SOUTH;
     } else {
         log_error("Unhandled exit direction of %u in get_first_empty_cell_around_rect()", (uint32_t)exit_direction);
         GOLD_ASSERT_MESSAGE(false, "Unhandled exit direction in get_first_empty_cell_around_rect()");
     }
-    int step_count = 0;
-    int x_step_amount = rect.size.x + cell_size.x;
-    int y_step_amount = rect.size.y;
 
     while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect)) {
         cell_rect.position += DIRECTION_XY[step_direction];
-        step_count++;
-
-        bool is_y_stepping = step_direction == DIRECTION_SOUTH || step_direction == DIRECTION_NORTH;
-        int step_amount = is_y_stepping ? y_step_amount : x_step_amount;
-        if (step_count == step_amount) {
-            if (is_y_stepping) {
-                y_step_amount += cell_size.y;
-            } else {
-                x_step_amount += cell_size.x;
-            }
-            step_count = 0;
-
-            // change directions counterclockwise
-            step_direction = step_direction == DIRECTION_NORTH ? DIRECTION_WEST : step_direction - 2;
+        if (cell_rect.position == search_corners[step_direction / 2]) {
+            step_direction = (step_direction + 2) % DIRECTION_COUNT;
+        } else if (cell_rect.position == start_cell) {
+            cell_rect.position += DIRECTION_XY[exit_direction];
+            start_cell = cell_rect.position;
+            search_corners[0] += xy(-1, -1);
+            search_corners[1] += xy(1, -1);
+            search_corners[2] += xy(1, 1);
+            search_corners[3] += xy(-1, 1);
         }
     }
 
@@ -1204,4 +1214,12 @@ xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, r
     }
 
     return nearest_cell_dist != -1 ? nearest_cell : start.position;
+}
+
+rect_t mine_get_rect(const mine_t& mine) {
+    return rect_t(mine.cell * TILE_SIZE, xy(3, 3) * TILE_SIZE);
+}
+
+rect_t mine_get_block_building_rect(const mine_t& mine) {
+    return rect_t(mine.cell - xy(3, 3), xy(9, 9));
 }

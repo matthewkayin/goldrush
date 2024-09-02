@@ -90,7 +90,7 @@ bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
     switch (ui_button_requirements_it->second.type) {
         case UI_BUTTON_REQUIRES_BUILDING: {
             for (const building_t& building : state.buildings) {
-                if (building.player_id == network_get_player_id() && building.mode == BUILDING_MODE_FINISHED && building.type == ui_button_requirements_it->second.building_type) {
+                if (building.player_id == network_get_player_id() && building_is_finished(building) && building.type == ui_button_requirements_it->second.building_type) {
                     return true;
                 }
             }

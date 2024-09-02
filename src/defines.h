@@ -13,7 +13,7 @@
     #define GOLD_DEBUG_FAST_BUILD
     #define GOLD_DEBUG_FAST_TRAIN
     // #define GOLD_DEBUG_UNIT_PATHS
-    // #define GOLD_DEBUG_UNIT_STATE
+    #define GOLD_DEBUG_UNIT_STATE
     #define GOLD_DEBUG_MOUSE
     #define GOLD_DEBUG_FOG_DISABLED
 #endif

@@ -78,6 +78,7 @@ entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, co
 
     unit.gold_held = 0;
     unit.timer = 0;
+    unit.garrison_id = ID_NULL;
 
     entity_id unit_id = state.units.push_back(unit);
     map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
@@ -120,9 +121,11 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     break;
                 } else if (unit_has_reached_target(state, unit)) {
                     unit.mode = UNIT_MODE_MOVE_FINISHED;
+                    log_trace("In idle, has reached target");
                     break;
                 } else {
                     map_pathfind(state, unit.cell, unit_get_target_cell(state, unit), unit_cell_size(unit.type), &unit.path);
+                    log_trace("In idle, pathfind");
                     if (!unit.path.empty()) {
                         unit.mode = UNIT_MODE_MOVE;
                         break;
@@ -286,7 +289,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     } // End case UNIT_TARGET_BUILD
                     case UNIT_TARGET_MINE: {
                         uint32_t mine_index = state.mines.get_index_of(unit.target.id);
-                        if (mine_index == INDEX_INVALID) {
+                        if (mine_index == INDEX_INVALID || state.mines[mine_index].gold_left == 0) {
                             unit.mode = UNIT_MODE_IDLE;
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
@@ -304,11 +307,17 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             break;
                         }
                         
-                        unit.gold_held = UNIT_MAX_GOLD_HELD;
+                        unit.gold_held = std::min(UNIT_MAX_GOLD_HELD, state.mines[mine_index].gold_left);
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
                         unit.mode = UNIT_MODE_IN_MINE;
                         unit.timer = UNIT_IN_DURATION;
+                        unit.garrison_id = unit.target.id;
+                        unit.target = (unit_target_t) {
+                            .type = UNIT_TARGET_NONE
+                        };
+                        unit.path.clear();
                         state.mines[mine_index].is_occupied = true;
+                        state.mines[mine_index].gold_left -= unit.gold_held;
                         break;
                     }
                     case UNIT_TARGET_CAMP: {
@@ -329,7 +338,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             break;
                         }
 
-                        if (building.is_occupied) {
+                        if (building.mode == BUILDING_MODE_OCCUPIED) {
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
@@ -341,10 +350,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         unit.mode = UNIT_MODE_IN_CAMP;
                         unit.timer = UNIT_IN_DURATION;
                         // Clearing the unit's target to prevent weirdness if the camp gets destroyed while unit is inside
+                        unit.garrison_id = unit.target.id;
                         unit.target = (unit_target_t) {
                             .type = UNIT_TARGET_NONE
                         };
-                        building.is_occupied = true;
+                        unit.path.clear();
+                        building.mode = BUILDING_MODE_OCCUPIED;
                         break;
                     }
                     case UNIT_TARGET_UNIT: 
@@ -451,7 +462,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 #endif
                     if (building.health == BUILDING_DATA.at(building.type).max_health) {
                         // On building finished
-                        building.mode = BUILDING_MODE_FINISHED;
+                        building.mode = BUILDING_MODE_UNOCCUPIED;
 
                         // If selecting the building
                         if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == unit.target.build.building_id) {
@@ -471,34 +482,23 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             case UNIT_MODE_IN_CAMP: {
                 unit.timer--;
                 if (unit.timer == 0) {
-                    unit.cell = get_first_empty_cell_around_rect()
-                }
-                // Handles case where this unit was mining has ran out
-                if (!map_is_cell_gold(state, unit.target.cell)) {
-                    unit.timer = 0;
-                    unit.target = unit_target_nearest_gold(state, unit);
-                    unit.mode = UNIT_MODE_IDLE;
-                    break;
-                }
-
-                unit.timer--;
-                if (unit.timer == 0) {
-                    // Collect a gold
-                    unit.gold_held++;
-                    map_decrement_gold(state, unit.target.cell);
-
-                    if (unit.gold_held == UNIT_MAX_GOLD_HELD) {
-                        // Return to mining camp
+                    xy in_position = unit.mode == UNIT_MODE_IN_MINE ? state.mines.get_by_id(unit.garrison_id).cell : state.buildings.get_by_id(unit.garrison_id).cell;
+                    xy in_size = unit.mode == UNIT_MODE_IN_MINE ? xy(3, 3) : building_cell_size(BUILDING_CAMP);
+                    unit.cell = get_first_empty_cell_around_rect(state, unit_cell_size(unit.type), rect_t(in_position, in_size), unit.mode == UNIT_MODE_IN_MINE ? DIRECTION_SOUTH : DIRECTION_NORTH);
+                    unit.position = cell_center(unit.cell);
+                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
+                    if (unit.mode == UNIT_MODE_IN_MINE) {
+                        mine_t& mine = state.mines.get_by_id(unit.garrison_id);
+                        mine.is_occupied = false;
                         unit.target = unit_target_nearest_camp(state, unit);
-                        unit.mode = UNIT_MODE_IDLE;
-                    } else if (!map_is_cell_gold(state, unit.target.cell)) {
-                        // Gold ran out, find a new gold cell to mine
-                        unit.target = unit_target_nearest_gold(state, unit);
-                        unit.mode = UNIT_MODE_IDLE;
+                        log_trace("after mine, unit target type is %u", unit.target.type);
                     } else {
-                        // Continue mining
-                        unit.timer = UNIT_MINE_TICK_DURATION;
+                        state.buildings.get_by_id(unit.garrison_id).mode = BUILDING_MODE_UNOCCUPIED;
+                        unit.target = unit_target_nearest_mine(state, unit);
+                        log_trace("after camp, unit target type is %u", unit.target.type);
                     }
+                    unit.mode = UNIT_MODE_IDLE;
+                    unit.garrison_id = ID_NULL;
                 }
                 unit_update_finished = true;
                 break;
@@ -601,7 +601,7 @@ void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t tar
     unit.target = target;
     unit.path.clear();
 
-    if (unit.mode != UNIT_MODE_MOVE) {
+    if (unit.mode != UNIT_MODE_MOVE && unit.mode != UNIT_MODE_IN_CAMP && unit.mode != UNIT_MODE_IN_MINE) {
         // Abandon current behavior in favor of new order
         unit.timer = 0;
         unit.mode = UNIT_MODE_IDLE;
@@ -616,8 +616,9 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
             return unit.target.build.unit_cell;
         case UNIT_TARGET_ATTACK:
         case UNIT_TARGET_CELL:
-        case UNIT_TARGET_GOLD:
             return unit.target.cell;
+        case UNIT_TARGET_MINE:
+            return get_nearest_free_cell_around_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), rect_t(state.mines.get_by_id(unit.target.id).cell, xy(3, 3)));
         case UNIT_TARGET_UNIT: {
             uint32_t target_unit_index = state.units.get_index_of(unit.target.id);
             if (target_unit_index == INDEX_INVALID || state.units[target_unit_index].health == 0) {
@@ -650,8 +651,11 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
         case UNIT_TARGET_ATTACK:
         case UNIT_TARGET_CELL:
             return unit.cell == unit.target.cell;
-        case UNIT_TARGET_GOLD:
-            return xy::manhattan_distance(unit.cell, unit.target.cell) == 1;
+        case UNIT_TARGET_MINE: {
+            rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
+            rect_t mine_rect = rect_t(state.mines.get_by_id(unit.target.id).cell, xy(3, 3));
+            return unit_rect.is_adjacent_to(mine_rect);
+        }
         case UNIT_TARGET_UNIT: {
             uint32_t target_unit_index = state.units.get_index_of(unit.target.id);
             GOLD_ASSERT(target_unit_index != INDEX_INVALID);
@@ -717,7 +721,6 @@ AnimationName unit_get_expected_animation(const unit_t& unit) {
             return ANIMATION_UNIT_MOVE; 
         case UNIT_MODE_BUILD:
             return ANIMATION_UNIT_BUILD;
-        case UNIT_MODE_MINE:
         case UNIT_MODE_ATTACK_WINDUP:
             return ANIMATION_UNIT_ATTACK;
         case UNIT_MODE_DEATH:
@@ -780,12 +783,13 @@ void unit_stop_building(match_state_t& state, entity_id unit_id, const building_
     map_set_cell(state, unit.cell, CELL_UNIT, unit_id);
 }
 
-entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit) {
+unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit) {
     int nearest_camp_dist = -1;
     entity_id nearest_camp_id = ID_NULL;
 
+    // Find the nearest mining camp
     for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
-        if (state.buildings[building_index].mode == BUILDING_MODE_FINISHED && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit.player_id) {
+        if (building_is_finished(state.buildings[building_index]) && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit.player_id) {
             if (nearest_camp_dist == -1 || xy::manhattan_distance(unit.cell, state.buildings[building_index].cell) < nearest_camp_dist) {
                 nearest_camp_id = state.buildings.get_id_of(building_index);
                 nearest_camp_dist = xy::manhattan_distance(unit.cell, state.buildings[building_index].cell);
@@ -793,13 +797,7 @@ entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit)
         }
     }
 
-    return nearest_camp_id;
-}
-
-unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit) {
-    // Find the nearest mining camp
-    entity_id nearest_camp_id = unit_find_nearest_camp(state, unit);
-    if (nearest_camp_id != ID_NULL) {
+    if (nearest_camp_id != ID_NULL && nearest_camp_dist < 20) {
         return (unit_target_t) {
             .type = UNIT_TARGET_CAMP,
             .id = nearest_camp_id
@@ -811,56 +809,27 @@ unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t&
     };
 }
 
-unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit) {
-    xy start_cell = unit.cell;
+unit_target_t unit_target_nearest_mine(const match_state_t& state, const unit_t& unit) {
+    int nearest_mine_dist = -1;
+    entity_id nearest_mine_id = ID_NULL;
 
-    std::unordered_map<uint32_t, bool> reserved_gold_cells;
-    for (const unit_t& other_unit : state.units) {
-        if (other_unit.player_id == unit.player_id || other_unit.target.type != UNIT_TARGET_GOLD || other_unit.path.empty()) {
-            continue;
-        }
-        xy other_unit_target_cell = other_unit.path[other_unit.path.size() - 1];
-        reserved_gold_cells[other_unit_target_cell.x + (other_unit_target_cell.y * state.map_width)] = true;
-    }
-
-    xy nearest_gold_cell = unit.cell;
-    int nearest_gold_dist = -1;
-    for (int x = 0; x < state.map_width; x++) {
-        for (int y = 0; y < state.map_height; y++) {
-            xy gold_cell = xy(x, y);
-            // Check if the cell is gold
-            if (!map_is_cell_gold(state, gold_cell)) {
-                continue;
-            }
-
-            // Check if the gold can be mined around
-            bool is_gold_cell_free = false;
-            for (int direction = DIRECTION_NORTH; direction < DIRECTION_COUNT; direction += 2) {
-                xy adjacent_cell = gold_cell + DIRECTION_XY[direction];
-                if (map_is_cell_in_bounds(state, adjacent_cell) && 
-                        reserved_gold_cells.find(adjacent_cell.x + (adjacent_cell.y * state.map_width)) == reserved_gold_cells.end() && 
-                        (adjacent_cell == start_cell || !map_is_cell_blocked(state, adjacent_cell))) {
-                    is_gold_cell_free = true;
-                    break;
-                }
-            }
-
-            // Check if the cell is closer to the nearest cell
-            if (is_gold_cell_free && (nearest_gold_dist == -1 || xy::manhattan_distance(start_cell, gold_cell) < nearest_gold_dist)) {
-                nearest_gold_cell = gold_cell;
-                nearest_gold_dist = xy::manhattan_distance(start_cell, nearest_gold_cell);
+    // Find the nearest mining camp
+    for (uint32_t mine_index = 0; mine_index < state.mines.size(); mine_index++) {
+        if (state.mines[mine_index].gold_left != 0) {
+            if (nearest_mine_dist == -1 || xy::manhattan_distance(unit.cell, state.mines[mine_index].cell) < nearest_mine_dist) {
+                nearest_mine_id = state.mines.get_id_of(mine_index);
+                nearest_mine_dist = xy::manhattan_distance(unit.cell, state.mines[mine_index].cell);
             }
         }
     }
 
-    if (nearest_gold_dist != -1) {
+    if (nearest_mine_dist != ID_NULL && nearest_mine_dist < 20) {
         return (unit_target_t) {
-            .type = UNIT_TARGET_GOLD,
-            .cell = nearest_gold_cell
+            .type = UNIT_TARGET_MINE,
+            .id = nearest_mine_id
         };
-    }
+    } 
 
-    log_trace("No nearest gold cell found");
     return (unit_target_t) {
         .type = UNIT_TARGET_NONE
     };

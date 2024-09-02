@@ -170,6 +170,10 @@ rect_t building_get_rect(const building_t& building) {
     return rect_t(building.cell * TILE_SIZE, building_cell_size(building.type) * TILE_SIZE);
 }
 
+bool building_is_finished(const building_t& building) {
+    return building.mode == BUILDING_MODE_UNOCCUPIED || building.mode == BUILDING_MODE_OCCUPIED;
+}
+
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell) {
     rect_t building_rect = rect_t(cell, building_cell_size(type));
     if (!map_is_cell_in_bounds(state, building_rect.position + building_rect.size - xy(1, 1))) {
@@ -182,6 +186,12 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
             if (map_get_fog(state, xy(x, y)).type == FOG_HIDDEN) {
                 return false;
             }
+        }
+    }
+
+    for (const mine_t& mine : state.mines) {
+        if (building_rect.intersects(mine_get_block_building_rect(mine))) {
+            return false;
         }
     }
 

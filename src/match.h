@@ -27,7 +27,7 @@ const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 const uint32_t UNIT_MINE_TICK_DURATION = 40;
 const uint32_t UNIT_MAX_GOLD_HELD = 7;
 const uint32_t UNIT_CANT_BE_FERRIED = 0;
-const uint32_t UNIT_IN_DURATION = 20;
+const uint32_t UNIT_IN_DURATION = 120;
 
 const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_MAX = 5;
@@ -218,7 +218,8 @@ struct building_queue_item_t {
 
 enum BuildingMode {
     BUILDING_MODE_IN_PROGRESS,
-    BUILDING_MODE_FINISHED,
+    BUILDING_MODE_UNOCCUPIED,
+    BUILDING_MODE_OCCUPIED,
     BUILDING_MODE_DESTROYED
 };
 
@@ -248,7 +249,7 @@ struct building_data_t {
 
 struct mine_t {
     xy cell;
-    int gold_left;
+    uint32_t gold_left;
     bool is_occupied;
 };
 
@@ -396,6 +397,8 @@ xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
 xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction = DIRECTION_SOUTH);
 xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect);
+rect_t mine_get_rect(const mine_t& mine);
+rect_t mine_get_block_building_rect(const mine_t& mine);
 
 // UI
 void ui_show_status(match_state_t& state, const char* message);
@@ -443,9 +446,8 @@ int unit_get_animation_vframe(const unit_t& unit);
 bool unit_sprite_should_flip_h(const unit_t& unit);
 Sprite unit_get_select_ring(UnitType type, bool is_enemy);
 void unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building);
-entity_id unit_find_nearest_camp(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);
-unit_target_t unit_target_nearest_gold(const match_state_t& state, const unit_t& unit);
+unit_target_t unit_target_nearest_mine(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, const unit_t& unit);
 xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy cell_size);
 
@@ -458,6 +460,7 @@ void building_dequeue(match_state_t& state, building_t& building);
 bool building_is_supply_blocked(const match_state_t& state, const building_t& building);
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
+bool building_is_finished(const building_t& building);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);
 Sprite building_get_select_ring(BuildingType type, bool is_enemy);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);
