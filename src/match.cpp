@@ -1129,7 +1129,26 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction) {
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy target) {
+    // Determine exit direction based on target
+    Direction exit_direction = DIRECTION_SOUTH;
+    if (target != xy(-1, -1)) {
+        if (std::abs(rect.position.x - target.x) > std::abs(rect.position.y - target.y)) {
+            if (target.x > rect.position.x) {
+                exit_direction = DIRECTION_EAST;
+            } else {
+                exit_direction = DIRECTION_WEST;
+            }
+        } else {
+            if (target.y > rect.position.y) {
+                exit_direction = DIRECTION_SOUTH;
+            } else {
+                exit_direction = DIRECTION_NORTH;
+            }
+        }
+    }
+
+    // Setup search
     rect_t cell_rect = rect_t(rect.position, cell_size);
     xy start_cell = cell_rect.position;
     xy search_corners[4] = { 
@@ -1138,6 +1157,8 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
         rect.position + rect.size,
         rect.position + xy(-cell_size.x, rect.position.y)
     };
+
+    // Determine cell start and step direction based on exit direction
     int step_direction = DIRECTION_SOUTH;
     if (exit_direction == DIRECTION_SOUTH) {
         cell_rect.position.y += rect.size.y;
@@ -1151,12 +1172,14 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
         step_direction = DIRECTION_NORTH;
     } else if (exit_direction == DIRECTION_EAST) {
         cell_rect.position.x += rect.size.x;
+        cell_rect.position.y++;
         step_direction = DIRECTION_SOUTH;
     } else {
         log_error("Unhandled exit direction of %u in get_first_empty_cell_around_rect()", (uint32_t)exit_direction);
         GOLD_ASSERT_MESSAGE(false, "Unhandled exit direction in get_first_empty_cell_around_rect()");
     }
 
+    // Step along search until we find an empty cell
     while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect)) {
         cell_rect.position += DIRECTION_XY[step_direction];
         if (cell_rect.position == search_corners[step_direction / 2]) {

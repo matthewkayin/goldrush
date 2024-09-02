@@ -175,7 +175,6 @@ struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
     bool is_running = false;
-    bool is_fullscreen = false;
     Cursor current_cursor;
 
     // Input state
@@ -369,12 +368,6 @@ int gold_main(int argc, char** argv) {
                         options[OPTION_DISPLAY] = DISPLAY_WINDOWED;
                     }
                     engine_set_window_fullscreen((OptionDisplayValue)options[OPTION_DISPLAY]);
-                    if (engine.is_fullscreen) {
-                        SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-                        SDL_SetWindowGrab(engine.window, SDL_TRUE);
-                    } else {
-                        SDL_SetWindowFullscreen(engine.window, 0);
-                    }
                     break;
                 }
                 // Capture mouse
@@ -1275,15 +1268,6 @@ void render_match(const match_state_t& state) {
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
 
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
-
-            if (map_get_cell(state, base_coords + xy(x, y)).type == CELL_MINE) {
-                SDL_SetRenderDrawColor(engine.renderer, 255, 0, 0, 255);
-                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
-            }
-            if (animation_is_playing(state.ui_move_animation) && base_coords + xy(x, y) == state.ui_move_position / TILE_SIZE) {
-                SDL_SetRenderDrawColor(engine.renderer, 0, 255, 0, 255);
-                SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
-            }
 
             // Render decorations
             if (state.map_tiles[map_index].decoration != 0) {

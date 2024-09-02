@@ -484,9 +484,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 if (unit.timer == 0) {
                     xy in_position = unit.mode == UNIT_MODE_IN_MINE ? state.mines.get_by_id(unit.garrison_id).cell : state.buildings.get_by_id(unit.garrison_id).cell;
                     xy in_size = unit.mode == UNIT_MODE_IN_MINE ? xy(3, 3) : building_cell_size(BUILDING_CAMP);
-                    unit.cell = get_first_empty_cell_around_rect(state, unit_cell_size(unit.type), rect_t(in_position, in_size), unit.mode == UNIT_MODE_IN_MINE ? DIRECTION_SOUTH : DIRECTION_NORTH);
-                    unit.position = cell_center(unit.cell);
-                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
                     if (unit.mode == UNIT_MODE_IN_MINE) {
                         mine_t& mine = state.mines.get_by_id(unit.garrison_id);
                         mine.is_occupied = false;
@@ -497,6 +494,10 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         unit.target = unit_target_nearest_mine(state, unit);
                         log_trace("after camp, unit target type is %u", unit.target.type);
                     }
+                    xy unit_target_cell = unit.target.type == UNIT_TARGET_NONE ? xy(-1, -1) : unit_get_target_cell(state, unit);
+                    unit.cell = get_first_empty_cell_around_rect(state, unit_cell_size(unit.type), rect_t(in_position, in_size), unit_target_cell);
+                    unit.position = cell_center(unit.cell);
+                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
                     unit.mode = UNIT_MODE_IDLE;
                     unit.garrison_id = ID_NULL;
                 }

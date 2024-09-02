@@ -97,17 +97,22 @@ void building_update(match_state_t& state, building_t& building) {
             building_queue_item_t& item = building.queue[0];
             switch (item.type) {
                 case BUILDING_QUEUE_ITEM_UNIT: {
-                    xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)));
+                    xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)), building.rally_point);
                     entity_id unit_id = unit_create(state, building.player_id, item.unit_type, unit_spawn_cell);
                     if (building.rally_point.x != -1) {
                         xy rally_cell = building.rally_point / TILE_SIZE;
                         unit_t& unit = state.units.get_by_id(unit_id);
-                        unit.target = (unit_target_t) {
-                            .type = map_get_cell(state, rally_cell).type == CELL_MINE && unit.type == UNIT_MINER
-                                        ? UNIT_TARGET_MINE
-                                        : UNIT_TARGET_CELL,
-                            .id = map_get_cell(state, rally_cell).value
-                        };
+                        if (map_get_cell(state, rally_cell).type == CELL_MINE && unit.type == UNIT_MINER) {
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_MINE,
+                                .id = map_get_cell(state, rally_cell).value
+                            };
+                        } else {
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_CELL,
+                                .cell = rally_cell
+                            };
+                        }
                     }
                     break;
                 }

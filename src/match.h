@@ -27,7 +27,7 @@ const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 const uint32_t UNIT_MINE_TICK_DURATION = 40;
 const uint32_t UNIT_MAX_GOLD_HELD = 7;
 const uint32_t UNIT_CANT_BE_FERRIED = 0;
-const uint32_t UNIT_IN_DURATION = 120;
+const uint32_t UNIT_IN_DURATION = 90;
 
 const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_MAX = 5;
@@ -395,7 +395,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 // Misc
 xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction = DIRECTION_SOUTH);
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy target = xy(-1, -1));
 xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect);
 rect_t mine_get_rect(const mine_t& mine);
 rect_t mine_get_block_building_rect(const mine_t& mine);
