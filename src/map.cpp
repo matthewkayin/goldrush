@@ -35,29 +35,6 @@ bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect) {
     return false;
 }
 
-bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect) {
-    entity_id origin_id = state.map_cells[origin.x + (origin.y * state.map_width)].value;
-    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
-        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
-            cell_t cell = state.map_cells[x + (y * state.map_width)];
-            if (cell.type == CELL_EMPTY) {
-                continue;
-            }
-            if (cell.type == CELL_UNIT) {
-                if (cell.value == origin_id) {
-                    continue;
-                }
-                if (xy::manhattan_distance(origin, xy(x, y)) > 3) {
-                    continue;
-                }
-            }
-            return true;
-        }
-    }
-
-    return false;
-}
-
 cell_t map_get_cell(const match_state_t& state, xy cell) {
     return state.map_cells[cell.x + (cell.y * state.map_height)];
 }
@@ -80,6 +57,29 @@ void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, ui
         }
     }
     state.is_fog_dirty = true;
+}
+
+bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect) {
+    entity_id origin_id = state.map_cells[origin.x + (origin.y * state.map_width)].value;
+    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
+        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
+            cell_t cell = state.map_cells[x + (y * state.map_width)];
+            if (cell.type == CELL_EMPTY) {
+                continue;
+            }
+            if (cell.type == CELL_UNIT) {
+                if (cell.value == origin_id) {
+                    continue;
+                }
+                if (xy::manhattan_distance(origin, xy(x, y)) > 3) {
+                    continue;
+                }
+            }
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path) {

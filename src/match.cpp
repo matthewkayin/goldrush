@@ -23,7 +23,6 @@ static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
 // static const uint32_t PLAYER_STARTING_GOLD = 200;
 static const uint32_t PLAYER_STARTING_GOLD = 1000;
-static const uint32_t MAP_GOLD_CELL_AMOUNT = 300;
 static const uint32_t WINNING_GOLD_AMOUNT = 5000;
 
 match_state_t match_init() {
@@ -490,7 +489,6 @@ void match_update(match_state_t& state) {
         if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || ((cell_type == CELL_BUILDING || cell_type == CELL_MINE) && fog_type != FOG_HIDDEN)) {
             input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
         }
-        log_trace("move target cell %xi target entity id %u", &input.move.target_cell, input.move.target_entity_id);
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
         if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state, input.move.target_cell).type == FOG_HIDDEN)) {
@@ -506,7 +504,6 @@ void match_update(match_state_t& state) {
         } else {
             input.type = INPUT_MOVE;
         }
-        log_trace("move input type %u", input.type);
 
         input.move.unit_count = 0;
         memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
@@ -958,7 +955,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         .type = UNIT_TARGET_MINE,
                         .id = input.move.target_entity_id
                     });
-                    log_trace("set unit target to %u id %u", unit.target.type, unit.target.id);
                 } else {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_CELL,
@@ -1129,33 +1125,14 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy target) {
-    // Determine exit direction based on target
-    Direction exit_direction = DIRECTION_SOUTH;
-    if (target != xy(-1, -1)) {
-        if (std::abs(rect.position.x - target.x) > std::abs(rect.position.y - target.y)) {
-            if (target.x > rect.position.x) {
-                exit_direction = DIRECTION_EAST;
-            } else {
-                exit_direction = DIRECTION_WEST;
-            }
-        } else {
-            if (target.y > rect.position.y) {
-                exit_direction = DIRECTION_SOUTH;
-            } else {
-                exit_direction = DIRECTION_NORTH;
-            }
-        }
-    }
-
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction) {
     // Setup search
     rect_t cell_rect = rect_t(rect.position, cell_size);
-    xy start_cell = cell_rect.position;
     xy search_corners[4] = { 
         rect.position - cell_size,
         rect.position + xy(rect.size.x, -cell_size.y),
         rect.position + rect.size,
-        rect.position + xy(-cell_size.x, rect.position.y)
+        rect.position + xy(-cell_size.x, rect.size.y)
     };
 
     // Determine cell start and step direction based on exit direction
@@ -1178,6 +1155,7 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
         log_error("Unhandled exit direction of %u in get_first_empty_cell_around_rect()", (uint32_t)exit_direction);
         GOLD_ASSERT_MESSAGE(false, "Unhandled exit direction in get_first_empty_cell_around_rect()");
     }
+    xy start_cell = cell_rect.position;
 
     // Step along search until we find an empty cell
     while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect)) {
@@ -1199,7 +1177,7 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
 
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
-xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect) {
+xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect, bool allow_blocked_cells) {
     xy nearest_cell;
     int nearest_cell_dist = -1;
 
@@ -1220,7 +1198,7 @@ xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, r
     xy cell = cell_begin[index];
     while (index < 4) {
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {
-            if (!map_is_cell_rect_blocked(state, rect_t(cell, start.size)) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
+            if ((allow_blocked_cells || !map_is_cell_rect_blocked(state, rect_t(cell, start.size))) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = xy::manhattan_distance(start.position, cell);
             }

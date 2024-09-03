@@ -97,8 +97,30 @@ void building_update(match_state_t& state, building_t& building) {
             building_queue_item_t& item = building.queue[0];
             switch (item.type) {
                 case BUILDING_QUEUE_ITEM_UNIT: {
-                    xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)), building.rally_point);
+                    // Determine exit direction based on target
+                    Direction exit_direction = DIRECTION_SOUTH;
+                    if (building.rally_point != xy(-1, -1)) {
+                        xy rally_cell = building.rally_point / TILE_SIZE;
+                        if (std::abs(building.cell.x - rally_cell.x) > std::abs(building.cell.y - rally_cell.y)) {
+                            if (rally_cell.x > building.cell.x) {
+                                exit_direction = DIRECTION_EAST;
+                            } else {
+                                exit_direction = DIRECTION_WEST;
+                            }
+                        } else {
+                            if (rally_cell.y > building.cell.y) {
+                                exit_direction = DIRECTION_SOUTH;
+                            } else {
+                                exit_direction = DIRECTION_NORTH;
+                            }
+                        }
+                    }
+
+                    // Spawn unit
+                    xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)), exit_direction);
                     entity_id unit_id = unit_create(state, building.player_id, item.unit_type, unit_spawn_cell);
+
+                    // Set unit target if there is a rally point
                     if (building.rally_point.x != -1) {
                         xy rally_cell = building.rally_point / TILE_SIZE;
                         unit_t& unit = state.units.get_by_id(unit_id);

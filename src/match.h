@@ -25,13 +25,14 @@ const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 const uint32_t UNIT_PATH_PAUSE_DURATION = 30;
 const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 const uint32_t UNIT_MINE_TICK_DURATION = 40;
-const uint32_t UNIT_MAX_GOLD_HELD = 7;
+const uint32_t UNIT_MAX_GOLD_HELD = 10;
 const uint32_t UNIT_CANT_BE_FERRIED = 0;
-const uint32_t UNIT_IN_DURATION = 90;
+const uint32_t UNIT_IN_DURATION = 60;
 
 const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_MAX = 5;
 const uint32_t BUILDING_FADE_DURATION = 300;
+const uint32_t MINE_SIZE = 3;
 
 struct tile_t {
     uint16_t base;
@@ -395,8 +396,8 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 // Misc
 xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy target = xy(-1, -1));
-xy get_nearest_free_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect);
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction = DIRECTION_SOUTH);
+xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect, bool allow_blocked_cells = false);
 rect_t mine_get_rect(const mine_t& mine);
 rect_t mine_get_block_building_rect(const mine_t& mine);
 
@@ -419,10 +420,10 @@ bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_rect_in_bounds(const match_state_t& state, rect_t cell_rect);
 bool map_is_cell_blocked(const match_state_t& state, xy cell);
 bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
-bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect);
 cell_t map_get_cell(const match_state_t& state, xy cell);
 void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value = 0);
 void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
+bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path);
 fog_t map_get_fog(const match_state_t& state, xy cell);
 void map_update_fog(match_state_t& state);
