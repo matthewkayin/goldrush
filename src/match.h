@@ -426,8 +426,8 @@ bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
 cell_t map_get_cell(const match_state_t& state, xy cell);
 void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value = 0);
 void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
-bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect);
-void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path);
+bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
+void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners);
 fog_t map_get_fog(const match_state_t& state, xy cell);
 void map_update_fog(match_state_t& state);
 

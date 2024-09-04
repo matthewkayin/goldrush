@@ -59,7 +59,7 @@ void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, ui
     state.is_fog_dirty = true;
 }
 
-bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect) {
+bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners) {
     entity_id origin_id = state.map_cells[origin.x + (origin.y * state.map_width)].value;
     for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
         for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
@@ -74,6 +74,12 @@ bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, re
                 if (xy::manhattan_distance(origin, xy(x, y)) > 3) {
                     continue;
                 }
+                if (should_ignore_miners) {
+                    const unit_t& unit = state.units.get_by_id(cell.value);
+                    if ((unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP) && xy::manhattan_distance(origin, xy(x, y)) > 1) {
+                        continue;
+                    }
+                }
             }
             return true;
         }
@@ -82,7 +88,7 @@ bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, re
     return false;
 }
 
-void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path) {
+void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners) {
     struct node_t {
         fixed cost;
         fixed distance;
@@ -104,7 +110,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
     }
 
     // Find an alternate cell for large units
-    if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(to, cell_size)) && cell_size.x + cell_size.y > 2) {
+    if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(to, cell_size), should_ignore_miners) && cell_size.x + cell_size.y > 2) {
         xy nearest_alternate;
         int nearest_alternate_distance = -1;
         for (int x = 0; x < cell_size.x; x++) {
@@ -113,7 +119,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
                     continue;
                 }
                 xy alternate = to - xy(x, y);
-                if (map_is_cell_rect_in_bounds(state, rect_t(alternate, cell_size)) && !map_is_cell_rect_blocked_pathfind(state, from, rect_t(alternate, cell_size))) {
+                if (map_is_cell_rect_in_bounds(state, rect_t(alternate, cell_size)) && !map_is_cell_rect_blocked_pathfind(state, from, rect_t(alternate, cell_size), should_ignore_miners)) {
                     if (nearest_alternate_distance == -1 || xy::manhattan_distance(from, alternate) < nearest_alternate_distance) {
                         nearest_alternate = alternate;
                         nearest_alternate_distance = xy::manhattan_distance(from, alternate);
@@ -183,7 +189,10 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
                                                         DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST, DIRECTION_NORTHWEST };
         for (int i = 0; i < DIRECTION_COUNT; i++) {
             int direction = CHILD_DIRECTIONS[i];
-            fixed cost_increase = direction % 2 == 0 ? fixed::from_int(1) : (fixed::from_int(3) / 2);
+            fixed cost_increase = fixed::from_int(1);
+            if (direction % 2 == 1) {
+                cost_increase = should_ignore_miners ? fixed::from_int(2) : (fixed::from_int(3) / 2);
+            }
             node_t child = (node_t) {
                 .cost = smallest.cost + cost_increase,
                 .distance = fixed::from_int(xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], to)),
@@ -198,7 +207,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
             // 1. the blocked space is a unit that is very far away. we pretend such spaces are blocked since the unit will probably move by the time we get there
             // 2. the blocked space is the target_cell. by allowing the path to go here we can avoid worst-case pathfinding even when the target_cell is blocked
             if (child.cell != to || xy::manhattan_distance(smallest.cell, child.cell) != 1) {
-                if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(child.cell, cell_size))) {
+                if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(child.cell, cell_size), should_ignore_miners)) {
                     continue;
                 }
             }

@@ -123,7 +123,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     unit.mode = UNIT_MODE_MOVE_FINISHED;
                     break;
                 } else {
-                    map_pathfind(state, unit.cell, unit_get_target_cell(state, unit), unit_cell_size(unit.type), &unit.path);
+                    map_pathfind(state, unit.cell, unit_get_target_cell(state, unit), unit_cell_size(unit.type), &unit.path, unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP);
                     if (!unit.path.empty()) {
                         unit.mode = UNIT_MODE_MOVE;
                         break;
