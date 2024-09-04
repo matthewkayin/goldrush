@@ -1224,3 +1224,25 @@ rect_t mine_get_rect(const mine_t& mine) {
 rect_t mine_get_block_building_rect(const mine_t& mine) {
     return rect_t(mine.cell - xy(3, 3), xy(9, 9));
 }
+
+uint32_t mine_get_worker_count(const match_state_t& state, entity_id mine_id, uint8_t player_id) {
+    const mine_t& mine = state.mines.get_by_id(mine_id);
+    const unit_target_t camp_target = unit_target_nearest_camp(state, mine.cell + xy(1, 1), player_id);
+
+    uint32_t worker_count = 0;
+    for (const unit_t& unit : state.units) {
+        if (unit.player_id != player_id) {
+            continue;
+        }
+        if (unit.target.type == UNIT_TARGET_MINE && unit.target.id == mine_id) {
+            worker_count++;
+            continue;
+        }
+        if (unit.target.type == UNIT_TARGET_CAMP && camp_target.type == UNIT_TARGET_CAMP && unit.target.id == camp_target.id) {
+            worker_count++;
+            continue;
+        }
+    }
+
+    return worker_count;
+}

@@ -252,6 +252,8 @@ struct mine_t {
     xy cell;
     uint32_t gold_left;
     bool is_occupied;
+    std::vector<xy> out_paths[MAX_PLAYERS];
+    std::vector<xy> in_paths[MAX_PLAYERS];
 };
 
 // More UI
@@ -400,6 +402,7 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
 xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect, bool allow_blocked_cells = false);
 rect_t mine_get_rect(const mine_t& mine);
 rect_t mine_get_block_building_rect(const mine_t& mine);
+uint32_t mine_get_worker_count(const match_state_t& state, entity_id mine_id, uint8_t player_id);
 
 // UI
 void ui_show_status(match_state_t& state, const char* message);
@@ -447,7 +450,7 @@ int unit_get_animation_vframe(const unit_t& unit);
 bool unit_sprite_should_flip_h(const unit_t& unit);
 Sprite unit_get_select_ring(UnitType type, bool is_enemy);
 void unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building);
-unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit);
+unit_target_t unit_target_nearest_camp(const match_state_t& state, xy unit_cell, uint8_t unit_player_id);
 unit_target_t unit_target_nearest_mine(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, const unit_t& unit);
 xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy cell_size);

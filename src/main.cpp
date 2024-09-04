@@ -212,9 +212,6 @@ const uint32_t RENDER_SPRITE_FLIP_H = 1;
 const uint32_t RENDER_SPRITE_CENTERED = 1 << 1;
 const uint32_t RENDER_SPRITE_NO_CULL = 1 << 2;
 
-static uint32_t gold_last_second = 0;
-static uint32_t gps = 0;
-
 bool engine_init(xy window_size);
 void engine_quit();
 bool engine_create_renderer();
@@ -347,10 +344,6 @@ int gold_main(int argc, char** argv) {
             ups = updates;
             updates = 0;
             last_second += 1.0;
-            if (mode == MODE_MATCH) {
-                gps = match_state.player_gold[0] - gold_last_second;
-                gold_last_second = match_state.player_gold[0];
-            }
         }
         frames++;
 
@@ -494,9 +487,6 @@ int gold_main(int argc, char** argv) {
         sprintf(ups_text, "UPS: %u", ups);
         render_text(FONT_HACK, fps_text, COLOR_WHITE, xy(0, 0));
         render_text(FONT_HACK, ups_text, COLOR_WHITE, xy(0, 12));
-        char gps_text[16];
-        sprintf(gps_text, "GPS: %u", gps);
-        render_text(FONT_HACK, gps_text, COLOR_WHITE, xy(0, 24));
 
         SDL_RenderPresent(engine.renderer);
     } // End while running

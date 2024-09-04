@@ -344,16 +344,28 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         // Return gold
                         state.player_gold[unit.player_id] += unit.gold_held;
                         unit.gold_held = 0;
-                        map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
-                        unit.mode = UNIT_MODE_IN_CAMP;
-                        unit.timer = UNIT_IN_DURATION;
-                        // Clearing the unit's target to prevent weirdness if the camp gets destroyed while unit is inside
-                        unit.garrison_id = unit.target.id;
-                        unit.target = (unit_target_t) {
-                            .type = UNIT_TARGET_NONE
-                        };
-                        unit.path.clear();
-                        building.mode = BUILDING_MODE_OCCUPIED;
+                        unit.target = unit_target_nearest_mine(state, unit);
+
+                        if (unit.target.type == UNIT_TARGET_NONE) {
+                            unit.mode = UNIT_MODE_IDLE;
+                        } else {
+                            // Circle swim
+                            xy exit_cell;
+                            if (unit.cell.x < building.cell.x || unit.cell.x == building.cell.x + building_cell_size(building.type).x) {
+                                exit_cell.x = unit.cell.x;
+                                exit_cell.y = unit.cell.y == building.cell.y ? building.cell.y + 1 : building.cell.y;
+                            } else {
+                                exit_cell.y = unit.cell.y;
+                                exit_cell.x = unit.cell.x == building.cell.x ? building.cell.x + 1 : building.cell.x;
+                            }
+                            if (!map_is_cell_blocked(state, exit_cell)) {
+                                unit.path.clear();
+                                unit.path.push_back(exit_cell);
+                                unit.mode = UNIT_MODE_MOVE;
+                            } else {
+                                unit.mode = UNIT_MODE_IDLE;
+                            }
+                        }
                         break;
                     }
                     case UNIT_TARGET_UNIT: 
@@ -487,7 +499,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     if (unit.mode == UNIT_MODE_IN_MINE) {
                         mine_t& mine = state.mines.get_by_id(unit.garrison_id);
                         mine.is_occupied = false;
-                        unit.target = unit_target_nearest_camp(state, unit);
+                        unit.target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
                         exit_rect = rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE));
                         if (unit.target.type == UNIT_TARGET_CAMP) {
                             dest_rect = rect_t(state.buildings.get_by_id(unit.target.id).cell, building_cell_size(BUILDING_CAMP));
@@ -503,23 +515,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
                     
                     // Determine exit direction
-                    Direction exit_direction;
-                    bool x_overlaps = !(exit_rect.position.x + exit_rect.size.x < dest_rect.position.x || dest_rect.position.x + dest_rect.size.x < exit_rect.position.x);
-                    bool y_overlaps = !(exit_rect.position.y + exit_rect.size.y < dest_rect.position.y || dest_rect.position.y + dest_rect.size.y < exit_rect.position.y);
-                    if (x_overlaps && exit_rect.position.y < dest_rect.position.y) {
-                        exit_direction = DIRECTION_SOUTH;
-                    } else if (x_overlaps && exit_rect.position.y > dest_rect.position.y) {
-                        exit_direction = DIRECTION_NORTH;
-                    } else if (y_overlaps && exit_rect.position.x < dest_rect.position.x) {
-                        exit_direction = DIRECTION_EAST;
-                    } else if (y_overlaps && exit_rect.position.x > dest_rect.position.x) {
-                        exit_direction = DIRECTION_WEST;
-                    } else if (exit_rect.position.x < dest_rect.position.x) {
-                        exit_direction = DIRECTION_EAST;
-                    } else {
-                        exit_direction = DIRECTION_WEST;
-                    }
-
+                    Direction exit_direction = get_exit_direction(exit_rect, dest_rect);
                     unit.cell = get_first_empty_cell_around_rect(state, unit_cell_size(unit.type), rect_t(in_position, in_size), exit_direction);
                     unit.position = cell_center(unit.cell);
                     map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
@@ -809,16 +805,16 @@ void unit_stop_building(match_state_t& state, entity_id unit_id, const building_
     map_set_cell(state, unit.cell, CELL_UNIT, unit_id);
 }
 
-unit_target_t unit_target_nearest_camp(const match_state_t& state, const unit_t& unit) {
+unit_target_t unit_target_nearest_camp(const match_state_t& state, xy unit_cell, uint8_t unit_player_id) {
     int nearest_camp_dist = -1;
     entity_id nearest_camp_id = ID_NULL;
 
     // Find the nearest mining camp
     for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
-        if (building_is_finished(state.buildings[building_index]) && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit.player_id) {
-            if (nearest_camp_dist == -1 || xy::manhattan_distance(unit.cell, state.buildings[building_index].cell) < nearest_camp_dist) {
+        if (building_is_finished(state.buildings[building_index]) && state.buildings[building_index].type == BUILDING_CAMP && state.buildings[building_index].player_id == unit_player_id) {
+            if (nearest_camp_dist == -1 || xy::manhattan_distance(unit_cell, state.buildings[building_index].cell) < nearest_camp_dist) {
                 nearest_camp_id = state.buildings.get_id_of(building_index);
-                nearest_camp_dist = xy::manhattan_distance(unit.cell, state.buildings[building_index].cell);
+                nearest_camp_dist = xy::manhattan_distance(unit_cell, state.buildings[building_index].cell);
             }
         }
     }
