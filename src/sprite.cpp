@@ -160,7 +160,7 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     { SPRITE_MINER_BUILDING, (sprite_params_t) {
         .path = "sprite/unit_miner_building.png",
         .hframes = 2,
-        .vframes = 1,
+        .vframes = 3,
         .recolor = true
     }},
     { SPRITE_UNIT_MINER, (sprite_params_t) {

@@ -368,7 +368,26 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
         state.selection.type = SELECTION_TYPE_NONE;
     }
 
-    if (state.selection.type == SELECTION_TYPE_NONE || state.selection.type == SELECTION_TYPE_ENEMY_UNIT || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING || state.selection.type == SELECTION_TYPE_MINE) {
+    if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
+        if (state.selection.type != SELECTION_TYPE_UNITS) {
+            state.ui_mode = UI_MODE_NONE;
+            state.ui_buttonset = UI_BUTTONSET_NONE;
+        } else {
+            bool is_selection_miners_only = true;
+            bool is_selecting_miners = false;
+            for (entity_id id : state.selection.ids) {
+                if (state.units.get_by_id(id).type == UNIT_MINER) {
+                    is_selecting_miners = true;
+                } else {
+                    is_selection_miners_only = false;
+                }
+            }
+            if (!is_selecting_miners || !is_selection_miners_only) {
+                state.ui_mode = UI_MODE_NONE;
+                state.ui_buttonset = UI_BUTTONSET_NONE;
+            }
+        }
+    } else if (state.selection.type == SELECTION_TYPE_NONE || state.selection.type == SELECTION_TYPE_ENEMY_UNIT || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING || state.selection.type == SELECTION_TYPE_MINE) {
         state.ui_buttonset = UI_BUTTONSET_NONE;
     } else if (state.selection.type == SELECTION_TYPE_UNITS) {
         bool all_unit_types_are_same = true;

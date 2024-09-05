@@ -141,8 +141,8 @@ enum UnitMode {
     UNIT_MODE_MOVE_BLOCKED,
     UNIT_MODE_MOVE_FINISHED,
     UNIT_MODE_BUILD,
+    UNIT_MODE_REPAIR,
     UNIT_MODE_IN_MINE,
-    UNIT_MODE_IN_CAMP,
     UNIT_MODE_ATTACK_WINDUP,
     UNIT_MODE_ATTACK_COOLDOWN,
     UNIT_MODE_FERRY,
@@ -220,8 +220,7 @@ struct building_queue_item_t {
 
 enum BuildingMode {
     BUILDING_MODE_IN_PROGRESS,
-    BUILDING_MODE_UNOCCUPIED,
-    BUILDING_MODE_OCCUPIED,
+    BUILDING_MODE_FINISHED,
     BUILDING_MODE_DESTROYED
 };
 
@@ -467,7 +466,7 @@ bool building_is_supply_blocked(const match_state_t& state, const building_t& bu
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_is_finished(const building_t& building);
-bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell);
+bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell, xy miner_cell);
 Sprite building_get_select_ring(BuildingType type, bool is_enemy);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);
 UiButton building_queue_item_icon(const building_queue_item_t& item);

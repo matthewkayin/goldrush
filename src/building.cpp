@@ -198,10 +198,10 @@ rect_t building_get_rect(const building_t& building) {
 }
 
 bool building_is_finished(const building_t& building) {
-    return building.mode == BUILDING_MODE_UNOCCUPIED || building.mode == BUILDING_MODE_OCCUPIED;
+    return building.mode == BUILDING_MODE_FINISHED;
 }
 
-bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell) {
+bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell, xy miner_cell) {
     rect_t building_rect = rect_t(cell, building_cell_size(type));
     if (!map_is_cell_in_bounds(state, building_rect.position + building_rect.size - xy(1, 1))) {
         return false;
@@ -222,7 +222,18 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
         }
     }
 
-    return !map_is_cell_rect_blocked(state, building_rect);
+    for (int x = building_rect.position.x; x < building_rect.position.x + building_rect.size.x; x++) {
+        for (int y = building_rect.position.y; y < building_rect.position.y + building_rect.size.y; y++) {
+            if (xy(x, y) == miner_cell) {
+                continue;
+            }
+            if (map_is_cell_blocked(state, xy(x, y))) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 Sprite building_get_select_ring(BuildingType type, bool is_enemy) {

@@ -60,8 +60,9 @@ match_state_t match_init() {
     state.tick_timer = 0;
 
     // Init map
-    state.map_width = 192;
-    state.map_height = 192;
+    log_info("Generating map...");
+    state.map_width = 128;
+    state.map_height = 128;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
         .base = 0,
         .decoration = 0
@@ -84,6 +85,7 @@ match_state_t match_init() {
     }
 
     // Init players
+    log_trace("Initializing players...");
     xy player_spawns[MAX_PLAYERS];
     bool is_spawn_direction_used[DIRECTION_COUNT];
     memset(is_spawn_direction_used, 0, sizeof(is_spawn_direction_used));
@@ -118,11 +120,12 @@ match_state_t match_init() {
     state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
 
     // Place gold on the map
+    log_trace("Placing gold...");
     int gold_patch_x_regions = 3;
     int gold_patch_y_regions = 2;
     int region_width = state.map_width / gold_patch_x_regions;
     int region_height = state.map_height / gold_patch_y_regions;
-    int region_padding = 12;
+    int region_padding = 6;
     for (int region_x = 0; region_x < gold_patch_x_regions; region_x++) {
         for (int region_y = 0; region_y < gold_patch_y_regions; region_y++) {
             rect_t region_rect = rect_t(xy(region_x * region_width, region_y * region_height) + xy(region_padding, region_padding), xy(region_width, region_height) - xy(2 * region_padding, 2 * region_padding));
@@ -136,7 +139,7 @@ match_state_t match_init() {
                 // Check that it's not too close to the player spawns
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
-                        xy::manhattan_distance(gold_patch_cell, player_spawns[player_id]) < 48) {
+                        xy::manhattan_distance(gold_patch_cell, player_spawns[player_id]) < 20) {
                             gold_patch_cell_is_valid = false;
                             break;
                     }
@@ -156,6 +159,7 @@ match_state_t match_init() {
     }
 
     // Place decorations on the map
+    log_trace("Placing decorations...");
     for (int i = 0; i < state.map_width * state.map_height; i++) {
         if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map_cells[i].type == CELL_EMPTY) {
             bool is_gold_nearby = false;
@@ -181,6 +185,7 @@ match_state_t match_init() {
             state.map_cells[i].type = CELL_BLOCKED;
         }
     }
+    log_info("Map complete!");
 
     map_update_fog(state);
 
@@ -349,12 +354,23 @@ void match_update(match_state_t& state) {
         if (ui_get_ui_button_hovered(state) != -1) {
             ui_handle_button_pressed(state, ui_get_ui_button(state, ui_get_ui_button_hovered(state)));
         } else if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
-            if (building_can_be_placed(state, state.ui_building_type, ui_get_building_cell(state))) {
+            if (building_can_be_placed(state, state.ui_building_type, ui_get_building_cell(state), state.units.get_by_id(state.selection.ids[0]).cell)) {
                 input_t input;
                 input.type = INPUT_BUILD;
                 input.build.building_type = state.ui_building_type;
                 input.build.target_cell = ui_get_building_cell(state);
-                input.build.unit_id = state.selection.ids[0];
+
+                entity_id nearest_unit_id; 
+                int nearest_unit_dist = -1;
+                for (entity_id id : state.selection.ids) {
+                    int selection_dist = xy::manhattan_distance(input.build.target_cell, state.units.get_by_id(id).cell);
+                    if (nearest_unit_dist == -1 || selection_dist < nearest_unit_dist) {
+                        nearest_unit_id = id;
+                        nearest_unit_dist = selection_dist;
+                    }
+                }
+
+                input.build.unit_id = nearest_unit_id;
                 state.input_queue.push_back(input);
 
                 state.ui_buttonset = UI_BUTTONSET_MINER;
