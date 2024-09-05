@@ -265,6 +265,18 @@ fog_t map_get_fog(const match_state_t& state, xy cell) {
     return state.map_fog[cell.x + (state.map_width * cell.y)];
 }
 
+bool map_is_cell_rect_revealed(const match_state_t& state, rect_t rect) {
+    for (int x = rect.position.x; x < rect.position.x + rect.size.x; x++) {
+        for (int y = rect.position.y; y < rect.position.y + rect.size.y; y++) {
+            if (map_get_fog(state, xy(x, y)).type == FOG_REVEALED) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void map_fog_reveal(match_state_t& state, xy cell, xy size, int sight) {
     int xmin = std::max(0, cell.x - sight);
     int xmax = std::min((int)state.map_width, cell.x + size.x + sight);

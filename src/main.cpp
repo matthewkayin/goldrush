@@ -1219,18 +1219,6 @@ void ysort(render_sprite_params_t* params, int low, int high) {
     }
 }
 
-bool is_cell_revealed(const match_state_t& state, xy cell, xy size) {
-    for (int x = cell.x; x < cell.x + size.x; x++) {
-        for (int y = cell.y; y < cell.y + size.y; y++) {
-            if (map_get_fog(state, xy(x, y)).type == FOG_REVEALED) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 void render_match(const match_state_t& state) {
     Cursor expected_cursor = CURSOR_DEFAULT;
     if (state.ui_mode == UI_MODE_ATTACK_MOVE && (!ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
@@ -1363,6 +1351,10 @@ void render_match(const match_state_t& state) {
             SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
             SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
         }
+    } else if (state.selection.type == SELECTION_TYPE_MINE) {
+        const mine_t& mine = state.mines.get_by_id(state.selection.ids[0]);
+        rect_t mine_rect = rect_t(mine.cell * TILE_SIZE, xy(MINE_SIZE * TILE_SIZE, MINE_SIZE * TILE_SIZE));
+        render_sprite(SPRITE_SELECT_RING_BUILDING_3, xy(0, 0), mine_rect.position + (mine_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
     // UI move animation
@@ -1374,7 +1366,7 @@ void render_match(const match_state_t& state) {
             switch (state.ui_move_cell.type) {
                 case CELL_UNIT: {
                     uint32_t unit_index = state.units.get_index_of(id);
-                    if (unit_index != INDEX_INVALID && is_cell_revealed(state, state.units[unit_index].cell, xy(1, 1))) {
+                    if (unit_index != INDEX_INVALID && map_is_cell_rect_revealed(state, rect_t(state.units[unit_index].cell, xy(1, 1)))) {
                         Sprite sprite = unit_get_select_ring(state.units[unit_index].type, state.units[unit_index].player_id != network_get_player_id());
                         render_sprite(sprite, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
@@ -1475,7 +1467,7 @@ void render_match(const match_state_t& state) {
         if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
             continue;
         }
-        if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, unit_cell_size(unit.type))) {
+        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
         if (unit.mode == UNIT_MODE_IN_MINE || unit.mode == UNIT_MODE_IN_CAMP) {
@@ -1651,21 +1643,26 @@ void render_match(const match_state_t& state) {
             if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_ENEMY_UNIT) {
                 const unit_t& unit = state.units.get_by_id(state.selection.ids[i]);
                 name = UNIT_DATA.at(unit.type).name;
-                selected_icon = UI_BUTTON_UNIT_MINER + unit.type - 1;
+                selected_icon = UI_BUTTON_UNIT_MINER + unit.type;
                 selected_health = unit.health;
                 selected_max_health = UNIT_DATA.at(unit.type).max_health;
-            } else {
+            } else if (state.selection.type == SELECTION_TYPE_BUILDINGS || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
                 const building_t& building = state.buildings.get_by_id(state.selection.ids[i]);
                 name = BUILDING_DATA.at(building.type).name;
-                selected_icon = UI_BUTTON_BUILD_HOUSE + (building.type - BUILDING_HOUSE) - 1;
+                selected_icon = UI_BUTTON_BUILD_HOUSE + (building.type - BUILDING_HOUSE);
                 selected_health = building.health;
                 selected_max_health = BUILDING_DATA.at(building.type).max_health;
+            } else {
+                name = "Gold Mine";
+                selected_icon = UI_BUTTON_MINE;
+                selected_health = state.mines.get_by_id(state.selection.ids[0]).gold_left;
+                selected_max_health = 0;
             }
 
             if (state.selection.ids.size() != 1) {
                 xy icon_position = SELECTION_LIST_TOP_LEFT + xy(((i % 10) * 34) - 12, (i / 10) * 34);
                 render_sprite(SPRITE_UI_BUTTON, xy(0, 0), icon_position, RENDER_SPRITE_NO_CULL);
-                render_sprite(SPRITE_UI_BUTTON_ICON, xy(selected_icon, 0), icon_position, RENDER_SPRITE_NO_CULL);
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(selected_icon - 1, 0), icon_position, RENDER_SPRITE_NO_CULL);
 
                 SDL_Rect healthbar_rect = (SDL_Rect) {
                     .x = icon_position.x + 1,
@@ -1684,44 +1681,55 @@ void render_match(const match_state_t& state) {
                 render_text_with_text_frame(name, SELECTION_LIST_TOP_LEFT);
 
                 render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
-                render_sprite(SPRITE_UI_BUTTON_ICON, xy(selected_icon, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(selected_icon - 1, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
 
-                SDL_Rect healthbar_rect = (SDL_Rect) {
-                    .x = SELECTION_LIST_TOP_LEFT.x,
-                    .y = SELECTION_LIST_TOP_LEFT.y + 18 + 35,
-                    .w = 64,
-                    .h = 12
-                };
-                SDL_Rect healthbar_subrect = healthbar_rect;
-                healthbar_subrect.w = (healthbar_rect.w * selected_health) / selected_max_health;
-                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
-                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
-                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
-                SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
-                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+                if (selected_max_health != 0) {
+                    SDL_Rect healthbar_rect = (SDL_Rect) {
+                        .x = SELECTION_LIST_TOP_LEFT.x,
+                        .y = SELECTION_LIST_TOP_LEFT.y + 18 + 35,
+                        .w = 64,
+                        .h = 12
+                    };
+                    SDL_Rect healthbar_subrect = healthbar_rect;
+                    healthbar_subrect.w = (healthbar_rect.w * selected_health) / selected_max_health;
+                    SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                    SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                    SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                    SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+                    SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
 
-                char health_text[10];        
-                sprintf(health_text, "%i/%i", selected_health, selected_max_health);
-                SDL_Surface* health_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_HACK], health_text, COLOR_WHITE);
-                if (health_text_surface == NULL) {
-                    log_error("Unable to render text to surface: %s", TTF_GetError());
-                    return;
+                    char health_text[10];        
+                    sprintf(health_text, "%i/%i", selected_health, selected_max_health);
+                    SDL_Surface* health_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_HACK], health_text, COLOR_WHITE);
+                    if (health_text_surface == NULL) {
+                        log_error("Unable to render text to surface: %s", TTF_GetError());
+                        return;
+                    }
+                    SDL_Texture* health_text_texture = SDL_CreateTextureFromSurface(engine.renderer, health_text_surface);
+                    if (health_text_texture == NULL) {
+                        log_error("Unable to create text texture from surface: %s", SDL_GetError());
+                        return;
+                    }
+                    SDL_Rect health_text_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = health_text_surface->w, .h = health_text_surface->h };
+                    SDL_Rect health_text_dst_rect = (SDL_Rect) { 
+                        .x = healthbar_rect.x + (healthbar_rect.w / 2) - (health_text_surface->w / 2), 
+                        .y = healthbar_rect.y + (healthbar_rect.h / 2) - (health_text_surface->h / 2),
+                        .w = health_text_src_rect.w,
+                        .h = health_text_src_rect.h
+                    };
+                    SDL_RenderCopy(engine.renderer, health_text_texture, &health_text_src_rect, &health_text_dst_rect);
+                    SDL_DestroyTexture(health_text_texture);
+                    SDL_FreeSurface(health_text_surface);
+                // End if selected max health != 0
+                } else {
+                    char gold_left_str[17];
+                    if (selected_health == 0) {
+                        sprintf(gold_left_str, "Mine Collapsed!");
+                    } else {
+                        sprintf(gold_left_str, "Gold Left: %i", selected_health);
+                    }
+                    render_text(FONT_WESTERN8, gold_left_str, selected_health == 0 ? COLOR_RED : COLOR_GOLD, SELECTION_LIST_TOP_LEFT + xy(36, 22));
                 }
-                SDL_Texture* health_text_texture = SDL_CreateTextureFromSurface(engine.renderer, health_text_surface);
-                if (health_text_texture == NULL) {
-                    log_error("Unable to create text texture from surface: %s", SDL_GetError());
-                    return;
-                }
-                SDL_Rect health_text_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = health_text_surface->w, .h = health_text_surface->h };
-                SDL_Rect health_text_dst_rect = (SDL_Rect) { 
-                    .x = healthbar_rect.x + (healthbar_rect.w / 2) - (health_text_surface->w / 2), 
-                    .y = healthbar_rect.y + (healthbar_rect.h / 2) - (health_text_surface->h / 2),
-                    .w = health_text_src_rect.w,
-                    .h = health_text_src_rect.h
-                };
-                SDL_RenderCopy(engine.renderer, health_text_texture, &health_text_src_rect, &health_text_dst_rect);
-                SDL_DestroyTexture(health_text_texture);
-                SDL_FreeSurface(health_text_surface);
             } // End if selection size is 1
         } // End for each selected unit
     } // End render selection list
@@ -1750,7 +1758,7 @@ void render_match(const match_state_t& state) {
                 .h = 6
             };
             if (building.queue_timer == BUILDING_QUEUE_BLOCKED) {
-                render_text(FONT_WESTERN8, "Build more houses.", COLOR_WHITE, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
+                render_text(FONT_WESTERN8, "Build more houses.", COLOR_GOLD, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
             } else {
                 SDL_Rect building_queue_progress_bar_rect = (SDL_Rect) {
                     .x = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x,
@@ -1939,7 +1947,10 @@ void render_match(const match_state_t& state) {
     }
 
     for (const building_t& building : state.buildings) {
-        if (building.player_id != network_get_player_id() && !is_cell_revealed(state, building.cell, building_cell_size(building.type))) {
+        if (building.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, rect_t(building.cell, building_cell_size(building.type)))) {
+            continue;
+        }
+        if (building.health == 0) {
             continue;
         }
 
@@ -1975,10 +1986,10 @@ void render_match(const match_state_t& state) {
     }
 
     for (const unit_t& unit : state.units) {
-        if (unit.player_id != network_get_player_id() && !is_cell_revealed(state, unit.cell, unit_cell_size(unit.type))) {
+        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
-        if (unit.mode == UNIT_MODE_FERRY) {
+        if (unit.mode == UNIT_MODE_FERRY || unit.mode == UNIT_MODE_IN_MINE || unit.health == 0) {
             continue;
         }
 

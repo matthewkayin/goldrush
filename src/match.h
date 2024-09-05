@@ -95,7 +95,8 @@ enum SelectionType {
     SELECTION_TYPE_UNITS,
     SELECTION_TYPE_BUILDINGS,
     SELECTION_TYPE_ENEMY_UNIT,
-    SELECTION_TYPE_ENEMY_BUILDING
+    SELECTION_TYPE_ENEMY_BUILDING,
+    SELECTION_TYPE_MINE
 };
 
 struct selection_t {
@@ -429,6 +430,7 @@ void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, ui
 bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners);
 fog_t map_get_fog(const match_state_t& state, xy cell);
+bool map_is_cell_rect_revealed(const match_state_t& state, rect_t rect);
 void map_update_fog(match_state_t& state);
 
 // Unit

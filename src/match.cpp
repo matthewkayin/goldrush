@@ -146,7 +146,7 @@ match_state_t match_init() {
             // Now that we've found the cluster origin the actual gold on the map
             mine_t mine = (mine_t) {
                 .cell = gold_patch_cell,
-                .gold_left = 2500,
+                .gold_left = 100,
                 .is_occupied = false
             };
             entity_id mine_id = state.mines.push_back(mine);

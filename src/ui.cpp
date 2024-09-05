@@ -252,7 +252,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
         }
 
         // Don't select units which are building
-        if (unit.mode == UNIT_MODE_BUILD || unit.mode == UNIT_MODE_FERRY) {
+        if (unit.mode == UNIT_MODE_BUILD || unit.mode == UNIT_MODE_FERRY || unit.mode == UNIT_MODE_IN_MINE) {
             continue;
         }
 
@@ -291,6 +291,10 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
         if (unit.player_id == network_get_player_id()) {
             continue;
         }
+        // Don't select hidden units
+        if (!map_is_cell_rect_revealed(state, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+            continue;
+        }
 
         if (unit_get_rect(unit).intersects(state.select_rect)) {
             selection.ids.push_back(state.units.get_id_of(index));
@@ -306,10 +310,30 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
         if (building.player_id == network_get_player_id()) {
             continue;
         }
+        // Don't select hidden buildings
+        if (!map_is_cell_rect_revealed(state, rect_t(building.cell, building_cell_size(building.type)))) {
+            continue;
+        }
 
         if (building_get_rect(building).intersects(state.select_rect)) {
             selection.ids.push_back(state.buildings.get_id_of(index));
             selection.type = SELECTION_TYPE_ENEMY_BUILDING;
+            return selection;
+        }
+    }
+
+    // Otherwise, check for mines
+    for (uint32_t index = 0; index < state.mines.size(); index++) {
+        const mine_t& mine = state.mines[index];
+        // Don't select hidden gold
+        if (!map_is_cell_rect_revealed(state, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
+            continue;
+        }
+
+        rect_t mine_rect = rect_t(mine.cell * TILE_SIZE, xy(MINE_SIZE * TILE_SIZE, MINE_SIZE * TILE_SIZE));
+        if (mine_rect.intersects(state.select_rect)) {
+            selection.ids.push_back(state.mines.get_id_of(index));
+            selection.type = SELECTION_TYPE_MINE;
             return selection;
         }
     }
@@ -344,7 +368,7 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
         state.selection.type = SELECTION_TYPE_NONE;
     }
 
-    if (state.selection.type == SELECTION_TYPE_NONE || state.selection.type == SELECTION_TYPE_ENEMY_UNIT || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
+    if (state.selection.type == SELECTION_TYPE_NONE || state.selection.type == SELECTION_TYPE_ENEMY_UNIT || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING || state.selection.type == SELECTION_TYPE_MINE) {
         state.ui_buttonset = UI_BUTTONSET_NONE;
     } else if (state.selection.type == SELECTION_TYPE_UNITS) {
         bool all_unit_types_are_same = true;
