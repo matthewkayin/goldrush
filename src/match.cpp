@@ -21,8 +21,8 @@ static const int CAMERA_DRAG_SPEED = 8;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 1000;
-static const uint32_t WINNING_GOLD_AMOUNT = 10000;
+static const uint32_t PLAYER_STARTING_GOLD = 200;
+const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
 static const uint32_t MINE_STARTING_GOLD_AMOUNT = 2500;
 
 match_state_t match_init() {
@@ -129,53 +129,50 @@ match_state_t match_init() {
             gold_patch_cells.push_back(xy(12 + (24 * x), 12 + (24 * y)));
         }
     }
-    for (xy gold_patch_cell : gold_patch_cells) {
+    */
+    uint32_t target_mine_count = 7;
+    uint32_t attempts = 0;
+    while (state.mines.size() < target_mine_count) {
+        xy mine_cell;
+        mine_cell.x = 16 + (lcg_rand() % (state.map_width - 32));
+        mine_cell.y = 16 + (lcg_rand() % (state.map_height - 32));
+
+        // Check that it's not too close to the player spawns
+        bool mine_cell_valid = true;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
+                xy::manhattan_distance(mine_cell, player_spawns[player_id]) < 20) {
+                    mine_cell_valid = false;
+                    break;
+            }
+        }
+        // Check that it's not too close to other mines
+        for (mine_t& mine : state.mines) {
+            if (xy::manhattan_distance(mine.cell, mine_cell) < 20) {
+                mine_cell_valid = false;
+                break;
+            }
+        }
+        if (!mine_cell_valid) {
+            attempts++;
+            if (attempts == 5) {
+                log_warn("Mine generation reached max attempts.");
+                while (state.mines.size() != 0) {
+                    map_set_cell_rect(state, rect_t(state.mines[0].cell, xy(MINE_SIZE, MINE_SIZE)), CELL_EMPTY);
+                    state.mines.remove_at(0);
+                }
+                attempts = 0;
+            }
+            continue;
+        }
+
         mine_t mine = (mine_t) {
-            .cell = gold_patch_cell,
-            .gold_left = 1000,
+            .cell = mine_cell,
+            .gold_left = MINE_STARTING_GOLD_AMOUNT,
             .is_occupied = false
         };
         entity_id mine_id = state.mines.push_back(mine);
-        log_trace("mine id %u", mine_id);
-        map_set_cell_rect(state, rect_t(gold_patch_cell, xy(3, 3)), CELL_MINE, mine_id);
-        unit_create(state, 0, UNIT_MINER, gold_patch_cell + xy(MINE_SIZE, MINE_SIZE));
-    }
-    */
-
-    int gold_patch_x_regions = 3;
-    int gold_patch_y_regions = 2;
-    int region_width = state.map_width / gold_patch_x_regions;
-    int region_height = state.map_height / gold_patch_y_regions;
-    int region_padding = 6;
-    for (int region_x = 0; region_x < gold_patch_x_regions; region_x++) {
-        for (int region_y = 0; region_y < gold_patch_y_regions; region_y++) {
-            rect_t region_rect = rect_t(xy(region_x * region_width, region_y * region_height) + xy(region_padding, region_padding), xy(region_width, region_height) - xy(2 * region_padding, 2 * region_padding));
-            xy gold_patch_cell;
-            bool gold_patch_cell_is_valid = false;
-            while (!gold_patch_cell_is_valid) {
-                gold_patch_cell.x = region_rect.position.x + (lcg_rand() % region_rect.size.x);
-                gold_patch_cell.y = region_rect.position.y + (lcg_rand() % region_rect.size.y);
-                gold_patch_cell_is_valid = true;
-
-                // Check that it's not too close to the player spawns
-                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                    if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
-                        xy::manhattan_distance(gold_patch_cell, player_spawns[player_id]) < 20) {
-                            gold_patch_cell_is_valid = false;
-                            break;
-                    }
-                }
-            }
-
-            mine_t mine = (mine_t) {
-                .cell = gold_patch_cell,
-                .gold_left = MINE_STARTING_GOLD_AMOUNT,
-                .is_occupied = false
-            };
-            entity_id mine_id = state.mines.push_back(mine);
-            map_set_cell_rect(state, rect_t(gold_patch_cell, xy(3, 3)), CELL_MINE, mine_id);
-            log_info("mine id %u has cell %xi", mine_id, &state.mines.get_by_id(mine_id).cell);
-        }
+        map_set_cell_rect(state, rect_t(mine_cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
     }
 
     // Place decorations on the map
@@ -701,7 +698,7 @@ void match_update(match_state_t& state) {
         if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
             continue;
         }
-        if (state.player_gold[player_id] >= WINNING_GOLD_AMOUNT) {
+        if (state.player_gold[player_id] >= MATCH_WINNING_GOLD_AMOUNT) {
             state.ui_mode = UI_MODE_MATCH_OVER;
             if (player_id == network_get_player_id()) {
                 ui_show_status(state, "You win!");

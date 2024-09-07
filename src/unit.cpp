@@ -1,7 +1,7 @@
 #include "match.h"
 
 #include "logger.h"
-
+#include "network.h"
 
 const uint32_t UNIT_PATH_PAUSE_DURATION = 30;
 const uint32_t UNIT_BUILD_TICK_DURATION = 6;
@@ -577,6 +577,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     mine_t& mine = state.mines.get_by_id(unit.garrison_id);
                     rect_t mine_rect = rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE));
                     mine.is_occupied = false;
+                    if (unit.player_id == network_get_player_id() && mine.gold_left == 0) {
+                        ui_show_status(state, UI_STATUS_MINE_COLLAPSED);
+                    }
                     unit.target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
                     xy exit_cell = xy(-1, -1);
                     if (unit.target.type == UNIT_TARGET_CAMP) {
@@ -645,14 +648,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         // NOTE: Buildings have no armor 
                         int damage = std::min(1, unit_get_damage(state, unit));
                         enemy.health = std::max(0, enemy.health - damage);
-                    }
-
-                    if (unit.type == UNIT_COWBOY) {
-                        state.bullet_trails.push_back((bullet_trail_t) {
-                            .start = unit.position.to_xy(),
-                            .end = enemy_position,
-                            .timer = PARTICLE_BULLET_TRAIL_DURATION
-                        });
                     }
 
                     unit.timer = unit_data.attack_cooldown;

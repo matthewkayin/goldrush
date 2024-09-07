@@ -18,6 +18,7 @@
 #define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
 #define UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."
 #define UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
+#define UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
 
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
@@ -33,6 +34,8 @@ const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_MAX = 5;
 const uint32_t BUILDING_FADE_DURATION = 300;
 const uint32_t MINE_SIZE = 3;
+
+extern const uint32_t MATCH_WINNING_GOLD_AMOUNT;
 
 struct tile_t {
     uint16_t base;

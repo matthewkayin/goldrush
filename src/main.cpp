@@ -1412,10 +1412,16 @@ void render_match(const match_state_t& state) {
         if (mine_render_rect.position.x + mine_render_rect.size.x < 0 || mine_render_rect.position.x > SCREEN_WIDTH || mine_render_rect.position.y + mine_render_rect.size.y < 0 || mine_render_rect.position.y > SCREEN_HEIGHT) {
             continue;
         }
+        int hframe = 0;
+        if (mine.is_occupied) {
+            hframe = 1;
+        } else if (mine.gold_left == 0) {
+            hframe = 2;
+        }
         ysorted.push_back((render_sprite_params_t) {
             .sprite = SPRITE_BUILDING_MINE,
             .position = mine_render_rect.position,
-            .frame = xy(mine.is_occupied ? 1 : 0, 0),
+            .frame = xy(hframe, 0),
             .options = RENDER_SPRITE_NO_CULL,
             .recolor_name = RECOLOR_NONE
         });
@@ -1925,6 +1931,20 @@ void render_match(const match_state_t& state) {
     sprintf(population_text, "%u/%u", match_get_player_population(state, network_get_player_id()), match_get_player_max_population(state, network_get_player_id()));
     render_text(FONT_WESTERN8, population_text, COLOR_WHITE, xy(SCREEN_WIDTH - 88 + 22, 4));
     render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL);
+
+    // Scores
+    char player_score_text[256];
+    xy player_score_text_pos = xy(SCREEN_WIDTH - 4, 6);
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        // gets a percent but snapped to 10% intervals
+        uint32_t win_percent = ((state.player_gold[player_id] * 10) / MATCH_WINNING_GOLD_AMOUNT) * 10;
+        player_score_text_pos.y += 12;
+        sprintf(player_score_text, "%s: %u%%", network_get_player(player_id).name, win_percent);
+        render_text(FONT_HACK, player_score_text, COLOR_PLAYER.at(player_id), player_score_text_pos, TEXT_ANCHOR_TOP_RIGHT);
+    }
 
     // Render minimap
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
