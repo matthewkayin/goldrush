@@ -2,6 +2,14 @@
 
 #include "logger.h"
 
+
+const uint32_t UNIT_PATH_PAUSE_DURATION = 30;
+const uint32_t UNIT_BUILD_TICK_DURATION = 6;
+const uint32_t UNIT_MINE_TICK_DURATION = 40;
+const uint32_t UNIT_MAX_GOLD_HELD = 10;
+const uint32_t UNIT_CANT_BE_FERRIED = 0;
+const uint32_t UNIT_IN_DURATION = 60;
+
 const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
     { UNIT_MINER, (unit_data_t) {
         .name = "Miner",
@@ -610,10 +618,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 }
 
                 if (!animation_is_playing(unit.animation)) {
+                    xy enemy_position;
                     if (unit.target.type == UNIT_TARGET_UNIT) {
                         uint32_t enemy_index = state.units.get_index_of(unit.target.id);
                         GOLD_ASSERT(enemy_index != INDEX_INVALID);
                         unit_t& enemy = state.units[enemy_index];
+                        enemy_position = enemy.position.to_xy();
 
                         int damage = std::max(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
                         enemy.health = std::max(0, enemy.health - damage);
@@ -629,10 +639,20 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         uint32_t enemy_index = state.buildings.get_index_of(unit.target.id);
                         GOLD_ASSERT(enemy_index != INDEX_INVALID);
                         building_t& enemy = state.buildings[enemy_index];
+                        rect_t enemy_rect = building_get_rect(enemy);
+                        enemy_position = enemy_rect.position + (enemy_rect.size / 2);
 
                         // NOTE: Buildings have no armor 
                         int damage = std::min(1, unit_get_damage(state, unit));
                         enemy.health = std::max(0, enemy.health - damage);
+                    }
+
+                    if (unit.type == UNIT_COWBOY) {
+                        state.bullet_trails.push_back((bullet_trail_t) {
+                            .start = unit.position.to_xy(),
+                            .end = enemy_position,
+                            .timer = PARTICLE_BULLET_TRAIL_DURATION
+                        });
                     }
 
                     unit.timer = unit_data.attack_cooldown;

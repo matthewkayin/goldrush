@@ -1937,8 +1937,8 @@ void render_match(const match_state_t& state) {
         SDL_Rect mine_rect = (SDL_Rect) {
             .x = (mine.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width,
             .y = (mine.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height,
-            .w = 6,
-            .h = 6
+            .w = 4,
+            .h = 4
         };
         SDL_RenderFillRect(engine.renderer, &mine_rect);
     }
@@ -1954,8 +1954,8 @@ void render_match(const match_state_t& state) {
         SDL_Rect building_rect = (SDL_Rect) { 
             .x = (building.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width,
             .y = (building.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
-            .w = 2 * BUILDING_DATA.at(building.type).cell_size,
-            .h = 2 * BUILDING_DATA.at(building.type).cell_size
+            .w = 1 + BUILDING_DATA.at(building.type).cell_size,
+            .h = 1 + BUILDING_DATA.at(building.type).cell_size
         };
         SDL_Color color = building.player_id == network_get_player_id() 
                             ? COLOR_GREEN 
@@ -1993,8 +1993,8 @@ void render_match(const match_state_t& state) {
         SDL_Rect unit_rect = (SDL_Rect) { 
             .x = (unit.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width, 
             .y = (unit.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
-            .w = 2 * UNIT_DATA.at(unit.type).cell_size, 
-            .h = 2 * UNIT_DATA.at(unit.type).cell_size
+            .w = 1 + UNIT_DATA.at(unit.type).cell_size, 
+            .h = 1 + UNIT_DATA.at(unit.type).cell_size
         };
         SDL_Color color = unit.player_id == network_get_player_id() 
                             ? COLOR_GREEN 
