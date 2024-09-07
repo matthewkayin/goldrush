@@ -22,8 +22,8 @@ static const int CAMERA_DRAG_SPEED = 8;
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 
 // static const uint32_t PLAYER_STARTING_GOLD = 200;
-static const uint32_t PLAYER_STARTING_GOLD = 1000;
-static const uint32_t WINNING_GOLD_AMOUNT = 5000;
+static const uint32_t PLAYER_STARTING_GOLD = 10000;
+static const uint32_t WINNING_GOLD_AMOUNT = 100000;
 
 match_state_t match_init() {
     match_state_t state;
@@ -110,17 +110,37 @@ match_state_t match_init() {
         player_spawns[player_id] = xy(state.map_width / 2, state.map_height / 2) + 
                                    xy(DIRECTION_XY[spawn_direction].x * ((state.map_width * 6) / 16), 
                                       DIRECTION_XY[spawn_direction].y * ((state.map_height * 6) / 16));
+        player_spawns[0] = xy(16, 16);
 
         // Place player starting units
-        unit_create(state, player_id, UNIT_WAGON, player_spawns[player_id] + xy(0, 0));
+        /*unit_create(state, player_id, UNIT_WAGON, player_spawns[player_id] + xy(0, 0));
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-2, -1));
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-2, 0));
-        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(2, 2));
+        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(2, 2));*/
     }
     state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
 
     // Place gold on the map
     log_trace("Placing gold...");
+    std::vector<xy> gold_patch_cells;
+    for (int x = 0; x < 5; x++) {
+        for (int y = 0; y < 5; y++) {
+            gold_patch_cells.push_back(xy(12 + (24 * x), 12 + (24 * y)));
+        }
+    }
+    for (xy gold_patch_cell : gold_patch_cells) {
+        mine_t mine = (mine_t) {
+            .cell = gold_patch_cell,
+            .gold_left = 1000,
+            .is_occupied = false
+        };
+        entity_id mine_id = state.mines.push_back(mine);
+        log_trace("mine id %u", mine_id);
+        map_set_cell_rect(state, rect_t(gold_patch_cell, xy(3, 3)), CELL_MINE, mine_id);
+        unit_create(state, 0, UNIT_MINER, gold_patch_cell + xy(MINE_SIZE, MINE_SIZE));
+    }
+
+    /*
     int gold_patch_x_regions = 3;
     int gold_patch_y_regions = 2;
     int region_width = state.map_width / gold_patch_x_regions;
@@ -146,10 +166,9 @@ match_state_t match_init() {
                 }
             }
 
-            // Now that we've found the cluster origin the actual gold on the map
             mine_t mine = (mine_t) {
                 .cell = gold_patch_cell,
-                .gold_left = 100,
+                .gold_left = 1000,
                 .is_occupied = false
             };
             entity_id mine_id = state.mines.push_back(mine);
@@ -157,9 +176,11 @@ match_state_t match_init() {
             log_info("mine id %u has cell %xi", mine_id, &state.mines.get_by_id(mine_id).cell);
         }
     }
+    */
 
     // Place decorations on the map
     log_trace("Placing decorations...");
+    /*
     for (int i = 0; i < state.map_width * state.map_height; i++) {
         if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map_cells[i].type == CELL_EMPTY) {
             bool is_gold_nearby = false;
@@ -185,6 +206,7 @@ match_state_t match_init() {
             state.map_cells[i].type = CELL_BLOCKED;
         }
     }
+    */
     log_info("Map complete!");
 
     map_update_fog(state);
@@ -705,6 +727,7 @@ uint32_t match_get_player_population(const match_state_t& state, uint8_t player_
 }
 
 uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id) {
+    return 200;
     uint32_t max_population = 10;
     for (const building_t& building : state.buildings) {
         if (building.player_id == player_id && building.type == BUILDING_HOUSE && building_is_finished(building)) {
@@ -1141,35 +1164,34 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, Direction exit_direction) {
+xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy preferred_cell) {
     // Setup search
-    rect_t cell_rect = rect_t(rect.position, cell_size);
     xy search_corners[4] = { 
         rect.position - cell_size,
         rect.position + xy(rect.size.x, -cell_size.y),
         rect.position + rect.size,
         rect.position + xy(-cell_size.x, rect.size.y)
     };
-
+    
     // Determine cell start and step direction based on exit direction
+    if (preferred_cell == xy(-1, -1)) {
+        preferred_cell = rect.position + xy(0, rect.size.y);
+    }
+    rect_t cell_rect = rect_t(preferred_cell, cell_size);
     int step_direction = DIRECTION_SOUTH;
-    if (exit_direction == DIRECTION_SOUTH) {
-        cell_rect.position.y += rect.size.y;
+    Direction exit_direction;
+    if (cell_rect.position.x >= rect.position.x && cell_rect.position.y == rect.position.y + rect.size.y) {
+        exit_direction = DIRECTION_SOUTH;
         step_direction = DIRECTION_WEST;
-    } else if (exit_direction == DIRECTION_NORTH) {
-        cell_rect.position.y -= cell_size.y;
-        cell_rect.position.x++;
-        step_direction = DIRECTION_EAST;
-    } else if (exit_direction == DIRECTION_WEST) {
-        cell_rect.position.x -= cell_size.x;
+    } else if (cell_rect.position.x < rect.position.x && cell_rect.position.y >= rect.position.y) {
+        exit_direction = DIRECTION_WEST;
         step_direction = DIRECTION_NORTH;
-    } else if (exit_direction == DIRECTION_EAST) {
-        cell_rect.position.x += rect.size.x;
-        cell_rect.position.y++;
-        step_direction = DIRECTION_SOUTH;
+    } else if (cell_rect.position.x >= rect.position.x && cell_rect.position.y < rect.position.y) {
+        exit_direction = DIRECTION_NORTH;
+        step_direction = DIRECTION_EAST;
     } else {
-        log_error("Unhandled exit direction of %u in get_first_empty_cell_around_rect()", (uint32_t)exit_direction);
-        GOLD_ASSERT_MESSAGE(false, "Unhandled exit direction in get_first_empty_cell_around_rect()");
+        exit_direction = DIRECTION_EAST;
+        step_direction = DIRECTION_SOUTH;
     }
     xy start_cell = cell_rect.position;
 

@@ -117,7 +117,7 @@ void building_update(match_state_t& state, building_t& building) {
                     }
 
                     // Spawn unit
-                    xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)), exit_direction);
+                    xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)));
                     entity_id unit_id = unit_create(state, building.player_id, item.unit_type, unit_spawn_cell);
 
                     // Set unit target if there is a rally point

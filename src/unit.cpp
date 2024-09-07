@@ -345,13 +345,38 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             unit.mode = UNIT_MODE_IDLE;
                         } else {
                             // Circle swim
-                            xy exit_cell;
-                            if (unit.cell.x < building.cell.x || unit.cell.x == building.cell.x + building_cell_size(building.type).x) {
-                                exit_cell.x = unit.cell.x;
-                                exit_cell.y = unit.cell.y == building.cell.y ? building.cell.y + 1 : building.cell.y;
-                            } else {
-                                exit_cell.y = unit.cell.y;
-                                exit_cell.x = unit.cell.x == building.cell.x ? building.cell.x + 1 : building.cell.x;
+                            xy exit_cell = xy(-1, -1);
+                            rect_t mine_rect = rect_t(state.mines.get_by_id(unit.target.id).cell, xy(MINE_SIZE, MINE_SIZE));
+                            unit_target_t camp_target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
+                            if (camp_target.type == UNIT_TARGET_CAMP) {
+                                rect_t camp_rect = rect_t(state.buildings.get_by_id(camp_target.id).cell, building_cell_size(BUILDING_CAMP));
+                                int x_dist = 0;
+                                if (mine_rect.position.x + mine_rect.size.x - 1 < camp_rect.position.x) {
+                                    x_dist = camp_rect.position.x - (mine_rect.position.x + mine_rect.size.x - 1);
+                                } else if (camp_rect.position.x + camp_rect.size.x - 1 < mine_rect.position.x) {
+                                    x_dist = mine_rect.position.x - (camp_rect.position.x + camp_rect.size.x - 1);
+                                }
+                                int y_dist = 0;
+                                if (mine_rect.position.y + mine_rect.size.y < camp_rect.position.y) {
+                                    y_dist = camp_rect.position.y - (mine_rect.position.y + mine_rect.size.y - 1);
+                                } else if (camp_rect.position.y + camp_rect.size.y < mine_rect.position.y) {
+                                    y_dist = mine_rect.position.y - (camp_rect.position.y + camp_rect.size.y - 1);
+                                }
+                                if (y_dist >= x_dist && x_dist != 0 && x_dist < 3) {
+                                    exit_cell.x = unit.cell.x > mine_rect.position.x
+                                                    ? unit.cell.x - 1
+                                                    : unit.cell.x + 1;
+                                    exit_cell.y = unit.cell.y;
+                                }
+                            }
+                            if (exit_cell.x == -1) {
+                                if (unit.cell.x < building.cell.x || unit.cell.x == building.cell.x + building_cell_size(building.type).x) {
+                                    exit_cell.x = unit.cell.x;
+                                    exit_cell.y = unit.cell.y == building.cell.y ? building.cell.y + 1 : building.cell.y;
+                                } else {
+                                    exit_cell.y = unit.cell.y;
+                                    exit_cell.x = unit.cell.x == building.cell.x ? building.cell.x + 1 : building.cell.x;
+                                }
                             }
                             if (!map_is_cell_blocked(state, exit_cell)) {
                                 unit.path.clear();
@@ -501,6 +526,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
 
                         unit_stop_building(state, unit_id, building);
+                        if (building.type == BUILDING_CAMP) {
+                            unit.target = unit_target_nearest_mine(state, unit);
+                        }
                     } else {
                         unit.timer = UNIT_BUILD_TICK_DURATION;
                     }
@@ -542,14 +570,30 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     rect_t mine_rect = rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE));
                     mine.is_occupied = false;
                     unit.target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
-                    Direction exit_direction = DIRECTION_SOUTH;
+                    xy exit_cell = xy(-1, -1);
                     if (unit.target.type == UNIT_TARGET_CAMP) {
-                        rect_t dest_rect = rect_t(state.buildings.get_by_id(unit.target.id).cell, building_cell_size(BUILDING_CAMP));
-                        exit_direction = get_exit_direction(mine_rect, dest_rect);
+                        // Circle swim - determine exit cell
+                        rect_t camp_rect = rect_t(state.buildings.get_by_id(unit.target.id).cell, building_cell_size(BUILDING_CAMP));
+                        bool x_overlaps = !(mine_rect.position.x + mine_rect.size.x - 1 < camp_rect.position.x || camp_rect.position.x + camp_rect.size.x - 1 < mine_rect.position.x);
+                        bool y_overlaps = !(mine_rect.position.y + mine_rect.size.y - 1 < camp_rect.position.y || camp_rect.position.y + camp_rect.size.y - 1 < mine_rect.position.y);
+                        if (x_overlaps && !y_overlaps) {
+                            exit_cell.y = mine_rect.position.y > camp_rect.position.y
+                                            ? mine_rect.position.y - 1 // Exit NORTH
+                                            : mine_rect.position.y + MINE_SIZE; // Exit SOUTH
+                            exit_cell.x = mine_rect.position.x >= camp_rect.position.x
+                                            ? mine_rect.position.x // On the EAST side
+                                            : mine_rect.position.x + (MINE_SIZE - 1); // On the WEST side
+                        } else {
+                            exit_cell.x = mine_rect.position.x > camp_rect.position.x
+                                            ? mine_rect.position.x - 1 // Exit WEST
+                                            : mine_rect.position.x + MINE_SIZE; // Exit EAST
+                            exit_cell.y = mine_rect.position.y >= camp_rect.position.y
+                                            ? mine_rect.position.y // On the NORTH side
+                                            : mine_rect.position.y + (MINE_SIZE - 1); // On the SOUTH side
+                        }
                     }
                     
-                    // Determine exit direction
-                    unit.cell = get_first_empty_cell_around_rect(state, unit_cell_size(unit.type), mine_rect, exit_direction);
+                    unit.cell = get_first_empty_cell_around_rect(state, unit_cell_size(unit.type), mine_rect, exit_cell);
                     unit.position = cell_center(unit.cell);
                     map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
                     unit.mode = UNIT_MODE_IDLE;
@@ -683,11 +727,40 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
         }
         case UNIT_TARGET_BUILDING:
         case UNIT_TARGET_CAMP: {
-            uint32_t target_building_index = state.buildings.get_index_of(unit.target.id);
-            if (target_building_index == INDEX_INVALID || state.buildings[target_building_index].health == 0) {
-                return unit.cell;
+            rect_t camp_rect = rect_t(state.buildings.get_by_id(unit.target.id).cell, building_cell_size(BUILDING_CAMP));
+            /*
+            if (mine_target.type == UNIT_TARGET_MINE) {
+                rect_t mine_rect = rect_t(state.mines.get_by_id(mine_target.id).cell, xy(MINE_SIZE, MINE_SIZE));
+                rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
+                log_info("unit rect %r", &unit_rect);
+                if (unit_rect.is_adjacent_to(mine_rect)) {
+                    int x_dist = 0;
+                    if (mine_rect.position.x + mine_rect.size.x - 1 < camp_rect.position.x) {
+                        x_dist = camp_rect.position.x - (mine_rect.position.x + mine_rect.size.x - 1);
+                    } else if (camp_rect.position.x + camp_rect.size.x - 1 < mine_rect.position.x) {
+                        x_dist = mine_rect.position.x - (camp_rect.position.x + camp_rect.size.x - 1);
+                    }
+                    int y_dist = 0;
+                    if (mine_rect.position.y + mine_rect.size.y < camp_rect.position.y) {
+                        y_dist = camp_rect.position.y - (mine_rect.position.y + mine_rect.size.y - 1);
+                    } else if (camp_rect.position.y + camp_rect.size.y < mine_rect.position.y) {
+                        y_dist = mine_rect.position.y - (camp_rect.position.y + camp_rect.size.y - 1);
+                    }
+                    if (x_dist > y_dist && y_dist != 0) {
+                        xy target_cell; 
+                        target_cell.x = mine_rect.position.x < camp_rect.position.x ? camp_rect.position.x - 1 : camp_rect.position.x + camp_rect.size.x;
+                        target_cell.y = mine_rect.position.y < camp_rect.position.y ? camp_rect.position.y : camp_rect.position.y + (camp_rect.size.y - 1);
+                        return target_cell;
+                    } else if (y_dist >= x_dist && x_dist != 0) {
+                        xy target_cell; 
+                        target_cell.y = mine_rect.position.y < camp_rect.position.y ? camp_rect.position.y - 1 : camp_rect.position.y + camp_rect.size.y;
+                        target_cell.x = mine_rect.position.x < camp_rect.position.x ? camp_rect.position.x : camp_rect.position.x + (camp_rect.size.x - 1);
+                        return target_cell;
+                    }
+                }
             }
-            return get_nearest_cell_around_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), rect_t(state.buildings[target_building_index].cell, building_cell_size(state.buildings[target_building_index].type)), unit.target.type == UNIT_TARGET_CAMP);
+            */
+            return get_nearest_cell_around_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), camp_rect, unit.target.type == UNIT_TARGET_CAMP);
         }
     }
 }

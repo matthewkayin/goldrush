@@ -351,24 +351,6 @@ inline Direction get_enum_direction_to_rect(xy from, rect_t rect) {
     }
 }
 
-inline Direction get_exit_direction(rect_t exit_rect, rect_t dest_rect) {
-    bool x_overlaps = !(exit_rect.position.x + exit_rect.size.x < dest_rect.position.x || dest_rect.position.x + dest_rect.size.x < exit_rect.position.x);
-    bool y_overlaps = !(exit_rect.position.y + exit_rect.size.y < dest_rect.position.y || dest_rect.position.y + dest_rect.size.y < exit_rect.position.y);
-    if (x_overlaps && exit_rect.position.y < dest_rect.position.y) {
-        return DIRECTION_SOUTH;
-    } else if (x_overlaps && exit_rect.position.y > dest_rect.position.y) {
-        return DIRECTION_NORTH;
-    } else if (y_overlaps && exit_rect.position.x < dest_rect.position.x) {
-        return DIRECTION_EAST;
-    } else if (y_overlaps && exit_rect.position.x > dest_rect.position.x) {
-        return DIRECTION_WEST;
-    } else if (exit_rect.position.x < dest_rect.position.x) {
-        return DIRECTION_EAST;
-    } else {
-        return DIRECTION_WEST;
-    }
-}
-
 /*
  * Quick note: xy_fixed(1,1).normalized() in the diagonal direction would result in vec2(0.707,0.707)
  * To create a fixed with value .707, we take the fractional scale 256 * .707 = 181
