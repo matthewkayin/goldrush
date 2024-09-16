@@ -343,6 +343,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
 
 void ui_set_selection(match_state_t& state, selection_t& selection) {
     state.selection = selection;
+    state.ui_selected_control_group = -1;
 
     if (state.selection.type == SELECTION_TYPE_UNITS) {
         for (uint32_t id_index = 0; id_index < state.selection.ids.size(); id_index++) {
@@ -423,6 +424,66 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
         }
     }
 }
+
+selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const selection_t& selection) {
+    // This function is only meant to be used for player control groups
+    GOLD_ASSERT(selection.type != SELECTION_TYPE_ENEMY_UNIT && selection.type != SELECTION_TYPE_ENEMY_BUILDING && selection.type != SELECTION_TYPE_MINE);
+
+    selection_mode_t mode;
+    mode.type = SELECTION_MODE_NONE;
+    mode.count = 0;
+    if (selection.ids.empty()) {
+        return mode;
+    }
+
+    if (selection.type == SELECTION_TYPE_UNITS) {
+        std::unordered_map<UnitType, uint32_t> unit_type_count;
+        UnitType mode_unit_type = UNIT_MINER;
+        uint32_t mode_unit_type_count = 0;
+
+        for (entity_id id : selection.ids) {
+            uint32_t unit_index = state.units.get_index_of(id);
+            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
+                continue;
+            }
+            UnitType unit_type = state.units[unit_index].type;
+            auto it = unit_type_count.find(unit_type);
+            if (it == unit_type_count.end()) {
+                unit_type_count[mode_unit_type] = 1;
+                if (mode_unit_type_count == 0) {
+                    mode_unit_type = unit_type;
+                    mode_unit_type_count = 1;
+                }
+            } else {
+                it->second++;
+                if (mode_unit_type_count < it->second) {
+                    mode_unit_type = unit_type;
+                    mode_unit_type_count = it->second;
+                }
+            }
+        }
+
+        if (mode_unit_type_count == 0) {
+            return mode;
+        }
+        mode.type = SELECTION_MODE_UNIT;
+        mode.unit_type = mode_unit_type;
+        mode.count = selection.ids.size();
+        return mode;
+    } else if (selection.type == SELECTION_TYPE_BUILDINGS) {
+        uint32_t building_index = state.buildings.get_index_of(selection.ids[0]);
+        if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
+            return mode;
+        }
+        mode.type = SELECTION_MODE_BUILDING;
+        mode.building_type = state.buildings[building_index].type;
+        mode.count = selection.ids.size();
+        return mode;
+    }
+
+    return mode;
+}
+
 
 xy ui_camera_clamp(xy camera_offset, int map_width, int map_height) {
     return xy(std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH),

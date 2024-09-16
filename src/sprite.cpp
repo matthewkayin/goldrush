@@ -103,6 +103,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 5,
         .recolor = false
     }},
+    { SPRITE_UI_CONTROL_GROUP_FRAME, (sprite_params_t) {
+        .path = "sprite/ui_control_group_frame.png",
+        .hframes = 3,
+        .vframes = 1,
+        .recolor = false
+    }},
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .hframes = 1,

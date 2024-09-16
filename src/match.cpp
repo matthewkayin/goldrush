@@ -20,6 +20,7 @@ static const int CAMERA_DRAG_MARGIN = 8;
 static const int CAMERA_DRAG_SPEED = 8;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
+static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
 static const uint32_t PLAYER_STARTING_GOLD = 200;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
@@ -40,6 +41,7 @@ match_state_t match_init() {
         };
     }
     state.control_group_double_click_timer = 0;
+    state.ui_selected_control_group = -1;
 
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -407,12 +409,13 @@ void match_update(match_state_t& state) {
 
     // KEY PRESS
     if (!input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
-        for (uint32_t key = KEY_1; key < KEY_9 + 1; key++) {
+        for (uint32_t key = KEY_1; key < KEY_0 + 1; key++) {
             if (input_is_key_just_pressed((Key)key)) {
                 // Set control group
                 if (input_is_key_pressed(KEY_CTRL)) {
                     if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_BUILDINGS) {
                         state.control_groups[key] = state.selection;
+                        state.ui_selected_control_group = key - KEY_1;
                     }
                 // Append control group
                 } else if (input_is_key_pressed(KEY_SHIFT)) {
@@ -453,6 +456,7 @@ void match_update(match_state_t& state) {
                     // Switch to control group
                     } else if (state.control_groups[key].type != SELECTION_TYPE_NONE) {
                         ui_set_selection(state, state.control_groups[key]);
+                        state.ui_selected_control_group = key - KEY_1;
                         state.control_group_double_click_timer = CONTROL_GROUP_DOUBLE_CLICK_DURATION;
                         state.control_group_double_click_key = key;
                     }
@@ -493,6 +497,27 @@ void match_update(match_state_t& state) {
         // On finished selecting
         if (state.ui_mode == UI_MODE_SELECTING) {
             selection_t selection = ui_create_selection_from_rect(state);
+            // Double click selection
+            if (selection.ids.size() == 1 && (selection.type == SELECTION_TYPE_UNITS || selection.type == SELECTION_TYPE_BUILDINGS)) {
+                if (state.ui_double_click_timer == 0) {
+                    state.ui_double_click_timer = UI_DOUBLE_CLICK_DURATION;
+                } else if (state.ui_double_click_timer != 0 && state.selection.ids.size() == 1 && state.selection.type == selection.type && state.selection.ids[0] == selection.ids[0]) {
+                    // TODO: add buildings to this
+                    if (selection.type == SELECTION_TYPE_UNITS) {
+                        rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
+                        UnitType double_click_unit_type = state.units.get_by_id(selection.ids[0]).type;
+                        selection.ids.clear();
+                        for (uint32_t index = 0; index < state.units.size(); index++) {
+                            if (state.units[index].player_id == network_get_player_id() && 
+                                state.units[index].type == double_click_unit_type &&
+                                screen_rect.intersects(unit_get_rect(state.units[index]))) {
+                                    selection.ids.push_back(state.units.get_id_of(index));
+                            }
+                        }
+                    }
+                    state.ui_double_click_timer = 0;
+                }
+            }
             ui_set_selection(state, selection);
             state.ui_mode = UI_MODE_NONE;
         } else if (state.ui_mode == UI_MODE_MINIMAP_DRAG) {

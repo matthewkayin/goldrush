@@ -271,6 +271,21 @@ struct ui_button_requirements_t {
     };
 };
 
+enum SelectionModeType {
+    SELECTION_MODE_NONE,
+    SELECTION_MODE_UNIT,
+    SELECTION_MODE_BUILDING
+};
+
+struct selection_mode_t {
+    SelectionModeType type;
+    uint32_t count;
+    union {
+        UnitType unit_type;
+        BuildingType building_type;
+    };
+};
+
 // Input
 
 enum InputType {
@@ -360,9 +375,11 @@ struct match_state_t {
     animation_t ui_move_animation;
     animation_t ui_rally_animation;
     xy ui_move_position;
-    selection_t control_groups[9];
+    selection_t control_groups[10];
     uint32_t control_group_double_click_timer;
     uint32_t control_group_double_click_key;
+    uint32_t ui_double_click_timer;
+    int ui_selected_control_group;
 
     // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
@@ -417,6 +434,7 @@ bool ui_is_mouse_in_ui();
 xy ui_get_building_cell(const match_state_t& state);
 selection_t ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, selection_t& selection);
+selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const selection_t& selection);
 xy ui_camera_clamp(xy camera_offset, int map_width, int map_height);
 xy ui_camera_centered_on_cell(xy cell);
 

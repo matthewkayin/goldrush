@@ -23,6 +23,7 @@ enum Key {
     KEY_7,
     KEY_8,
     KEY_9,
+    KEY_0,
     KEY_CTRL,
     KEY_SHIFT,
     KEY_COUNT

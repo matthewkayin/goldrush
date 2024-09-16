@@ -38,12 +38,14 @@ enum TextAnchor {
     TEXT_ANCHOR_TOP_LEFT,
     TEXT_ANCHOR_BOTTOM_LEFT,
     TEXT_ANCHOR_TOP_RIGHT,
-    TEXT_ANCHOR_BOTTOM_RIGHT
+    TEXT_ANCHOR_BOTTOM_RIGHT,
+    TEXT_ANCHOR_TOP_CENTER
 };
 const int RENDER_TEXT_CENTERED = -1;
 
 const SDL_Color COLOR_BLACK = (SDL_Color) { .r = 0, .g = 0, .b = 0, .a = 255 };
 const SDL_Color COLOR_OFFBLACK = (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 255 };
+const SDL_Color COLOR_DARKBLACK = (SDL_Color) { .r = 16, .g = 15, .b = 18, .a = 255 };
 const SDL_Color COLOR_WHITE = (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 };
 const SDL_Color COLOR_SKY_BLUE = (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 };
 const SDL_Color COLOR_SAND_DARK = (SDL_Color) { .r = 204, .g = 162, .b = 139, .a = 255 };
@@ -81,6 +83,7 @@ enum Font {
     FONT_WESTERN8,
     FONT_WESTERN16,
     FONT_WESTERN32,
+    FONT_M3X6,
     FONT_COUNT
 };
 
@@ -105,7 +108,11 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
     { FONT_WESTERN32, (font_params_t) {
         .path = "font/western.ttf",
         .size = 32
-    }}
+    }},
+    { FONT_M3X6, (font_params_t) {
+        .path = "font/m3x6.ttf",
+        .size = 16
+    }},
 };
 
 // SPRITE
@@ -153,6 +160,7 @@ const std::unordered_map<SDL_Keycode, Key> keymap = {
     { SDLK_7, KEY_7 },
     { SDLK_8, KEY_8 },
     { SDLK_9, KEY_9 },
+    { SDLK_0, KEY_0 },
     { SDLK_LCTRL, KEY_CTRL },
     { SDLK_LSHIFT, KEY_SHIFT }
 };
@@ -840,6 +848,9 @@ void render_text(Font font, const char* text, SDL_Color color, xy position, Text
     } 
     if (anchor == TEXT_ANCHOR_TOP_RIGHT || anchor == TEXT_ANCHOR_BOTTOM_RIGHT) {
         dst_rect.x -= dst_rect.w;
+    }
+    if (anchor == TEXT_ANCHOR_TOP_CENTER) {
+        dst_rect.x -= (dst_rect.w / 2);
     }
     SDL_RenderCopy(engine.renderer, text_texture, &src_rect, &dst_rect);
 
@@ -1609,8 +1620,35 @@ void render_match(const match_state_t& state) {
         SDL_RenderDrawRect(engine.renderer, &select_rect);
     }
 
-    // UI frames
+    // UI Control Groups
     static const xy UI_FRAME_BOTTOM_POSITION = xy(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT);
+    for (uint32_t i = 0; i < 10; i++) {
+        selection_mode_t control_group_mode = ui_get_mode_of_selection(state, state.control_groups[i]);
+        if (control_group_mode.type == SELECTION_MODE_NONE) {
+            continue;
+        }
+        int button_frame = 0;
+        SDL_Color text_color = COLOR_OFFBLACK;
+        if (state.ui_selected_control_group == i) {
+            text_color = COLOR_DARKBLACK;
+            button_frame = 2;
+        }
+
+        int button_icon = control_group_mode.type == SELECTION_MODE_UNIT
+                            ? UI_BUTTON_UNIT_MINER + control_group_mode.unit_type
+                            : UI_BUTTON_BUILD_HOUSE + (control_group_mode.building_type - BUILDING_HOUSE);
+        xy render_pos = UI_FRAME_BOTTOM_POSITION + xy(4, 0) + xy((4 + engine.sprites[SPRITE_UI_CONTROL_GROUP_FRAME].frame_size.x) * i, -32);
+        render_sprite(SPRITE_UI_CONTROL_GROUP_FRAME, xy(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL);
+        render_sprite(SPRITE_UI_BUTTON_ICON, xy(button_icon - 1, button_frame), render_pos + xy(1, 0), RENDER_SPRITE_NO_CULL);
+        char control_group_number_text[4];
+        sprintf(control_group_number_text, "%u", i == 9 ? 0 : i + 1);
+        render_text(FONT_M3X6, control_group_number_text, text_color, render_pos + xy(3, -2));
+        char control_group_count_text[4];
+        sprintf(control_group_count_text, "%u", control_group_mode.count);
+        render_text(FONT_M3X6, control_group_count_text, text_color, render_pos + xy(32, 30), TEXT_ANCHOR_BOTTOM_RIGHT);
+    }
+
+    // UI frames
     render_sprite(SPRITE_UI_MINIMAP, xy(0, 0), xy(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
     render_sprite(SPRITE_UI_FRAME_BOTTOM, xy(0, 0), UI_FRAME_BOTTOM_POSITION);
     render_sprite(SPRITE_UI_FRAME_BUTTONS, xy(0, 0), xy(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x + engine.sprites[SPRITE_UI_FRAME_BOTTOM].frame_size.x, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y));

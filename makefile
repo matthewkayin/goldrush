@@ -7,7 +7,7 @@ else
 	endif
 endif
 
-IS_DEBUG := false
+IS_DEBUG := true
 ASSEMBLY := gold
 EXTENSION :=
 DIR := $(subst /,\,${CURDIR})
