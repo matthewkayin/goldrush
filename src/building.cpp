@@ -210,14 +210,14 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
     // Check that all cells in the rect are explored
     for (int x = building_rect.position.x; x < building_rect.position.x + building_rect.size.x; x++) {
         for (int y = building_rect.position.y; y < building_rect.position.y + building_rect.size.y; y++) {
-            if (map_get_fog(state, xy(x, y)).type == FOG_HIDDEN) {
+            if (map_get_fog(state, xy(x, y)) == FOG_HIDDEN) {
                 return false;
             }
         }
     }
 
     for (const mine_t& mine : state.mines) {
-        if (building_rect.intersects(mine_get_block_building_rect(mine))) {
+        if (building_rect.intersects(mine_get_block_building_rect(mine.cell))) {
             return false;
         }
     }

@@ -61,13 +61,6 @@ enum FogType: uint16_t {
     FOG_REVEALED
 };
 
-const uint16_t FOG_VALUE_NONE = UINT16_MAX;
-
-struct fog_t {
-    FogType type;
-    uint16_t value;
-};
-
 // UI
 
 enum UiMode {
@@ -240,6 +233,14 @@ struct building_t {
     xy rally_point;
 };
 
+struct remembered_building_t {
+    uint8_t player_id;
+    BuildingType type;
+    int health;
+    xy cell;
+    BuildingMode mode;
+};
+
 struct building_data_t {
     const char* name;
     int cell_size;
@@ -255,7 +256,12 @@ struct mine_t {
     xy cell;
     uint32_t gold_left;
     bool is_occupied;
-    std::vector<xy> return_paths[MAX_PLAYERS];
+};
+
+struct remembered_mine_t {
+    xy cell;
+    uint32_t gold_left;
+    bool is_occupied;
 };
 
 // More UI
@@ -389,7 +395,7 @@ struct match_state_t {
     // Map
     std::vector<tile_t> map_tiles;
     std::vector<cell_t> map_cells;
-    std::vector<fog_t> map_fog;
+    std::vector<FogType> map_fog;
     uint32_t map_width;
     uint32_t map_height;
     bool is_fog_dirty;
@@ -398,6 +404,8 @@ struct match_state_t {
     id_array<unit_t> units;
     id_array<building_t> buildings;
     id_array<mine_t> mines;
+    std::unordered_map<entity_id, remembered_building_t> remembered_buildings;
+    std::unordered_map<entity_id, remembered_mine_t> remembered_mines;
 
     // Players
     uint32_t player_gold[MAX_PLAYERS];
@@ -419,8 +427,8 @@ xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
 xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy preferred_cell = xy(-1, -1));
 xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect, bool allow_blocked_cells = false);
-rect_t mine_get_rect(const mine_t& mine);
-rect_t mine_get_block_building_rect(const mine_t& mine);
+rect_t mine_get_rect(xy mine_cell);
+rect_t mine_get_block_building_rect(xy mine_cell);
 uint32_t mine_get_worker_count(const match_state_t& state, entity_id mine_id, uint8_t player_id);
 
 // UI
@@ -448,7 +456,7 @@ void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value =
 void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
 bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners);
-fog_t map_get_fog(const match_state_t& state, xy cell);
+FogType map_get_fog(const match_state_t& state, xy cell);
 bool map_is_cell_rect_revealed(const match_state_t& state, rect_t rect);
 void map_update_fog(match_state_t& state);
 

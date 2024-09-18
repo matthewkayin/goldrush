@@ -261,14 +261,14 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
     }
 }
 
-fog_t map_get_fog(const match_state_t& state, xy cell) {
+FogType map_get_fog(const match_state_t& state, xy cell) {
     return state.map_fog[cell.x + (state.map_width * cell.y)];
 }
 
 bool map_is_cell_rect_revealed(const match_state_t& state, rect_t rect) {
     for (int x = rect.position.x; x < rect.position.x + rect.size.x; x++) {
         for (int y = rect.position.y; y < rect.position.y + rect.size.y; y++) {
-            if (map_get_fog(state, xy(x, y)).type == FOG_REVEALED) {
+            if (map_get_fog(state, xy(x, y)) == FOG_REVEALED) {
                 return true;
             }
         }
@@ -290,41 +290,44 @@ void map_fog_reveal(match_state_t& state, xy cell, xy size, int sight) {
                 continue;
             }
 
-            state.map_fog[x + (state.map_width * y)] = (fog_t) {
-                .type = FOG_REVEALED,
-                .value = FOG_VALUE_NONE
-            };
+            state.map_fog[x + (state.map_width * y)] = FOG_REVEALED;
         }
     }
 }
 
 void map_update_fog(match_state_t& state) {
-    // First dim anything that is revealed
+    // First remember any revealed buildings
+    for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
+        building_t& building = state.buildings[building_index];
+        if (!map_is_cell_rect_revealed(state, rect_t(building.cell, building_cell_size(building.type)))) {
+            continue;
+        }
+        state.remembered_buildings[state.buildings.get_id_of(building_index)] = (remembered_building_t) {
+            .player_id = building.player_id,
+            .type = building.type,
+            .health = building.health,
+            .cell = building.cell,
+            .mode = building.mode
+        };
+    }
+
+    // Then remember any revealed mines
+    for (uint32_t mine_index = 0; mine_index < state.mines.size(); mine_index++) {
+        mine_t& mine = state.mines[mine_index];
+        if (!map_is_cell_rect_revealed(state, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
+            continue;
+        }
+        state.remembered_mines[state.mines.get_id_of(mine_index)] = (remembered_mine_t) {
+            .cell = mine.cell,
+            .gold_left = mine.gold_left,
+            .is_occupied = mine.is_occupied
+        };
+    }
+
+    // Now dim anything that is revealed
     for (uint32_t i = 0; i < state.map_width * state.map_height; i++) {
-        if (state.map_fog[i].type == FOG_REVEALED) {
-            if (state.map_cells[i].type == CELL_BUILDING) {
-                uint32_t cell_value_index = state.buildings.get_index_of(state.map_cells[i].value);
-                GOLD_ASSERT(cell_value_index != INDEX_INVALID);
-                uint8_t cell_value_player_id = state.buildings[cell_value_index].player_id;
-                xy cell_value_size = building_cell_size(state.buildings[cell_value_index].type);
-                xy cell_value_origin = xy(i % state.map_width, i / state.map_width);
-                for (uint32_t x = cell_value_origin.x; x < cell_value_origin.x + cell_value_size.x; x++) {
-                    for (uint32_t y = cell_value_origin.y; y < cell_value_origin.y + cell_value_size.y; y++) {
-                        if (map_get_fog(state, xy(x, y)).type == FOG_HIDDEN) {
-                            continue;
-                        }
-                        state.map_fog[x + (y * state.map_width)] = (fog_t) {
-                            .type = FOG_EXPLORED,
-                            .value = (uint16_t)cell_value_player_id
-                        };
-                    }
-                }
-            } else {
-                state.map_fog[i] = (fog_t) {
-                    .type = FOG_EXPLORED,
-                    .value = FOG_VALUE_NONE
-                };
-            }
+        if (state.map_fog[i] == FOG_REVEALED) {
+            state.map_fog[i] = FOG_EXPLORED;
         }
     }
 
@@ -343,6 +346,18 @@ void map_update_fog(match_state_t& state) {
         }
 
         map_fog_reveal(state, building.cell, building_cell_size(building.type), 4);
+    }
+
+    // Finally remove from the remembered buildings map for any buildings that no longer exist
+    // Note the buildings are only removed from the list if the player can see where the building once was
+    auto it = state.remembered_buildings.begin();
+    while (it != state.remembered_buildings.end()) {
+        if (state.buildings.get_index_of(it->first) == INDEX_INVALID && map_is_cell_rect_revealed(state, rect_t(it->second.cell, building_cell_size(it->second.type)))) {
+            log_trace("deleting remembered building");
+            it = state.remembered_buildings.erase(it);
+        } else {
+            it++;
+        }
     }
 
     state.is_fog_dirty = false;
