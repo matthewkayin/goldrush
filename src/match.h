@@ -19,6 +19,7 @@
 #define UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."
 #define UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
 #define UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
+#define UI_STATUS_UNDER_ATTACK "You're under attack!"
 
 const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
@@ -38,6 +39,9 @@ const uint32_t MINE_SIZE = 3;
 extern const uint32_t MATCH_WINNING_GOLD_AMOUNT;
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
 extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
+extern const uint32_t MATCH_ALERT_DURATION;
+extern const uint32_t MATCH_ATTACK_ALERT_DURATION;
+extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
 
 struct tile_t {
     uint16_t base;
@@ -100,6 +104,25 @@ enum SelectionType {
 struct selection_t {
     SelectionType type;
     std::vector<entity_id> ids;
+};
+
+enum AlertType {
+    ALERT_UNIT_ATTACKED,
+    ALERT_BUILDING_ATTACKED,
+    ALERT_UNIT_FINISHED,
+    ALERT_BUILDING_FINISHED,
+    ALERT_MINE_COLLAPSED
+};
+
+struct alert_t {
+    AlertType type;
+    entity_id id;
+    uint32_t timer;
+};
+
+struct attack_alert_t {
+    xy cell;
+    uint32_t timer;
 };
 
 // Unit
@@ -396,6 +419,8 @@ struct match_state_t {
     uint32_t control_group_double_click_key;
     uint32_t ui_double_click_timer;
     int ui_selected_control_group;
+    std::vector<alert_t> alerts;
+    std::vector<attack_alert_t> attack_alerts;
 
     // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
@@ -455,6 +480,7 @@ void ui_set_selection(match_state_t& state, selection_t& selection);
 selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const selection_t& selection);
 xy ui_camera_clamp(xy camera_offset, int map_width, int map_height);
 xy ui_camera_centered_on_cell(xy cell);
+xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert);
 
 // Map
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);

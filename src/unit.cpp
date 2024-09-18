@@ -531,6 +531,19 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         // On building finished
                         building.mode = BUILDING_MODE_FINISHED;
 
+                        // Show alert
+                        if (building.player_id == network_get_player_id()) {
+                            rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
+                            rect_t building_rect = building_get_rect(building);
+                            if (!screen_rect.intersects(building_rect)) {
+                                state.alerts.push_back((alert_t) {
+                                    .type = ALERT_BUILDING_FINISHED,
+                                    .id = unit.target.build.building_id,
+                                    .timer = MATCH_ALERT_DURATION
+                                });
+                            }
+                        }
+
                         // If selecting the building
                         if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == unit.target.build.building_id) {
                             // Trigger a re-select so that UI buttons are updated correctly
@@ -583,6 +596,15 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     mine.is_occupied = false;
                     if (unit.player_id == network_get_player_id() && mine.gold_left == 0) {
                         ui_show_status(state, UI_STATUS_MINE_COLLAPSED);
+                        rect_t mine_screen_rect = rect_t(mine.cell * TILE_SIZE, xy(MINE_SIZE, MINE_SIZE) * TILE_SIZE);
+                        rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
+                        if (!screen_rect.intersects(mine_screen_rect)) {
+                            state.alerts.push_back((alert_t) {
+                                .type = ALERT_MINE_COLLAPSED,
+                                .id = unit.garrison_id,
+                                .timer = MATCH_ALERT_DURATION
+                            });
+                        }
                     }
                     unit.target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
                     xy exit_cell = xy(-1, -1);
@@ -635,6 +657,36 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         int damage = std::max(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
                         enemy.health = std::max(0, enemy.health - damage);
                         if (enemy.taking_damage_timer == 0) {
+                            // Only show the alert if the enemy being attacked belongs to the current player
+                            if (enemy.player_id == network_get_player_id()) {
+                                // Only show the alert if the enemy being attacked is not on screen
+                                rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT - UI_HEIGHT));
+                                rect_t enemy_rect = unit_get_rect(enemy);
+                                if (!screen_rect.intersects(enemy_rect)) {
+                                    bool is_existing_attack_alert_close_by = false;
+                                    for (const attack_alert_t& attack_alert : state.attack_alerts) {
+                                        if (xy::manhattan_distance(attack_alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
+                                            is_existing_attack_alert_close_by = true;
+                                            break;
+                                        }
+                                    }
+
+                                    // Only show the alert if this is the first enemy being attacked
+                                    if (!is_existing_attack_alert_close_by) {
+                                        state.alerts.push_back((alert_t) {
+                                            .type = ALERT_UNIT_ATTACKED,
+                                            .id = unit.target.id,
+                                            .timer = MATCH_ALERT_DURATION
+                                        });
+                                        state.attack_alerts.push_back((attack_alert_t) {
+                                            .cell = enemy.cell,
+                                            .timer = MATCH_ATTACK_ALERT_DURATION
+                                        });
+                                        ui_show_status(state, UI_STATUS_UNDER_ATTACK);
+                                    }
+                                }
+                            }
+
                             enemy.taking_damage_flicker = true;
                             enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
                         }
@@ -658,6 +710,36 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         int damage = std::min(1, unit_get_damage(state, unit));
                         enemy.health = std::max(0, enemy.health - damage);
                         if (enemy.taking_damage_timer == 0) {
+                            // Only show the alert if the enemy being attacked belongs to the current player
+                            if (enemy.player_id == network_get_player_id()) {
+                                // Only show the alert if the enemy being attacked is not on screen
+                                rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT - UI_HEIGHT));
+                                rect_t enemy_rect = building_get_rect(enemy);
+                                if (!screen_rect.intersects(enemy_rect)) {
+                                    bool is_existing_attack_alert_close_by = false;
+                                    for (const attack_alert_t& attack_alert : state.attack_alerts) {
+                                        if (xy::manhattan_distance(attack_alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
+                                            is_existing_attack_alert_close_by = true;
+                                            break;
+                                        }
+                                    }
+
+                                    // Only show the alert if this is the first enemy being attacked
+                                    if (!is_existing_attack_alert_close_by) {
+                                        state.alerts.push_back((alert_t) {
+                                            .type = ALERT_BUILDING_ATTACKED,
+                                            .id = unit.target.id,
+                                            .timer = MATCH_ALERT_DURATION
+                                        });
+                                        state.attack_alerts.push_back((attack_alert_t) {
+                                            .cell = enemy.cell,
+                                            .timer = MATCH_ATTACK_ALERT_DURATION
+                                        });
+                                        ui_show_status(state, UI_STATUS_UNDER_ATTACK);
+                                    }
+                                }
+                            }
+
                             enemy.taking_damage_flicker = true;
                             enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
                         }

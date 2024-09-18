@@ -24,10 +24,13 @@ static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
 static const uint32_t PLAYER_STARTING_GOLD = 1000;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
-static const uint32_t MINE_STARTING_GOLD_AMOUNT = 2500;
+static const uint32_t MINE_STARTING_GOLD_AMOUNT = 100;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION = 10;
+const uint32_t MATCH_ALERT_DURATION = 90;
+const uint32_t MATCH_ATTACK_ALERT_DURATION = 60 * 20;
+const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
 
 match_state_t match_init() {
     match_state_t state;
@@ -66,8 +69,8 @@ match_state_t match_init() {
 
     // Init map
     log_info("Generating map...");
-    state.map_width = 128;
-    state.map_height = 128;
+    state.map_width = 96;
+    state.map_height = 96;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
         .base = 0,
         .decoration = 0
@@ -716,6 +719,31 @@ void match_update(match_state_t& state) {
     // Update Fog of War
     if (state.is_fog_dirty) {
         map_update_fog(state);
+    }
+
+    // Update alerts
+    auto it = state.alerts.begin();
+    while (it != state.alerts.end()) {
+        it->timer--;
+        bool is_entity_invalid;
+        switch (it->type) {
+            case ALERT_UNIT_ATTACKED:
+            case ALERT_UNIT_FINISHED:
+                is_entity_invalid = state.units.get_index_of(it->id) == INDEX_INVALID;
+                break;
+            case ALERT_BUILDING_ATTACKED:
+            case ALERT_BUILDING_FINISHED:
+                is_entity_invalid = state.buildings.get_index_of(it->id) == INDEX_INVALID;
+                break;
+            case ALERT_MINE_COLLAPSED:
+                is_entity_invalid = false;
+                break;
+        }
+        if (it->timer == 0 || is_entity_invalid) {
+            it = state.alerts.erase(it);
+        } else {
+            it++;
+        }
     }
 
     // Check for winners

@@ -124,6 +124,18 @@ void building_update(match_state_t& state, building_t& building) {
                     xy unit_spawn_cell = get_first_empty_cell_around_rect(state, unit_cell_size(item.unit_type), rect_t(building.cell, building_cell_size(building.type)));
                     entity_id unit_id = unit_create(state, building.player_id, item.unit_type, unit_spawn_cell);
 
+                    if (building.player_id == network_get_player_id()) {
+                        rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
+                        rect_t building_rect = building_get_rect(building);
+                        if (!screen_rect.intersects(building_rect)) {
+                            state.alerts.push_back((alert_t) {
+                                .type = ALERT_UNIT_FINISHED,
+                                .id = unit_id,
+                                .timer = MATCH_ALERT_DURATION
+                            });
+                        }
+                    }
+
                     // Set unit target if there is a rally point
                     if (building.rally_point.x != -1) {
                         xy rally_cell = building.rally_point / TILE_SIZE;

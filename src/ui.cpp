@@ -493,3 +493,16 @@ xy ui_camera_clamp(xy camera_offset, int map_width, int map_height) {
 xy ui_camera_centered_on_cell(xy cell) {
     return xy((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
 }
+
+xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert) {
+    switch (alert.type) {
+        case ALERT_UNIT_ATTACKED:
+        case ALERT_UNIT_FINISHED:
+            return state.units.get_by_id(alert.id).cell;
+        case ALERT_BUILDING_ATTACKED:
+        case ALERT_BUILDING_FINISHED:
+            return state.buildings.get_by_id(alert.id).cell;
+        case ALERT_MINE_COLLAPSED:
+            return state.mines.get_by_id(alert.id).cell;
+    }
+}

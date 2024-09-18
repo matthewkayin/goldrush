@@ -448,6 +448,7 @@ int gold_main(int argc, char** argv) {
                     if (menu_state.mode == MENU_MODE_MATCH_START) {
                         match_state = match_init();
                         mode = MODE_MATCH;
+                        engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, match_state.map_width, match_state.map_height);
                     } else if (menu_state.mode == MENU_MODE_EXIT) {
                         engine.is_running = false;
                         break;
@@ -470,6 +471,8 @@ int gold_main(int argc, char** argv) {
                     if (match_state.ui_mode == UI_MODE_LEAVE_MATCH) {
                         menu_state = menu_init();
                         mode = MODE_MENU;
+                        SDL_DestroyTexture(engine.minimap_texture);
+                        engine.minimap_texture = NULL;
                     }
                     break;
                 }
@@ -536,6 +539,7 @@ bool engine_init(xy window_size) {
         return false;
     }
 
+    engine.minimap_texture = NULL;
     if (!engine_create_renderer()) {
         return false;
     }
@@ -712,7 +716,6 @@ bool engine_create_renderer() {
     engine.current_cursor = CURSOR_DEFAULT;
     SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
 
-    engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, 128, 128);
     log_info("Initialized renderer.");
     return true;
 }
@@ -736,7 +739,9 @@ void engine_destroy_renderer() {
         SDL_FreeCursor(cursor);
     }
     engine.cursors.clear();
-    SDL_DestroyTexture(engine.minimap_texture);
+    if (engine.minimap_texture != NULL) {
+        SDL_DestroyTexture(engine.minimap_texture);
+    }
 
     SDL_DestroyRenderer(engine.renderer);
 
@@ -1996,10 +2001,10 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderDrawColor(engine.renderer, COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, COLOR_GOLD.a);
     for (const mine_t& mine : state.mines) {
         SDL_Rect mine_rect = (SDL_Rect) {
-            .x = (mine.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width,
-            .y = (mine.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height,
-            .w = 4,
-            .h = 4
+            .x = mine.cell.x,
+            .y = mine.cell.y,
+            .w = MINE_SIZE + 1,
+            .h = MINE_SIZE + 1
         };
         SDL_RenderFillRect(engine.renderer, &mine_rect);
     }
@@ -2011,10 +2016,10 @@ void render_match(const match_state_t& state) {
         }
 
         SDL_Rect building_rect = (SDL_Rect) { 
-            .x = (building.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width,
-            .y = (building.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
-            .w = 1 + BUILDING_DATA.at(building.type).cell_size,
-            .h = 1 + BUILDING_DATA.at(building.type).cell_size
+            .x = building.cell.x, 
+            .y = building.cell.y, 
+            .w = BUILDING_DATA.at(building.type).cell_size + 1,
+            .h = BUILDING_DATA.at(building.type).cell_size + 1
         };
         SDL_Color color;
         if (building.player_id == network_get_player_id()) {
@@ -2035,10 +2040,10 @@ void render_match(const match_state_t& state) {
         }
 
         SDL_Rect unit_rect = (SDL_Rect) { 
-            .x = (unit.cell.x * MINIMAP_RECT.size.x) / (int)state.map_width, 
-            .y = (unit.cell.y * MINIMAP_RECT.size.y) / (int)state.map_height, 
-            .w = 1 + UNIT_DATA.at(unit.type).cell_size, 
-            .h = 1 + UNIT_DATA.at(unit.type).cell_size
+            .x = unit.cell.x, 
+            .y = unit.cell.y, 
+            .w = UNIT_DATA.at(unit.type).cell_size + 1, 
+            .h = UNIT_DATA.at(unit.type).cell_size + 1
         };
         SDL_Color color;
         if (unit.player_id == network_get_player_id()) {
@@ -2051,7 +2056,7 @@ void render_match(const match_state_t& state) {
     }
 
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
-    SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 2, .h = 2 };
+    SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 1, .h = 1 };
     for (int x = 0; x < state.map_width; x++) {
         for (int y = 0; y < state.map_height; y++) {
             FogType fog = state.map_fog[x + (y * state.map_width)];
@@ -2059,8 +2064,8 @@ void render_match(const match_state_t& state) {
                 continue;
             }
 
-            fog_rect.x = (x * MINIMAP_RECT.size.x) / (int)state.map_width;
-            fog_rect.y = (y * MINIMAP_RECT.size.y) / (int)state.map_height;
+            fog_rect.x = x;
+            fog_rect.y = y; 
             SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog == FOG_HIDDEN ? 255 : 128);
 #ifndef GOLD_DEBUG_FOG_DISABLED
             SDL_RenderFillRect(engine.renderer, &fog_rect);
@@ -2069,18 +2074,80 @@ void render_match(const match_state_t& state) {
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
+    for (const alert_t& alert : state.alerts) {
+        SDL_Color color;
+        switch (alert.type) {
+            case ALERT_UNIT_ATTACKED:
+            case ALERT_BUILDING_ATTACKED:
+                color = COLOR_RED;
+                break;
+            case ALERT_UNIT_FINISHED:
+            case ALERT_BUILDING_FINISHED:
+                color = COLOR_GREEN;
+                break;
+            case ALERT_MINE_COLLAPSED:
+                color = COLOR_GOLD;
+                break;
+        }
+
+        SDL_Rect alert_rect;
+        switch (alert.type) {
+            case ALERT_UNIT_ATTACKED:
+            case ALERT_UNIT_FINISHED: {
+                const unit_t& unit = state.units.get_by_id(alert.id);
+                alert_rect = (SDL_Rect) {
+                    .x = unit.cell.x,
+                    .y = unit.cell.y,
+                    .w = unit_cell_size(unit.type).x + 1,
+                    .h = unit_cell_size(unit.type).y + 1
+                };
+                break;
+            }
+            case ALERT_BUILDING_ATTACKED:
+            case ALERT_BUILDING_FINISHED: {
+                const building_t& building = state.buildings.get_by_id(alert.id);
+                alert_rect = (SDL_Rect) {
+                    .x = building.cell.x,
+                    .y = building.cell.y,
+                    .w = building_cell_size(building.type).x + 1,
+                    .h = building_cell_size(building.type).y + 1
+                };
+                break;
+            }
+            case ALERT_MINE_COLLAPSED: {
+                const mine_t& mine = state.mines.get_by_id(alert.id);
+                alert_rect = (SDL_Rect) {
+                    .x = mine.cell.x,
+                    .y = mine.cell.y,
+                    .w = MINE_SIZE + 1,
+                    .h = MINE_SIZE + 1
+                };
+            }
+        }
+
+        int alert_rect_margin = 3 + (alert.timer <= 60 ? 0 : ((alert.timer - 60) / 3));
+        alert_rect.x -= alert_rect_margin;
+        alert_rect.y -= alert_rect_margin;
+        alert_rect.w += alert_rect_margin * 2;
+        alert_rect.h += alert_rect_margin * 2;
+
+        SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+        SDL_RenderDrawRect(engine.renderer, &alert_rect);
+    }
+
     SDL_Rect camera_rect = (SDL_Rect) { 
-        .x = ((state.camera_offset.x / TILE_SIZE) * MINIMAP_RECT.size.x) / (int)state.map_width, 
-        .y = ((state.camera_offset.y / TILE_SIZE) * MINIMAP_RECT.size.y) / (int)state.map_height, 
-        .w = ((SCREEN_WIDTH / TILE_SIZE) * MINIMAP_RECT.size.x) / (int)state.map_width, 
-        .h = 1 + (((SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE) * MINIMAP_RECT.size.y) / (int)state.map_height };
+        .x = state.camera_offset.x / TILE_SIZE,
+        .y = state.camera_offset.y / TILE_SIZE,
+        .w = SCREEN_WIDTH / TILE_SIZE,
+        .h = 1 + ((SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE) 
+    };
     SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(engine.renderer, &camera_rect);
 
     SDL_SetRenderTarget(engine.renderer, NULL);
 
     // Render the minimap texture
-    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = (int)state.map_width, .h = (int)state.map_height };
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
 
