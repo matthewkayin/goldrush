@@ -22,9 +22,12 @@ static const int CAMERA_DRAG_SPEED = 8;
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 200;
+static const uint32_t PLAYER_STARTING_GOLD = 1000;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
 static const uint32_t MINE_STARTING_GOLD_AMOUNT = 2500;
+
+const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
+const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION = 10;
 
 match_state_t match_init() {
     match_state_t state;

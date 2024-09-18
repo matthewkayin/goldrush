@@ -88,6 +88,10 @@ entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, co
     unit.timer = 0;
     unit.garrison_id = ID_NULL;
 
+    unit.taking_damage_timer = 0;
+    unit.taking_damage_flicker_timer = 0;
+    unit.taking_damage_flicker = false;
+
     entity_id unit_id = state.units.push_back(unit);
     map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
     return unit_id;
@@ -630,6 +634,11 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                         int damage = std::max(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
                         enemy.health = std::max(0, enemy.health - damage);
+                        if (enemy.taking_damage_timer == 0) {
+                            enemy.taking_damage_flicker = true;
+                            enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
+                        }
+                        enemy.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
 
                         // Make the enemy attack back
                         if (enemy.mode == UNIT_MODE_IDLE && enemy.target.type == UNIT_TARGET_NONE && UNIT_DATA.at(enemy.type).damage != 0 && unit_can_see_rect(enemy, rect_t(unit.cell, unit_cell_size(unit.type)))) {
@@ -648,6 +657,11 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         // NOTE: Buildings have no armor 
                         int damage = std::min(1, unit_get_damage(state, unit));
                         enemy.health = std::max(0, enemy.health - damage);
+                        if (enemy.taking_damage_timer == 0) {
+                            enemy.taking_damage_flicker = true;
+                            enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
+                        }
+                        enemy.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
                     }
 
                     unit.timer = unit_data.attack_cooldown;
@@ -699,6 +713,19 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
             }
         }
     } // End while !unit_update_finished
+
+    if (unit.taking_damage_timer > 0) {
+        unit.taking_damage_timer--;
+        if (unit.taking_damage_timer == 0) {
+            unit.taking_damage_flicker = false;
+        } else {
+            unit.taking_damage_flicker_timer--;
+            if (unit.taking_damage_flicker_timer == 0) {
+                unit.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
+                unit.taking_damage_flicker = !unit.taking_damage_flicker;
+            }
+        }
+    }
 }
 
 xy unit_cell_size(UnitType type) {

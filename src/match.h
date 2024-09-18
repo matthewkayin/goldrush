@@ -36,6 +36,8 @@ const uint32_t BUILDING_FADE_DURATION = 300;
 const uint32_t MINE_SIZE = 3;
 
 extern const uint32_t MATCH_WINNING_GOLD_AMOUNT;
+extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
+extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
 
 struct tile_t {
     uint16_t base;
@@ -181,6 +183,10 @@ struct unit_t {
     std::vector<entity_id> ferried_units;
     uint32_t gold_held;
     uint32_t timer;
+
+    uint32_t taking_damage_timer;
+    uint32_t taking_damage_flicker_timer;
+    bool taking_damage_flicker;
 };
 
 struct unit_data_t {
@@ -231,6 +237,10 @@ struct building_t {
     std::vector<building_queue_item_t> queue;
     uint32_t queue_timer;
     xy rally_point;
+
+    uint32_t taking_damage_timer;
+    uint32_t taking_damage_flicker_timer;
+    bool taking_damage_flicker;
 };
 
 struct remembered_building_t {

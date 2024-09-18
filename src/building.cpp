@@ -51,6 +51,10 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     building.queue_timer = 0;
     building.rally_point = xy(-1, -1);
 
+    building.taking_damage_timer = 0;
+    building.taking_damage_flicker_timer = 0;
+    building.taking_damage_flicker = false;
+
     entity_id building_id = state.buildings.push_back(building);
     map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_size, building_data.cell_size)), CELL_BUILDING, building_id);
     return building_id;
@@ -141,6 +145,19 @@ void building_update(match_state_t& state, building_t& building) {
             }
 
             building_dequeue(state, building);
+        }
+    }
+
+    if (building.taking_damage_timer > 0) {
+        building.taking_damage_timer--;
+        if (building.taking_damage_timer == 0) {
+            building.taking_damage_flicker = false;
+        } else {
+            building.taking_damage_flicker_timer--;
+            if (building.taking_damage_flicker_timer == 0) {
+                building.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
+                building.taking_damage_flicker = !building.taking_damage_flicker;
+            }
         }
     }
 }

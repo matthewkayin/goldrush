@@ -2016,9 +2016,12 @@ void render_match(const match_state_t& state) {
             .w = 1 + BUILDING_DATA.at(building.type).cell_size,
             .h = 1 + BUILDING_DATA.at(building.type).cell_size
         };
-        SDL_Color color = building.player_id == network_get_player_id() 
-                            ? COLOR_GREEN 
-                            : COLOR_PLAYER.at((RecolorName)building.player_id);
+        SDL_Color color;
+        if (building.player_id == network_get_player_id()) {
+            color = state.buildings.get_by_id(it.first).taking_damage_flicker ? COLOR_RED : COLOR_GREEN;
+        } else {
+            color = COLOR_PLAYER.at((RecolorName)building.player_id);
+        }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &building_rect);
     }
@@ -2037,9 +2040,12 @@ void render_match(const match_state_t& state) {
             .w = 1 + UNIT_DATA.at(unit.type).cell_size, 
             .h = 1 + UNIT_DATA.at(unit.type).cell_size
         };
-        SDL_Color color = unit.player_id == network_get_player_id() 
-                            ? COLOR_GREEN 
-                            : COLOR_PLAYER.at((RecolorName)unit.player_id);
+        SDL_Color color;
+        if (unit.player_id == network_get_player_id()) {
+            color = unit.taking_damage_flicker ? COLOR_RED : COLOR_GREEN;
+        } else {
+            color = COLOR_PLAYER.at((RecolorName)unit.player_id);
+        }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &unit_rect);
     }
