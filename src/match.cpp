@@ -480,6 +480,11 @@ void match_update(match_state_t& state) {
                 break;
             }
         }
+
+        if (input_is_key_just_pressed(KEY_SPACE) && !state.attack_alerts.empty()) {
+            attack_alert_t latest_attack_alert = state.attack_alerts[state.attack_alerts.size() - 1];
+            state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(latest_attack_alert.cell), state.map_width, state.map_height);
+        }
     }
 
     // SELECT RECT

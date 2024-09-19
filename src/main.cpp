@@ -162,7 +162,8 @@ const std::unordered_map<SDL_Keycode, Key> keymap = {
     { SDLK_9, KEY_9 },
     { SDLK_0, KEY_0 },
     { SDLK_LCTRL, KEY_CTRL },
-    { SDLK_LSHIFT, KEY_SHIFT }
+    { SDLK_LSHIFT, KEY_SHIFT },
+    { SDLK_SPACE, KEY_SPACE }
 };
 const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_MOVE, SDLK_v },
