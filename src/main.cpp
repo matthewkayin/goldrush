@@ -11,6 +11,7 @@
 #include "input.h"
 #include "container.h"
 #include "lcg.h"
+#include "editor.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
@@ -241,16 +242,20 @@ enum Mode {
 };
 
 int gold_main(int argc, char** argv) {
-    xy window_size = xy(SCREEN_WIDTH, SCREEN_HEIGHT);
-    char logfile_path[128];
-
     if (!std::filesystem::exists("./logs")) {
         std::filesystem::create_directory("./logs");
     }
 
+    xy window_size = xy(SCREEN_WIDTH, SCREEN_HEIGHT);
+    char logfile_path[128];
+    bool edit_mode = false;
+
+    time_t _time = time(NULL);
+    tm _tm = *localtime(&_time);
+    sprintf(logfile_path, "./logs/%d-%02d-%02dT%02d%02d%02d.log", _tm.tm_year + 1900, _tm.tm_mon + 1, _tm.tm_mday, _tm.tm_hour, _tm.tm_min, _tm.tm_sec);
+
 #ifdef GOLD_DEBUG
-    strcpy(logfile_path, "./logs/debug.log");
-    window_size = xy(SCREEN_WIDTH * 2, SCREEN_HEIGHT * 2);
+    // Parse Arguments
     for (int argn = 1; argn < argc; argn++) {
         std::string arg = std::string(argv[argn]);
         if (arg == "--logfile" && argn + 1 < argc) {
@@ -283,17 +288,19 @@ int gold_main(int argc, char** argv) {
             }
 
             window_size = xy(std::stoi(width_string.c_str()), std::stoi(height_string.c_str()));
+        } else if (arg == "--edit") {
+            edit_mode = true;
         }
     }
-#else
-    time_t _time = time(NULL);
-    tm _tm = *localtime(&_time);
-    sprintf(logfile_path, "./logs/%d-%02d-%02dT%02d%02d%02d.log", _tm.tm_year + 1900, _tm.tm_mon + 1, _tm.tm_mday, _tm.tm_hour, _tm.tm_min, _tm.tm_sec);
-    printf("%s\n", logfile_path);
+
 #endif
 
     logger_init(logfile_path);
     platform_clock_init();
+    if (edit_mode) {
+        return editor_run();
+    }
+
     options_init();
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {

@@ -1,13 +1,15 @@
-#define SDL_MAIN_HANDLED
+#include "editor.h"
+
+#ifdef GOLD_DEBUG
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
-#include <cstdio>
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_sdl2.h>
+#include <imgui/imgui_impl_sdlrenderer2.h>
 #include <cstdint>
-#include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_sdlrenderer2.h"
+#include "defines.h"
+#include "logger.h"
 
 struct editor_t {
     SDL_Window* window;
@@ -16,38 +18,30 @@ struct editor_t {
 };
 static editor_t editor;
 
-int main() {
-    // INIT
+int editor_run() {
+    log_info("Initializing GoldRush Map Editor...");
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        printf("SDL failed to initialize: %s\n", SDL_GetError());
-        return 1;
-    }
-
-#ifdef SDL_HINT_IME_SHOW_UI
-    SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
-#endif
-
-    if (TTF_Init() == -1) {
-        printf("SDL_ttf failed to initialize: %s\n", TTF_GetError());
+        log_error("SDL failed to initialize: %s", SDL_GetError());
         return 1;
     }
 
     int img_flags = IMG_INIT_PNG;
     if (!(IMG_Init(img_flags) & img_flags)) {
-        printf("SDL_image failed to initialize: %s\n", IMG_GetError());
+        log_error("SDL_image failed to initialize: %s", IMG_GetError());
         return 1;
     }
 
+
     editor.window = SDL_CreateWindow("GoldRush Map Editor", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (editor.window == NULL) {
-        printf("Error creating window: %s\n", SDL_GetError());
+        log_error("Error creating window: %s", SDL_GetError());
         return 1;
     }
 
     editor.renderer = SDL_CreateRenderer(editor.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (editor.renderer == NULL) {
-        printf("Error creating renderer: %s\n", SDL_GetError());
+        log_error("Error creating renderer: %s", SDL_GetError());
         return 1;
     }
 
@@ -58,9 +52,8 @@ int main() {
     ImGui_ImplSDL2_InitForSDLRenderer(editor.window, editor.renderer);
     ImGui_ImplSDLRenderer2_Init(editor.renderer);
 
-    printf("Initialized editor.\n");
+    log_info("Initialized editor.");
 
-    // GAME LOOP
     editor.is_running = true;
 
     while (editor.is_running) {
@@ -98,7 +91,7 @@ int main() {
 
         SDL_SetRenderDrawColor(editor.renderer, 0, 0, 0, 255);
         SDL_RenderClear(editor.renderer);
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), editor.renderer);
         SDL_RenderPresent(editor.renderer);
     } // End while running
 
@@ -110,8 +103,13 @@ int main() {
     SDL_DestroyRenderer(editor.renderer);
     SDL_DestroyWindow(editor.window);
     IMG_Quit();
-    TTF_Quit();
     SDL_Quit();
 
     return 0;
 }
+
+#else
+
+int editor_run() {}
+
+#endif

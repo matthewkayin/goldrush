@@ -103,14 +103,16 @@
             "name": "Editor",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/gedit",
-            "args": [],
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--edit"
+            ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",
             "environment": [],
             "windows": {
                 "type": "cppvsdbg",
-                "program": "${workspaceFolder}/bin/gedit.exe",
+                "program": "${workspaceFolder}/bin/gold.exe",
                 "console": "integratedTerminal"
             },
             "osx": {
