@@ -50,6 +50,61 @@ enum EditorMode {
     EDITOR_MODE_MINIMAP_DRAG
 };
 
+enum EditorTool {
+    TOOL_BRUSH,
+    TOOL_DECORATIONS,
+    TOOL_MINES,
+    TOOL_SPAWNS,
+    TOOL_COUNT
+};
+
+const char* editor_tool_to_string(EditorTool tool) {
+    switch (tool) {
+        case TOOL_BRUSH:
+            return "Brush";
+        case TOOL_DECORATIONS:
+            return "Decorations";
+        case TOOL_MINES:
+            return "Mines";
+        case TOOL_SPAWNS:
+            return "Spawns";
+        case TOOL_COUNT:
+            return "";
+    }
+}
+
+const char* editor_tool_shortcut(EditorTool tool) {
+    switch (tool) {
+        case TOOL_BRUSH:
+            return "B";
+        case TOOL_DECORATIONS:
+            return "D";
+        case TOOL_MINES:
+            return "M";
+        case TOOL_SPAWNS:
+            return "S";
+        case TOOL_COUNT:
+            return "";
+    }
+}
+
+enum ActionType {
+    ACTION_DECORATE
+};
+
+struct action_decorate_t {
+    int index;
+    int decoration;
+    int previous_decoration;
+};
+
+struct action_t {
+    ActionType type;
+    union {
+        action_decorate_t decorate;
+    };
+};
+
 struct editor_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -60,10 +115,16 @@ struct editor_t {
     sprite_t sprite_mine;
 
     EditorMode mode;
+    EditorTool tool;
     bool show_demo_window;
     map_data_t map;
     xy camera_offset;
     xy mouse_pos;
+    bool view_gridlines;
+    int decoration_index;
+
+    std::vector<action_t> action_history;
+    uint32_t action_history_head;
 };
 static editor_t editor;
 
@@ -84,6 +145,9 @@ xy editor_camera_centered_on_cell(xy cell) {
 sprite_t load_sprite(Sprite sprite);
 void imgui_style_init();
 void map_new(uint32_t width, uint32_t height);
+void editor_set_defaults();
+void editor_do_action(action_t action);
+void editor_undo();
 
 int editor_run() {
     log_info("Opening in edit mode.");
@@ -155,15 +219,32 @@ int editor_run() {
                     editor.camera_offset = editor_camera_centered_on_cell(map_pos / EDITOR_TILE_SIZE); 
                 }
             } else if (event.type == SDL_MOUSEBUTTONDOWN) {
-                if (event.button.button == SDL_BUTTON_RIGHT && editor.mode == EDITOR_MODE_DEFAULT && sdl_rect_has_point(CANVAS_RECT, editor.mouse_pos)) {
+                if (event.button.button == SDL_BUTTON_MIDDLE && editor.mode == EDITOR_MODE_DEFAULT && sdl_rect_has_point(CANVAS_RECT, editor.mouse_pos)) {
                     editor.mode = EDITOR_MODE_PAN;
                 } else if (event.button.button == SDL_BUTTON_LEFT && editor.mode == EDITOR_MODE_DEFAULT && sdl_rect_has_point(MINIMAP_RECT, editor.mouse_pos)) {
                     editor.mode = EDITOR_MODE_MINIMAP_DRAG;
-                }
+                } 
             } else if (event.type == SDL_MOUSEBUTTONUP) {
-                if ((event.button.button == SDL_BUTTON_RIGHT && editor.mode == EDITOR_MODE_PAN) ||
+                if ((event.button.button == SDL_BUTTON_MIDDLE && editor.mode == EDITOR_MODE_PAN) ||
                     (event.button.button == SDL_BUTTON_LEFT && editor.mode == EDITOR_MODE_MINIMAP_DRAG)) {
                     editor.mode = EDITOR_MODE_DEFAULT;
+                }
+            } else if (event.type == SDL_KEYDOWN && editor.mode == EDITOR_MODE_DEFAULT) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_b:
+                        editor.tool = TOOL_BRUSH;
+                        break;
+                    case SDLK_d:
+                        editor.tool = TOOL_DECORATIONS;
+                        break;
+                    case SDLK_m:
+                        editor.tool = TOOL_MINES;
+                        break;
+                    case SDLK_s:
+                        editor.tool = TOOL_SPAWNS;
+                        break;
+                    default:
+                        break;
                 }
             }
         }
@@ -174,6 +255,25 @@ int editor_run() {
         }
 
         // UPDATE / RENDER
+
+        bool mouse_left_pressed = SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_LMASK;
+        bool mouse_right_pressed = SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK;
+        if (mouse_left_pressed || mouse_right_pressed) {
+            // Place decoration
+            if (editor.tool == TOOL_DECORATIONS && sdl_rect_has_point(CANVAS_RECT, editor.mouse_pos)) {
+                xy hovered_tile = ((editor.mouse_pos - xy(CANVAS_RECT.x, CANVAS_RECT.y)) + editor.camera_offset) / EDITOR_TILE_SIZE;
+                int hovered_tile_index = hovered_tile.x + (hovered_tile.y * editor.map.width);
+                log_trace("place");
+                editor_do_action((action_t) {
+                    .type = ACTION_DECORATE,
+                    .decorate = (action_decorate_t) {
+                        .index = hovered_tile_index,
+                        .decoration = mouse_left_pressed ? editor.decoration_index + 1 : 0,
+                        .previous_decoration = editor.map.tiles[hovered_tile_index].decoration
+                    }
+                });
+            }
+        }
 
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
@@ -186,27 +286,63 @@ int editor_run() {
             ImGui::MenuItem("Save");
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Edit")) {
+            if (ImGui::MenuItem("Undo")) {
+                editor_undo();
+            }
+            ImGui::MenuItem("Redo");
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Tool")) {
+            for (int i = TOOL_BRUSH; i < TOOL_COUNT; i++) {
+                if (ImGui::MenuItem(editor_tool_to_string((EditorTool)i), editor_tool_shortcut((EditorTool)i), editor.tool == i)) {
+                    editor.tool = (EditorTool)i;
+                }
+            }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("View")) {
+            ImGui::MenuItem("Grid Lines", NULL, &editor.view_gridlines);
+            ImGui::EndMenu();
+        }
         ImGui::EndMainMenuBar();
 
-        ImGui::SetNextWindowPos(ImVec2(0, EDITOR_WINDOW_HEIGHT - EDITOR_STATUSBAR_HEIGHT), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(EDITOR_WINDOW_WIDTH, EDITOR_STATUSBAR_HEIGHT), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(0, EDITOR_WINDOW_HEIGHT - EDITOR_STATUSBAR_HEIGHT));
+        ImGui::SetNextWindowSize(ImVec2(EDITOR_WINDOW_WIDTH, EDITOR_STATUSBAR_HEIGHT));
         ImGui::Begin("Status Bar", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus);
-        ImGui::Text("Hello friends.");
+        // ImGui::Text("", editor_tool_to_string(editor.tool));
         ImGui::End();
 
-        /*
-        ImGui::SetNextWindowPos(ImVec2(0, menubar_size.y), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(MINIMAP_CANVAS_SIZE + 16.0f, EDITOR_WINDOW_HEIGHT - menubar_size.y - EDITOR_STATUSBAR_HEIGHT), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(0, MENUBAR_SIZE + MINIMAP_FRAME_RECT.h));
+        ImGui::SetNextWindowSize(ImVec2(MINIMAP_FRAME_RECT.w, EDITOR_WINDOW_HEIGHT - EDITOR_STATUSBAR_HEIGHT - MENUBAR_SIZE - MINIMAP_FRAME_RECT.y));
         ImGui::Begin("Sidebar", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus);
-        ImVec2 sidebar_size = ImGui::GetWindowSize();
-        SDL_SetRenderTarget(editor.renderer, editor.minimap_texture);
-        SDL_SetRenderDrawColor(editor.renderer, 255, 0, 0, 255);
-        SDL_RenderClear(editor.renderer);
-        SDL_SetRenderTarget(editor.renderer, NULL);
-        ImGui::SetCursorPos(ImVec2(8.0f, 8.0f));
-        ImGui::Image(editor.minimap_texture, ImVec2(MINIMAP_CANVAS_SIZE, MINIMAP_CANVAS_SIZE));
+        ImGui::Text("%s Tool", editor_tool_to_string(editor.tool));
+
+        // Tool Palette
+        if (editor.tool == TOOL_DECORATIONS) {
+            float sprite_deocration_size = (float)(editor.sprite_decorations.frame_size.x * editor.sprite_decorations.hframes);
+            char decoration_id[32];
+            for (int i = 0; i < editor.sprite_decorations.hframes; i++) {
+                ImVec2 uv0 = ImVec2((float)(i * editor.sprite_decorations.frame_size.x) / sprite_deocration_size, 0.0f);
+                ImVec2 uv1 = ImVec2((float)((i + 1) * editor.sprite_decorations.frame_size.x) / sprite_deocration_size, 1.0f);
+                bool is_decoration_selected = i == editor.decoration_index;
+                if (is_decoration_selected) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.59f, 0.98f, 1.0f));
+                }
+                sprintf(decoration_id, "decoration_%i", i);
+                if (ImGui::ImageButton(decoration_id, editor.sprite_decorations.texture, ImVec2(32, 32), uv0, uv1)) {
+                    editor.decoration_index = i;
+                }
+                if (is_decoration_selected) {
+                    ImGui::PopStyleColor();
+                }
+                if (i % 4 != 3) {
+                    ImGui::SameLine();
+                } 
+            }
+            ImGui::NewLine();
+        }
         ImGui::End();
-        */
 
         if (editor.show_demo_window) {
             ImGui::ShowDemoWindow();
@@ -236,6 +372,11 @@ int editor_run() {
             max_visible_tiles.y++;
         }
 
+        int hovered_tile_index = -1;
+        if (editor.tool == TOOL_DECORATIONS && sdl_rect_has_point(CANVAS_RECT, editor.mouse_pos)) {
+            xy hovered_tile = ((editor.mouse_pos - xy(CANVAS_RECT.x, CANVAS_RECT.y)) + editor.camera_offset) / EDITOR_TILE_SIZE;
+            hovered_tile_index = hovered_tile.x + (hovered_tile.y * editor.map.width);
+        }
         for (int y = 0; y < max_visible_tiles.y; y++) {
             for (int x = 0; x < max_visible_tiles.x; x++) {
                 int map_index = (base_coords.x + x) + ((base_coords.y + y) * editor.map.width);
@@ -246,6 +387,34 @@ int editor_run() {
                 tile_dst_rect.y = CANVAS_RECT.y + base_pos.y + (y * EDITOR_TILE_SIZE);
 
                 SDL_RenderCopy(editor.renderer, editor.sprite_tileset.texture, &tile_src_rect, &tile_dst_rect);
+
+                // Render decorations
+                int decoration_frame = editor.tool == TOOL_DECORATIONS && map_index == hovered_tile_index
+                                        ? editor.decoration_index 
+                                        : editor.map.tiles[map_index].decoration - 1;
+                if (decoration_frame != -1) {
+                    SDL_Rect decoration_src_rect = (SDL_Rect) { .x = decoration_frame * TILE_SIZE, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
+                    SDL_RenderCopy(editor.renderer, editor.sprite_decorations.texture, &decoration_src_rect, &tile_dst_rect);
+                }
+            }
+        }
+
+        // Render gridlines
+        if (editor.view_gridlines) {
+            SDL_SetRenderDrawColor(editor.renderer, 128, 128, 128, 255);
+            for (int y = 0; y < max_visible_tiles.y; y++) {
+                int gridline_y = CANVAS_RECT.y + base_pos.y + (y * EDITOR_TILE_SIZE);
+                if (gridline_y <= CANVAS_RECT.y || gridline_y >= CANVAS_RECT.y + CANVAS_RECT.h) {
+                    continue;
+                }
+                SDL_RenderDrawLine(editor.renderer, CANVAS_RECT.x, gridline_y, CANVAS_RECT.x + CANVAS_RECT.w, gridline_y);
+            }
+            for (int x = 0; x < max_visible_tiles.x; x++) {
+                int gridline_x = CANVAS_RECT.x + base_pos.x + (x * EDITOR_TILE_SIZE);
+                if (gridline_x <= CANVAS_RECT.x || gridline_x >= CANVAS_RECT.x + CANVAS_RECT.w) {
+                    continue;
+                }
+                SDL_RenderDrawLine(editor.renderer, gridline_x, CANVAS_RECT.y, gridline_x, CANVAS_RECT.y + CANVAS_RECT.h);
             }
         }
 
@@ -386,6 +555,19 @@ void imgui_style_init() {
     style.Colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
 }
 
+void editor_set_defaults() {
+    editor.tool = TOOL_BRUSH;
+    editor.view_gridlines = true;
+    editor.camera_offset = xy(0, 0);
+    if (editor.minimap_texture != NULL) {
+        SDL_DestroyTexture(editor.minimap_texture);
+    }
+    editor.minimap_texture = SDL_CreateTexture(editor.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, editor.map.width, editor.map.height);
+    editor.decoration_index = 0;
+    editor.action_history.clear();
+    editor.action_history_head = 0;
+}
+
 void map_new(uint32_t width, uint32_t height) {
     map_data_t map;
     map.width = width;
@@ -396,11 +578,45 @@ void map_new(uint32_t width, uint32_t height) {
     });
 
     editor.map = map;
-    editor.camera_offset = xy(0, 0);
-    if (editor.minimap_texture != NULL) {
-        SDL_DestroyTexture(editor.minimap_texture);
+    editor_set_defaults();
+}
+
+void editor_do_action(action_t action) {
+    switch (action.type) {
+        case ACTION_DECORATE: {
+            if (action.decorate.decoration == action.decorate.previous_decoration) {
+                return;
+            }
+            editor.map.tiles[action.decorate.index].decoration = action.decorate.decoration;
+            break;
+        }
     }
-    editor.minimap_texture = SDL_CreateTexture(editor.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, editor.map.width, editor.map.height);
+
+    while (editor.action_history.size() > editor.action_history_head) {
+        editor.action_history.pop_back();
+    }
+    editor.action_history.push_back(action);
+    editor.action_history_head++;
+}
+
+void editor_undo() {
+    if (editor.action_history_head == 0) {
+        return;
+    }
+
+    editor.action_history_head--;
+    action_t action = editor.action_history[editor.action_history_head];
+
+    switch (action.type) {
+        case ACTION_DECORATE: {
+            editor.map.tiles[action.decorate.index].decoration = action.decorate.previous_decoration;
+            break;
+        }
+    }
+}
+
+void editor_redo() {
+
 }
 
 #else
