@@ -110,8 +110,6 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
     }},
 };
 
-// SPRITE
-
 struct sprite_t {
     union {
         SDL_Texture* texture;
@@ -121,6 +119,7 @@ struct sprite_t {
     int hframes;
     int vframes;
 };
+
 
 // CURSOR
 

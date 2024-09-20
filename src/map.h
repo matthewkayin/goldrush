@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util.h"
 #include <vector>
 
 struct tile_t {
@@ -42,7 +43,9 @@ struct mine_t {
 };
 
 struct map_data_t {
-    map_t map;
+    uint32_t width;
+    uint32_t height;
+    std::vector<tile_t> tiles;
     std::vector<xy> player_spawns;
     std::vector<mine_t> mines;
 };
