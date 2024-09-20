@@ -27,12 +27,6 @@
 #include <windows.h>
 #endif
 
-#ifdef GOLD_DEBUG
-    #define RESOURCE_BASE_PATH "../res/"
-#else
-    #define RESOURCE_BASE_PATH "./res/"
-#endif
-
 const double UPDATE_TIME = 1.0 / 60;
 const uint8_t INPUT_MOUSE_BUTTON_COUNT = 3;
 enum TextAnchor {
