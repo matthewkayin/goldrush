@@ -450,7 +450,7 @@ int gold_main(int argc, char** argv) {
                     if (menu_state.mode == MENU_MODE_MATCH_START) {
                         match_state = match_init();
                         mode = MODE_MATCH;
-                        engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, match_state.map_width, match_state.map_height);
+                        engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, match_state.map.width, match_state.map.height);
                     } else if (menu_state.mode == MENU_MODE_EXIT) {
                         engine.is_running = false;
                         break;
@@ -1266,9 +1266,9 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderDrawColor(engine.renderer, 255, 0, 0, 255);
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
-            int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map_width);
-            tile_src_rect.x = ((int)state.map_tiles[map_index].base % engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
-            tile_src_rect.y = ((int)state.map_tiles[map_index].base / engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
+            int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map.width);
+            tile_src_rect.x = ((int)state.map.tiles[map_index].base % engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
+            tile_src_rect.y = ((int)state.map.tiles[map_index].base / engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
 
             tile_dst_rect.x = base_pos.x + (x * TILE_SIZE);
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
@@ -1276,11 +1276,11 @@ void render_match(const match_state_t& state) {
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
 
             // Render decorations
-            if (state.map_tiles[map_index].decoration != 0) {
+            if (state.map.tiles[map_index].decoration != 0) {
                 ysorted.push_back((render_sprite_params_t) {
                     .sprite = SPRITE_TILE_DECORATION,
                     .position = xy(tile_dst_rect.x, tile_dst_rect.y),
-                    .frame = xy(state.map_tiles[map_index].decoration - 1, 0),
+                    .frame = xy(state.map.tiles[map_index].decoration - 1, 0),
                     .options = RENDER_SPRITE_NO_CULL,
                     .recolor_name = RECOLOR_NONE
                 });
@@ -1377,7 +1377,7 @@ void render_match(const match_state_t& state) {
     }
 
     // UI move animation
-    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, state.ui_move_position / TILE_SIZE) != FOG_HIDDEN) {
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state.map, state.ui_move_position / TILE_SIZE) != FOG_HIDDEN) {
         if (state.ui_move_cell.type == CELL_EMPTY) {
             render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
         } else if (state.ui_move_animation.frame.x % 2 == 0) {
@@ -1385,7 +1385,7 @@ void render_match(const match_state_t& state) {
             switch (state.ui_move_cell.type) {
                 case CELL_UNIT: {
                     uint32_t unit_index = state.units.get_index_of(id);
-                    if (unit_index != INDEX_INVALID && map_is_cell_rect_revealed(state, rect_t(state.units[unit_index].cell, xy(1, 1)))) {
+                    if (unit_index != INDEX_INVALID && map_is_cell_rect_revealed(state.map, rect_t(state.units[unit_index].cell, xy(1, 1)))) {
                         Sprite sprite = unit_get_select_ring(state.units[unit_index].type, state.units[unit_index].player_id != network_get_player_id());
                         render_sprite(sprite, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
@@ -1426,7 +1426,7 @@ void render_match(const match_state_t& state) {
 
     // Mines
     for (auto it : state.remembered_mines) {
-        const remembered_mine_t& mine = it.second;
+        const mine_t& mine = it.second;
         rect_t mine_render_rect = mine_get_rect(mine.cell);
         mine_render_rect.position -= state.camera_offset;
         if (mine_render_rect.position.x + mine_render_rect.size.x < 0 || mine_render_rect.position.x > SCREEN_WIDTH || mine_render_rect.position.y + mine_render_rect.size.y < 0 || mine_render_rect.position.y > SCREEN_HEIGHT) {
@@ -1487,7 +1487,7 @@ void render_match(const match_state_t& state) {
         if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
             continue;
         }
-        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state.map, rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
         if (unit.mode == UNIT_MODE_IN_MINE) {
@@ -1541,7 +1541,7 @@ void render_match(const match_state_t& state) {
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             xy fog_cell = base_coords + xy(x, y);
-            FogType fog = state.map_fog[fog_cell.x + (fog_cell.y * state.map_width)];
+            FogType fog = state.map.fog[fog_cell.x + (fog_cell.y * state.map.width)];
             if (fog == FOG_REVEALED) {
                 continue;
             }
@@ -1557,7 +1557,7 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
     // UI move animation (for blind moves)
-    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, state.ui_move_position / TILE_SIZE) == FOG_HIDDEN) {
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state.map, state.ui_move_position / TILE_SIZE) == FOG_HIDDEN) {
         render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
@@ -1584,13 +1584,13 @@ void render_match(const match_state_t& state) {
         render_sprite((Sprite)(sprite), xy(3, 0), (ui_get_building_cell(state) * TILE_SIZE) - state.camera_offset, 0, (RecolorName)network_get_player_id());
 
         const building_data_t& data = BUILDING_DATA.at(state.ui_building_type);
-        bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_size > state.map_width || 
-                                          ui_get_building_cell(state).y + data.cell_size > state.map_height;
+        bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_size > state.map.width || 
+                                          ui_get_building_cell(state).y + data.cell_size > state.map.height;
         SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
         for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_size; y++) {
             for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_size; x++) {
                 bool is_cell_green = true;
-                if (is_placement_out_of_bounds || map_get_fog(state, xy(x, y)) == FOG_HIDDEN) {
+                if (is_placement_out_of_bounds || map_get_fog(state.map, xy(x, y)) == FOG_HIDDEN) {
                     is_cell_green = false;
                 } else {
                     for (const mine_t& mine : state.mines) {
@@ -1601,7 +1601,7 @@ void render_match(const match_state_t& state) {
                     }
                     xy miner_cell = state.units.get_by_id(state.selection.ids[0]).cell;
                     if (is_cell_green) {
-                        is_cell_green = xy(x, y) == miner_cell || !map_is_cell_blocked(state, xy(x, y));
+                        is_cell_green = xy(x, y) == miner_cell || !map_is_cell_blocked(state.map, xy(x, y));
                     }
                 }
 
@@ -2034,7 +2034,7 @@ void render_match(const match_state_t& state) {
     }
 
     for (const unit_t& unit : state.units) {
-        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state.map, rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
         if (unit.mode == UNIT_MODE_FERRY || unit.mode == UNIT_MODE_IN_MINE || unit.health == 0) {
@@ -2059,9 +2059,9 @@ void render_match(const match_state_t& state) {
 
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 1, .h = 1 };
-    for (int x = 0; x < state.map_width; x++) {
-        for (int y = 0; y < state.map_height; y++) {
-            FogType fog = state.map_fog[x + (y * state.map_width)];
+    for (int x = 0; x < state.map.width; x++) {
+        for (int y = 0; y < state.map.height; y++) {
+            FogType fog = state.map.fog[x + (y * state.map.width)];
             if (fog == FOG_REVEALED) {
                 continue;
             }
@@ -2149,7 +2149,7 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderTarget(engine.renderer, NULL);
 
     // Render the minimap texture
-    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = (int)state.map_width, .h = (int)state.map_height };
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = (int)state.map.width, .h = (int)state.map.height };
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
 

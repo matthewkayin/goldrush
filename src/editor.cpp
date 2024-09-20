@@ -27,7 +27,7 @@ static editor_t editor;
 void imgui_style_init();
 
 int editor_run() {
-    log_info("Initializing GoldRush Map Editor...");
+    log_info("Opening in edit mode.");
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
@@ -61,7 +61,7 @@ int editor_run() {
 
     imgui_style_init();
 
-    log_info("Initialized editor.");
+    log_info("Initialized GoldRush Map Editor.");
 
     editor.is_running = true;
     editor.show_demo_window = false;

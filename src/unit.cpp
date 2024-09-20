@@ -93,7 +93,7 @@ entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, co
     unit.taking_damage_flicker = false;
 
     entity_id unit_id = state.units.push_back(unit);
-    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
+    map_set_cell_rect(state.map, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
     return unit_id;
 }
 
@@ -174,17 +174,17 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     if (unit.position == unit_get_target_position(unit.type, unit.cell) && !unit.path.empty()) {
                         unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
                         // Clear the unit's rect so that the unit does not block itself from moving
-                        map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
-                        if (map_is_cell_rect_blocked(state, rect_t(unit.path[0], unit_cell_size(unit.type)))) {
+                        map_set_cell_rect(state.map, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
+                        if (map_is_cell_rect_blocked(state.map, rect_t(unit.path[0], unit_cell_size(unit.type)))) {
                             is_path_blocked = true;
                             // Since we are not moving, repopulate the cell grid with the unit's rect
-                            map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
+                            map_set_cell_rect(state.map, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
                             // breaks out of while movement_left > 0
                             break;
                         }
 
                         unit.cell = unit.path[0];
-                        map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
+                        map_set_cell_rect(state.map, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
                         unit.path.erase(unit.path.begin());
                     }
 
@@ -252,12 +252,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
                     case UNIT_TARGET_BUILD: {
                         // Temporarily set cell to empty so that we can check if the space is clear for building
-                        map_set_cell(state, unit.cell, CELL_EMPTY);
+                        map_set_cell(state.map, unit.cell, CELL_EMPTY);
                         bool can_build = unit.cell == unit.target.build.unit_cell && 
-                                                        !map_is_cell_rect_blocked(state, rect_t(unit.target.build.building_cell, building_cell_size(unit.target.build.building_type)));
+                                                        !map_is_cell_rect_blocked(state.map, rect_t(unit.target.build.building_cell, building_cell_size(unit.target.build.building_type)));
                         if (!can_build) {
                             // Set the cell back to filled
-                            map_set_cell(state, unit.cell, CELL_EMPTY);
+                            map_set_cell(state.map, unit.cell, CELL_EMPTY);
                             ui_show_status(state, UI_STATUS_CANT_BUILD);
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
@@ -318,7 +318,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
                         
                         unit.gold_held = std::min(UNIT_MAX_GOLD_HELD, state.mines[mine_index].gold_left);
-                        map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
+                        map_set_cell_rect(state.map, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
                         unit.mode = UNIT_MODE_IN_MINE;
                         unit.timer = UNIT_IN_DURATION;
                         unit.garrison_id = unit.target.id;
@@ -390,7 +390,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                     exit_cell.x = unit.cell.x == building.cell.x ? building.cell.x + 1 : building.cell.x;
                                 }
                             }
-                            if (!map_is_cell_blocked(state, exit_cell)) {
+                            if (!map_is_cell_blocked(state.map, exit_cell)) {
                                 unit.path.clear();
                                 unit.path.push_back(exit_cell);
                                 unit.mode = UNIT_MODE_MOVE;
@@ -436,7 +436,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                     state.units[target_index].ferried_units.push_back(state.units.get_id_of(unit_index));
                                     unit.mode = UNIT_MODE_FERRY;
                                     unit_update_finished = true;
-                                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
+                                    map_set_cell_rect(state.map, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
                                     // Force re-select so that unit is deselected if needed and so that ferry unload button pops up if needed
                                     ui_set_selection(state, state.selection);
                                     break;
@@ -632,7 +632,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     
                     unit.cell = get_first_empty_cell_around_rect(state, unit_cell_size(unit.type), mine_rect, exit_cell);
                     unit.position = cell_center(unit.cell);
-                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
+                    map_set_cell_rect(state.map, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
                     unit.mode = UNIT_MODE_IDLE;
                     unit.garrison_id = ID_NULL;
                 }
@@ -782,7 +782,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 break;
             case UNIT_MODE_DEATH: {
                 if (!animation_is_playing(unit.animation)) {
-                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
+                    map_set_cell_rect(state.map, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
                     unit.mode = UNIT_MODE_DEATH_FADE;
                 }
                 unit_update_finished = true;
@@ -1033,7 +1033,7 @@ void unit_stop_building(match_state_t& state, entity_id unit_id, const building_
         .type = UNIT_TARGET_NONE
     };
     unit.mode = UNIT_MODE_IDLE;
-    map_set_cell(state, unit.cell, CELL_UNIT, unit_id);
+    map_set_cell(state.map, unit.cell, CELL_UNIT, unit_id);
 }
 
 unit_target_t unit_target_nearest_camp(const match_state_t& state, xy unit_cell, uint8_t unit_player_id) {
@@ -1184,7 +1184,7 @@ xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy 
                                 ? dropoff_origin.x - cell_size.x
                                 : dropoff_origin.x + unit_size.x;
             for (int dropoff_y = dropoff_origin.y; dropoff_y < dropoff_origin.y + unit_size.y; dropoff_y++) {
-                if (map_is_cell_rect_in_bounds(state, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state, rect_t(xy(dropoff_x, dropoff_y), cell_size))) {
+                if (map_is_cell_rect_in_bounds(state.map, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state.map, rect_t(xy(dropoff_x, dropoff_y), cell_size))) {
                     return xy(dropoff_x, dropoff_y);
                 }
             }
@@ -1194,7 +1194,7 @@ xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy 
                                 ? dropoff_origin.y - cell_size.y
                                 : dropoff_origin.y + unit_size.y;
             for (int dropoff_x = dropoff_origin.x; dropoff_x < dropoff_origin.x + unit_size.x; dropoff_x++) {
-                if (map_is_cell_rect_in_bounds(state, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state, rect_t(xy(dropoff_x, dropoff_y), cell_size))) {
+                if (map_is_cell_rect_in_bounds(state.map, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state.map, rect_t(xy(dropoff_x, dropoff_y), cell_size))) {
                     return xy(dropoff_x, dropoff_y);
                 }
             }

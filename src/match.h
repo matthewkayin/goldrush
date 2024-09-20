@@ -4,6 +4,7 @@
 #include "util.h"
 #include "sprite.h"
 #include "container.h"
+#include "map.h"
 #include <cstdint>
 #include <vector>
 #include <queue>
@@ -21,7 +22,6 @@
 #define UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
 #define UI_STATUS_UNDER_ATTACK "You're under attack!"
 
-const int UI_HEIGHT = 88;
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 
 extern const uint32_t UNIT_PATH_PAUSE_DURATION;
@@ -42,30 +42,6 @@ extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
 extern const uint32_t MATCH_ALERT_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
-
-struct tile_t {
-    uint16_t base;
-    uint16_t decoration;
-};
-
-enum CellType: uint16_t {
-    CELL_EMPTY,
-    CELL_BLOCKED,
-    CELL_UNIT,
-    CELL_BUILDING,
-    CELL_MINE
-};
-
-struct cell_t {
-    CellType type;
-    uint16_t value;
-};
-
-enum FogType: uint16_t {
-    FOG_HIDDEN,
-    FOG_EXPLORED,
-    FOG_REVEALED
-};
 
 // UI
 
@@ -285,18 +261,6 @@ struct building_data_t {
     bool can_rally;
 };
 
-struct mine_t {
-    xy cell;
-    uint32_t gold_left;
-    bool is_occupied;
-};
-
-struct remembered_mine_t {
-    xy cell;
-    uint32_t gold_left;
-    bool is_occupied;
-};
-
 // More UI
 
 enum UiButtonRequirementsType {
@@ -428,19 +392,14 @@ struct match_state_t {
     uint32_t tick_timer;
 
     // Map
-    std::vector<tile_t> map_tiles;
-    std::vector<cell_t> map_cells;
-    std::vector<FogType> map_fog;
-    uint32_t map_width;
-    uint32_t map_height;
-    bool is_fog_dirty;
+    map_t map;
 
     // Entities
     id_array<unit_t> units;
     id_array<building_t> buildings;
     id_array<mine_t> mines;
     std::unordered_map<entity_id, remembered_building_t> remembered_buildings;
-    std::unordered_map<entity_id, remembered_mine_t> remembered_mines;
+    std::unordered_map<entity_id, mine_t> remembered_mines;
 
     // Players
     uint32_t player_gold[MAX_PLAYERS];
@@ -478,22 +437,11 @@ xy ui_get_building_cell(const match_state_t& state);
 selection_t ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, selection_t& selection);
 selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const selection_t& selection);
-xy ui_camera_clamp(xy camera_offset, int map_width, int map_height);
-xy ui_camera_centered_on_cell(xy cell);
 xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert);
 
 // Map
-bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
-bool map_is_cell_rect_in_bounds(const match_state_t& state, rect_t cell_rect);
-bool map_is_cell_blocked(const match_state_t& state, xy cell);
-bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
-cell_t map_get_cell(const match_state_t& state, xy cell);
-void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value = 0);
-void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
 bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners);
-FogType map_get_fog(const match_state_t& state, xy cell);
-bool map_is_cell_rect_revealed(const match_state_t& state, rect_t rect);
 void map_update_fog(match_state_t& state);
 
 // Unit

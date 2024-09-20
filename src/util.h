@@ -1,6 +1,7 @@
 #pragma once
 
 #include "asserts.h"
+#include "defines.h"
 #include <cstdint>
 #include <cstddef>
 #include <cmath>
@@ -381,4 +382,13 @@ inline rect_t create_bounding_rect_for_points(xy* points, uint32_t point_count) 
     point_max.y++;
     
     return rect_t(point_min, point_max - point_min);
+}
+
+inline xy camera_clamp(xy camera_offset, int map_width, int map_height) {
+    return xy(std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH),
+                 std::clamp(camera_offset.y, 0, (map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT));
+}
+
+inline xy camera_centered_on_cell(xy cell, int map_width, int map_height) {
+    return camera_clamp(xy((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2)), map_width, map_height);
 }

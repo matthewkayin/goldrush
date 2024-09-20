@@ -8,6 +8,7 @@
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 8
 #define TILE_SIZE 16
+#define UI_HEIGHT 88
 // #define GOLD_RAND_SEED 1725446982
 #ifdef GOLD_DEBUG
     #define GOLD_DEBUG_FAST_BUILD

@@ -292,7 +292,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
             continue;
         }
         // Don't select hidden units
-        if (!map_is_cell_rect_revealed(state, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+        if (!map_is_cell_rect_revealed(state.map, rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
 
@@ -311,7 +311,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
             continue;
         }
         // Don't select hidden buildings
-        if (!map_is_cell_rect_revealed(state, rect_t(building.cell, building_cell_size(building.type)))) {
+        if (!map_is_cell_rect_revealed(state.map, rect_t(building.cell, building_cell_size(building.type)))) {
             continue;
         }
 
@@ -326,7 +326,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
     for (uint32_t index = 0; index < state.mines.size(); index++) {
         const mine_t& mine = state.mines[index];
         // Don't select hidden gold
-        if (!map_is_cell_rect_revealed(state, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
+        if (!map_is_cell_rect_revealed(state.map, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
             continue;
         }
 
@@ -484,15 +484,6 @@ selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const sele
     return mode;
 }
 
-
-xy ui_camera_clamp(xy camera_offset, int map_width, int map_height) {
-    return xy(std::clamp(camera_offset.x, 0, (map_width * TILE_SIZE) - SCREEN_WIDTH),
-                 std::clamp(camera_offset.y, 0, (map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT));
-}
-
-xy ui_camera_centered_on_cell(xy cell) {
-    return xy((cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2), (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2));
-}
 
 xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert) {
     switch (alert.type) {

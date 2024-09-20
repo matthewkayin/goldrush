@@ -56,7 +56,7 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     building.taking_damage_flicker = false;
 
     entity_id building_id = state.buildings.push_back(building);
-    map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_size, building_data.cell_size)), CELL_BUILDING, building_id);
+    map_set_cell_rect(state.map, rect_t(cell, xy(building_data.cell_size, building_data.cell_size)), CELL_BUILDING, building_id);
     return building_id;
 }
 
@@ -67,7 +67,7 @@ void building_destroy(match_state_t& state, uint32_t building_index) {
 void building_update(match_state_t& state, building_t& building) {
     if (building.health == 0 && building.mode != BUILDING_MODE_DESTROYED) {
         const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
-        map_set_cell_rect(state, rect_t(building.cell, xy(building_data.cell_size, building_data.cell_size)), CELL_EMPTY);
+        map_set_cell_rect(state.map, rect_t(building.cell, xy(building_data.cell_size, building_data.cell_size)), CELL_EMPTY);
         building.mode = BUILDING_MODE_DESTROYED;
         building.queue.clear();
         building.queue_timer = BUILDING_FADE_DURATION;
@@ -140,10 +140,10 @@ void building_update(match_state_t& state, building_t& building) {
                     if (building.rally_point.x != -1) {
                         xy rally_cell = building.rally_point / TILE_SIZE;
                         unit_t& unit = state.units.get_by_id(unit_id);
-                        if (map_get_cell(state, rally_cell).type == CELL_MINE && unit.type == UNIT_MINER) {
+                        if (map_get_cell(state.map, rally_cell).type == CELL_MINE && unit.type == UNIT_MINER) {
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_MINE,
-                                .id = map_get_cell(state, rally_cell).value
+                                .id = map_get_cell(state.map, rally_cell).value
                             };
                         } else {
                             unit.target = (unit_target_t) {
@@ -232,14 +232,14 @@ bool building_is_finished(const building_t& building) {
 
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell, xy miner_cell) {
     rect_t building_rect = rect_t(cell, building_cell_size(type));
-    if (!map_is_cell_in_bounds(state, building_rect.position + building_rect.size - xy(1, 1))) {
+    if (!map_is_cell_in_bounds(state.map, building_rect.position + building_rect.size - xy(1, 1))) {
         return false;
     }
 
     // Check that all cells in the rect are explored
     for (int x = building_rect.position.x; x < building_rect.position.x + building_rect.size.x; x++) {
         for (int y = building_rect.position.y; y < building_rect.position.y + building_rect.size.y; y++) {
-            if (map_get_fog(state, xy(x, y)) == FOG_HIDDEN) {
+            if (map_get_fog(state.map, xy(x, y)) == FOG_HIDDEN) {
                 return false;
             }
         }
@@ -256,7 +256,7 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
             if (xy(x, y) == miner_cell) {
                 continue;
             }
-            if (map_is_cell_blocked(state, xy(x, y))) {
+            if (map_is_cell_blocked(state.map, xy(x, y))) {
                 return false;
             }
         }

@@ -69,6 +69,7 @@ match_state_t match_init() {
 
     // Init map
     log_info("Generating map...");
+    /*
     state.map_width = 96;
     state.map_height = 96;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
@@ -88,6 +89,7 @@ match_state_t match_init() {
             state.map_tiles[i].base = new_base == 1 ? 2 : 1; 
         }
     }
+    */
 
     // Init players
     log_trace("Initializing players...");
@@ -112,9 +114,9 @@ match_state_t match_init() {
         is_spawn_direction_used[spawn_direction] = true;
 
         // Determine player spawn point
-        player_spawns[player_id] = xy(state.map_width / 2, state.map_height / 2) + 
-                                   xy(DIRECTION_XY[spawn_direction].x * ((state.map_width * 6) / 16), 
-                                      DIRECTION_XY[spawn_direction].y * ((state.map_height * 6) / 16));
+        player_spawns[player_id] = xy(state.map.width / 2, state.map.height / 2) + 
+                                   xy(DIRECTION_XY[spawn_direction].x * ((state.map.width * 6) / 16), 
+                                      DIRECTION_XY[spawn_direction].y * ((state.map.height * 6) / 16));
         player_spawns[0] = xy(16, 16);
 
         // Place player starting units
@@ -123,7 +125,7 @@ match_state_t match_init() {
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-2, 0));
         unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(2, 2));
     }
-    state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(player_spawns[network_get_player_id()]), state.map_width, state.map_height);
+    state.camera_offset = camera_centered_on_cell(player_spawns[network_get_player_id()], state.map.width, state.map.height);
 
     // Place gold on the map
     log_trace("Placing gold...");
@@ -134,7 +136,6 @@ match_state_t match_init() {
             gold_patch_cells.push_back(xy(12 + (24 * x), 12 + (24 * y)));
         }
     }
-    */
     uint32_t target_mine_count = 7;
     uint32_t attempts = 0;
     while (state.mines.size() < target_mine_count) {
@@ -179,8 +180,10 @@ match_state_t match_init() {
         entity_id mine_id = state.mines.push_back(mine);
         map_set_cell_rect(state, rect_t(mine_cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
     }
+    */
 
     // Place decorations on the map
+    /*
     log_trace("Placing decorations...");
     for (int i = 0; i < state.map_width * state.map_height; i++) {
         if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map_cells[i].type == CELL_EMPTY) {
@@ -207,6 +210,7 @@ match_state_t match_init() {
             state.map_cells[i].type = CELL_BLOCKED;
         }
     }
+    */
     log_info("Map complete!");
 
     map_update_fog(state);
@@ -454,7 +458,7 @@ void match_update(match_state_t& state) {
 
                         rect_t selection_rect = create_bounding_rect_for_points(&selection_cells[0], selection_cells.size());
                         xy selection_center = selection_rect.position + (selection_rect.size / 2);
-                        state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(selection_center), state.map_width, state.map_height);
+                        state.camera_offset = camera_centered_on_cell(selection_center, state.map.width, state.map.height);
                         state.control_group_double_click_timer = 0;
                     // Switch to control group
                     } else if (state.control_groups[key].type != SELECTION_TYPE_NONE) {
@@ -483,7 +487,7 @@ void match_update(match_state_t& state) {
 
         if (input_is_key_just_pressed(KEY_SPACE) && !state.attack_alerts.empty()) {
             attack_alert_t latest_attack_alert = state.attack_alerts[state.attack_alerts.size() - 1];
-            state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(latest_attack_alert.cell), state.map_width, state.map_height);
+            state.camera_offset = camera_centered_on_cell(latest_attack_alert.cell, state.map.width, state.map.height);
         }
     }
 
@@ -496,8 +500,8 @@ void match_update(match_state_t& state) {
         xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
         minimap_pos.x = std::clamp(minimap_pos.x, 0, MINIMAP_RECT.size.x);
         minimap_pos.y = std::clamp(minimap_pos.y, 0, MINIMAP_RECT.size.y);
-        xy map_pos = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
-        state.camera_offset = ui_camera_clamp(ui_camera_centered_on_cell(map_pos / TILE_SIZE), state.map_width, state.map_height);
+        xy map_pos = xy((state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+        state.camera_offset = camera_centered_on_cell(map_pos / TILE_SIZE, state.map.width, state.map.height);
     }
 
     // LEFT MOUSE RELEASE
@@ -540,8 +544,8 @@ void match_update(match_state_t& state) {
         xy move_target;
         if (ui_is_mouse_in_ui()) {
             xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
-            move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
-                                (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+            move_target = xy((state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
+                                (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
         } else {
             move_target = mouse_world_pos;
         }
@@ -550,22 +554,22 @@ void match_update(match_state_t& state) {
         input_t input;
         input.move.target_cell = move_target / TILE_SIZE;
         input.move.target_entity_id = ID_NULL;
-        CellType cell_type = map_get_cell(state, input.move.target_cell).type;
-        FogType fog_type = map_get_fog(state, input.move.target_cell);
+        CellType cell_type = map_get_cell(state.map, input.move.target_cell).type;
+        FogType fog_type = map_get_fog(state.map, input.move.target_cell);
         if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || ((cell_type == CELL_BUILDING || cell_type == CELL_MINE) && fog_type != FOG_HIDDEN)) {
-            input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
+            input.move.target_entity_id = map_get_cell(state.map, input.move.target_cell).value;
         }
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
-        if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state, input.move.target_cell) == FOG_HIDDEN)) {
+        if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state.map, input.move.target_cell) == FOG_HIDDEN)) {
             input.type = INPUT_ATTACK_MOVE;
-        } else if (map_get_fog(state, input.move.target_cell) == FOG_HIDDEN) {
+        } else if (map_get_fog(state.map, input.move.target_cell) == FOG_HIDDEN) {
             input.type = INPUT_BLIND_MOVE;
-        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_UNIT) {
+        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state.map, input.move.target_cell).type == CELL_UNIT) {
             input.type = INPUT_MOVE_UNIT;
-        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_BUILDING) {
+        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state.map, input.move.target_cell).type == CELL_BUILDING) {
             input.type = INPUT_MOVE_BUILDING;
-        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_MINE) {
+        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state.map, input.move.target_cell).type == CELL_MINE) {
             input.type = INPUT_MOVE_MINE;
         } else {
             input.type = INPUT_MOVE;
@@ -579,8 +583,8 @@ void match_update(match_state_t& state) {
         state.input_queue.push_back(input);
 
         // Provide instant user feedback
-        state.ui_move_cell = map_get_cell(state, input.move.target_cell);
-        if (input.type == INPUT_BLIND_MOVE || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
+        state.ui_move_cell = map_get_cell(state.map, input.move.target_cell);
+        if (input.type == INPUT_BLIND_MOVE || map_get_cell(state.map, input.move.target_cell).type == CELL_EMPTY) {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
             state.ui_move_position = mouse_world_pos;
         } else {
@@ -603,8 +607,8 @@ void match_update(match_state_t& state) {
             xy move_target;
             if (ui_is_mouse_in_ui()) {
                 xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
-                move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
-                                    (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+                move_target = xy((state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
+                                    (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
             } else {
                 move_target = mouse_world_pos;
             }
@@ -633,7 +637,7 @@ void match_update(match_state_t& state) {
             camera_drag_direction.y = 1;
         }
         state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
-        state.camera_offset = ui_camera_clamp(state.camera_offset, state.map_width, state.map_height);
+        state.camera_offset = camera_clamp(state.camera_offset, state.map.width, state.map.height);
     }
 
     // Update timers
@@ -722,7 +726,7 @@ void match_update(match_state_t& state) {
     }
 
     // Update Fog of War
-    if (state.is_fog_dirty) {
+    if (state.map.is_fog_dirty) {
         map_update_fog(state);
     }
 
@@ -788,6 +792,276 @@ uint32_t match_get_player_max_population(const match_state_t& state, uint8_t pla
     }
 
     return max_population;
+}
+
+bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners) {
+    entity_id origin_id = state.map.cells[origin.x + (origin.y * state.map.width)].value;
+    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
+        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
+            cell_t cell = state.map.cells[x + (y * state.map.width)];
+            if (cell.type == CELL_EMPTY) {
+                continue;
+            }
+            if (cell.type == CELL_UNIT) {
+                if (cell.value == origin_id) {
+                    continue;
+                }
+                if (xy::manhattan_distance(origin, xy(x, y)) > 3) {
+                    continue;
+                }
+                if (should_ignore_miners) {
+                    const unit_t& unit = state.units.get_by_id(cell.value);
+                    if ((unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP) && xy::manhattan_distance(origin, xy(x, y)) > 1) {
+                        continue;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners) {
+    struct node_t {
+        fixed cost;
+        fixed distance;
+        // The parent is the previous node stepped in the path to reach this node
+        // It should be an index in the explored list, or -1 if it is the start node
+        int parent; 
+        xy cell;
+
+        fixed score() const {
+            return cost + distance;
+        }
+    };
+
+    // Don't bother pathing to unit's cell
+    if (from == to) {
+        log_trace("from == to, end pathfind");
+        path->clear();
+        return;
+    }
+
+    // Find an alternate cell for large units
+    if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(to, cell_size), should_ignore_miners) && cell_size.x + cell_size.y > 2) {
+        xy nearest_alternate;
+        int nearest_alternate_distance = -1;
+        for (int x = 0; x < cell_size.x; x++) {
+            for (int y = 0; y < cell_size.y; y++) {
+                if (x == 0 && y == 0) {
+                    continue;
+                }
+                xy alternate = to - xy(x, y);
+                if (map_is_cell_rect_in_bounds(state.map, rect_t(alternate, cell_size)) && !map_is_cell_rect_blocked_pathfind(state, from, rect_t(alternate, cell_size), should_ignore_miners)) {
+                    if (nearest_alternate_distance == -1 || xy::manhattan_distance(from, alternate) < nearest_alternate_distance) {
+                        nearest_alternate = alternate;
+                        nearest_alternate_distance = xy::manhattan_distance(from, alternate);
+                    }
+                }
+            }
+        }
+
+        if (nearest_alternate_distance != -1) {
+            to = nearest_alternate;
+        }
+    }
+
+    std::vector<node_t> frontier;
+    std::vector<node_t> explored;
+    int explored_indices[state.map.width * state.map.height];
+    memset(explored_indices, -1, state.map.width * state.map.height * sizeof(int));
+    uint32_t closest_explored = 0;
+    bool found_path = false;
+    node_t path_end;
+
+    frontier.push_back((node_t) {
+        .cost = fixed::from_raw(0),
+        .distance = fixed::from_int(xy::manhattan_distance(from, to)),
+        .parent = -1,
+        .cell = from
+    });
+
+    // TODO prevent unit from pathing through diagonal gaps
+    while (!frontier.empty()) {
+        // Find the smallest path
+        uint32_t smallest_index = 0;
+        for (uint32_t i = 1; i < frontier.size(); i++) {
+            if (frontier[i].score() < frontier[smallest_index].score()) {
+                smallest_index = i;
+            }
+        }
+
+        // Pop the smallest path
+        node_t smallest = frontier[smallest_index];
+        frontier.erase(frontier.begin() + smallest_index);
+
+        // If it's the solution, return it
+        if (smallest.cell == to) {
+            found_path = true;
+            path_end = smallest;
+            break;
+        }
+
+        // Otherwise, add this tile to the explored list
+        explored.push_back(smallest);
+        explored_indices[smallest.cell.x + (smallest.cell.y * state.map.width)] = explored.size() - 1;
+        if (explored[explored.size() - 1].distance < explored[closest_explored].distance) {
+            closest_explored = explored.size() - 1;
+        }
+
+        if (explored.size() > 1999) {
+            log_warn("Pathfinding too long, aborting...");
+            path->clear();
+            return;
+        }
+
+        // Consider all children
+        // Adjacent cells are considered first so that we can use information about them to inform whether or not a diagonal movement is allowed
+        bool is_adjacent_direction_blocked[4] = { true, true, true, true };
+        const int CHILD_DIRECTIONS[DIRECTION_COUNT] = { DIRECTION_NORTH, DIRECTION_EAST, DIRECTION_SOUTH, DIRECTION_WEST, 
+                                                        DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST, DIRECTION_NORTHWEST };
+        for (int i = 0; i < DIRECTION_COUNT; i++) {
+            int direction = CHILD_DIRECTIONS[i];
+            fixed cost_increase = fixed::from_int(1);
+            if (direction % 2 == 1) {
+                cost_increase = should_ignore_miners ? fixed::from_int(2) : (fixed::from_int(3) / 2);
+            }
+            node_t child = (node_t) {
+                .cost = smallest.cost + cost_increase,
+                .distance = fixed::from_int(xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], to)),
+                .parent = (int)explored.size() - 1,
+                .cell = smallest.cell + DIRECTION_XY[direction]
+            };
+            // Don't consider out of bounds children
+            if (!map_is_cell_rect_in_bounds(state.map, rect_t(child.cell, cell_size))) {
+                continue;
+            }
+            // Don't consider blocked spaces, unless:
+            // 1. the blocked space is a unit that is very far away. we pretend such spaces are blocked since the unit will probably move by the time we get there
+            // 2. the blocked space is the target_cell. by allowing the path to go here we can avoid worst-case pathfinding even when the target_cell is blocked
+            if (child.cell != to || xy::manhattan_distance(smallest.cell, child.cell) != 1) {
+                if (map_is_cell_rect_blocked_pathfind(state, from, rect_t(child.cell, cell_size), should_ignore_miners)) {
+                    continue;
+                }
+            }
+            // Don't allow diagonal movement through cracks
+            if (direction % 2 == 0) {
+                is_adjacent_direction_blocked[direction / 2] = false;
+            } else {
+                int next_direction = direction + 1 == DIRECTION_COUNT ? 0 : direction + 1;
+                int prev_direction = direction - 1;
+                if (is_adjacent_direction_blocked[next_direction / 2] && is_adjacent_direction_blocked[prev_direction / 2]) {
+                    continue;
+                }
+            }
+            // Don't consider already explored children
+            if (explored_indices[child.cell.x + (child.cell.y * state.map.width)] != -1) {
+                continue;
+            }
+            // Check if it's in the frontier
+            uint32_t frontier_index;
+            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                node_t& frontier_node = frontier[frontier_index];
+                if (frontier_node.cell == child.cell) {
+                    break;
+                }
+            }
+            // If it is in the frontier...
+            if (frontier_index < frontier.size()) {
+                // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
+                if (child.score() < frontier[frontier_index].score()) {
+                    frontier[frontier_index] = child;
+                }
+                continue;
+            }
+            // If it's not in the frontier, then add it to the frontier
+            frontier.push_back(child);
+        } // End for each child
+    } // End while !frontier.empty()
+
+    // Backtrack to build the path
+    node_t current = found_path ? path_end : explored[closest_explored];
+    path->clear();
+    path->reserve(current.cost.integer_part());
+    while (current.parent != -1) {
+        path->insert(path->begin(), current.cell);
+        current = explored[current.parent];
+    }
+    // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,
+    // but if the target_cell really is blocked, we need to remove it from the path. The unit will path as close as they can.
+    if ((*path)[path->size() - 1] == to && map_is_cell_blocked(state.map, to)) {
+        path->pop_back();
+    }
+}
+
+void map_update_fog(match_state_t& state) {
+    // First remember any revealed buildings
+    for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
+        building_t& building = state.buildings[building_index];
+        if (!map_is_cell_rect_revealed(state.map, rect_t(building.cell, building_cell_size(building.type)))) {
+            continue;
+        }
+        state.remembered_buildings[state.buildings.get_id_of(building_index)] = (remembered_building_t) {
+            .player_id = building.player_id,
+            .type = building.type,
+            .health = building.health,
+            .cell = building.cell,
+            .mode = building.mode
+        };
+    }
+
+    // Then remember any revealed mines
+    for (uint32_t mine_index = 0; mine_index < state.mines.size(); mine_index++) {
+        mine_t& mine = state.mines[mine_index];
+        if (!map_is_cell_rect_revealed(state.map, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
+            continue;
+        }
+        state.remembered_mines[state.mines.get_id_of(mine_index)] = (mine_t) {
+            .cell = mine.cell,
+            .gold_left = mine.gold_left,
+            .is_occupied = mine.is_occupied
+        };
+    }
+
+    // Now dim anything that is revealed
+    for (uint32_t i = 0; i < state.map.width * state.map.height; i++) {
+        if (state.map.fog[i] == FOG_REVEALED) {
+            state.map.fog[i] = FOG_EXPLORED;
+        }
+    }
+
+    // Reveal based on unit vision
+    for (const unit_t& unit : state.units) {
+        if (unit.player_id != network_get_player_id() || unit.mode == UNIT_MODE_FERRY) {
+            continue;
+        }
+
+        map_fog_reveal(state.map, unit.cell, unit_cell_size(unit.type), UNIT_DATA.at(unit.type).sight);
+    }
+
+    for (const building_t& building : state.buildings) {
+        if (building.player_id != network_get_player_id()) {
+            continue;
+        }
+
+        map_fog_reveal(state.map, building.cell, building_cell_size(building.type), 4);
+    }
+
+    // Finally remove from the remembered buildings map for any buildings that no longer exist
+    // Note the buildings are only removed from the list if the player can see where the building once was
+    auto it = state.remembered_buildings.begin();
+    while (it != state.remembered_buildings.end()) {
+        if (state.buildings.get_index_of(it->first) == INDEX_INVALID && map_is_cell_rect_revealed(state.map, rect_t(it->second.cell, building_cell_size(it->second.type)))) {
+            log_trace("deleting remembered building");
+            it = state.remembered_buildings.erase(it);
+        } else {
+            it++;
+        }
+    }
+
+    state.map.is_fog_dirty = false;
 }
 
 // INPUT
@@ -965,7 +1239,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 target_index = INDEX_INVALID;
             }
 
-            bool should_move_as_group = target_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell(state, input.move.target_cell).type == CELL_EMPTY;
+            bool should_move_as_group = target_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell(state.map, input.move.target_cell).type == CELL_EMPTY;
             xy group_center;
 
             if (should_move_as_group) {
@@ -1006,7 +1280,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 xy unit_target = input.move.target_cell;
                 if (should_move_as_group) {
                     xy group_move_target = input.move.target_cell + (unit.cell - group_center);
-                    if (map_is_cell_in_bounds(state, group_move_target) && xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3) {
+                    if (map_is_cell_in_bounds(state.map, group_move_target) && xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3) {
                         unit_target = group_move_target;
                     }
                 } else if (target_index != INDEX_INVALID) {
@@ -1172,7 +1446,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 
                     ferried_unit.cell = dropoff_cell;
                     ferried_unit.position = unit_get_target_position(ferried_unit.type, ferried_unit.cell);
-                    map_set_cell_rect(state, rect_t(ferried_unit.cell, unit_cell_size(ferried_unit.type)), CELL_UNIT, ferried_id);
+                    map_set_cell_rect(state.map, rect_t(ferried_unit.cell, unit_cell_size(ferried_unit.type)), CELL_UNIT, ferried_id);
                     ferried_unit.mode = UNIT_MODE_IDLE;
                     ferried_unit.target = (unit_target_t) { .type = UNIT_TARGET_NONE };
                     unit.ferried_units.erase(unit.ferried_units.begin() + ferried_id_index);
@@ -1248,7 +1522,7 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
     xy start_cell = cell_rect.position;
 
     // Step along search until we find an empty cell
-    while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect)) {
+    while (!map_is_cell_rect_in_bounds(state.map, cell_rect) || map_is_cell_rect_blocked(state.map, cell_rect)) {
         cell_rect.position += DIRECTION_XY[step_direction];
         if (cell_rect.position == search_corners[step_direction / 2]) {
             step_direction = (step_direction + 2) % DIRECTION_COUNT;
@@ -1287,8 +1561,8 @@ xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t
     uint32_t index = 0;
     xy cell = cell_begin[index];
     while (index < 4) {
-        if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {
-            if ((allow_blocked_cells || !map_is_cell_rect_blocked(state, rect_t(cell, start.size))) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
+        if (map_is_cell_rect_in_bounds(state.map, rect_t(cell, start.size))) {
+            if ((allow_blocked_cells || !map_is_cell_rect_blocked(state.map, rect_t(cell, start.size))) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = xy::manhattan_distance(start.position, cell);
             }
