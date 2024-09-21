@@ -126,7 +126,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 if (unit.target.type == UNIT_TARGET_NONE) {
                     unit_update_finished = true;
                     break;
-                } else if ((unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING) && unit_is_target_dead_or_ferried(state, unit)) {
+                } else if ((unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING || unit.target.type == UNIT_TARGET_BUILD_ASSIST) && unit_is_target_dead_or_ferried(state, unit)) {
                     unit.target = (unit_target_t) {
                         .type = UNIT_TARGET_NONE
                     };
@@ -297,6 +297,25 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
                         break;
                     } // End case UNIT_TARGET_BUILD
+                    case UNIT_TARGET_BUILD_ASSIST: {
+                        if (unit_is_target_dead_or_ferried(state, unit)) {
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_NONE
+                            };
+                            unit.mode = UNIT_MODE_IDLE;
+                            break;
+                        }
+                        unit_t& builder = state.units.get_by_id(unit.target.id);
+                        if (builder.mode == UNIT_MODE_BUILD) {
+                            GOLD_ASSERT(builder.target.build.building_id != ID_NULL);
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_BUILDING,
+                                .id = builder.target.build.building_id
+                            };
+                            unit.mode = UNIT_MODE_REPAIR;
+                        }
+                        break;
+                    }
                     case UNIT_TARGET_MINE: {
                         uint32_t mine_index = state.mines.get_index_of(unit.target.id);
                         if (mine_index == INDEX_INVALID || state.mines[mine_index].gold_left == 0) {
@@ -816,6 +835,12 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
             return unit.cell;
         case UNIT_TARGET_BUILD:
             return unit.target.build.unit_cell;
+        case UNIT_TARGET_BUILD_ASSIST: {
+            const unit_t& builder = state.units.get_by_id(unit.target.id);
+            rect_t building_rect = rect_t(builder.target.build.building_cell, building_cell_size(builder.target.build.building_type));
+            rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
+            return get_nearest_cell_around_rect(state, unit_rect, building_rect);
+        }
         case UNIT_TARGET_ATTACK:
         case UNIT_TARGET_CELL:
             return unit.target.cell;
@@ -831,38 +856,6 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
         case UNIT_TARGET_BUILDING:
         case UNIT_TARGET_CAMP: {
             rect_t camp_rect = rect_t(state.buildings.get_by_id(unit.target.id).cell, building_cell_size(BUILDING_CAMP));
-            /*
-            if (mine_target.type == UNIT_TARGET_MINE) {
-                rect_t mine_rect = rect_t(state.mines.get_by_id(mine_target.id).cell, xy(MINE_SIZE, MINE_SIZE));
-                rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
-                log_info("unit rect %r", &unit_rect);
-                if (unit_rect.is_adjacent_to(mine_rect)) {
-                    int x_dist = 0;
-                    if (mine_rect.position.x + mine_rect.size.x - 1 < camp_rect.position.x) {
-                        x_dist = camp_rect.position.x - (mine_rect.position.x + mine_rect.size.x - 1);
-                    } else if (camp_rect.position.x + camp_rect.size.x - 1 < mine_rect.position.x) {
-                        x_dist = mine_rect.position.x - (camp_rect.position.x + camp_rect.size.x - 1);
-                    }
-                    int y_dist = 0;
-                    if (mine_rect.position.y + mine_rect.size.y < camp_rect.position.y) {
-                        y_dist = camp_rect.position.y - (mine_rect.position.y + mine_rect.size.y - 1);
-                    } else if (camp_rect.position.y + camp_rect.size.y < mine_rect.position.y) {
-                        y_dist = mine_rect.position.y - (camp_rect.position.y + camp_rect.size.y - 1);
-                    }
-                    if (x_dist > y_dist && y_dist != 0) {
-                        xy target_cell; 
-                        target_cell.x = mine_rect.position.x < camp_rect.position.x ? camp_rect.position.x - 1 : camp_rect.position.x + camp_rect.size.x;
-                        target_cell.y = mine_rect.position.y < camp_rect.position.y ? camp_rect.position.y : camp_rect.position.y + (camp_rect.size.y - 1);
-                        return target_cell;
-                    } else if (y_dist >= x_dist && x_dist != 0) {
-                        xy target_cell; 
-                        target_cell.y = mine_rect.position.y < camp_rect.position.y ? camp_rect.position.y - 1 : camp_rect.position.y + camp_rect.size.y;
-                        target_cell.x = mine_rect.position.x < camp_rect.position.x ? camp_rect.position.x : camp_rect.position.x + (camp_rect.size.x - 1);
-                        return target_cell;
-                    }
-                }
-            }
-            */
             return get_nearest_cell_around_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), camp_rect, unit.target.type == UNIT_TARGET_CAMP);
         }
     }
@@ -879,6 +872,12 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             return true;
         case UNIT_TARGET_BUILD:
             return unit.cell == unit.target.build.unit_cell;
+        case UNIT_TARGET_BUILD_ASSIST: {
+            const unit_t& builder = state.units.get_by_id(unit.target.id);
+            rect_t building_rect = rect_t(builder.target.build.building_cell, building_cell_size(builder.target.build.building_type));
+            rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
+            return unit_rect.is_adjacent_to(building_rect);
+        }
         case UNIT_TARGET_ATTACK:
         case UNIT_TARGET_CELL:
             return unit.cell == unit.target.cell;
@@ -917,13 +916,17 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
 }
 
 bool unit_is_target_dead_or_ferried(const match_state_t& state, const unit_t& unit) {
-    GOLD_ASSERT(unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING);
-    uint32_t target_index = unit.target.type == UNIT_TARGET_UNIT ? state.units.get_index_of(unit.target.id) : state.buildings.get_index_of(unit.target.id);
+    GOLD_ASSERT(unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING || unit.target.type == UNIT_TARGET_BUILD_ASSIST);
+
+    uint32_t target_index = (unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILD_ASSIST) ? state.units.get_index_of(unit.target.id) : state.buildings.get_index_of(unit.target.id);
     if (target_index == INDEX_INVALID) {
         return true;
     }
-    int target_health = unit.target.type == UNIT_TARGET_UNIT ? state.units[target_index].health : state.buildings[target_index].health;
+    int target_health = (unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILD_ASSIST) ? state.units[target_index].health : state.buildings[target_index].health;
     if (target_health == 0) {
+        return true;
+    }
+    if (unit.target.type == UNIT_TARGET_BUILD_ASSIST && state.units[target_index].target.type != UNIT_TARGET_BUILD) {
         return true;
     }
     if (unit.target.type == UNIT_TARGET_UNIT && (state.units[target_index].mode == UNIT_MODE_FERRY || state.units[target_index].mode == UNIT_MODE_IN_MINE)) {

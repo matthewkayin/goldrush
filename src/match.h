@@ -125,6 +125,7 @@ enum UnitTargetType {
     UNIT_TARGET_NONE,
     UNIT_TARGET_CELL,
     UNIT_TARGET_BUILD,
+    UNIT_TARGET_BUILD_ASSIST,
     UNIT_TARGET_UNIT,
     UNIT_TARGET_BUILDING,
     UNIT_TARGET_CAMP,
@@ -321,7 +322,8 @@ struct input_stop_t {
 };
 
 struct input_build_t {
-    uint16_t unit_id;
+    uint16_t unit_count;
+    entity_id unit_ids[MAX_UNITS];
     uint8_t building_type;
     xy target_cell;
 };

@@ -390,7 +390,16 @@ void match_update(match_state_t& state) {
                 input.type = INPUT_BUILD;
                 input.build.building_type = state.ui_building_type;
                 input.build.target_cell = ui_get_building_cell(state);
-                input.build.unit_id = nearest_builder_id;
+                input.build.unit_count = state.selection.ids.size();
+                input.build.unit_ids[0] = nearest_builder_id;
+                uint32_t index = 1;
+                for (entity_id id : state.selection.ids) {
+                    if (id == nearest_builder_id) {
+                        continue;
+                    }
+                    input.build.unit_ids[index] = id;
+                    index++;
+                }
                 state.input_queue.push_back(input);
 
                 state.ui_buttonset = UI_BUTTONSET_MINER;
@@ -1098,8 +1107,17 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             break;
         }
         case INPUT_BUILD: {
-            memcpy(out_buffer + out_buffer_length, &input.build, sizeof(input_build_t));
-            out_buffer_length += sizeof(input_build_t);
+            memcpy(out_buffer + out_buffer_length, &input.build.unit_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.build.unit_ids, input.build.unit_count * sizeof(entity_id));
+            out_buffer_length += input.build.unit_count * sizeof(entity_id);
+
+            memcpy(out_buffer + out_buffer_length, &input.build.building_type, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.build.target_cell, sizeof(xy));
+            out_buffer_length += sizeof(xy);
             break;
         }
         case INPUT_BUILD_CANCEL: {
@@ -1171,8 +1189,17 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             break;
         }
         case INPUT_BUILD: {
-            memcpy(&input.build, in_buffer + in_buffer_head, sizeof(input_build_t));
-            in_buffer_head += sizeof(input_build_t);
+            memcpy(&input.build.unit_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(&input.build.unit_ids, in_buffer + in_buffer_head, input.build.unit_count * sizeof(entity_id));
+            in_buffer_head += input.build.unit_count * sizeof(entity_id);
+
+            memcpy(&input.build.building_type, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
+            memcpy(&input.build.target_cell, in_buffer + in_buffer_head, sizeof(xy));
+            in_buffer_head += sizeof(xy);
             break;
         }
         case INPUT_BUILD_CANCEL: {
@@ -1345,7 +1372,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             break;
         }
         case INPUT_BUILD: {
-            uint32_t unit_index = state.units.get_index_of(input.build.unit_id);
+            uint32_t unit_index = state.units.get_index_of(input.build.unit_ids[0]);
             if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
                 return;
             }
@@ -1362,6 +1389,18 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     .building_id = ID_NULL
                 }
             });
+
+            for (uint32_t index = 1; index < input.build.unit_count; index++) {
+                uint32_t helper_index = state.units.get_index_of(input.build.unit_ids[index]);
+                if (helper_index == INDEX_INVALID || state.units[helper_index].health == 0) {
+                    return;
+                }
+                unit_t& helper = state.units[helper_index];
+                unit_set_target(state, helper, (unit_target_t) {
+                    .type = UNIT_TARGET_BUILD_ASSIST,
+                    .id = input.build.unit_ids[0]
+                });
+            }
             break;
         }
         case INPUT_BUILD_CANCEL: {
