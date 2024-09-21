@@ -69,27 +69,24 @@ match_state_t match_init() {
 
     // Init map
     log_info("Generating map...");
-    /*
-    state.map_width = 96;
-    state.map_height = 96;
-    state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
+    state.map.width = 96;
+    state.map.height = 96;
+    state.map.tiles = std::vector<tile_t>(state.map.width * state.map.height, (tile_t) {
         .base = 0,
         .decoration = 0
     });
-    state.map_cells = std::vector<cell_t>(state.map_width * state.map_height, (cell_t) {
+    state.map.cells = std::vector<cell_t>(state.map.width * state.map.height, (cell_t) {
         .type = CELL_EMPTY,
         .value = 0
     });
-    state.map_fog = std::vector<FogType>(state.map_width * state.map_height, FOG_HIDDEN);
-    state.is_fog_dirty = true;
+    state.map.fog = std::vector<FogType>(state.map.width * state.map.height, FOG_HIDDEN);
 
-    for (uint32_t i = 0; i < state.map_width * state.map_height; i++) {
+    for (uint32_t i = 0; i < state.map.width * state.map.height; i++) {
         int new_base = lcg_rand() % 7;
         if (new_base < 4 && i % 3 == 0) {
-            state.map_tiles[i].base = new_base == 1 ? 2 : 1; 
+            state.map.tiles[i].base = new_base == 1 ? 2 : 1; 
         }
     }
-    */
 
     // Init players
     log_trace("Initializing players...");
@@ -129,13 +126,23 @@ match_state_t match_init() {
 
     // Place gold on the map
     log_trace("Placing gold...");
-    /*
     std::vector<xy> gold_patch_cells;
-    for (int x = 0; x < 5; x++) {
-        for (int y = 0; y < 5; y++) {
+    for (int x = 0; x < 4; x++) {
+        for (int y = 0; y < 4; y++) {
+            if (x == 0 && y == 0) {
+                continue;
+            }
             gold_patch_cells.push_back(xy(12 + (24 * x), 12 + (24 * y)));
+            xy mine_cell = xy(12 + (24 * x), 12 + (24 * y));
+            entity_id mine_id = state.mines.push_back((mine_t) {
+                .cell = mine_cell,
+                .gold_left = MINE_STARTING_GOLD_AMOUNT,
+                .is_occupied = false
+            });
+            map_set_cell_rect(state.map, rect_t(mine_cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
         }
     }
+    /*
     uint32_t target_mine_count = 7;
     uint32_t attempts = 0;
     while (state.mines.size() < target_mine_count) {
@@ -183,17 +190,16 @@ match_state_t match_init() {
     */
 
     // Place decorations on the map
-    /*
     log_trace("Placing decorations...");
-    for (int i = 0; i < state.map_width * state.map_height; i++) {
-        if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map_cells[i].type == CELL_EMPTY) {
+    for (int i = 0; i < state.map.width * state.map.height; i++) {
+        if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map.cells[i].type == CELL_EMPTY) {
             bool is_gold_nearby = false;
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                xy cell = xy(i % state.map_width, i / state.map_height) + DIRECTION_XY[direction];
-                if (!map_is_cell_in_bounds(state, cell)) {
+                xy cell = xy(i % state.map.width, i / state.map.height) + DIRECTION_XY[direction];
+                if (!map_is_cell_in_bounds(state.map, cell)) {
                     continue;
                 }
-                if (map_get_cell(state, cell).type != CELL_EMPTY) {
+                if (map_get_cell(state.map, cell).type != CELL_EMPTY) {
                     is_gold_nearby = true;
                     break;
                 }
@@ -203,16 +209,17 @@ match_state_t match_init() {
                 continue;
             }
 
-            state.map_tiles[i] = (tile_t) {
+            state.map.tiles[i] = (tile_t) {
                 .base = 0,
                 .decoration = (uint16_t)(1 + (rand() % 5))
             };
-            state.map_cells[i].type = CELL_BLOCKED;
+            state.map.cells[i].type = CELL_BLOCKED;
         }
     }
-    */
     log_info("Map complete!");
 
+    map_fog_reveal(state);
+    state.map.is_fog_dirty = true;
     map_update_fog(state);
 
     if (!network_is_server()) {
@@ -996,6 +1003,27 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
     }
 }
 
+void map_fog_reveal(match_state_t& state) {
+    // Reveal based on unit vision
+    for (const unit_t& unit : state.units) {
+        if (unit.player_id != network_get_player_id() || unit.mode == UNIT_MODE_FERRY) {
+            continue;
+        }
+
+        map_fog_reveal_at_cell(state.map, unit.cell, unit_cell_size(unit.type), UNIT_DATA.at(unit.type).sight);
+    }
+
+    for (const building_t& building : state.buildings) {
+        if (building.player_id != network_get_player_id()) {
+            continue;
+        }
+
+        map_fog_reveal_at_cell(state.map, building.cell, building_cell_size(building.type), 4);
+    }
+
+    // Finally remove from the remembered buildings map for any buildings that no longer exist
+}
+
 void map_update_fog(match_state_t& state) {
     // First remember any revealed buildings
     for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
@@ -1032,24 +1060,8 @@ void map_update_fog(match_state_t& state) {
         }
     }
 
-    // Reveal based on unit vision
-    for (const unit_t& unit : state.units) {
-        if (unit.player_id != network_get_player_id() || unit.mode == UNIT_MODE_FERRY) {
-            continue;
-        }
+    map_fog_reveal(state);
 
-        map_fog_reveal(state.map, unit.cell, unit_cell_size(unit.type), UNIT_DATA.at(unit.type).sight);
-    }
-
-    for (const building_t& building : state.buildings) {
-        if (building.player_id != network_get_player_id()) {
-            continue;
-        }
-
-        map_fog_reveal(state.map, building.cell, building_cell_size(building.type), 4);
-    }
-
-    // Finally remove from the remembered buildings map for any buildings that no longer exist
     // Note the buildings are only removed from the list if the player can see where the building once was
     auto it = state.remembered_buildings.begin();
     while (it != state.remembered_buildings.end()) {

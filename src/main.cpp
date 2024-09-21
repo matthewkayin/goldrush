@@ -11,7 +11,6 @@
 #include "input.h"
 #include "container.h"
 #include "lcg.h"
-#include "editor.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
@@ -241,7 +240,6 @@ int gold_main(int argc, char** argv) {
 
     xy window_size = xy(SCREEN_WIDTH, SCREEN_HEIGHT);
     char logfile_path[128];
-    bool edit_mode = false;
 
     time_t _time = time(NULL);
     tm _tm = *localtime(&_time);
@@ -281,18 +279,13 @@ int gold_main(int argc, char** argv) {
             }
 
             window_size = xy(std::stoi(width_string.c_str()), std::stoi(height_string.c_str()));
-        } else if (arg == "--edit") {
-            edit_mode = true;
-        }
+        } 
     }
 
 #endif
 
     logger_init(logfile_path);
     platform_clock_init();
-    if (edit_mode) {
-        return editor_run();
-    }
 
     options_init();
 

@@ -1068,15 +1068,18 @@ unit_target_t unit_target_nearest_mine(const match_state_t& state, const unit_t&
 
     // Find the nearest mining camp
     for (uint32_t mine_index = 0; mine_index < state.mines.size(); mine_index++) {
-        if (state.mines[mine_index].gold_left != 0) {
-            if (nearest_mine_dist == -1 || xy::manhattan_distance(unit.cell, state.mines[mine_index].cell) < nearest_mine_dist) {
-                nearest_mine_id = state.mines.get_id_of(mine_index);
-                nearest_mine_dist = xy::manhattan_distance(unit.cell, state.mines[mine_index].cell);
-            }
+        // Don't target empty mines                    Don't target mines the player can't see
+        if (state.mines[mine_index].gold_left == 0 || !map_is_cell_rect_revealed(state.map, rect_t(state.mines[mine_index].cell, xy(MINE_SIZE, MINE_SIZE)))) {
+            continue;
+        }
+
+        if (nearest_mine_dist == -1 || xy::manhattan_distance(unit.cell, state.mines[mine_index].cell) < nearest_mine_dist) {
+            nearest_mine_id = state.mines.get_id_of(mine_index);
+            nearest_mine_dist = xy::manhattan_distance(unit.cell, state.mines[mine_index].cell);
         }
     }
 
-    if (nearest_mine_dist != ID_NULL && nearest_mine_dist < 20) {
+    if (nearest_mine_id != ID_NULL && nearest_mine_dist < 20) {
         return (unit_target_t) {
             .type = UNIT_TARGET_MINE,
             .id = nearest_mine_id

@@ -98,28 +98,6 @@
                 "targetArchitecture": "arm64",
                 "externalConsole": false,
             },
-        },
-        {
-            "name": "Editor",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/bin/gold",
-            "args": [
-                "--edit"
-            ],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/bin",
-            "environment": [],
-            "windows": {
-                "type": "cppvsdbg",
-                "program": "${workspaceFolder}/bin/gold.exe",
-                "console": "integratedTerminal"
-            },
-            "osx": {
-                "MIMode": "lldb",
-                "targetArchitecture": "arm64",
-                "externalConsole": false,
-            },
         }
     ],
     "compounds": [

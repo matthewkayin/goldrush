@@ -76,7 +76,7 @@ bool map_is_cell_rect_revealed(const map_t& map, rect_t rect) {
     return false;
 }
 
-void map_fog_reveal(map_t& map, xy cell, xy size, int sight) {
+void map_fog_reveal_at_cell(map_t& map, xy cell, xy size, int sight) {
     int xmin = std::max(0, cell.x - sight);
     int xmax = std::min((int)map.width, cell.x + size.x + sight);
     int ymin = std::max(0, cell.y - sight);

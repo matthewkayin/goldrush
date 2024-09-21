@@ -42,14 +42,6 @@ struct mine_t {
     bool is_occupied;
 };
 
-struct map_data_t {
-    uint32_t width;
-    uint32_t height;
-    std::vector<tile_t> tiles;
-    std::vector<xy> player_spawns;
-    std::vector<mine_t> mines;
-};
-
 bool map_is_cell_in_bounds(const map_t& map, xy cell);
 bool map_is_cell_rect_in_bounds(const map_t& map, rect_t cell_rect);
 bool map_is_cell_blocked(const map_t& map, xy cell);
@@ -59,4 +51,4 @@ void map_set_cell(map_t& map, xy cell, CellType type, uint16_t value = 0);
 void map_set_cell_rect(map_t& map, rect_t cell_rect, CellType type, uint16_t id = 0);
 FogType map_get_fog(const map_t& map, xy cell);
 bool map_is_cell_rect_revealed(const map_t& map, rect_t rect);
-void map_fog_reveal(map_t& map, xy cell, xy size, int sight);
+void map_fog_reveal_at_cell(map_t& map, xy cell, xy size, int sight);

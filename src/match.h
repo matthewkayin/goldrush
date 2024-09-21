@@ -442,6 +442,7 @@ xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert);
 // Map
 bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners);
+void map_fog_reveal(match_state_t& state);
 void map_update_fog(match_state_t& state);
 
 // Unit
