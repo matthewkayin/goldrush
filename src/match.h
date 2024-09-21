@@ -438,6 +438,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, selection_t& selection);
 selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const selection_t& selection);
 xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert);
+entity_id ui_get_nearest_builder(const match_state_t& state, xy cell);
 
 // Map
 bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
@@ -472,6 +473,7 @@ xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy 
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
 void building_destroy(match_state_t& state, uint32_t building_index);
+void building_on_finish(match_state_t& state, entity_id building_id);
 void building_update(match_state_t& state, building_t& building);
 void building_enqueue(match_state_t& state, building_t& building, building_queue_item_t item);
 void building_dequeue(match_state_t& state, building_t& building);

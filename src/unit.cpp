@@ -528,32 +528,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     building.health++;
 #endif
                     if (building.health == BUILDING_DATA.at(building.type).max_health) {
-                        // On building finished
-                        building.mode = BUILDING_MODE_FINISHED;
-
-                        // Show alert
-                        if (building.player_id == network_get_player_id()) {
-                            rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
-                            rect_t building_rect = building_get_rect(building);
-                            if (!screen_rect.intersects(building_rect)) {
-                                state.alerts.push_back((alert_t) {
-                                    .type = ALERT_BUILDING_FINISHED,
-                                    .id = unit.target.build.building_id,
-                                    .timer = MATCH_ALERT_DURATION
-                                });
-                            }
-                        }
-
-                        // If selecting the building
-                        if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == unit.target.build.building_id) {
-                            // Trigger a re-select so that UI buttons are updated correctly
-                            ui_set_selection(state, state.selection);
-                        }
-
-                        unit_stop_building(state, unit_id, building);
-                        if (building.type == BUILDING_CAMP) {
-                            unit.target = unit_target_nearest_mine(state, unit);
-                        }
+                        building_on_finish(state, unit.target.build.building_id);
                     } else {
                         unit.timer = UNIT_BUILD_TICK_DURATION;
                     }
@@ -580,9 +555,13 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
                 }
                 if (building.health == BUILDING_DATA.at(building.type).max_health) {
-                    unit.target = (unit_target_t) {
-                        .type = UNIT_TARGET_NONE
-                    };
+                    if (building.mode == BUILDING_MODE_IN_PROGRESS) {
+                        building_on_finish(state, unit.target.id);
+                    } else {
+                        unit.target = (unit_target_t) {
+                            .type = UNIT_TARGET_NONE
+                        };
+                    }
                     unit.mode = UNIT_MODE_IDLE;
                 }
                 unit_update_finished = true;

@@ -24,7 +24,7 @@ static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
 static const uint32_t PLAYER_STARTING_GOLD = 1000;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
-static const uint32_t MINE_STARTING_GOLD_AMOUNT = 100;
+static const uint32_t MINE_STARTING_GOLD_AMOUNT = 2500;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION = 10;
@@ -129,9 +129,6 @@ match_state_t match_init() {
     std::vector<xy> gold_patch_cells;
     for (int x = 0; x < 4; x++) {
         for (int y = 0; y < 4; y++) {
-            if (x == 0 && y == 0) {
-                continue;
-            }
             gold_patch_cells.push_back(xy(12 + (24 * x), 12 + (24 * y)));
             xy mine_cell = xy(12 + (24 * x), 12 + (24 * y));
             entity_id mine_id = state.mines.push_back((mine_t) {
@@ -387,23 +384,13 @@ void match_update(match_state_t& state) {
         if (ui_get_ui_button_hovered(state) != -1) {
             ui_handle_button_pressed(state, ui_get_ui_button(state, ui_get_ui_button_hovered(state)));
         } else if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
-            if (building_can_be_placed(state, state.ui_building_type, ui_get_building_cell(state), state.units.get_by_id(state.selection.ids[0]).cell)) {
+            entity_id nearest_builder_id = ui_get_nearest_builder(state, ui_get_building_cell(state));
+            if (building_can_be_placed(state, state.ui_building_type, ui_get_building_cell(state), state.units.get_by_id(nearest_builder_id).cell)) {
                 input_t input;
                 input.type = INPUT_BUILD;
                 input.build.building_type = state.ui_building_type;
                 input.build.target_cell = ui_get_building_cell(state);
-
-                entity_id nearest_unit_id; 
-                int nearest_unit_dist = -1;
-                for (entity_id id : state.selection.ids) {
-                    int selection_dist = xy::manhattan_distance(input.build.target_cell, state.units.get_by_id(id).cell);
-                    if (nearest_unit_dist == -1 || selection_dist < nearest_unit_dist) {
-                        nearest_unit_id = id;
-                        nearest_unit_dist = selection_dist;
-                    }
-                }
-
-                input.build.unit_id = nearest_unit_id;
+                input.build.unit_id = nearest_builder_id;
                 state.input_queue.push_back(input);
 
                 state.ui_buttonset = UI_BUTTONSET_MINER;
@@ -733,9 +720,9 @@ void match_update(match_state_t& state) {
     }
 
     // Update Fog of War
-    if (state.map.is_fog_dirty) {
-        map_update_fog(state);
-    }
+    // if (state.map.is_fog_dirty) {
+    map_update_fog(state);
+    // }
 
     // Update alerts
     auto it = state.alerts.begin();

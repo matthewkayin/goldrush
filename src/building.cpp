@@ -64,6 +64,44 @@ void building_destroy(match_state_t& state, uint32_t building_index) {
     state.buildings.remove_at(building_index);
 }
 
+void building_on_finish(match_state_t& state, entity_id building_id) {
+    building_t& building = state.buildings.get_by_id(building_id);
+
+    building.mode = BUILDING_MODE_FINISHED;
+
+    // Show alert
+    if (building.player_id == network_get_player_id()) {
+        rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
+        rect_t building_rect = building_get_rect(building);
+        if (!screen_rect.intersects(building_rect)) {
+            state.alerts.push_back((alert_t) {
+                .type = ALERT_BUILDING_FINISHED,
+                .id = building_id,
+                .timer = MATCH_ALERT_DURATION
+            });
+        }
+    }
+
+    // If selecting the building
+    if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids[0] == building_id) {
+        // Trigger a re-select so that UI buttons are updated correctly
+        ui_set_selection(state, state.selection);
+    }
+
+    for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
+        unit_t& unit = state.units[unit_index];
+        if (unit.target.type == UNIT_TARGET_BUILD && unit.target.build.building_id == building_id) {
+            unit_stop_building(state, state.units.get_id_of(unit_index), building);
+            if (building.type == BUILDING_CAMP) {
+                unit.target = unit_target_nearest_mine(state, unit);
+            }
+        } else if (unit.mode == UNIT_MODE_REPAIR && building.type == BUILDING_CAMP && unit.target.id == building_id) {
+            unit.target = unit_target_nearest_mine(state, unit);
+            unit.mode = UNIT_MODE_IDLE;
+        }
+    }
+}
+
 void building_update(match_state_t& state, building_t& building) {
     if (building.health == 0 && building.mode != BUILDING_MODE_DESTROYED) {
         const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;

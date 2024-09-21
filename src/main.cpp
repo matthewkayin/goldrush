@@ -177,6 +177,7 @@ struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
     bool is_running = false;
+    bool view_fps = false;
     Cursor current_cursor;
 
     // Input state
@@ -361,21 +362,13 @@ int gold_main(int argc, char** argv) {
                 // Handle quit
                 if (event.type == SDL_QUIT) {
                     engine.is_running = false;
-                }
-                // Toggle fullscreen
-                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
-                    if (options[OPTION_DISPLAY] == DISPLAY_WINDOWED) {
-                        options[OPTION_DISPLAY] = DISPLAY_BORDERLESS;
-                    } else {
-                        options[OPTION_DISPLAY] = DISPLAY_WINDOWED;
-                    }
-                    engine_set_window_fullscreen((OptionDisplayValue)options[OPTION_DISPLAY]);
                     break;
-                }
+                } 
                 // Capture mouse
                 if (SDL_GetWindowGrab(engine.window) == SDL_FALSE) {
                     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
                         SDL_SetWindowGrab(engine.window, SDL_TRUE);
+                        continue;
                     }
                     // If the mouse is not captured, don't handle any other input
                     break;
@@ -385,17 +378,32 @@ int gold_main(int argc, char** argv) {
                     SDL_SetWindowGrab(engine.window, SDL_FALSE);
                     break;
                 }
+                // Toggle fullscreen
+                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F11) {
+                    if (options[OPTION_DISPLAY] == DISPLAY_WINDOWED) {
+                        options[OPTION_DISPLAY] = DISPLAY_BORDERLESS;
+                    } else {
+                        options[OPTION_DISPLAY] = DISPLAY_WINDOWED;
+                    }
+                    engine_set_window_fullscreen((OptionDisplayValue)options[OPTION_DISPLAY]);
+                    continue;
+                } 
+                // Toggle view FPS
+                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3) {
+                    engine.view_fps = !engine.view_fps;
+                    continue;
+                }
                 // Update mouse position
                 if (event.type == SDL_MOUSEMOTION) {
                     engine.mouse_position = xy(event.motion.x, event.motion.y);
-                    break;
+                    continue;
                 }
                 // Handle mouse button
                 if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)  {
                     if (event.button.button - 1 < INPUT_MOUSE_BUTTON_COUNT) {
                         engine.mouse_button_state[event.button.button - 1] = event.type == SDL_MOUSEBUTTONDOWN;
                     }
-                    break;
+                    continue;
                 }
                 // Text input
                 if (event.type == SDL_TEXTINPUT) {
@@ -403,13 +411,13 @@ int gold_main(int argc, char** argv) {
                     if (engine.input_text.length() > engine.input_length_limit) {
                         engine.input_text = engine.input_text.substr(0, engine.input_length_limit);
                     }
-                    break;
+                    continue;
                 }
                 if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {
                     if (engine.input_text.length() > 0) {
                         engine.input_text.pop_back();
                     }
-                    break;
+                    continue;
                 }
                 if (mode == MODE_MATCH && (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)) {
                     auto keymap_it = keymap.find(event.key.keysym.sym);
@@ -425,7 +433,7 @@ int gold_main(int argc, char** argv) {
                     for (UiButton button : hotkey_it->second) {
                         engine.hotkey_state[button] = event.type == SDL_KEYDOWN;
                     }
-                    break;
+                    continue;
                 }
             } // End while SDL_PollEvent()
         } // End if update_accumulator >= UPDATE_TIME
@@ -1365,7 +1373,7 @@ void render_match(const match_state_t& state) {
     } else if (state.selection.type == SELECTION_TYPE_MINE) {
         const mine_t& mine = state.mines.get_by_id(state.selection.ids[0]);
         rect_t mine_rect = rect_t(mine.cell * TILE_SIZE, xy(MINE_SIZE * TILE_SIZE, MINE_SIZE * TILE_SIZE));
-        render_sprite(SPRITE_SELECT_RING_BUILDING_3, xy(0, 0), mine_rect.position + (mine_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+        render_sprite(SPRITE_SELECT_RING_BUILDING_3, xy(0, 0), mine_rect.position + (mine_rect.size / 2) - state.camera_offset + xy(0, -3), RENDER_SPRITE_CENTERED);
     }
 
     // UI move animation
@@ -1591,7 +1599,7 @@ void render_match(const match_state_t& state) {
                             break;
                         }
                     }
-                    xy miner_cell = state.units.get_by_id(state.selection.ids[0]).cell;
+                    xy miner_cell = state.units.get_by_id(ui_get_nearest_builder(state, ui_get_building_cell(state))).cell;
                     if (is_cell_green) {
                         is_cell_green = xy(x, y) == miner_cell || !map_is_cell_blocked(state.map, xy(x, y));
                     }

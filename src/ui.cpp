@@ -497,3 +497,17 @@ xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert) {
             return state.mines.get_by_id(alert.id).cell;
     }
 }
+
+entity_id ui_get_nearest_builder(const match_state_t& state, xy cell) {
+    entity_id nearest_unit_id; 
+    int nearest_unit_dist = -1;
+    for (entity_id id : state.selection.ids) {
+        int selection_dist = xy::manhattan_distance(cell, state.units.get_by_id(id).cell);
+        if (nearest_unit_dist == -1 || selection_dist < nearest_unit_dist) {
+            nearest_unit_id = id;
+            nearest_unit_dist = selection_dist;
+        }
+    }
+
+    return nearest_unit_id;
+}
