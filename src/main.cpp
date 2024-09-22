@@ -195,6 +195,7 @@ struct engine_t {
     std::vector<TTF_Font*> fonts;
     std::vector<sprite_t> sprites;
     std::vector<SDL_Cursor*> cursors;
+    SDL_Texture* texture_water_autotile;
     SDL_Texture* minimap_texture;
 
 };
@@ -718,6 +719,46 @@ bool engine_create_renderer() {
     engine.current_cursor = CURSOR_DEFAULT;
     SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
 
+    engine.texture_water_autotile = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, 47 * 16, 16);
+    SDL_SetRenderTarget(engine.renderer, engine.texture_water_autotile);
+    uint32_t direction_mask[DIRECTION_COUNT] = {
+        1,
+        2,
+        4,
+        8,
+        16,
+        32,
+        64, 
+        128
+    };
+    uint32_t unique_index = 0;
+    for (uint32_t i = 0; i < 256; i++) {
+        bool has_direction[DIRECTION_COUNT];
+        for (uint32_t direction = 0; direction < DIRECTION_COUNT; direction++) {
+            has_direction[direction] = i & direction_mask[direction];
+        }
+        bool is_unique_combination = true;
+        for (uint32_t direction = DIRECTION_NORTHEAST; direction < DIRECTION_COUNT; direction += 2) {
+            if (has_direction[direction] && !(has_direction[direction - 1] && has_direction[(direction + 1) % DIRECTION_COUNT])) {
+                is_unique_combination = false;
+                break;
+            }
+        }
+        if (!is_unique_combination) {
+            continue;
+        }
+
+        for (int sub_x = 0; sub_x < 1; sub_x++) {
+            for (int sub_y = 0; sub_y < 1; sub_y++) {
+
+            }
+        }
+
+        unique_index++;
+    }
+
+    SDL_SetRenderTarget(engine.renderer, NULL);
+
     log_info("Initialized renderer.");
     return true;
 }
@@ -744,6 +785,8 @@ void engine_destroy_renderer() {
     if (engine.minimap_texture != NULL) {
         SDL_DestroyTexture(engine.minimap_texture);
     }
+
+    SDL_DestroyTexture(engine.texture_water_autotile);
 
     SDL_DestroyRenderer(engine.renderer);
 
@@ -1273,7 +1316,19 @@ void render_match(const match_state_t& state) {
             tile_dst_rect.x = base_pos.x + (x * TILE_SIZE);
             tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
 
-            SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
+            if (state.map.tiles[map_index].base > 2) {
+                if (state.map.tiles[map_index].base == 3) {
+                    tile_src_rect.x = 8;
+                    tile_src_rect.y = 24;
+                    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILE_WATER].texture, &tile_src_rect, &tile_dst_rect);
+                } else {
+                    tile_src_rect.x = state.map.tiles[map_index].base - 4;
+                    tile_src_rect.y = 0;
+                    SDL_RenderCopy(engine.renderer, engine.texture_water_autotile, &tile_src_rect, &tile_dst_rect);
+                }
+            } else {
+                SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
+            }
 
             // Render decorations
             if (state.map.tiles[map_index].decoration != 0) {

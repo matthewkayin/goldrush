@@ -86,12 +86,63 @@ match_state_t match_init() {
         state.map.player_fog[player_id] = std::vector<FogType>(state.map.width * state.map.height, FOG_HIDDEN);
     }
 
+    /*
     for (uint32_t i = 0; i < state.map.width * state.map.height; i++) {
         int new_base = lcg_rand() % 7;
         if (new_base < 4 && i % 3 == 0) {
             state.map.tiles[i].base = new_base == 1 ? 2 : 1; 
         }
     }
+    */
+
+    uint32_t direction_mask[DIRECTION_COUNT] = {
+        1,
+        2,
+        4,
+        8,
+        16,
+        32,
+        64, 
+        128
+    };
+    uint32_t unique_index = 0;
+    xy coords = xy(1, 1);
+    for (uint32_t i = 0; i < 256; i++) {
+        bool has_direction[DIRECTION_COUNT];
+        for (uint32_t direction = 0; direction < DIRECTION_COUNT; direction++) {
+            has_direction[direction] = i & direction_mask[direction];
+        }
+        bool is_unique_combination = true;
+        for (uint32_t direction = DIRECTION_NORTHEAST; direction < DIRECTION_COUNT; direction += 2) {
+            if (has_direction[direction] && !(has_direction[direction - 1] && has_direction[(direction + 1) % DIRECTION_COUNT])) {
+                is_unique_combination = false;
+                break;
+            }
+        }
+        if (!is_unique_combination) {
+            continue;
+        }
+
+        log_trace("unique index: %u, bitsum: %u\n%i%i%i\n%i %i\n%i%i%i", unique_index, i,
+            has_direction[DIRECTION_NORTHWEST], has_direction[DIRECTION_NORTH], has_direction[DIRECTION_NORTHEAST],
+            has_direction[DIRECTION_WEST], has_direction[DIRECTION_EAST],
+            has_direction[DIRECTION_SOUTHWEST], has_direction[DIRECTION_SOUTH], has_direction[DIRECTION_SOUTHEAST]
+        );
+        xy cell = coords + xy(1, 1);
+        state.map.tiles[cell.x + (cell.y * state.map.width)].base = 4 + i;
+        for (uint32_t direction = 0; direction < DIRECTION_COUNT; direction++) {
+            cell = coords + xy(1, 1) + DIRECTION_XY[direction];
+            state.map.tiles[cell.x + (cell.y * state.map.width)].base = has_direction[direction] ? 0 : 3;
+        }
+        coords.x += 4;
+        if (coords.x + 4 > state.map.width) {
+            coords.x = 1;
+            coords.y += 4;
+        }
+
+        unique_index++;
+    }
+
 
     // Init players
     log_trace("Initializing players...");
@@ -131,6 +182,7 @@ match_state_t match_init() {
 
     // Place gold on the map
     log_trace("Placing gold...");
+    /*
     std::vector<xy> gold_patch_cells;
     for (int x = 0; x < 4; x++) {
         for (int y = 0; y < 4; y++) {
@@ -144,6 +196,7 @@ match_state_t match_init() {
             map_set_cell_rect(state.map, rect_t(mine_cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
         }
     }
+    */
     /*
     uint32_t target_mine_count = 7;
     uint32_t attempts = 0;
@@ -193,6 +246,7 @@ match_state_t match_init() {
 
     // Place decorations on the map
     log_trace("Placing decorations...");
+    /*
     for (int i = 0; i < state.map.width * state.map.height; i++) {
         if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map.cells[i].type == CELL_EMPTY) {
             bool is_gold_nearby = false;
@@ -218,6 +272,7 @@ match_state_t match_init() {
             state.map.cells[i].type = CELL_BLOCKED;
         }
     }
+    */
     log_info("Map complete!");
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
