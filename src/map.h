@@ -32,7 +32,7 @@ struct map_t {
     uint32_t height;
     std::vector<tile_t> tiles;
     std::vector<cell_t> cells;
-    std::vector<FogType> fog;
+    std::vector<FogType> player_fog[MAX_PLAYERS];
     bool is_fog_dirty;
 };
 
@@ -49,6 +49,6 @@ bool map_is_cell_rect_blocked(const map_t& map, rect_t cell_rect);
 cell_t map_get_cell(const map_t& map, xy cell);
 void map_set_cell(map_t& map, xy cell, CellType type, uint16_t value = 0);
 void map_set_cell_rect(map_t& map, rect_t cell_rect, CellType type, uint16_t id = 0);
-FogType map_get_fog(const map_t& map, xy cell);
-bool map_is_cell_rect_revealed(const map_t& map, rect_t rect);
-void map_fog_reveal_at_cell(map_t& map, xy cell, xy size, int sight);
+FogType map_get_fog(const map_t& map, uint8_t player_id, xy cell);
+bool map_is_cell_rect_revealed(const map_t& map, uint8_t player_id, rect_t rect);
+void map_fog_reveal_at_cell(map_t& map, uint8_t player_id, xy cell, xy size, int sight);

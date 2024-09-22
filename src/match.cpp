@@ -79,7 +79,12 @@ match_state_t match_init() {
         .type = CELL_EMPTY,
         .value = 0
     });
-    state.map.fog = std::vector<FogType>(state.map.width * state.map.height, FOG_HIDDEN);
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        state.map.player_fog[player_id] = std::vector<FogType>(state.map.width * state.map.height, FOG_HIDDEN);
+    }
 
     for (uint32_t i = 0; i < state.map.width * state.map.height; i++) {
         int new_base = lcg_rand() % 7;
@@ -215,9 +220,14 @@ match_state_t match_init() {
     }
     log_info("Map complete!");
 
-    map_fog_reveal(state);
-    state.map.is_fog_dirty = true;
-    map_update_fog(state);
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        map_fog_reveal(state, player_id);
+        map_update_fog(state, player_id);
+        // state.map.is_fog_dirty = true;
+    }
 
     if (!network_is_server()) {
         log_info("Client in match.");
@@ -407,6 +417,14 @@ void match_update(match_state_t& state) {
             } else {
                 ui_show_status(state, UI_STATUS_CANT_BUILD);
             }
+        } else if (state.ui_mode == UI_MODE_NONE && ui_get_building_queue_index_hovered(state) != -1) {
+            state.input_queue.push_back((input_t) {
+                .type = INPUT_BUILDING_DEQUEUE,
+                .building_dequeue = (input_building_dequeue_t) {
+                    .building_id = state.selection.ids[0],
+                    .index = (uint16_t)ui_get_building_queue_index_hovered(state)
+                }
+            });
         } else if (state.ui_mode == UI_MODE_NONE && MINIMAP_RECT.has_point(mouse_pos)) {
             // On begin minimap drag
             state.ui_mode = UI_MODE_MINIMAP_DRAG;
@@ -558,15 +576,15 @@ void match_update(match_state_t& state) {
         input.move.target_cell = move_target / TILE_SIZE;
         input.move.target_entity_id = ID_NULL;
         CellType cell_type = map_get_cell(state.map, input.move.target_cell).type;
-        FogType fog_type = map_get_fog(state.map, input.move.target_cell);
+        FogType fog_type = map_get_fog(state.map, network_get_player_id(), input.move.target_cell);
         if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || ((cell_type == CELL_BUILDING || cell_type == CELL_MINE) && fog_type != FOG_HIDDEN)) {
             input.move.target_entity_id = map_get_cell(state.map, input.move.target_cell).value;
         }
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
-        if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state.map, input.move.target_cell) == FOG_HIDDEN)) {
+        if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state.map, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN)) {
             input.type = INPUT_ATTACK_MOVE;
-        } else if (map_get_fog(state.map, input.move.target_cell) == FOG_HIDDEN) {
+        } else if (map_get_fog(state.map, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN) {
             input.type = INPUT_BLIND_MOVE;
         } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state.map, input.move.target_cell).type == CELL_UNIT) {
             input.type = INPUT_MOVE_UNIT;
@@ -729,9 +747,12 @@ void match_update(match_state_t& state) {
     }
 
     // Update Fog of War
-    // if (state.map.is_fog_dirty) {
-    map_update_fog(state);
-    // }
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        map_update_fog(state, player_id);
+    }
 
     // Update alerts
     auto it = state.alerts.begin();
@@ -999,32 +1020,32 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
     }
 }
 
-void map_fog_reveal(match_state_t& state) {
+void map_fog_reveal(match_state_t& state, uint8_t player_id) {
     // Reveal based on unit vision
     for (const unit_t& unit : state.units) {
-        if (unit.player_id != network_get_player_id() || unit.mode == UNIT_MODE_FERRY) {
+        if (unit.player_id != player_id || unit.mode == UNIT_MODE_FERRY) {
             continue;
         }
 
-        map_fog_reveal_at_cell(state.map, unit.cell, unit_cell_size(unit.type), UNIT_DATA.at(unit.type).sight);
+        map_fog_reveal_at_cell(state.map, player_id, unit.cell, unit_cell_size(unit.type), UNIT_DATA.at(unit.type).sight);
     }
 
     for (const building_t& building : state.buildings) {
-        if (building.player_id != network_get_player_id()) {
+        if (building.player_id != player_id) {
             continue;
         }
 
-        map_fog_reveal_at_cell(state.map, building.cell, building_cell_size(building.type), 4);
+        map_fog_reveal_at_cell(state.map, player_id, building.cell, building_cell_size(building.type), 4);
     }
 
     // Finally remove from the remembered buildings map for any buildings that no longer exist
 }
 
-void map_update_fog(match_state_t& state) {
+void map_update_fog(match_state_t& state, uint8_t player_id) {
     // First remember any revealed buildings
     for (uint32_t building_index = 0; building_index < state.buildings.size(); building_index++) {
         building_t& building = state.buildings[building_index];
-        if (!map_is_cell_rect_revealed(state.map, rect_t(building.cell, building_cell_size(building.type)))) {
+        if (!map_is_cell_rect_revealed(state.map, player_id, rect_t(building.cell, building_cell_size(building.type)))) {
             continue;
         }
         state.remembered_buildings[state.buildings.get_id_of(building_index)] = (remembered_building_t) {
@@ -1039,7 +1060,7 @@ void map_update_fog(match_state_t& state) {
     // Then remember any revealed mines
     for (uint32_t mine_index = 0; mine_index < state.mines.size(); mine_index++) {
         mine_t& mine = state.mines[mine_index];
-        if (!map_is_cell_rect_revealed(state.map, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
+        if (!map_is_cell_rect_revealed(state.map, player_id, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
             continue;
         }
         state.remembered_mines[state.mines.get_id_of(mine_index)] = (mine_t) {
@@ -1051,25 +1072,23 @@ void map_update_fog(match_state_t& state) {
 
     // Now dim anything that is revealed
     for (uint32_t i = 0; i < state.map.width * state.map.height; i++) {
-        if (state.map.fog[i] == FOG_REVEALED) {
-            state.map.fog[i] = FOG_EXPLORED;
+        if (state.map.player_fog[player_id][i] == FOG_REVEALED) {
+            state.map.player_fog[player_id][i] = FOG_EXPLORED;
         }
     }
 
-    map_fog_reveal(state);
+    map_fog_reveal(state, player_id);
 
     // Note the buildings are only removed from the list if the player can see where the building once was
     auto it = state.remembered_buildings.begin();
     while (it != state.remembered_buildings.end()) {
-        if (state.buildings.get_index_of(it->first) == INDEX_INVALID && map_is_cell_rect_revealed(state.map, rect_t(it->second.cell, building_cell_size(it->second.type)))) {
+        if (state.buildings.get_index_of(it->first) == INDEX_INVALID && map_is_cell_rect_revealed(state.map, player_id, rect_t(it->second.cell, building_cell_size(it->second.type)))) {
             log_trace("deleting remembered building");
             it = state.remembered_buildings.erase(it);
         } else {
             it++;
         }
     }
-
-    state.map.is_fog_dirty = false;
 }
 
 // INPUT
@@ -1443,12 +1462,21 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
                 return;
             }
-            if (state.buildings[building_index].queue.empty()) {
+            building_t& building = state.buildings[building_index];
+            if (building.queue.empty()) {
                 return;
             }
 
-            state.player_gold[player_id] += building_queue_item_cost(state.buildings[building_index].queue[0]);
-            building_dequeue(state, state.buildings[building_index]);
+            uint32_t index = input.building_dequeue.index != BUILDING_QUEUE_MAX 
+                                ? input.building_dequeue.index 
+                                : building.queue.size() - 1;
+            if (index == 0) {
+                state.player_gold[player_id] += building_queue_item_cost(building.queue[0]);
+                building_dequeue(state, building);
+            } else {
+                state.player_gold[player_id] += building_queue_item_cost(building.queue[index]);
+                building.queue.erase(building.queue.begin() + index);
+            }
 
             break;
         }

@@ -36,6 +36,10 @@ const uint32_t BUILDING_QUEUE_MAX = 5;
 const uint32_t BUILDING_FADE_DURATION = 300;
 const uint32_t MINE_SIZE = 3;
 
+extern const xy UI_FRAME_BOTTOM_POSITION;
+extern const xy BUILDING_QUEUE_TOP_LEFT;
+extern const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX];
+
 extern const uint32_t MATCH_WINNING_GOLD_AMOUNT;
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
 extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
@@ -339,6 +343,7 @@ struct input_building_enqueue_t {
 
 struct input_building_dequeue_t {
     entity_id building_id;
+    uint16_t index;
 };
 
 struct input_unload_all_t {
@@ -441,12 +446,13 @@ void ui_set_selection(match_state_t& state, selection_t& selection);
 selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const selection_t& selection);
 xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert);
 entity_id ui_get_nearest_builder(const match_state_t& state, xy cell);
+int ui_get_building_queue_index_hovered(const match_state_t& state);
 
 // Map
 bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners);
-void map_fog_reveal(match_state_t& state);
-void map_update_fog(match_state_t& state);
+void map_fog_reveal(match_state_t& state, uint8_t player_id);
+void map_update_fog(match_state_t& state, uint8_t player_id);
 
 // Unit
 entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);

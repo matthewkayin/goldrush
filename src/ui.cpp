@@ -36,6 +36,17 @@ static const rect_t UI_BUTTON_RECT[6] = {
     rect_t(UI_BUTTON_POSITIONS[4], UI_BUTTON_SIZE),
     rect_t(UI_BUTTON_POSITIONS[5], UI_BUTTON_SIZE),
 };
+
+const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
+const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
+const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT,
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(0, 35),
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36, 35),
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 2, 35),
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 3, 35)
+};
+
 const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS = {
     { UI_BUTTON_BUILD_HOUSE, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
@@ -129,7 +140,8 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 input_t input = (input_t) {
                     .type = INPUT_BUILDING_DEQUEUE,
                     .building_dequeue = (input_building_dequeue_t) {
-                        .building_id = state.selection.ids[0]
+                        .building_id = state.selection.ids[0],
+                        .index = BUILDING_QUEUE_MAX
                     }
                 };
                 state.input_queue.push_back(input);
@@ -292,7 +304,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
             continue;
         }
         // Don't select hidden units
-        if (!map_is_cell_rect_revealed(state.map, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+        if (!map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
 
@@ -311,7 +323,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
             continue;
         }
         // Don't select hidden buildings
-        if (!map_is_cell_rect_revealed(state.map, rect_t(building.cell, building_cell_size(building.type)))) {
+        if (!map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(building.cell, building_cell_size(building.type)))) {
             continue;
         }
 
@@ -326,7 +338,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
     for (uint32_t index = 0; index < state.mines.size(); index++) {
         const mine_t& mine = state.mines[index];
         // Don't select hidden gold
-        if (!map_is_cell_rect_revealed(state.map, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
+        if (!map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)))) {
             continue;
         }
 
@@ -510,4 +522,19 @@ entity_id ui_get_nearest_builder(const match_state_t& state, xy cell) {
     }
 
     return nearest_unit_id;
+}
+
+int ui_get_building_queue_index_hovered(const match_state_t& state) {
+    if (state.selection.type != SELECTION_TYPE_BUILDINGS || state.selection.ids.size() != 1) {
+        return -1;
+    }
+
+    const building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
+    for (int building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
+        if (rect_t(UI_BUILDING_QUEUE_POSITIONS[building_queue_index], xy(32, 32)).has_point(input_get_mouse_position())) {
+            return building_queue_index;
+        }
+    }
+    
+    return -1;
 }

@@ -60,14 +60,14 @@ void map_set_cell_rect(map_t& map, rect_t cell_rect, CellType type, uint16_t val
 }
 
 
-FogType map_get_fog(const map_t& map, xy cell) {
-    return map.fog[cell.x + (map.width * cell.y)];
+FogType map_get_fog(const map_t& map, uint8_t player_id, xy cell) {
+    return map.player_fog[player_id][cell.x + (map.width * cell.y)];
 }
 
-bool map_is_cell_rect_revealed(const map_t& map, rect_t rect) {
+bool map_is_cell_rect_revealed(const map_t& map, uint8_t player_id, rect_t rect) {
     for (int x = rect.position.x; x < rect.position.x + rect.size.x; x++) {
         for (int y = rect.position.y; y < rect.position.y + rect.size.y; y++) {
-            if (map_get_fog(map, xy(x, y)) == FOG_REVEALED) {
+            if (map_get_fog(map, player_id, xy(x, y)) == FOG_REVEALED) {
                 return true;
             }
         }
@@ -76,7 +76,7 @@ bool map_is_cell_rect_revealed(const map_t& map, rect_t rect) {
     return false;
 }
 
-void map_fog_reveal_at_cell(map_t& map, xy cell, xy size, int sight) {
+void map_fog_reveal_at_cell(map_t& map, uint8_t player_id, xy cell, xy size, int sight) {
     int xmin = std::max(0, cell.x - sight);
     int xmax = std::min((int)map.width, cell.x + size.x + sight);
     int ymin = std::max(0, cell.y - sight);
@@ -89,7 +89,7 @@ void map_fog_reveal_at_cell(map_t& map, xy cell, xy size, int sight) {
                 continue;
             }
 
-            map.fog[x + (map.width * y)] = FOG_REVEALED;
+            map.player_fog[player_id][x + (map.width * y)] = FOG_REVEALED;
         }
     }
 }

@@ -1377,7 +1377,7 @@ void render_match(const match_state_t& state) {
     }
 
     // UI move animation
-    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state.map, state.ui_move_position / TILE_SIZE) != FOG_HIDDEN) {
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state.map, network_get_player_id(), state.ui_move_position / TILE_SIZE) != FOG_HIDDEN) {
         if (state.ui_move_cell.type == CELL_EMPTY) {
             render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
         } else if (state.ui_move_animation.frame.x % 2 == 0) {
@@ -1385,7 +1385,7 @@ void render_match(const match_state_t& state) {
             switch (state.ui_move_cell.type) {
                 case CELL_UNIT: {
                     uint32_t unit_index = state.units.get_index_of(id);
-                    if (unit_index != INDEX_INVALID && map_is_cell_rect_revealed(state.map, rect_t(state.units[unit_index].cell, xy(1, 1)))) {
+                    if (unit_index != INDEX_INVALID && map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(state.units[unit_index].cell, xy(1, 1)))) {
                         Sprite sprite = unit_get_select_ring(state.units[unit_index].type, state.units[unit_index].player_id != network_get_player_id());
                         render_sprite(sprite, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
@@ -1487,7 +1487,7 @@ void render_match(const match_state_t& state) {
         if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
             continue;
         }
-        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state.map, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
         if (unit.mode == UNIT_MODE_IN_MINE) {
@@ -1541,7 +1541,7 @@ void render_match(const match_state_t& state) {
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             xy fog_cell = base_coords + xy(x, y);
-            FogType fog = state.map.fog[fog_cell.x + (fog_cell.y * state.map.width)];
+            FogType fog = state.map.player_fog[network_get_player_id()][fog_cell.x + (fog_cell.y * state.map.width)];
             if (fog == FOG_REVEALED) {
                 continue;
             }
@@ -1557,7 +1557,7 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
     // UI move animation (for blind moves)
-    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state.map, state.ui_move_position / TILE_SIZE) == FOG_HIDDEN) {
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state.map, network_get_player_id(), state.ui_move_position / TILE_SIZE) == FOG_HIDDEN) {
         render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
@@ -1590,7 +1590,7 @@ void render_match(const match_state_t& state) {
         for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_size; y++) {
             for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_size; x++) {
                 bool is_cell_green = true;
-                if (is_placement_out_of_bounds || map_get_fog(state.map, xy(x, y)) == FOG_HIDDEN) {
+                if (is_placement_out_of_bounds || map_get_fog(state.map, network_get_player_id(), xy(x, y)) == FOG_HIDDEN) {
                     is_cell_green = false;
                 } else {
                     for (const mine_t& mine : state.mines) {
@@ -1631,7 +1631,6 @@ void render_match(const match_state_t& state) {
     }
 
     // UI Control Groups
-    static const xy UI_FRAME_BOTTOM_POSITION = xy(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x, SCREEN_HEIGHT - UI_HEIGHT);
     for (uint32_t i = 0; i < 10; i++) {
         selection_mode_t control_group_mode = ui_get_mode_of_selection(state, state.control_groups[i]);
         if (control_group_mode.type == SELECTION_MODE_NONE) {
@@ -1786,20 +1785,17 @@ void render_match(const match_state_t& state) {
     } // End render selection list
 
     // UI Building queues
-    static const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
     if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
         GOLD_ASSERT(building_index != INDEX_INVALID);
         const building_t& building = state.buildings[building_index];
 
         if (!building.queue.empty()) {
-            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT, RENDER_SPRITE_NO_CULL);
-            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[0]) - 1, 0), UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT, RENDER_SPRITE_NO_CULL);
-
-            for (uint32_t building_queue_index = 1; building_queue_index < building.queue.size(); building_queue_index++) {
-                int icon_x_position = BUILDING_QUEUE_TOP_LEFT.x + (36 * (building_queue_index - 1));
-                render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, BUILDING_QUEUE_TOP_LEFT.y + 33), RENDER_SPRITE_NO_CULL);
-                render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_FRAME_BOTTOM_POSITION + xy(icon_x_position, BUILDING_QUEUE_TOP_LEFT.y + 33), RENDER_SPRITE_NO_CULL);
+            int hovered_index = ui_get_building_queue_index_hovered(state);
+            for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
+                xy offset = building_queue_index == hovered_index ? xy(0, -1) : xy(0, 0);
+                render_sprite(SPRITE_UI_BUTTON, xy(building_queue_index == hovered_index ? 1 : 0, 0), UI_BUILDING_QUEUE_POSITIONS[building_queue_index] + offset, RENDER_SPRITE_NO_CULL);
+                render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, building_queue_index == hovered_index ? 1 : 0), UI_BUILDING_QUEUE_POSITIONS[building_queue_index] + offset, RENDER_SPRITE_NO_CULL);
             }
 
             static const SDL_Rect BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT = (SDL_Rect) {
@@ -2034,7 +2030,7 @@ void render_match(const match_state_t& state) {
     }
 
     for (const unit_t& unit : state.units) {
-        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state.map, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
         if (unit.mode == UNIT_MODE_FERRY || unit.mode == UNIT_MODE_IN_MINE || unit.health == 0) {
@@ -2061,7 +2057,7 @@ void render_match(const match_state_t& state) {
     SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 1, .h = 1 };
     for (int x = 0; x < state.map.width; x++) {
         for (int y = 0; y < state.map.height; y++) {
-            FogType fog = state.map.fog[x + (y * state.map.width)];
+            FogType fog = state.map.player_fog[network_get_player_id()][x + (y * state.map.width)];
             if (fog == FOG_REVEALED) {
                 continue;
             }

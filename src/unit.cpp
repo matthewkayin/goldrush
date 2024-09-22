@@ -1051,7 +1051,7 @@ unit_target_t unit_target_nearest_mine(const match_state_t& state, const unit_t&
     // Find the nearest mining camp
     for (uint32_t mine_index = 0; mine_index < state.mines.size(); mine_index++) {
         // Don't target empty mines                    Don't target mines the player can't see
-        if (state.mines[mine_index].gold_left == 0 || !map_is_cell_rect_revealed(state.map, rect_t(state.mines[mine_index].cell, xy(MINE_SIZE, MINE_SIZE)))) {
+        if (state.mines[mine_index].gold_left == 0 || !map_is_cell_rect_revealed(state.map, unit.player_id, rect_t(state.mines[mine_index].cell, xy(MINE_SIZE, MINE_SIZE)))) {
             continue;
         }
 
