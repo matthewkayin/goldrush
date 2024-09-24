@@ -1341,29 +1341,30 @@ void render_match(const match_state_t& state) {
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map.width);
+            tile_data_t tile_data = get_tile_data(state.map.tiles[map_index]);
             uint32_t neighbors = 0;
-            for (int i = 0; i < DIRECTION_COUNT; i++) {
-                xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[i];
-                if (!map_is_cell_in_bounds(state.map, neighbor_cell)) {
-                    continue;
-                }
-                if (state.map.tiles[neighbor_cell.x + (neighbor_cell.y * state.map.width)] == state.map.tiles[map_index]) {
-                    neighbors += direction_mask[i];
+            if (tile_data.type == TILE_TYPE_AUTO) {
+                for (int i = 0; i < DIRECTION_COUNT; i++) {
+                    xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[i];
+                    if (!map_is_cell_in_bounds(state.map, neighbor_cell)) {
+                        continue;
+                    }
+                    if (state.map.tiles[neighbor_cell.x + (neighbor_cell.y * state.map.width)] == state.map.tiles[map_index]) {
+                        neighbors += direction_mask[i];
+                    }
                 }
             }
             for (int edge = 0; edge < 4; edge++) {
-                xy src_offset;
-                if (state.map.tiles[map_index] == TILE_ARIZONA_WATER) {
-                    src_offset = autotile_edge_lookup(edge, neighbors & edge_mask[edge]);
+                xy src_offset = tile_data.cell;
+                if (tile_data.type == TILE_TYPE_AUTO) {
+                    src_offset += autotile_edge_lookup(edge, neighbors & edge_mask[edge]);
                 } else {
-                    src_offset = edge_offsets[edge];
+                    src_offset += edge_offsets[edge];
                 }
                 
                 SDL_Rect tile_src_rect = (SDL_Rect) { 
-                    .x = (((int)state.map.tiles[map_index] % engine.sprites[SPRITE_TILESET_ARIZONA].hframes) * TILE_SIZE) +
-                         (src_offset.x * HALF_TILE_SIZE),
-                    .y = (((int)state.map.tiles[map_index] / engine.sprites[SPRITE_TILESET_ARIZONA].hframes) * TILE_SIZE) +
-                         (src_offset.y * HALF_TILE_SIZE),
+                    .x = (src_offset.x * HALF_TILE_SIZE),
+                    .y = (src_offset.y * HALF_TILE_SIZE),
                     .w = HALF_TILE_SIZE, 
                     .h = HALF_TILE_SIZE 
                 };

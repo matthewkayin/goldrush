@@ -140,6 +140,13 @@ match_state_t match_init() {
         unique_index++;
     }
 
+    // Set blocked cells
+    for (uint32_t index = 0; index < state.map.width * state.map.height; index++) {
+        if (get_tile_data(state.map.tiles[index]).blocked) {
+            state.map.cells[index].type = CELL_BLOCKED;
+        }
+    }
+
     // Init players
     log_trace("Initializing players...");
     xy player_spawns[MAX_PLAYERS];

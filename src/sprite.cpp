@@ -242,27 +242,33 @@ tile_data_t get_tile_data(uint32_t tile) {
         case TILE_ARIZONA_SAND1: 
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .cell = xy(0, 0)
+                .cell = xy(0, 0),
+                .blocked = false
             };
         case TILE_ARIZONA_SAND2: 
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .cell = xy(2, 0)
+                .cell = xy(2, 0),
+                .blocked = false
             };
         case TILE_ARIZONA_SAND3: 
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .cell = xy(4, 0)
+                .cell = xy(4, 0),
+                .blocked = false
             };
         case TILE_ARIZONA_WATER: 
             return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .cell = xy(0, 2)
+                .type = TILE_TYPE_AUTO,
+                .cell = xy(0, 2),
+                .blocked = true
             };
         default: 
+            GOLD_ASSERT(false);
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .cell = xy(-1, -1)
+                .cell = xy(-1, -1),
+                .blocked = false
             };
     }
 }

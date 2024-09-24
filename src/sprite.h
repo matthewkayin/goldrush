@@ -94,6 +94,7 @@ enum TileType {
 struct tile_data_t {
     TileType type;
     xy cell;
+    bool blocked;
 };
 
 tile_data_t get_tile_data(uint32_t tile);
