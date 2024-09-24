@@ -51,22 +51,22 @@ enum RecolorName {
     RECOLOR_BLUE,
     RECOLOR_RED,
     RECOLOR_GREEN,
-    RECOLOR_ORANGE,
+    RECOLOR_YELLOW,
     RECOLOR_TURQUOISE,
     RECOLOR_PURPLE,
-    RECOLOR_BLACK,
-    RECOLOR_WHITE,
+    RECOLOR_ORANGE,
+    RECOLOR_PINK,
     RECOLOR_NONE
 };
 const std::unordered_map<uint32_t, SDL_Color> COLOR_PLAYER = {
-    { RECOLOR_BLUE, (SDL_Color) { .r = 64, .g = 74, .b = 94, .a = 255 } },
-    { RECOLOR_RED, (SDL_Color) { .r = 158, .g = 83, .b = 82, .a = 255 } },
-    { RECOLOR_GREEN, (SDL_Color) { .r = 63, .g = 112, .b = 95, .a = 255 } },
-    { RECOLOR_ORANGE, (SDL_Color) { .r = 191, .g = 136, .b = 112, .a = 255 } },
-    { RECOLOR_TURQUOISE, (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 } },
-    { RECOLOR_PURPLE, (SDL_Color) { .r = 91, .g = 75, .b = 97, .a = 255 } },
-    { RECOLOR_BLACK, (SDL_Color) { .r = 61, .g = 57, .b = 69, .a = 255 } },
-    { RECOLOR_WHITE, (SDL_Color) { .r = 196, .g = 194, .b = 173, .a = 255 } }
+    { RECOLOR_BLUE, (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 } },
+    { RECOLOR_RED, (SDL_Color) { .r = 181, .g = 94, .b = 94, .a = 255 } },
+    { RECOLOR_GREEN, (SDL_Color) { .r = 77, .g = 160, .b = 116, .a = 255 } },
+    { RECOLOR_YELLOW, (SDL_Color) { .r = 212, .g = 166, .b = 80, .a = 255 } },
+    { RECOLOR_TURQUOISE, (SDL_Color) { .r = 92, .g = 170, .b = 153, .a = 255 } },
+    { RECOLOR_PURPLE, (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 } },
+    { RECOLOR_ORANGE, (SDL_Color) { .r = 204, .g = 115, .b = 80, .a = 255 } },
+    { RECOLOR_PINK, (SDL_Color) { .r = 200, .g = 134, .b = 209, .a = 255 } }
 };
 const SDL_Color RECOLOR_REF = (SDL_Color) { .r = 255, .g = 0, .b = 255, .a = 255 };
 
