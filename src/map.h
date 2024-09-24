@@ -3,9 +3,9 @@
 #include "util.h"
 #include <vector>
 
-struct tile_t {
-    uint16_t base;
-    uint16_t decoration;
+struct decoration_t {
+    uint32_t index;
+    xy cell;
 };
 
 enum CellType: uint16_t {
@@ -30,7 +30,8 @@ enum FogType: uint16_t {
 struct map_t {
     uint32_t width;
     uint32_t height;
-    std::vector<tile_t> tiles;
+    std::vector<uint32_t> tiles;
+    std::vector<decoration_t> decorations;
     std::vector<cell_t> cells;
     std::vector<FogType> player_fog[MAX_PLAYERS];
     bool is_fog_dirty;

@@ -23,10 +23,8 @@ enum UiButton {
 };
 
 enum Sprite {
-    SPRITE_TILES,
-    SPRITE_TILE_GOLD,
+    SPRITE_TILESET_ARIZONA,
     SPRITE_TILE_DECORATION,
-    SPRITE_TILE_WATER,
     SPRITE_UI_FRAME,
     SPRITE_UI_FRAME_BOTTOM,
     SPRITE_UI_FRAME_BUTTONS,
@@ -75,6 +73,30 @@ struct sprite_params_t {
 };
 
 extern const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS;
+
+enum TilesetName {
+    TILESET_ARIZONA,
+    TILESET_COUNT
+};
+
+enum ArizonaTile {
+    TILE_ARIZONA_SAND1,
+    TILE_ARIZONA_SAND2,
+    TILE_ARIZONA_SAND3,
+    TILE_ARIZONA_WATER
+};
+
+enum TileType {
+    TILE_TYPE_SINGLE,
+    TILE_TYPE_AUTO
+};
+
+struct tile_data_t {
+    TileType type;
+    xy cell;
+};
+
+tile_data_t get_tile_data(uint32_t tile);
 
 enum AnimationName {
     ANIMATION_UI_MOVE,

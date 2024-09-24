@@ -71,10 +71,7 @@ match_state_t match_init() {
     log_info("Generating map...");
     state.map.width = 96;
     state.map.height = 96;
-    state.map.tiles = std::vector<tile_t>(state.map.width * state.map.height, (tile_t) {
-        .base = 0,
-        .decoration = 0
-    });
+    state.map.tiles = std::vector<uint32_t>(state.map.width * state.map.height, TILE_ARIZONA_SAND1);
     state.map.cells = std::vector<cell_t>(state.map.width * state.map.height, (cell_t) {
         .type = CELL_EMPTY,
         .value = 0
@@ -90,7 +87,7 @@ match_state_t match_init() {
     for (uint32_t i = 0; i < state.map.width * state.map.height; i++) {
         int new_base = lcg_rand() % 7;
         if (new_base < 4 && i % 3 == 0) {
-            state.map.tiles[i].base = new_base == 1 ? 2 : 1; 
+            state.map.tiles[i] = new_base == 1 ? 2 : 1; 
         }
     }
     */
@@ -129,10 +126,10 @@ match_state_t match_init() {
             has_direction[DIRECTION_SOUTHWEST], has_direction[DIRECTION_SOUTH], has_direction[DIRECTION_SOUTHEAST]
         );
         xy cell = coords + xy(1, 1);
-        state.map.tiles[cell.x + (cell.y * state.map.width)].base = 4 + i;
+        state.map.tiles[cell.x + (cell.y * state.map.width)] = TILE_ARIZONA_WATER;
         for (uint32_t direction = 0; direction < DIRECTION_COUNT; direction++) {
             cell = coords + xy(1, 1) + DIRECTION_XY[direction];
-            state.map.tiles[cell.x + (cell.y * state.map.width)].base = has_direction[direction] ? 0 : 3;
+            state.map.tiles[cell.x + (cell.y * state.map.width)] = has_direction[direction] ? TILE_ARIZONA_SAND1 : TILE_ARIZONA_WATER;
         }
         coords.x += 4;
         if (coords.x + 4 > state.map.width) {
@@ -142,7 +139,6 @@ match_state_t match_init() {
 
         unique_index++;
     }
-
 
     // Init players
     log_trace("Initializing players...");
@@ -269,6 +265,10 @@ match_state_t match_init() {
                 .base = 0,
                 .decoration = (uint16_t)(1 + (rand() % 5))
             };
+            state.map.decorations.push_back((decoration_t) {
+                .index = (uint16_t)(rand() % 5),
+                .cell = xy(i % state.map.width, i / state.map.width)
+            });
             state.map.cells[i].type = CELL_BLOCKED;
         }
     }

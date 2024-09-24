@@ -228,6 +228,7 @@ void render_ninepatch(Sprite sprite, rect_t rect, int patch_margin);
 void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, RecolorName recolor_name = RECOLOR_NONE);
 void render_menu(const menu_state_t& menu);
 void render_options_menu(const option_menu_state_t& state);
+xy autotile_edge_lookup(uint32_t edge, uint32_t neighbors);
 void render_match(const match_state_t& state);
 
 enum Mode {
@@ -626,21 +627,24 @@ bool engine_create_renderer() {
     engine.sprites.reserve(SPRITE_COUNT);
     for (uint32_t i = 0; i < SPRITE_COUNT; i++) {
         // Get the sprite params
+        sprite_params_t params;
         auto sprite_params_it = SPRITE_PARAMS.find(i);
-        if (sprite_params_it == SPRITE_PARAMS.end()) {
+        if (sprite_params_it != SPRITE_PARAMS.end()) {
+            params = sprite_params_it->second;
+        } else {
             log_error("Sprite params not defined for sprite id %u", i);
             return false;
         }
 
         // Load the sprite
         sprite_t sprite;
-        SDL_Surface* sprite_surface = IMG_Load((resource_base_path + std::string(sprite_params_it->second.path)).c_str());
+        SDL_Surface* sprite_surface = IMG_Load((resource_base_path + std::string(params.path)).c_str());
         if (sprite_surface == NULL) {
-            log_error("Error loading sprite %s: %s", sprite_params_it->second.path, IMG_GetError());
+            log_error("Error loading sprite %s: %s", params.path, IMG_GetError());
             return false;
         }
 
-        if (sprite_params_it->second.recolor) {
+        if (params.recolor) {
             // Re-color texture creation
             uint32_t* sprite_pixels = (uint32_t*)sprite_surface->pixels;
             uint32_t reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_REF.r, RECOLOR_REF.g, RECOLOR_REF.b, RECOLOR_REF.a);
@@ -670,18 +674,18 @@ bool engine_create_renderer() {
             // Non-recolor texture creation
             sprite.texture = SDL_CreateTextureFromSurface(engine.renderer, sprite_surface);
             if (sprite.texture == NULL) {
-                log_error("Error creating texture for sprite %s: %s", sprite_params_it->second.path, SDL_GetError());
+                log_error("Error creating texture for sprite %s: %s", params.path, SDL_GetError());
                 return false;
             }
         }
 
-        if (sprite_params_it->second.hframes == -1) {
-            sprite.frame_size = xy(TILE_SIZE, TILE_SIZE);
+        if (params.hframes == -1 || params.hframes == -2) {
+            sprite.frame_size = params.hframes == -1 ? xy(TILE_SIZE, TILE_SIZE) : xy(HALF_TILE_SIZE, HALF_TILE_SIZE);
             sprite.hframes = sprite_surface->w / sprite.frame_size.x;
             sprite.vframes = sprite_surface->h / sprite.frame_size.y;
         } else {
-            sprite.hframes = sprite_params_it->second.hframes;
-            sprite.vframes = sprite_params_it->second.vframes;
+            sprite.hframes = params.hframes;
+            sprite.vframes = params.vframes;
             sprite.frame_size = xy(sprite_surface->w / sprite.hframes, sprite_surface->h / sprite.vframes);
         }
         GOLD_ASSERT(sprite_surface->w % sprite.frame_size.x == 0);
@@ -719,44 +723,6 @@ bool engine_create_renderer() {
     engine.current_cursor = CURSOR_DEFAULT;
     SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
 
-    engine.texture_water_autotile = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, 47 * 16, 16);
-    SDL_SetRenderTarget(engine.renderer, engine.texture_water_autotile);
-    uint32_t direction_mask[DIRECTION_COUNT] = {
-        1,
-        2,
-        4,
-        8,
-        16,
-        32,
-        64, 
-        128
-    };
-    uint32_t unique_index = 0;
-    for (uint32_t i = 0; i < 256; i++) {
-        bool has_direction[DIRECTION_COUNT];
-        for (uint32_t direction = 0; direction < DIRECTION_COUNT; direction++) {
-            has_direction[direction] = i & direction_mask[direction];
-        }
-        bool is_unique_combination = true;
-        for (uint32_t direction = DIRECTION_NORTHEAST; direction < DIRECTION_COUNT; direction += 2) {
-            if (has_direction[direction] && !(has_direction[direction - 1] && has_direction[(direction + 1) % DIRECTION_COUNT])) {
-                is_unique_combination = false;
-                break;
-            }
-        }
-        if (!is_unique_combination) {
-            continue;
-        }
-
-        for (int sub_x = 0; sub_x < 1; sub_x++) {
-            for (int sub_y = 0; sub_y < 1; sub_y++) {
-
-            }
-        }
-
-        unique_index++;
-    }
-
     SDL_SetRenderTarget(engine.renderer, NULL);
 
     log_info("Initialized renderer.");
@@ -785,8 +751,6 @@ void engine_destroy_renderer() {
     if (engine.minimap_texture != NULL) {
         SDL_DestroyTexture(engine.minimap_texture);
     }
-
-    SDL_DestroyTexture(engine.texture_water_autotile);
 
     SDL_DestroyRenderer(engine.renderer);
 
@@ -1044,7 +1008,7 @@ void render_menu(const menu_state_t& menu) {
             if (dst_rect.x > SCREEN_WIDTH || dst_rect.x + (TILE_SIZE * 2) < 0) {
                 continue;
             }
-            SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &src_rect, &dst_rect);
+            SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &src_rect, &dst_rect);
 
         }
     }
@@ -1280,6 +1244,60 @@ void ysort(render_sprite_params_t* params, int low, int high) {
     }
 }
 
+xy autotile_edge_lookup(uint32_t edge, uint32_t neighbors) {
+    switch (edge) {
+        case 0:
+            switch (neighbors) {
+                case 0: return xy(0, 0);
+                case 128: return xy(0, 0);
+                case 1: return xy(0, 3);
+                case 129: return xy(0, 3);
+                case 64: return xy(1, 2);
+                case 192: return xy(1, 2);
+                case 65: return xy(2, 0);
+                case 193: return xy(1, 3);
+                default: GOLD_ASSERT(false);
+            }
+        case 1:
+            switch (neighbors) {
+                case 0: return xy(1, 0);
+                case 2: return xy(1, 0);
+                case 1: return xy(3, 3);
+                case 3: return xy(3, 3);
+                case 4: return xy(1, 2);
+                case 6: return xy(1, 2);
+                case 5: return xy(3, 0);
+                case 7: return xy(1, 3);
+                default: GOLD_ASSERT(false);
+            }
+        case 2:
+            switch (neighbors) {
+                case 0: return xy(0, 1);
+                case 32: return xy(0, 1);
+                case 16: return xy(0, 3);
+                case 48: return xy(0, 3);
+                case 64: return xy(1, 5);
+                case 96: return xy(1, 5);
+                case 80: return xy(2, 1);
+                case 112: return xy(1, 3);
+            }
+        case 3:
+            switch (neighbors) {
+                case 0: return xy(1, 1);
+                case 8: return xy(1, 1);
+                case 4: return xy(1, 5);
+                case 12: return xy(1, 5);
+                case 16: return xy(3, 3);
+                case 24: return xy(3, 3);
+                case 20: return xy(3, 1);
+                case 28: return xy(1, 3);
+            }
+        default: GOLD_ASSERT(false);
+    }
+
+    return xy(-1, -1);
+}
+
 void render_match(const match_state_t& state) {
     Cursor expected_cursor = CURSOR_DEFAULT;
     if (state.ui_mode == UI_MODE_ATTACK_MOVE && (!ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
@@ -1291,10 +1309,9 @@ void render_match(const match_state_t& state) {
     }
 
     std::vector<render_sprite_params_t> ysorted;
+    rect_t screen_rect = rect_t(xy(0, 0), xy(SCREEN_WIDTH, SCREEN_HEIGHT));
 
     // Render map
-    SDL_Rect tile_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
-    SDL_Rect tile_dst_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
     xy base_pos = xy(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
     xy base_coords = xy(state.camera_offset.x / TILE_SIZE, state.camera_offset.y / TILE_SIZE);
     xy max_visible_tiles = xy(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE);
@@ -1304,43 +1321,76 @@ void render_match(const match_state_t& state) {
     if (base_pos.y != 0) {
         max_visible_tiles.y++;
     }
-    rect_t screen_rect = rect_t(xy(0, 0), xy(SCREEN_WIDTH, SCREEN_HEIGHT));
-
-    SDL_SetRenderDrawColor(engine.renderer, 255, 0, 0, 255);
+    static const xy edge_offsets[4] = { xy(0, 0), xy(1, 0), xy(0, 1), xy(1, 1) };
+    static const uint32_t direction_mask[DIRECTION_COUNT] = {
+        1,
+        2,
+        4,
+        8,
+        16,
+        32,
+        64, 
+        128
+    };
+    static const uint32_t edge_mask[4] = { 
+        direction_mask[DIRECTION_NORTH] + direction_mask[DIRECTION_NORTHWEST] + direction_mask[DIRECTION_WEST],
+        direction_mask[DIRECTION_NORTH] + direction_mask[DIRECTION_NORTHEAST] + direction_mask[DIRECTION_EAST],
+        direction_mask[DIRECTION_WEST] + direction_mask[DIRECTION_SOUTHWEST] + direction_mask[DIRECTION_SOUTH],
+        direction_mask[DIRECTION_EAST] + direction_mask[DIRECTION_SOUTHEAST] + direction_mask[DIRECTION_SOUTH]
+    };
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map.width);
-            tile_src_rect.x = ((int)state.map.tiles[map_index].base % engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
-            tile_src_rect.y = ((int)state.map.tiles[map_index].base / engine.sprites[SPRITE_TILES].hframes) * TILE_SIZE;
-
-            tile_dst_rect.x = base_pos.x + (x * TILE_SIZE);
-            tile_dst_rect.y = base_pos.y + (y * TILE_SIZE);
-
-            if (state.map.tiles[map_index].base > 2) {
-                if (state.map.tiles[map_index].base == 3) {
-                    tile_src_rect.x = 8;
-                    tile_src_rect.y = 24;
-                    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILE_WATER].texture, &tile_src_rect, &tile_dst_rect);
-                } else {
-                    tile_src_rect.x = state.map.tiles[map_index].base - 4;
-                    tile_src_rect.y = 0;
-                    SDL_RenderCopy(engine.renderer, engine.texture_water_autotile, &tile_src_rect, &tile_dst_rect);
+            uint32_t neighbors = 0;
+            for (int i = 0; i < DIRECTION_COUNT; i++) {
+                xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[i];
+                if (!map_is_cell_in_bounds(state.map, neighbor_cell)) {
+                    continue;
                 }
-            } else {
-                SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILES].texture, &tile_src_rect, &tile_dst_rect);
+                if (state.map.tiles[neighbor_cell.x + (neighbor_cell.y * state.map.width)] == state.map.tiles[map_index]) {
+                    neighbors += direction_mask[i];
+                }
             }
+            for (int edge = 0; edge < 4; edge++) {
+                xy src_offset;
+                if (state.map.tiles[map_index] == TILE_ARIZONA_WATER) {
+                    src_offset = autotile_edge_lookup(edge, neighbors & edge_mask[edge]);
+                } else {
+                    src_offset = edge_offsets[edge];
+                }
+                
+                SDL_Rect tile_src_rect = (SDL_Rect) { 
+                    .x = (((int)state.map.tiles[map_index] % engine.sprites[SPRITE_TILESET_ARIZONA].hframes) * TILE_SIZE) +
+                         (src_offset.x * HALF_TILE_SIZE),
+                    .y = (((int)state.map.tiles[map_index] / engine.sprites[SPRITE_TILESET_ARIZONA].hframes) * TILE_SIZE) +
+                         (src_offset.y * HALF_TILE_SIZE),
+                    .w = HALF_TILE_SIZE, 
+                    .h = HALF_TILE_SIZE 
+                };
+                SDL_Rect tile_dst_rect = (SDL_Rect) { 
+                    .x = base_pos.x + (x * TILE_SIZE) + (edge_offsets[edge].x * HALF_TILE_SIZE),
+                    .y = base_pos.y + (y * TILE_SIZE) + (edge_offsets[edge].y * HALF_TILE_SIZE),
+                    .w = HALF_TILE_SIZE, 
+                    .h = HALF_TILE_SIZE 
+                };
 
-            // Render decorations
-            if (state.map.tiles[map_index].decoration != 0) {
-                ysorted.push_back((render_sprite_params_t) {
-                    .sprite = SPRITE_TILE_DECORATION,
-                    .position = xy(tile_dst_rect.x, tile_dst_rect.y),
-                    .frame = xy(state.map.tiles[map_index].decoration - 1, 0),
-                    .options = RENDER_SPRITE_NO_CULL,
-                    .recolor_name = RECOLOR_NONE
-                });
+                SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &tile_src_rect, &tile_dst_rect);
             }
         }
+    }
+
+    for (const decoration_t& decoration : state.map.decorations) {
+        rect_t decoration_rect = rect_t((decoration.cell * TILE_SIZE) - state.camera_offset, xy(TILE_SIZE, TILE_SIZE));
+        if (!screen_rect.intersects(decoration_rect)) {
+            continue;
+        }
+        ysorted.push_back((render_sprite_params_t) {
+            .sprite = SPRITE_TILE_DECORATION,
+            .position = decoration_rect.position,
+            .frame = xy(decoration.index, 0),
+            .options = RENDER_SPRITE_NO_CULL,
+            .recolor_name = RECOLOR_NONE
+        });
     }
 
     // Render destroyed buildings
@@ -1601,11 +1651,15 @@ void render_match(const match_state_t& state) {
                 continue;
             }
 
-            tile_dst_rect.x = base_pos.x + x * TILE_SIZE;
-            tile_dst_rect.y = base_pos.y + y * TILE_SIZE;
+            SDL_Rect fog_rect = (SDL_Rect) {
+                .x = base_pos.x + (x * TILE_SIZE),
+                .y = base_pos.y + (y * TILE_SIZE),
+                .w = TILE_SIZE,
+                .h = TILE_SIZE
+            };
             SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog == FOG_HIDDEN ? 255 : 128);
 #ifndef GOLD_DEBUG_FOG_DISABLED
-            SDL_RenderFillRect(engine.renderer, &tile_dst_rect);
+            SDL_RenderFillRect(engine.renderer, &fog_rect);
 #endif
         }
     }

@@ -1,14 +1,8 @@
 #include "sprite.h"
 
 const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
-    { SPRITE_TILES, (sprite_params_t) {
-        .path = "sprite/tiles.png",
-        .hframes = -1,
-        .vframes = -1,
-        .recolor = false
-    }},
-    { SPRITE_TILE_GOLD, (sprite_params_t) {
-        .path = "sprite/tile_gold.png",
+    { SPRITE_TILESET_ARIZONA, (sprite_params_t) {
+        .path = "sprite/tileset_arizona.png",
         .hframes = -1,
         .vframes = -1,
         .recolor = false
@@ -17,12 +11,6 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .path = "sprite/tile_decorations.png",
         .hframes = -1,
         .vframes = -1,
-        .recolor = false
-    }},
-    { SPRITE_TILE_WATER, (sprite_params_t) {
-        .path = "sprite/tile_water.png",
-        .hframes = 4,
-        .vframes = 6,
         .recolor = false
     }},
     { SPRITE_UI_FRAME, (sprite_params_t) {
@@ -248,6 +236,36 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .recolor = false
     }}  
 };
+
+tile_data_t get_tile_data(uint32_t tile) {
+    switch (tile) {
+        case TILE_ARIZONA_SAND1: 
+            return (tile_data_t) {
+                .type = TILE_TYPE_SINGLE,
+                .cell = xy(0, 0)
+            };
+        case TILE_ARIZONA_SAND2: 
+            return (tile_data_t) {
+                .type = TILE_TYPE_SINGLE,
+                .cell = xy(2, 0)
+            };
+        case TILE_ARIZONA_SAND3: 
+            return (tile_data_t) {
+                .type = TILE_TYPE_SINGLE,
+                .cell = xy(4, 0)
+            };
+        case TILE_ARIZONA_WATER: 
+            return (tile_data_t) {
+                .type = TILE_TYPE_SINGLE,
+                .cell = xy(0, 2)
+            };
+        default: 
+            return (tile_data_t) {
+                .type = TILE_TYPE_SINGLE,
+                .cell = xy(-1, -1)
+            };
+    }
+}
 
 const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
     { ANIMATION_UI_MOVE, (animation_data_t) {
