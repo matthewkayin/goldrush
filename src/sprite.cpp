@@ -260,7 +260,7 @@ tile_data_t get_tile_data(uint32_t tile) {
         case TILE_ARIZONA_WATER: 
             return (tile_data_t) {
                 .type = TILE_TYPE_AUTO,
-                .cell = xy(0, 2),
+                .cell = xy(6, 0),
                 .blocked = true
             };
         default: 
