@@ -83,7 +83,12 @@ enum ArizonaTile {
     TILE_ARIZONA_SAND1,
     TILE_ARIZONA_SAND2,
     TILE_ARIZONA_SAND3,
-    TILE_ARIZONA_WATER
+    TILE_ARIZONA_WATER,
+    TILE_ARIZONA_WALL,
+    TILE_ARIZONA_WALL_FRONT_LEFT,
+    TILE_ARIZONA_WALL_FRONT_CENTER,
+    TILE_ARIZONA_WALL_FRONT_RIGHT,
+    TILE_ARIZONA_COUNT
 };
 
 enum TileType {
@@ -93,8 +98,7 @@ enum TileType {
 
 struct tile_data_t {
     TileType type;
-    xy cell;
-    bool blocked;
+    xy source_pos;
 };
 
 tile_data_t get_tile_data(uint32_t tile);

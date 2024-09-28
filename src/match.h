@@ -4,7 +4,6 @@
 #include "util.h"
 #include "sprite.h"
 #include "container.h"
-#include "map.h"
 #include <cstdint>
 #include <vector>
 #include <queue>
@@ -46,6 +45,43 @@ extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
 extern const uint32_t MATCH_ALERT_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
+
+// Map
+
+struct tile_t {
+    uint16_t index;
+    int16_t elevation;
+};
+
+struct decoration_t {
+    uint32_t index;
+    xy cell;
+};
+
+enum CellType: uint16_t {
+    CELL_EMPTY,
+    CELL_BLOCKED,
+    CELL_UNIT,
+    CELL_BUILDING,
+    CELL_MINE
+};
+
+struct cell_t {
+    CellType type;
+    uint16_t value;
+};
+
+enum FogType: uint16_t {
+    FOG_HIDDEN,
+    FOG_EXPLORED,
+    FOG_REVEALED
+};
+
+struct mine_t {
+    xy cell;
+    uint32_t gold_left;
+    bool is_occupied;
+};
 
 // UI
 
@@ -399,7 +435,15 @@ struct match_state_t {
     uint32_t tick_timer;
 
     // Map
-    map_t map;
+    uint32_t map_width;
+    uint32_t map_height;
+    int map_lowest_elevation;
+    int map_highest_elevation;
+    std::vector<tile_t> map_tiles;
+    std::vector<decoration_t> map_decorations;
+    std::vector<cell_t> map_cells;
+    std::vector<FogType> player_fog[MAX_PLAYERS];
+    bool is_fog_dirty;
 
     // Entities
     id_array<unit_t> units;
@@ -449,6 +493,18 @@ entity_id ui_get_nearest_builder(const match_state_t& state, xy cell);
 int ui_get_building_queue_index_hovered(const match_state_t& state);
 
 // Map
+void map_init(match_state_t& state, uint32_t width, uint32_t height);
+bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
+bool map_is_cell_rect_in_bounds(const match_state_t& state, rect_t cell_rect);
+bool map_is_cell_blocked(const match_state_t& state, xy cell);
+bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
+cell_t map_get_cell(const match_state_t& state, xy cell);
+void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value = 0);
+void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
+FogType map_get_fog(const match_state_t& state, uint8_t player_id, xy cell);
+bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, rect_t rect);
+void map_fog_reveal_at_cell(match_state_t& state, uint8_t player_id, xy cell, xy size, int sight);
+uint16_t map_get_elevation(const match_state_t& state, xy cell);
 bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners);
 void map_fog_reveal(match_state_t& state, uint8_t player_id);

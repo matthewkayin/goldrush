@@ -119,7 +119,6 @@ struct sprite_t {
     int vframes;
 };
 
-
 // CURSOR
 
 struct cursor_params_t {    
@@ -195,9 +194,7 @@ struct engine_t {
     std::vector<TTF_Font*> fonts;
     std::vector<sprite_t> sprites;
     std::vector<SDL_Cursor*> cursors;
-    SDL_Texture* texture_water_autotile;
     SDL_Texture* minimap_texture;
-
 };
 static engine_t engine;
 
@@ -452,7 +449,7 @@ int gold_main(int argc, char** argv) {
                     if (menu_state.mode == MENU_MODE_MATCH_START) {
                         match_state = match_init();
                         mode = MODE_MATCH;
-                        engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, match_state.map.width, match_state.map.height);
+                        engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, match_state.map_width, match_state.map_height);
                     } else if (menu_state.mode == MENU_MODE_EXIT) {
                         engine.is_running = false;
                         break;
@@ -496,12 +493,14 @@ int gold_main(int argc, char** argv) {
                 break;
         }
 
-        char fps_text[16];
-        sprintf(fps_text, "FPS: %u", fps);
-        char ups_text[16];
-        sprintf(ups_text, "UPS: %u", ups);
-        render_text(FONT_HACK, fps_text, COLOR_WHITE, xy(0, 0));
-        render_text(FONT_HACK, ups_text, COLOR_WHITE, xy(0, 12));
+        if (engine.view_fps) {
+            char fps_text[16];
+            sprintf(fps_text, "FPS: %u", fps);
+            char ups_text[16];
+            sprintf(ups_text, "UPS: %u", ups);
+            render_text(FONT_HACK, fps_text, COLOR_WHITE, xy(0, 0));
+            render_text(FONT_HACK, ups_text, COLOR_WHITE, xy(0, 12));
+        }
 
         SDL_RenderPresent(engine.renderer);
     } // End while running
@@ -543,7 +542,6 @@ bool engine_init(xy window_size) {
         return false;
     }
 
-    engine.minimap_texture = NULL;
     if (!engine_create_renderer()) {
         return false;
     }
@@ -574,6 +572,8 @@ void engine_set_window_fullscreen(OptionDisplayValue display_value) {
 }
 
 bool engine_create_renderer() {
+    engine.minimap_texture = NULL;
+
     // Create renderer
     uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
     if (options[OPTION_VSYNC] == VSYNC_ENABLED) {
@@ -680,7 +680,7 @@ bool engine_create_renderer() {
         }
 
         if (params.hframes == -1 || params.hframes == -2) {
-            sprite.frame_size = params.hframes == -1 ? xy(TILE_SIZE, TILE_SIZE) : xy(HALF_TILE_SIZE, HALF_TILE_SIZE);
+            sprite.frame_size = params.hframes == -1 ? xy(TILE_SIZE, TILE_SIZE) : xy(TILE_SIZE / 2, TILE_SIZE / 2);
             sprite.hframes = sprite_surface->w / sprite.frame_size.x;
             sprite.vframes = sprite_surface->h / sprite.frame_size.y;
         } else {
@@ -750,6 +750,7 @@ void engine_destroy_renderer() {
     engine.cursors.clear();
     if (engine.minimap_texture != NULL) {
         SDL_DestroyTexture(engine.minimap_texture);
+        engine.minimap_texture = NULL;
     }
 
     SDL_DestroyRenderer(engine.renderer);
@@ -1188,9 +1189,12 @@ void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t 
     bool centered = (options & RENDER_SPRITE_CENTERED) == RENDER_SPRITE_CENTERED;
     bool cull = !((options & RENDER_SPRITE_NO_CULL) == RENDER_SPRITE_NO_CULL);
 
-    SDL_Rect src_rect = (SDL_Rect) { 
-        .x = frame.x * engine.sprites[sprite].frame_size.x, .y = frame.y * engine.sprites[sprite].frame_size.y, 
-        .w = engine.sprites[sprite].frame_size.x, .h = engine.sprites[sprite].frame_size.y };
+    SDL_Rect src_rect = (SDL_Rect) {
+        .x = frame.x * engine.sprites[sprite].frame_size.x, 
+        .y = frame.y * engine.sprites[sprite].frame_size.y, 
+        .w = engine.sprites[sprite].frame_size.x, 
+        .h = engine.sprites[sprite].frame_size.y 
+    };
     SDL_Rect dst_rect = (SDL_Rect) {
         .x = position.x, .y = position.y,
         .w = src_rect.w, .h = src_rect.h
@@ -1308,10 +1312,8 @@ void render_match(const match_state_t& state) {
         SDL_SetCursor(engine.cursors[engine.current_cursor]);
     }
 
-    std::vector<render_sprite_params_t> ysorted;
-    rect_t screen_rect = rect_t(xy(0, 0), xy(SCREEN_WIDTH, SCREEN_HEIGHT));
-
-    // Render map
+    static const rect_t screen_rect = rect_t(xy(0, 0), xy(SCREEN_WIDTH, SCREEN_HEIGHT));
+    // Prepare to render map. These variables only need to be set once instead of per elevation level
     xy base_pos = xy(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
     xy base_coords = xy(state.camera_offset.x / TILE_SIZE, state.camera_offset.y / TILE_SIZE);
     xy max_visible_tiles = xy(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE);
@@ -1321,83 +1323,85 @@ void render_match(const match_state_t& state) {
     if (base_pos.y != 0) {
         max_visible_tiles.y++;
     }
-    static const xy edge_offsets[4] = { xy(0, 0), xy(1, 0), xy(0, 1), xy(1, 1) };
-    static const uint32_t direction_mask[DIRECTION_COUNT] = {
-        1,
-        2,
-        4,
-        8,
-        16,
-        32,
-        64, 
-        128
-    };
-    static const uint32_t edge_mask[4] = { 
-        direction_mask[DIRECTION_NORTH] + direction_mask[DIRECTION_NORTHWEST] + direction_mask[DIRECTION_WEST],
-        direction_mask[DIRECTION_NORTH] + direction_mask[DIRECTION_NORTHEAST] + direction_mask[DIRECTION_EAST],
-        direction_mask[DIRECTION_WEST] + direction_mask[DIRECTION_SOUTHWEST] + direction_mask[DIRECTION_SOUTH],
-        direction_mask[DIRECTION_EAST] + direction_mask[DIRECTION_SOUTHEAST] + direction_mask[DIRECTION_SOUTH]
-    };
-    for (int y = 0; y < max_visible_tiles.y; y++) {
-        for (int x = 0; x < max_visible_tiles.x; x++) {
-            int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map.width);
-            tile_data_t tile_data = get_tile_data(state.map.tiles[map_index]);
-            uint32_t neighbors = 0;
-            if (tile_data.type == TILE_TYPE_AUTO) {
-                for (int i = 0; i < DIRECTION_COUNT; i++) {
-                    xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[i];
-                    if (!map_is_cell_in_bounds(state.map, neighbor_cell)) {
-                        continue;
-                    }
-                    if (state.map.tiles[neighbor_cell.x + (neighbor_cell.y * state.map.width)] == state.map.tiles[map_index]) {
-                        neighbors += direction_mask[i];
-                    }
+
+    for (int elevation = state.map_lowest_elevation; elevation < state.map_highest_elevation + 1; elevation++) {
+        std::vector<render_sprite_params_t> ysorted;
+
+        // Render map
+        for (int y = 0; y < max_visible_tiles.y; y++) {
+            for (int x = 0; x < max_visible_tiles.x; x++) {
+                int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map_width);
+                // If current elevation is above the tile, then skip it
+                if (state.map_tiles[map_index].elevation < elevation) {
+                    continue;
                 }
-            }
-            for (int edge = 0; edge < 4; edge++) {
-                xy src_offset = tile_data.cell;
+                // If current elevation is equal to the tile, then render the tile, otherwise render default ground tile beneath it
+                uint16_t map_tile_index = state.map_tiles[map_index].elevation == elevation 
+                                            ? state.map_tiles[map_index].index
+                                            : TILE_ARIZONA_SAND1;
+                const tile_data_t& tile_data = get_tile_data(map_tile_index);
+
+                // Calculate tile neighbors
+                uint32_t neighbors = 0;
                 if (tile_data.type == TILE_TYPE_AUTO) {
-                    src_offset += autotile_edge_lookup(edge, neighbors & edge_mask[edge]);
-                } else {
-                    src_offset += edge_offsets[edge];
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                        xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[direction];
+                        if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                            continue;
+                        }
+                        if (state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index == map_tile_index) {
+                            neighbors += AUTOTILE_DIRECTION_MASK[direction];
+                        }
+                    }
                 }
-                
-                SDL_Rect tile_src_rect = (SDL_Rect) { 
-                    .x = (src_offset.x * HALF_TILE_SIZE),
-                    .y = (src_offset.y * HALF_TILE_SIZE),
-                    .w = HALF_TILE_SIZE, 
-                    .h = HALF_TILE_SIZE 
-                };
-                SDL_Rect tile_dst_rect = (SDL_Rect) { 
-                    .x = base_pos.x + (x * TILE_SIZE) + (edge_offsets[edge].x * HALF_TILE_SIZE),
-                    .y = base_pos.y + (y * TILE_SIZE) + (edge_offsets[edge].y * HALF_TILE_SIZE),
-                    .w = HALF_TILE_SIZE, 
-                    .h = HALF_TILE_SIZE 
-                };
 
-                SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &tile_src_rect, &tile_dst_rect);
+                for (int edge = 0; edge < 4; edge++) {
+                    // Since neighbors defaults to 0, this function will work even for non-auto tiles
+                    xy source_pos = tile_data.source_pos + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
+                    SDL_Rect tile_src_rect = (SDL_Rect) {
+                        .x = source_pos.x,
+                        .y = source_pos.y,
+                        .w = TILE_SIZE / 2,
+                        .h = TILE_SIZE / 2
+                    };
+                    SDL_Rect tile_dst_rect = (SDL_Rect) {
+                        .x = base_pos.x + (x * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
+                        .y = base_pos.y + (y * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2)),
+                        .w = TILE_SIZE / 2,
+                        .h = TILE_SIZE / 2
+                    };
+
+                    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &tile_src_rect, &tile_dst_rect);
+                }
+            } // End for x of visible tiles
+        } // End for y of visible tiles
+        // End render map
+
+        // Render map decorations
+        for (const decoration_t& decoration : state.map_decorations) {
+            rect_t decoration_rect = rect_t((decoration.cell * TILE_SIZE) - state.camera_offset, xy(TILE_SIZE, TILE_SIZE));
+            if (!screen_rect.intersects(decoration_rect)) {
+                continue;
             }
+            if (map_get_elevation(state, decoration.cell) != elevation) {
+                continue;
+            }
+            ysorted.push_back((render_sprite_params_t) {
+                .sprite = SPRITE_TILE_DECORATION,
+                .position = decoration_rect.position,
+                .frame = xy(decoration.index, 0),
+                .options = RENDER_SPRITE_NO_CULL,
+                .recolor_name = RECOLOR_NONE
+            });
         }
-    }
 
-    for (const decoration_t& decoration : state.map.decorations) {
-        rect_t decoration_rect = rect_t((decoration.cell * TILE_SIZE) - state.camera_offset, xy(TILE_SIZE, TILE_SIZE));
-        if (!screen_rect.intersects(decoration_rect)) {
-            continue;
-        }
-        ysorted.push_back((render_sprite_params_t) {
-            .sprite = SPRITE_TILE_DECORATION,
-            .position = decoration_rect.position,
-            .frame = xy(decoration.index, 0),
-            .options = RENDER_SPRITE_NO_CULL,
-            .recolor_name = RECOLOR_NONE
-        });
-    }
+        // Render destroyed buildings
+        for (auto it : state.remembered_buildings) {
+            const remembered_building_t& building = it.second;
+            if (building.mode != BUILDING_MODE_DESTROYED || map_get_elevation(state, building.cell) != elevation) {
+                continue;
+            }
 
-    // Render destroyed buildings
-    for (auto it : state.remembered_buildings) {
-        const remembered_building_t& building = it.second;
-        if (building.mode == BUILDING_MODE_DESTROYED) {
             Sprite destroyed_sprite;
             if (building_cell_size(building.type) == xy(3, 3)) {
                 destroyed_sprite = SPRITE_BUILDING_DESTROYED_3;
@@ -1406,35 +1410,74 @@ void render_match(const match_state_t& state) {
             }
             render_sprite(destroyed_sprite, xy(0, 0), (building.cell * TILE_SIZE) - state.camera_offset);
         }
-    }
 
-    // Select rings and healthbars
-    static const int HEALTHBAR_HEIGHT = 4;
-    static const int HEALTHBAR_PADDING = 2;
-    static const int BUILDING_HEALTHBAR_PADDING = 5;
-    if (state.selection.type == SELECTION_TYPE_BUILDINGS || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
-        uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
-        if (building_index != INDEX_INVALID) {
-            const building_t& building = state.buildings[building_index];
-            rect_t building_rect = building_get_rect(building);
-            render_sprite(building_get_select_ring(building.type, state.selection.type == SELECTION_TYPE_ENEMY_BUILDING), xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+        // Select rings and healthbars
+        static const int HEALTHBAR_HEIGHT = 4;
+        static const int HEALTHBAR_PADDING = 2;
+        static const int BUILDING_HEALTHBAR_PADDING = 5;
+        if (state.selection.type == SELECTION_TYPE_BUILDINGS || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
+            uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
+            if (building_index != INDEX_INVALID) {
+                const building_t& building = state.buildings[building_index];
+                if (map_get_elevation(state, building.cell) == elevation) {
+                    rect_t building_rect = building_get_rect(building);
+                    render_sprite(building_get_select_ring(building.type, state.selection.type == SELECTION_TYPE_ENEMY_BUILDING), xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
-            // Determine healthbar rect
-            xy building_render_pos = building_rect.position - state.camera_offset;
-            SDL_Rect healthbar_rect = (SDL_Rect) { 
-                .x = building_render_pos.x, 
-                .y = building_render_pos.y + building_rect.size.y + BUILDING_HEALTHBAR_PADDING, 
-                .w = building_rect.size.x, 
-                .h = HEALTHBAR_HEIGHT };
-            SDL_Rect healthbar_subrect = healthbar_rect;
-            healthbar_subrect.w = (healthbar_rect.w * building.health) / 
-                                    BUILDING_DATA.at(building.type).max_health;
+                    // Determine healthbar rect
+                    xy building_render_pos = building_rect.position - state.camera_offset;
+                    SDL_Rect healthbar_rect = (SDL_Rect) { 
+                        .x = building_render_pos.x, 
+                        .y = building_render_pos.y + building_rect.size.y + BUILDING_HEALTHBAR_PADDING, 
+                        .w = building_rect.size.x, 
+                        .h = HEALTHBAR_HEIGHT };
+                    SDL_Rect healthbar_subrect = healthbar_rect;
+                    healthbar_subrect.w = (healthbar_rect.w * building.health) / 
+                                            BUILDING_DATA.at(building.type).max_health;
 
-            // Cull the healthbar
-            if (!(healthbar_rect.x + healthbar_rect.w < 0 || 
-                  healthbar_rect.y + healthbar_rect.h < 0 || 
-                  healthbar_rect.x >= SCREEN_WIDTH || 
-                  healthbar_rect.y >= SCREEN_HEIGHT)) {
+                    // Cull the healthbar
+                    if (!(healthbar_rect.x + healthbar_rect.w < 0 || 
+                        healthbar_rect.y + healthbar_rect.h < 0 || 
+                        healthbar_rect.x >= SCREEN_WIDTH || 
+                        healthbar_rect.y >= SCREEN_HEIGHT)) {
+                        // Render the healthbar
+                        SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                        SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                        SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                        SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+                        SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+                    }
+                } // End if building is on current elevation
+            } // End if building is valid
+        // End if selection type is buildings or enemy buildings
+        } else if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_ENEMY_UNIT) {
+            for (entity_id unit_id : state.selection.ids) {
+                uint32_t index = state.units.get_index_of(unit_id);
+                if (index == INDEX_INVALID) {
+                    continue;
+                }
+                const unit_t& unit = state.units[index];
+                if (unit.mode == UNIT_MODE_IN_MINE) {
+                    continue;
+                }
+                if (map_get_elevation(state, unit.cell) != elevation) {
+                    continue;
+                }
+
+                xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
+                Sprite select_ring_sprite = unit_get_select_ring(unit.type, state.selection.type == SELECTION_TYPE_ENEMY_UNIT);
+                render_sprite(select_ring_sprite, xy(0, 0), unit_render_pos, RENDER_SPRITE_CENTERED);
+
+                // Determine healthbar rect
+                xy unit_render_size = engine.sprites[UNIT_DATA.at(unit.type).sprite].frame_size;
+                SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
+                SDL_Rect healthbar_subrect = healthbar_rect;
+                healthbar_subrect.w = (healthbar_rect.w * unit.health) / UNIT_DATA.at(unit.type).max_health;
+
+                // Cull the healthbar
+                if (healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT ) {
+                    continue;
+                }
+
                 // Render the healthbar
                 SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
                 SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
@@ -1442,212 +1485,191 @@ void render_match(const match_state_t& state) {
                 SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
                 SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
             }
+        // End if selection type is unit or enemy unit
+        } else if (state.selection.type == SELECTION_TYPE_MINE) {
+            const mine_t& mine = state.mines.get_by_id(state.selection.ids[0]);
+            if (map_get_elevation(state, mine.cell) == elevation) {
+                rect_t mine_rect = rect_t(mine.cell * TILE_SIZE, xy(MINE_SIZE * TILE_SIZE, MINE_SIZE * TILE_SIZE));
+                render_sprite(SPRITE_SELECT_RING_BUILDING_3, xy(0, 0), mine_rect.position + (mine_rect.size / 2) - state.camera_offset + xy(0, -3), RENDER_SPRITE_CENTERED);
+            }
         }
-    } else if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_ENEMY_UNIT) {
-        for (entity_id unit_id : state.selection.ids) {
-            uint32_t index = state.units.get_index_of(unit_id);
-            if (index == INDEX_INVALID) {
+
+        // UI move animation
+        if (animation_is_playing(state.ui_move_animation) && 
+            map_get_fog(state, network_get_player_id(), state.ui_move_position / TILE_SIZE) != FOG_HIDDEN && 
+            map_get_elevation(state, state.ui_move_position / TILE_SIZE) == elevation) {
+            if (state.ui_move_cell.type == CELL_EMPTY) {
+                render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
+            } else if (state.ui_move_animation.frame.x % 2 == 0) {
+                entity_id id = (entity_id)(state.ui_move_cell.value);
+                switch (state.ui_move_cell.type) {
+                    case CELL_UNIT: {
+                        uint32_t unit_index = state.units.get_index_of(id);
+                        if (unit_index != INDEX_INVALID && map_is_cell_rect_revealed(state, network_get_player_id(), rect_t(state.units[unit_index].cell, xy(1, 1)))) {
+                            Sprite sprite = unit_get_select_ring(state.units[unit_index].type, state.units[unit_index].player_id != network_get_player_id());
+                            render_sprite(sprite, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
+                        }
+                        break;
+                    }
+                    case CELL_BUILDING: {
+                        uint32_t building_index = state.buildings.get_index_of(id);
+                        if (building_index != INDEX_INVALID) {
+                            rect_t building_rect = building_get_rect(state.buildings[building_index]);
+                            Sprite sprite = building_get_select_ring(state.buildings[building_index].type, state.buildings[building_index].player_id != network_get_player_id());
+                            render_sprite(sprite, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                        }
+                        break;
+                    }
+                    case CELL_MINE: {
+                        render_sprite(SPRITE_SELECT_RING_BUILDING_3, xy(0, 0), (state.mines.get_by_id(id).cell * TILE_SIZE) + (xy(3 * TILE_SIZE, 3 * TILE_SIZE) / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
+        // End render UI move animation
+
+        // Rally points
+        if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+            const building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
+            if (building_is_finished(building) && building.rally_point.x != -1) {
+                if (map_get_elevation(state, building.rally_point / TILE_SIZE) == elevation) {
+                    ysorted.push_back((render_sprite_params_t) {
+                        .sprite = SPRITE_RALLY_FLAG,
+                        .position = building.rally_point - xy(4, 15) - state.camera_offset,
+                        .frame = state.ui_rally_animation.frame,
+                        .options = 0,
+                        .recolor_name = (RecolorName)network_get_player_id()
+                    });
+                }
+            }
+        }
+
+        // Mines
+        for (auto it : state.remembered_mines) {
+            const mine_t& mine = it.second;
+            if (map_get_elevation(state, mine.cell) != elevation) {
                 continue;
             }
-            const unit_t& unit = state.units[index];
-            if (unit.mode == UNIT_MODE_IN_MINE) {
+            rect_t mine_render_rect = mine_get_rect(mine.cell);
+            mine_render_rect.position -= state.camera_offset;
+            if (mine_render_rect.position.x + mine_render_rect.size.x < 0 || mine_render_rect.position.x > SCREEN_WIDTH || mine_render_rect.position.y + mine_render_rect.size.y < 0 || mine_render_rect.position.y > SCREEN_HEIGHT) {
+                continue;
+            }
+            int hframe = 0;
+            if (mine.is_occupied) {
+                hframe = 1;
+            } else if (mine.gold_left == 0) {
+                hframe = 2;
+            }
+            ysorted.push_back((render_sprite_params_t) {
+                .sprite = SPRITE_BUILDING_MINE,
+                .position = mine_render_rect.position,
+                .frame = xy(hframe, 0),
+                .options = RENDER_SPRITE_NO_CULL,
+                .recolor_name = RECOLOR_NONE
+            });
+        }
+
+        // Buildings
+        for (auto it : state.remembered_buildings) {
+            const remembered_building_t& building = it.second;
+            if (building.mode == BUILDING_MODE_DESTROYED || map_get_elevation(state, building.cell) != elevation) {
+                continue;
+            }
+
+            int sprite = SPRITE_BUILDING_HOUSE + (building.type - BUILDING_HOUSE);
+            GOLD_ASSERT(sprite < SPRITE_COUNT);
+
+            // Cull the building sprite
+            xy building_render_pos = (building.cell * TILE_SIZE) - state.camera_offset;
+            xy building_render_size = engine.sprites[sprite].frame_size;
+            if (building_render_pos.x + building_render_size.x < 0 || building_render_pos.x > SCREEN_WIDTH || building_render_pos.y + building_render_size.y < 0 || building_render_pos.y > SCREEN_HEIGHT) {
+                continue;
+            }
+
+            int hframe = building.mode == BUILDING_MODE_FINISHED ? 3 : ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
+            ysorted.push_back((render_sprite_params_t) {
+                .sprite = (Sprite)sprite,
+                .position = building_render_pos,
+                .frame = xy(hframe, 0),
+                .options = RENDER_SPRITE_NO_CULL,
+                .recolor_name = (RecolorName)building.player_id
+            });
+        }
+
+        // Units
+        for (const unit_t& unit : state.units) {
+            if (unit.mode == UNIT_MODE_FERRY || map_get_elevation(state, unit.cell) != elevation) {
                 continue;
             }
 
             xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
-            Sprite select_ring_sprite = unit_get_select_ring(unit.type, state.selection.type == SELECTION_TYPE_ENEMY_UNIT);
-            render_sprite(select_ring_sprite, xy(0, 0), unit_render_pos, RENDER_SPRITE_CENTERED);
-
-            // Determine healthbar rect
             xy unit_render_size = engine.sprites[UNIT_DATA.at(unit.type).sprite].frame_size;
-            SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
-            SDL_Rect healthbar_subrect = healthbar_rect;
-            healthbar_subrect.w = (healthbar_rect.w * unit.health) / UNIT_DATA.at(unit.type).max_health;
 
-            // Cull the healthbar
-            if (healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT ) {
+            // Cull the unit sprite
+            if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
+                continue;
+            }
+            if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
+                continue;
+            }
+            if (unit.mode == UNIT_MODE_IN_MINE) {
                 continue;
             }
 
-            // Render the healthbar
-            SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
-            SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
-            SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
-            SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
-            SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
-        }
-    } else if (state.selection.type == SELECTION_TYPE_MINE) {
-        const mine_t& mine = state.mines.get_by_id(state.selection.ids[0]);
-        rect_t mine_rect = rect_t(mine.cell * TILE_SIZE, xy(MINE_SIZE * TILE_SIZE, MINE_SIZE * TILE_SIZE));
-        render_sprite(SPRITE_SELECT_RING_BUILDING_3, xy(0, 0), mine_rect.position + (mine_rect.size / 2) - state.camera_offset + xy(0, -3), RENDER_SPRITE_CENTERED);
-    }
-
-    // UI move animation
-    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state.map, network_get_player_id(), state.ui_move_position / TILE_SIZE) != FOG_HIDDEN) {
-        if (state.ui_move_cell.type == CELL_EMPTY) {
-            render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
-        } else if (state.ui_move_animation.frame.x % 2 == 0) {
-            entity_id id = (entity_id)(state.ui_move_cell.value);
-            switch (state.ui_move_cell.type) {
-                case CELL_UNIT: {
-                    uint32_t unit_index = state.units.get_index_of(id);
-                    if (unit_index != INDEX_INVALID && map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(state.units[unit_index].cell, xy(1, 1)))) {
-                        Sprite sprite = unit_get_select_ring(state.units[unit_index].type, state.units[unit_index].player_id != network_get_player_id());
-                        render_sprite(sprite, xy(0, 0), state.units[unit_index].position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
-                    }
-                    break;
-                }
-                case CELL_BUILDING: {
-                    uint32_t building_index = state.buildings.get_index_of(id);
-                    if (building_index != INDEX_INVALID) {
-                        rect_t building_rect = building_get_rect(state.buildings[building_index]);
-                        Sprite sprite = building_get_select_ring(state.buildings[building_index].type, state.buildings[building_index].player_id != network_get_player_id());
-                        render_sprite(sprite, xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
-                    }
-                    break;
-                }
-                case CELL_MINE: {
-                    render_sprite(SPRITE_SELECT_RING_BUILDING_3, xy(0, 0), (state.mines.get_by_id(id).cell * TILE_SIZE) + (xy(3 * TILE_SIZE, 3 * TILE_SIZE) / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
-                    break;
-                }
-                default:
-                    break;
-            }
-        }
-    }
-
-    // Rally points
-    if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
-        const building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
-        if (building_is_finished(building) && building.rally_point.x != -1) {
-            ysorted.push_back((render_sprite_params_t) {
-                .sprite = SPRITE_RALLY_FLAG,
-                .position = building.rally_point - xy(4, 15) - state.camera_offset,
-                .frame = state.ui_rally_animation.frame,
-                .options = 0,
-                .recolor_name = (RecolorName)network_get_player_id()
-            });
-        }
-    }
-
-    // Mines
-    for (auto it : state.remembered_mines) {
-        const mine_t& mine = it.second;
-        rect_t mine_render_rect = mine_get_rect(mine.cell);
-        mine_render_rect.position -= state.camera_offset;
-        if (mine_render_rect.position.x + mine_render_rect.size.x < 0 || mine_render_rect.position.x > SCREEN_WIDTH || mine_render_rect.position.y + mine_render_rect.size.y < 0 || mine_render_rect.position.y > SCREEN_HEIGHT) {
-            continue;
-        }
-        int hframe = 0;
-        if (mine.is_occupied) {
-            hframe = 1;
-        } else if (mine.gold_left == 0) {
-            hframe = 2;
-        }
-        ysorted.push_back((render_sprite_params_t) {
-            .sprite = SPRITE_BUILDING_MINE,
-            .position = mine_render_rect.position,
-            .frame = xy(hframe, 0),
-            .options = RENDER_SPRITE_NO_CULL,
-            .recolor_name = RECOLOR_NONE
-        });
-    }
-
-    // Buildings
-    for (auto it : state.remembered_buildings) {
-        const remembered_building_t& building = it.second;
-        if (building.mode == BUILDING_MODE_DESTROYED) {
-            continue;
-        }
-
-        int sprite = SPRITE_BUILDING_HOUSE + (building.type - BUILDING_HOUSE);
-        GOLD_ASSERT(sprite < SPRITE_COUNT);
-
-        // Cull the building sprite
-        xy building_render_pos = (building.cell * TILE_SIZE) - state.camera_offset;
-        xy building_render_size = engine.sprites[sprite].frame_size;
-        if (building_render_pos.x + building_render_size.x < 0 || building_render_pos.x > SCREEN_WIDTH || building_render_pos.y + building_render_size.y < 0 || building_render_pos.y > SCREEN_HEIGHT) {
-            continue;
-        }
-
-        int hframe = building.mode == BUILDING_MODE_FINISHED ? 3 : ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
-        ysorted.push_back((render_sprite_params_t) {
-            .sprite = (Sprite)sprite,
-            .position = building_render_pos,
-            .frame = xy(hframe, 0),
-            .options = RENDER_SPRITE_NO_CULL,
-            .recolor_name = (RecolorName)building.player_id
-        });
-    }
-
-    // Units
-    for (const unit_t& unit : state.units) {
-        if (unit.mode == UNIT_MODE_FERRY) {
-            continue;
-        }
-
-        xy unit_render_pos = unit.position.to_xy() - state.camera_offset;
-        xy unit_render_size = engine.sprites[UNIT_DATA.at(unit.type).sprite].frame_size;
-
-        // Cull the unit sprite
-        if (unit_render_pos.x + unit_render_size.x < 0 || unit_render_pos.x > SCREEN_WIDTH || unit_render_pos.y + unit_render_size.y < 0 || unit_render_pos.y > SCREEN_HEIGHT) {
-            continue;
-        }
-        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
-            continue;
-        }
-        if (unit.mode == UNIT_MODE_IN_MINE) {
-            continue;
-        }
-
-        render_sprite_params_t unit_params = (render_sprite_params_t) { 
-            .sprite = UNIT_DATA.at(unit.type).sprite, 
-            .position = unit_render_pos, 
-            .frame = unit.animation.frame,
-            .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL,
-            .recolor_name = (RecolorName)unit.player_id
-        };
-        if (unit.mode != UNIT_MODE_BUILD && unit_sprite_should_flip_h(unit)) {
-            unit_params.options |= RENDER_SPRITE_FLIP_H;
-        }
-        if (unit.mode == UNIT_MODE_BUILD) {
-            const building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
-            const building_data_t& data = BUILDING_DATA.at(building.type);
-            int hframe = ((3 * building.health) / data.max_health);
-            unit_params.sprite = SPRITE_MINER_BUILDING;
-
-            xy building_position = (building.cell * TILE_SIZE) - state.camera_offset;
-            unit_params.position = building_position + xy(data.builder_positions_x[hframe], 
-                                                          data.builder_positions_y[hframe]);
-
-            unit_params.options &= ~RENDER_SPRITE_CENTERED;
-            if (data.builder_flip_h[hframe]) {
+            render_sprite_params_t unit_params = (render_sprite_params_t) { 
+                .sprite = UNIT_DATA.at(unit.type).sprite, 
+                .position = unit_render_pos, 
+                .frame = unit.animation.frame,
+                .options = RENDER_SPRITE_CENTERED | RENDER_SPRITE_NO_CULL,
+                .recolor_name = (RecolorName)unit.player_id
+            };
+            if (unit.mode != UNIT_MODE_BUILD && unit_sprite_should_flip_h(unit)) {
                 unit_params.options |= RENDER_SPRITE_FLIP_H;
             }
-        }
-        if (unit.mode == UNIT_MODE_REPAIR) {
-            unit_params.sprite = SPRITE_MINER_BUILDING;
-        }
-        if (unit.mode == UNIT_MODE_DEATH_FADE) {
-            render_sprite(unit_params.sprite, unit_params.frame, unit_params.position, unit_params.options, unit_params.recolor_name);
-        } else {
-            ysorted.push_back(unit_params);
-        }
-    }
+            if (unit.mode == UNIT_MODE_BUILD) {
+                const building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
+                const building_data_t& data = BUILDING_DATA.at(building.type);
+                int hframe = ((3 * building.health) / data.max_health);
+                unit_params.sprite = SPRITE_MINER_BUILDING;
 
-    // End Ysort
-    ysort(&ysorted[0], 0, ysorted.size() - 1);
-    for (uint32_t i = 0; i < ysorted.size(); i++) {
-        const render_sprite_params_t& params= ysorted[i];
-        render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_name);
-    }
+                xy building_position = (building.cell * TILE_SIZE) - state.camera_offset;
+                unit_params.position = building_position + xy(data.builder_positions_x[hframe], 
+                                                            data.builder_positions_y[hframe]);
+
+                unit_params.options &= ~RENDER_SPRITE_CENTERED;
+                if (data.builder_flip_h[hframe]) {
+                    unit_params.options |= RENDER_SPRITE_FLIP_H;
+                }
+            }
+            if (unit.mode == UNIT_MODE_REPAIR) {
+                unit_params.sprite = SPRITE_MINER_BUILDING;
+            }
+            if (unit.mode == UNIT_MODE_DEATH_FADE) {
+                render_sprite(unit_params.sprite, unit_params.frame, unit_params.position, unit_params.options, unit_params.recolor_name);
+            } else {
+                ysorted.push_back(unit_params);
+            }
+        }
+        // End render units
+
+        // End Ysort
+        ysort(&ysorted[0], 0, ysorted.size() - 1);
+        for (uint32_t i = 0; i < ysorted.size(); i++) {
+            const render_sprite_params_t& params = ysorted[i];
+            render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_name);
+        }
+    } // End for each elevation
 
     // Fog of War
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     for (int y = 0; y < max_visible_tiles.y; y++) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             xy fog_cell = base_coords + xy(x, y);
-            FogType fog = state.map.player_fog[network_get_player_id()][fog_cell.x + (fog_cell.y * state.map.width)];
+            FogType fog = state.player_fog[network_get_player_id()][fog_cell.x + (fog_cell.y * state.map_width)];
             if (fog == FOG_REVEALED) {
                 continue;
             }
@@ -1667,7 +1689,7 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
     // UI move animation (for blind moves)
-    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state.map, network_get_player_id(), state.ui_move_position / TILE_SIZE) == FOG_HIDDEN) {
+    if (animation_is_playing(state.ui_move_animation) && map_get_fog(state, network_get_player_id(), state.ui_move_position / TILE_SIZE) == FOG_HIDDEN) {
         render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
@@ -1694,13 +1716,13 @@ void render_match(const match_state_t& state) {
         render_sprite((Sprite)(sprite), xy(3, 0), (ui_get_building_cell(state) * TILE_SIZE) - state.camera_offset, 0, (RecolorName)network_get_player_id());
 
         const building_data_t& data = BUILDING_DATA.at(state.ui_building_type);
-        bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_size > state.map.width || 
-                                          ui_get_building_cell(state).y + data.cell_size > state.map.height;
+        bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_size > state.map_width || 
+                                          ui_get_building_cell(state).y + data.cell_size > state.map_height;
         SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
         for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_size; y++) {
             for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_size; x++) {
                 bool is_cell_green = true;
-                if (is_placement_out_of_bounds || map_get_fog(state.map, network_get_player_id(), xy(x, y)) == FOG_HIDDEN) {
+                if (is_placement_out_of_bounds || map_get_fog(state, network_get_player_id(), xy(x, y)) == FOG_HIDDEN) {
                     is_cell_green = false;
                 } else {
                     for (const mine_t& mine : state.mines) {
@@ -1711,7 +1733,7 @@ void render_match(const match_state_t& state) {
                     }
                     xy miner_cell = state.units.get_by_id(ui_get_nearest_builder(state, ui_get_building_cell(state))).cell;
                     if (is_cell_green) {
-                        is_cell_green = xy(x, y) == miner_cell || !map_is_cell_blocked(state.map, xy(x, y));
+                        is_cell_green = xy(x, y) == miner_cell || !map_is_cell_blocked(state, xy(x, y));
                     }
                 }
 
@@ -2140,7 +2162,7 @@ void render_match(const match_state_t& state) {
     }
 
     for (const unit_t& unit : state.units) {
-        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state.map, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
+        if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
         if (unit.mode == UNIT_MODE_FERRY || unit.mode == UNIT_MODE_IN_MINE || unit.health == 0) {
@@ -2165,9 +2187,9 @@ void render_match(const match_state_t& state) {
 
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 1, .h = 1 };
-    for (int x = 0; x < state.map.width; x++) {
-        for (int y = 0; y < state.map.height; y++) {
-            FogType fog = state.map.player_fog[network_get_player_id()][x + (y * state.map.width)];
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            FogType fog = state.player_fog[network_get_player_id()][x + (y * state.map_width)];
             if (fog == FOG_REVEALED) {
                 continue;
             }
@@ -2255,7 +2277,7 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderTarget(engine.renderer, NULL);
 
     // Render the minimap texture
-    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = (int)state.map.width, .h = (int)state.map.height };
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = (int)state.map_width, .h = (int)state.map_height };
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
 

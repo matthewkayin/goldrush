@@ -242,33 +242,48 @@ tile_data_t get_tile_data(uint32_t tile) {
         case TILE_ARIZONA_SAND1: 
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .cell = xy(0, 0),
-                .blocked = false
+                .source_pos = xy(0, 0)
             };
         case TILE_ARIZONA_SAND2: 
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .cell = xy(2, 0),
-                .blocked = false
+                .source_pos = xy(16, 0)
             };
         case TILE_ARIZONA_SAND3: 
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .cell = xy(4, 0),
-                .blocked = false
+                .source_pos = xy(32, 0)
             };
-        case TILE_ARIZONA_WATER: 
+        case TILE_ARIZONA_WATER:
             return (tile_data_t) {
                 .type = TILE_TYPE_AUTO,
-                .cell = xy(6, 0),
-                .blocked = true
+                .source_pos = xy(0, 16)
+            };
+        case TILE_ARIZONA_WALL: 
+            return (tile_data_t) {
+                .type = TILE_TYPE_AUTO,
+                .source_pos = xy(48, 0)
+            };
+        case TILE_ARIZONA_WALL_FRONT_LEFT:
+            return (tile_data_t) {
+                .type = TILE_TYPE_SINGLE,
+                .source_pos = xy(48, 48)
+            };
+        case TILE_ARIZONA_WALL_FRONT_CENTER:
+            return (tile_data_t) {
+                .type = TILE_TYPE_SINGLE,
+                .source_pos = xy(56, 48)
+            };
+        case TILE_ARIZONA_WALL_FRONT_RIGHT:
+            return (tile_data_t) {
+                .type = TILE_TYPE_SINGLE,
+                .source_pos = xy(64, 48)
             };
         default: 
             GOLD_ASSERT(false);
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .cell = xy(-1, -1),
-                .blocked = false
+                .source_pos = xy(-1, -1)
             };
     }
 }
