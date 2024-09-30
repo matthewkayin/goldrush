@@ -10,7 +10,7 @@ static uint64_t clock_start_time;
 
 void platform_clock_init() {
     mach_timebase_info(&clock_timebase);
-    uint64_t clock_start_time = mach_absolute_time();
+    clock_start_time = mach_absolute_time();
 }
 
 double platform_get_absolute_time() {

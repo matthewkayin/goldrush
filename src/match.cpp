@@ -1277,6 +1277,9 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
+// TODO: make this function only check one ring around. If it fails the check, it should keep the unit blocked inside the building queue and give a message saying "building exit is blocked"
+// Also for ejecting units after a building is cancelled, the unit should just go to the building cell
+// And then for ejecting units from a drop, units should just stay inside which they might already do because I'm pretty sure drops use a different function
 xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy preferred_cell) {
     // Setup search
     xy search_corners[4] = { 
@@ -1309,7 +1312,7 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
     xy start_cell = cell_rect.position;
 
     // Step along search until we find an empty cell
-    while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect)) {
+    while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect, map_get_elevation(state, cell_rect.position), xy(-1, -1), IS_CELL_RECT_BLOCKED_ALLOW_RAMPS)) {
         cell_rect.position += DIRECTION_XY[step_direction];
         if (cell_rect.position == search_corners[step_direction / 2]) {
             step_direction = (step_direction + 2) % DIRECTION_COUNT;
@@ -1349,7 +1352,7 @@ xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t
     xy cell = cell_begin[index];
     while (index < 4) {
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {
-            if ((allow_blocked_cells || !map_is_cell_rect_blocked(state, rect_t(cell, start.size))) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
+            if (!map_is_cell_rect_blocked(state, rect_t(cell, start.size), map_get_elevation(state, cell), xy(-1, -1), IS_CELL_RECT_BLOCKED_ALLOW_RAMPS | (allow_blocked_cells ? IS_CELL_RECT_BLOCKED_IGNORE_MINERS : 0)) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = xy::manhattan_distance(start.position, cell);
             }

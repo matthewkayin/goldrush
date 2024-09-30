@@ -351,6 +351,7 @@ int gold_main(int argc, char** argv) {
 
         // INPUT
         // Note that input is not processed unless we are about to update during this iteration
+        double input_start = platform_get_absolute_time();
         if (update_accumulator >= UPDATE_TIME) {
             memcpy(engine.mouse_button_previous_state, engine.mouse_button_state, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
             memcpy(engine.hotkey_state_previous, engine.hotkey_state, UI_BUTTON_COUNT * sizeof(bool));
@@ -437,7 +438,10 @@ int gold_main(int argc, char** argv) {
             } // End while SDL_PollEvent()
         } // End if update_accumulator >= UPDATE_TIME
 
+        double input_elapsed = platform_get_absolute_time() - input_start;
         // UPDATE
+        double update_start = platform_get_absolute_time();
+        int update_count = (int)(update_accumulator / UPDATE_TIME);
         while (update_accumulator >= UPDATE_TIME) {
             update_accumulator -= UPDATE_TIME;
             updates++;
@@ -480,7 +484,9 @@ int gold_main(int argc, char** argv) {
             }
         }
 
+        double update_elapsed = platform_get_absolute_time() - update_start;
         // RENDER
+        double render_start = platform_get_absolute_time();
         SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
         SDL_RenderClear(engine.renderer);
 
@@ -502,6 +508,8 @@ int gold_main(int argc, char** argv) {
             render_text(FONT_HACK, ups_text, COLOR_WHITE, xy(0, 12));
         }
 
+        double render_elapsed = platform_get_absolute_time() - render_start;
+        log_trace("input: %f update: %f #updates: %i render: %f", input_elapsed, update_elapsed, update_count, render_elapsed);
         SDL_RenderPresent(engine.renderer);
     } // End while running
 
@@ -1324,7 +1332,7 @@ void render_match(const match_state_t& state) {
         max_visible_tiles.y++;
     }
 
-    for (int elevation = state.map_lowest_elevation; elevation < state.map_highest_elevation + 1; elevation++) {
+    for (int16_t elevation = state.map_lowest_elevation; elevation < state.map_highest_elevation + 1; elevation++) {
         std::vector<render_sprite_params_t> ysorted;
 
         // Render map
@@ -1732,6 +1740,9 @@ void render_match(const match_state_t& state) {
                         }
                     }
                     xy miner_cell = state.units.get_by_id(ui_get_nearest_builder(state, ui_get_building_cell(state))).cell;
+                    if (map_get_elevation(state, ui_get_building_cell(state)) != map_get_elevation(state, xy(x, y))) {
+                        is_cell_green = false;
+                    }
                     if (is_cell_green) {
                         is_cell_green = xy(x, y) == miner_cell || !map_is_cell_blocked(state, xy(x, y));
                     }

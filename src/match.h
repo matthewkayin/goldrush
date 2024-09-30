@@ -83,6 +83,11 @@ struct mine_t {
     bool is_occupied;
 };
 
+const int16_t IS_CELL_RECT_BLOCKED_IGNORE_ELEVATION = INT16_MAX;
+const int16_t ELEVATION_RAMP = INT16_MAX - 1;
+const uint32_t IS_CELL_RECT_BLOCKED_IGNORE_MINERS = 1;
+const uint32_t IS_CELL_RECT_BLOCKED_ALLOW_RAMPS = 1 << 2;
+
 // UI
 
 enum UiMode {
@@ -437,8 +442,8 @@ struct match_state_t {
     // Map
     uint32_t map_width;
     uint32_t map_height;
-    int map_lowest_elevation;
-    int map_highest_elevation;
+    int16_t map_lowest_elevation;
+    int16_t map_highest_elevation;
     std::vector<tile_t> map_tiles;
     std::vector<decoration_t> map_decorations;
     std::vector<cell_t> map_cells;
@@ -497,15 +502,14 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height);
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_rect_in_bounds(const match_state_t& state, rect_t cell_rect);
 bool map_is_cell_blocked(const match_state_t& state, xy cell);
-bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect);
+bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect, int16_t elevation = IS_CELL_RECT_BLOCKED_IGNORE_ELEVATION, xy origin = xy(-1, -1), uint32_t options = 0);
 cell_t map_get_cell(const match_state_t& state, xy cell);
 void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value = 0);
 void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t id = 0);
 FogType map_get_fog(const match_state_t& state, uint8_t player_id, xy cell);
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, rect_t rect);
 void map_fog_reveal_at_cell(match_state_t& state, uint8_t player_id, xy cell, xy size, int sight);
-uint16_t map_get_elevation(const match_state_t& state, xy cell);
-bool map_is_cell_rect_blocked_pathfind(const match_state_t& state, xy origin, rect_t cell_rect, bool should_ignore_miners);
+int16_t map_get_elevation(const match_state_t& state, xy cell);
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners);
 void map_fog_reveal(match_state_t& state, uint8_t player_id);
 void map_update_fog(match_state_t& state, uint8_t player_id);
