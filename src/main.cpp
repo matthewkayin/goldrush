@@ -351,7 +351,6 @@ int gold_main(int argc, char** argv) {
 
         // INPUT
         // Note that input is not processed unless we are about to update during this iteration
-        double input_start = platform_get_absolute_time();
         if (update_accumulator >= UPDATE_TIME) {
             memcpy(engine.mouse_button_previous_state, engine.mouse_button_state, INPUT_MOUSE_BUTTON_COUNT * sizeof(bool));
             memcpy(engine.hotkey_state_previous, engine.hotkey_state, UI_BUTTON_COUNT * sizeof(bool));
@@ -438,10 +437,7 @@ int gold_main(int argc, char** argv) {
             } // End while SDL_PollEvent()
         } // End if update_accumulator >= UPDATE_TIME
 
-        double input_elapsed = platform_get_absolute_time() - input_start;
         // UPDATE
-        double update_start = platform_get_absolute_time();
-        int update_count = (int)(update_accumulator / UPDATE_TIME);
         while (update_accumulator >= UPDATE_TIME) {
             update_accumulator -= UPDATE_TIME;
             updates++;
@@ -484,9 +480,7 @@ int gold_main(int argc, char** argv) {
             }
         }
 
-        double update_elapsed = platform_get_absolute_time() - update_start;
         // RENDER
-        double render_start = platform_get_absolute_time();
         SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
         SDL_RenderClear(engine.renderer);
 
@@ -508,8 +502,6 @@ int gold_main(int argc, char** argv) {
             render_text(FONT_HACK, ups_text, COLOR_WHITE, xy(0, 12));
         }
 
-        double render_elapsed = platform_get_absolute_time() - render_start;
-        log_trace("input: %f update: %f #updates: %i render: %f", input_elapsed, update_elapsed, update_count, render_elapsed);
         SDL_RenderPresent(engine.renderer);
     } // End while running
 
@@ -1351,13 +1343,16 @@ void render_match(const match_state_t& state) {
 
                 // Calculate tile neighbors
                 uint32_t neighbors = 0;
-                if (tile_data.type == TILE_TYPE_AUTO) {
+                if (tile_data.type == TILE_TYPE_AUTO || (map_tile_index == TILE_ARIZONA_SAND1 && state.map_tiles[map_index].elevation == elevation)) {
                     for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                         xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[direction];
                         if (!map_is_cell_in_bounds(state, neighbor_cell)) {
                             continue;
                         }
-                        if (state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index == map_tile_index) {
+                        bool is_neighbor_same = tile_data.type == TILE_TYPE_AUTO
+                                ? state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index == map_tile_index
+                                : state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation >= state.map_tiles[map_index].elevation;
+                        if (is_neighbor_same) {
                             neighbors += AUTOTILE_DIRECTION_MASK[direction];
                         }
                     }
@@ -1365,7 +1360,17 @@ void render_match(const match_state_t& state) {
 
                 for (int edge = 0; edge < 4; edge++) {
                     // Since neighbors defaults to 0, this function will work even for non-auto tiles
+                    if (state.map_tiles[map_index].elevation != elevation) {
+                        // continue;
+                    }
                     xy source_pos = tile_data.source_pos + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
+                    static bool should_log = true;
+                    if (should_log && base_coords + xy(x, y) == xy(2, 5)) {
+                        log_trace("edge %i neighbors %u sourcepos %xi", edge, neighbors & AUTOTILE_EDGE_MASK[edge], &source_pos);
+                        if (edge == 3) {
+                            should_log = false;
+                        }
+                    }
                     SDL_Rect tile_src_rect = (SDL_Rect) {
                         .x = source_pos.x,
                         .y = source_pos.y,
@@ -1467,7 +1472,7 @@ void render_match(const match_state_t& state) {
                 if (unit.mode == UNIT_MODE_IN_MINE) {
                     continue;
                 }
-                if (map_get_elevation(state, unit.cell) != elevation) {
+                if (unit_get_elevation(state, unit) != elevation) {
                     continue;
                 }
 
@@ -1610,7 +1615,7 @@ void render_match(const match_state_t& state) {
 
         // Units
         for (const unit_t& unit : state.units) {
-            if (unit.mode == UNIT_MODE_FERRY || map_get_elevation(state, unit.cell) != elevation) {
+            if (unit.mode == UNIT_MODE_FERRY || unit_get_elevation(state, unit) != elevation) {
                 continue;
             }
 
@@ -1740,7 +1745,7 @@ void render_match(const match_state_t& state) {
                         }
                     }
                     xy miner_cell = state.units.get_by_id(ui_get_nearest_builder(state, ui_get_building_cell(state))).cell;
-                    if (map_get_elevation(state, ui_get_building_cell(state)) != map_get_elevation(state, xy(x, y))) {
+                    if (map_is_ramp(state, ui_get_building_cell(state)) == 1 || map_is_ramp(state, xy(x, y)) == 1 || map_get_elevation(state, ui_get_building_cell(state)) != map_get_elevation(state, xy(x, y))) {
                         is_cell_green = false;
                     }
                     if (is_cell_green) {

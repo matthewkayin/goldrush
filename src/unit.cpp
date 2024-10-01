@@ -175,7 +175,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
                         // Clear the unit's rect so that the unit does not block itself from moving
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
-                        if (map_is_cell_rect_blocked(state, rect_t(unit.path[0], unit_cell_size(unit.type)), map_get_elevation(state, unit.cell), xy(-1, -1), IS_CELL_RECT_BLOCKED_ALLOW_RAMPS)) {
+                        if (map_is_cell_rect_blocked(state, rect_t(unit.path[0], unit_cell_size(unit.type)), unit.cell, xy(-1, -1), IS_CELL_RECT_BLOCKED_ALLOW_RAMPS)) {
                             is_path_blocked = true;
                             // Since we are not moving, repopulate the cell grid with the unit's rect
                             map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
@@ -254,7 +254,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         // Temporarily set cell to empty so that we can check if the space is clear for building
                         map_set_cell(state, unit.cell, CELL_EMPTY);
                         bool can_build = unit.cell == unit.target.build.unit_cell && 
-                                                        !map_is_cell_rect_blocked(state, rect_t(unit.target.build.building_cell, building_cell_size(unit.target.build.building_type)), map_get_elevation(state, unit.target.build.building_cell));
+                                                        !map_is_cell_rect_blocked(state, rect_t(unit.target.build.building_cell, building_cell_size(unit.target.build.building_type)), unit.target.build.building_cell);
                         if (!can_build) {
                             // Set the cell back to filled
                             map_set_cell(state, unit.cell, CELL_EMPTY);
@@ -817,6 +817,15 @@ rect_t unit_get_rect(const unit_t& unit) {
     return rect_t(unit.position.to_xy() - xy(unit_size / 2, unit_size / 2), xy(unit_size, unit_size));
 }
 
+int8_t unit_get_elevation(const match_state_t& state, const unit_t& unit) {
+    if (unit.mode == UNIT_MODE_MOVE) {
+        xy unit_prev_cell = unit.cell - DIRECTION_XY[unit.direction];
+        return std::max(map_get_elevation(state, unit.cell), map_get_elevation(state, unit_prev_cell));
+    }
+
+    return map_get_elevation(state, unit.cell);
+}
+
 void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t target) {
     GOLD_ASSERT(unit.mode != UNIT_MODE_BUILD);
     unit.target = target;
@@ -1169,7 +1178,7 @@ xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy 
                                 ? dropoff_origin.x - cell_size.x
                                 : dropoff_origin.x + unit_size.x;
             for (int dropoff_y = dropoff_origin.y; dropoff_y < dropoff_origin.y + unit_size.y; dropoff_y++) {
-                if (map_is_cell_rect_in_bounds(state, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state, rect_t(xy(dropoff_x, dropoff_y), cell_size), map_get_elevation(state, xy(dropoff_x, dropoff_y)))) {
+                if (map_is_cell_rect_in_bounds(state, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state, rect_t(xy(dropoff_x, dropoff_y), cell_size), xy(dropoff_x, dropoff_y))) {
                     return xy(dropoff_x, dropoff_y);
                 }
             }
@@ -1179,7 +1188,7 @@ xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy 
                                 ? dropoff_origin.y - cell_size.y
                                 : dropoff_origin.y + unit_size.y;
             for (int dropoff_x = dropoff_origin.x; dropoff_x < dropoff_origin.x + unit_size.x; dropoff_x++) {
-                if (map_is_cell_rect_in_bounds(state, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state, rect_t(xy(dropoff_x, dropoff_y), cell_size), map_get_elevation(state, xy(dropoff_x, dropoff_y)))) {
+                if (map_is_cell_rect_in_bounds(state, rect_t(xy(dropoff_x, dropoff_y), cell_size)) && !map_is_cell_rect_blocked(state, rect_t(xy(dropoff_x, dropoff_y), cell_size), xy(dropoff_x, dropoff_y))) {
                     return xy(dropoff_x, dropoff_y);
                 }
             }

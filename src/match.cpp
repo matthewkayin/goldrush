@@ -1312,7 +1312,7 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
     xy start_cell = cell_rect.position;
 
     // Step along search until we find an empty cell
-    while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect, map_get_elevation(state, cell_rect.position), xy(-1, -1), IS_CELL_RECT_BLOCKED_ALLOW_RAMPS)) {
+    while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_blocked(state, cell_rect, cell_rect.position, xy(-1, -1), IS_CELL_RECT_BLOCKED_ALLOW_RAMPS)) {
         cell_rect.position += DIRECTION_XY[step_direction];
         if (cell_rect.position == search_corners[step_direction / 2]) {
             step_direction = (step_direction + 2) % DIRECTION_COUNT;
@@ -1352,7 +1352,7 @@ xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t
     xy cell = cell_begin[index];
     while (index < 4) {
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {
-            if (!map_is_cell_rect_blocked(state, rect_t(cell, start.size), map_get_elevation(state, cell), xy(-1, -1), IS_CELL_RECT_BLOCKED_ALLOW_RAMPS | (allow_blocked_cells ? IS_CELL_RECT_BLOCKED_IGNORE_MINERS : 0)) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
+            if (!map_is_cell_rect_blocked(state, rect_t(cell, start.size), cell, xy(-1, -1), IS_CELL_RECT_BLOCKED_ALLOW_RAMPS | (allow_blocked_cells ? IS_CELL_RECT_BLOCKED_IGNORE_MINERS : 0)) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = xy::manhattan_distance(start.position, cell);
             }
