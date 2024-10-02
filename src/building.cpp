@@ -307,7 +307,7 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
             if (xy(x, y) == miner_cell) {
                 continue;
             }
-            if (map_is_cell_blocked(state, xy(x, y)) || map_is_ramp(state, building_rect.position) == 1 || map_is_ramp(state, xy(x, y)) == 1 || map_get_elevation(state, building_rect.position) != map_get_elevation(state, xy(x, y))) {
+            if (map_is_cell_blocked(state, xy(x, y)) || map_get_elevation(state, building_rect.position) != map_get_elevation(state, xy(x, y))) {
                 return false;
             }
         }

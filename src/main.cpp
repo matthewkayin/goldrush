@@ -225,7 +225,7 @@ void render_ninepatch(Sprite sprite, rect_t rect, int patch_margin);
 void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, RecolorName recolor_name = RECOLOR_NONE);
 void render_menu(const menu_state_t& menu);
 void render_options_menu(const option_menu_state_t& state);
-xy autotile_edge_lookup(uint32_t edge, uint32_t neighbors);
+xy autotile_edge_lookup(uint32_t edge, uint8_t neighbors);
 void render_match(const match_state_t& state);
 
 enum Mode {
@@ -1248,7 +1248,7 @@ void ysort(render_sprite_params_t* params, int low, int high) {
     }
 }
 
-xy autotile_edge_lookup(uint32_t edge, uint32_t neighbors) {
+xy autotile_edge_lookup(uint32_t edge, uint8_t neighbors) {
     switch (edge) {
         case 0:
             switch (neighbors) {
@@ -1342,7 +1342,7 @@ void render_match(const match_state_t& state) {
                 const tile_data_t& tile_data = get_tile_data(map_tile_index);
 
                 // Calculate tile neighbors
-                uint32_t neighbors = 0;
+                uint8_t neighbors = 0;
                 if (tile_data.type == TILE_TYPE_AUTO || (map_tile_index == TILE_ARIZONA_SAND1 && state.map_tiles[map_index].elevation == elevation)) {
                     for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                         xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[direction];
@@ -1353,12 +1353,12 @@ void render_match(const match_state_t& state) {
                                 ? state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index == map_tile_index
                                 : state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation >= state.map_tiles[map_index].elevation;
                         if (is_neighbor_same) {
-                            neighbors += AUTOTILE_DIRECTION_MASK[direction];
+                            neighbors += DIRECTION_MASK[direction];
                         }
                     }
                 }
 
-                for (int edge = 0; edge < 4; edge++) {
+                for (uint32_t edge = 0; edge < 4; edge++) {
                     // Since neighbors defaults to 0, this function will work even for non-auto tiles
                     if (state.map_tiles[map_index].elevation != elevation) {
                         // continue;
@@ -1745,9 +1745,11 @@ void render_match(const match_state_t& state) {
                         }
                     }
                     xy miner_cell = state.units.get_by_id(ui_get_nearest_builder(state, ui_get_building_cell(state))).cell;
-                    if (map_is_ramp(state, ui_get_building_cell(state)) == 1 || map_is_ramp(state, xy(x, y)) == 1 || map_get_elevation(state, ui_get_building_cell(state)) != map_get_elevation(state, xy(x, y))) {
+                    /*
+                    if (map_get_ramp(state, ui_get_building_cell(state)) != RAMP_NONE || map_get_ramp(state, xy(x, y)) != RAMP_NONE || map_get_elevation(state, ui_get_building_cell(state)) != map_get_elevation(state, xy(x, y))) {
                         is_cell_green = false;
                     }
+                    */
                     if (is_cell_green) {
                         is_cell_green = xy(x, y) == miner_cell || !map_is_cell_blocked(state, xy(x, y));
                     }

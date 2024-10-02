@@ -9,7 +9,7 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
         .index = TILE_ARIZONA_SAND1,
         .elevation = 0,
-        .is_ramp = 0
+        .blocked = BLOCKED_NONE
     });
     state.map_cells = std::vector<cell_t>(state.map_width * state.map_height, (cell_t) {
         .type = CELL_EMPTY,
@@ -32,19 +32,25 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
                 (y == highground_rect.position.y)) {
                 continue;
             }
-            if (x == highground_rect.position.x + 2 && y == highground_rect.position.y + highground_rect.size.y - 1) {
+            if (x == highground_rect.position.x + 2 && y == highground_rect.position.y + highground_rect.size.y - 2) {
+                state.map_tiles[x + (y * state.map_width)] = (tile_t) {
+                    .index = TILE_ARIZONA_SAND1,
+                    .elevation = 1,
+                    .blocked = (uint8_t)(DIRECTION_MASK[DIRECTION_SOUTHEAST] | DIRECTION_MASK[DIRECTION_SOUTHWEST])
+                };
+            } else if (x == highground_rect.position.x + 2 && y == highground_rect.position.y + highground_rect.size.y - 1) {
                 state.map_tiles[x + (y * state.map_width)] = (tile_t) {
                     .index = TILE_ARIZONA_SAND1,
                     .elevation = 0,
-                    .is_ramp = 1
+                    .blocked = (uint8_t)(~(DIRECTION_MASK[DIRECTION_NORTH] | DIRECTION_MASK[DIRECTION_SOUTH]))
                 };
-                continue;
+            } else {
+                state.map_tiles[x + (y * state.map_width)] = (tile_t) {
+                    .index = TILE_ARIZONA_SAND1,
+                    .elevation = 1,
+                    .blocked = BLOCKED_NONE
+                };
             }
-            state.map_tiles[x + (y * state.map_width)] = (tile_t) {
-                .index = TILE_ARIZONA_SAND1,
-                .elevation = 1,
-                .is_ramp = 0
-            };
         }
     }
     for (int x = highground_rect.position.x; x < highground_rect.position.x + highground_rect.size.x; x++) {
@@ -53,7 +59,7 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
             state.map_tiles[x + (y * state.map_width)] = (tile_t) {
                 .index = TILE_ARIZONA_SAND1,
                 .elevation = 0,
-                .is_ramp = 1
+                .blocked = (uint8_t)(~(DIRECTION_MASK[DIRECTION_NORTH] | DIRECTION_MASK[DIRECTION_SOUTH]))
             };
             continue;
         }
@@ -66,21 +72,46 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
         state.map_tiles[x + (y * state.map_width)] = (tile_t) {
             .index = tile,
             .elevation = 0,
-            .is_ramp = 0
+            .blocked = BLOCKED_COMPLETELY
         };
-        map_set_cell(state, xy(x, y), CELL_BLOCKED);
     }
 
     state.map_lowest_elevation = 0;
     state.map_highest_elevation = 0;
     for (uint32_t index = 0; index < state.map_width * state.map_height; index++) {
-        if (state.map_tiles[index].is_ramp == 1) {
-            continue;
-        }
         state.map_lowest_elevation = std::min(state.map_lowest_elevation, state.map_tiles[index].elevation);
         state.map_highest_elevation = std::max(state.map_highest_elevation, state.map_tiles[index].elevation);
     }
     GOLD_ASSERT(std::abs(state.map_highest_elevation - state.map_lowest_elevation) < 6);
+    
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            if (state.map_tiles[x + (y * state.map_width)].blocked != BLOCKED_NONE) {
+                continue;
+            }
+            uint8_t lower_neighbors = 0;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
+                if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                    continue;
+                }
+                if (map_get_elevation(state, neighbor_cell) < map_get_elevation(state, xy(x, y))) {
+                    lower_neighbors += DIRECTION_MASK[direction];
+                }
+            }
+            state.map_tiles[x + (y * state.map_width)].blocked = lower_neighbors;
+            if (lower_neighbors != 0) {
+                xy cell = xy(x, y);
+                log_trace("cell %xi blocked %u", &cell, lower_neighbors);
+            }
+        }
+    }
+
+    for (int index = 0; index < state.map_width * state.map_height; index++) {
+        if (state.map_tiles[index].blocked == BLOCKED_COMPLETELY) {
+            state.map_cells[index].type = CELL_BLOCKED;
+        }
+    }
 }
 
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {
@@ -103,24 +134,11 @@ bool map_is_cell_blocked(const match_state_t& state, xy cell) {
     return state.map_cells[cell.x + (cell.y * state.map_width)].type != CELL_EMPTY;
 }
 
-bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect, xy elevation_cell, xy origin, uint32_t options) {
-    bool ignore_miners = (options & IS_CELL_RECT_BLOCKED_IGNORE_MINERS) == IS_CELL_RECT_BLOCKED_IGNORE_MINERS;
-    bool allow_ramps = (options & IS_CELL_RECT_BLOCKED_ALLOW_RAMPS) == IS_CELL_RECT_BLOCKED_ALLOW_RAMPS;
+bool map_is_cell_rect_occupied(const match_state_t& state, rect_t cell_rect, xy origin, bool ignore_miners) {
     entity_id origin_id = origin.x == -1 ? ID_NULL : map_get_cell(state, origin).value;
-    int8_t elevation_cell_elevation;
-    int8_t elevation_cell_is_ramp;
-    if (elevation_cell.x != -1) {
-        tile_t tile = state.map_tiles[elevation_cell.x + (elevation_cell.y * state.map_width)];
-        elevation_cell_elevation = tile.elevation;
-        elevation_cell_is_ramp = tile.is_ramp;
-    }
     for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
         for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
-            cell_t cell = state.map_cells[x + (y * state.map_width)];
-            tile_t tile = state.map_tiles[x + (y * state.map_width)];
-            if (elevation_cell.x != -1 && !(allow_ramps && (tile.is_ramp == 1 || elevation_cell_is_ramp == 1)) && tile.elevation != elevation_cell_elevation) {
-                return true;
-            }
+            cell_t cell = map_get_cell(state, xy(x, y));
             if (cell.type == CELL_EMPTY) {
                 continue;
             }
@@ -136,7 +154,8 @@ bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect, xy e
 
                 if (ignore_miners) {
                     const unit_t& unit = state.units.get_by_id(cell.value);
-                    if ((unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP) && xy::manhattan_distance(origin, xy(x, y)) > 1) {
+                    if ((unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP) && 
+                        (origin_id == ID_NULL || xy::manhattan_distance(origin, xy(x, y)) > 1)) {
                         continue;
                     }
                 }
@@ -146,6 +165,34 @@ bool map_is_cell_rect_blocked(const match_state_t& state, rect_t cell_rect, xy e
     }
 
     return false;
+}
+
+bool map_is_cell_rect_same_elevation(const match_state_t& state, rect_t cell_rect) {
+    for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
+        for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
+            if (map_get_elevation(state, xy(x, y)) != map_get_elevation(state, cell_rect.position)) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+bool map_can_cell_rect_step_in_direction(const match_state_t& state, rect_t from, int direction) {
+    int inverse_direction = (direction + 4) % DIRECTION_COUNT;
+    for (int x = from.position.x; x < from.position.x + from.size.x; x++) {
+        for (int y = from.position.y; y < from.position.y + from.size.y; y++) {
+            if (map_is_cell_blocked_in_direction(state, xy(x, y), direction)) {
+                return false;
+            }
+            if (map_is_cell_blocked_in_direction(state, xy(x, y) + DIRECTION_XY[direction], inverse_direction)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 cell_t map_get_cell(const match_state_t& state, xy cell) {
@@ -215,8 +262,8 @@ int8_t map_get_elevation(const match_state_t& state, xy cell) {
     return state.map_tiles[cell.x + (cell.y * state.map_width)].elevation;
 }
 
-int8_t map_is_ramp(const match_state_t& state, xy cell) {
-    return state.map_tiles[cell.x + (cell.y * state.map_width)].is_ramp;
+bool map_is_cell_blocked_in_direction(const match_state_t& state, xy cell, int direction) {
+    return (state.map_tiles[cell.x + (cell.y * state.map_width)].blocked & DIRECTION_MASK[direction]) == DIRECTION_MASK[direction];
 }
 
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners) {
@@ -241,16 +288,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
     }
 
     // Find an alternate cell for large units
-    uint32_t is_cell_rect_blocked_options = IS_CELL_RECT_BLOCKED_ALLOW_RAMPS;
-    if (should_ignore_miners) {
-        is_cell_rect_blocked_options |= IS_CELL_RECT_BLOCKED_IGNORE_MINERS;
-    }
-    if (map_is_cell_rect_blocked(
-        state, 
-        rect_t(to, cell_size), 
-        to,
-        from, 
-        is_cell_rect_blocked_options) && cell_size.x + cell_size.y > 2) {
+    if (cell_size.x + cell_size.y > 2 && 
+        map_is_cell_rect_occupied(state, rect_t(to, cell_size), from, should_ignore_miners)) {
         xy nearest_alternate;
         int nearest_alternate_distance = -1;
         for (int x = 0; x < cell_size.x; x++) {
@@ -259,7 +298,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
                     continue;
                 }
                 xy alternate = to - xy(x, y);
-                if (map_is_cell_rect_in_bounds(state, rect_t(alternate, cell_size)) && !map_is_cell_rect_blocked(state, rect_t(alternate, cell_size), alternate, from, is_cell_rect_blocked_options)) {
+                if (map_is_cell_rect_in_bounds(state, rect_t(alternate, cell_size)) && 
+                   !map_is_cell_rect_occupied(state, rect_t(alternate, cell_size), from, should_ignore_miners)) {
                     if (nearest_alternate_distance == -1 || xy::manhattan_distance(from, alternate) < nearest_alternate_distance) {
                         nearest_alternate = alternate;
                         nearest_alternate_distance = xy::manhattan_distance(from, alternate);
@@ -288,7 +328,6 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         .cell = from
     });
 
-    // TODO prevent unit from pathing through diagonal gaps
     while (!frontier.empty()) {
         // Find the smallest path
         uint32_t smallest_index = 0;
@@ -343,12 +382,13 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
             if (!map_is_cell_rect_in_bounds(state, rect_t(child.cell, cell_size))) {
                 continue;
             }
-            // If the cell is blocked skip it, unless the cell is one step away from our goal in which case we keep going because this avoids worst-case pathfinding
-            // However if the cell type is CELL_EMPTY we do not use this optimization because this can lead to incorrect paths where elevation is concerned
-            bool child_is_blocked = map_is_cell_rect_blocked(state, rect_t(child.cell, cell_size), smallest.cell, from, is_cell_rect_blocked_options);
-            if (child_is_blocked && (child.cell != to || 
-                    xy::manhattan_distance(smallest.cell, child.cell) != 1 || 
-                    map_get_cell(state, child.cell).type != CELL_EMPTY)) {
+            // If the cell is occupied skip it, unless the cell is one step away from our goal in which case we keep going because this avoids worst-case pathfinding
+            if (map_is_cell_rect_occupied(state, rect_t(child.cell, cell_size), from, should_ignore_miners) && (child.cell != to || 
+                    xy::manhattan_distance(smallest.cell, child.cell) != 1)) {
+                continue;
+            }
+            // Skip this child if the cell is directionally blocked
+            if (!map_can_cell_rect_step_in_direction(state, rect_t(smallest.cell, cell_size), direction)) {
                 continue;
             }
             // Don't allow diagonal movement through cracks
