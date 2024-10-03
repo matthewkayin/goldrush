@@ -103,6 +103,9 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
             if (lower_neighbors != 0) {
                 xy cell = xy(x, y);
                 log_trace("cell %xi blocked %u", &cell, lower_neighbors);
+                if (state.map_tiles[x + (y * state.map_width)].index >= TILE_ARIZONA_SAND1 && state.map_tiles[x + (y * state.map_width)].index <= TILE_ARIZONA_SAND3) {
+                    state.map_tiles[x + (y * state.map_width)].index = TILE_ARIZONA_WALL;
+                }
             }
         }
     }
@@ -356,9 +359,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         }
 
         if (explored.size() > 1999) {
-            log_warn("Pathfinding too long, aborting...");
-            path->clear();
-            return;
+            log_warn("Pathfinding too long, going with closest explored...");
+            break;
         }
 
         // Consider all children

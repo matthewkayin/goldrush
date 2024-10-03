@@ -1005,7 +1005,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 target_index = INDEX_INVALID;
             }
 
-            bool should_move_as_group = target_index == INDEX_INVALID && input.move.unit_count > 1 && map_get_cell(state, input.move.target_cell).type == CELL_EMPTY;
+            bool should_move_as_group = target_index == INDEX_INVALID && 
+                                        input.move.unit_count > 1 && 
+                                        map_get_cell(state, input.move.target_cell).type == CELL_EMPTY;
             xy group_center;
 
             if (should_move_as_group) {
@@ -1046,7 +1048,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 xy unit_target = input.move.target_cell;
                 if (should_move_as_group) {
                     xy group_move_target = input.move.target_cell + (unit.cell - group_center);
-                    if (map_is_cell_in_bounds(state, group_move_target) && xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3) {
+                    if (map_is_cell_in_bounds(state, group_move_target) && 
+                        xy::manhattan_distance(group_move_target, input.move.target_cell) <= 3 &&
+                        map_get_elevation(state, input.move.target_cell) == map_get_elevation(state, group_move_target)) {
                         unit_target = group_move_target;
                     }
                 } else if (target_index != INDEX_INVALID) {

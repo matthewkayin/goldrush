@@ -242,7 +242,7 @@ tile_data_t get_tile_data(uint32_t tile) {
         case TILE_ARIZONA_SAND1: 
             return (tile_data_t) {
                 .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(48, 0)
+                .source_pos = xy(0, 0)
             };
         case TILE_ARIZONA_SAND2: 
             return (tile_data_t) {
@@ -261,7 +261,7 @@ tile_data_t get_tile_data(uint32_t tile) {
             };
         case TILE_ARIZONA_WALL: 
             return (tile_data_t) {
-                .type = TILE_TYPE_AUTO,
+                .type = TILE_TYPE_SINGLE,
                 .source_pos = xy(48, 0)
             };
         case TILE_ARIZONA_WALL_FRONT_LEFT:

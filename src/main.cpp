@@ -1336,14 +1336,13 @@ void render_match(const match_state_t& state) {
                     continue;
                 }
                 // If current elevation is equal to the tile, then render the tile, otherwise render default ground tile beneath it
-                uint16_t map_tile_index = state.map_tiles[map_index].elevation == elevation 
+                uint16_t map_tile_index = state.map_tiles[map_index].elevation == elevation
                                             ? state.map_tiles[map_index].index
                                             : TILE_ARIZONA_SAND1;
-                const tile_data_t& tile_data = get_tile_data(map_tile_index);
-
+                tile_data_t tile_data = get_tile_data(map_tile_index);
                 // Calculate tile neighbors
                 uint8_t neighbors = 0;
-                if (tile_data.type == TILE_TYPE_AUTO || (map_tile_index == TILE_ARIZONA_SAND1 && state.map_tiles[map_index].elevation == elevation)) {
+                if (tile_data.type == TILE_TYPE_AUTO || (map_tile_index == TILE_ARIZONA_WALL && state.map_tiles[map_index].elevation == elevation)) {
                     for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                         xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[direction];
                         if (!map_is_cell_in_bounds(state, neighbor_cell)) {
@@ -1360,17 +1359,7 @@ void render_match(const match_state_t& state) {
 
                 for (uint32_t edge = 0; edge < 4; edge++) {
                     // Since neighbors defaults to 0, this function will work even for non-auto tiles
-                    if (state.map_tiles[map_index].elevation != elevation) {
-                        // continue;
-                    }
                     xy source_pos = tile_data.source_pos + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
-                    static bool should_log = true;
-                    if (should_log && base_coords + xy(x, y) == xy(2, 5)) {
-                        log_trace("edge %i neighbors %u sourcepos %xi", edge, neighbors & AUTOTILE_EDGE_MASK[edge], &source_pos);
-                        if (edge == 3) {
-                            should_log = false;
-                        }
-                    }
                     SDL_Rect tile_src_rect = (SDL_Rect) {
                         .x = source_pos.x,
                         .y = source_pos.y,
