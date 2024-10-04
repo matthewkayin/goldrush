@@ -2,6 +2,7 @@
 
 #include "network.h"
 #include "logger.h"
+#include "lcg.h"
 
 void map_init(match_state_t& state, uint32_t width, uint32_t height) {
     state.map_width = width;
@@ -16,20 +17,18 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
         .value = 0
     });
 
-    /*
-    for (uint32_t i = 0; i < state.map.width * state.map.height; i++) {
-        int new_base = lcg_rand() % 7;
-        if (new_base < 4 && i % 3 == 0) {
-            state.map.tiles[i] = new_base == 1 ? 2 : 1; 
+    for (uint32_t i = 0; i < state.map_width * state.map_height; i++) {
+        int new_index = lcg_rand() % 7;
+        if (new_index < 4 && i % 3 == 0) {
+            state.map_tiles[i].index = new_index == 1 ? 2 : 1; 
         }
     }
-    */
    
-    rect_t highground_rect = rect_t(xy(1, 3), xy(6, 4));
+    rect_t highground_rect = rect_t(xy(1, 3), xy(18, 5));
     for (int x = highground_rect.position.x; x < highground_rect.position.x + highground_rect.size.x; x++) {
         for (int y = highground_rect.position.y; y < highground_rect.position.y + highground_rect.size.y; y++) {
-            if ((x == highground_rect.position.x || x == highground_rect.position.x + highground_rect.size.x - 1) &&
-                (y == highground_rect.position.y)) {
+            if (x == highground_rect.position.x + highground_rect.size.x - 1 &&
+                y == highground_rect.position.y) {
                 continue;
             }
             if (x == highground_rect.position.x + 2 && y == highground_rect.position.y + highground_rect.size.y - 2) {
@@ -115,6 +114,13 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
             state.map_cells[index].type = CELL_BLOCKED;
         }
     }
+
+    entity_id mine_id = state.mines.push_back((mine_t) {
+        .cell = xy(1, 3),
+        .gold_left = 100,
+        .is_occupied = false
+    });
+    map_set_cell_rect(state, rect_t(xy(1, 3), xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
 }
 
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {

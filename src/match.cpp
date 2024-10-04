@@ -22,8 +22,8 @@ static const int CAMERA_DRAG_SPEED = 8;
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 1000;
-const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
+static const uint32_t PLAYER_STARTING_GOLD = 10000;
+const uint32_t MATCH_WINNING_GOLD_AMOUNT = 25000;
 static const uint32_t MINE_STARTING_GOLD_AMOUNT = 2500;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
@@ -1159,7 +1159,14 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             // Tell the unit to stop building this building
             for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
                 if (state.units[unit_index].target.type == UNIT_TARGET_BUILD && state.units[unit_index].target.build.building_id == input.build_cancel.building_id) {
-                    unit_stop_building(state, state.units.get_id_of(unit_index), building);
+                    unit_t& unit = state.units[unit_index];
+                    unit.cell = unit.target.build.building_cell;
+                    unit.position = cell_center(unit.cell);
+                    unit.target = (unit_target_t) {
+                        .type = UNIT_TARGET_NONE
+                    };
+                    unit.mode = UNIT_MODE_IDLE;
+                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
                 }
             }
             // Destroy the building
@@ -1281,9 +1288,6 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
-// TODO: make this function only check one ring around. If it fails the check, it should keep the unit blocked inside the building queue and give a message saying "building exit is blocked"
-// Also for ejecting units after a building is cancelled, the unit should just go to the building cell
-// And then for ejecting units from a drop, units should just stay inside which they might already do because I'm pretty sure drops use a different function
 xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy preferred_cell) {
     // Setup search
     xy search_corners[4] = { 
@@ -1321,12 +1325,7 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
         if (cell_rect.position == search_corners[step_direction / 2]) {
             step_direction = (step_direction + 2) % DIRECTION_COUNT;
         } else if (cell_rect.position == start_cell) {
-            cell_rect.position += DIRECTION_XY[exit_direction];
-            start_cell = cell_rect.position;
-            search_corners[0] += xy(-1, -1);
-            search_corners[1] += xy(1, -1);
-            search_corners[2] += xy(1, 1);
-            search_corners[3] += xy(-1, 1);
+            // we have done one search around the rect and found no cell
         }
     }
 
@@ -1355,7 +1354,8 @@ xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t
     uint32_t index = 0;
     xy cell = cell_begin[index];
     while (index < 4) {
-        if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {
+        if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size)) && 
+           (map_get_elevation(state, cell) == map_get_elevation(state, rect.position))) {
             if (!map_is_cell_rect_occupied(state, rect_t(cell, start.size), xy(-1, -1), allow_blocked_cells) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = xy::manhattan_distance(start.position, cell);

@@ -20,6 +20,8 @@
 #define UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
 #define UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
 #define UI_STATUS_UNDER_ATTACK "You're under attack!"
+#define UI_STATUS_MINE_EXIT_BLOCKED "Mine exit is blocked."
+#define UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
 
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 
@@ -535,7 +537,7 @@ AnimationName unit_get_expected_animation(const unit_t& unit);
 int unit_get_animation_vframe(const unit_t& unit);
 bool unit_sprite_should_flip_h(const unit_t& unit);
 Sprite unit_get_select_ring(UnitType type, bool is_enemy);
-void unit_stop_building(match_state_t& state, entity_id unit_id, const building_t& building);
+void unit_stop_building(match_state_t& state, entity_id unit_id);
 unit_target_t unit_target_nearest_camp(const match_state_t& state, xy unit_cell, uint8_t unit_player_id);
 unit_target_t unit_target_nearest_mine(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, const unit_t& unit);

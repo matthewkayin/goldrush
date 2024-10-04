@@ -91,8 +91,12 @@ void building_on_finish(match_state_t& state, entity_id building_id) {
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
         unit_t& unit = state.units[unit_index];
         if (unit.target.type == UNIT_TARGET_BUILD && unit.target.build.building_id == building_id) {
-            unit_stop_building(state, state.units.get_id_of(unit_index), building);
-            if (building.type == BUILDING_CAMP) {
+            unit_stop_building(state, state.units.get_id_of(unit_index));
+            // If the unit was unable to stop building, notify the user that the exit is blocked
+            if (unit.mode != UNIT_MODE_IDLE && unit.player_id == network_get_player_id()) {
+                ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+            }
+            if (unit.mode == UNIT_MODE_IDLE && building.type == BUILDING_CAMP) {
                 unit.target = unit_target_nearest_mine(state, unit);
             }
         } else if (unit.mode == UNIT_MODE_REPAIR && building.type == BUILDING_CAMP && unit.target.id == building_id) {

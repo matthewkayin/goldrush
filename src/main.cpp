@@ -1633,18 +1633,24 @@ void render_match(const match_state_t& state) {
                 unit_params.options |= RENDER_SPRITE_FLIP_H;
             }
             if (unit.mode == UNIT_MODE_BUILD) {
-                const building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
-                const building_data_t& data = BUILDING_DATA.at(building.type);
-                int hframe = ((3 * building.health) / data.max_health);
-                unit_params.sprite = SPRITE_MINER_BUILDING;
+                uint32_t building_index = state.buildings.get_index_of(unit.target.build.building_id);
+                if (building_index == INDEX_INVALID || unit.timer == 0) {
+                    unit_params.frame.x = 0;
+                    unit_params.sprite = SPRITE_MINER_BUILDING;
+                } else {
+                    const building_t& building = state.buildings[state.buildings.get_index_of(unit.target.build.building_id)];
+                    const building_data_t& data = BUILDING_DATA.at(building.type);
+                    int hframe = ((3 * building.health) / data.max_health);
+                    unit_params.sprite = SPRITE_MINER_BUILDING;
 
-                xy building_position = (building.cell * TILE_SIZE) - state.camera_offset;
-                unit_params.position = building_position + xy(data.builder_positions_x[hframe], 
-                                                            data.builder_positions_y[hframe]);
+                    xy building_position = (building.cell * TILE_SIZE) - state.camera_offset;
+                    unit_params.position = building_position + xy(data.builder_positions_x[hframe], 
+                                                                data.builder_positions_y[hframe]);
 
-                unit_params.options &= ~RENDER_SPRITE_CENTERED;
-                if (data.builder_flip_h[hframe]) {
-                    unit_params.options |= RENDER_SPRITE_FLIP_H;
+                    unit_params.options &= ~RENDER_SPRITE_CENTERED;
+                    if (data.builder_flip_h[hframe]) {
+                        unit_params.options |= RENDER_SPRITE_FLIP_H;
+                    }
                 }
             }
             if (unit.mode == UNIT_MODE_REPAIR) {
@@ -1721,26 +1727,27 @@ void render_match(const match_state_t& state) {
         bool is_placement_out_of_bounds = ui_get_building_cell(state).x + data.cell_size > state.map_width || 
                                           ui_get_building_cell(state).y + data.cell_size > state.map_height;
         SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+        xy miner_cell = state.units.get_by_id(ui_get_nearest_builder(state, ui_get_building_cell(state))).cell;
         for (int y = ui_get_building_cell(state).y; y < ui_get_building_cell(state).y + data.cell_size; y++) {
             for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_size; x++) {
                 bool is_cell_green = true;
                 if (is_placement_out_of_bounds || map_get_fog(state, network_get_player_id(), xy(x, y)) == FOG_HIDDEN) {
+                    log_trace("not green because out of bounds or fog hidden");
                     is_cell_green = false;
                 } else {
                     for (const mine_t& mine : state.mines) {
                         if (rect_t(xy(x, y), xy(1, 1)).intersects(mine_get_block_building_rect(mine.cell))) {
                             is_cell_green = false;
+                            log_trace("not green because intersects mine");
                             break;
                         }
                     }
-                    xy miner_cell = state.units.get_by_id(ui_get_nearest_builder(state, ui_get_building_cell(state))).cell;
-                    /*
-                    if (map_get_ramp(state, ui_get_building_cell(state)) != RAMP_NONE || map_get_ramp(state, xy(x, y)) != RAMP_NONE || map_get_elevation(state, ui_get_building_cell(state)) != map_get_elevation(state, xy(x, y))) {
+                    if (xy(x, y) != miner_cell && map_is_cell_blocked(state, xy(x, y))) {
+                        log_trace("not green because cell is occupied");
                         is_cell_green = false;
                     }
-                    */
-                    if (is_cell_green) {
-                        is_cell_green = xy(x, y) == miner_cell || !map_is_cell_blocked(state, xy(x, y));
+                    if (map_get_elevation(state, xy(x, y)) != map_get_elevation(state, ui_get_building_cell(state))) {
+                        is_cell_green = false;
                     }
                 }
 
