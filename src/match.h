@@ -33,6 +33,7 @@ extern const uint32_t UNIT_CANT_BE_FERRIED;
 extern const uint32_t UNIT_IN_DURATION; 
 
 const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
+const uint32_t BUILDING_QUEUE_EXIT_BLOCKED = UINT32_MAX - 1;
 const uint32_t BUILDING_QUEUE_MAX = 5;
 const uint32_t BUILDING_FADE_DURATION = 300;
 const uint32_t MINE_SIZE = 3;
@@ -556,6 +557,7 @@ rect_t building_get_rect(const building_t& building);
 bool building_is_finished(const building_t& building);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell, xy miner_cell);
 Sprite building_get_select_ring(BuildingType type, bool is_enemy);
+xy building_get_exit_cell(const match_state_t& state, const building_t& building, xy unit_size);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);
 UiButton building_queue_item_icon(const building_queue_item_t& item);
 uint32_t building_queue_item_cost(const building_queue_item_t& item);

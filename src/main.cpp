@@ -1952,6 +1952,8 @@ void render_match(const match_state_t& state) {
             };
             if (building.queue_timer == BUILDING_QUEUE_BLOCKED) {
                 render_text(FONT_WESTERN8, "Build more houses.", COLOR_GOLD, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
+            } else if (building.queue_timer == BUILDING_QUEUE_EXIT_BLOCKED) {
+                render_text(FONT_WESTERN8, "Exit is blocked.", COLOR_GOLD, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
             } else {
                 SDL_Rect building_queue_progress_bar_rect = (SDL_Rect) {
                     .x = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x,

@@ -276,6 +276,7 @@ bool map_is_cell_blocked_in_direction(const match_state_t& state, xy cell, int d
 }
 
 void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std::vector<xy>* path, bool should_ignore_miners) {
+    log_trace("called map_pathfind() from %xi to %xi", &from, &to);
     struct node_t {
         fixed cost;
         fixed distance;
@@ -436,16 +437,20 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
 
     // Backtrack to build the path
     node_t current = found_path ? path_end : explored[closest_explored];
+    log_trace("found path? %i, current cell %xi closest explored %u", (int)found_path, &current.cell, closest_explored);
     path->clear();
     path->reserve(current.cost.integer_part());
     while (current.parent != -1) {
         path->insert(path->begin(), current.cell);
         current = explored[current.parent];
     }
-    // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,
-    // but if the target_cell really is blocked, we need to remove it from the path. The unit will path as close as they can.
-    if ((*path)[path->size() - 1] == to && map_is_cell_blocked(state, to)) {
-        path->pop_back();
+
+    if (!path->empty()) {
+        // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,
+        // but if the target_cell really is blocked, we need to remove it from the path. The unit will path as close as they can.
+        if ((*path)[path->size() - 1] == to && map_is_cell_blocked(state, to)) {
+            path->pop_back();
+        }
     }
 }
 
