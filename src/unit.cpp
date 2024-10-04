@@ -609,29 +609,29 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     unit_target_t mine_target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
 
                     // Check to make sure that the unit can exit the mine
-                    xy exit_cell = xy(-1, -1);
+                    xy preferred_exit_cell = xy(-1, -1);
                     if (mine_target.type == UNIT_TARGET_CAMP) {
                         // Circle swim - determine exit cell
                         rect_t camp_rect = rect_t(state.buildings.get_by_id(unit.target.id).cell, building_cell_size(BUILDING_CAMP));
                         bool x_overlaps = !(mine_rect.position.x + mine_rect.size.x - 1 < camp_rect.position.x || camp_rect.position.x + camp_rect.size.x - 1 < mine_rect.position.x);
                         bool y_overlaps = !(mine_rect.position.y + mine_rect.size.y - 1 < camp_rect.position.y || camp_rect.position.y + camp_rect.size.y - 1 < mine_rect.position.y);
                         if (x_overlaps && !y_overlaps) {
-                            exit_cell.y = mine_rect.position.y > camp_rect.position.y
+                            preferred_exit_cell.y = mine_rect.position.y > camp_rect.position.y
                                             ? mine_rect.position.y - 1 // Exit NORTH
                                             : mine_rect.position.y + MINE_SIZE; // Exit SOUTH
-                            exit_cell.x = mine_rect.position.x >= camp_rect.position.x
+                            preferred_exit_cell.x = mine_rect.position.x >= camp_rect.position.x
                                             ? mine_rect.position.x // On the EAST side
                                             : mine_rect.position.x + (MINE_SIZE - 1); // On the WEST side
                         } else {
-                            exit_cell.x = mine_rect.position.x > camp_rect.position.x
+                            preferred_exit_cell.x = mine_rect.position.x > camp_rect.position.x
                                             ? mine_rect.position.x - 1 // Exit WEST
                                             : mine_rect.position.x + MINE_SIZE; // Exit EAST
-                            exit_cell.y = mine_rect.position.y >= camp_rect.position.y
+                            preferred_exit_cell.y = mine_rect.position.y >= camp_rect.position.y
                                             ? mine_rect.position.y // On the NORTH side
                                             : mine_rect.position.y + (MINE_SIZE - 1); // On the SOUTH side
                         }
                     }
-                    exit_cell = get_nearest_cell_around_rect(state, rect_t(exit_cell, unit_cell_size(unit.type)), mine_rect);
+                    xy exit_cell = get_exit_cell(state, rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE)), unit_cell_size(unit.type), preferred_exit_cell);
                     if (exit_cell.x != -1) {
                         mine.is_occupied = false;
 
@@ -648,7 +648,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             }
                         }
                         unit.target = mine_target;
-                        unit.cell = get_first_empty_cell_around_rect(state, unit_cell_size(unit.type), mine_rect, exit_cell);
+                        unit.cell = exit_cell;
                         unit.position = cell_center(unit.cell);
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
                         unit.mode = UNIT_MODE_IDLE;

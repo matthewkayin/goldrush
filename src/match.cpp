@@ -1303,18 +1303,13 @@ xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, re
     }
     rect_t cell_rect = rect_t(preferred_cell, cell_size);
     int step_direction = DIRECTION_SOUTH;
-    Direction exit_direction;
     if (cell_rect.position.x >= rect.position.x && cell_rect.position.y == rect.position.y + rect.size.y) {
-        exit_direction = DIRECTION_SOUTH;
         step_direction = DIRECTION_WEST;
     } else if (cell_rect.position.x < rect.position.x && cell_rect.position.y >= rect.position.y) {
-        exit_direction = DIRECTION_WEST;
         step_direction = DIRECTION_NORTH;
     } else if (cell_rect.position.x >= rect.position.x && cell_rect.position.y < rect.position.y) {
-        exit_direction = DIRECTION_NORTH;
         step_direction = DIRECTION_EAST;
     } else {
-        exit_direction = DIRECTION_EAST;
         step_direction = DIRECTION_SOUTH;
     }
     xy start_cell = cell_rect.position;
@@ -1373,6 +1368,53 @@ xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t
     }
 
     return nearest_cell_dist != -1 ? nearest_cell : start.position;
+}
+
+xy get_exit_cell(const match_state_t& state, rect_t building_rect, xy unit_size, xy rally_cell) {
+    xy exit_cell = xy(-1, -1);
+    int exit_cell_dist = -1;
+    for (int x = building_rect.position.x - unit_size.x; x < building_rect.position.x + building_rect.size.x + unit_size.x; x++) {
+        xy cell = xy(x, building_rect.position.y - unit_size.y);
+        int cell_dist = xy::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
+           !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
+           map_get_elevation(state, building_rect.position) == map_get_elevation(state, cell) &&
+           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+        cell = xy(x, building_rect.position.y + building_rect.size.y + (unit_size.y - 1));
+        cell_dist = xy::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
+           !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
+           map_get_elevation(state, building_rect.position) == map_get_elevation(state, cell) &&
+           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+    }
+    for (int y = building_rect.position.y - unit_size.y; y < building_rect.position.y + building_rect.size.y + unit_size.y; y++) {
+        xy cell = xy(building_rect.position.x - unit_size.x, y);
+        int cell_dist = xy::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
+           !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
+           map_get_elevation(state, building_rect.position) == map_get_elevation(state, cell) &&
+           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+        cell = xy(building_rect.position.x + building_rect.size.x + (unit_size.x - 1), y);
+        cell_dist = xy::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
+           !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
+           map_get_elevation(state, building_rect.position) == map_get_elevation(state, cell) &&
+           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+    }
+
+    return exit_cell;
 }
 
 rect_t mine_get_rect(xy mine_cell) {

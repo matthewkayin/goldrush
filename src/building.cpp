@@ -140,7 +140,8 @@ void building_update(match_state_t& state, building_t& building) {
 
         if ((building.queue_timer == 0 && building.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) ||
              building.queue_timer == BUILDING_QUEUE_EXIT_BLOCKED) {
-            if (building_get_exit_cell(state, building, unit_cell_size(building.queue[0].unit_type)).x == -1) {
+            xy rally_cell = building.rally_point.x != -1 ? (building.rally_point / TILE_SIZE) : building.cell + xy(0, building_cell_size(building.type).y);
+            if (get_exit_cell(state, rect_t(building.cell, building_cell_size(building.type)), unit_cell_size(building.queue[0].unit_type), rally_cell).x == -1) {
                 if (building.queue_timer == 0 && building.player_id == network_get_player_id()) {
                     ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
                 }
@@ -156,7 +157,8 @@ void building_update(match_state_t& state, building_t& building) {
             switch (item.type) {
                 case BUILDING_QUEUE_ITEM_UNIT: {
                     // Spawn unit
-                    xy exit_cell = building_get_exit_cell(state, building, unit_cell_size(item.unit_type));
+                    xy rally_cell = building.rally_point.x != -1 ? (building.rally_point / TILE_SIZE) : building.cell + xy(0, building_cell_size(building.type).y);
+                    xy exit_cell = get_exit_cell(state, rect_t(building.cell, building_cell_size(building.type)), unit_cell_size(building.queue[0].unit_type), rally_cell);
                     GOLD_ASSERT(exit_cell.x != -1);
                     entity_id unit_id = unit_create(state, building.player_id, item.unit_type, exit_cell);
 
@@ -311,54 +313,6 @@ Sprite building_get_select_ring(BuildingType type, bool is_enemy) {
                     ? SPRITE_SELECT_RING_BUILDING_3_ATTACK
                     : SPRITE_SELECT_RING_BUILDING_3;
     }
-}
-
-xy building_get_exit_cell(const match_state_t& state, const building_t& building, xy unit_size) {
-    xy rally_cell = building.rally_point.x != -1 ? (building.rally_point / TILE_SIZE) : building.cell + xy(0, building_cell_size(building.type).y);
-    xy exit_cell = xy(-1, -1);
-    int exit_cell_dist = -1;
-    for (int x = building.cell.x - unit_size.x; x < building.cell.x + building_cell_size(building.type).x + unit_size.x; x++) {
-        xy cell = xy(x, building.cell.y - unit_size.y);
-        int cell_dist = xy::manhattan_distance(cell, rally_cell);
-        if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
-           !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
-           map_get_elevation(state, building.cell) == map_get_elevation(state, cell) &&
-           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
-            exit_cell = cell;
-            exit_cell_dist = cell_dist;
-        }
-        cell = xy(x, building.cell.y + building_cell_size(building.type).y + (unit_size.y - 1));
-        cell_dist = xy::manhattan_distance(cell, rally_cell);
-        if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
-           !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
-           map_get_elevation(state, building.cell) == map_get_elevation(state, cell) &&
-           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
-            exit_cell = cell;
-            exit_cell_dist = cell_dist;
-        }
-    }
-    for (int y = building.cell.y - unit_size.y; y < building.cell.y + building_cell_size(building.type).y + unit_size.y; y++) {
-        xy cell = xy(building.cell.x - unit_size.x, y);
-        int cell_dist = xy::manhattan_distance(cell, rally_cell);
-        if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
-           !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
-           map_get_elevation(state, building.cell) == map_get_elevation(state, cell) &&
-           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
-            exit_cell = cell;
-            exit_cell_dist = cell_dist;
-        }
-        cell = xy(building.cell.x + building_cell_size(building.type).x + (unit_size.x - 1), y);
-        cell_dist = xy::manhattan_distance(cell, rally_cell);
-        if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
-           !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
-           map_get_elevation(state, building.cell) == map_get_elevation(state, cell) &&
-           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
-            exit_cell = cell;
-            exit_cell_dist = cell_dist;
-        }
-    }
-
-    return exit_cell;
 }
 
 uint32_t building_queue_item_duration(const building_queue_item_t& item) {
