@@ -477,7 +477,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 // Misc
 xy_fixed cell_center(xy cell);
 xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect);
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy preferred_cell = xy(-1, -1));
 xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect, bool allow_blocked_cells = false);
 xy get_exit_cell(const match_state_t& state, rect_t building_rect, xy unit_size, xy rally_cell);
 rect_t mine_get_rect(xy mine_cell);

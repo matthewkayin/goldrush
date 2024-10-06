@@ -1288,45 +1288,6 @@ xy get_nearest_free_cell_within_rect(xy start_cell, rect_t rect) {
     return nearest_cell;
 }
 
-xy get_first_empty_cell_around_rect(const match_state_t& state, xy cell_size, rect_t rect, xy preferred_cell) {
-    // Setup search
-    xy search_corners[4] = { 
-        rect.position - cell_size,
-        rect.position + xy(rect.size.x, -cell_size.y),
-        rect.position + rect.size,
-        rect.position + xy(-cell_size.x, rect.size.y)
-    };
-    
-    // Determine cell start and step direction based on exit direction
-    if (preferred_cell == xy(-1, -1)) {
-        preferred_cell = rect.position + xy(0, rect.size.y);
-    }
-    rect_t cell_rect = rect_t(preferred_cell, cell_size);
-    int step_direction = DIRECTION_SOUTH;
-    if (cell_rect.position.x >= rect.position.x && cell_rect.position.y == rect.position.y + rect.size.y) {
-        step_direction = DIRECTION_WEST;
-    } else if (cell_rect.position.x < rect.position.x && cell_rect.position.y >= rect.position.y) {
-        step_direction = DIRECTION_NORTH;
-    } else if (cell_rect.position.x >= rect.position.x && cell_rect.position.y < rect.position.y) {
-        step_direction = DIRECTION_EAST;
-    } else {
-        step_direction = DIRECTION_SOUTH;
-    }
-    xy start_cell = cell_rect.position;
-
-    // Step along search until we find an empty cell
-    while (!map_is_cell_rect_in_bounds(state, cell_rect) || map_is_cell_rect_occupied(state, cell_rect)) {
-        cell_rect.position += DIRECTION_XY[step_direction];
-        if (cell_rect.position == search_corners[step_direction / 2]) {
-            step_direction = (step_direction + 2) % DIRECTION_COUNT;
-        } else if (cell_rect.position == start_cell) {
-            // we have done one search around the rect and found no cell
-        }
-    }
-
-    return cell_rect.position;
-}
-
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
 xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t rect, bool allow_blocked_cells) {

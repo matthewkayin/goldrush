@@ -910,7 +910,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             const unit_t& builder = state.units.get_by_id(unit.target.id);
             rect_t building_rect = rect_t(builder.target.build.building_cell, building_cell_size(builder.target.build.building_type));
             rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
-            return unit_rect.is_adjacent_to(building_rect);
+            return unit_rect.is_adjacent_to(building_rect) && map_get_elevation(state, unit_rect.position) == map_get_elevation(state, building_rect.position);
         }
         case UNIT_TARGET_ATTACK:
         case UNIT_TARGET_CELL:
@@ -918,7 +918,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
         case UNIT_TARGET_MINE: {
             rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
             rect_t mine_rect = rect_t(state.mines.get_by_id(unit.target.id).cell, xy(3, 3));
-            return unit_rect.is_adjacent_to(mine_rect);
+            return unit_rect.is_adjacent_to(mine_rect) && map_get_elevation(state, unit_rect.position) == map_get_elevation(state, mine_rect.position);
         }
         case UNIT_TARGET_UNIT: {
             uint32_t target_unit_index = state.units.get_index_of(unit.target.id);
@@ -926,7 +926,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
             rect_t target_unit_rect = rect_t(state.units[target_unit_index].cell, unit_cell_size(state.units[target_unit_index].type));
             return state.units[target_unit_index].player_id == unit.player_id || UNIT_DATA.at(unit.type).range_squared == 1
-                        ? unit_rect.is_adjacent_to(target_unit_rect)
+                        ? unit_rect.is_adjacent_to(target_unit_rect) && map_get_elevation(state, unit_rect.position) == map_get_elevation(state, target_unit_rect.position)
                         : unit_rect.euclidean_distance_squared_to(target_unit_rect) <= UNIT_DATA.at(unit.type).range_squared;
         }
         case UNIT_TARGET_BUILDING: {
@@ -936,7 +936,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
             rect_t building_rect = rect_t(target_building.cell, building_cell_size(target_building.type));
             return unit.player_id == target_building.player_id || UNIT_DATA.at(unit.type).range_squared == 1
-                        ? unit_rect.is_adjacent_to(building_rect) 
+                        ? unit_rect.is_adjacent_to(building_rect) && map_get_elevation(state, unit_rect.position) == map_get_elevation(state, building_rect.position)
                         : unit_rect.euclidean_distance_squared_to(building_rect) <= UNIT_DATA.at(unit.type).range_squared;
         }
         case UNIT_TARGET_CAMP: {
@@ -944,7 +944,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             GOLD_ASSERT(camp_index != INDEX_INVALID);
             rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
             rect_t building_rect = rect_t(state.buildings[camp_index].cell, building_cell_size(state.buildings[camp_index].type));
-            return unit_rect.is_adjacent_to(building_rect);
+            return unit_rect.is_adjacent_to(building_rect) && map_get_elevation(state, unit_rect.position) == map_get_elevation(state, building_rect.position);
         }
     }
 }

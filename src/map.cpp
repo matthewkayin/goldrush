@@ -233,36 +233,6 @@ FogType map_get_fog(const match_state_t& state, uint8_t player_id, xy cell) {
     return state.player_fog[player_id][cell.x + (state.map_width * cell.y)];
 }
 
-bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, rect_t rect) {
-    for (int x = rect.position.x; x < rect.position.x + rect.size.x; x++) {
-        for (int y = rect.position.y; y < rect.position.y + rect.size.y; y++) {
-            if (map_get_fog(state, player_id, xy(x, y)) == FOG_REVEALED) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-void map_fog_reveal_at_cell(match_state_t& state, uint8_t player_id, xy cell, xy size, int sight) {
-    int xmin = std::max(0, cell.x - sight);
-    int xmax = std::min((int)state.map_width, cell.x + size.x + sight);
-    int ymin = std::max(0, cell.y - sight);
-    int ymax = std::min((int)state.map_height, cell.y + size.y + sight);
-    for (int x = xmin; x < xmax; x++) {
-        for (int y = ymin; y < ymax; y++) {
-            bool is_x_edge = x == cell.x - sight || x == (cell.x + size.x + sight) - 1;
-            bool is_y_edge = y == cell.y - sight || y == (cell.y + size.y + sight) - 1;
-            if (is_x_edge && is_y_edge) {
-                continue;
-            }
-
-            state.player_fog[player_id][x + (state.map_width * y)] = FOG_REVEALED;
-        }
-    }
-}
-
 tile_t map_get_tile(const match_state_t& state, xy cell) {
     return state.map_tiles[cell.x + (cell.y * state.map_width)];
 }
@@ -451,6 +421,49 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         }
     }
 }
+
+bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, rect_t rect) {
+    for (int x = rect.position.x; x < rect.position.x + rect.size.x; x++) {
+        for (int y = rect.position.y; y < rect.position.y + rect.size.y; y++) {
+            if (map_get_fog(state, player_id, xy(x, y)) == FOG_REVEALED) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void map_fog_reveal_at_cell(match_state_t& state, uint8_t player_id, xy cell, xy size, int sight) {
+    std::queue<xy> frontier;
+    std::unordered_map<int, int> explored;
+    frontier.push(cell);
+    while (!frontier.empty()) {
+        xy next = frontier.front();
+        frontier.pop();
+        auto explored_it = explored.find(next.x + (state.map_width * next.y));
+        if (explored_it != explored.end()) {
+            continue;
+        }
+        explored[next.x + (state.map_width * next.y)] = 1;
+        if (((next.x == cell.x - sight || next.x == cell.x + sight) && 
+            (next.y == cell.y - sight || next.y == cell.y + sight)) ||
+            std::abs(next.x - cell.x) > sight || std::abs(next.y - cell.y) > sight) {
+            continue;
+        }
+        if (!map_is_cell_in_bounds(state, next)) {
+            continue;
+        }
+        if (map_get_elevation(state, cell) < map_get_elevation(state, next)) {
+            continue;
+        }
+        state.player_fog[player_id][next.x + (state.map_width * next.y)] = FOG_REVEALED;
+        for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+            frontier.push(next + DIRECTION_XY[direction]);
+        }
+    }
+}
+
 
 void map_fog_reveal(match_state_t& state, uint8_t player_id) {
     // Reveal based on unit vision
