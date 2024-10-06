@@ -65,30 +65,23 @@ enum Sprite {
     SPRITE_COUNT
 };
 
+const uint32_t SPRITE_OPTION_HFRAME_AS_TILE_SIZE = 1;
+const uint32_t SPRITE_OPTION_RECOLOR = 1 << 1;
+const uint32_t SPRITE_OPTION_TILESET = 1 << 2;
+
 struct sprite_params_t {
     const char* path;
     int hframes;
     int vframes;
-    bool recolor;
+    uint32_t options;
 };
 
 extern const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS;
 
-enum TilesetName {
-    TILESET_ARIZONA,
-    TILESET_COUNT
-};
-
-enum ArizonaTile {
-    TILE_ARIZONA_SAND1,
-    TILE_ARIZONA_SAND2,
-    TILE_ARIZONA_SAND3,
-    TILE_ARIZONA_WATER,
-    TILE_ARIZONA_WALL,
-    TILE_ARIZONA_WALL_FRONT_LEFT,
-    TILE_ARIZONA_WALL_FRONT_CENTER,
-    TILE_ARIZONA_WALL_FRONT_RIGHT,
-    TILE_ARIZONA_COUNT
+enum Tile {
+    TILE_SAND,
+    TILE_WATER,
+    TILE_WALL
 };
 
 enum TileType {
@@ -100,8 +93,6 @@ struct tile_data_t {
     TileType type;
     xy source_pos;
 };
-
-tile_data_t get_tile_data(uint32_t tile);
 
 enum AnimationName {
     ANIMATION_UI_MOVE,

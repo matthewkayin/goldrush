@@ -5,288 +5,237 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .path = "sprite/tileset_arizona.png",
         .hframes = -1,
         .vframes = -1,
-        .recolor = false
+        .options = SPRITE_OPTION_TILESET
     }},
     { SPRITE_TILE_DECORATION, (sprite_params_t) {
         .path = "sprite/tile_decorations.png",
-        .hframes = -1,
-        .vframes = -1,
-        .recolor = false
+        .hframes = 16,
+        .vframes = 16,
+        .options = SPRITE_OPTION_HFRAME_AS_TILE_SIZE
     }},
     { SPRITE_UI_FRAME, (sprite_params_t) {
         .path = "sprite/ui_frame.png",
         .hframes = 3,
         .vframes = 3,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_FRAME_BOTTOM, (sprite_params_t) {
         .path = "sprite/ui_frame_bottom.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_FRAME_BUTTONS, (sprite_params_t) {
         .path = "sprite/ui_frame_buttons.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_MINIMAP, (sprite_params_t) {
         .path = "sprite/ui_minimap.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_BUTTON, (sprite_params_t) {
         .path = "sprite/ui_button.png",
         .hframes = 3,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_BUTTON_ICON, (sprite_params_t) {
         .path = "sprite/ui_button_icon.png",
         .hframes = UI_BUTTON_COUNT - 1,
         .vframes = 3,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_TOOLTIP_FRAME, (sprite_params_t) {
         .path = "sprite/ui_tooltip_frame.png",
         .hframes = 3,
         .vframes = 3,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_TEXT_FRAME, (sprite_params_t) {
         .path = "sprite/ui_text_frame.png",
         .hframes = 3,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_TABS, (sprite_params_t) {
         .path = "sprite/ui_frame_tabs.png",
         .hframes = 2,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_GOLD, (sprite_params_t) {
         .path = "sprite/ui_gold.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_HOUSE, (sprite_params_t) {
         .path = "sprite/ui_house.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_MOVE, (sprite_params_t) {
         .path = "sprite/ui_move.png",
         .hframes = 5,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_PARCHMENT_BUTTONS, (sprite_params_t) {
         .path = "sprite/ui_parchment_buttons.png",
         .hframes = 2,
         .vframes = 2,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_OPTIONS_DROPDOWN, (sprite_params_t) {
         .path = "sprite/ui_options_dropdown.png",
         .hframes = 1,
         .vframes = 5,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_UI_CONTROL_GROUP_FRAME, (sprite_params_t) {
         .path = "sprite/ui_control_group_frame.png",
         .hframes = 3,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING_ATTACK, (sprite_params_t) {
         .path = "sprite/select_ring_attack.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING_WAGON, (sprite_params_t) {
         .path = "sprite/select_ring_wagon.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING_WAGON_ATTACK, (sprite_params_t) {
         .path = "sprite/select_ring_wagon_attack.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING_BUILDING_2, (sprite_params_t) {
         .path = "sprite/select_ring_building2x2.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING_BUILDING_2_ATTACK, (sprite_params_t) {
         .path = "sprite/select_ring_building2x2_attack.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING_BUILDING_3, (sprite_params_t) {
         .path = "sprite/select_ring_building3x3.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING_BUILDING_3_ATTACK, (sprite_params_t) {
         .path = "sprite/select_ring_building3x3_attack.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
         .path = "sprite/select_ring_gold.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_MINER_BUILDING, (sprite_params_t) {
         .path = "sprite/unit_miner_building.png",
         .hframes = 2,
         .vframes = 3,
-        .recolor = true
+        .options = SPRITE_OPTION_RECOLOR
     }},
     { SPRITE_UNIT_MINER, (sprite_params_t) {
         .path = "sprite/unit_miner.png",
         .hframes = 15,
         .vframes = 6,
-        .recolor = true
+        .options = SPRITE_OPTION_RECOLOR
     }},
     { SPRITE_UNIT_COWBOY, (sprite_params_t) {
         .path = "sprite/unit_cowboy.png",
         .hframes = 15,
         .vframes = 3,
-        .recolor = true
+        .options = SPRITE_OPTION_RECOLOR
     }},
     { SPRITE_UNIT_WAGON, (sprite_params_t) {
         .path = "sprite/unit_wagon.png",
         .hframes = 15,
         .vframes = 3,
-        .recolor = true
+        .options = SPRITE_OPTION_RECOLOR
     }},
     { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
         .path = "sprite/building_house.png",
         .hframes = 4,
         .vframes = 1,
-        .recolor = true
+        .options = SPRITE_OPTION_RECOLOR
     }},
     { SPRITE_BUILDING_CAMP, (sprite_params_t) {
         .path = "sprite/building_camp.png",
         .hframes = 5,
         .vframes = 1,
-        .recolor = true
+        .options = SPRITE_OPTION_RECOLOR
     }},
     { SPRITE_BUILDING_SALOON, (sprite_params_t) {
         .path = "sprite/building_saloon.png",
         .hframes = 4,
         .vframes = 1,
-        .recolor = true
+        .options = SPRITE_OPTION_RECOLOR
     }},
     { SPRITE_BUILDING_MINE, (sprite_params_t) {
         .path = "sprite/building_mine.png",
         .hframes = 3,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_BUILDING_DESTROYED_2, (sprite_params_t) {
         .path = "sprite/building_destroyed2x2.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_BUILDING_DESTROYED_3, (sprite_params_t) {
         .path = "sprite/building_destroyed3x3.png",
         .hframes = 1,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_FOG_OF_WAR, (sprite_params_t) {
         .path = "sprite/fog_of_war.png",
         .hframes = 8,
         .vframes = 6,
-        .recolor = false
+        .options = 0
     }},
     { SPRITE_RALLY_FLAG, (sprite_params_t) {
         .path = "sprite/rally_flag.png",
         .hframes = 6,
         .vframes = 1,
-        .recolor = true
+        .options = SPRITE_OPTION_RECOLOR
     }},
     { SPRITE_MENU_CLOUDS, (sprite_params_t) {
         .path = "sprite/menu_clouds.png",
         .hframes = 3,
         .vframes = 1,
-        .recolor = false
+        .options = 0
     }}  
 };
-
-tile_data_t get_tile_data(uint32_t tile) {
-    switch (tile) {
-        case TILE_ARIZONA_SAND1: 
-            return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(0, 0)
-            };
-        case TILE_ARIZONA_SAND2: 
-            return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(16, 0)
-            };
-        case TILE_ARIZONA_SAND3: 
-            return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(32, 0)
-            };
-        case TILE_ARIZONA_WATER:
-            return (tile_data_t) {
-                .type = TILE_TYPE_AUTO,
-                .source_pos = xy(0, 16)
-            };
-        case TILE_ARIZONA_WALL: 
-            return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(48, 0)
-            };
-        case TILE_ARIZONA_WALL_FRONT_LEFT:
-            return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(48, 48)
-            };
-        case TILE_ARIZONA_WALL_FRONT_CENTER:
-            return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(56, 48)
-            };
-        case TILE_ARIZONA_WALL_FRONT_RIGHT:
-            return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(64, 48)
-            };
-        default: 
-            GOLD_ASSERT(false);
-            return (tile_data_t) {
-                .type = TILE_TYPE_SINGLE,
-                .source_pos = xy(-1, -1)
-            };
-    }
-}
 
 const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
     { ANIMATION_UI_MOVE, (animation_data_t) {

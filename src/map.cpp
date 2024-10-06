@@ -8,7 +8,7 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
     state.map_width = width;
     state.map_height = height;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
-        .index = TILE_ARIZONA_SAND1,
+        .index = 0,
         .elevation = 0,
         .blocked = BLOCKED_NONE
     });
@@ -17,13 +17,116 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
         .value = 0
     });
 
-    for (uint32_t i = 0; i < state.map_width * state.map_height; i++) {
-        int new_index = lcg_rand() % 7;
-        if (new_index < 4 && i % 3 == 0) {
-            state.map_tiles[i].index = new_index == 1 ? 2 : 1; 
+    std::vector<tile_t> map_tiles_prebaked(state.map_width * state.map_height, (tile_t) {
+        .index = TILE_SAND,
+        .elevation = 0,
+        .blocked = BLOCKED_NONE
+    });
+
+    xy water_test_base = xy(1, 1);
+    for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
+        bool is_unique = true;
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
+                int prev_direction = direction - 1;
+                int next_direction = (direction + 1) % DIRECTION_COUNT;
+                if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                    (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                    is_unique = false;
+                    break;
+                }
+            }
+        }
+        if (!is_unique) {
+            continue;
+        }
+
+        xy cell = water_test_base + xy(1, 1);
+        map_tiles_prebaked[cell.x + (cell.y * state.map_width)].index = TILE_WATER;
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            if ((DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
+                xy neighbor_cell = cell + DIRECTION_XY[direction];
+                map_tiles_prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index = TILE_WATER;
+            }
+        }
+
+        water_test_base.x += 4;
+        if (water_test_base.x + 4 >= state.map_width) {
+            water_test_base.x = 1;
+            water_test_base.y += 4;
         }
     }
+
+    // Setup the autotile index lookup
+    std::unordered_map<uint32_t, uint32_t> neighbors_to_autotile_index;
+    {
+        uint32_t unique_index = 0;
+        for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
+            bool is_unique = true;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
+                    int prev_direction = direction - 1;
+                    int next_direction = (direction + 1) % DIRECTION_COUNT;
+                    if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                        (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                        is_unique = false;
+                        break;
+                    }
+                }
+            }
+            if (!is_unique) {
+                continue;
+            }
+            neighbors_to_autotile_index[neighbors] = unique_index;
+            unique_index++;
+        }
+    }
+
+    // Bake map tiles
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            int index = x + (y * state.map_width);
+            if (map_tiles_prebaked[index].index == TILE_SAND) {
+                int new_index = lcg_rand() % 7;
+                if (new_index < 4 && index % 3 == 0) {
+                    state.map_tiles[index].index = new_index == 1 ? 2 : 1; 
+                } else {
+                    state.map_tiles[index].index = 0;
+                }
+            } else if (map_tiles_prebaked[index].index == TILE_WATER) {
+                uint32_t neighbors = 0;
+                // Check adjacent neighbors
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
+                    if (!map_is_cell_in_bounds(state, neighbor_cell) || 
+                        map_tiles_prebaked[index].index == map_tiles_prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+                // Check diagonal neighbors
+                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                    xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
+                    int prev_direction = direction - 1;
+                    int next_direction = (direction + 1) % DIRECTION_COUNT;
+                    if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                        (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                        continue;
+                    }
+                    if (!map_is_cell_in_bounds(state, neighbor_cell) || 
+                        map_tiles_prebaked[index].index == map_tiles_prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+                // Set the map tile based on the neighbors
+                state.map_tiles[index].index = 3 + neighbors_to_autotile_index[neighbors];
+            } // End else if tile is water
+
+            state.map_tiles[index].elevation = map_tiles_prebaked[index].elevation;
+        } // end for each y
+    } // end for each x
+    // End bake tiles
    
+    /*
     rect_t highground_rect = rect_t(xy(1, 3), xy(18, 5));
     for (int x = highground_rect.position.x; x < highground_rect.position.x + highground_rect.size.x; x++) {
         for (int y = highground_rect.position.y; y < highground_rect.position.y + highground_rect.size.y; y++) {
@@ -74,15 +177,17 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
             .blocked = BLOCKED_COMPLETELY
         };
     }
+    */
 
+    // Set map elevation
     state.map_lowest_elevation = 0;
     state.map_highest_elevation = 0;
     for (uint32_t index = 0; index < state.map_width * state.map_height; index++) {
         state.map_lowest_elevation = std::min(state.map_lowest_elevation, state.map_tiles[index].elevation);
         state.map_highest_elevation = std::max(state.map_highest_elevation, state.map_tiles[index].elevation);
     }
-    GOLD_ASSERT(std::abs(state.map_highest_elevation - state.map_lowest_elevation) < 6);
     
+    /*
     for (int x = 0; x < state.map_width; x++) {
         for (int y = 0; y < state.map_height; y++) {
             if (state.map_tiles[x + (y * state.map_width)].blocked != BLOCKED_NONE) {
@@ -108,6 +213,7 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
             }
         }
     }
+    */
 
     for (int index = 0; index < state.map_width * state.map_height; index++) {
         if (state.map_tiles[index].blocked == BLOCKED_COMPLETELY) {
@@ -115,12 +221,14 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
         }
     }
 
+    /*
     entity_id mine_id = state.mines.push_back((mine_t) {
         .cell = xy(1, 3),
         .gold_left = 100,
         .is_occupied = false
     });
     map_set_cell_rect(state, rect_t(xy(1, 3), xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
+    */
 }
 
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {
