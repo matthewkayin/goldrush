@@ -213,6 +213,8 @@ const uint32_t RENDER_SPRITE_FLIP_H = 1;
 const uint32_t RENDER_SPRITE_CENTERED = 1 << 1;
 const uint32_t RENDER_SPRITE_NO_CULL = 1 << 2;
 
+uint16_t wall_index_offset;
+
 bool engine_init(xy window_size);
 void engine_quit();
 bool engine_create_renderer();
@@ -635,7 +637,6 @@ bool engine_create_renderer() {
             log_error("Sprite params not defined for sprite id %u", i);
             return false;
         }
-        bool sprite_params_recolor = (params.options & SPRITE_OPTION_RECOLOR) == SPRITE_OPTION_RECOLOR;
 
         // Load the sprite
         sprite_t sprite;
@@ -680,13 +681,14 @@ bool engine_create_renderer() {
             }
 
             // Create tileset texture
-            // sand variations + water autotile + rock wall
-            int hframes = 3 + 47 + 15;
+            // error tile + sand variations + water autotile + rock wall
+            int hframes = 1 + 3 + 47 + 19;
             sprite.texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, hframes * TILE_SIZE, TILE_SIZE);
             if (sprite.texture == NULL) {
                 log_error("Unable to create tileset texture: %s", SDL_GetError());
                 return false;
             }
+            SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
             SDL_SetRenderTarget(engine.renderer, sprite.texture);
             int tileset_index = 0;
             SDL_Rect src_rect = (SDL_Rect) {
@@ -702,9 +704,17 @@ bool engine_create_renderer() {
                 .h = TILE_SIZE
             };
 
+            // Blit error tile
+            src_rect.x = 32;
+            src_rect.y = 16;
+            dst_rect.x = 0;
+            SDL_RenderCopy(engine.renderer, base_texture, &src_rect, &dst_rect);
+            tileset_index++;
+
             // Blit sand variations
             for (int i = 0; i < 3; i++) {
                 src_rect.x = i * TILE_SIZE;
+                src_rect.y = 0;
                 dst_rect.x = tileset_index * TILE_SIZE;
                 SDL_RenderCopy(engine.renderer, base_texture, &src_rect, &dst_rect);
                 tileset_index++;
@@ -748,6 +758,22 @@ bool engine_create_renderer() {
                 }
                 tileset_index++;
             } // End for each neighbor combo in water autotile
+
+            // Blit wall tiles
+            xy wall_tile_base_pos = xy(48, 0);
+            wall_index_offset = tileset_index;
+            for (int y = 0; y < 4; y++) {
+                for (int x = 0; x < 5; x++) {
+                    if (x == 1 && y == 1) {
+                        continue;
+                    }
+                    src_rect.x = wall_tile_base_pos.x + (x * TILE_SIZE);
+                    src_rect.y = wall_tile_base_pos.y + (y * TILE_SIZE);
+                    dst_rect.x = tileset_index * TILE_SIZE;
+                    SDL_RenderCopy(engine.renderer, base_texture, &src_rect, &dst_rect);
+                    tileset_index++;
+                }
+            }
 
             SDL_SetRenderTarget(engine.renderer, NULL);
             SDL_DestroyTexture(base_texture);
@@ -1076,7 +1102,7 @@ void render_menu(const menu_state_t& menu) {
     for (int x = 0; x < menu_tile_width; x++) {
         for (int y = 0; y < menu_tile_height; y++) {
             SDL_Rect src_rect = (SDL_Rect) {
-                .x = (y == 0 || y == 2) && (x + y) % 10 == 0 ? 32 : 0,
+                .x = (y == 0 || y == 2) && (x + y) % 10 == 0 ? 48 : 16,
                 .y = 0,
                 .w = TILE_SIZE,
                 .h = TILE_SIZE
@@ -1417,7 +1443,7 @@ void render_match(const match_state_t& state) {
                 // If current elevation is equal to the tile, then render the tile, otherwise render default ground tile beneath it
                 uint16_t map_tile_index = state.map_tiles[map_index].elevation == elevation
                                             ? state.map_tiles[map_index].index
-                                            : 0;
+                                            : 1;
                 /*
                 tile_data_t tile_data = get_tile_data(map_tile_index);
                 // Calculate tile neighbors
