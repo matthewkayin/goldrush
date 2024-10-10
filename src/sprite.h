@@ -78,6 +78,7 @@ struct sprite_params_t {
 
 extern const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS;
 extern uint16_t wall_index_offset;
+extern std::unordered_map<uint32_t, uint32_t> neighbors_to_autotile_index;
 
 enum Tile {
     TILE_SAND,

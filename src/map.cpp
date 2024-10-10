@@ -127,31 +127,6 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
         .is_ramp = 1
     };
 
-    // Setup the autotile index lookup
-    std::unordered_map<uint32_t, uint32_t> neighbors_to_autotile_index;
-    {
-        uint32_t unique_index = 0;
-        for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
-            bool is_unique = true;
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
-                    int prev_direction = direction - 1;
-                    int next_direction = (direction + 1) % DIRECTION_COUNT;
-                    if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
-                        (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
-                        is_unique = false;
-                        break;
-                    }
-                }
-            }
-            if (!is_unique) {
-                continue;
-            }
-            neighbors_to_autotile_index[neighbors] = unique_index;
-            unique_index++;
-        }
-    }
-
     // Bake map tiles
     for (int y = 0; y < state.map_height; y++) {
         for (int x = 0; x < state.map_width; x++) {
@@ -562,10 +537,10 @@ void map_fog_reveal_at_cell(match_state_t& state, uint8_t player_id, xy cell, xy
         if (!map_is_cell_in_bounds(state, next)) {
             continue;
         }
+        state.player_fog[player_id][next.x + (state.map_width * next.y)] = FOG_REVEALED;
         if (map_get_elevation(state, cell) < map_get_elevation(state, next)) {
             continue;
         }
-        state.player_fog[player_id][next.x + (state.map_width * next.y)] = FOG_REVEALED;
         for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
             frontier.push(next + DIRECTION_XY[direction]);
         }
