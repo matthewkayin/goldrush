@@ -1310,8 +1310,7 @@ xy get_nearest_cell_around_rect(const match_state_t& state, rect_t start, rect_t
     uint32_t index = 0;
     xy cell = cell_begin[index];
     while (index < 4) {
-        if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size)) && 
-           (map_get_elevation(state, cell) == map_get_elevation(state, rect.position))) {
+        if (map_is_cell_rect_in_bounds(state, rect_t(cell, start.size))) {
             if (!map_is_cell_rect_occupied(state, rect_t(cell, start.size), xy(-1, -1), allow_blocked_cells) && (nearest_cell_dist == -1 || xy::manhattan_distance(start.position, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = xy::manhattan_distance(start.position, cell);
@@ -1339,7 +1338,6 @@ xy get_exit_cell(const match_state_t& state, rect_t building_rect, xy unit_size,
         int cell_dist = xy::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
            !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
-           map_get_elevation(state, building_rect.position) == map_get_elevation(state, cell) &&
            (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -1348,7 +1346,6 @@ xy get_exit_cell(const match_state_t& state, rect_t building_rect, xy unit_size,
         cell_dist = xy::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
            !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
-           map_get_elevation(state, building_rect.position) == map_get_elevation(state, cell) &&
            (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -1359,7 +1356,6 @@ xy get_exit_cell(const match_state_t& state, rect_t building_rect, xy unit_size,
         int cell_dist = xy::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
            !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
-           map_get_elevation(state, building_rect.position) == map_get_elevation(state, cell) &&
            (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -1368,7 +1364,6 @@ xy get_exit_cell(const match_state_t& state, rect_t building_rect, xy unit_size,
         cell_dist = xy::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(state, rect_t(cell, unit_size)) && 
            !map_is_cell_rect_occupied(state, rect_t(cell, unit_size)) && 
-           map_get_elevation(state, building_rect.position) == map_get_elevation(state, cell) &&
            (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;

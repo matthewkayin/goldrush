@@ -1990,21 +1990,18 @@ void render_match(const match_state_t& state) {
             for (int x = ui_get_building_cell(state).x; x < ui_get_building_cell(state).x + data.cell_size; x++) {
                 bool is_cell_green = true;
                 if (is_placement_out_of_bounds || map_get_fog(state, network_get_player_id(), xy(x, y)) == FOG_HIDDEN) {
-                    log_trace("not green because out of bounds or fog hidden");
                     is_cell_green = false;
                 } else {
                     for (const mine_t& mine : state.mines) {
                         if (rect_t(xy(x, y), xy(1, 1)).intersects(mine_get_block_building_rect(mine.cell))) {
                             is_cell_green = false;
-                            log_trace("not green because intersects mine");
                             break;
                         }
                     }
                     if (xy(x, y) != miner_cell && map_is_cell_blocked(state, xy(x, y))) {
-                        log_trace("not green because cell is occupied");
                         is_cell_green = false;
                     }
-                    if (map_get_elevation(state, xy(x, y)) != map_get_elevation(state, ui_get_building_cell(state))) {
+                    if (state.map_tiles[x + (y * state.map_width)].is_ramp == 1) {
                         is_cell_green = false;
                     }
                 }

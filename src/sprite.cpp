@@ -219,8 +219,8 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_FOG_OF_WAR, (sprite_params_t) {
         .path = "sprite/fog_of_war.png",
-        .hframes = 8,
-        .vframes = 6,
+        .hframes = 47 * 2,
+        .vframes = 1,
         .options = 0
     }},
     { SPRITE_RALLY_FLAG, (sprite_params_t) {
