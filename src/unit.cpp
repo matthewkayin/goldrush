@@ -2,6 +2,7 @@
 
 #include "logger.h"
 #include "network.h"
+#include "lcg.h"
 
 const uint32_t UNIT_PATH_PAUSE_DURATION = 30;
 const uint32_t UNIT_BUILD_TICK_DURATION = 6;
@@ -678,6 +679,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         enemy_position = enemy.position.to_xy();
 
                         int damage = std::max(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
+                        // Elevation accuracy disadvantage - If unit is on lower elevation than target, unit has 50% chance to miss
+                        if (unit_get_elevation(state, unit) < unit_get_elevation(state, enemy)) {
+                            if (lcg_rand() % 2 == 0) {
+                                damage = 0;
+                            }
+                        }
                         enemy.health = std::max(0, enemy.health - damage);
                         if (enemy.taking_damage_timer == 0) {
                             // Only show the alert if the enemy being attacked belongs to the current player
