@@ -612,7 +612,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     xy preferred_exit_cell = xy(-1, -1);
                     if (mine_target.type == UNIT_TARGET_CAMP) {
                         // Circle swim - determine exit cell
-                        rect_t camp_rect = rect_t(state.buildings.get_by_id(unit.target.id).cell, building_cell_size(BUILDING_CAMP));
+                        rect_t camp_rect = rect_t(state.buildings.get_by_id(mine_target.id).cell, building_cell_size(BUILDING_CAMP));
                         bool x_overlaps = !(mine_rect.position.x + mine_rect.size.x - 1 < camp_rect.position.x || camp_rect.position.x + camp_rect.size.x - 1 < mine_rect.position.x);
                         bool y_overlaps = !(mine_rect.position.y + mine_rect.size.y - 1 < camp_rect.position.y || camp_rect.position.y + camp_rect.size.y - 1 < mine_rect.position.y);
                         if (x_overlaps && !y_overlaps) {

@@ -115,70 +115,6 @@ match_state_t match_init() {
     }
     state.camera_offset = camera_centered_on_cell(player_spawns[network_get_player_id()], state.map_width, state.map_height);
 
-    // Place gold on the map
-    log_trace("Placing gold...");
-    /*
-    std::vector<xy> gold_patch_cells;
-    for (int x = 0; x < 4; x++) {
-        for (int y = 0; y < 4; y++) {
-            gold_patch_cells.push_back(xy(12 + (24 * x), 12 + (24 * y)));
-            xy mine_cell = xy(12 + (24 * x), 12 + (24 * y));
-            entity_id mine_id = state.mines.push_back((mine_t) {
-                .cell = mine_cell,
-                .gold_left = MINE_STARTING_GOLD_AMOUNT,
-                .is_occupied = false
-            });
-            map_set_cell_rect(state.map, rect_t(mine_cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
-        }
-    }
-    */
-    /*
-    uint32_t target_mine_count = 7;
-    uint32_t attempts = 0;
-    while (state.mines.size() < target_mine_count) {
-        xy mine_cell;
-        mine_cell.x = 16 + (lcg_rand() % (state.map_width - 32));
-        mine_cell.y = 16 + (lcg_rand() % (state.map_height - 32));
-
-        // Check that it's not too close to the player spawns
-        bool mine_cell_valid = true;
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status != PLAYER_STATUS_NONE && 
-                xy::manhattan_distance(mine_cell, player_spawns[player_id]) < 20) {
-                    mine_cell_valid = false;
-                    break;
-            }
-        }
-        // Check that it's not too close to other mines
-        for (mine_t& mine : state.mines) {
-            if (xy::manhattan_distance(mine.cell, mine_cell) < 20) {
-                mine_cell_valid = false;
-                break;
-            }
-        }
-        if (!mine_cell_valid) {
-            attempts++;
-            if (attempts == 5) {
-                log_warn("Mine generation reached max attempts.");
-                while (state.mines.size() != 0) {
-                    map_set_cell_rect(state, rect_t(state.mines[0].cell, xy(MINE_SIZE, MINE_SIZE)), CELL_EMPTY);
-                    state.mines.remove_at(0);
-                }
-                attempts = 0;
-            }
-            continue;
-        }
-
-        mine_t mine = (mine_t) {
-            .cell = mine_cell,
-            .gold_left = MINE_STARTING_GOLD_AMOUNT,
-            .is_occupied = false
-        };
-        entity_id mine_id = state.mines.push_back(mine);
-        map_set_cell_rect(state, rect_t(mine_cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
-    }
-    */
-
     // Place decorations on the map
     log_trace("Placing decorations...");
     /*
@@ -214,14 +150,7 @@ match_state_t match_init() {
     */
     log_info("Map complete!");
 
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
-            continue;
-        }
-        map_fog_reveal(state, player_id);
-        map_update_fog(state, player_id);
-        // state.map.is_fog_dirty = true;
-    }
+    state.is_fog_dirty = true;
 
     if (!network_is_server()) {
         log_info("Client in match.");
@@ -573,6 +502,11 @@ void match_update(match_state_t& state) {
         FogType fog_type = map_get_fog(state, network_get_player_id(), input.move.target_cell);
         if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || ((cell_type == CELL_BUILDING || cell_type == CELL_MINE) && fog_type != FOG_HIDDEN)) {
             input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
+            // If the cell is a building or a mine and the player has not seen this cell or mine, then treat this movement like a normal cell move
+            if ((cell_type == CELL_BUILDING && state.remembered_buildings[network_get_player_id()].find(input.move.target_entity_id) == state.remembered_buildings[network_get_player_id()].end()) ||
+                (cell_type == CELL_MINE && state.remembered_mines[network_get_player_id()].find(input.move.target_entity_id) == state.remembered_mines[network_get_player_id()].end())) {
+                input.move.target_entity_id = ID_NULL;
+            }
         }
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
@@ -598,7 +532,12 @@ void match_update(match_state_t& state) {
         state.input_queue.push_back(input);
 
         // Provide instant user feedback
-        state.ui_move_cell = map_get_cell(state, input.move.target_cell);
+        state.ui_move_cell = input.move.target_entity_id == ID_NULL
+                                ? (cell_t) {
+                                    .type = CELL_EMPTY,
+                                    .value = 0
+                                }
+                                : map_get_cell(state, input.move.target_cell);
         if (input.type == INPUT_BLIND_MOVE || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
             state.ui_move_position = mouse_world_pos;
@@ -741,11 +680,13 @@ void match_update(match_state_t& state) {
     }
 
     // Update Fog of War
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
-            continue;
+    if (state.is_fog_dirty) {
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
+                continue;
+            }
+            map_update_fog(state, player_id);
         }
-        map_update_fog(state, player_id);
     }
 
     // Update alerts

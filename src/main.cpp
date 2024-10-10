@@ -1610,7 +1610,7 @@ void render_match(const match_state_t& state) {
         }
 
         // Render destroyed buildings
-        for (auto it : state.remembered_buildings) {
+        for (auto it : state.remembered_buildings[network_get_player_id()]) {
             const remembered_building_t& building = it.second;
             if (building.mode != BUILDING_MODE_DESTROYED || map_get_elevation(state, building.cell) != elevation) {
                 continue;
@@ -1762,7 +1762,7 @@ void render_match(const match_state_t& state) {
         }
 
         // Mines
-        for (auto it : state.remembered_mines) {
+        for (auto it : state.remembered_mines[network_get_player_id()]) {
             const mine_t& mine = it.second;
             if (map_get_elevation(state, mine.cell) != elevation) {
                 continue;
@@ -1788,7 +1788,7 @@ void render_match(const match_state_t& state) {
         }
 
         // Buildings
-        for (auto it : state.remembered_buildings) {
+        for (auto it : state.remembered_buildings[network_get_player_id()]) {
             const remembered_building_t& building = it.second;
             if (building.mode == BUILDING_MODE_DESTROYED || map_get_elevation(state, building.cell) != elevation) {
                 continue;
@@ -2410,7 +2410,7 @@ void render_match(const match_state_t& state) {
         SDL_RenderFillRect(engine.renderer, &mine_rect);
     }
 
-    for (auto it : state.remembered_buildings) {
+    for (auto it : state.remembered_buildings[network_get_player_id()]) {
         const remembered_building_t& building = it.second;
         if (building.health == 0) {
             continue;
