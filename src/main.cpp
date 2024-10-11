@@ -46,6 +46,7 @@ const SDL_Color COLOR_SAND_DARK = (SDL_Color) { .r = 204, .g = 162, .b = 139, .a
 const SDL_Color COLOR_RED = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 };
 const SDL_Color COLOR_GREEN = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
 const SDL_Color COLOR_GOLD = (SDL_Color) { .r = 238, .g = 209, .b = 158, .a = 255 };
+const SDL_Color COLOR_DARK_GRAY = (SDL_Color) { .r = 94, .g = 88, .b = 89, .a = 255 };
 
 enum RecolorName {
     RECOLOR_BLUE,
@@ -195,6 +196,7 @@ struct engine_t {
     std::vector<sprite_t> sprites;
     std::vector<SDL_Cursor*> cursors;
     SDL_Texture* minimap_texture;
+    SDL_Texture* minimap_tiles_texture;
 };
 static engine_t engine;
 
@@ -219,6 +221,7 @@ std::unordered_map<uint32_t, uint32_t> neighbors_to_autotile_index;
 bool engine_init(xy window_size);
 void engine_quit();
 bool engine_create_renderer();
+void engine_create_minimap_texture(const match_state_t& state);
 void engine_destroy_renderer();
 void engine_set_window_fullscreen(OptionDisplayValue display_value);
 int sdlk_to_str(char* str, SDL_Keycode key);
@@ -452,7 +455,7 @@ int gold_main(int argc, char** argv) {
                     if (menu_state.mode == MENU_MODE_MATCH_START) {
                         match_state = match_init();
                         mode = MODE_MATCH;
-                        engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, match_state.map_width, match_state.map_height);
+                        engine_create_minimap_texture(match_state);
                     } else if (menu_state.mode == MENU_MODE_EXIT) {
                         engine.is_running = false;
                         break;
@@ -476,7 +479,9 @@ int gold_main(int argc, char** argv) {
                         menu_state = menu_init();
                         mode = MODE_MENU;
                         SDL_DestroyTexture(engine.minimap_texture);
+                        SDL_DestroyTexture(engine.minimap_tiles_texture);
                         engine.minimap_texture = NULL;
+                        engine.minimap_tiles_texture = NULL;
                     }
                     break;
                 }
@@ -913,6 +918,30 @@ bool engine_create_renderer() {
     return true;
 }
 
+void engine_create_minimap_texture(const match_state_t& state) {
+    engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
+    engine.minimap_tiles_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
+    SDL_SetRenderTarget(engine.renderer, engine.minimap_tiles_texture);
+    for (int y = 0; y < state.map_height; y++) {
+        for (int x = 0; x < state.map_width; x++) {
+            SDL_Color color;
+            int tile_index = state.map_tiles[x + (y * state.map_width)].index;
+            if (tile_index == 0) {
+                color = COLOR_WHITE;
+            } else if (tile_index >= TILE_DATA[TILE_SAND].index && tile_index <= TILE_DATA[TILE_SAND3].index) {
+                color = COLOR_SAND_DARK;
+            } else if (tile_index >= TILE_DATA[TILE_WATER].index && tile_index < TILE_DATA[TILE_WATER].index + 47) {
+                color = COLOR_SKY_BLUE;
+            } else {
+                color = COLOR_DARK_GRAY;
+            }
+            SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+            SDL_RenderDrawPoint(engine.renderer, x, y);
+        }
+    }
+    SDL_SetRenderTarget(engine.renderer, NULL);
+}
+
 void engine_quit() {
     SDL_DestroyWindow(engine.window);
 
@@ -935,6 +964,10 @@ void engine_destroy_renderer() {
     if (engine.minimap_texture != NULL) {
         SDL_DestroyTexture(engine.minimap_texture);
         engine.minimap_texture = NULL;
+    }
+    if (engine.minimap_tiles_texture != NULL) {
+        SDL_DestroyTexture(engine.minimap_tiles_texture);
+        engine.minimap_tiles_texture = NULL;
     }
 
     SDL_DestroyRenderer(engine.renderer);
@@ -2381,8 +2414,13 @@ void render_match(const match_state_t& state) {
     // Render minimap
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
 
-    SDL_SetRenderDrawColor(engine.renderer, COLOR_SAND_DARK.r, COLOR_SAND_DARK.g, COLOR_SAND_DARK.b, COLOR_SAND_DARK.a);
-    SDL_RenderClear(engine.renderer);
+    SDL_Rect minimap_src_rect = (SDL_Rect) { 
+        .x = 0,
+        .y = 0,
+        .w = (int)state.map_width,
+        .h = (int)state.map_height
+    };
+    SDL_RenderCopy(engine.renderer, engine.minimap_tiles_texture, &minimap_src_rect, &minimap_src_rect);
 
     SDL_SetRenderDrawColor(engine.renderer, COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, COLOR_GOLD.a);
     for (const mine_t& mine : state.mines) {

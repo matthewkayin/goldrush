@@ -412,19 +412,19 @@ std::unordered_map<uint32_t, tile_data_t> TILE_DATA = {
         .source_y = 48,
         .index = 0
     }},
-    { TILE_WALL_EAST_STAIR_TOP, (tile_data_t) {
+    { TILE_WALL_WEST_STAIR_TOP, (tile_data_t) {
         .type = TILE_TYPE_SINGLE,
         .source_x = 144,
         .source_y = 0,
         .index = 0
     }},
-    { TILE_WALL_EAST_STAIR_CENTER, (tile_data_t) {
+    { TILE_WALL_WEST_STAIR_CENTER, (tile_data_t) {
         .type = TILE_TYPE_SINGLE,
         .source_x = 144,
         .source_y = 16,
         .index = 0
     }},
-    { TILE_WALL_EAST_STAIR_BOTTOM, (tile_data_t) {
+    { TILE_WALL_WEST_STAIR_BOTTOM, (tile_data_t) {
         .type = TILE_TYPE_SINGLE,
         .source_x = 144,
         .source_y = 32,

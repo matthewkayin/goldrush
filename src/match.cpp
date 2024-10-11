@@ -69,7 +69,8 @@ match_state_t match_init() {
 
     // Init map
     log_info("Generating map...");
-    map_init(state, 96, 96);
+    std::vector<xy> player_spawns;
+    map_init(state, player_spawns, MAP_LAKE_PIT, 128, 128);
 
     // Init fog of war
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -81,37 +82,23 @@ match_state_t match_init() {
 
     // Init players
     log_trace("Initializing players...");
-    xy player_spawns[MAX_PLAYERS];
-    bool is_spawn_direction_used[DIRECTION_COUNT];
-    memset(is_spawn_direction_used, 0, sizeof(is_spawn_direction_used));
-    uint8_t player_count = 0;
+    int player_count = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        const player_t& player = network_get_player(player_id);
-        if (player.status == PLAYER_STATUS_NONE) {
+        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
             continue;
         }
         player_count++;
 
+        int player_spawn_index = lcg_rand() % player_spawns.size();
+        xy player_spawn = player_spawns[player_spawn_index];
+        player_spawns.erase(player_spawns.begin() + player_spawn_index);
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
-        // Find an unused spawn direction
-        int spawn_direction;
-        do {
-            spawn_direction = lcg_rand() % DIRECTION_COUNT;
-        } while (is_spawn_direction_used[spawn_direction]);
-        is_spawn_direction_used[spawn_direction] = true;
-
-        // Determine player spawn point
-        player_spawns[player_id] = xy(state.map_width / 2, state.map_height / 2) + 
-                                   xy(DIRECTION_XY[spawn_direction].x * ((state.map_width * 6) / 16), 
-                                      DIRECTION_XY[spawn_direction].y * ((state.map_height * 6) / 16));
-        player_spawns[0] = xy(16, 16);
-
         // Place player starting units
-        unit_create(state, player_id, UNIT_WAGON, player_spawns[player_id] + xy(0, 0));
-        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-2, -1));
-        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(-2, 0));
-        unit_create(state, player_id, UNIT_MINER, player_spawns[player_id] + xy(2, 2));
+        unit_create(state, player_id, UNIT_WAGON, player_spawn + xy(0, 0));
+        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(-2, -1));
+        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(-2, 0));
+        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(2, 2));
     }
     state.camera_offset = camera_centered_on_cell(player_spawns[network_get_player_id()], state.map_width, state.map_height);
 

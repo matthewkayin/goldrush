@@ -59,7 +59,7 @@ Tile wall_autotile_lookup(uint32_t neighbors) {
     }
 }
 
-void map_init(match_state_t& state, uint32_t width, uint32_t height) {
+void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_name, uint32_t width, uint32_t height) {
     state.map_width = width;
     state.map_height = height;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
@@ -77,50 +77,15 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
         .elevation = 0,
         .is_ramp = 0
     });
-
-    rect_t highground_rect = rect_t(xy(2, 2), xy(5, 4));
-    for (int x = highground_rect.position.x; x < highground_rect.position.x + highground_rect.size.x; x++) {
-        for (int y = highground_rect.position.y; y < highground_rect.position.y + highground_rect.size.y; y++) {
-            map_tiles_prebaked[x + (y * state.map_width)].elevation = 1;
-        }
+    switch (map_name) {
+        case MAP_LAKE_PIT:
+            map_gen_lake_pit(state, player_spawns, map_tiles_prebaked);
+            break;
+        default:
+            log_error("Map name of %i not handled", map_name);
+            GOLD_ASSERT_MESSAGE(false, "Map name not handled");
+            return;
     }
-    highground_rect = rect_t(xy(4, 4), xy(6, 3));
-    for (int x = highground_rect.position.x; x < highground_rect.position.x + highground_rect.size.x; x++) {
-        for (int y = highground_rect.position.y; y < highground_rect.position.y + highground_rect.size.y; y++) {
-            map_tiles_prebaked[x + (y * state.map_width)].elevation = 1;
-        }
-    }
-    xy ramp_cell = highground_rect.position + xy(2, highground_rect.size.y);
-    map_tiles_prebaked[ramp_cell.x + (ramp_cell.y * state.map_width)] = (tile_t) {
-        .index = TILE_WALL_SOUTH_STAIR_LEFT,
-        .elevation = 0,
-        .is_ramp = 1
-    };
-    ramp_cell = ramp_cell + xy(1, 0);
-    map_tiles_prebaked[ramp_cell.x + (ramp_cell.y * state.map_width)] = (tile_t) {
-        .index = TILE_WALL_SOUTH_STAIR_RIGHT,
-        .elevation = 0,
-        .is_ramp = 1
-    };
-    ramp_cell = ramp_cell + xy(0, 1);
-    map_tiles_prebaked[ramp_cell.x + (ramp_cell.y * state.map_width)] = (tile_t) {
-        .index = TILE_WALL_SOUTH_STAIR_FRONT_RIGHT,
-        .elevation = 0,
-        .is_ramp = 1
-    };
-    ramp_cell = ramp_cell + xy(-1, 0);
-    map_tiles_prebaked[ramp_cell.x + (ramp_cell.y * state.map_width)] = (tile_t) {
-        .index = TILE_WALL_SOUTH_STAIR_FRONT_LEFT,
-        .elevation = 0,
-        .is_ramp = 1
-    };
-
-    entity_id mine_id = state.mines.push_back((mine_t) {
-        .cell = xy(6, 12),
-        .gold_left = 100,
-        .is_occupied = false
-    });
-    map_set_cell_rect(state, rect_t(state.mines.get_by_id(mine_id).cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
 
     // Bake map tiles
     for (int y = 0; y < state.map_height; y++) {
@@ -203,14 +168,16 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
             }
 
             // Block every wall on the cell grid
-            if (state.map_tiles[index].index >= TILE_DATA[TILE_WALL_NW_CORNER].index && state.map_tiles[index].is_ramp != 1) {
+            if (state.map_tiles[index].index >= TILE_DATA[TILE_WALL_SOUTH_STAIR_LEFT].index && state.map_tiles[index].index <= TILE_DATA[TILE_WALL_WEST_STAIR_BOTTOM].index) {
+                state.map_tiles[index].is_ramp = 1;
+            }
+            if ((state.map_tiles[index].index >= TILE_DATA[TILE_WALL_NW_CORNER].index && state.map_tiles[index].is_ramp != 1) ||
+                (state.map_tiles[index].index >= TILE_DATA[TILE_WATER].index && state.map_tiles[index].index < TILE_DATA[TILE_WATER].index + 47)) {
                 state.map_cells[index].type = CELL_BLOCKED;
             }
         } // end for each x
     } // end for each y
     // End bake tiles
-
-    log_trace("value of 7,8: %u", state.map_tiles[7 + (state.map_width * 8)].index);
 
     // Set map elevation
     state.map_lowest_elevation = 0;
@@ -218,6 +185,91 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
     for (uint32_t index = 0; index < state.map_width * state.map_height; index++) {
         state.map_lowest_elevation = std::min(state.map_lowest_elevation, state.map_tiles[index].elevation);
         state.map_highest_elevation = std::max(state.map_highest_elevation, state.map_tiles[index].elevation);
+    }
+}
+
+void map_gen_lake_pit(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked) {
+    // Generate spawn points
+    int spawn_margin = 8;
+    xy map_center = xy(state.map_width / 2, state.map_height / 2);
+    int player_count = 0;
+    for (uint8_t i = 0; i < MAX_PLAYERS; i++) {
+        if (network_get_player(i).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        player_count++;
+    }
+    for (int i = 0; i < DIRECTION_COUNT; i++) {
+        // For player count < 5, generate corner spawns only
+        if (player_count < 5 && i % 2 == 0) {
+            continue;
+        }
+        player_spawns.push_back(map_center + xy(
+            DIRECTION_XY[i].x * ((state.map_width / 2) - spawn_margin), 
+            DIRECTION_XY[i].y * ((state.map_height / 2) - spawn_margin)));
+    }
+
+    int lake_radius = 16;
+    int crater_radius = 36;
+    std::vector<xy> crater_frontier;
+    std::unordered_map<int, int> crater_explored;
+    crater_frontier.push_back(xy(state.map_width / 2, state.map_height / 2));
+    while (!crater_frontier.empty()) {
+        xy next = crater_frontier[0];
+        crater_frontier.erase(crater_frontier.begin());
+        int index = next.x + (next.y * state.map_width);
+        if (xy::euclidean_distance_squared(next, xy(state.map_width / 2, state.map_height / 2)) > crater_radius * crater_radius ||
+            std::abs((next - xy(state.map_width / 2, state.map_height / 2)).x) == crater_radius || 
+            std::abs((next - xy(state.map_width / 2, state.map_height / 2)).y) == crater_radius) {
+            continue;
+        }
+        if (crater_explored.find(index) != crater_explored.end()) {
+            continue;
+        }
+        crater_explored[index] = 1;
+        map_tiles_prebaked[index].elevation = -1;
+        if (xy::euclidean_distance_squared(next, xy(state.map_width / 2, state.map_height / 2)) <= lake_radius * lake_radius &&
+            std::abs((next - xy(state.map_width / 2, state.map_height / 2)).x) != lake_radius &&
+            std::abs((next - xy(state.map_width / 2, state.map_height / 2)).y) != lake_radius) {
+            map_tiles_prebaked[index].index = TILE_WATER;
+        } 
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            xy child = next + DIRECTION_XY[direction];
+            crater_frontier.push_back(child);
+        }
+    }
+    for (int y = (state.map_height / 2) - 2; y < (state.map_height / 2) + 3; y++) {
+        uint16_t left_tile;
+        uint16_t right_tile;
+        uint16_t top_tile;
+        uint16_t top_tile_front;
+        uint16_t bottom_tile;
+        if (y == (state.map_height / 2) - 2) {
+            left_tile = TILE_WALL_EAST_STAIR_TOP;
+            right_tile = TILE_WALL_WEST_STAIR_TOP;
+            bottom_tile = TILE_WALL_NORTH_STAIR_LEFT;
+            top_tile = TILE_WALL_SOUTH_STAIR_LEFT;
+            top_tile_front = TILE_WALL_SOUTH_STAIR_FRONT_LEFT;
+        } else if (y == (state.map_height / 2) + 2) {
+            left_tile = TILE_WALL_EAST_STAIR_BOTTOM;
+            right_tile = TILE_WALL_WEST_STAIR_BOTTOM;
+            bottom_tile = TILE_WALL_NORTH_STAIR_RIGHT;
+            top_tile = TILE_WALL_SOUTH_STAIR_RIGHT;
+            top_tile_front = TILE_WALL_SOUTH_STAIR_FRONT_RIGHT;
+        } else {
+            left_tile = TILE_WALL_EAST_STAIR_CENTER;
+            right_tile = TILE_WALL_WEST_STAIR_CENTER;
+            bottom_tile = TILE_WALL_NORTH_STAIR_CENTER;
+            top_tile = TILE_WALL_SOUTH_STAIR_CENTER;
+            top_tile_front = TILE_WALL_SOUTH_STAIR_FRONT_CENTER;
+        }
+        int x = (state.map_width / 2) - (crater_radius - 1);
+        map_tiles_prebaked[x + (y * state.map_width)].index = left_tile;
+        map_tiles_prebaked[y + (x * state.map_width)].index = top_tile;
+        map_tiles_prebaked[y + ((x + 1) * state.map_width)].index = top_tile_front;
+        x = (state.map_width / 2) + (crater_radius - 1);
+        map_tiles_prebaked[x + (y * state.map_width)].index = right_tile;
+        map_tiles_prebaked[y + (x * state.map_width)].index = bottom_tile;
     }
 }
 
