@@ -77,13 +77,45 @@ struct sprite_params_t {
 };
 
 extern const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS;
-extern uint16_t wall_index_offset;
 extern std::unordered_map<uint32_t, uint32_t> neighbors_to_autotile_index;
 
 enum Tile {
+    TILE_NULL,
     TILE_SAND,
+    TILE_SAND2,
+    TILE_SAND3,
     TILE_WATER,
-    TILE_WALL
+    TILE_WALL_NW_CORNER,
+    TILE_WALL_NE_CORNER,
+    TILE_WALL_SW_CORNER,
+    TILE_WALL_SE_CORNER,
+    TILE_WALL_NORTH_EDGE,
+    TILE_WALL_WEST_EDGE,
+    TILE_WALL_EAST_EDGE,
+    TILE_WALL_SOUTH_EDGE,
+    TILE_WALL_SE_FRONT,
+    TILE_WALL_SOUTH_FRONT,
+    TILE_WALL_SW_FRONT,
+    TILE_WALL_NW_INNER_CORNER,
+    TILE_WALL_NE_INNER_CORNER,
+    TILE_WALL_SW_INNER_CORNER,
+    TILE_WALL_SE_INNER_CORNER,
+    TILE_WALL_SOUTH_STAIR_LEFT,
+    TILE_WALL_SOUTH_STAIR_CENTER,
+    TILE_WALL_SOUTH_STAIR_RIGHT,
+    TILE_WALL_SOUTH_STAIR_FRONT_LEFT,
+    TILE_WALL_SOUTH_STAIR_FRONT_CENTER,
+    TILE_WALL_SOUTH_STAIR_FRONT_RIGHT,
+    TILE_WALL_NORTH_STAIR_LEFT,
+    TILE_WALL_NORTH_STAIR_CENTER,
+    TILE_WALL_NORTH_STAIR_RIGHT,
+    TILE_WALL_EAST_STAIR_TOP,
+    TILE_WALL_EAST_STAIR_CENTER,
+    TILE_WALL_EAST_STAIR_BOTTOM,
+    TILE_WALL_WEST_STAIR_TOP,
+    TILE_WALL_WEST_STAIR_CENTER,
+    TILE_WALL_WEST_STAIR_BOTTOM,
+    TILE_COUNT
 };
 
 enum TileType {
@@ -93,8 +125,12 @@ enum TileType {
 
 struct tile_data_t {
     TileType type;
-    xy source_pos;
+    int source_x;
+    int source_y;
+    uint16_t index;
 };
+
+extern std::unordered_map<uint32_t, tile_data_t> TILE_DATA;
 
 enum AnimationName {
     ANIMATION_UI_MOVE,

@@ -1,9 +1,13 @@
 todos
 
 - map generation
-- lowground accuracy disadvantage
+- hold position, also make it so that units will attack and follow if they are on idle,
+  also make sure that when units are attacked they only attack back if they are not attacking 
+  i.e. if they are attacking unit A and unit B attacks them, they should continue to attack unit A
+  also should I have a move command that moves and ignores attacks? or should that just be the default?
 
 backlog
+- replace percent to win with a UI ticker (maybe vertical UI? either way, use colored arrows and hide usernames unless hovered)
 - handle transition out of match 
     - Allow surrendering
     - Handle server / client disconnect

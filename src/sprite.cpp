@@ -237,6 +237,219 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }}  
 };
 
+std::unordered_map<uint32_t, tile_data_t> TILE_DATA = {
+    { TILE_NULL, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 32,
+        .source_y = 16,
+        .index = 0
+    }},
+    { TILE_SAND, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 0,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_SAND2, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 16,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_SAND3, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 32,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_WATER, (tile_data_t) {
+        .type = TILE_TYPE_AUTO,
+        .source_x = 0,
+        .source_y = 16,
+        .index = 0
+    }},
+    { TILE_WALL_NW_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_WALL_NE_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 80,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_WALL_SW_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 32,
+        .index = 0
+    }},
+    { TILE_WALL_SE_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 80,
+        .source_y = 32,
+        .index = 0
+    }},
+    { TILE_WALL_NORTH_EDGE, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 64,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_WALL_WEST_EDGE, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 16,
+        .index = 0
+    }},
+    { TILE_WALL_EAST_EDGE, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 80,
+        .source_y = 16,
+        .index = 0
+    }},
+    { TILE_WALL_SOUTH_EDGE, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 64,
+        .source_y = 32,
+        .index = 0
+    }},
+    { TILE_WALL_SW_FRONT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_SOUTH_FRONT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 64,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_SE_FRONT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 80,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_NW_INNER_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 96,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_WALL_NE_INNER_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 112,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_WALL_SW_INNER_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 96,
+        .source_y = 16,
+        .index = 0
+    }},
+    { TILE_WALL_SE_INNER_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 112,
+        .source_y = 16,
+        .index = 0
+    }},
+    { TILE_WALL_SOUTH_STAIR_LEFT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 96,
+        .source_y = 32,
+        .index = 0
+    }},
+    { TILE_WALL_SOUTH_STAIR_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 112,
+        .source_y = 32,
+        .index = 0
+    }},
+    { TILE_WALL_SOUTH_STAIR_RIGHT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 128,
+        .source_y = 32,
+        .index = 0
+    }},
+    { TILE_WALL_SOUTH_STAIR_FRONT_LEFT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 96,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_SOUTH_STAIR_FRONT_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 112,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_SOUTH_STAIR_FRONT_RIGHT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 128,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_NORTH_STAIR_LEFT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 144,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_NORTH_STAIR_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 160,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_NORTH_STAIR_RIGHT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 176,
+        .source_y = 48,
+        .index = 0
+    }},
+    { TILE_WALL_EAST_STAIR_TOP, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 144,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_WALL_EAST_STAIR_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 144,
+        .source_y = 16,
+        .index = 0
+    }},
+    { TILE_WALL_EAST_STAIR_BOTTOM, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 144,
+        .source_y = 32,
+        .index = 0
+    }},
+    { TILE_WALL_EAST_STAIR_TOP, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 160,
+        .source_y = 0,
+        .index = 0
+    }},
+    { TILE_WALL_EAST_STAIR_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 160,
+        .source_y = 16,
+        .index = 0
+    }},
+    { TILE_WALL_EAST_STAIR_BOTTOM, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 160,
+        .source_y = 32,
+        .index = 0
+    }},
+};
+
 const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
     { ANIMATION_UI_MOVE, (animation_data_t) {
         .vframe = 0,

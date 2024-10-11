@@ -707,8 +707,14 @@ bool engine_create_renderer() {
             }
 
             // Create tileset texture
-            // error tile + sand variations + water autotile + rock wall
-            int hframes = 1 + 3 + 47 + 19;
+            int hframes = 0;
+            for (int tile = 0; tile < TILE_COUNT; tile++) {
+                if (TILE_DATA[tile].type == TILE_TYPE_SINGLE) {
+                    hframes++;
+                } else {
+                    hframes += 47;
+                }
+            }
             sprite.texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, hframes * TILE_SIZE, TILE_SIZE);
             if (sprite.texture == NULL) {
                 log_error("Unable to create tileset texture: %s", SDL_GetError());
@@ -730,76 +736,55 @@ bool engine_create_renderer() {
                 .h = TILE_SIZE
             };
 
-            // Blit error tile
-            src_rect.x = 32;
-            src_rect.y = 16;
-            dst_rect.x = 0;
-            SDL_RenderCopy(engine.renderer, base_texture, &src_rect, &dst_rect);
-            tileset_index++;
-
-            // Blit sand variations
-            for (int i = 0; i < 3; i++) {
-                src_rect.x = i * TILE_SIZE;
-                src_rect.y = 0;
-                dst_rect.x = tileset_index * TILE_SIZE;
-                SDL_RenderCopy(engine.renderer, base_texture, &src_rect, &dst_rect);
-                tileset_index++;
-            }
-
-            // Blit water autotile
-            xy water_base_pos = xy(0, 16);
-            for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
-                bool is_unique = true;
-                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                    if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
-                        int prev_direction = direction - 1;
-                        int next_direction = (direction + 1) % DIRECTION_COUNT;
-                        if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
-                            (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
-                            is_unique = false;
-                            break;
-                        }
-                    }
-                }
-                if (!is_unique) {
-                    continue;
-                }
-
-                for (uint32_t edge = 0; edge < 4; edge++) {
-                    xy source_pos = water_base_pos + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
-                    SDL_Rect subtile_src_rect = (SDL_Rect) {
-                        .x = source_pos.x,
-                        .y = source_pos.y,
-                        .w = TILE_SIZE / 2,
-                        .h = TILE_SIZE / 2
-                    };
-                    SDL_Rect subtile_dst_rect = (SDL_Rect) {
-                        .x = (tileset_index * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
-                        .y = AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2),
-                        .w = TILE_SIZE / 2,
-                        .h = TILE_SIZE / 2
-                    };
-
-                    SDL_RenderCopy(engine.renderer, base_texture, &subtile_src_rect, &subtile_dst_rect);
-                }
-                tileset_index++;
-            } // End for each neighbor combo in water autotile
-
-            // Blit wall tiles
-            xy wall_tile_base_pos = xy(48, 0);
-            wall_index_offset = tileset_index;
-            for (int y = 0; y < 4; y++) {
-                for (int x = 0; x < 5; x++) {
-                    if (x == 1 && y == 1) {
-                        continue;
-                    }
-                    src_rect.x = wall_tile_base_pos.x + (x * TILE_SIZE);
-                    src_rect.y = wall_tile_base_pos.y + (y * TILE_SIZE);
+            for (int tile = 0; tile < TILE_COUNT; tile++) {
+                tile_data_t& tile_data = TILE_DATA[tile];
+                tile_data.index = tileset_index;
+                if (tile_data.type == TILE_TYPE_SINGLE) {
+                    src_rect.x = tile_data.source_x;
+                    src_rect.y = tile_data.source_y;
                     dst_rect.x = tileset_index * TILE_SIZE;
                     SDL_RenderCopy(engine.renderer, base_texture, &src_rect, &dst_rect);
                     tileset_index++;
-                }
-            }
+                } else if (tile_data.type == TILE_TYPE_AUTO) {
+                    xy auto_base_pos = xy(tile_data.source_x, tile_data.source_y);
+                    for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
+                        bool is_unique = true;
+                        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                            if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
+                                int prev_direction = direction - 1;
+                                int next_direction = (direction + 1) % DIRECTION_COUNT;
+                                if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                                    (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                                    is_unique = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!is_unique) {
+                            continue;
+                        }
+
+                        for (uint32_t edge = 0; edge < 4; edge++) {
+                            xy source_pos = auto_base_pos + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
+                            SDL_Rect subtile_src_rect = (SDL_Rect) {
+                                .x = source_pos.x,
+                                .y = source_pos.y,
+                                .w = TILE_SIZE / 2,
+                                .h = TILE_SIZE / 2
+                            };
+                            SDL_Rect subtile_dst_rect = (SDL_Rect) {
+                                .x = (tileset_index * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
+                                .y = AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2),
+                                .w = TILE_SIZE / 2,
+                                .h = TILE_SIZE / 2
+                            };
+
+                            SDL_RenderCopy(engine.renderer, base_texture, &subtile_src_rect, &subtile_dst_rect);
+                        }
+                        tileset_index++;
+                    } // End for each neighbor combo in water autotile
+                } // End if tile type is auto
+            } // End for each tile
 
             SDL_SetRenderTarget(engine.renderer, NULL);
             SDL_DestroyTexture(base_texture);

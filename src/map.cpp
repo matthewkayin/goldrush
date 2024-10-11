@@ -4,70 +4,58 @@
 #include "logger.h"
 #include "lcg.h"
 
-uint16_t wall_autotile_lookup(uint32_t neighbors) {
+Tile wall_autotile_lookup(uint32_t neighbors) {
     switch (neighbors) {
-        // South facing wall
         case 1:
         case 3:
         case 129:
         case 131:
-            return wall_index_offset + 10;
-        // West facing wall
+            return TILE_WALL_SOUTH_EDGE;
         case 4:
         case 6:
         case 12:
         case 14:
-            return wall_index_offset + 5;
-        // North facing wall
+            return TILE_WALL_WEST_EDGE;
         case 16:
         case 24:
         case 48:
         case 56:
-            return wall_index_offset + 1;
-        // East facing wall
+            return TILE_WALL_NORTH_EDGE;
         case 64:
         case 96:
         case 192:
         case 224:
-            return wall_index_offset + 6;
-        // Southwest facing corner
+            return TILE_WALL_EAST_EDGE;
         case 2:
-            return wall_index_offset + 9;
-        // Northwest facing corner
+            return TILE_WALL_SW_CORNER;
         case 8:
-            return wall_index_offset + 0;
-        // Northeast facing corner
+            return TILE_WALL_NW_CORNER;
         case 32:
-            return wall_index_offset + 2;
-        // Southeast facing corner
+            return TILE_WALL_NE_CORNER;
         case 128:
-            return wall_index_offset + 11;
-        // Southeast facing inner corner
+            return TILE_WALL_SE_CORNER;
         case 7:
         case 15:
         case 135:
         case 143:
-            return wall_index_offset + 7;
-        // Northwest facing inner corner
+            return TILE_WALL_SW_INNER_CORNER;
         case 28:
         case 30:
         case 60:
         case 62:
-            return wall_index_offset + 3;
-        // Northeast facing inner corner
+            return TILE_WALL_NW_INNER_CORNER;
         case 112:
         case 120:
         case 240:
         case 248:
-            return wall_index_offset + 4;
-        // Southeast facing inner corner
+            return TILE_WALL_NE_INNER_CORNER;
         case 193:
         case 195:
         case 225:
         case 227:
-            return wall_index_offset + 8;
+            return TILE_WALL_SE_INNER_CORNER;
         default:
-            return 0;
+            return TILE_NULL;
     }
 }
 
@@ -104,25 +92,25 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
     }
     xy ramp_cell = highground_rect.position + xy(2, highground_rect.size.y);
     map_tiles_prebaked[ramp_cell.x + (ramp_cell.y * state.map_width)] = (tile_t) {
-        .index = (uint16_t)(wall_index_offset + 12),
+        .index = TILE_WALL_SOUTH_STAIR_LEFT,
         .elevation = 0,
         .is_ramp = 1
     };
     ramp_cell = ramp_cell + xy(1, 0);
     map_tiles_prebaked[ramp_cell.x + (ramp_cell.y * state.map_width)] = (tile_t) {
-        .index = (uint16_t)(wall_index_offset + 13),
+        .index = TILE_WALL_SOUTH_STAIR_RIGHT,
         .elevation = 0,
         .is_ramp = 1
     };
     ramp_cell = ramp_cell + xy(0, 1);
     map_tiles_prebaked[ramp_cell.x + (ramp_cell.y * state.map_width)] = (tile_t) {
-        .index = (uint16_t)(wall_index_offset + 18),
+        .index = TILE_WALL_SOUTH_STAIR_FRONT_RIGHT,
         .elevation = 0,
         .is_ramp = 1
     };
     ramp_cell = ramp_cell + xy(-1, 0);
     map_tiles_prebaked[ramp_cell.x + (ramp_cell.y * state.map_width)] = (tile_t) {
-        .index = (uint16_t)(wall_index_offset + 17),
+        .index = TILE_WALL_SOUTH_STAIR_FRONT_LEFT,
         .elevation = 0,
         .is_ramp = 1
     };
@@ -157,13 +145,13 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
                 if (neighbors == 0) {
                     int new_index = lcg_rand() % 7;
                     if (new_index < 4 && index % 3 == 0) {
-                        state.map_tiles[index].index = new_index == 1 ? 3 : 2; 
+                        state.map_tiles[index].index = new_index == 1 ? TILE_DATA[TILE_SAND3].index : TILE_DATA[TILE_SAND2].index;
                     } else {
-                        state.map_tiles[index].index = 1;
+                        state.map_tiles[index].index = TILE_DATA[TILE_SAND].index;
                     }
                 // Wall tile 
                 } else {
-                    state.map_tiles[index].index = wall_autotile_lookup(neighbors);
+                    state.map_tiles[index].index = TILE_DATA[wall_autotile_lookup(neighbors)].index;
                 }
             } else if (map_tiles_prebaked[index].index == TILE_WATER) {
                 uint32_t neighbors = 0;
@@ -190,34 +178,39 @@ void map_init(match_state_t& state, uint32_t width, uint32_t height) {
                     }
                 }
                 // Set the map tile based on the neighbors
-                state.map_tiles[index].index = 4 + neighbors_to_autotile_index[neighbors];
-            } // End else if tile is water
+                state.map_tiles[index].index = TILE_DATA[TILE_WATER].index + neighbors_to_autotile_index[neighbors];
+            // End else if tile is water
+            } else {
+                state.map_tiles[index].index = TILE_DATA[map_tiles_prebaked[index].index].index;
+            }
 
             if (y != 0) {
                 // Add the extended walls
-                if (state.map_tiles[index - state.map_width].index == wall_index_offset + 9) {
-                    state.map_tiles[index].index = wall_index_offset + 14;
-                } else if (state.map_tiles[index - state.map_width].index == wall_index_offset + 10) {
-                    state.map_tiles[index].index = wall_index_offset + 15;
-                } else if (state.map_tiles[index - state.map_width].index == wall_index_offset + 11) {
-                    state.map_tiles[index].index = wall_index_offset + 16;
+                if (state.map_tiles[index - state.map_width].index == TILE_DATA[TILE_WALL_SW_CORNER].index) {
+                    state.map_tiles[index].index = TILE_DATA[TILE_WALL_SW_FRONT].index;
+                } else if (state.map_tiles[index - state.map_width].index == TILE_DATA[TILE_WALL_SOUTH_EDGE].index) {
+                    state.map_tiles[index].index = TILE_DATA[TILE_WALL_SOUTH_FRONT].index;
+                } else if (state.map_tiles[index - state.map_width].index == TILE_DATA[TILE_WALL_SE_CORNER].index) {
+                    state.map_tiles[index].index = TILE_DATA[TILE_WALL_SE_FRONT].index;
                 }
             }
 
             // Increase the elevation of every wall
             // Walls are created on lower elevation than the highground because of how the algorithm works, 
             // but we want them on higher elevation so that they y-sort with units properly
-            if (state.map_tiles[index].index >= wall_index_offset) {
+            if (state.map_tiles[index].index >= TILE_DATA[TILE_WALL_NW_CORNER].index) {
                 state.map_tiles[index].elevation++;
             }
 
             // Block every wall on the cell grid
-            if (state.map_tiles[index].index >= wall_index_offset && state.map_tiles[index].is_ramp != 1) {
+            if (state.map_tiles[index].index >= TILE_DATA[TILE_WALL_NW_CORNER].index && state.map_tiles[index].is_ramp != 1) {
                 state.map_cells[index].type = CELL_BLOCKED;
             }
         } // end for each x
     } // end for each y
     // End bake tiles
+
+    log_trace("value of 7,8: %u", state.map_tiles[7 + (state.map_width * 8)].index);
 
     // Set map elevation
     state.map_lowest_elevation = 0;
