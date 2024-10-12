@@ -52,7 +52,7 @@ extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
 // Map
 
 enum MapName {
-    MAP_LAKE_PIT,
+    MAP_OASIS,
     MAP_COUNT
 };
 
@@ -503,7 +503,7 @@ int ui_get_building_queue_index_hovered(const match_state_t& state);
 
 // Map
 void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_name, uint32_t width, uint32_t height);
-void map_gen_lake_pit(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked);
+void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked);
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_rect_in_bounds(const match_state_t& state, rect_t cell_rect);
 bool map_is_cell_blocked(const match_state_t& state, xy cell);

@@ -24,7 +24,6 @@ static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
 static const uint32_t PLAYER_STARTING_GOLD = 10000;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 25000;
-static const uint32_t MINE_STARTING_GOLD_AMOUNT = 2500;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION = 10;
@@ -68,9 +67,8 @@ match_state_t match_init() {
     state.tick_timer = 0;
 
     // Init map
-    log_info("Generating map...");
     std::vector<xy> player_spawns;
-    map_init(state, player_spawns, MAP_LAKE_PIT, 128, 128);
+    map_init(state, player_spawns, MAP_OASIS, 96, 96);
 
     // Init fog of war
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -101,41 +99,6 @@ match_state_t match_init() {
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(2, 2));
     }
     state.camera_offset = camera_centered_on_cell(player_spawns[network_get_player_id()], state.map_width, state.map_height);
-
-    // Place decorations on the map
-    log_trace("Placing decorations...");
-    /*
-    for (int i = 0; i < state.map.width * state.map.height; i++) {
-        if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map.cells[i].type == CELL_EMPTY) {
-            bool is_gold_nearby = false;
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                xy cell = xy(i % state.map.width, i / state.map.height) + DIRECTION_XY[direction];
-                if (!map_is_cell_in_bounds(state.map, cell)) {
-                    continue;
-                }
-                if (map_get_cell(state.map, cell).type != CELL_EMPTY) {
-                    is_gold_nearby = true;
-                    break;
-                }
-            }
-
-            if (is_gold_nearby) {
-                continue;
-            }
-
-            state.map.tiles[i] = (tile_t) {
-                .base = 0,
-                .decoration = (uint16_t)(1 + (rand() % 5))
-            };
-            state.map.decorations.push_back((decoration_t) {
-                .index = (uint16_t)(rand() % 5),
-                .cell = xy(i % state.map.width, i / state.map.width)
-            });
-            state.map.cells[i].type = CELL_BLOCKED;
-        }
-    }
-    */
-    log_info("Map complete!");
 
     state.is_fog_dirty = true;
 

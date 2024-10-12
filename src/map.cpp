@@ -4,6 +4,9 @@
 #include "logger.h"
 #include "lcg.h"
 
+static const uint32_t MINE_GOLD_AMOUNT_LOW = 1000;
+static const uint32_t MINE_GOLD_AMOUNT_HIGH = 3000;
+
 Tile wall_autotile_lookup(uint32_t neighbors) {
     switch (neighbors) {
         case 1:
@@ -60,6 +63,7 @@ Tile wall_autotile_lookup(uint32_t neighbors) {
 }
 
 void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_name, uint32_t width, uint32_t height) {
+    log_trace("Generating map. Map name: %u. Map size: %ux%u", map_name, width, height);
     state.map_width = width;
     state.map_height = height;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
@@ -78,8 +82,8 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_
         .is_ramp = 0
     });
     switch (map_name) {
-        case MAP_LAKE_PIT:
-            map_gen_lake_pit(state, player_spawns, map_tiles_prebaked);
+        case MAP_OASIS:
+            map_gen_oasis(state, player_spawns, map_tiles_prebaked);
             break;
         default:
             log_error("Map name of %i not handled", map_name);
@@ -88,6 +92,7 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_
     }
 
     // Bake map tiles
+    log_trace("Baking map tiles...");
     for (int y = 0; y < state.map_height; y++) {
         for (int x = 0; x < state.map_width; x++) {
             int index = x + (y * state.map_width);
@@ -179,6 +184,53 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_
     } // end for each y
     // End bake tiles
 
+    // Generate decorations
+    log_trace("Generating decorations...");
+    for (int i = 0; i < state.map_width * state.map_height; i++) {
+        if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map_cells[i].type == CELL_EMPTY) {
+            xy decoration_cell = xy(i % state.map_width, i / state.map_width);
+            if (map_is_cell_blocked(state, decoration_cell)) {
+                continue;
+            }
+            bool is_adjacent_to_ramp = false;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                xy neighbor_cell = decoration_cell + DIRECTION_XY[direction];
+                if (state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].is_ramp == 1) {
+                    is_adjacent_to_ramp = true;
+                    break;
+                }
+            }
+            if (is_adjacent_to_ramp) {
+                continue;
+            }
+            bool is_gold_nearby = false;
+            for (mine_t& mine : state.mines) {
+                if (mine_get_block_building_rect(mine.cell).has_point(decoration_cell)) {
+                    is_gold_nearby = true;
+                    break;
+                }
+            }
+            if (is_gold_nearby) {
+                continue;
+            }
+            bool is_too_close_to_player = false;
+            for (xy cell : player_spawns) {
+                if (xy::manhattan_distance(cell, decoration_cell) < 4) {
+                    is_too_close_to_player = true;
+                    break;
+                }
+            }
+            if (is_too_close_to_player) {
+                continue;
+            }
+            state.map_decorations.push_back((decoration_t) {
+                .index = (uint16_t)(lcg_rand() % 5),
+                .cell = decoration_cell
+            });
+            map_set_cell(state, decoration_cell, CELL_BLOCKED);
+        }
+    }
+
     // Set map elevation
     state.map_lowest_elevation = 0;
     state.map_highest_elevation = 0;
@@ -186,10 +238,15 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_
         state.map_lowest_elevation = std::min(state.map_lowest_elevation, state.map_tiles[index].elevation);
         state.map_highest_elevation = std::max(state.map_highest_elevation, state.map_tiles[index].elevation);
     }
+    log_trace("Elevation low: %i / high: %i", state.map_lowest_elevation, state.map_highest_elevation);
+    log_trace("Map generation complete.");
 }
 
-void map_gen_lake_pit(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked) {
+void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked) {
+    log_trace("Generating map oasis...");
+
     // Generate spawn points
+    log_trace("Generating spawn points...");
     int spawn_margin = 8;
     xy map_center = xy(state.map_width / 2, state.map_height / 2);
     int player_count = 0;
@@ -209,6 +266,7 @@ void map_gen_lake_pit(match_state_t& state, std::vector<xy>& player_spawns, std:
             DIRECTION_XY[i].y * ((state.map_height / 2) - spawn_margin)));
     }
 
+    log_trace("Generating crater...");
     int lake_radius = 16;
     int crater_radius = 36;
     std::vector<xy> crater_frontier;
@@ -271,6 +329,69 @@ void map_gen_lake_pit(match_state_t& state, std::vector<xy>& player_spawns, std:
         map_tiles_prebaked[x + (y * state.map_width)].index = right_tile;
         map_tiles_prebaked[y + (x * state.map_width)].index = bottom_tile;
     }
+
+    log_trace("Generating high value mines...");
+    std::vector<xy> mine_cells = {
+        xy((state.map_width / 2) + lake_radius + 1, (state.map_height / 2) + lake_radius + 1),
+        xy((state.map_width / 2) - (lake_radius + 1 + MINE_SIZE), (state.map_height / 2) + lake_radius + 1),
+        xy((state.map_width / 2) + lake_radius + 1, (state.map_height / 2) - (lake_radius + 1 + MINE_SIZE)),
+        xy((state.map_width / 2) - (lake_radius + 1 + MINE_SIZE), (state.map_height / 2) - (lake_radius + 1 + MINE_SIZE)),
+    };
+    for (xy cell : mine_cells) {
+        entity_id mine_id = state.mines.push_back((mine_t) {
+            .cell = cell,
+            .gold_left = MINE_GOLD_AMOUNT_HIGH,
+            .is_occupied = false
+        });
+        map_set_cell_rect(state, rect_t(cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
+    }
+
+    log_trace("Generating low value mines...");
+    mine_cells.clear();
+    int mine_cell_target = player_count + 2;
+    int iterations = 0;
+    while (mine_cells.size() < mine_cell_target) {
+        xy mine_cell;
+        mine_cell.x = lcg_rand() % (state.map_width - MINE_SIZE);
+        mine_cell.y = lcg_rand() % (state.map_height - MINE_SIZE);
+        if (xy::euclidean_distance_squared(mine_cell, xy(state.map_width / 2, state.map_height / 2)) <= (crater_radius + 1) * (crater_radius + 1)) {
+            continue;
+        }
+        bool mine_cell_too_close = false;
+        for (xy cell : mine_cells) {
+            if (xy::manhattan_distance(cell, mine_cell) < 24) {
+                mine_cell_too_close = true;
+                break;
+            }
+        }
+        if (mine_cell_too_close) {
+            continue;
+        }
+        for (xy cell : player_spawns) {
+            if (xy::manhattan_distance(cell, mine_cell) < 24) {
+                mine_cell_too_close = true;
+                break;
+            }
+            continue;
+        }
+        mine_cells.push_back(mine_cell);
+        iterations++;
+        if (iterations > 20) {
+            log_trace("Reached max iterations. Restarting...");
+            mine_cells.clear();
+            iterations = 0;
+        }
+    }
+    for (xy cell : mine_cells) {
+        entity_id mine_id = state.mines.push_back((mine_t) {
+            .cell = cell,
+            .gold_left = MINE_GOLD_AMOUNT_LOW,
+            .is_occupied = false
+        });
+        map_set_cell_rect(state, rect_t(cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
+    }
+
+    log_trace("Map Oasis complete.");
 }
 
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {
