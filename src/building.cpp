@@ -77,8 +77,10 @@ void building_on_finish(match_state_t& state, entity_id building_id) {
         rect_t building_rect = building_get_rect(building);
         if (!screen_rect.intersects(building_rect)) {
             state.alerts.push_back((alert_t) {
-                .type = ALERT_BUILDING_FINISHED,
-                .id = building_id,
+                .type = ALERT_GREEN,
+                .status = ALERT_STATUS_SHOW,
+                .cell = building.cell,
+                .cell_size = building_cell_size(building.type),
                 .timer = MATCH_ALERT_DURATION
             });
         }
@@ -169,8 +171,10 @@ void building_update(match_state_t& state, building_t& building) {
                         rect_t building_rect = building_get_rect(building);
                         if (!screen_rect.intersects(building_rect)) {
                             state.alerts.push_back((alert_t) {
-                                .type = ALERT_UNIT_FINISHED,
-                                .id = unit_id,
+                                .type = ALERT_GREEN,
+                                .status = ALERT_STATUS_SHOW,
+                                .cell = exit_cell,
+                                .cell_size = unit_cell_size(item.unit_type),
                                 .timer = MATCH_ALERT_DURATION
                             });
                         }

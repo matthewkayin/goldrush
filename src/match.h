@@ -46,7 +46,7 @@ extern const uint32_t MATCH_WINNING_GOLD_AMOUNT;
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
 extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
 extern const uint32_t MATCH_ALERT_DURATION;
-extern const uint32_t MATCH_ATTACK_ALERT_DURATION;
+extern const uint32_t MATCH_ALERT_LINGER_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
 
 // Map
@@ -132,21 +132,21 @@ struct selection_t {
 };
 
 enum AlertType {
-    ALERT_UNIT_ATTACKED,
-    ALERT_BUILDING_ATTACKED,
-    ALERT_UNIT_FINISHED,
-    ALERT_BUILDING_FINISHED,
-    ALERT_MINE_COLLAPSED
+    ALERT_RED,
+    ALERT_GREEN,
+    ALERT_GOLD
+};
+
+enum AlertStatus {
+    ALERT_STATUS_SHOW,
+    ALERT_STATUS_LINGER
 };
 
 struct alert_t {
     AlertType type;
-    entity_id id;
-    uint32_t timer;
-};
-
-struct attack_alert_t {
+    AlertStatus status;
     xy cell;
+    xy cell_size;
     uint32_t timer;
 };
 
@@ -449,7 +449,6 @@ struct match_state_t {
     uint32_t ui_double_click_timer;
     int ui_selected_control_group;
     std::vector<alert_t> alerts;
-    std::vector<attack_alert_t> attack_alerts;
 
     // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
@@ -511,7 +510,6 @@ xy ui_get_building_cell(const match_state_t& state);
 selection_t ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, selection_t& selection);
 selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const selection_t& selection);
-xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert);
 entity_id ui_get_nearest_builder(const match_state_t& state, xy cell);
 int ui_get_building_queue_index_hovered(const match_state_t& state);
 

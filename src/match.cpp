@@ -28,7 +28,7 @@ const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION = 10;
 const uint32_t MATCH_ALERT_DURATION = 90;
-const uint32_t MATCH_ATTACK_ALERT_DURATION = 60 * 20;
+const uint32_t MATCH_ALERT_LINGER_DURATION = 60 * 20;
 const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
 
 match_state_t match_init() {
@@ -381,9 +381,9 @@ void match_update(match_state_t& state) {
             }
         }
 
-        if (input_is_key_just_pressed(KEY_SPACE) && !state.attack_alerts.empty()) {
-            attack_alert_t latest_attack_alert = state.attack_alerts[state.attack_alerts.size() - 1];
-            state.camera_offset = camera_centered_on_cell(latest_attack_alert.cell, state.map_width, state.map_height);
+        if (input_is_key_just_pressed(KEY_SPACE) && !state.alerts.empty()) {
+            alert_t latest_alert = state.alerts[state.alerts.size() - 1];
+            state.camera_offset = camera_centered_on_cell(latest_alert.cell, state.map_width, state.map_height);
         }
     }
 
@@ -658,25 +658,16 @@ void match_update(match_state_t& state) {
     auto it = state.alerts.begin();
     while (it != state.alerts.end()) {
         it->timer--;
-        bool is_entity_invalid;
-        switch (it->type) {
-            case ALERT_UNIT_ATTACKED:
-            case ALERT_UNIT_FINISHED:
-                is_entity_invalid = state.units.get_index_of(it->id) == INDEX_INVALID;
-                break;
-            case ALERT_BUILDING_ATTACKED:
-            case ALERT_BUILDING_FINISHED:
-                is_entity_invalid = state.buildings.get_index_of(it->id) == INDEX_INVALID;
-                break;
-            case ALERT_MINE_COLLAPSED:
-                is_entity_invalid = false;
-                break;
-        }
-        if (it->timer == 0 || is_entity_invalid) {
-            it = state.alerts.erase(it);
-        } else {
-            it++;
-        }
+        if (it->timer == 0) {
+            if (it->status == ALERT_STATUS_SHOW) {
+                it->status = ALERT_STATUS_LINGER;
+                it->timer = MATCH_ALERT_LINGER_DURATION;
+            } else {
+                it = state.alerts.erase(it);
+                continue; // prevents it++
+            }
+        } 
+        it++;
     }
 
     // Check for winners

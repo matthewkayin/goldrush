@@ -630,8 +630,10 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                 rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
                                 if (!screen_rect.intersects(mine_screen_rect)) {
                                     state.alerts.push_back((alert_t) {
-                                        .type = ALERT_MINE_COLLAPSED,
-                                        .id = unit.garrison_id,
+                                        .type = ALERT_GOLD,
+                                        .status = ALERT_STATUS_SHOW,
+                                        .cell = mine.cell,
+                                        .cell_size = xy(MINE_SIZE, MINE_SIZE),
                                         .timer = MATCH_ALERT_DURATION
                                     });
                                 }
@@ -689,8 +691,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                 rect_t enemy_rect = unit_get_rect(enemy);
                                 if (!screen_rect.intersects(enemy_rect)) {
                                     bool is_existing_attack_alert_close_by = false;
-                                    for (const attack_alert_t& attack_alert : state.attack_alerts) {
-                                        if (xy::manhattan_distance(attack_alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
+                                    for (const alert_t& alert : state.alerts) {
+                                        if (xy::manhattan_distance(alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
                                             is_existing_attack_alert_close_by = true;
                                             break;
                                         }
@@ -699,13 +701,11 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                     // Only show the alert if this is the first enemy being attacked
                                     if (!is_existing_attack_alert_close_by) {
                                         state.alerts.push_back((alert_t) {
-                                            .type = ALERT_UNIT_ATTACKED,
-                                            .id = unit.target.id,
-                                            .timer = MATCH_ALERT_DURATION
-                                        });
-                                        state.attack_alerts.push_back((attack_alert_t) {
+                                            .type = ALERT_RED,
+                                            .status = ALERT_STATUS_SHOW,
                                             .cell = enemy.cell,
-                                            .timer = MATCH_ATTACK_ALERT_DURATION
+                                            .cell_size = unit_cell_size(enemy.type),
+                                            .timer = MATCH_ALERT_DURATION
                                         });
                                         ui_show_status(state, UI_STATUS_UNDER_ATTACK);
                                     }
@@ -742,8 +742,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                 rect_t enemy_rect = building_get_rect(enemy);
                                 if (!screen_rect.intersects(enemy_rect)) {
                                     bool is_existing_attack_alert_close_by = false;
-                                    for (const attack_alert_t& attack_alert : state.attack_alerts) {
-                                        if (xy::manhattan_distance(attack_alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
+                                    for (const alert_t& alert : state.alerts) {
+                                        if (alert.type == ALERT_RED && xy::manhattan_distance(alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
                                             is_existing_attack_alert_close_by = true;
                                             break;
                                         }
@@ -752,13 +752,11 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                     // Only show the alert if this is the first enemy being attacked
                                     if (!is_existing_attack_alert_close_by) {
                                         state.alerts.push_back((alert_t) {
-                                            .type = ALERT_BUILDING_ATTACKED,
-                                            .id = unit.target.id,
-                                            .timer = MATCH_ALERT_DURATION
-                                        });
-                                        state.attack_alerts.push_back((attack_alert_t) {
+                                            .type = ALERT_RED,
+                                            .status = ALERT_STATUS_SHOW,
                                             .cell = enemy.cell,
-                                            .timer = MATCH_ATTACK_ALERT_DURATION
+                                            .cell_size = building_cell_size(enemy.type),
+                                            .timer = MATCH_ALERT_DURATION
                                         });
                                         ui_show_status(state, UI_STATUS_UNDER_ATTACK);
                                     }
@@ -860,12 +858,22 @@ rect_t unit_get_rect(const unit_t& unit) {
 }
 
 int8_t unit_get_elevation(const match_state_t& state, const unit_t& unit) {
+    int8_t elevation = map_get_elevation(state, unit.cell);
+    for (int x = unit.cell.x; x < unit.cell.x + unit_cell_size(unit.type).x; x++) {
+        for (int y = unit.cell.y; y < unit.cell.y + unit_cell_size(unit.type).y; y++) {
+            elevation = std::max(elevation, map_get_elevation(state, xy(x, y)));
+        }
+    }
     if (unit.mode == UNIT_MODE_MOVE) {
         xy unit_prev_cell = unit.cell - DIRECTION_XY[unit.direction];
-        return std::max(map_get_elevation(state, unit.cell), map_get_elevation(state, unit_prev_cell));
+        for (int x = unit_prev_cell.x; x < unit_prev_cell.x + unit_cell_size(unit.type).x; x++) {
+            for (int y = unit_prev_cell.y; y < unit_prev_cell.y + unit_cell_size(unit.type).y; y++) {
+                elevation = std::max(elevation, map_get_elevation(state, xy(x, y)));
+            }
+        }
     }
 
-    return map_get_elevation(state, unit.cell);
+    return elevation;
 }
 
 void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t target) {

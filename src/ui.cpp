@@ -501,20 +501,6 @@ selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const sele
     return mode;
 }
 
-
-xy ui_alert_get_cell(const match_state_t& state, const alert_t& alert) {
-    switch (alert.type) {
-        case ALERT_UNIT_ATTACKED:
-        case ALERT_UNIT_FINISHED:
-            return state.units.get_by_id(alert.id).cell;
-        case ALERT_BUILDING_ATTACKED:
-        case ALERT_BUILDING_FINISHED:
-            return state.buildings.get_by_id(alert.id).cell;
-        case ALERT_MINE_COLLAPSED:
-            return state.mines.get_by_id(alert.id).cell;
-    }
-}
-
 entity_id ui_get_nearest_builder(const match_state_t& state, xy cell) {
     entity_id nearest_unit_id; 
     int nearest_unit_dist = -1;

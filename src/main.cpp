@@ -2515,56 +2515,29 @@ void render_match(const match_state_t& state) {
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
     for (const alert_t& alert : state.alerts) {
+        if (alert.status == ALERT_STATUS_LINGER) {
+            continue;
+        }
+
         SDL_Color color;
         switch (alert.type) {
-            case ALERT_UNIT_ATTACKED:
-            case ALERT_BUILDING_ATTACKED:
+            case ALERT_RED:
                 color = COLOR_RED;
                 break;
-            case ALERT_UNIT_FINISHED:
-            case ALERT_BUILDING_FINISHED:
+            case ALERT_GREEN:
                 color = COLOR_GREEN;
                 break;
-            case ALERT_MINE_COLLAPSED:
+            case ALERT_GOLD:
                 color = COLOR_GOLD;
                 break;
         }
 
-        SDL_Rect alert_rect;
-        switch (alert.type) {
-            case ALERT_UNIT_ATTACKED:
-            case ALERT_UNIT_FINISHED: {
-                const unit_t& unit = state.units.get_by_id(alert.id);
-                alert_rect = (SDL_Rect) {
-                    .x = unit.cell.x,
-                    .y = unit.cell.y,
-                    .w = unit_cell_size(unit.type).x + 1,
-                    .h = unit_cell_size(unit.type).y + 1
-                };
-                break;
-            }
-            case ALERT_BUILDING_ATTACKED:
-            case ALERT_BUILDING_FINISHED: {
-                const building_t& building = state.buildings.get_by_id(alert.id);
-                alert_rect = (SDL_Rect) {
-                    .x = building.cell.x,
-                    .y = building.cell.y,
-                    .w = building_cell_size(building.type).x + 1,
-                    .h = building_cell_size(building.type).y + 1
-                };
-                break;
-            }
-            case ALERT_MINE_COLLAPSED: {
-                const mine_t& mine = state.mines.get_by_id(alert.id);
-                alert_rect = (SDL_Rect) {
-                    .x = mine.cell.x,
-                    .y = mine.cell.y,
-                    .w = MINE_SIZE + 1,
-                    .h = MINE_SIZE + 1
-                };
-            }
-        }
-
+        SDL_Rect alert_rect = (SDL_Rect) {
+            .x = alert.cell.x,
+            .y = alert.cell.y,
+            .w = alert.cell_size.x + 1,
+            .h = alert.cell_size.y + 1
+        };
         int alert_rect_margin = 3 + (alert.timer <= 60 ? 0 : ((alert.timer - 60) / 3));
         alert_rect.x -= alert_rect_margin;
         alert_rect.y -= alert_rect_margin;
