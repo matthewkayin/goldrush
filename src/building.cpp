@@ -55,6 +55,8 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     building.taking_damage_flicker_timer = 0;
     building.taking_damage_flicker = false;
 
+    building.is_occupied = false;
+
     entity_id building_id = state.buildings.push_back(building);
     map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_size, building_data.cell_size)), CELL_BUILDING, building_id);
     return building_id;

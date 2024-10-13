@@ -190,6 +190,7 @@ enum UnitMode {
     UNIT_MODE_BUILD,
     UNIT_MODE_REPAIR,
     UNIT_MODE_IN_MINE,
+    UNIT_MODE_IN_CAMP,
     UNIT_MODE_ATTACK_WINDUP,
     UNIT_MODE_ATTACK_COOLDOWN,
     UNIT_MODE_FERRY,
@@ -290,6 +291,8 @@ struct building_t {
     uint32_t taking_damage_timer;
     uint32_t taking_damage_flicker_timer;
     bool taking_damage_flicker;
+
+    bool is_occupied;
 };
 
 struct remembered_building_t {
@@ -298,6 +301,7 @@ struct remembered_building_t {
     int health;
     xy cell;
     BuildingMode mode;
+    bool is_occupied;
 };
 
 struct building_data_t {

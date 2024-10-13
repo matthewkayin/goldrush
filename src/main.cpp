@@ -1688,7 +1688,7 @@ void render_match(const match_state_t& state) {
                     continue;
                 }
                 const unit_t& unit = state.units[index];
-                if (unit.mode == UNIT_MODE_IN_MINE) {
+                if (unit.mode == UNIT_MODE_IN_MINE || unit.mode == UNIT_MODE_IN_CAMP) {
                     continue;
                 }
                 if (unit_get_elevation(state, unit) != elevation) {
@@ -1822,7 +1822,12 @@ void render_match(const match_state_t& state) {
                 continue;
             }
 
-            int hframe = building.mode == BUILDING_MODE_FINISHED ? 3 : ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
+            int hframe = 3;
+            if (building.mode == BUILDING_MODE_IN_PROGRESS) {
+                hframe = ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
+            } else if (building.is_occupied) {
+                hframe = 4;
+            }
             ysorted.push_back((render_sprite_params_t) {
                 .sprite = (Sprite)sprite,
                 .position = building_render_pos,
@@ -1848,7 +1853,7 @@ void render_match(const match_state_t& state) {
             if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
                 continue;
             }
-            if (unit.mode == UNIT_MODE_IN_MINE) {
+            if (unit.mode == UNIT_MODE_IN_MINE || unit.mode == UNIT_MODE_IN_CAMP) {
                 continue;
             }
 
@@ -2468,7 +2473,7 @@ void render_match(const match_state_t& state) {
         if (unit.player_id != network_get_player_id() && !map_is_cell_rect_revealed(state, network_get_player_id(), rect_t(unit.cell, unit_cell_size(unit.type)))) {
             continue;
         }
-        if (unit.mode == UNIT_MODE_FERRY || unit.mode == UNIT_MODE_IN_MINE || unit.health == 0) {
+        if (unit.mode == UNIT_MODE_FERRY || unit.mode == UNIT_MODE_IN_MINE || unit.mode == UNIT_MODE_IN_CAMP || unit.health == 0) {
             continue;
         }
 
