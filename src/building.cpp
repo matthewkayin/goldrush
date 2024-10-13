@@ -283,9 +283,11 @@ bool building_can_be_placed(const match_state_t& state, BuildingType type, xy ce
         }
     }
 
-    for (const mine_t& mine : state.mines) {
-        if (building_rect.intersects(mine_get_block_building_rect(mine.cell))) {
-            return false;
+    if (type == BUILDING_CAMP) {
+        for (const mine_t& mine : state.mines) {
+            if (building_rect.intersects(mine_get_block_building_rect(mine.cell))) {
+                return false;
+            }
         }
     }
 

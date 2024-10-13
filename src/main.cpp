@@ -2019,10 +2019,12 @@ void render_match(const match_state_t& state) {
                 if (is_placement_out_of_bounds || map_get_fog(state, network_get_player_id(), xy(x, y)) == FOG_HIDDEN) {
                     is_cell_green = false;
                 } else {
-                    for (const mine_t& mine : state.mines) {
-                        if (rect_t(xy(x, y), xy(1, 1)).intersects(mine_get_block_building_rect(mine.cell))) {
-                            is_cell_green = false;
-                            break;
+                    if (state.ui_building_type == BUILDING_CAMP) {
+                        for (const mine_t& mine : state.mines) {
+                            if (rect_t(xy(x, y), xy(1, 1)).intersects(mine_get_block_building_rect(mine.cell))) {
+                                is_cell_green = false;
+                                break;
+                            }
                         }
                     }
                     if (xy(x, y) != miner_cell && map_is_cell_blocked(state, xy(x, y))) {
@@ -2066,7 +2068,7 @@ void render_match(const match_state_t& state) {
         }
         int button_frame = 0;
         SDL_Color text_color = COLOR_OFFBLACK;
-        if (state.ui_selected_control_group == i) {
+        if (state.ui_selected_control_group != i) {
             text_color = COLOR_DARKBLACK;
             button_frame = 2;
         }
