@@ -727,7 +727,8 @@ void map_update_fog(match_state_t& state, uint8_t player_id) {
             .type = building.type,
             .health = building.health,
             .cell = building.cell,
-            .mode = building.mode
+            .mode = building.mode,
+            .is_occupied = building.is_occupied
         };
     }
 
