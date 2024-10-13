@@ -16,14 +16,14 @@
 static const uint32_t TICK_DURATION = 4;
 static const uint8_t TICK_OFFSET = 4;
 
-static const int CAMERA_DRAG_MARGIN = 8;
-static const int CAMERA_DRAG_SPEED = 8;
+static const int CAMERA_DRAG_MARGIN = 16;
+static const int CAMERA_DRAG_SPEED = 16;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 10000;
-const uint32_t MATCH_WINNING_GOLD_AMOUNT = 25000;
+static const uint32_t PLAYER_STARTING_GOLD = 1000;
+const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION = 10;
@@ -89,6 +89,9 @@ match_state_t match_init() {
 
         int player_spawn_index = lcg_rand() % player_spawns.size();
         xy player_spawn = player_spawns[player_spawn_index];
+        if (player_id == network_get_player_id()) {
+            state.camera_offset = camera_centered_on_cell(player_spawn, state.map_width, state.map_height);
+        }
         player_spawns.erase(player_spawns.begin() + player_spawn_index);
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
@@ -98,7 +101,6 @@ match_state_t match_init() {
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(-2, 0));
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(2, 2));
     }
-    state.camera_offset = camera_centered_on_cell(player_spawns[network_get_player_id()], state.map_width, state.map_height);
 
     state.is_fog_dirty = true;
 
@@ -557,6 +559,19 @@ void match_update(match_state_t& state) {
         animation_update(state.ui_move_animation);
     }
     animation_update(state.ui_rally_animation);
+
+    for (int particle_index = 0; particle_index < state.particles.size(); particle_index++) {
+        particle_t& particle = state.particles[particle_index];
+        if (!animation_is_playing(particle.animation)) {
+            continue;
+        }
+        animation_update(particle.animation);
+        log_trace("particle update");
+    }
+    while (state.particles.size() > 0 && !animation_is_playing(state.particles[0].animation)) {
+        state.particles.pop_front();
+        log_trace("particle pop_front");
+    }
 
     // Update units
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {

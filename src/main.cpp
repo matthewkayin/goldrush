@@ -1902,6 +1902,15 @@ void render_match(const match_state_t& state) {
         }
     } // End for each elevation
 
+    // Particles
+    for (int particle_index = 0; particle_index < state.particles.size(); particle_index++) {
+        const particle_t& particle = state.particles[particle_index];
+        if (!animation_is_playing(particle.animation)) {
+            continue;
+        }
+        render_sprite(particle.sprite, xy(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED);
+    }
+
     // Fog of War
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     for (int fog_pass = 0; fog_pass < 2; fog_pass++) {

@@ -234,6 +234,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 3,
         .vframes = 1,
         .options = 0
+    }},
+    { SPRITE_PARTICLE_SPARKS, (sprite_params_t) {
+        .path = "sprite/particle_sparks.png",
+        .hframes = 4,
+        .vframes = 3,
+        .options = 0
     }}  
 };
 
@@ -510,6 +516,12 @@ const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
         .hframe_start = 0, .hframe_end = 5,
         .frame_duration = 6,
         .loops = ANIMATION_LOOPS_INDEFINITELY
+    }},
+    { ANIMATION_PARTICLE_SPARKS, (animation_data_t) {
+        .vframe = -1,
+        .hframe_start = 0, .hframe_end = 3,
+        .frame_duration = 3,
+        .loops = 1
     }}
 };
 

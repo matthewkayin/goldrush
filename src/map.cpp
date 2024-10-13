@@ -195,6 +195,9 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_
             bool is_adjacent_to_ramp = false;
             for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
                 xy neighbor_cell = decoration_cell + DIRECTION_XY[direction];
+                if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                    continue;
+                }
                 if (state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].is_ramp == 1) {
                     is_adjacent_to_ramp = true;
                     break;
@@ -372,6 +375,9 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
                 mine_cell_too_close = true;
                 break;
             }
+            continue;
+        }
+        if (mine_cell_too_close) {
             continue;
         }
         mine_cells.push_back(mine_cell);

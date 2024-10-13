@@ -16,7 +16,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .name = "Miner",
         .sprite = SPRITE_UNIT_MINER,
         .cell_size = 1,
-        .max_health = 20,
+        .max_health = 30,
         .damage = 3,
         .armor = 0,
         .range_squared = 1,
@@ -671,18 +671,21 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 }
 
                 if (!animation_is_playing(unit.animation)) {
-                    xy enemy_position;
+                    bool attack_missed = false;
+
+                    rect_t enemy_rect;
                     if (unit.target.type == UNIT_TARGET_UNIT) {
                         uint32_t enemy_index = state.units.get_index_of(unit.target.id);
                         GOLD_ASSERT(enemy_index != INDEX_INVALID);
                         unit_t& enemy = state.units[enemy_index];
-                        enemy_position = enemy.position.to_xy();
+                        enemy_rect = unit_get_rect(enemy);
 
                         int damage = std::max(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
                         // Elevation accuracy disadvantage - If unit is on lower elevation than target, unit has 50% chance to miss
                         if (unit_get_elevation(state, unit) < unit_get_elevation(state, enemy)) {
                             if (lcg_rand() % 2 == 0) {
                                 damage = 0;
+                                attack_missed = true;
                             }
                         }
                         enemy.health = std::max(0, enemy.health - damage);
@@ -734,7 +737,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         GOLD_ASSERT(enemy_index != INDEX_INVALID);
                         building_t& enemy = state.buildings[enemy_index];
                         rect_t enemy_rect = building_get_rect(enemy);
-                        enemy_position = enemy_rect.position + (enemy_rect.size / 2);
+                        enemy_rect = rect_t(enemy_rect.position, enemy_rect.size);
 
                         // NOTE: Buildings have no armor 
                         int damage = std::min(1, unit_get_damage(state, unit));
@@ -774,6 +777,21 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
                         }
                         enemy.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
+                    }
+
+                    // Create particle effects
+                    if (!attack_missed) {
+                        if (unit.type == UNIT_COWBOY) {
+                            xy particle_position;
+                            particle_position.x = enemy_rect.position.x + (enemy_rect.size.x / 4) + (lcg_rand() % (enemy_rect.size.x / 2));
+                            particle_position.y = enemy_rect.position.y + (enemy_rect.size.y / 4) + (lcg_rand() % (enemy_rect.size.y / 2));
+                            state.particles.push_back((particle_t) {
+                                .sprite = SPRITE_PARTICLE_SPARKS,
+                                .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
+                                .vframe = lcg_rand() % 3,
+                                .position = particle_position
+                            });
+                        }
                     }
 
                     unit.timer = unit_data.attack_cooldown;

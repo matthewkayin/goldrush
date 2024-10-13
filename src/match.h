@@ -339,6 +339,15 @@ struct selection_mode_t {
     };
 };
 
+// Particles
+
+struct particle_t {
+    Sprite sprite;
+    animation_t animation;
+    int vframe;
+    xy position;
+};
+
 // Input
 
 enum InputType {
@@ -460,6 +469,7 @@ struct match_state_t {
     id_array<unit_t> units;
     id_array<building_t> buildings;
     id_array<mine_t> mines;
+    circular_vector<particle_t, 256> particles;
 
     // Players
     uint32_t player_gold[MAX_PLAYERS];
