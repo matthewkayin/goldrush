@@ -410,8 +410,9 @@ struct input_unload_all_t {
 };
 
 struct input_rally_t {
-    entity_id building_id;
     xy rally_point;
+    uint16_t building_count;
+    entity_id building_ids[MAX_UNITS];
 };
 
 struct input_t {

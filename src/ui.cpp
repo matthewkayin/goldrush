@@ -64,7 +64,7 @@ void ui_show_status(match_state_t& state, const char* message) {
 }
 
 UiButton ui_get_ui_button(const match_state_t& state, int index) {
-    if (index == 5 && state.selection.type == SELECTION_TYPE_BUILDINGS && !state.buildings[state.buildings.get_index_of(state.selection.ids[0])].queue.empty()) {
+    if (index == 5 && state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids.size() == 1 && !state.buildings[state.buildings.get_index_of(state.selection.ids[0])].queue.empty()) {
         return UI_BUTTON_CANCEL;
     }
 
@@ -202,8 +202,13 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             // Begin unit training
             UnitType unit_type = (UnitType)(UNIT_MINER + (button - UI_BUTTON_UNIT_MINER));
 
+            // Decide which building to enqueue
             uint32_t selected_building_index = state.buildings.get_index_of(state.selection.ids[0]);
-            GOLD_ASSERT(selected_building_index != INDEX_INVALID);
+            for (int id_index = 1; id_index < state.selection.ids.size(); id_index++) {
+                if (state.buildings.get_by_id(state.selection.ids[id_index]).queue.size() < state.buildings[selected_building_index].queue.size()) {
+                    selected_building_index = state.buildings.get_index_of(state.selection.ids[id_index]);
+                }
+            }
             building_t& building = state.buildings[selected_building_index];
 
             building_queue_item_t item = (building_queue_item_t) {
@@ -219,7 +224,7 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 input_t input = (input_t) {
                     .type = INPUT_BUILDING_ENQUEUE,
                     .building_enqueue = (input_building_enqueue_t) {
-                        .building_id = state.selection.ids[0],
+                        .building_id = state.buildings.get_id_of(selected_building_index),
                         .item = item
                     }
                 };
@@ -283,17 +288,18 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
         const building_t& building = state.buildings[index];
 
         // Don't select other player's buildings
-        // TODO: remove this to allow enemy building selection
         if (building.player_id != network_get_player_id()) {
             continue;
         }
 
         if (building_get_rect(building).intersects(state.select_rect)) {
-            // Return here so that only one building can be selected at once
             selection.ids.push_back(state.buildings.get_id_of(index));
-            selection.type = SELECTION_TYPE_BUILDINGS;
-            return selection;
         }
+    }
+    // If we're selecting buildings, then return the building selection
+    if (!selection.ids.empty()) {
+        selection.type = SELECTION_TYPE_BUILDINGS;
+        return selection;
     }
 
     // Otherwise, check for enemy units
@@ -429,12 +435,22 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
             state.ui_buttonset = UI_BUTTONSET_UNIT;
         }
     } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
-        building_t& building = state.buildings[state.buildings.get_index_of(state.selection.ids[0])];
-        if (building.mode == BUILDING_MODE_IN_PROGRESS) {
+        bool all_buildings_are_finished_and_same_type = true;
+        BuildingType selected_building_type = state.buildings.get_by_id(state.selection.ids[0]).type;
+        for (entity_id id : state.selection.ids) {
+            const building_t& id_building = state.buildings.get_by_id(id);
+            if (id_building.type != selected_building_type || id_building.mode != BUILDING_MODE_FINISHED) {
+                all_buildings_are_finished_and_same_type = false;
+                break;
+            }
+        }
+        if (state.selection.ids.size() == 1 && state.buildings.get_by_id(state.selection.ids[0]).mode == BUILDING_MODE_IN_PROGRESS) {
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
-        } else if (building.type == BUILDING_CAMP) {
+        } else if (!all_buildings_are_finished_and_same_type) {
+            state.ui_buttonset = UI_BUTTONSET_NONE;
+        } else if (selected_building_type == BUILDING_CAMP) {
             state.ui_buttonset = UI_BUTTONSET_CAMP;
-        } else if (building.type == BUILDING_SALOON) {
+        } else if (selected_building_type == BUILDING_SALOON) {
             state.ui_buttonset = UI_BUTTONSET_SALOON;
         } else {
             state.ui_buttonset = UI_BUTTONSET_NONE;
@@ -466,7 +482,7 @@ selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const sele
             UnitType unit_type = state.units[unit_index].type;
             auto it = unit_type_count.find(unit_type);
             if (it == unit_type_count.end()) {
-                unit_type_count[mode_unit_type] = 1;
+                unit_type_count[unit_type] = 1;
                 if (mode_unit_type_count == 0) {
                     mode_unit_type = unit_type;
                     mode_unit_type_count = 1;
@@ -488,12 +504,37 @@ selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const sele
         mode.count = selection.ids.size();
         return mode;
     } else if (selection.type == SELECTION_TYPE_BUILDINGS) {
-        uint32_t building_index = state.buildings.get_index_of(selection.ids[0]);
-        if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
+        std::unordered_map<BuildingType, uint32_t> building_type_count;
+        BuildingType mode_building_type = BUILDING_CAMP;
+        uint32_t mode_building_type_count = 0;
+
+        for (entity_id id : selection.ids) {
+            uint32_t building_index = state.buildings.get_index_of(id);
+            if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
+                continue;
+            }
+            BuildingType building_type = state.buildings[building_index].type;
+            auto it = building_type_count.find(building_type);
+            if (it == building_type_count.end()) {
+                building_type_count[building_type] = 1;
+                if (mode_building_type_count == 0) {
+                    mode_building_type = building_type;
+                    mode_building_type_count = 1;
+                } else {
+                    it->second++;
+                    if (mode_building_type_count < it->second) {
+                        mode_building_type = building_type;
+                        mode_building_type_count = it->second;
+                    }
+                }
+            }
+        }
+
+        if (mode_building_type_count == 0) {
             return mode;
         }
         mode.type = SELECTION_MODE_BUILDING;
-        mode.building_type = state.buildings[building_index].type;
+        mode.building_type = mode_building_type;
         mode.count = selection.ids.size();
         return mode;
     }

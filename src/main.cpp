@@ -1555,44 +1555,6 @@ void render_match(const match_state_t& state) {
                 uint16_t map_tile_index = state.map_tiles[map_index].elevation == elevation
                                             ? state.map_tiles[map_index].index
                                             : 1;
-                /*
-                tile_data_t tile_data = get_tile_data(map_tile_index);
-                // Calculate tile neighbors
-                uint8_t neighbors = 0;
-                if (tile_data.type == TILE_TYPE_AUTO || (map_tile_index == TILE_ARIZONA_WALL && state.map_tiles[map_index].elevation == elevation)) {
-                    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                        xy neighbor_cell = base_coords + xy(x, y) + DIRECTION_XY[direction];
-                        if (!map_is_cell_in_bounds(state, neighbor_cell)) {
-                            continue;
-                        }
-                        bool is_neighbor_same = tile_data.type == TILE_TYPE_AUTO
-                                ? state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index == map_tile_index
-                                : state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation >= state.map_tiles[map_index].elevation;
-                        if (is_neighbor_same) {
-                            neighbors += DIRECTION_MASK[direction];
-                        }
-                    }
-                }
-
-                for (uint32_t edge = 0; edge < 4; edge++) {
-                    // Since neighbors defaults to 0, this function will work even for non-auto tiles
-                    xy source_pos = tile_data.source_pos + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
-                    SDL_Rect tile_src_rect = (SDL_Rect) {
-                        .x = source_pos.x,
-                        .y = source_pos.y,
-                        .w = TILE_SIZE / 2,
-                        .h = TILE_SIZE / 2
-                    };
-                    SDL_Rect tile_dst_rect = (SDL_Rect) {
-                        .x = base_pos.x + (x * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
-                        .y = base_pos.y + (y * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2)),
-                        .w = TILE_SIZE / 2,
-                        .h = TILE_SIZE / 2
-                    };
-
-                    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &tile_src_rect, &tile_dst_rect);
-                }
-                */
                 SDL_Rect tile_src_rect = (SDL_Rect) {
                     .x = map_tile_index * TILE_SIZE,
                     .y = 0,
@@ -1649,38 +1611,40 @@ void render_match(const match_state_t& state) {
         static const int HEALTHBAR_PADDING = 2;
         static const int BUILDING_HEALTHBAR_PADDING = 5;
         if (state.selection.type == SELECTION_TYPE_BUILDINGS || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
-            uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
-            if (building_index != INDEX_INVALID) {
-                const building_t& building = state.buildings[building_index];
-                if (map_get_elevation(state, building.cell) == elevation) {
-                    rect_t building_rect = building_get_rect(building);
-                    render_sprite(building_get_select_ring(building.type, state.selection.type == SELECTION_TYPE_ENEMY_BUILDING), xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+            for (entity_id id : state.selection.ids) {
+                uint32_t building_index = state.buildings.get_index_of(id);
+                if (building_index != INDEX_INVALID) {
+                    const building_t& building = state.buildings[building_index];
+                    if (map_get_elevation(state, building.cell) == elevation) {
+                        rect_t building_rect = building_get_rect(building);
+                        render_sprite(building_get_select_ring(building.type, state.selection.type == SELECTION_TYPE_ENEMY_BUILDING), xy(0, 0), building_rect.position + (building_rect.size / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
-                    // Determine healthbar rect
-                    xy building_render_pos = building_rect.position - state.camera_offset;
-                    SDL_Rect healthbar_rect = (SDL_Rect) { 
-                        .x = building_render_pos.x, 
-                        .y = building_render_pos.y + building_rect.size.y + BUILDING_HEALTHBAR_PADDING, 
-                        .w = building_rect.size.x, 
-                        .h = HEALTHBAR_HEIGHT };
-                    SDL_Rect healthbar_subrect = healthbar_rect;
-                    healthbar_subrect.w = (healthbar_rect.w * building.health) / 
-                                            BUILDING_DATA.at(building.type).max_health;
+                        // Determine healthbar rect
+                        xy building_render_pos = building_rect.position - state.camera_offset;
+                        SDL_Rect healthbar_rect = (SDL_Rect) { 
+                            .x = building_render_pos.x, 
+                            .y = building_render_pos.y + building_rect.size.y + BUILDING_HEALTHBAR_PADDING, 
+                            .w = building_rect.size.x, 
+                            .h = HEALTHBAR_HEIGHT };
+                        SDL_Rect healthbar_subrect = healthbar_rect;
+                        healthbar_subrect.w = (healthbar_rect.w * building.health) / 
+                                                BUILDING_DATA.at(building.type).max_health;
 
-                    // Cull the healthbar
-                    if (!(healthbar_rect.x + healthbar_rect.w < 0 || 
-                        healthbar_rect.y + healthbar_rect.h < 0 || 
-                        healthbar_rect.x >= SCREEN_WIDTH || 
-                        healthbar_rect.y >= SCREEN_HEIGHT)) {
-                        // Render the healthbar
-                        SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
-                        SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
-                        SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
-                        SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
-                        SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
-                    }
-                } // End if building is on current elevation
-            } // End if building is valid
+                        // Cull the healthbar
+                        if (!(healthbar_rect.x + healthbar_rect.w < 0 || 
+                            healthbar_rect.y + healthbar_rect.h < 0 || 
+                            healthbar_rect.x >= SCREEN_WIDTH || 
+                            healthbar_rect.y >= SCREEN_HEIGHT)) {
+                            // Render the healthbar
+                            SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                            SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                            SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                            SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+                            SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+                        }
+                    } // End if building is on current elevation
+                } // End if building is valid
+            } // End for each building ID
         // End if selection type is buildings or enemy buildings
         } else if (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_ENEMY_UNIT) {
             for (entity_id unit_id : state.selection.ids) {
@@ -1766,18 +1730,20 @@ void render_match(const match_state_t& state) {
 
         // Rally points
         if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
-            const building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
-            if (building_is_finished(building) && building.rally_point.x != -1) {
-                if (map_get_elevation(state, building.rally_point / TILE_SIZE) == elevation) {
-                    ysorted.push_back((render_sprite_params_t) {
-                        .sprite = SPRITE_RALLY_FLAG,
-                        .position = building.rally_point - xy(4, 15) - state.camera_offset,
-                        .frame = state.ui_rally_animation.frame,
-                        .options = 0,
-                        .recolor_name = (RecolorName)network_get_player_id()
-                    });
-                }
-            }
+            for (entity_id id : state.selection.ids) {
+                const building_t& building = state.buildings.get_by_id(id);
+                if (building_is_finished(building) && building.rally_point.x != -1) {
+                    if (map_get_elevation(state, building.rally_point / TILE_SIZE) == elevation) {
+                        ysorted.push_back((render_sprite_params_t) {
+                            .sprite = SPRITE_RALLY_FLAG,
+                            .position = building.rally_point - xy(4, 15) - state.camera_offset,
+                            .frame = state.ui_rally_animation.frame,
+                            .options = 0,
+                            .recolor_name = (RecolorName)network_get_player_id()
+                        });
+                    } // End if map get elevation
+                } // End if building is finished
+            } // End for each id in selection
         }
 
         // Mines
@@ -2215,7 +2181,7 @@ void render_match(const match_state_t& state) {
     } // End render selection list
 
     // UI Building queues
-    if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
+    if (state.selection.type == SELECTION_TYPE_BUILDINGS && state.selection.ids.size() == 1) {
         uint32_t building_index = state.buildings.get_index_of(state.selection.ids[0]);
         GOLD_ASSERT(building_index != INDEX_INVALID);
         const building_t& building = state.buildings[building_index];

@@ -22,7 +22,7 @@ static const int CAMERA_DRAG_SPEED = 16;
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 200;
+static const uint32_t PLAYER_STARTING_GOLD = 1000;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
@@ -410,7 +410,6 @@ void match_update(match_state_t& state) {
                 if (state.ui_double_click_timer == 0) {
                     state.ui_double_click_timer = UI_DOUBLE_CLICK_DURATION;
                 } else if (state.ui_double_click_timer != 0 && state.selection.ids.size() == 1 && state.selection.type == selection.type && state.selection.ids[0] == selection.ids[0]) {
-                    // TODO: add buildings to this
                     if (selection.type == SELECTION_TYPE_UNITS) {
                         rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
                         UnitType double_click_unit_type = state.units.get_by_id(selection.ids[0]).type;
@@ -420,6 +419,17 @@ void match_update(match_state_t& state) {
                                 state.units[index].type == double_click_unit_type &&
                                 screen_rect.intersects(unit_get_rect(state.units[index]))) {
                                     selection.ids.push_back(state.units.get_id_of(index));
+                            }
+                        }
+                    } else if (selection.type == SELECTION_TYPE_BUILDINGS) {
+                        rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
+                        BuildingType double_click_building_type = state.buildings.get_by_id(selection.ids[0]).type;
+                        selection.ids.clear();
+                        for (uint32_t index = 0; index < state.buildings.size(); index++) {
+                            if (state.buildings[index].player_id == network_get_player_id() &&
+                                state.buildings[index].type == double_click_building_type &&
+                                screen_rect.intersects(building_get_rect(state.buildings[index]))) {
+                                    selection.ids.push_back(state.buildings.get_id_of(index));
                             }
                         }
                     }
@@ -508,25 +518,28 @@ void match_update(match_state_t& state) {
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT) && 
         state.selection.type == SELECTION_TYPE_BUILDINGS && 
         (MINIMAP_RECT.has_point(mouse_pos) || !ui_is_mouse_in_ui())) {
-        building_t& building = state.buildings.get_by_id(state.selection.ids[0]);
-        if (building_is_finished(building) && BUILDING_DATA.at(building.type).can_rally) {
-            xy move_target;
+        input_t input;
+        input.type = INPUT_RALLY;
+        input.rally.building_count = 0;
+
+        for (entity_id id : state.selection.ids) {
+            building_t& building = state.buildings.get_by_id(id);
+            if (building_is_finished(building) && BUILDING_DATA.at(building.type).can_rally) {
+                input.rally.building_ids[input.rally.building_count] = id;
+                input.rally.building_count++;
+            }
+        }
+        if (input.rally.building_count != 0) {
             if (ui_is_mouse_in_ui()) {
                 xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
-                move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
+                input.rally.rally_point = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
                                     (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
             } else {
-                move_target = mouse_world_pos;
+                input.rally.rally_point = mouse_world_pos;
             }
 
-            input_t input;
-            input.type = INPUT_RALLY;
-            input.rally = (input_rally_t) {
-                .building_id = state.selection.ids[0],
-                .rally_point = move_target
-            };
             state.input_queue.push_back(input);
-        }
+        } 
     }
 
     // CAMERA DRAG
@@ -633,13 +646,21 @@ void match_update(match_state_t& state) {
             }
         }
     } else if (state.selection.type == SELECTION_TYPE_BUILDINGS || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
-        uint32_t index = state.buildings.get_index_of(state.selection.ids[0]);
-        if (index == INDEX_INVALID || state.buildings[index].health == 0) {
-            selection_t selection_empty = (selection_t) {
-                .type = SELECTION_TYPE_NONE,
-                .ids = std::vector<entity_id>()
-            };
-            ui_set_selection(state, selection_empty);
+        uint32_t index = 0;
+        while (index < state.selection.ids.size()) {
+            uint32_t building_index = state.buildings.get_index_of(state.selection.ids[index]);
+            if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
+                state.selection.ids.erase(state.selection.ids.begin() + index);
+            } else {
+                index++;
+            }
+            if (state.selection.ids.size() == 0) {
+                selection_t selection_empty = (selection_t) {
+                    .type = SELECTION_TYPE_NONE,
+                    .ids = std::vector<entity_id>()
+                };
+                ui_set_selection(state, selection_empty);
+            }
         }
     }
 
@@ -780,11 +801,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             break;
         }
         case INPUT_RALLY: {
-            memcpy(out_buffer + out_buffer_length, &input.rally.building_id, sizeof(entity_id));
-            out_buffer_length += sizeof(entity_id);
-
             memcpy(out_buffer + out_buffer_length, &input.rally.rally_point, sizeof(xy));
             out_buffer_length += sizeof(xy);
+
+            memcpy(out_buffer + out_buffer_length, &input.rally.building_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.rally.building_ids, input.rally.building_count * sizeof(entity_id));
+            out_buffer_length += input.rally.building_count * sizeof(uint16_t);
             break;
         }
         default:
@@ -862,11 +886,14 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             break;
         }
         case INPUT_RALLY: {
-            memcpy(&input.rally.building_id, in_buffer + in_buffer_head, sizeof(entity_id));
-            in_buffer_head += sizeof(entity_id);
-
             memcpy(&input.rally.rally_point, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
+
+            memcpy(&input.rally.building_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(&input.rally.building_ids, in_buffer + in_buffer_head, input.rally.building_count * sizeof(entity_id));
+            in_buffer_head += input.rally.building_count * sizeof(entity_id);
         }
         default:
             break;
@@ -1150,11 +1177,13 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             break;
         }
         case INPUT_RALLY: {
-            uint32_t building_index = state.buildings.get_index_of(input.rally.building_id);
-            if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
-                return;
+            for (uint16_t id_index = 0; id_index < input.rally.building_count; id_index++) {
+                uint32_t building_index = state.buildings.get_index_of(input.rally.building_ids[id_index]);
+                if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
+                    continue;
+                }
+                state.buildings[building_index].rally_point = input.rally.rally_point;
             }
-            state.buildings[building_index].rally_point = input.rally.rally_point;
         }
         default:
             break;
