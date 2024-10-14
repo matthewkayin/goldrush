@@ -42,6 +42,7 @@ const SDL_Color COLOR_OFFBLACK = (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 2
 const SDL_Color COLOR_DARKBLACK = (SDL_Color) { .r = 16, .g = 15, .b = 18, .a = 255 };
 const SDL_Color COLOR_WHITE = (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 };
 const SDL_Color COLOR_SKY_BLUE = (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 };
+const SDL_Color COLOR_DIM_BLUE = (SDL_Color) { .r = 70, .g = 100, .b = 115, .a = 255 };
 const SDL_Color COLOR_SAND_DARK = (SDL_Color) { .r = 204, .g = 162, .b = 139, .a = 255 };
 const SDL_Color COLOR_RED = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 };
 const SDL_Color COLOR_GREEN = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
@@ -931,7 +932,7 @@ void engine_create_minimap_texture(const match_state_t& state) {
             } else if (tile_index >= TILE_DATA[TILE_SAND].index && tile_index <= TILE_DATA[TILE_SAND3].index) {
                 color = COLOR_SAND_DARK;
             } else if (tile_index >= TILE_DATA[TILE_WATER].index && tile_index < TILE_DATA[TILE_WATER].index + 47) {
-                color = COLOR_SKY_BLUE;
+                color = COLOR_DIM_BLUE;
             } else {
                 color = COLOR_DARK_GRAY;
             }
@@ -1822,16 +1823,10 @@ void render_match(const match_state_t& state) {
                 continue;
             }
 
-            int hframe = 3;
-            if (building.mode == BUILDING_MODE_IN_PROGRESS) {
-                hframe = ((3 * building.health) / BUILDING_DATA.at(building.type).max_health);
-            } else if (building.is_occupied) {
-                hframe = 4;
-            }
             ysorted.push_back((render_sprite_params_t) {
                 .sprite = (Sprite)sprite,
                 .position = building_render_pos,
-                .frame = xy(hframe, 0),
+                .frame = xy(building_get_hframe(building.type, building.mode, building.health, building.is_occupied), 0),
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_name = (RecolorName)building.player_id
             });

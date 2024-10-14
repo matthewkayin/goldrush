@@ -62,10 +62,6 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     return building_id;
 }
 
-void building_destroy(match_state_t& state, uint32_t building_index) {
-    state.buildings.remove_at(building_index);
-}
-
 void building_on_finish(match_state_t& state, entity_id building_id) {
     building_t& building = state.buildings.get_by_id(building_id);
 
@@ -272,6 +268,16 @@ rect_t building_get_rect(const building_t& building) {
 
 bool building_is_finished(const building_t& building) {
     return building.mode == BUILDING_MODE_FINISHED;
+}
+
+int building_get_hframe(BuildingType type, BuildingMode mode, int health, bool is_occupied) {
+    if (mode == BUILDING_MODE_IN_PROGRESS) {
+        return ((3 * health) / BUILDING_DATA.at(type).max_health);
+    } else if (is_occupied) {
+        return 4;
+    } else {
+        return 3;
+    }
 }
 
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell, xy miner_cell) {

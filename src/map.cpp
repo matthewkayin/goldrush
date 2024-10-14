@@ -474,6 +474,7 @@ void map_set_cell(match_state_t& state, xy cell, CellType type, uint16_t value) 
         .type = type,
         .value = value
     };
+    state.is_fog_dirty = true;
 }
 
 void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, uint16_t value) {
@@ -485,6 +486,7 @@ void map_set_cell_rect(match_state_t& state, rect_t cell_rect, CellType type, ui
             };
         }
     }
+    state.is_fog_dirty = true;
 }
 
 
@@ -780,4 +782,6 @@ void map_update_fog(match_state_t& state, uint8_t player_id) {
             it++;
         }
     }
+
+    state.is_fog_dirty = false;
 }

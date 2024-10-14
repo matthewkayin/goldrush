@@ -15,7 +15,7 @@ LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
-COMPILER_FLAGS := -std=c++17 -Wall -O0 
+COMPILER_FLAGS := -std=c++17 -Wall
 LINKER_FLAGS := -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 ifeq ($(IS_DEBUG),true)

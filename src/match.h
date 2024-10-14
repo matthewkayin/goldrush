@@ -533,7 +533,6 @@ void map_update_fog(match_state_t& state, uint8_t player_id);
 
 // Unit
 entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, const xy& cell);
-void unit_destroy(match_state_t& state, uint32_t unit_index);
 void unit_update(match_state_t& state, uint32_t unit_index);
 xy unit_cell_size(UnitType type);
 rect_t unit_get_rect(const unit_t& unit);
@@ -558,7 +557,6 @@ xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy 
 
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);
-void building_destroy(match_state_t& state, uint32_t building_index);
 void building_on_finish(match_state_t& state, entity_id building_id);
 void building_update(match_state_t& state, building_t& building);
 void building_enqueue(match_state_t& state, building_t& building, building_queue_item_t item);
@@ -567,6 +565,7 @@ bool building_is_supply_blocked(const match_state_t& state, const building_t& bu
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_is_finished(const building_t& building);
+int building_get_hframe(BuildingType type, BuildingMode mode, int health, bool is_occupied);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell, xy miner_cell);
 Sprite building_get_select_ring(BuildingType type, bool is_enemy);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);

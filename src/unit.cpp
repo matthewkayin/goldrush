@@ -98,10 +98,6 @@ entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, co
     return unit_id;
 }
 
-void unit_destroy(match_state_t& state, uint32_t unit_index) {
-    state.units.remove_at(unit_index);
-}
-
 void unit_update(match_state_t& state, uint32_t unit_index) {
     entity_id unit_id = state.units.get_id_of(unit_index);
     unit_t& unit = state.units[unit_index];
@@ -513,6 +509,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     // Building tick
                     building_t& building = state.buildings[building_index];
 
+                    int building_hframe = building_get_hframe(building.type, building.mode, building.health, building.is_occupied);
 #ifdef GOLD_DEBUG_FAST_BUILD
                     building.health = std::min(building.health + 20, BUILDING_DATA.at(building.type).max_health);
 #else
@@ -522,6 +519,10 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         building_on_finish(state, unit.target.build.building_id);
                     } else {
                         unit.timer = UNIT_BUILD_TICK_DURATION;
+                    }
+
+                    if (building_get_hframe(building.type, building.mode, building.health, building.is_occupied) != building_hframe) {
+                        state.is_fog_dirty = true;
                     }
                 }
                 unit_update_finished = true;
@@ -540,6 +541,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 building_t& building = state.buildings.get_by_id(unit.target.id);
 
                 unit.timer--;
+                int building_hframe = building_get_hframe(building.type, building.mode, building.health, building.is_occupied);
                 if (unit.timer == 0) {
                     if (building.health < BUILDING_DATA.at(building.type).max_health) {
                         building.health++;
@@ -554,6 +556,9 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         };
                     }
                     unit.mode = UNIT_MODE_IDLE;
+                }
+                if (building_get_hframe(building.type, building.mode, building.health, building.is_occupied) != building_hframe) {
+                    state.is_fog_dirty = true;
                 }
                 unit_update_finished = true;
                 break;
@@ -638,7 +643,10 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                     });
                                 }
                             }
-                        } 
+                        } else {
+                            building_t& building = state.buildings.get_by_id(unit.garrison_id);
+                            building.is_occupied = false;
+                        }
 
                         unit.target = exit_target;
                         unit.cell = exit_cell;

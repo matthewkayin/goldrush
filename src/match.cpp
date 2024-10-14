@@ -22,7 +22,7 @@ static const int CAMERA_DRAG_SPEED = 16;
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 1000;
+static const uint32_t PLAYER_STARTING_GOLD = 200;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
@@ -566,11 +566,9 @@ void match_update(match_state_t& state) {
             continue;
         }
         animation_update(particle.animation);
-        log_trace("particle update");
     }
     while (state.particles.size() > 0 && !animation_is_playing(state.particles[0].animation)) {
         state.particles.pop_front();
-        log_trace("particle pop_front");
     }
 
     // Update units
@@ -590,7 +588,8 @@ void match_update(match_state_t& state) {
     while (unit_index < state.units.size()) {
         if ((state.units[unit_index].mode == UNIT_MODE_DEATH_FADE && !animation_is_playing(state.units[unit_index].animation)) ||
             (state.units[unit_index].mode == UNIT_MODE_FERRY && state.units[unit_index].health == 0)) {
-            unit_destroy(state, unit_index);
+            state.units.remove_at(unit_index);
+            state.is_fog_dirty = true;
         } else {
             unit_index++;
         }
@@ -605,8 +604,8 @@ void match_update(match_state_t& state) {
     uint32_t building_index = 0;
     while (building_index < state.buildings.size()) {
         if (state.buildings[building_index].mode == BUILDING_MODE_DESTROYED && state.buildings[building_index].queue_timer == 0) {
-            // TODO play death animation
-            building_destroy(state, building_index);
+            state.buildings.remove_at(building_index);
+            state.is_fog_dirty = true;
         } else {
             building_index++;
         }
