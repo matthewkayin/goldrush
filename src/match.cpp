@@ -405,8 +405,22 @@ void match_update(match_state_t& state) {
         // On finished selecting
         if (state.ui_mode == UI_MODE_SELECTING) {
             selection_t selection = ui_create_selection_from_rect(state);
+            // Control click selection
+            if (input_is_key_pressed(KEY_CTRL) && selection.type == state.selection.type && 
+                (selection.type == SELECTION_TYPE_UNITS || selection.type == SELECTION_TYPE_BUILDINGS)) {
+                std::unordered_map<entity_id, int> id_lookup;
+                for (entity_id id : selection.ids) {
+                    id_lookup[id] = 1;
+                }
+                for (entity_id id : state.selection.ids) {
+                    if (id_lookup.find(id) != id_lookup.end()) {
+                        continue;
+                    }
+                    id_lookup[id] = 1;
+                    selection.ids.push_back(id);
+                }
             // Double click selection
-            if (selection.ids.size() == 1 && (selection.type == SELECTION_TYPE_UNITS || selection.type == SELECTION_TYPE_BUILDINGS)) {
+            } else if (selection.ids.size() == 1 && (selection.type == SELECTION_TYPE_UNITS || selection.type == SELECTION_TYPE_BUILDINGS)) {
                 if (state.ui_double_click_timer == 0) {
                     state.ui_double_click_timer = UI_DOUBLE_CLICK_DURATION;
                 } else if (state.ui_double_click_timer != 0 && state.selection.ids.size() == 1 && state.selection.type == selection.type && state.selection.ids[0] == selection.ids[0]) {
@@ -565,6 +579,9 @@ void match_update(match_state_t& state) {
     }
     if (state.control_group_double_click_timer != 0) {
         state.control_group_double_click_timer--;
+    }
+    if (state.ui_double_click_timer != 0) {
+        state.ui_double_click_timer--;
     }
 
     // Update particles
