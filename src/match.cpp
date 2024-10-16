@@ -780,6 +780,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.stop.unit_count * sizeof(entity_id);
             break;
         }
+        case INPUT_DEFEND: {
+            out_buffer[out_buffer_length] = input.defend.unit_count;
+            out_buffer_length += 1;
+
+            memcpy(out_buffer + out_buffer_length, input.defend.unit_ids, input.defend.unit_count * sizeof(entity_id));
+            out_buffer_length += input.defend.unit_count * sizeof(entity_id);
+            break;
+        }
         case INPUT_BUILD: {
             memcpy(out_buffer + out_buffer_length, &input.build.unit_count, sizeof(uint16_t));
             out_buffer_length += sizeof(uint16_t);
@@ -863,6 +871,13 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             in_buffer_head++;
             memcpy(input.stop.unit_ids, in_buffer + in_buffer_head, input.stop.unit_count * sizeof(entity_id));
             in_buffer_head += input.stop.unit_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_DEFEND: {
+            input.defend.unit_count = in_buffer[in_buffer_head];
+            in_buffer_head++;
+            memcpy(input.defend.unit_ids, in_buffer + in_buffer_head, input.defend.unit_count * sizeof(entity_id));
+            in_buffer_head += input.defend.unit_count * sizeof(entity_id);
             break;
         }
         case INPUT_BUILD: {
@@ -1040,9 +1055,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             }
             break;
         }
-        case INPUT_STOP: {
-            for (uint32_t i = 0; i < input.stop.unit_count; i++) {
-                uint32_t unit_index = state.units.get_index_of(input.stop.unit_ids[i]);
+        case INPUT_STOP:
+        case INPUT_DEFEND: {
+            uint32_t unit_count = input.type == INPUT_STOP ? input.stop.unit_count : input.defend.unit_count;
+            const entity_id* unit_ids = input.type == INPUT_STOP ? input.stop.unit_ids : input.defend.unit_ids;
+            for (uint32_t i = 0; i < unit_count; i++) {
+                uint32_t unit_index = state.units.get_index_of(unit_ids[i]);
                 if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
                     continue;
                 }
@@ -1052,6 +1070,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 unit_set_target(state, unit, (unit_target_t) {
                     .type = UNIT_TARGET_NONE
                 });
+                unit.hold_position = true;
             }
             break;
         }

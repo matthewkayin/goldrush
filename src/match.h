@@ -228,6 +228,7 @@ struct unit_t {
 
     unit_target_t target;
     std::vector<xy> path;
+    bool hold_position;
 
     entity_id garrison_id;
     std::vector<entity_id> ferried_units;
@@ -363,6 +364,7 @@ enum InputType {
     INPUT_BLIND_MOVE,
     INPUT_ATTACK_MOVE,
     INPUT_STOP,
+    INPUT_DEFEND,
     INPUT_BUILD,
     INPUT_BUILD_CANCEL,
     INPUT_BUILDING_ENQUEUE,
@@ -379,6 +381,11 @@ struct input_move_t {
 };
 
 struct input_stop_t {
+    uint8_t unit_count;
+    entity_id unit_ids[MAX_UNITS];
+};
+
+struct input_defend_t {
     uint8_t unit_count;
     entity_id unit_ids[MAX_UNITS];
 };
@@ -420,6 +427,7 @@ struct input_t {
     union {
         input_move_t move;
         input_stop_t stop;
+        input_defend_t defend;
         input_build_t build;
         input_build_cancel_t build_cancel;
         input_building_enqueue_t building_enqueue;

@@ -163,9 +163,10 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_MOVE, SDLK_v },
     { UI_BUTTON_STOP, SDLK_s },
     { UI_BUTTON_ATTACK, SDLK_a },
+    { UI_BUTTON_DEFEND, SDLK_d },
     { UI_BUTTON_BUILD, SDLK_b },
     { UI_BUTTON_CANCEL, SDLK_ESCAPE },
-    { UI_BUTTON_UNLOAD, SDLK_d },
+    { UI_BUTTON_UNLOAD, SDLK_x },
     { UI_BUTTON_BUILD_HOUSE, SDLK_e },
     { UI_BUTTON_BUILD_CAMP, SDLK_c },
     { UI_BUTTON_BUILD_SALOON, SDLK_s },
@@ -2271,6 +2272,8 @@ void render_match(const match_state_t& state) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Stop");
         } else if (button == UI_BUTTON_BUILD) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Build");
+        } else if (button == UI_BUTTON_DEFEND) {
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Defend");
         } else if (button == UI_BUTTON_CANCEL) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Cancel");
         } else if (button == UI_BUTTON_UNLOAD) {

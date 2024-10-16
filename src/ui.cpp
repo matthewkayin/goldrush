@@ -8,10 +8,10 @@ static const uint32_t UI_STATUS_DURATION = 60;
 const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
     { UI_BUTTONSET_NONE, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_UNIT, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_NONE,
+    { UI_BUTTONSET_UNIT, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_MINER, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_BUILD,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
+    { UI_BUTTONSET_MINER, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
+                      UI_BUTTON_BUILD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_CAMP, UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_SALOON,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
@@ -122,6 +122,16 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                 input.type = INPUT_STOP;
                 memcpy(input.stop.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(entity_id));
                 input.stop.unit_count = state.selection.ids.size();
+                state.input_queue.push_back(input);
+            }
+            break;
+        }
+        case UI_BUTTON_DEFEND: {
+            if (state.selection.type == SELECTION_TYPE_UNITS) {
+                input_t input;
+                input.type = INPUT_DEFEND;
+                memcpy(input.defend.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(entity_id));
+                input.defend.unit_count = state.selection.ids.size();
                 state.input_queue.push_back(input);
             }
             break;

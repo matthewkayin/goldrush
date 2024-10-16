@@ -84,6 +84,7 @@ entity_id unit_create(match_state_t& state, uint8_t player_id, UnitType type, co
     unit.target = (unit_target_t) {
         .type = UNIT_TARGET_NONE
     };
+    unit.hold_position = false;
 
     unit.gold_held = 0;
     unit.timer = 0;
@@ -131,7 +132,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 } else if (unit_has_reached_target(state, unit)) {
                     unit.mode = UNIT_MODE_MOVE_FINISHED;
                     break;
-                } else {
+                } else if (!unit.hold_position) {
                     map_pathfind(state, unit.cell, unit_get_target_cell(state, unit), unit_cell_size(unit.type), &unit.path, unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP);
                     if (!unit.path.empty()) {
                         unit.mode = UNIT_MODE_MOVE;
@@ -491,6 +492,32 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         break;
                     }
                 } // End switch unit target type
+                // Check if nearby enemy units should attack this unit
+                // This is done here for efficiencies sake 
+                for (uint32_t enemy_index = 0; enemy_index < state.units.size(); enemy_index++) {
+                    unit_t& enemy = state.units[enemy_index];
+                    if (enemy.player_id == unit.player_id ||
+                        enemy.health == 0) {
+                        continue;
+                    }
+                    // If we've reached here, then the enemy is an alive enemy who deals damage and who is currently idle with no target
+                    // Now check to see if this unit is in range of the enemy unit
+                    if (enemy.target.type == UNIT_TARGET_NONE && enemy.type != UNIT_MINER && UNIT_DATA.at(enemy.type).damage != 0 &&
+                        unit_can_see_rect(enemy, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+                        enemy.target = (unit_target_t) {
+                            .type = UNIT_TARGET_UNIT,
+                            .id = state.units.get_id_of(unit_index)
+                        };
+                    }
+                    // Meanwhile, if this unit isn't doing anything and it can see this enemy, then attack it
+                    if (unit.target.type == UNIT_TARGET_NONE && unit.mode == UNIT_MODE_IDLE && unit.type != UNIT_MINER && UNIT_DATA.at(unit.type).damage != 0 &&
+                        unit_can_see_rect(unit, rect_t(enemy.cell, unit_cell_size(enemy.type)))) {
+                        unit.target = (unit_target_t) {
+                            .type = UNIT_TARGET_UNIT,
+                            .id = state.units.get_id_of(enemy_index)
+                        };
+                    }
+                }
                 unit_update_finished = true;
                 break;
             } // End case UNIT_MODE_MOVE_FINISHED
@@ -736,8 +763,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         uint32_t enemy_index = state.buildings.get_index_of(unit.target.id);
                         GOLD_ASSERT(enemy_index != INDEX_INVALID);
                         building_t& enemy = state.buildings[enemy_index];
-                        rect_t enemy_rect = building_get_rect(enemy);
-                        enemy_rect = rect_t(enemy_rect.position, enemy_rect.size);
+                        enemy_rect = building_get_rect(enemy);
 
                         // NOTE: Buildings have no armor 
                         int damage = std::min(1, unit_get_damage(state, unit));
@@ -888,6 +914,7 @@ void unit_set_target(const match_state_t& state, unit_t& unit, unit_target_t tar
     GOLD_ASSERT(unit.mode != UNIT_MODE_BUILD);
     unit.target = target;
     unit.path.clear();
+    unit.hold_position = false;
 
     if (unit.mode != UNIT_MODE_MOVE && unit.mode != UNIT_MODE_IN_MINE) {
         // Abandon current behavior in favor of new order
