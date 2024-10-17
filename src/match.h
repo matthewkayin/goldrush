@@ -100,7 +100,8 @@ enum UiMode {
     UI_MODE_SELECTING,
     UI_MODE_MINIMAP_DRAG,
     UI_MODE_BUILDING_PLACE,
-    UI_MODE_ATTACK_MOVE,
+    UI_MODE_TARGET_ATTACK,
+    UI_MODE_TARGET_UNLOAD,
     UI_MODE_MATCH_OVER,
     UI_MODE_LEAVE_MATCH
 };
@@ -179,7 +180,8 @@ enum UnitTargetType {
     UNIT_TARGET_BUILDING,
     UNIT_TARGET_CAMP,
     UNIT_TARGET_MINE,
-    UNIT_TARGET_ATTACK
+    UNIT_TARGET_ATTACK,
+    UNIT_TARGET_UNLOAD
 };
 
 enum UnitMode {
@@ -363,13 +365,13 @@ enum InputType {
     INPUT_MOVE_MINE,
     INPUT_BLIND_MOVE,
     INPUT_ATTACK_MOVE,
+    INPUT_UNLOAD_MOVE,
     INPUT_STOP,
     INPUT_DEFEND,
     INPUT_BUILD,
     INPUT_BUILD_CANCEL,
     INPUT_BUILDING_ENQUEUE,
     INPUT_BUILDING_DEQUEUE,
-    INPUT_UNLOAD_ALL,
     INPUT_RALLY
 };
 
@@ -411,11 +413,6 @@ struct input_building_dequeue_t {
     uint16_t index;
 };
 
-struct input_unload_all_t {
-    uint16_t unit_count;
-    entity_id unit_ids[MAX_UNITS];
-};
-
 struct input_rally_t {
     xy rally_point;
     uint16_t building_count;
@@ -432,7 +429,6 @@ struct input_t {
         input_build_cancel_t build_cancel;
         input_building_enqueue_t building_enqueue;
         input_building_dequeue_t building_dequeue;
-        input_unload_all_t unload_all;
         input_rally_t rally;
     };
 };
@@ -508,6 +504,7 @@ rect_t mine_get_block_building_rect(xy mine_cell);
 uint32_t mine_get_worker_count(const match_state_t& state, entity_id mine_id, uint8_t player_id);
 
 // UI
+bool ui_is_ui_mode_target(UiMode mode);
 void ui_show_status(match_state_t& state, const char* message);
 UiButton ui_get_ui_button(const match_state_t& state, int index);
 int ui_get_ui_button_hovered(const match_state_t& state);

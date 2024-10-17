@@ -1521,7 +1521,7 @@ xy autotile_edge_lookup(uint32_t edge, uint8_t neighbors) {
 
 void render_match(const match_state_t& state) {
     Cursor expected_cursor = CURSOR_DEFAULT;
-    if (state.ui_mode == UI_MODE_ATTACK_MOVE && (!ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
+    if (ui_is_ui_mode_target(state.ui_mode) && (!ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
         expected_cursor = CURSOR_TARGET;
     }
     if (engine.current_cursor != expected_cursor) {

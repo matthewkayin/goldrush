@@ -20,8 +20,8 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_COWBOY, UI_BUTTON_NONE, UI_BUTTON_NONE,
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_WAGON, { UI_BUTTON_STOP, UI_BUTTON_UNLOAD, UI_BUTTON_NONE,
-                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
+    { UI_BUTTONSET_WAGON, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
+                             UI_BUTTON_UNLOAD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
 };
 static const xy UI_BUTTON_SIZE = xy(32, 32);
 static const xy UI_BUTTON_PADDING = xy(4, 6);
@@ -57,6 +57,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
         .building_type = BUILDING_CAMP
     }}
 };
+
+bool ui_is_ui_mode_target(UiMode mode) {
+    return mode >= UI_MODE_TARGET_ATTACK && mode <= UI_MODE_TARGET_UNLOAD;
+}
 
 void ui_show_status(match_state_t& state, const char* message) {
     state.ui_status_message = std::string(message);
@@ -155,7 +159,7 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
                     }
                 };
                 state.input_queue.push_back(input);
-            } else if (state.ui_mode == UI_MODE_ATTACK_MOVE) {
+            } else if (ui_is_ui_mode_target(state.ui_mode)) {
                 state.ui_mode = UI_MODE_NONE;
                 ui_set_selection(state, state.selection);
             } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
@@ -173,22 +177,13 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_ATTACK: {
-            state.ui_mode = UI_MODE_ATTACK_MOVE;
+            state.ui_mode = UI_MODE_TARGET_ATTACK;
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
             break;
         }
         case UI_BUTTON_UNLOAD: {
-            input_t input;
-            input.type = INPUT_UNLOAD_ALL;
-            input.unload_all.unit_count = 0;
-            for (entity_id id : state.selection.ids) {
-                if (state.units.get_by_id(id).ferried_units.empty()) {
-                    continue;
-                }
-                input.unload_all.unit_ids[input.unload_all.unit_count] = id;
-                input.unload_all.unit_count++;
-            }
-            state.input_queue.push_back(input);
+            state.ui_mode = UI_MODE_TARGET_UNLOAD;
+            state.ui_buttonset = UI_BUTTONSET_CANCEL;
             break;
         }
         case UI_BUTTON_BUILD_HOUSE:

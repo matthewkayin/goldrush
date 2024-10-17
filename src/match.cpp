@@ -459,7 +459,7 @@ void match_update(match_state_t& state) {
 
     // ORDER MOVEMENT
     bool is_player_ordering_move = (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT) && state.ui_mode == UI_MODE_NONE) ||
-                                       (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && state.ui_mode == UI_MODE_ATTACK_MOVE) ;
+                                       (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && ui_is_ui_mode_target(state.ui_mode)) ;
     if (is_player_ordering_move && state.selection.type == SELECTION_TYPE_UNITS && (MINIMAP_RECT.has_point(mouse_pos) || !ui_is_mouse_in_ui())) {
         xy move_target;
         if (ui_is_mouse_in_ui()) {
@@ -486,8 +486,10 @@ void match_update(match_state_t& state) {
         }
 
         //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
-        if (state.ui_mode == UI_MODE_ATTACK_MOVE && (input.move.target_entity_id == ID_NULL || map_get_fog(state, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN)) {
+        if (state.ui_mode == UI_MODE_TARGET_ATTACK && (input.move.target_entity_id == ID_NULL || map_get_fog(state, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN)) {
             input.type = INPUT_ATTACK_MOVE;
+        } else if (state.ui_mode == UI_MODE_TARGET_UNLOAD) {
+            input.type = INPUT_UNLOAD_MOVE;
         } else if (map_get_fog(state, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN) {
             input.type = INPUT_BLIND_MOVE;
         } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_UNIT) {
@@ -514,7 +516,7 @@ void match_update(match_state_t& state) {
                                     .value = 0
                                 }
                                 : map_get_cell(state, input.move.target_cell);
-        if (input.type == INPUT_BLIND_MOVE || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
+        if (input.type == INPUT_BLIND_MOVE || input.type == INPUT_UNLOAD_MOVE || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
             state.ui_move_position = mouse_world_pos;
         } else {
@@ -522,7 +524,7 @@ void match_update(match_state_t& state) {
             state.ui_move_position = cell_center(input.move.target_cell).to_xy();
         }
 
-        if (state.ui_mode == UI_MODE_ATTACK_MOVE) {
+        if (ui_is_ui_mode_target(state.ui_mode)) {
             state.ui_mode = UI_MODE_NONE;
             ui_set_selection(state, state.selection);
         }
@@ -658,7 +660,7 @@ void match_update(match_state_t& state) {
                 .ids = std::vector<entity_id>()
             };
             ui_set_selection(state, selection_empty);
-            if (state.ui_mode == UI_MODE_ATTACK_MOVE) {
+            if (ui_is_ui_mode_target(state.ui_mode)) {
                 state.ui_mode = UI_MODE_NONE;
             }
         }
@@ -817,14 +819,6 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += sizeof(input_building_dequeue_t);
             break;
         }
-        case INPUT_UNLOAD_ALL: {
-            memcpy(out_buffer + out_buffer_length, &input.unload_all.unit_count, sizeof(uint16_t));
-            out_buffer_length += sizeof(uint16_t);
-
-            memcpy(out_buffer + out_buffer_length, input.unload_all.unit_ids, input.unload_all.unit_count * sizeof(entity_id));
-            out_buffer_length += input.unload_all.unit_count * sizeof(entity_id);
-            break;
-        }
         case INPUT_RALLY: {
             memcpy(out_buffer + out_buffer_length, &input.rally.rally_point, sizeof(xy));
             out_buffer_length += sizeof(xy);
@@ -909,14 +903,6 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             in_buffer_head += sizeof(input_building_dequeue_t);
             break;
         }
-        case INPUT_UNLOAD_ALL: {
-            memcpy(&input.unload_all.unit_count, in_buffer + in_buffer_head, sizeof(uint16_t));
-            in_buffer_head += sizeof(uint16_t);
-
-            memcpy(input.unload_all.unit_ids, in_buffer + in_buffer_head, input.unload_all.unit_count * sizeof(entity_id));
-            in_buffer_head += input.unload_all.unit_count * sizeof(entity_id);
-            break;
-        }
         case INPUT_RALLY: {
             memcpy(&input.rally.rally_point, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
@@ -938,6 +924,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
     switch (input.type) {
         case INPUT_BLIND_MOVE:
         case INPUT_ATTACK_MOVE:
+        case INPUT_UNLOAD_MOVE:
         case INPUT_MOVE_UNIT:
         case INPUT_MOVE_BUILDING:
         case INPUT_MOVE_MINE:
@@ -1021,6 +1008,11 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 } else if (input.type == INPUT_ATTACK_MOVE) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_ATTACK,
+                        .cell = unit_target
+                    });
+                } else if (input.type == INPUT_UNLOAD_MOVE) {
+                    unit_set_target(state, unit, (unit_target_t) {
+                        .type = UNIT_TARGET_UNLOAD,
                         .cell = unit_target
                     });
                 } else if (input.type == INPUT_MOVE_UNIT && target_index != INDEX_INVALID && unit_index != target_index) {
@@ -1169,47 +1161,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 building.queue.erase(building.queue.begin() + index);
             }
 
-            break;
-        }
-        case INPUT_UNLOAD_ALL: {
-            log_trace("Handling unloading. unit count %u", input.unload_all.unit_count);
-            for (uint16_t i = 0; i < input.unload_all.unit_count; i++) {
-                entity_id id = input.unload_all.unit_ids[i];
-
-                uint32_t unit_index = state.units.get_index_of(id);
-                log_trace("Unloading for id of %u with index of %u", id, unit_index);
-                if (unit_index == INDEX_INVALID) {
-                    continue;
-                }
-
-                unit_t& unit = state.units[unit_index];
-                log_trace("Units to unload: %z", unit.ferried_units.size());
-                if (unit.ferried_units.empty()) {
-                    continue;
-                }
-
-                log_trace("Unit cell is %xi", &unit.cell);
-                for (uint32_t ferried_id_index = 0; ferried_id_index < unit.ferried_units.size(); ferried_id_index++) {
-                    entity_id ferried_id = unit.ferried_units[ferried_id_index];
-                    log_trace("Attempt unload for unit ferried id index %u ferried id %u", ferried_id_index, ferried_id);
-                    unit_t& ferried_unit = state.units.get_by_id(ferried_id);
-                    xy dropoff_cell = unit_get_best_unload_cell(state, unit, unit_cell_size(ferried_unit.type));
-                    log_trace("Dropoff cell %xi", &dropoff_cell);
-                    // If this is true, then no free spaces are available to unload
-                    if (dropoff_cell == xy(-1, -1)) {
-                        log_trace("No free cells!");
-                        break;
-                    }
-
-                    ferried_unit.cell = dropoff_cell;
-                    ferried_unit.position = unit_get_target_position(ferried_unit.type, ferried_unit.cell);
-                    map_set_cell_rect(state, rect_t(ferried_unit.cell, unit_cell_size(ferried_unit.type)), CELL_UNIT, ferried_id);
-                    ferried_unit.mode = UNIT_MODE_IDLE;
-                    ferried_unit.target = (unit_target_t) { .type = UNIT_TARGET_NONE };
-                    unit.ferried_units.erase(unit.ferried_units.begin() + ferried_id_index);
-                    ferried_id_index--;
-                }
-            }
             break;
         }
         case INPUT_RALLY: {

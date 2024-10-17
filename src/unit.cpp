@@ -248,6 +248,48 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         unit.mode = UNIT_MODE_IDLE;
                         break;
                     }
+                    case UNIT_TARGET_UNLOAD: {
+                        // Unload ferried units
+                        for (uint32_t ferried_id_index = 0; ferried_id_index < unit.ferried_units.size(); ferried_id_index++) {
+                            entity_id ferried_id = unit.ferried_units[ferried_id_index];
+                            log_trace("Attempt unload for unit ferried id index %u ferried id %u", ferried_id_index, ferried_id);
+                            unit_t& ferried_unit = state.units.get_by_id(ferried_id);
+                            xy dropoff_cell = unit_get_best_unload_cell(state, unit, unit_cell_size(ferried_unit.type));
+                            log_trace("Dropoff cell %xi", &dropoff_cell);
+                            // If this is true, then no free spaces are available to unload
+                            if (dropoff_cell == xy(-1, -1)) {
+                                log_trace("No free cells!");
+                                break;
+                            }
+
+                            ferried_unit.cell = dropoff_cell;
+                            ferried_unit.position = unit_get_target_position(ferried_unit.type, ferried_unit.cell);
+                            map_set_cell_rect(state, rect_t(ferried_unit.cell, unit_cell_size(ferried_unit.type)), CELL_UNIT, ferried_id);
+                            ferried_unit.mode = UNIT_MODE_IDLE;
+                            ferried_unit.target = (unit_target_t) { .type = UNIT_TARGET_NONE };
+                            unit.ferried_units.erase(unit.ferried_units.begin() + ferried_id_index);
+                            ferried_id_index--;
+                        }
+                        // Set this units target to none
+                        unit.target = (unit_target_t) {
+                            .type = UNIT_TARGET_NONE
+                        };
+                        unit.mode = UNIT_MODE_IDLE;
+                        // Check if this unit is selected, if it is, refresh the UI buttons
+                        if (state.ui_buttonset == UI_BUTTONSET_WAGON) {
+                            bool is_selecting_this_unit = false;
+                            for (entity_id id : state.selection.ids) {
+                                if (id == state.units.get_id_of(unit_index)) {
+                                    is_selecting_this_unit = true;
+                                    break;
+                                }
+                            }
+                            if (is_selecting_this_unit) {
+                                ui_set_selection(state, state.selection);
+                            }
+                        }
+                        break;
+                    }
                     case UNIT_TARGET_BUILD: {
                         // Temporarily set cell to empty so that we can check if the space is clear for building
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
@@ -936,6 +978,7 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
             return get_nearest_cell_around_rect(state, unit_rect, building_rect);
         }
         case UNIT_TARGET_ATTACK:
+        case UNIT_TARGET_UNLOAD:
         case UNIT_TARGET_CELL:
             return unit.target.cell;
         case UNIT_TARGET_MINE:
@@ -975,6 +1018,8 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
         case UNIT_TARGET_ATTACK:
         case UNIT_TARGET_CELL:
             return unit.cell == unit.target.cell;
+        case UNIT_TARGET_UNLOAD:
+            return unit.path.empty() && xy::manhattan_distance(unit.cell, unit.target.cell) < 3;
         case UNIT_TARGET_MINE: {
             rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
             rect_t mine_rect = rect_t(state.mines.get_by_id(unit.target.id).cell, xy(3, 3));
