@@ -19,7 +19,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .name = "Mining Camp",
         .cell_size = 2,
         .cost = 150,
-        .max_health = 200,
+        .max_health = 300,
         .builder_positions_x = { 1, 15, 14 },
         .builder_positions_y = { 13, 13, 2 },
         .builder_flip_h = { false, true, true },
@@ -29,7 +29,7 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .name = "Saloon",
         .cell_size = 3,
         .cost = 200,
-        .max_health = 400,
+        .max_health = 500,
         .builder_positions_x = { 6, 27, 9 },
         .builder_positions_y = { 32, 27, 9 },
         .builder_flip_h = { false, true, false },
@@ -123,7 +123,7 @@ void building_update(match_state_t& state, building_t& building) {
         return;
     }
 
-    if (building.queue_timer != 0) {
+    if (building.queue_timer != 0 && building.mode == BUILDING_MODE_FINISHED) {
         if (building.queue_timer == BUILDING_QUEUE_BLOCKED && !building_is_supply_blocked(state, building)) {
             building.queue_timer = building_queue_item_duration(building.queue[0]);
         } else if (building.queue_timer != BUILDING_QUEUE_BLOCKED && building_is_supply_blocked(state, building)) {

@@ -271,7 +271,7 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
 
     log_trace("Generating crater...");
     int lake_radius = 16;
-    int crater_radius = 36;
+    int crater_radius = 42;
     std::vector<xy> crater_frontier;
     std::unordered_map<int, int> crater_explored;
     crater_frontier.push_back(xy(state.map_width / 2, state.map_height / 2));

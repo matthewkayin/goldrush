@@ -547,6 +547,22 @@ selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const sele
     return mode;
 }
 
+void ui_deselect_unit_if_selected(match_state_t& state, entity_id unit_id) {
+    if (state.selection.type != SELECTION_TYPE_UNITS) {
+        return;
+    }
+
+    for (uint32_t id_index = 0; id_index < state.selection.ids.size(); id_index++) {
+        if (state.selection.ids[id_index] == unit_id) {
+            state.selection.ids.erase(state.selection.ids.begin() + id_index);
+            if (state.ui_mode == UI_MODE_NONE) {
+                ui_set_selection(state, state.selection);
+            }
+            return;
+        }
+    }
+}
+
 entity_id ui_get_nearest_builder(const match_state_t& state, xy cell) {
     entity_id nearest_unit_id; 
     int nearest_unit_dist = -1;

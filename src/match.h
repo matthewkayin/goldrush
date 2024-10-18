@@ -516,6 +516,7 @@ xy ui_get_building_cell(const match_state_t& state);
 selection_t ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, selection_t& selection);
 selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const selection_t& selection);
+void ui_deselect_unit_if_selected(match_state_t& state, entity_id unit_id);
 entity_id ui_get_nearest_builder(const match_state_t& state, xy cell);
 int ui_get_building_queue_index_hovered(const match_state_t& state);
 

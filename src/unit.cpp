@@ -121,6 +121,10 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
     while (!unit_update_finished) {
         switch (unit.mode) {
             case UNIT_MODE_IDLE: {
+                // If unit is idle, try to find a nearby target
+                if (unit.target.type == UNIT_TARGET_NONE && unit.type != UNIT_MINER && UNIT_DATA.at(unit.type).damage != 0) {
+                    unit.target = unit_target_nearest_insight_enemy(state, unit);
+                }
                 if (unit.target.type == UNIT_TARGET_NONE) {
                     unit_update_finished = true;
                     break;
@@ -387,6 +391,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         unit.path.clear();
                         state.mines[mine_index].is_occupied = true;
                         state.mines[mine_index].gold_left -= unit.gold_held;
+                        ui_deselect_unit_if_selected(state, state.units.get_id_of(unit_index));
                         break;
                     }
                     case UNIT_TARGET_CAMP: {
@@ -419,6 +424,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         };
                         unit.path.clear();
                         state.buildings[building_index].is_occupied = true;
+                        ui_deselect_unit_if_selected(state, state.units.get_id_of(unit_index));
                         break;
                     }
                     case UNIT_TARGET_UNIT: 
@@ -534,32 +540,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         break;
                     }
                 } // End switch unit target type
-                // Check if nearby enemy units should attack this unit
-                // This is done here for efficiencies sake 
-                for (uint32_t enemy_index = 0; enemy_index < state.units.size(); enemy_index++) {
-                    unit_t& enemy = state.units[enemy_index];
-                    if (enemy.player_id == unit.player_id ||
-                        enemy.health == 0) {
-                        continue;
-                    }
-                    // If we've reached here, then the enemy is an alive enemy who deals damage and who is currently idle with no target
-                    // Now check to see if this unit is in range of the enemy unit
-                    if (enemy.target.type == UNIT_TARGET_NONE && enemy.type != UNIT_MINER && UNIT_DATA.at(enemy.type).damage != 0 &&
-                        unit_can_see_rect(enemy, rect_t(unit.cell, unit_cell_size(unit.type)))) {
-                        enemy.target = (unit_target_t) {
-                            .type = UNIT_TARGET_UNIT,
-                            .id = state.units.get_id_of(unit_index)
-                        };
-                    }
-                    // Meanwhile, if this unit isn't doing anything and it can see this enemy, then attack it
-                    if (unit.target.type == UNIT_TARGET_NONE && unit.mode == UNIT_MODE_IDLE && unit.type != UNIT_MINER && UNIT_DATA.at(unit.type).damage != 0 &&
-                        unit_can_see_rect(unit, rect_t(enemy.cell, unit_cell_size(enemy.type)))) {
-                        unit.target = (unit_target_t) {
-                            .type = UNIT_TARGET_UNIT,
-                            .id = state.units.get_id_of(enemy_index)
-                        };
-                    }
-                }
                 unit_update_finished = true;
                 break;
             } // End case UNIT_MODE_MOVE_FINISHED
@@ -567,7 +547,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 // This code handles the case where 1. the building is destroyed while the unit is building it
                 // and 2. the unit was unable to exit the building and is now stuck inside it
                 uint32_t building_index = state.buildings.get_index_of(unit.target.build.building_id);
-                if (unit.timer == 0 || building_index == INDEX_INVALID) {
+                if (building_index == INDEX_INVALID || state.buildings[building_index].mode != BUILDING_MODE_IN_PROGRESS) {
                     unit_stop_building(state, state.units.get_id_of(unit_index));
                     unit_update_finished = true;
                     break;
@@ -598,6 +578,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 break;
             }
             case UNIT_MODE_REPAIR: {
+                // Stop repairing if the building is destroyed
                 if (unit_is_target_dead_or_ferried(state, unit)) {
                     unit.target = (unit_target_t) {
                         .type = UNIT_TARGET_NONE
@@ -609,25 +590,32 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                 building_t& building = state.buildings.get_by_id(unit.target.id);
 
-                unit.timer--;
-                int building_hframe = building_get_hframe(building.type, building.mode, building.health, building.is_occupied);
-                if (unit.timer == 0) {
-                    if (building.health < BUILDING_DATA.at(building.type).max_health) {
-                        building.health++;
-                    }
-                }
                 if (building.health == BUILDING_DATA.at(building.type).max_health) {
-                    if (building.mode == BUILDING_MODE_IN_PROGRESS) {
-                        building_on_finish(state, unit.target.id);
-                    } else {
-                        unit.target = (unit_target_t) {
-                            .type = UNIT_TARGET_NONE
-                        };
-                    }
+                    unit.target = (unit_target_t) {
+                        .type = UNIT_TARGET_NONE
+                    };
                     unit.mode = UNIT_MODE_IDLE;
                 }
-                if (building_get_hframe(building.type, building.mode, building.health, building.is_occupied) != building_hframe) {
-                    state.is_fog_dirty = true;
+
+                unit.timer--;
+                if (unit.timer == 0) {
+                    int building_hframe = building_get_hframe(building.type, building.mode, building.health, building.is_occupied);
+                    building.health++;
+                    if (building.health == BUILDING_DATA.at(building.type).max_health) {
+                        if (building.mode == BUILDING_MODE_IN_PROGRESS) {
+                            building_on_finish(state, unit.target.id);
+                        } else {
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_NONE
+                            };
+                            unit.mode = UNIT_MODE_IDLE;
+                        }
+                    } else {
+                        unit.timer = UNIT_BUILD_TICK_DURATION;
+                    }
+                    if (building_get_hframe(building.type, building.mode, building.queue_timer, building.is_occupied) != building_hframe) {
+                        state.is_fog_dirty = true;
+                    }
                 }
                 unit_update_finished = true;
                 break;
@@ -1239,6 +1227,9 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, cons
     for (uint32_t unit_index = 0; unit_index < state.units.size(); unit_index++) {
         const unit_t& other_unit = state.units[unit_index];
         if (unit.player_id == other_unit.player_id) {
+            continue;
+        }
+        if (other_unit.mode == UNIT_MODE_FERRY || other_unit.mode == UNIT_MODE_IN_CAMP || other_unit.mode == UNIT_MODE_IN_MINE) {
             continue;
         }
         if (other_unit.health == 0) {
