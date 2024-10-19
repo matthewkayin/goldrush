@@ -1759,7 +1759,7 @@ void render_match(const match_state_t& state) {
                 continue;
             }
             int hframe = 0;
-            if (mine.is_occupied) {
+            if (mine.occupancy == OCCUPANCY_FULL) {
                 hframe = 1;
             } else if (mine.gold_left == 0) {
                 hframe = 2;
@@ -1793,7 +1793,7 @@ void render_match(const match_state_t& state) {
             ysorted.push_back((render_sprite_params_t) {
                 .sprite = (Sprite)sprite,
                 .position = building_render_pos,
-                .frame = xy(building_get_hframe(building.type, building.mode, building.health, building.is_occupied), 0),
+                .frame = xy(building_get_hframe(building.type, building.mode, building.health, building.occupancy), 0),
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_name = (RecolorName)building.player_id
             });
@@ -1852,6 +1852,10 @@ void render_match(const match_state_t& state) {
             }
             if (unit.mode == UNIT_MODE_REPAIR) {
                 unit_params.sprite = SPRITE_MINER_BUILDING;
+            }
+            if ((unit_params.options & RENDER_SPRITE_CENTERED) == RENDER_SPRITE_CENTERED) {
+                unit_params.options &= ~RENDER_SPRITE_CENTERED;
+                unit_params.position -= engine.sprites[unit_params.sprite].frame_size / 2;
             }
             if (unit.mode == UNIT_MODE_DEATH_FADE) {
                 render_sprite(unit_params.sprite, unit_params.frame, unit_params.position, unit_params.options, unit_params.recolor_name);

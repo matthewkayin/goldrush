@@ -983,7 +983,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             // Give each unit the move command
             for (uint32_t i = 0; i < input.move.unit_count; i++) {
                 uint32_t unit_index = state.units.get_index_of(input.move.unit_ids[i]);
-                if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
+                if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0 || !unit_can_be_selected(state.units[unit_index])) {
                     continue;
                 }
                 unit_t& unit = state.units[unit_index];
@@ -1055,7 +1055,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             const entity_id* unit_ids = input.type == INPUT_STOP ? input.stop.unit_ids : input.defend.unit_ids;
             for (uint32_t i = 0; i < unit_count; i++) {
                 uint32_t unit_index = state.units.get_index_of(unit_ids[i]);
-                if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
+                if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0 || !unit_can_be_selected(state.units[unit_index])) {
                     continue;
                 }
                 unit_t& unit = state.units[unit_index];
@@ -1070,7 +1070,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         }
         case INPUT_BUILD: {
             uint32_t unit_index = state.units.get_index_of(input.build.unit_ids[0]);
-            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0) {
+            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0 || !unit_can_be_selected(state.units[unit_index])) {
                 return;
             }
             unit_t& unit = state.units[unit_index];

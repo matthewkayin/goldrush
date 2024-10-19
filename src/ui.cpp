@@ -319,8 +319,7 @@ selection_t ui_create_selection_from_rect(const match_state_t& state) {
             continue;
         }
 
-        // Don't select units which are building
-        if (unit.mode == UNIT_MODE_BUILD || unit.mode == UNIT_MODE_FERRY || unit.mode == UNIT_MODE_IN_MINE || unit.mode == UNIT_MODE_IN_CAMP) {
+        if (!unit_can_be_selected(unit)) {
             continue;
         }
 

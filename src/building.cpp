@@ -55,7 +55,7 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     building.taking_damage_flicker_timer = 0;
     building.taking_damage_flicker = false;
 
-    building.is_occupied = false;
+    building.occupancy = OCCUPANCY_EMPTY;
 
     entity_id building_id = state.buildings.push_back(building);
     map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_size, building_data.cell_size)), CELL_BUILDING, building_id);
@@ -270,10 +270,10 @@ bool building_is_finished(const building_t& building) {
     return building.mode == BUILDING_MODE_FINISHED;
 }
 
-int building_get_hframe(BuildingType type, BuildingMode mode, int health, bool is_occupied) {
+int building_get_hframe(BuildingType type, BuildingMode mode, int health, Occupancy occupancy) {
     if (mode == BUILDING_MODE_IN_PROGRESS) {
         return ((3 * health) / BUILDING_DATA.at(type).max_health);
-    } else if (is_occupied) {
+    } else if (occupancy == OCCUPANCY_FULL) {
         return 4;
     } else {
         return 3;

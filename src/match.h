@@ -86,10 +86,16 @@ enum FogType: uint16_t {
     FOG_REVEALED
 };
 
+enum Occupancy {
+    OCCUPANCY_EMPTY,
+    OCCUPANCY_RESERVED,
+    OCCUPANCY_FULL
+};
+
 struct mine_t {
     xy cell;
     uint32_t gold_left;
-    bool is_occupied;
+    Occupancy occupancy;
 };
 
 // UI
@@ -295,7 +301,7 @@ struct building_t {
     uint32_t taking_damage_flicker_timer;
     bool taking_damage_flicker;
 
-    bool is_occupied;
+    Occupancy occupancy;
 };
 
 struct remembered_building_t {
@@ -304,7 +310,7 @@ struct remembered_building_t {
     int health;
     xy cell;
     BuildingMode mode;
-    bool is_occupied;
+    Occupancy occupancy;
 };
 
 struct building_data_t {
@@ -556,6 +562,7 @@ AnimationName unit_get_expected_animation(const unit_t& unit);
 int unit_get_animation_vframe(const unit_t& unit);
 bool unit_sprite_should_flip_h(const unit_t& unit);
 Sprite unit_get_select_ring(UnitType type, bool is_enemy);
+bool unit_can_be_selected(const unit_t& unit);
 void unit_stop_building(match_state_t& state, entity_id unit_id);
 unit_target_t unit_target_nearest_camp(const match_state_t& state, xy unit_cell, uint8_t unit_player_id);
 unit_target_t unit_target_nearest_mine(const match_state_t& state, const unit_t& unit);
@@ -572,7 +579,7 @@ bool building_is_supply_blocked(const match_state_t& state, const building_t& bu
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_is_finished(const building_t& building);
-int building_get_hframe(BuildingType type, BuildingMode mode, int health, bool is_occupied);
+int building_get_hframe(BuildingType type, BuildingMode mode, int health, Occupancy occupancy);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell, xy miner_cell);
 Sprite building_get_select_ring(BuildingType type, bool is_enemy);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);

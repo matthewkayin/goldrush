@@ -344,7 +344,7 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
         entity_id mine_id = state.mines.push_back((mine_t) {
             .cell = cell,
             .gold_left = MINE_GOLD_AMOUNT_HIGH,
-            .is_occupied = false
+            .occupancy = OCCUPANCY_EMPTY
         });
         map_set_cell_rect(state, rect_t(cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
     }
@@ -392,7 +392,7 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
         entity_id mine_id = state.mines.push_back((mine_t) {
             .cell = cell,
             .gold_left = MINE_GOLD_AMOUNT_LOW,
-            .is_occupied = false
+            .occupancy = OCCUPANCY_EMPTY
         });
         map_set_cell_rect(state, rect_t(cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
     }
@@ -730,7 +730,7 @@ void map_update_fog(match_state_t& state, uint8_t player_id) {
             .health = building.health,
             .cell = building.cell,
             .mode = building.mode,
-            .is_occupied = building.is_occupied
+            .occupancy = building.occupancy
         };
     }
 
@@ -743,7 +743,7 @@ void map_update_fog(match_state_t& state, uint8_t player_id) {
         state.remembered_mines[player_id][state.mines.get_id_of(mine_index)] = (mine_t) {
             .cell = mine.cell,
             .gold_left = mine.gold_left,
-            .is_occupied = mine.is_occupied
+            .occupancy = mine.occupancy
         };
     }
 
