@@ -439,7 +439,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                         if (!unit_has_reached_target(state, unit)) {
                             // This will trigger a repath
-                            log_trace("Has not reached target");
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
@@ -525,6 +524,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                 .type = UNIT_TARGET_BUILDING,
                                 .id = state.units[target_index].target.build.building_id
                             };
+                            target_index = state.buildings.get_index_of(unit.target.id);
+                            GOLD_ASSERT(target_index != INDEX_INVALID);
 
                             if (!unit_has_reached_target(state, unit)) {
                                 unit.mode = UNIT_MODE_IDLE;
@@ -1229,7 +1230,7 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, cons
         if (unit.player_id == other_unit.player_id) {
             continue;
         }
-        if (other_unit.mode == UNIT_MODE_FERRY || other_unit.mode == UNIT_MODE_IN_CAMP || other_unit.mode == UNIT_MODE_IN_MINE) {
+        if (other_unit.mode == UNIT_MODE_FERRY || other_unit.mode == UNIT_MODE_IN_CAMP || other_unit.mode == UNIT_MODE_IN_MINE || other_unit.mode == UNIT_MODE_BUILD) {
             continue;
         }
         if (other_unit.health == 0) {
