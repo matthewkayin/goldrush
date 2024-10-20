@@ -174,8 +174,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     // If the unit is not moving between tiles, then pop the next cell off the path
                     if (unit.position == unit_get_target_position(unit.type, unit.cell) && !unit.path.empty()) {
                         unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
-                        // Clear the unit's rect so that the unit does not block itself from moving
-                        map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
                         if (map_is_cell_rect_occupied(state, rect_t(unit.path[0], unit_cell_size(unit.type)), unit.cell, unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP)) {
                             is_path_blocked = true;
                             // Since we are not moving, repopulate the cell grid with the unit's rect
@@ -184,6 +182,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             break;
                         }
 
+                        map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
                         unit.cell = unit.path[0];
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
                         unit.path.erase(unit.path.begin());
@@ -223,12 +222,6 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                 if (is_path_blocked) {
                     // Trigger repath
-                    /*
-                    if (unit.target.type == UNIT_TARGET_GOLD) {
-                        unit.target = unit_target_nearest_gold(state, unit);
-                    }
-                    */
-                    // unit.mode = UNIT_MODE_IDLE;
                     unit.mode = UNIT_MODE_MOVE_BLOCKED;
                     unit.timer = UNIT_PATH_PAUSE_DURATION;
                     unit_update_finished = true;
@@ -636,48 +629,50 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
                 }
                 if (unit.timer == 0) {
-                    rect_t exit_from_rect;
-                    unit_target_t exit_target;
                     mine_t& mine = state.mines.get_by_id(unit.garrison_id);
-                    exit_from_rect = rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE));
-                    exit_target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
+                    rect_t mine_rect = rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE));
+                    unit_target_t camp_target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
+                    rect_t camp_rect;
 
                     xy preferred_exit_cell = xy(-1, -1);
-                    rect_t exit_to_rect;
-                    if (exit_target.type != UNIT_TARGET_NONE) {
-                        exit_to_rect = rect_t(state.buildings.get_by_id(exit_target.id).cell, building_cell_size(BUILDING_CAMP));
-                        bool y_overlaps = !(exit_from_rect.position.y < exit_to_rect.position.y || exit_to_rect.position.y < exit_from_rect.position.y ||
-                                            (exit_from_rect.position.y != exit_to_rect.position.y &&
-                                            (exit_from_rect.position.y + exit_from_rect.size.y - 1 > exit_to_rect.position.y + exit_to_rect.size.y - 1 ||
-                                            exit_to_rect.position.y + exit_to_rect.size.y - 1 > exit_from_rect.position.y + exit_from_rect.size.y - 1)));
-                        if (y_overlaps) {
-                            if (exit_from_rect.position.x < exit_to_rect.position.x) {
-                                preferred_exit_cell = exit_from_rect.position + xy(exit_from_rect.size.x, exit_from_rect.size.y - 1);
+                    if (camp_target.type != UNIT_TARGET_NONE) {
+                        camp_rect = rect_t(state.buildings.get_by_id(camp_target.id).cell, building_cell_size(BUILDING_CAMP));
+                        bool y_overlaps = !(camp_rect.position.y < mine_rect.position.y || 
+                                            camp_rect.position.y + camp_rect.size.y - 1 > mine_rect.position.y + mine_rect.size.y - 1);
+                        bool x_overlaps = !(camp_rect.position.x < mine_rect.position.x || 
+                                            camp_rect.position.x + camp_rect.size.x - 1 > mine_rect.position.x + mine_rect.size.x - 1);
+                        if (x_overlaps) {
+                            if (camp_rect.position.y > mine_rect.position.y) {
+                                preferred_exit_cell = mine_rect.position + xy(1, mine_rect.size.y);
                             } else {
-                                preferred_exit_cell = exit_from_rect.position + xy(0, -1);
+                                preferred_exit_cell = mine_rect.position + xy(1, -1);
+                            }
+                        } else if (y_overlaps) {
+                            if (camp_rect.position.x > mine_rect.position.x) {
+                                preferred_exit_cell = mine_rect.position + xy(mine_rect.size.x, 1);
+                            } else {
+                                preferred_exit_cell = mine_rect.position + xy(-1, 1);
                             }
                         } else {
-                            if (exit_from_rect.position.y > exit_to_rect.position.y) {
-                                preferred_exit_cell.y = exit_from_rect.position.y - 1;
-                            } else {
-                                preferred_exit_cell.y = exit_from_rect.position.y + exit_from_rect.size.y;
-                            }
-                            if (exit_from_rect.position.x < exit_to_rect.position.x) {
-                                preferred_exit_cell.x = exit_from_rect.position.x + exit_from_rect.size.x - 1;
-                            } else {
-                                preferred_exit_cell.x = exit_from_rect.position.x;
-                            }
-                        } 
+                            preferred_exit_cell.y = camp_rect.position.y > mine_rect.position.y
+                                                        ? mine_rect.position.y + mine_rect.size.y
+                                                        : mine_rect.position.y - 1;
+                            preferred_exit_cell.x = camp_rect.position.x > mine_rect.position.x
+                                                        ? mine_rect.position.x + mine_rect.size.x - 1
+                                                        : mine_rect.position.x;
+                        }
                     }
                     // Check to make sure that the unit can exit
-                    xy exit_cell = get_exit_cell(state, exit_from_rect, unit_cell_size(unit.type), preferred_exit_cell);
+                    xy exit_cell = !map_is_cell_rect_occupied(state, rect_t(preferred_exit_cell, unit_cell_size(unit.type)), xy(-1, -1), true)
+                                        ? preferred_exit_cell
+                                        : get_exit_cell(state, mine_rect, unit_cell_size(unit.type), preferred_exit_cell);
                     if (exit_cell.x != -1) {
                         mine_t& mine = state.mines.get_by_id(unit.garrison_id);
                         mine.occupancy = OCCUPANCY_EMPTY;
 
                         if (unit.player_id == network_get_player_id() && mine.gold_left == 0) {
                             ui_show_status(state, UI_STATUS_MINE_COLLAPSED);
-                            rect_t mine_screen_rect = rect_t(exit_from_rect.position * TILE_SIZE, exit_from_rect.size * TILE_SIZE);
+                            rect_t mine_screen_rect = rect_t(mine_rect.position * TILE_SIZE, mine_rect.size * TILE_SIZE);
                             rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
                             if (!screen_rect.intersects(mine_screen_rect)) {
                                 state.alerts.push_back((alert_t) {
@@ -690,12 +685,12 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             }
                         }
 
-                        unit.target = exit_target;
+                        unit.target = camp_target;
                         unit.cell = exit_cell;
                         unit.position = cell_center(unit.cell);
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
                         unit.mode = UNIT_MODE_IDLE;
-                        unit.direction = get_enum_direction_to_rect(unit.cell, exit_to_rect);
+                        unit.direction = get_enum_direction_to_rect(unit.cell, camp_rect);
                         unit.garrison_id = ID_NULL;
                     } else {
                         if (timer_just_ended && unit.player_id == network_get_player_id()) {

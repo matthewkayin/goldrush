@@ -450,6 +450,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, rect_t cell_rect, xy 
                 continue;
             }
             if (cell.type == CELL_UNIT) {
+                const unit_t& unit = state.units.get_by_id(cell.value);
                 if (cell.value == origin_id) {
                     GOLD_ASSERT(cell.value != ID_NULL);
                     continue;
@@ -460,7 +461,6 @@ bool map_is_cell_rect_occupied(const match_state_t& state, rect_t cell_rect, xy 
                 }
 
                 if (ignore_miners) {
-                    const unit_t& unit = state.units.get_by_id(cell.value);
                     if (unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP) {
                         continue;
                     }
@@ -535,6 +535,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
             return cost + distance;
         }
     };
+
+    log_trace("beginning pathfind");
 
     // Don't bother pathing to unit's cell
     if (from == to) {
@@ -693,6 +695,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
             path->pop_back();
         }
     }
+
+    log_trace("ending pathfind");
 }
 
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, rect_t rect) {
