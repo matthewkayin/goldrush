@@ -85,6 +85,9 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_
         case MAP_OASIS:
             map_gen_oasis(state, player_spawns, map_tiles_prebaked);
             break;
+        case MAP_GOLD_TEST:
+            map_gen_gold_test(state, player_spawns, map_tiles_prebaked);
+            break;
         default:
             log_error("Map name of %i not handled", map_name);
             GOLD_ASSERT_MESSAGE(false, "Map name not handled");
@@ -400,6 +403,24 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
     log_trace("Map Oasis complete.");
 }
 
+void map_gen_gold_test(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked) {
+    player_spawns.push_back(xy(12, 12));
+    for (int x = 6; x < state.map_width - 6; x += 18) {
+        for (int y = 6; y < state.map_height - 6; y += 18) {
+            map_create_mine(state, xy(x, y), 1000);
+        }
+    }
+}
+
+void map_create_mine(match_state_t& state, xy cell, uint32_t gold_amount) {
+    entity_id mine_id = state.mines.push_back((mine_t) {
+        .cell = cell,
+        .gold_left = gold_amount,
+        .occupancy = OCCUPANCY_EMPTY
+    });
+    map_set_cell_rect(state, rect_t(cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
+}
+
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {
     return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
 }
@@ -440,8 +461,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, rect_t cell_rect, xy 
 
                 if (ignore_miners) {
                     const unit_t& unit = state.units.get_by_id(cell.value);
-                    if ((unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP) && 
-                        (origin_id == ID_NULL || xy::manhattan_distance(origin, xy(x, y)) > 1)) {
+                    if (unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP) {
                         continue;
                     }
                 }

@@ -9,8 +9,7 @@ const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 const uint32_t UNIT_MINE_TICK_DURATION = 40;
 const uint32_t UNIT_MAX_GOLD_HELD = 10;
 const uint32_t UNIT_CANT_BE_FERRIED = 0;
-const uint32_t UNIT_IN_DURATION = 50;
-const uint32_t UNIT_OUT_DURATION = 10;
+const uint32_t UNIT_IN_DURATION = 40;
 
 const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
     { UNIT_MINER, (unit_data_t) {
@@ -177,7 +176,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         unit.direction = get_enum_direction_from_xy_direction(unit.path[0] - unit.cell);
                         // Clear the unit's rect so that the unit does not block itself from moving
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
-                        if (map_is_cell_rect_occupied(state, rect_t(unit.path[0], unit_cell_size(unit.type)))) {
+                        if (map_is_cell_rect_occupied(state, rect_t(unit.path[0], unit_cell_size(unit.type)), unit.cell, unit.target.type == UNIT_TARGET_MINE || unit.target.type == UNIT_TARGET_CAMP)) {
                             is_path_blocked = true;
                             // Since we are not moving, repopulate the cell grid with the unit's rect
                             map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, unit_id);
@@ -360,21 +359,10 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
                         break;
                     }
-                    case UNIT_TARGET_MINE: 
-                    case UNIT_TARGET_CAMP: {
+                    case UNIT_TARGET_MINE: {
                         // Check if target is valid
-                        uint32_t target_index = unit.target.type == UNIT_TARGET_MINE
-                                                    ? state.mines.get_index_of(unit.target.id)
-                                                    : state.buildings.get_index_of(unit.target.id);
-                        bool is_target_invalid = target_index == INDEX_INVALID;
-                        if (!is_target_invalid) {
-                            if (unit.target.type == UNIT_TARGET_MINE) {
-                                is_target_invalid = state.mines[target_index].gold_left == 0;
-                            } else {
-                                is_target_invalid = state.buildings[target_index].health == 0;
-                            }
-                        }
-                        if (is_target_invalid) {
+                        uint32_t mine_index = state.mines.get_index_of(unit.target.id);
+                        if (mine_index == INDEX_INVALID || state.mines[mine_index].gold_left == 0) {
                             unit.mode = UNIT_MODE_IDLE;
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
@@ -389,22 +377,13 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         } 
 
                         // Make sure that the mine / camp is free
-                        Occupancy occupancy = unit.target.type == UNIT_TARGET_MINE
-                                                ? state.mines[target_index].occupancy
-                                                : state.buildings[target_index].occupancy;
+                        mine_t& mine = state.mines[mine_index];
                         // If this mine / camp is reserved by the current unit, then we can go inside
-                        if (occupancy == OCCUPANCY_RESERVED && unit.garrison_id == unit.target.id) {
-                            if (unit.target.type == UNIT_TARGET_MINE) {
-                                unit.gold_held = std::min(UNIT_MAX_GOLD_HELD, state.mines[target_index].gold_left);
-                                unit.mode = UNIT_MODE_IN_MINE;
-                                state.mines[target_index].gold_left -= unit.gold_held;
-                                state.mines[target_index].occupancy = OCCUPANCY_FULL;
-                            } else {
-                                state.player_gold[unit.player_id] += unit.gold_held;
-                                unit.gold_held = 0;
-                                unit.mode = UNIT_MODE_IN_CAMP;
-                                state.buildings[target_index].occupancy = OCCUPANCY_FULL;
-                            }
+                        if (mine.occupancy == OCCUPANCY_RESERVED && unit.garrison_id == unit.target.id) {
+                            unit.gold_held = std::min(UNIT_MAX_GOLD_HELD, mine.gold_left);
+                            unit.mode = UNIT_MODE_IN_MINE;
+                            mine.gold_left -= unit.gold_held;
+                            mine.occupancy = OCCUPANCY_FULL;
                             unit.timer = UNIT_IN_DURATION;
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
@@ -414,27 +393,44 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         } 
                         
                         // If this mine / camp is occupied or reserved, then wait
-                        if (occupancy != OCCUPANCY_EMPTY) {
+                        if (mine.occupancy != OCCUPANCY_EMPTY) {
                             unit.mode = UNIT_MODE_IDLE;
                             break;
                         }
 
                         // Otherwise, if the mine is available, reserve it and begin walking into it it
-                        if (unit.target.type == UNIT_TARGET_MINE) {
-                            state.mines[target_index].occupancy = OCCUPANCY_RESERVED;
-                        } else {
-                            state.buildings[target_index].occupancy = OCCUPANCY_RESERVED;
-                        }
+                        mine.occupancy = OCCUPANCY_RESERVED;
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
-                        rect_t enter_rect = unit.target.type == UNIT_TARGET_MINE
-                                                ? rect_t(state.mines[target_index].cell, xy(MINE_SIZE, MINE_SIZE))
-                                                : rect_t(state.buildings[target_index].cell, building_cell_size(BUILDING_CAMP));
+                        rect_t enter_rect = rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE));
                         unit.direction = get_enum_direction_to_rect(unit.cell, enter_rect);
                         unit.cell = unit.cell + DIRECTION_XY[unit.direction];
                         unit.path.clear();
                         unit.mode = UNIT_MODE_MOVE;
                         unit.garrison_id = unit.target.id;
                         ui_deselect_unit_if_selected(state, state.units.get_id_of(unit_index));
+                        break;
+                    }
+                    case UNIT_TARGET_CAMP: {
+                        // Check if target is valid
+                        uint32_t camp_index = state.buildings.get_index_of(unit.target.id);
+                        if (camp_index == INDEX_INVALID || state.buildings[camp_index].health == 0) {
+                            unit.mode = UNIT_MODE_IDLE;
+                            unit.target = (unit_target_t) {
+                                .type = UNIT_TARGET_NONE
+                            };
+                            break;
+                        }
+
+                        // Confirm that unit has reached target
+                        if (!unit_has_reached_target(state, unit)) {
+                            unit.mode = UNIT_MODE_IDLE;
+                            break;
+                        } 
+
+                        state.player_gold[unit.player_id] += unit.gold_held;
+                        unit.gold_held = 0;
+                        unit.mode = UNIT_MODE_IDLE;
+                        unit.target = unit_target_nearest_mine(state, unit);
                         break;
                     }
                     case UNIT_TARGET_UNIT: 
@@ -631,8 +627,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 unit_update_finished = true;
                 break;
             }
-            case UNIT_MODE_IN_MINE: 
-            case UNIT_MODE_IN_CAMP: {
+            case UNIT_MODE_IN_MINE: {
                 bool timer_just_ended = false;
                 if (unit.timer != 0) {
                     unit.timer--;
@@ -643,93 +638,68 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 if (unit.timer == 0) {
                     rect_t exit_from_rect;
                     unit_target_t exit_target;
-                    if (unit.mode == UNIT_MODE_IN_MINE) {
-                        mine_t& mine = state.mines.get_by_id(unit.garrison_id);
-                        exit_from_rect = rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE));
-                        exit_target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
-                    } else if (unit.mode == UNIT_MODE_IN_CAMP) {
-                        building_t& building = state.buildings.get_by_id(unit.garrison_id);
-                        exit_from_rect = rect_t(building.cell, building_cell_size(building.type));
-                        exit_target = unit_target_nearest_mine(state, unit);
-                    }
+                    mine_t& mine = state.mines.get_by_id(unit.garrison_id);
+                    exit_from_rect = rect_t(mine.cell, xy(MINE_SIZE, MINE_SIZE));
+                    exit_target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
 
                     xy preferred_exit_cell = xy(-1, -1);
                     rect_t exit_to_rect;
                     if (exit_target.type != UNIT_TARGET_NONE) {
-                        exit_to_rect = exit_target.type == UNIT_TARGET_CAMP
-                            ? rect_t(state.buildings.get_by_id(exit_target.id).cell, building_cell_size(BUILDING_CAMP))
-                            : rect_t(state.mines.get_by_id(exit_target.id).cell, xy(MINE_SIZE, MINE_SIZE));
-                        bool x_overlaps = !(exit_from_rect.position.x + exit_from_rect.size.x - 1 < exit_to_rect.position.x || exit_to_rect.position.x + exit_to_rect.size.x - 1 < exit_from_rect.position.x);
-                        int x_dist = 0;
-                        if (!x_overlaps) {
-                            if (exit_from_rect.position.x < exit_to_rect.position.x) {
-                                x_dist = exit_to_rect.position.x - (exit_from_rect.position.x + exit_from_rect.size.x);
-                            } else if (exit_from_rect.position.x > exit_to_rect.position.x) {
-                                x_dist = exit_from_rect.position.x - (exit_to_rect.position.x + exit_to_rect.size.x);
-                            }
-                        }
-                        bool y_overlaps = !(exit_from_rect.position.y + exit_from_rect.size.y - 1 < exit_to_rect.position.y || exit_to_rect.position.y + exit_to_rect.size.y - 1 < exit_from_rect.position.y);
-                        int y_dist = 0;
-                        if (!y_overlaps) {
-                            if (exit_from_rect.position.y < exit_to_rect.position.y) {
-                                y_dist = exit_to_rect.position.y - (exit_from_rect.position.y + exit_from_rect.size.y);
-                            } else if (exit_from_rect.position.y > exit_to_rect.position.y) {
-                                y_dist = exit_from_rect.position.y - (exit_to_rect.position.y + exit_to_rect.size.y);
-                            }
-                        }
-                        if (std::abs(y_dist) >= std::abs(x_dist)) {
-                            if (exit_from_rect.position.y < exit_to_rect.position.y) {
-                                preferred_exit_cell = exit_from_rect.position + xy(0, exit_from_rect.size.y);
-                            } else {
-                                preferred_exit_cell = exit_from_rect.position + xy(exit_from_rect.size.x - 1, -1);
-                            }
-                        } else {
+                        exit_to_rect = rect_t(state.buildings.get_by_id(exit_target.id).cell, building_cell_size(BUILDING_CAMP));
+                        bool y_overlaps = !(exit_from_rect.position.y < exit_to_rect.position.y || exit_to_rect.position.y < exit_from_rect.position.y ||
+                                            (exit_from_rect.position.y != exit_to_rect.position.y &&
+                                            (exit_from_rect.position.y + exit_from_rect.size.y - 1 > exit_to_rect.position.y + exit_to_rect.size.y - 1 ||
+                                            exit_to_rect.position.y + exit_to_rect.size.y - 1 > exit_from_rect.position.y + exit_from_rect.size.y - 1)));
+                        if (y_overlaps) {
                             if (exit_from_rect.position.x < exit_to_rect.position.x) {
                                 preferred_exit_cell = exit_from_rect.position + xy(exit_from_rect.size.x, exit_from_rect.size.y - 1);
                             } else {
-                                preferred_exit_cell = exit_from_rect.position + xy(-1, 0);
+                                preferred_exit_cell = exit_from_rect.position + xy(0, -1);
                             }
-                        }
+                        } else {
+                            if (exit_from_rect.position.y > exit_to_rect.position.y) {
+                                preferred_exit_cell.y = exit_from_rect.position.y - 1;
+                            } else {
+                                preferred_exit_cell.y = exit_from_rect.position.y + exit_from_rect.size.y;
+                            }
+                            if (exit_from_rect.position.x < exit_to_rect.position.x) {
+                                preferred_exit_cell.x = exit_from_rect.position.x + exit_from_rect.size.x - 1;
+                            } else {
+                                preferred_exit_cell.x = exit_from_rect.position.x;
+                            }
+                        } 
                     }
                     // Check to make sure that the unit can exit
                     xy exit_cell = get_exit_cell(state, exit_from_rect, unit_cell_size(unit.type), preferred_exit_cell);
                     if (exit_cell.x != -1) {
-                        if (unit.mode == UNIT_MODE_IN_MINE) {
-                            mine_t& mine = state.mines.get_by_id(unit.garrison_id);
-                            mine.occupancy = OCCUPANCY_EMPTY;
+                        mine_t& mine = state.mines.get_by_id(unit.garrison_id);
+                        mine.occupancy = OCCUPANCY_EMPTY;
 
-                            if (unit.player_id == network_get_player_id() && mine.gold_left == 0) {
-                                ui_show_status(state, UI_STATUS_MINE_COLLAPSED);
-                                rect_t mine_screen_rect = rect_t(exit_from_rect.position * TILE_SIZE, exit_from_rect.size * TILE_SIZE);
-                                rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
-                                if (!screen_rect.intersects(mine_screen_rect)) {
-                                    state.alerts.push_back((alert_t) {
-                                        .type = ALERT_GOLD,
-                                        .status = ALERT_STATUS_SHOW,
-                                        .cell = mine.cell,
-                                        .cell_size = xy(MINE_SIZE, MINE_SIZE),
-                                        .timer = MATCH_ALERT_DURATION
-                                    });
-                                }
+                        if (unit.player_id == network_get_player_id() && mine.gold_left == 0) {
+                            ui_show_status(state, UI_STATUS_MINE_COLLAPSED);
+                            rect_t mine_screen_rect = rect_t(exit_from_rect.position * TILE_SIZE, exit_from_rect.size * TILE_SIZE);
+                            rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
+                            if (!screen_rect.intersects(mine_screen_rect)) {
+                                state.alerts.push_back((alert_t) {
+                                    .type = ALERT_GOLD,
+                                    .status = ALERT_STATUS_SHOW,
+                                    .cell = mine.cell,
+                                    .cell_size = xy(MINE_SIZE, MINE_SIZE),
+                                    .timer = MATCH_ALERT_DURATION
+                                });
                             }
-                        } else {
-                            building_t& building = state.buildings.get_by_id(unit.garrison_id);
-                            building.occupancy = OCCUPANCY_EMPTY;
                         }
 
                         unit.target = exit_target;
                         unit.cell = exit_cell;
                         unit.position = cell_center(unit.cell);
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
-                        unit.mode = UNIT_MODE_MOVE_BLOCKED;
-                        unit.timer = UNIT_OUT_DURATION;
+                        unit.mode = UNIT_MODE_IDLE;
                         unit.direction = get_enum_direction_to_rect(unit.cell, exit_to_rect);
                         unit.garrison_id = ID_NULL;
                     } else {
                         if (timer_just_ended && unit.player_id == network_get_player_id()) {
-                            ui_show_status(state, unit.mode == UNIT_MODE_IN_MINE 
-                                            ? UI_STATUS_MINE_EXIT_BLOCKED
-                                            : UI_STATUS_BUILDING_EXIT_BLOCKED);
+                            ui_show_status(state, UI_STATUS_MINE_EXIT_BLOCKED);
                         }
                     }
                 }
@@ -1070,7 +1040,7 @@ bool unit_is_target_dead_or_ferried(const match_state_t& state, const unit_t& un
     if (unit.target.type == UNIT_TARGET_BUILD_ASSIST && state.units[target_index].target.type != UNIT_TARGET_BUILD) {
         return true;
     }
-    if (unit.target.type == UNIT_TARGET_UNIT && (state.units[target_index].mode == UNIT_MODE_FERRY || state.units[target_index].mode == UNIT_MODE_IN_MINE || state.units[target_index].mode == UNIT_MODE_IN_CAMP)) {
+    if (unit.target.type == UNIT_TARGET_UNIT && (state.units[target_index].mode == UNIT_MODE_FERRY || state.units[target_index].mode == UNIT_MODE_IN_MINE)) {
         return true;
     }
     return false;
@@ -1147,7 +1117,7 @@ Sprite unit_get_select_ring(UnitType type, bool is_enemy) {
 
 bool unit_can_be_selected(const unit_t& unit) {
     return !(unit.mode == UNIT_MODE_BUILD || unit.mode == UNIT_MODE_FERRY || 
-             unit.mode == UNIT_MODE_IN_MINE || unit.mode == UNIT_MODE_IN_CAMP ||
+             unit.mode == UNIT_MODE_IN_MINE ||
              (unit.mode == UNIT_MODE_MOVE && unit.garrison_id == unit.target.id));
 }
 
@@ -1249,7 +1219,7 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, cons
         if (unit.player_id == other_unit.player_id) {
             continue;
         }
-        if (other_unit.mode == UNIT_MODE_FERRY || other_unit.mode == UNIT_MODE_IN_CAMP || other_unit.mode == UNIT_MODE_IN_MINE || other_unit.mode == UNIT_MODE_BUILD) {
+        if (other_unit.mode == UNIT_MODE_FERRY || other_unit.mode == UNIT_MODE_IN_MINE || other_unit.mode == UNIT_MODE_BUILD) {
             continue;
         }
         if (other_unit.health == 0) {

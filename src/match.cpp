@@ -22,7 +22,7 @@ static const int CAMERA_DRAG_SPEED = 16;
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 200;
+static const uint32_t PLAYER_STARTING_GOLD = 2000;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
@@ -68,7 +68,7 @@ match_state_t match_init() {
 
     // Init map
     std::vector<xy> player_spawns;
-    map_init(state, player_spawns, MAP_OASIS, 128, 128);
+    map_init(state, player_spawns, MAP_GOLD_TEST, 96, 96);
 
     // Init fog of war
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
