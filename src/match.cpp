@@ -100,9 +100,13 @@ match_state_t match_init() {
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(-2, -1));
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(-2, 0));
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(2, 2));
+        // Fog is updated twice at the start of the match
+        // First update reveals cells, second update remembers buildings
+        map_update_fog(state, player_id);
+        map_update_fog(state, player_id);
     }
 
-    state.is_fog_dirty = true;
+    state.is_fog_dirty = false;
 
     if (!network_is_server()) {
         log_info("Client in match.");

@@ -9,7 +9,8 @@ const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 const uint32_t UNIT_MINE_TICK_DURATION = 40;
 const uint32_t UNIT_MAX_GOLD_HELD = 10;
 const uint32_t UNIT_CANT_BE_FERRIED = 0;
-const uint32_t UNIT_IN_DURATION = 40;
+const uint32_t UNIT_IN_DURATION = 50;
+const uint32_t UNIT_OUT_DURATION = 10;
 
 const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
     { UNIT_MINER, (unit_data_t) {
@@ -422,7 +423,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                         state.player_gold[unit.player_id] += unit.gold_held;
                         unit.gold_held = 0;
-                        unit.mode = UNIT_MODE_IDLE;
+                        unit.mode = UNIT_MODE_MOVE_BLOCKED;
+                        unit.timer = UNIT_OUT_DURATION;
                         unit.target = unit_target_nearest_mine(state, unit);
                         break;
                     }
@@ -689,7 +691,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         unit.cell = exit_cell;
                         unit.position = cell_center(unit.cell);
                         map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
-                        unit.mode = UNIT_MODE_IDLE;
+                        unit.mode = UNIT_MODE_MOVE_BLOCKED;
+                        unit.timer = UNIT_OUT_DURATION;
                         unit.direction = get_enum_direction_to_rect(unit.cell, camp_rect);
                         unit.garrison_id = ID_NULL;
                     } else {
