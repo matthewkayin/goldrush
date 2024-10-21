@@ -99,9 +99,11 @@ void building_on_finish(match_state_t& state, entity_id building_id) {
             if (unit.mode == UNIT_MODE_IDLE && building.type == BUILDING_CAMP) {
                 unit.target = unit_target_nearest_mine(state, unit);
             }
-        } else if (unit.mode == UNIT_MODE_REPAIR && building.type == BUILDING_CAMP && unit.target.id == building_id) {
-            unit.target = unit_target_nearest_mine(state, unit);
+        } else if (unit.mode == UNIT_MODE_REPAIR && unit.target.id == building_id) {
             unit.mode = UNIT_MODE_IDLE;
+            if (building.type == BUILDING_CAMP) {
+                unit.target = unit_target_nearest_mine(state, unit);
+            }
         }
     }
 }

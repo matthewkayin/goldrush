@@ -126,6 +126,10 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 if (unit.target.type == UNIT_TARGET_NONE && unit.type != UNIT_MINER && UNIT_DATA.at(unit.type).damage != 0) {
                     unit.target = unit_target_nearest_insight_enemy(state, unit);
                 }
+                // If unit is told to mine gold but is already holding gold, find a camp instead
+                if (unit.target.type == UNIT_TARGET_MINE && unit.gold_held == UNIT_MAX_GOLD_HELD) {
+                    unit.target = unit_target_nearest_camp(state, unit.cell, unit.player_id);
+                }
                 if (unit.target.type == UNIT_TARGET_NONE) {
                     unit_update_finished = true;
                     break;
@@ -350,6 +354,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                 .id = builder.target.build.building_id
                             };
                             unit.mode = UNIT_MODE_REPAIR;
+                            unit.direction = get_enum_direction_to_rect(unit.cell, rect_t(builder.target.build.building_cell, building_cell_size(builder.target.build.building_type)));
                         }
                         break;
                     }
@@ -374,7 +379,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         mine_t& mine = state.mines[mine_index];
                         // If this mine / camp is reserved by the current unit, then we can go inside
                         if (mine.occupancy == OCCUPANCY_RESERVED && unit.garrison_id == unit.target.id) {
-                            unit.gold_held = std::min(UNIT_MAX_GOLD_HELD, mine.gold_left);
+                            unit.gold_held = std::min(UNIT_MAX_GOLD_HELD - unit.gold_held, mine.gold_left);
                             unit.mode = UNIT_MODE_IN_MINE;
                             mine.gold_left -= unit.gold_held;
                             mine.occupancy = OCCUPANCY_FULL;
@@ -482,19 +487,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             building_t& building = state.buildings.get_by_id(unit.target.id);
                             if (building.health < BUILDING_DATA.at(building.type).max_health) {
                                 unit.mode = UNIT_MODE_REPAIR;
-                                if (unit.cell.y >= building.cell.y && unit.cell.y < building.cell.y + building_cell_size(building.type).y) {
-                                    if (unit.cell.x < building.cell.x) {
-                                        unit.direction = DIRECTION_EAST;
-                                    } else {
-                                        unit.direction = DIRECTION_WEST;
-                                    }
-                                } else {
-                                    if (unit.cell.y < building.cell.y) {
-                                        unit.direction = DIRECTION_SOUTH;
-                                    } else {
-                                        unit.direction = DIRECTION_NORTH;
-                                    }
-                                }
+                                unit.direction = get_enum_direction_to_rect(unit.cell, rect_t(building.cell, building_cell_size(building.type)));
                                 log_trace("index: %u, Beginning repair state. Direction: %u", unit_index, unit.direction);
                                 unit.timer = UNIT_BUILD_TICK_DURATION;
                                 unit_update_finished = true;
@@ -665,7 +658,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
                     }
                     // Check to make sure that the unit can exit
-                    xy exit_cell = !map_is_cell_rect_occupied(state, rect_t(preferred_exit_cell, unit_cell_size(unit.type)), xy(-1, -1), true)
+                    xy exit_cell = preferred_exit_cell.x != -1 && !map_is_cell_rect_occupied(state, rect_t(preferred_exit_cell, unit_cell_size(unit.type)), xy(-1, -1), true)
                                         ? preferred_exit_cell
                                         : get_exit_cell(state, mine_rect, unit_cell_size(unit.type), preferred_exit_cell);
                     if (exit_cell.x != -1) {
