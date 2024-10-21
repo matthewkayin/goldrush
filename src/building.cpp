@@ -109,7 +109,15 @@ void building_on_finish(match_state_t& state, entity_id building_id) {
 void building_update(match_state_t& state, building_t& building) {
     if (building.health == 0 && building.mode != BUILDING_MODE_DESTROYED) {
         const building_data_t& building_data = BUILDING_DATA.find(building.type)->second;
-        map_set_cell_rect(state, rect_t(building.cell, xy(building_data.cell_size, building_data.cell_size)), CELL_EMPTY);
+        // Set building cells to empty, done a special way to avoid overriding the miner cell
+        // in the case of a building cancel where the builder is placed on top of the building's old location
+        for (int x = building.cell.x; x < building.cell.x + building_data.cell_size; x++) {
+            for (int y = building.cell.y; y < building.cell.y + building_data.cell_size; y++) {
+                if (map_get_cell(state, xy(x, y)).type == CELL_BUILDING) {
+                    map_set_cell(state, xy(x, y), CELL_EMPTY);
+                }
+            }
+        }
         building.mode = BUILDING_MODE_DESTROYED;
         building.queue.clear();
         building.queue_timer = BUILDING_FADE_DURATION;

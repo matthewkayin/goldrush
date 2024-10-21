@@ -536,8 +536,6 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
         }
     };
 
-    log_trace("beginning pathfind");
-
     // Don't bother pathing to unit's cell
     if (from == to) {
         log_trace("from == to, end pathfind");
@@ -695,8 +693,6 @@ void map_pathfind(const match_state_t& state, xy from, xy to, xy cell_size, std:
             path->pop_back();
         }
     }
-
-    log_trace("ending pathfind");
 }
 
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, rect_t rect) {

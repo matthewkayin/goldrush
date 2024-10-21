@@ -68,7 +68,7 @@ match_state_t match_init() {
 
     // Init map
     std::vector<xy> player_spawns;
-    map_init(state, player_spawns, MAP_GOLD_TEST, 96, 96);
+    map_init(state, player_spawns, MAP_OASIS, 96, 96);
 
     // Init fog of war
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -1124,6 +1124,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     };
                     unit.mode = UNIT_MODE_IDLE;
                     map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, state.units.get_id_of(unit_index));
+                    break;
                 }
             }
             // Destroy the building
