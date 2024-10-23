@@ -13,6 +13,7 @@
 
 #define MAX_UNITS 200
 #define MAX_PARTICLES 256
+#define CHAT_SIZE 8
 
 #define UI_STATUS_CANT_BUILD "You can't build there."
 #define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
@@ -41,6 +42,7 @@ const uint32_t MINE_SIZE = 3;
 extern const xy UI_FRAME_BOTTOM_POSITION;
 extern const xy BUILDING_QUEUE_TOP_LEFT;
 extern const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX];
+extern const rect_t UI_DISCONNECT_FRAME_RECT;
 
 extern const uint32_t MATCH_WINNING_GOLD_AMOUNT;
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
@@ -48,6 +50,7 @@ extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
 extern const uint32_t MATCH_ALERT_DURATION;
 extern const uint32_t MATCH_ALERT_LINGER_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
+extern const uint32_t MATCH_DISCONNECT_GRACE;
 
 // Map
 
@@ -110,7 +113,8 @@ enum UiMode {
     UI_MODE_TARGET_ATTACK,
     UI_MODE_TARGET_UNLOAD,
     UI_MODE_MATCH_OVER,
-    UI_MODE_LEAVE_MATCH
+    UI_MODE_LEAVE_MATCH,
+    UI_MODE_WAITING_FOR_PLAYERS
 };
 
 enum UiButtonset {
@@ -155,6 +159,11 @@ struct alert_t {
     AlertStatus status;
     xy cell;
     xy cell_size;
+    uint32_t timer;
+};
+
+struct chat_message_t {
+    char message[128];
     uint32_t timer;
 };
 
@@ -442,6 +451,7 @@ struct input_t {
 struct match_state_t {
     // UI
     UiMode ui_mode;
+    uint32_t ui_disconnect_timer;
     UiButtonset ui_buttonset;
     xy camera_offset;
     std::string ui_status_message;
@@ -460,6 +470,8 @@ struct match_state_t {
     uint32_t ui_double_click_timer;
     int ui_selected_control_group;
     std::vector<alert_t> alerts;
+    chat_message_t chat[CHAT_SIZE];
+    uint32_t chat_head;
 
     // Inputs
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
@@ -525,6 +537,7 @@ selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const sele
 void ui_deselect_unit_if_selected(match_state_t& state, entity_id unit_id);
 entity_id ui_get_nearest_builder(const match_state_t& state, xy cell);
 int ui_get_building_queue_index_hovered(const match_state_t& state);
+void ui_add_chat_message(match_state_t& state, const char* message);
 
 // Map
 void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_name, uint32_t width, uint32_t height);

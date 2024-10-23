@@ -193,6 +193,7 @@ void network_service() {
 
                     network_event_t network_event;
                     network_event.type = NETWORK_EVENT_CLIENT_DISCONNECTED;
+                    network_event.client_disconnected.player_id = event.peer->incomingPeerID + 1;
                     network_event_enqueue(network_event);
                 } else if (state.status == NETWORK_STATUS_DISCONNECTING) {
                     enet_host_destroy(state.host);

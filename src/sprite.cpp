@@ -87,8 +87,8 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_UI_PARCHMENT_BUTTONS, (sprite_params_t) {
         .path = "sprite/ui_parchment_buttons.png",
-        .hframes = 2,
-        .vframes = 2,
+        .hframes = 3,
+        .vframes = 3,
         .options = 0
     }},
     { SPRITE_UI_OPTIONS_DROPDOWN, (sprite_params_t) {

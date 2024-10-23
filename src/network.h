@@ -47,10 +47,15 @@ struct network_event_input_t {
     uint8_t data_length;
 };
 
+struct network_event_client_disconnected_t {
+    uint8_t player_id;
+};
+
 struct network_event_t {
     NetworkEventType type;
     union {
         network_event_input_t input;
+        network_event_client_disconnected_t client_disconnected;
     };
 };
 

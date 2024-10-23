@@ -2367,7 +2367,32 @@ void render_match(const match_state_t& state) {
 
     // UI Status message
     if (state.ui_status_timer != 0) {
-        render_text(FONT_HACK, state.ui_status_message.c_str(), COLOR_WHITE, xy(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 128));
+        render_text(FONT_HACK, state.ui_status_message.c_str(), COLOR_WHITE, xy(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 148));
+    }
+
+    // UI Chat
+    uint32_t chat_index = state.chat_head;
+    uint32_t chat_message_count = 0;
+    while (state.chat[chat_index].timer != 0 && chat_message_count < CHAT_SIZE) {
+        render_text(FONT_HACK, state.chat[chat_index].message, COLOR_WHITE, xy(16, MINIMAP_RECT.position.y - 40 - (chat_message_count * 16)));
+        chat_message_count++;
+        chat_index = chat_index == 0 
+                ? CHAT_SIZE - 1 
+                : chat_index - 1;
+    }
+
+    // UI Disconnect frame
+    if (state.ui_mode == UI_MODE_WAITING_FOR_PLAYERS) {
+        render_ninepatch(SPRITE_UI_FRAME, UI_DISCONNECT_FRAME_RECT, 16);
+        render_text(FONT_WESTERN8, "Waiting for players...", COLOR_GOLD, UI_DISCONNECT_FRAME_RECT.position + xy(16, 8));
+        int player_text_y = 32;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS - 1; player_id++) {
+            if (network_get_player(player_id).status == PLAYER_STATUS_NONE || !(state.inputs[player_id].empty() || state.inputs[player_id][0].empty())) {
+                continue;
+            }
+            render_text(FONT_WESTERN8, network_get_player(player_id).name, COLOR_GOLD, UI_DISCONNECT_FRAME_RECT.position + xy(24, player_text_y));
+            player_text_y += 24;
+        }
     }
 
     // Resource counters

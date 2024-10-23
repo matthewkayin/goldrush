@@ -11,7 +11,7 @@
 #define UI_HEIGHT 88
 // #define GOLD_RAND_SEED 1728833364
 #ifdef GOLD_DEBUG
-    // #define GOLD_DEBUG_FAST_BUILD
+    #define GOLD_DEBUG_FAST_BUILD
     #define GOLD_DEBUG_FAST_TRAIN
     // #define GOLD_DEBUG_UNIT_PATHS
     // #define GOLD_DEBUG_UNIT_STATE

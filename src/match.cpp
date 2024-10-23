@@ -30,6 +30,7 @@ const uint32_t MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION = 10;
 const uint32_t MATCH_ALERT_DURATION = 90;
 const uint32_t MATCH_ALERT_LINGER_DURATION = 60 * 20;
 const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
+const uint32_t MATCH_DISCONNECT_GRACE = 10;
 
 match_state_t match_init() {
     match_state_t state;
@@ -47,6 +48,8 @@ match_state_t match_init() {
     }
     state.control_group_double_click_timer = 0;
     state.ui_selected_control_group = -1;
+    state.ui_disconnect_timer = 0;
+    state.chat_head = 0;
 
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -185,6 +188,11 @@ void match_update(match_state_t& state) {
                 state.inputs[in_player_id].push_back(tick_inputs);
                 break;
             }
+            case NETWORK_EVENT_CLIENT_DISCONNECTED: {
+                char message[128];
+                sprintf(message, "%s disconnected.", network_get_player(network_event.client_disconnected.player_id).name);
+                ui_add_chat_message(state, message);
+            }
             default:
                 break;
         }
@@ -192,22 +200,35 @@ void match_update(match_state_t& state) {
 
     // Tick loop
     if (state.tick_timer == 0) {
-        bool has_all_inputs = true;
+        bool all_inputs_received = true;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
             if (player.status == PLAYER_STATUS_NONE) {
                 continue;
             }
 
+            // We didn't receive inputs, start the timer
             if (state.inputs[player_id].empty() || state.inputs[player_id][0].empty()) {
-                has_all_inputs = false;
-                break;
-            }
+                all_inputs_received = false;
+                log_trace("Inputs not received for player %u", player_id);
+                continue;
+            } 
         }
 
-        if (!has_all_inputs) {
-            log_info("Missing inputs for this frame. waiting...");
+        if (!all_inputs_received) {
+            state.ui_disconnect_timer++;
+            if (state.ui_mode != UI_MODE_WAITING_FOR_PLAYERS && state.ui_disconnect_timer > MATCH_DISCONNECT_GRACE) {
+                state.ui_mode = UI_MODE_WAITING_FOR_PLAYERS;
+                // set selection in order to correct UI buttonset and avoid players getting stuck in certain modes
+                ui_set_selection(state, state.selection);
+            }
             return;
+        }
+
+        // Reset the disconnect timer if we receieved inputs
+        state.ui_disconnect_timer = 0;
+        if (state.ui_mode == UI_MODE_WAITING_FOR_PLAYERS) {
+            state.ui_mode = UI_MODE_NONE;
         }
 
         // Begin next tick
@@ -582,6 +603,11 @@ void match_update(match_state_t& state) {
     // Update timers
     if (state.ui_status_timer != 0) {
         state.ui_status_timer--;
+    }
+    for (uint32_t chat_index = 0; chat_index < CHAT_SIZE; chat_index++) {
+        if (state.chat[chat_index].timer != 0) {
+            state.chat[chat_index].timer--;
+        }
     }
     if (state.control_group_double_click_timer != 0) {
         state.control_group_double_click_timer--;

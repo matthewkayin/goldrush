@@ -47,6 +47,9 @@ const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 3, 35)
 };
 
+static const xy UI_DISCONNECT_FRAME_SIZE = xy(200, 200);
+const rect_t UI_DISCONNECT_FRAME_RECT = rect_t(xy((SCREEN_WIDTH / 2) - (UI_DISCONNECT_FRAME_SIZE.x / 2), 32), UI_DISCONNECT_FRAME_SIZE);
+
 const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS = {
     { UI_BUTTON_BUILD_HOUSE, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
@@ -588,4 +591,11 @@ int ui_get_building_queue_index_hovered(const match_state_t& state) {
     }
     
     return -1;
+}
+
+void ui_add_chat_message(match_state_t& state, const char* message) {
+    GOLD_ASSERT(strlen(message) + 1 <= 128);
+    state.chat_head = (state.chat_head + 1) % CHAT_SIZE;
+    strcpy(state.chat[state.chat_head].message, message);
+    state.chat[state.chat_head].timer = UI_STATUS_DURATION;
 }
