@@ -49,6 +49,9 @@ const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
 
 static const xy UI_DISCONNECT_FRAME_SIZE = xy(200, 200);
 const rect_t UI_DISCONNECT_FRAME_RECT = rect_t(xy((SCREEN_WIDTH / 2) - (UI_DISCONNECT_FRAME_SIZE.x / 2), 32), UI_DISCONNECT_FRAME_SIZE);
+static const xy UI_MATCH_OVER_FRAME_SIZE = xy(250, 60);
+const rect_t UI_MATCH_OVER_FRAME_RECT = rect_t(xy((SCREEN_WIDTH / 2) - (UI_MATCH_OVER_FRAME_SIZE.x / 2), 128), UI_MATCH_OVER_FRAME_SIZE);
+const rect_t UI_MATCH_OVER_EXIT_BUTTON_RECT = rect_t(xy((SCREEN_WIDTH / 2) - 32, UI_MATCH_OVER_FRAME_RECT.position.y + 32), xy(63, 21));
 
 const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS = {
     { UI_BUTTON_BUILD_HOUSE, (ui_button_requirements_t) {
@@ -598,4 +601,27 @@ void ui_add_chat_message(match_state_t& state, const char* message) {
     state.chat_head = (state.chat_head + 1) % CHAT_SIZE;
     strcpy(state.chat[state.chat_head].message, message);
     state.chat[state.chat_head].timer = UI_STATUS_DURATION;
+}
+
+bool ui_is_match_over(UiMode ui_mode) {
+    return ui_mode >= UI_MODE_MATCH_OVER_PLAYERS_DISCONNECTED && ui_mode <= UI_MODE_MATCH_OVER_PLAYER_LOST;
+}
+
+const char* ui_get_match_over_message(UiMode ui_mode) {
+    switch (ui_mode) {
+        case UI_MODE_MATCH_OVER_PLAYERS_DISCONNECTED:
+            return "Your opponents disconnected.";
+        case UI_MODE_MATCH_OVER_SERVER_DISCONNECTED:
+            return "The server disconnected.";
+        case UI_MODE_MATCH_OVER_PLAYER_WINS:
+            return "Victory!";
+        case UI_MODE_MATCH_OVER_PLAYER_LOST:
+            return "Defeat!";
+        default:
+            return "";
+    }
+}
+
+bool ui_match_over_is_exit_button_hovered() {
+    return UI_MATCH_OVER_EXIT_BUTTON_RECT.has_point(input_get_mouse_position());
 }

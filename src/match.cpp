@@ -22,7 +22,7 @@ static const int CAMERA_DRAG_SPEED = 16;
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
 static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
-static const uint32_t PLAYER_STARTING_GOLD = 2000;
+static const uint32_t PLAYER_STARTING_GOLD = 1000;
 const uint32_t MATCH_WINNING_GOLD_AMOUNT = 5000;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
@@ -156,15 +156,11 @@ void match_update(match_state_t& state) {
     }
 
     // Wait for player to leave the match
-    if (state.ui_mode == UI_MODE_MATCH_OVER) {
-        if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
+    if (ui_is_match_over(state.ui_mode)) {
+        if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && ui_match_over_is_exit_button_hovered()) {
             network_disconnect();
             state.ui_mode = UI_MODE_LEAVE_MATCH;
         }
-        return;
-    }
-
-    if (state.ui_mode == UI_MODE_MATCH_OVER) {
         return;
     }
 
@@ -192,6 +188,36 @@ void match_update(match_state_t& state) {
                 char message[128];
                 sprintf(message, "%s disconnected.", network_get_player(network_event.client_disconnected.player_id).name);
                 ui_add_chat_message(state, message);
+
+                // Determine if we should exit the match
+                int player_count = 0;
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (network_get_player(player_id).status != PLAYER_STATUS_NONE) {
+                        player_count++;
+                    }
+                }
+                if (player_count < 2) {
+                    state.ui_mode = UI_MODE_MATCH_OVER_PLAYERS_DISCONNECTED;
+                    return;
+                }
+                break;
+            }
+            case NETWORK_EVENT_SERVER_DISCONNECTED: {
+                // Announce that the server left in chat
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (network_get_player(player_id).status == PLAYER_STATUS_HOST) {
+                        char message[128];
+                        sprintf(message, "%s disconnected.", network_get_player(player_id).name);
+                        ui_add_chat_message(state, message);
+                        break;
+                    }
+                }
+
+                // Leave the match
+                state.ui_mode = UI_MODE_MATCH_OVER_SERVER_DISCONNECTED;
+                return;
+
+                break;
             }
             default:
                 break;
@@ -745,11 +771,10 @@ void match_update(match_state_t& state) {
             continue;
         }
         if (state.player_gold[player_id] >= MATCH_WINNING_GOLD_AMOUNT) {
-            state.ui_mode = UI_MODE_MATCH_OVER;
             if (player_id == network_get_player_id()) {
-                ui_show_status(state, "You win!");
+                state.ui_mode = UI_MODE_MATCH_OVER_PLAYER_WINS;
             } else {
-                ui_show_status(state, "You lose...");
+                state.ui_mode = UI_MODE_MATCH_OVER_PLAYER_LOST;
             }
             break;
         }

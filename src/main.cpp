@@ -2395,6 +2395,13 @@ void render_match(const match_state_t& state) {
         }
     }
 
+    // UI Match over
+    if (ui_is_match_over(state.ui_mode)) {
+        render_ninepatch(SPRITE_UI_FRAME, UI_MATCH_OVER_FRAME_RECT, 16);
+        render_text(FONT_WESTERN8, ui_get_match_over_message(state.ui_mode), COLOR_GOLD, xy(RENDER_TEXT_CENTERED, UI_MATCH_OVER_FRAME_RECT.position.y + 10));
+        render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(2, ui_match_over_is_exit_button_hovered() ? 1 : 0), UI_MATCH_OVER_EXIT_BUTTON_RECT.position + (ui_match_over_is_exit_button_hovered() ? xy(0, -1) : xy(0, 0)), RENDER_SPRITE_NO_CULL);
+    }
+
     // Resource counters
     char gold_text[8];
     sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);

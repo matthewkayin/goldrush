@@ -43,6 +43,8 @@ extern const xy UI_FRAME_BOTTOM_POSITION;
 extern const xy BUILDING_QUEUE_TOP_LEFT;
 extern const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX];
 extern const rect_t UI_DISCONNECT_FRAME_RECT;
+extern const rect_t UI_MATCH_OVER_FRAME_RECT;
+extern const rect_t UI_MATCH_OVER_EXIT_BUTTON_RECT;
 
 extern const uint32_t MATCH_WINNING_GOLD_AMOUNT;
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
@@ -112,9 +114,12 @@ enum UiMode {
     UI_MODE_BUILDING_PLACE,
     UI_MODE_TARGET_ATTACK,
     UI_MODE_TARGET_UNLOAD,
-    UI_MODE_MATCH_OVER,
-    UI_MODE_LEAVE_MATCH,
-    UI_MODE_WAITING_FOR_PLAYERS
+    UI_MODE_WAITING_FOR_PLAYERS,
+    UI_MODE_MATCH_OVER_PLAYERS_DISCONNECTED,
+    UI_MODE_MATCH_OVER_SERVER_DISCONNECTED,
+    UI_MODE_MATCH_OVER_PLAYER_WINS,
+    UI_MODE_MATCH_OVER_PLAYER_LOST,
+    UI_MODE_LEAVE_MATCH
 };
 
 enum UiButtonset {
@@ -538,6 +543,9 @@ void ui_deselect_unit_if_selected(match_state_t& state, entity_id unit_id);
 entity_id ui_get_nearest_builder(const match_state_t& state, xy cell);
 int ui_get_building_queue_index_hovered(const match_state_t& state);
 void ui_add_chat_message(match_state_t& state, const char* message);
+bool ui_is_match_over(UiMode ui_mode);
+const char* ui_get_match_over_message(UiMode ui_mode);
+bool ui_match_over_is_exit_button_hovered();
 
 // Map
 void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_name, uint32_t width, uint32_t height);
