@@ -317,7 +317,23 @@ void match_update(match_state_t& state) {
 
     // LEFT MOUSE CLICK
     if (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT)) {
-        if (ui_get_ui_button_hovered(state) != -1) {
+        if (ui_is_menu_button_hovered()) {
+            state.ui_mode = state.ui_mode == UI_MODE_MENU ? UI_MODE_NONE : UI_MODE_MENU;
+        } else if (state.ui_mode == UI_MODE_MENU) {
+            UiMenuButton button = ui_menu_get_parchment_button_hovered();
+            switch (button) {
+                case UI_MENU_BUTTON_SURRENDER: {
+                    network_disconnect();
+                    state.ui_mode = UI_MODE_MATCH_OVER_PLAYER_LOST;
+                    break;
+                }
+                case UI_MENU_BUTTON_BACK:
+                    state.ui_mode = UI_MODE_NONE;
+                    break;
+                default:
+                    break;
+            }
+        } else if (ui_get_ui_button_hovered(state) != -1) {
             ui_handle_button_pressed(state, ui_get_ui_button(state, ui_get_ui_button_hovered(state)));
         } else if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
             entity_id nearest_builder_id = ui_get_nearest_builder(state, ui_get_building_cell(state));
@@ -1229,6 +1245,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
                 state.buildings[building_index].rally_point = input.rally.rally_point;
             }
+            break;
         }
         default:
             break;

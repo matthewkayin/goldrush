@@ -165,6 +165,10 @@ bool network_are_all_players_ready() {
     return true;
 }
 
+void network_set_player_status(uint8_t player_id, PlayerStatus status) {
+    state.players[player_id].status = status;
+}
+
 // POLL EVENTS
 
 void network_service() {

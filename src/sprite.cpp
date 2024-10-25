@@ -103,6 +103,18 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .options = 0
     }},
+    { SPRITE_UI_MENU_BUTTON, (sprite_params_t) {
+        .path = "sprite/ui_menu_button.png",
+        .hframes = 2,
+        .vframes = 1,
+        .options = 0
+    }},
+    { SPRITE_UI_MENU_PARCHMENT_BUTTONS, (sprite_params_t) {
+        .path = "sprite/ui_menu_parchment_buttons.png",
+        .hframes = 2,
+        .vframes = 2,
+        .options = 0
+    }},
     { SPRITE_SELECT_RING, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .hframes = 1,

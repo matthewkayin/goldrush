@@ -68,6 +68,7 @@ NetworkStatus network_get_status();
 uint8_t network_get_player_id();
 const player_t& network_get_player(uint8_t player_id);
 bool network_are_all_players_ready();
+void network_set_player_status(uint8_t player_id, PlayerStatus status);
 
 void network_service();
 bool network_poll_events(network_event_t* event);

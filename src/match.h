@@ -45,6 +45,8 @@ extern const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX];
 extern const rect_t UI_DISCONNECT_FRAME_RECT;
 extern const rect_t UI_MATCH_OVER_FRAME_RECT;
 extern const rect_t UI_MATCH_OVER_EXIT_BUTTON_RECT;
+extern const rect_t UI_MENU_BUTTON_RECT;
+extern const rect_t UI_MENU_RECT;
 
 extern const uint32_t MATCH_WINNING_GOLD_AMOUNT;
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
@@ -115,6 +117,8 @@ enum UiMode {
     UI_MODE_TARGET_ATTACK,
     UI_MODE_TARGET_UNLOAD,
     UI_MODE_WAITING_FOR_PLAYERS,
+    UI_MODE_MENU,
+    UI_MODE_MENU_SURRENDER,
     UI_MODE_MATCH_OVER_PLAYERS_DISCONNECTED,
     UI_MODE_MATCH_OVER_SERVER_DISCONNECTED,
     UI_MODE_MATCH_OVER_PLAYER_WINS,
@@ -170,6 +174,13 @@ struct alert_t {
 struct chat_message_t {
     char message[128];
     uint32_t timer;
+};
+
+enum UiMenuButton {
+    UI_MENU_BUTTON_NONE,
+    UI_MENU_BUTTON_SURRENDER,
+    UI_MENU_BUTTON_BACK,
+    UI_MENU_BUTTON_COUNT
 };
 
 // Unit
@@ -546,6 +557,9 @@ void ui_add_chat_message(match_state_t& state, const char* message);
 bool ui_is_match_over(UiMode ui_mode);
 const char* ui_get_match_over_message(UiMode ui_mode);
 bool ui_match_over_is_exit_button_hovered();
+bool ui_is_menu_button_hovered();
+rect_t ui_menu_get_parchment_button_rect(UiMenuButton button);
+UiMenuButton ui_menu_get_parchment_button_hovered();
 
 // Map
 void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_name, uint32_t width, uint32_t height);

@@ -2402,6 +2402,16 @@ void render_match(const match_state_t& state) {
         render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(2, ui_match_over_is_exit_button_hovered() ? 1 : 0), UI_MATCH_OVER_EXIT_BUTTON_RECT.position + (ui_match_over_is_exit_button_hovered() ? xy(0, -1) : xy(0, 0)), RENDER_SPRITE_NO_CULL);
     }
 
+    // Menu button
+    render_sprite(SPRITE_UI_MENU_BUTTON, xy(ui_is_menu_button_hovered() || state.ui_mode == UI_MODE_MENU ? 1 : 0, 0), UI_MENU_BUTTON_RECT.position, RENDER_SPRITE_NO_CULL);
+    if (state.ui_mode == UI_MODE_MENU) {
+        render_ninepatch(SPRITE_UI_FRAME, UI_MENU_RECT, 16);
+        render_text(FONT_WESTERN8, "Game Menu", COLOR_GOLD, xy(RENDER_TEXT_CENTERED, UI_MENU_RECT.position.y + 10));
+        for (int i = UI_MENU_BUTTON_NONE + 1; i < UI_MENU_BUTTON_COUNT; i++) {
+            render_sprite(SPRITE_UI_MENU_PARCHMENT_BUTTONS, xy(i - (UI_MENU_BUTTON_NONE + 1), ui_menu_get_parchment_button_hovered() == i ? 1 : 0), ui_menu_get_parchment_button_rect((UiMenuButton)i).position, RENDER_SPRITE_NO_CULL);
+        }
+    }
+
     // Resource counters
     char gold_text[8];
     sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);

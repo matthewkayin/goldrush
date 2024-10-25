@@ -52,6 +52,9 @@ const rect_t UI_DISCONNECT_FRAME_RECT = rect_t(xy((SCREEN_WIDTH / 2) - (UI_DISCO
 static const xy UI_MATCH_OVER_FRAME_SIZE = xy(250, 60);
 const rect_t UI_MATCH_OVER_FRAME_RECT = rect_t(xy((SCREEN_WIDTH / 2) - (UI_MATCH_OVER_FRAME_SIZE.x / 2), 128), UI_MATCH_OVER_FRAME_SIZE);
 const rect_t UI_MATCH_OVER_EXIT_BUTTON_RECT = rect_t(xy((SCREEN_WIDTH / 2) - 32, UI_MATCH_OVER_FRAME_RECT.position.y + 32), xy(63, 21));
+const rect_t UI_MENU_BUTTON_RECT = rect_t(xy(1, 1), xy(19, 18));
+static const xy UI_MENU_SIZE = xy(150, 100);
+const rect_t UI_MENU_RECT = rect_t(xy((SCREEN_WIDTH / 2) - (UI_MENU_SIZE.x / 2), 64), UI_MENU_SIZE);
 
 const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS = {
     { UI_BUTTON_BUILD_HOUSE, (ui_button_requirements_t) {
@@ -624,4 +627,22 @@ const char* ui_get_match_over_message(UiMode ui_mode) {
 
 bool ui_match_over_is_exit_button_hovered() {
     return UI_MATCH_OVER_EXIT_BUTTON_RECT.has_point(input_get_mouse_position());
+}
+
+bool ui_is_menu_button_hovered() {
+    return UI_MENU_BUTTON_RECT.has_point(input_get_mouse_position());
+}
+
+rect_t ui_menu_get_parchment_button_rect(UiMenuButton button) {
+    int index = button - (UI_MENU_BUTTON_NONE + 1);
+    return rect_t(xy((SCREEN_WIDTH / 2) - 45, UI_MENU_RECT.position.y + 36 + (28 * index)), xy(89, 21));
+}
+
+UiMenuButton ui_menu_get_parchment_button_hovered() {
+    for (int i = UI_MENU_BUTTON_NONE + 1; i < UI_MENU_BUTTON_COUNT; i++) {
+        if (ui_menu_get_parchment_button_rect((UiMenuButton)i).has_point(input_get_mouse_position())) {
+            return (UiMenuButton)i;
+        }
+    }
+    return UI_MENU_BUTTON_NONE;
 }
