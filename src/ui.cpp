@@ -5,6 +5,7 @@
 #include "logger.h"
 
 static const uint32_t UI_STATUS_DURATION = 60;
+static const uint32_t UI_CHAT_MESSAGE_DURATION = 180;
 const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
     { UI_BUTTONSET_NONE, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
@@ -603,7 +604,7 @@ void ui_add_chat_message(match_state_t& state, const char* message) {
     GOLD_ASSERT(strlen(message) + 1 <= 128);
     state.chat_head = (state.chat_head + 1) % CHAT_SIZE;
     strcpy(state.chat[state.chat_head].message, message);
-    state.chat[state.chat_head].timer = UI_STATUS_DURATION;
+    state.chat[state.chat_head].timer = UI_CHAT_MESSAGE_DURATION;
 }
 
 bool ui_is_match_over(UiMode ui_mode) {

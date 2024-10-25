@@ -31,6 +31,7 @@ const uint32_t MATCH_ALERT_DURATION = 90;
 const uint32_t MATCH_ALERT_LINGER_DURATION = 60 * 20;
 const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
 const uint32_t MATCH_DISCONNECT_GRACE = 10;
+const rect_t MATCH_CHAT_RECT = rect_t(xy(16, MINIMAP_RECT.position.y - 24), xy(128, 16));
 
 match_state_t match_init() {
     match_state_t state;
@@ -266,10 +267,7 @@ void match_update(match_state_t& state) {
                 continue;
             }
 
-            char input_str[32];
-            char* input_str_ptr = input_str;
             for (const input_t& input : state.inputs[player_id][0]) {
-                input_str_ptr += sprintf(input_str_ptr, "%u, ", input.type);
                 match_input_handle(state, player_id, input);
             } // End for each input in player queue
             state.inputs[player_id].erase(state.inputs[player_id].begin());
@@ -451,6 +449,22 @@ void match_update(match_state_t& state) {
         if (input_is_key_just_pressed(KEY_SPACE) && !state.alerts.empty()) {
             alert_t latest_alert = state.alerts[state.alerts.size() - 1];
             state.camera_offset = camera_centered_on_cell(latest_alert.cell, state.map_width, state.map_height);
+        }
+        if (input_is_key_just_pressed(KEY_ENTER)) {
+            if (state.ui_mode == UI_MODE_NONE) {
+                input_set_text_input_value("");
+                input_start_text_input(MATCH_CHAT_RECT, MAX_CHAT_MESSAGE_SIZE - 1);
+                state.ui_mode = UI_MODE_CHAT;
+            } else {
+                if (input_get_text_input_length() > 0) {
+                    input_t input;
+                    input.type = INPUT_CHAT;
+                    strcpy(input.chat.message, input_get_text_input_value());
+                    state.input_queue.push_back(input);
+                    input_set_text_input_value("");
+                }
+                state.ui_mode = UI_MODE_NONE;
+            }
         }
     }
 
@@ -902,6 +916,12 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.rally.building_count * sizeof(uint16_t);
             break;
         }
+        case INPUT_CHAT: {
+            size_t chat_message_length = strlen(input.chat.message) + 1;
+            memcpy(out_buffer + out_buffer_length, &input.chat.message, chat_message_length * sizeof(char));
+            out_buffer_length += chat_message_length * sizeof(char);
+            break;
+        }
         default:
             break;
     }
@@ -985,6 +1005,10 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             memcpy(&input.rally.building_ids, in_buffer + in_buffer_head, input.rally.building_count * sizeof(entity_id));
             in_buffer_head += input.rally.building_count * sizeof(entity_id);
+        }
+        case INPUT_CHAT: {
+            strcpy(input.chat.message, (char*)(in_buffer + in_buffer_head));
+            log_trace("input chat message:%s", input.chat.message);
         }
         default:
             break;
@@ -1245,6 +1269,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
                 state.buildings[building_index].rally_point = input.rally.rally_point;
             }
+            break;
+        }
+        case INPUT_CHAT: {
+            char message[128];
+            sprintf(message, "%s: %s", network_get_player(player_id).name, input.chat.message);
+            ui_add_chat_message(state, message);
             break;
         }
         default:

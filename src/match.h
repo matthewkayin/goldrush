@@ -14,6 +14,7 @@
 #define MAX_UNITS 200
 #define MAX_PARTICLES 256
 #define CHAT_SIZE 8
+#define MAX_CHAT_MESSAGE_SIZE 64
 
 #define UI_STATUS_CANT_BUILD "You can't build there."
 #define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
@@ -55,6 +56,7 @@ extern const uint32_t MATCH_ALERT_DURATION;
 extern const uint32_t MATCH_ALERT_LINGER_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
 extern const uint32_t MATCH_DISCONNECT_GRACE;
+extern const rect_t MATCH_CHAT_RECT;
 
 // Map
 
@@ -116,6 +118,7 @@ enum UiMode {
     UI_MODE_BUILDING_PLACE,
     UI_MODE_TARGET_ATTACK,
     UI_MODE_TARGET_UNLOAD,
+    UI_MODE_CHAT,
     UI_MODE_WAITING_FOR_PLAYERS,
     UI_MODE_MENU,
     UI_MODE_MENU_SURRENDER,
@@ -403,7 +406,8 @@ enum InputType {
     INPUT_BUILD_CANCEL,
     INPUT_BUILDING_ENQUEUE,
     INPUT_BUILDING_DEQUEUE,
-    INPUT_RALLY
+    INPUT_RALLY,
+    INPUT_CHAT
 };
 
 struct input_move_t {
@@ -450,6 +454,10 @@ struct input_rally_t {
     entity_id building_ids[MAX_UNITS];
 };
 
+struct input_chat_t {
+    char message[MAX_CHAT_MESSAGE_SIZE];
+};
+
 struct input_t {
     uint8_t type;
     union {
@@ -461,6 +469,7 @@ struct input_t {
         input_building_enqueue_t building_enqueue;
         input_building_dequeue_t building_dequeue;
         input_rally_t rally;
+        input_chat_t chat;
     };
 };
 

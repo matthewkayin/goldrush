@@ -27,6 +27,7 @@ enum Key {
     KEY_CTRL,
     KEY_SHIFT,
     KEY_SPACE,
+    KEY_ENTER,
     KEY_COUNT
 };
 

@@ -157,7 +157,8 @@ const std::unordered_map<SDL_Keycode, Key> keymap = {
     { SDLK_0, KEY_0 },
     { SDLK_LCTRL, KEY_CTRL },
     { SDLK_LSHIFT, KEY_SHIFT },
-    { SDLK_SPACE, KEY_SPACE }
+    { SDLK_SPACE, KEY_SPACE },
+    { SDLK_RETURN, KEY_ENTER }
 };
 const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_MOVE, SDLK_v },
@@ -2379,6 +2380,11 @@ void render_match(const match_state_t& state) {
         chat_index = chat_index == 0 
                 ? CHAT_SIZE - 1 
                 : chat_index - 1;
+    }
+    if (state.ui_mode == UI_MODE_CHAT) {
+        char prompt_str[128];
+        sprintf(prompt_str, "Message: %s", input_get_text_input_value());
+        render_text(FONT_HACK, prompt_str, COLOR_WHITE, MATCH_CHAT_RECT.position);
     }
 
     // UI Disconnect frame
