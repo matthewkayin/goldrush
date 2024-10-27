@@ -172,7 +172,8 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_BUILD_CAMP, SDLK_c },
     { UI_BUTTON_BUILD_SALOON, SDLK_s },
     { UI_BUTTON_UNIT_MINER, SDLK_r },
-    { UI_BUTTON_UNIT_COWBOY, SDLK_c }
+    { UI_BUTTON_UNIT_COWBOY, SDLK_c },
+    { UI_BUTTON_UNIT_BANDIT, SDLK_b }
 };
 std::unordered_map<SDL_Keycode, std::vector<UiButton>> hotkeys;
 
@@ -630,7 +631,9 @@ bool engine_create_renderer() {
                 continue;
             }
 
-            SDL_Keycode key = hotkey_keymap.at(button);
+            auto key_it = hotkey_keymap.find(button);
+            GOLD_ASSERT_MESSAGE(key_it != hotkey_keymap.end(), "Hotkey not defined for button.");
+            SDL_Keycode key = key_it->second;
             auto it = hotkeys.find(key);
             if (it == hotkeys.end()) {
                 hotkeys[key] = std::vector<UiButton>();

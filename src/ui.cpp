@@ -19,7 +19,7 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CAMP, { UI_BUTTON_UNIT_MINER, UI_BUTTON_NONE, UI_BUTTON_NONE,
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_COWBOY, UI_BUTTON_NONE, UI_BUTTON_NONE,
+    { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_COWBOY, UI_BUTTON_UNIT_BANDIT, UI_BUTTON_NONE,
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_WAGON, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
                              UI_BUTTON_UNLOAD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
@@ -213,7 +213,8 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_UNIT_MINER: 
-        case UI_BUTTON_UNIT_COWBOY: {
+        case UI_BUTTON_UNIT_COWBOY:
+        case UI_BUTTON_UNIT_BANDIT: {
             // Begin unit training
             UnitType unit_type = (UnitType)(UNIT_MINER + (button - UI_BUTTON_UNIT_MINER));
 

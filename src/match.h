@@ -191,7 +191,8 @@ enum UiMenuButton {
 enum UnitType: uint8_t {
     UNIT_MINER,
     UNIT_COWBOY,
-    UNIT_WAGON
+    UNIT_WAGON,
+    UNIT_BANDIT
 };
 
 enum BuildingType {

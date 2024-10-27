@@ -63,7 +63,24 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .train_duration = 30,
         .ferry_capacity = 4,
         .ferry_size = UNIT_CANT_BE_FERRIED
-    }}
+    }},
+    { UNIT_BANDIT, (unit_data_t) {
+        .name = "Bandit",
+        .sprite = SPRITE_UNIT_BANDIT,
+        .cell_size = 1,
+        .max_health = 30,
+        .damage = 7,
+        .armor = 0,
+        .range_squared = 1,
+        .attack_cooldown = 10,
+        .speed = fixed::from_int_and_raw_decimal(1, 0),
+        .sight = 7,
+        .cost = 75,
+        .population_cost = 1,
+        .train_duration = 20,
+        .ferry_capacity = 0,
+        .ferry_size = 1
+    }},
 };
 
 // Unit
