@@ -1005,10 +1005,12 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             memcpy(&input.rally.building_ids, in_buffer + in_buffer_head, input.rally.building_count * sizeof(entity_id));
             in_buffer_head += input.rally.building_count * sizeof(entity_id);
+            break;
         }
         case INPUT_CHAT: {
             strcpy(input.chat.message, (char*)(in_buffer + in_buffer_head));
             log_trace("input chat message:%s", input.chat.message);
+            break;
         }
         default:
             break;
