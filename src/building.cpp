@@ -34,6 +34,16 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .builder_positions_y = { 32, 27, 9 },
         .builder_flip_h = { false, true, false },
         .can_rally = true
+    }},
+    { BUILDING_BUNKER, (building_data_t) {
+        .name = "Bunker",
+        .cell_size = 2,
+        .cost = 100,
+        .max_health = 100,
+        .builder_positions_x = { 1, 17, 4 },
+        .builder_positions_y = { 15, 0, -8 },
+        .builder_flip_h = { false, true, false },
+        .can_rally = false
     }}
 };
 
@@ -54,8 +64,6 @@ entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType 
     building.taking_damage_timer = 0;
     building.taking_damage_flicker_timer = 0;
     building.taking_damage_flicker = false;
-
-    building.occupancy = OCCUPANCY_EMPTY;
 
     entity_id building_id = state.buildings.push_back(building);
     map_set_cell_rect(state, rect_t(cell, xy(building_data.cell_size, building_data.cell_size)), CELL_BUILDING, building_id);
@@ -280,11 +288,9 @@ bool building_is_finished(const building_t& building) {
     return building.mode == BUILDING_MODE_FINISHED;
 }
 
-int building_get_hframe(BuildingType type, BuildingMode mode, int health, Occupancy occupancy) {
+int building_get_hframe(BuildingType type, BuildingMode mode, int health) {
     if (mode == BUILDING_MODE_IN_PROGRESS) {
         return ((3 * health) / BUILDING_DATA.at(type).max_health);
-    } else if (occupancy == OCCUPANCY_FULL) {
-        return 4;
     } else {
         return 3;
     }

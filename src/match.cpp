@@ -916,6 +916,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.rally.building_count * sizeof(uint16_t);
             break;
         }
+        case INPUT_BUNKER_UNLOAD: {
+            memcpy(out_buffer + out_buffer_length, &input.bunker_unload.building_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.bunker_unload.building_ids, input.bunker_unload.building_count * sizeof(entity_id));
+            out_buffer_length += input.bunker_unload.building_count * sizeof(uint16_t);
+            break;
+        }
         case INPUT_CHAT: {
             size_t chat_message_length = strlen(input.chat.message) + 1;
             memcpy(out_buffer + out_buffer_length, &input.chat.message, chat_message_length * sizeof(char));
@@ -1005,6 +1013,14 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             memcpy(&input.rally.building_ids, in_buffer + in_buffer_head, input.rally.building_count * sizeof(entity_id));
             in_buffer_head += input.rally.building_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_BUNKER_UNLOAD: {
+            memcpy(&input.bunker_unload.building_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(&input.bunker_unload.building_ids, in_buffer + in_buffer_head, input.bunker_unload.building_count * sizeof(entity_id));
+            in_buffer_head += input.bunker_unload.building_count * sizeof(entity_id);
             break;
         }
         case INPUT_CHAT: {
@@ -1272,6 +1288,15 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 state.buildings[building_index].rally_point = input.rally.rally_point;
             }
             break;
+        }
+        case INPUT_BUNKER_UNLOAD: {
+            for (uint16_t id_index = 0; id_index < input.bunker_unload.building_count; id_index++) {
+                uint32_t building_index = state.buildings.get_index_of(input.bunker_unload.building_ids[id_index]);
+                if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
+                    continue;
+                }
+                // TOOD: Unload units from bunker, make sure to handle case where unload location is blocked
+            }
         }
         case INPUT_CHAT: {
             char message[128];

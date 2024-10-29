@@ -474,6 +474,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         uint8_t target_player_id = unit.target.type == UNIT_TARGET_UNIT
                                             ? state.units[target_index].player_id
                                             : state.buildings[target_index].player_id;
+                        // Garrison into unit
                         if (unit.player_id == target_player_id && unit.target.type == UNIT_TARGET_UNIT) {
                             uint32_t target_ferry_capacity = UNIT_DATA.at(state.units[target_index].type).ferry_capacity;
                             if (target_ferry_capacity != 0) {
@@ -497,6 +498,21 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                             };
                             unit_update_finished = true;
                             break;
+                        }
+
+                        // Garrison into bunker
+                        if (unit.player_id == target_player_id && unit.target.type == UNIT_TARGET_BUILDING && state.buildings[target_index].type == BUILDING_BUNKER && UNIT_DATA.at(unit.type).ferry_size == 1) {
+                            if (state.buildings[target_index].garrisoned_units.size() < BUILDING_BUNKER_GARRISON_CAPACITY) {
+                                state.buildings[target_index].garrisoned_units.push_back(state.units.get_id_of(unit_index));
+                                unit.mode = UNIT_MODE_FERRY;
+                                unit.target = (unit_target_t) {
+                                    .type = UNIT_TARGET_NONE
+                                };
+                                map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
+                                ui_set_selection(state, state.selection);
+                                unit_update_finished = true;
+                                break;
+                            } 
                         }
 
                         // Begin repairing building
@@ -570,7 +586,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     // Building tick
                     building_t& building = state.buildings[building_index];
 
-                    int building_hframe = building_get_hframe(building.type, building.mode, building.health, building.occupancy);
+                    int building_hframe = building_get_hframe(building.type, building.mode, building.health);
 #ifdef GOLD_DEBUG_FAST_BUILD
                     building.health = std::min(building.health + 20, BUILDING_DATA.at(building.type).max_health);
 #else
@@ -582,7 +598,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         unit.timer = UNIT_BUILD_TICK_DURATION;
                     }
 
-                    if (building_get_hframe(building.type, building.mode, building.health, building.occupancy) != building_hframe) {
+                    if (building_get_hframe(building.type, building.mode, building.health) != building_hframe) {
                         state.is_fog_dirty = true;
                     }
                 }
@@ -611,7 +627,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
 
                 unit.timer--;
                 if (unit.timer == 0) {
-                    int building_hframe = building_get_hframe(building.type, building.mode, building.health, building.occupancy);
+                    int building_hframe = building_get_hframe(building.type, building.mode, building.health);
                     building.health++;
                     if (building.health == BUILDING_DATA.at(building.type).max_health) {
                         if (building.mode == BUILDING_MODE_IN_PROGRESS) {
@@ -625,7 +641,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     } else {
                         unit.timer = UNIT_BUILD_TICK_DURATION;
                     }
-                    if (building_get_hframe(building.type, building.mode, building.queue_timer, building.occupancy) != building_hframe) {
+                    if (building_get_hframe(building.type, building.mode, building.queue_timer) != building_hframe) {
                         state.is_fog_dirty = true;
                     }
                 }

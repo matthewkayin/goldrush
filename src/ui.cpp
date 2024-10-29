@@ -14,7 +14,7 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
     { UI_BUTTONSET_MINER, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
                       UI_BUTTON_BUILD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_CAMP, UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_SALOON,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
+                      UI_BUTTON_BUILD_BUNKER, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CAMP, { UI_BUTTON_UNIT_MINER, UI_BUTTON_NONE, UI_BUTTON_NONE,
@@ -23,6 +23,8 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_WAGON, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
                              UI_BUTTON_UNLOAD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
+    { UI_BUTTONSET_BUNKER, { UI_BUTTON_UNLOAD, UI_BUTTON_NONE, UI_BUTTON_NONE,
+                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }}
 };
 static const xy UI_BUTTON_SIZE = xy(32, 32);
 static const xy UI_BUTTON_PADDING = xy(4, 6);
@@ -65,6 +67,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
     { UI_BUTTON_BUILD_SALOON, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = BUILDING_CAMP
+    }},
+    { UI_BUTTON_BUILD_BUNKER, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = BUILDING_SALOON
     }}
 };
 
@@ -198,7 +204,8 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
         }
         case UI_BUTTON_BUILD_HOUSE:
         case UI_BUTTON_BUILD_CAMP: 
-        case UI_BUTTON_BUILD_SALOON: {
+        case UI_BUTTON_BUILD_SALOON: 
+        case UI_BUTTON_BUILD_BUNKER: {
             // Begin building placement
             BuildingType building_type = (BuildingType)(BUILDING_HOUSE + (button - UI_BUTTON_BUILD_HOUSE));
 
@@ -451,17 +458,20 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
     } else if (state.selection.type == SELECTION_TYPE_BUILDINGS) {
         bool all_buildings_are_finished_and_same_type = true;
         BuildingType selected_building_type = state.buildings.get_by_id(state.selection.ids[0]).type;
+        int garrison_count = 0;
         for (entity_id id : state.selection.ids) {
             const building_t& id_building = state.buildings.get_by_id(id);
+            garrison_count += id_building.garrisoned_units.size();
             if (id_building.type != selected_building_type || id_building.mode != BUILDING_MODE_FINISHED) {
                 all_buildings_are_finished_and_same_type = false;
-                break;
             }
         }
         if (state.selection.ids.size() == 1 && state.buildings.get_by_id(state.selection.ids[0]).mode == BUILDING_MODE_IN_PROGRESS) {
             state.ui_buttonset = UI_BUTTONSET_CANCEL;
         } else if (!all_buildings_are_finished_and_same_type) {
             state.ui_buttonset = UI_BUTTONSET_NONE;
+        } else if (selected_building_type == BUILDING_BUNKER && garrison_count != 0) {
+            state.ui_buttonset = UI_BUTTONSET_BUNKER;
         } else if (selected_building_type == BUILDING_CAMP) {
             state.ui_buttonset = UI_BUTTONSET_CAMP;
         } else if (selected_building_type == BUILDING_SALOON) {

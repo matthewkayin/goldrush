@@ -38,6 +38,7 @@ const uint32_t BUILDING_QUEUE_BLOCKED = UINT32_MAX;
 const uint32_t BUILDING_QUEUE_EXIT_BLOCKED = UINT32_MAX - 1;
 const uint32_t BUILDING_QUEUE_MAX = 5;
 const uint32_t BUILDING_FADE_DURATION = 300;
+const uint32_t BUILDING_BUNKER_GARRISON_CAPACITY = 4;
 const uint32_t MINE_SIZE = 3;
 
 extern const xy UI_FRAME_BOTTOM_POSITION;
@@ -138,6 +139,7 @@ enum UiButtonset {
     UI_BUTTONSET_CAMP,
     UI_BUTTONSET_SALOON,
     UI_BUTTONSET_WAGON,
+    UI_BUTTONSET_BUNKER,
     UI_BUTTONSET_COUNT
 };
 
@@ -199,7 +201,8 @@ enum BuildingType {
     BUILDING_NONE,
     BUILDING_HOUSE,
     BUILDING_CAMP,
-    BUILDING_SALOON
+    BUILDING_SALOON,
+    BUILDING_BUNKER
 };
 
 struct path_t {
@@ -330,7 +333,7 @@ struct building_t {
     uint32_t taking_damage_flicker_timer;
     bool taking_damage_flicker;
 
-    Occupancy occupancy;
+    std::vector<entity_id> garrisoned_units;
 };
 
 struct remembered_building_t {
@@ -339,7 +342,6 @@ struct remembered_building_t {
     int health;
     xy cell;
     BuildingMode mode;
-    Occupancy occupancy;
 };
 
 struct building_data_t {
@@ -408,6 +410,7 @@ enum InputType {
     INPUT_BUILDING_ENQUEUE,
     INPUT_BUILDING_DEQUEUE,
     INPUT_RALLY,
+    INPUT_BUNKER_UNLOAD,
     INPUT_CHAT
 };
 
@@ -455,6 +458,11 @@ struct input_rally_t {
     entity_id building_ids[MAX_UNITS];
 };
 
+struct input_bunker_unload_t {
+    uint16_t building_count;
+    entity_id building_ids[MAX_UNITS];
+};
+
 struct input_chat_t {
     char message[MAX_CHAT_MESSAGE_SIZE];
 };
@@ -470,6 +478,7 @@ struct input_t {
         input_building_enqueue_t building_enqueue;
         input_building_dequeue_t building_dequeue;
         input_rally_t rally;
+        input_bunker_unload_t bunker_unload;
         input_chat_t chat;
     };
 };
@@ -626,7 +635,7 @@ bool building_is_supply_blocked(const match_state_t& state, const building_t& bu
 xy building_cell_size(BuildingType type);
 rect_t building_get_rect(const building_t& building);
 bool building_is_finished(const building_t& building);
-int building_get_hframe(BuildingType type, BuildingMode mode, int health, Occupancy occupancy);
+int building_get_hframe(BuildingType type, BuildingMode mode, int health);
 bool building_can_be_placed(const match_state_t& state, BuildingType type, xy cell, xy miner_cell);
 Sprite building_get_select_ring(BuildingType type, bool is_enemy);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);

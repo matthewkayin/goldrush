@@ -171,6 +171,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_BUILD_HOUSE, SDLK_e },
     { UI_BUTTON_BUILD_CAMP, SDLK_c },
     { UI_BUTTON_BUILD_SALOON, SDLK_s },
+    { UI_BUTTON_BUILD_BUNKER, SDLK_b },
     { UI_BUTTON_UNIT_MINER, SDLK_r },
     { UI_BUTTON_UNIT_COWBOY, SDLK_c },
     { UI_BUTTON_UNIT_BANDIT, SDLK_b }
@@ -1797,7 +1798,7 @@ void render_match(const match_state_t& state) {
             ysorted.push_back((render_sprite_params_t) {
                 .sprite = (Sprite)sprite,
                 .position = building_render_pos,
-                .frame = xy(building_get_hframe(building.type, building.mode, building.health, building.occupancy), 0),
+                .frame = xy(building_get_hframe(building.type, building.mode, building.health), 0),
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_name = (RecolorName)building.player_id
             });
@@ -2229,10 +2230,12 @@ void render_match(const match_state_t& state) {
     }
 
     // UI Ferried units
-    if (state.selection.type == SELECTION_TYPE_UNITS && state.selection.ids.size() == 1) {
-        const unit_t& unit = state.units.get_by_id(state.selection.ids[0]);
-        for (int i = 0; i < unit.ferried_units.size(); i++) {
-            const unit_t& ferried_unit = state.units.get_by_id(unit.ferried_units[i]);
+    if ((state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_BUILDINGS) && state.selection.ids.size() == 1) {
+        const std::vector<entity_id>& ferried_units = state.selection.type == SELECTION_TYPE_UNITS
+                                    ? state.units.get_by_id(state.selection.ids[0]).ferried_units
+                                    : state.buildings.get_by_id(state.selection.ids[0]).garrisoned_units;
+        for (int i = 0; i < ferried_units.size(); i++) {
+            const unit_t& ferried_unit = state.units.get_by_id(ferried_units[i]);
             xy icon_position = UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy((i % 4) * 34, (i / 4) * 33);
             render_sprite(SPRITE_UI_BUTTON, xy(0, 0), icon_position, RENDER_SPRITE_NO_CULL);
             render_sprite(SPRITE_UI_BUTTON_ICON, xy(UI_BUTTON_UNIT_MINER + ferried_unit.type - 1, 0), icon_position, RENDER_SPRITE_NO_CULL);
