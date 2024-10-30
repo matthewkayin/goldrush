@@ -1614,7 +1614,7 @@ void render_match(const match_state_t& state) {
 
         // Select rings and healthbars
         static const int HEALTHBAR_HEIGHT = 4;
-        static const int HEALTHBAR_PADDING = 2;
+        static const int HEALTHBAR_PADDING = 3;
         static const int BUILDING_HEALTHBAR_PADDING = 5;
         if (state.selection.type == SELECTION_TYPE_BUILDINGS || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
             for (entity_id id : state.selection.ids) {
@@ -1671,8 +1671,8 @@ void render_match(const match_state_t& state) {
                 render_sprite(select_ring_sprite, xy(0, 0), unit_render_pos, RENDER_SPRITE_CENTERED);
 
                 // Determine healthbar rect
-                xy unit_render_size = engine.sprites[UNIT_DATA.at(unit.type).sprite].frame_size;
-                SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - (unit_render_size.x / 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x, .h = HEALTHBAR_HEIGHT };
+                xy unit_render_size = unit_cell_size(unit.type) * TILE_SIZE;
+                SDL_Rect healthbar_rect = (SDL_Rect) { .x = unit_render_pos.x - ((unit_render_size.x / 2) + 2), .y = unit_render_pos.y + (unit_render_size.y / 2) + HEALTHBAR_PADDING, .w = unit_render_size.x + 4, .h = HEALTHBAR_HEIGHT };
                 SDL_Rect healthbar_subrect = healthbar_rect;
                 healthbar_subrect.w = (healthbar_rect.w * unit.health) / UNIT_DATA.at(unit.type).max_health;
 
@@ -2230,15 +2230,16 @@ void render_match(const match_state_t& state) {
     }
 
     // UI Ferried units
-    if ((state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_BUILDINGS) && state.selection.ids.size() == 1) {
+    if (ui_should_render_ferried_units(state)) {
         const std::vector<entity_id>& ferried_units = state.selection.type == SELECTION_TYPE_UNITS
                                     ? state.units.get_by_id(state.selection.ids[0]).ferried_units
                                     : state.buildings.get_by_id(state.selection.ids[0]).garrisoned_units;
         for (int i = 0; i < ferried_units.size(); i++) {
             const unit_t& ferried_unit = state.units.get_by_id(ferried_units[i]);
-            xy icon_position = UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy((i % 4) * 34, (i / 4) * 33);
-            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), icon_position, RENDER_SPRITE_NO_CULL);
-            render_sprite(SPRITE_UI_BUTTON_ICON, xy(UI_BUTTON_UNIT_MINER + ferried_unit.type - 1, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            bool icon_hovered = ui_get_ferried_unit_index_hovered(state) == i;
+            xy icon_position = ui_ferried_unit_icon_position(i) + (icon_hovered ? xy(0, -1) : xy(0, 0));
+            render_sprite(SPRITE_UI_BUTTON, xy(icon_hovered ? 1 : 0, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(UI_BUTTON_UNIT_MINER + ferried_unit.type - 1, icon_hovered ? 1 : 0), icon_position, RENDER_SPRITE_NO_CULL);
 
             SDL_Rect healthbar_rect = (SDL_Rect) {
                 .x = icon_position.x + 1,

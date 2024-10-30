@@ -127,8 +127,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
         unit.mode = UNIT_MODE_DEATH;
         unit.animation = animation_create(unit_get_expected_animation(unit));
 
-        for (entity_id ferried_id : unit.ferried_units) {
-            state.units.get_by_id(ferried_id).health = 0;
+        for (entity_id garrisoned_unit_id : unit.garrisoned_units) {
+            state.units.get_by_id(garrisoned_unit_id).health = 0;
         }
 
         return;
@@ -268,8 +268,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                     }
                     case UNIT_TARGET_UNLOAD: {
                         // Unload ferried units
-                        for (uint32_t ferried_id_index = 0; ferried_id_index < unit.ferried_units.size(); ferried_id_index++) {
-                            entity_id ferried_id = unit.ferried_units[ferried_id_index];
+                        for (uint32_t ferried_id_index = 0; ferried_id_index < unit.garrisoned_units.size(); ferried_id_index++) {
+                            entity_id ferried_id = unit.garrisoned_units[ferried_id_index];
                             log_trace("Attempt unload for unit ferried id index %u ferried id %u", ferried_id_index, ferried_id);
                             unit_t& ferried_unit = state.units.get_by_id(ferried_id);
                             xy dropoff_cell = unit_get_best_unload_cell(state, unit, unit_cell_size(ferried_unit.type));
@@ -280,12 +280,13 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                 break;
                             }
 
+                            ferried_unit.garrison_id = ID_NULL;
                             ferried_unit.cell = dropoff_cell;
                             ferried_unit.position = unit_get_target_position(ferried_unit.type, ferried_unit.cell);
                             map_set_cell_rect(state, rect_t(ferried_unit.cell, unit_cell_size(ferried_unit.type)), CELL_UNIT, ferried_id);
                             ferried_unit.mode = UNIT_MODE_IDLE;
                             ferried_unit.target = (unit_target_t) { .type = UNIT_TARGET_NONE };
-                            unit.ferried_units.erase(unit.ferried_units.begin() + ferried_id_index);
+                            unit.garrisoned_units.erase(unit.garrisoned_units.begin() + ferried_id_index);
                             ferried_id_index--;
                         }
                         // Set this units target to none
@@ -478,13 +479,14 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         if (unit.player_id == target_player_id && unit.target.type == UNIT_TARGET_UNIT) {
                             uint32_t target_ferry_capacity = UNIT_DATA.at(state.units[target_index].type).ferry_capacity;
                             if (target_ferry_capacity != 0) {
-                                for (entity_id ferried_unit_id : state.units[target_index].ferried_units) {
+                                for (entity_id ferried_unit_id : state.units[target_index].garrisoned_units) {
                                     target_ferry_capacity -= UNIT_DATA.at(state.units.get_by_id(ferried_unit_id).type).ferry_size;
                                 }
 
                                 if (target_ferry_capacity >= UNIT_DATA.at(unit.type).ferry_size) {
-                                    state.units[target_index].ferried_units.push_back(state.units.get_id_of(unit_index));
+                                    state.units[target_index].garrisoned_units.push_back(state.units.get_id_of(unit_index));
                                     unit.mode = UNIT_MODE_FERRY;
+                                    unit.garrison_id = state.units.get_id_of(target_index);
                                     unit_update_finished = true;
                                     map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
                                     // Force re-select so that unit is deselected if needed and so that ferry unload button pops up if needed
@@ -508,6 +510,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                                 unit.target = (unit_target_t) {
                                     .type = UNIT_TARGET_NONE
                                 };
+                                unit.garrison_id = state.buildings.get_id_of(target_index);
                                 map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_EMPTY);
                                 ui_set_selection(state, state.selection);
                                 unit_update_finished = true;

@@ -365,6 +365,20 @@ void match_update(match_state_t& state) {
                     .index = (uint16_t)ui_get_building_queue_index_hovered(state)
                 }
             });
+        } else if (state.ui_mode == UI_MODE_NONE && ui_get_ferried_unit_index_hovered(state) != -1) {
+            log_trace("heyy bungalow bill");
+            state.input_queue.push_back((input_t) {
+                .type = (uint8_t)(state.selection.type == SELECTION_TYPE_UNITS
+                            ? INPUT_FERRY_SINGLE_UNLOAD
+                            : INPUT_BUNKER_SINGLE_UNLOAD),
+                .single_unload = (input_single_unload_t) {
+                    .carrier_id = state.selection.ids[0],
+                    .unit_id = state.selection.type == SELECTION_TYPE_UNITS
+                                ? state.units.get_by_id(state.selection.ids[0]).garrisoned_units[ui_get_ferried_unit_index_hovered(state)]
+                                : state.buildings.get_by_id(state.selection.ids[0]).garrisoned_units[ui_get_ferried_unit_index_hovered(state)]
+                }
+            });
+            log_trace("added input. carrier id %u unit id %u", state.input_queue[state.input_queue.size() - 1].single_unload.carrier_id, state.input_queue[state.input_queue.size() - 1].single_unload.unit_id);
         } else if (state.ui_mode == UI_MODE_NONE && MINIMAP_RECT.has_point(mouse_pos)) {
             // On begin minimap drag
             state.ui_mode = UI_MODE_MINIMAP_DRAG;
@@ -924,6 +938,12 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.bunker_unload.building_count * sizeof(uint16_t);
             break;
         }
+        case INPUT_FERRY_SINGLE_UNLOAD:
+        case INPUT_BUNKER_SINGLE_UNLOAD: {
+            memcpy(out_buffer + out_buffer_length, &input.single_unload, sizeof(input_single_unload_t));
+            out_buffer_length += sizeof(input_single_unload_t);
+            break;
+        }
         case INPUT_CHAT: {
             size_t chat_message_length = strlen(input.chat.message) + 1;
             memcpy(out_buffer + out_buffer_length, &input.chat.message, chat_message_length * sizeof(char));
@@ -1021,6 +1041,12 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             memcpy(&input.bunker_unload.building_ids, in_buffer + in_buffer_head, input.bunker_unload.building_count * sizeof(entity_id));
             in_buffer_head += input.bunker_unload.building_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_FERRY_SINGLE_UNLOAD:
+        case INPUT_BUNKER_SINGLE_UNLOAD: {
+            memcpy(&input.single_unload, in_buffer + in_buffer_head, sizeof(input_single_unload_t));
+            in_buffer_head += sizeof(input_single_unload_t);
             break;
         }
         case INPUT_CHAT: {
@@ -1295,8 +1321,97 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 if (building_index == INDEX_INVALID || state.buildings[building_index].health == 0) {
                     continue;
                 }
-                // TOOD: Unload units from bunker, make sure to handle case where unload location is blocked
+                building_t& building = state.buildings.get_by_id(input.bunker_unload.building_ids[id_index]);
+                while (!building.garrisoned_units.empty()) {
+                    // Figure out which cell to exit this unit to
+                    unit_t& unit = state.units.get_by_id(building.garrisoned_units[0]);
+                    xy exit_cell = get_exit_cell(state, rect_t(building.cell, building_cell_size(building.type)), unit_cell_size(unit.type), building.cell + xy(0, building_cell_size(building.type).y));
+                    if (exit_cell.x == -1) {
+                        // If no cell exists, notify the player
+                        if (building.player_id == network_get_player_id()) {
+                            ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                        }
+                        break;
+                    }
+                    unit.cell = exit_cell;
+                    unit.position = cell_center(unit.cell);
+                    map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, building.garrisoned_units[0]);
+                    unit.mode = UNIT_MODE_IDLE;
+                    unit.target = (unit_target_t) {
+                        .type = UNIT_TARGET_NONE
+                    };
+                    building.garrisoned_units.erase(building.garrisoned_units.begin());
+                } // End while garrisoned units not empty
+            } // End for each building in input
+            if (state.ui_buttonset == UI_BUTTONSET_BUNKER) {
+                ui_set_selection(state, state.selection);
             }
+            break;
+        }
+        case INPUT_FERRY_SINGLE_UNLOAD:
+        case INPUT_BUNKER_SINGLE_UNLOAD: {
+            log_trace("handling single unload carrier id %u unit id %u", input.single_unload.carrier_id, input.single_unload.unit_id);
+            // Confirm that unit to unload is alive and is currently being ferried by carrier_id
+            uint32_t unit_index = state.units.get_index_of(input.single_unload.unit_id);
+            if (unit_index == INDEX_INVALID || state.units[unit_index].health == 0 || state.units[unit_index].garrison_id != input.single_unload.carrier_id) {
+                log_trace("unit is invalid");
+                break;
+            }
+            uint32_t carrier_index;
+            rect_t exit_rect;
+            uint8_t player_id;
+            if (input.type == INPUT_FERRY_SINGLE_UNLOAD) {
+                // Check that the carrier is still alive
+                carrier_index = state.units.get_index_of(input.single_unload.carrier_id);
+                if (carrier_index == INDEX_INVALID || state.units[carrier_index].health == 0) {
+                    log_warn("Single unload of unit %u from carrier id %u. Unit is alive and being ferried by this carrier, but the carrier is somehow dead.", input.single_unload.unit_id, input.single_unload.carrier_id);
+                    break;
+                }
+                exit_rect = rect_t(state.units[carrier_index].cell, unit_cell_size(state.units[carrier_index].type));
+                player_id = state.units[carrier_index].player_id;
+            } else {
+                // Check that the carrier is still alive
+                carrier_index = state.buildings.get_index_of(input.single_unload.carrier_id);
+                if (carrier_index == INDEX_INVALID || state.buildings[carrier_index].health == 0) {
+                    log_warn("Single unload of unit %u from carrier id %u. Unit is alive and being ferried by this carrier, but the carrier is somehow dead.", input.single_unload.unit_id, input.single_unload.carrier_id);
+                    break;
+                }
+                exit_rect = rect_t(state.buildings[carrier_index].cell, building_cell_size(state.buildings[carrier_index].type));
+                player_id = state.buildings[carrier_index].player_id;
+            }
+            // Unload the unit
+            unit_t& unit = state.units[unit_index];
+            xy exit_cell = get_exit_cell(state, exit_rect, unit_cell_size(unit.type), exit_rect.position + xy(0, exit_rect.size.y));
+            if (exit_cell.x == -1) {
+                // If no cell exists, notify the player
+                if (player_id == network_get_player_id()) {
+                    // TODO ? show status for when wagon is blocked?
+                    if (input.type == INPUT_BUNKER_SINGLE_UNLOAD) {
+                        ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                    }
+                }
+                break;
+            }
+            unit.cell = exit_cell;
+            unit.position = cell_center(unit.cell);
+            map_set_cell_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), CELL_UNIT, input.single_unload.unit_id);
+            unit.mode = UNIT_MODE_IDLE;
+            unit.target = (unit_target_t) {
+                .type = UNIT_TARGET_NONE
+            };
+            std::vector<entity_id>& garrisoned_units = input.type == INPUT_FERRY_SINGLE_UNLOAD
+                                                        ? state.units[carrier_index].garrisoned_units
+                                                        : state.buildings[carrier_index].garrisoned_units;
+            auto it = std::find(garrisoned_units.begin(), garrisoned_units.end(), input.single_unload.unit_id);
+            if (it == garrisoned_units.end()) {
+                log_warn("During single unload, unit id %u not found in ferried units of id %u", input.single_unload.unit_id, input.single_unload.carrier_id);
+            } else {
+                garrisoned_units.erase(it);
+            }
+            if (std::find(state.selection.ids.begin(), state.selection.ids.end(), input.single_unload.carrier_id) != state.selection.ids.end()) {
+                ui_set_selection(state, state.selection);
+            }
+            break;
         }
         case INPUT_CHAT: {
             char message[128];

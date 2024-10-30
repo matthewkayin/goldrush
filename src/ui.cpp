@@ -198,8 +198,19 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_UNLOAD: {
-            state.ui_mode = UI_MODE_TARGET_UNLOAD;
-            state.ui_buttonset = UI_BUTTONSET_CANCEL;
+            if (state.ui_buttonset == UI_BUTTONSET_BUNKER) {
+                input_t input;
+                input.type = INPUT_BUNKER_UNLOAD;
+                input.bunker_unload.building_count = 0;
+                for (entity_id id : state.selection.ids) {
+                    input.bunker_unload.building_ids[input.bunker_unload.building_count] = id;
+                    input.bunker_unload.building_count++;
+                }
+                state.input_queue.push_back(input);
+            } else {
+                state.ui_mode = UI_MODE_TARGET_UNLOAD;
+                state.ui_buttonset = UI_BUTTONSET_CANCEL;
+            }
             break;
         }
         case UI_BUTTON_BUILD_HOUSE:
@@ -608,6 +619,31 @@ int ui_get_building_queue_index_hovered(const match_state_t& state) {
         }
     }
     
+    return -1;
+}
+
+xy ui_ferried_unit_icon_position(int i) {
+    return UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy((i % 4) * 34, (i / 4) * 33);
+}
+
+bool ui_should_render_ferried_units(const match_state_t& state) {
+    return (state.selection.type == SELECTION_TYPE_UNITS || state.selection.type == SELECTION_TYPE_BUILDINGS) && state.selection.ids.size() == 1;
+}
+
+int ui_get_ferried_unit_index_hovered(const match_state_t& state) {
+    if (!ui_should_render_ferried_units(state) || state.ui_mode != UI_MODE_NONE) {
+        return -1;
+    }
+
+    int ferried_units_size = state.selection.type == SELECTION_TYPE_UNITS
+                                                ? state.units.get_by_id(state.selection.ids[0]).ferried_units.size()
+                                                : state.buildings.get_by_id(state.selection.ids[0]).garrisoned_units.size();
+    for (int ferried_unit_index = 0; ferried_unit_index < ferried_units_size; ferried_unit_index++) {
+        if (rect_t(ui_ferried_unit_icon_position(ferried_unit_index), xy(32, 32)).has_point(input_get_mouse_position())) {
+            return ferried_unit_index;
+        }
+    }
+
     return -1;
 }
 

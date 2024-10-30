@@ -271,7 +271,7 @@ struct unit_t {
     bool hold_position;
 
     entity_id garrison_id;
-    std::vector<entity_id> ferried_units;
+    std::vector<entity_id> garrisoned_units;
     uint32_t gold_held;
     uint32_t timer;
 
@@ -411,6 +411,8 @@ enum InputType {
     INPUT_BUILDING_DEQUEUE,
     INPUT_RALLY,
     INPUT_BUNKER_UNLOAD,
+    INPUT_FERRY_SINGLE_UNLOAD,
+    INPUT_BUNKER_SINGLE_UNLOAD,
     INPUT_CHAT
 };
 
@@ -463,6 +465,11 @@ struct input_bunker_unload_t {
     entity_id building_ids[MAX_UNITS];
 };
 
+struct input_single_unload_t {
+    entity_id carrier_id;
+    entity_id unit_id;
+};
+
 struct input_chat_t {
     char message[MAX_CHAT_MESSAGE_SIZE];
 };
@@ -479,6 +486,7 @@ struct input_t {
         input_building_dequeue_t building_dequeue;
         input_rally_t rally;
         input_bunker_unload_t bunker_unload;
+        input_single_unload_t single_unload;
         input_chat_t chat;
     };
 };
@@ -572,6 +580,9 @@ selection_mode_t ui_get_mode_of_selection(const match_state_t& state, const sele
 void ui_deselect_unit_if_selected(match_state_t& state, entity_id unit_id);
 entity_id ui_get_nearest_builder(const match_state_t& state, xy cell);
 int ui_get_building_queue_index_hovered(const match_state_t& state);
+xy ui_ferried_unit_icon_position(int i);
+bool ui_should_render_ferried_units(const match_state_t& state);
+int ui_get_ferried_unit_index_hovered(const match_state_t& state);
 void ui_add_chat_message(match_state_t& state, const char* message);
 bool ui_is_match_over(UiMode ui_mode);
 const char* ui_get_match_over_message(UiMode ui_mode);
