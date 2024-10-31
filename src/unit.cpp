@@ -452,7 +452,8 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         break;
                     }
                     case UNIT_TARGET_UNIT: 
-                    case UNIT_TARGET_BUILDING: {
+                    case UNIT_TARGET_BUILDING: 
+                    case UNIT_TARGET_REPAIR: {
                         if (unit_is_target_dead_or_ferried(state, unit)) {
                             unit.target = (unit_target_t) {
                                 .type = UNIT_TARGET_NONE
@@ -519,7 +520,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                         }
 
                         // Begin repairing building
-                        if (unit.player_id == target_player_id && unit.type == UNIT_MINER && unit.target.type == UNIT_TARGET_BUILDING) {
+                        if (unit.player_id == target_player_id && unit.type == UNIT_MINER && (unit.target.type == UNIT_TARGET_BUILDING || unit.target.type == UNIT_TARGET_REPAIR)) {
                             building_t& building = state.buildings.get_by_id(unit.target.id);
                             if (building.health < BUILDING_DATA.at(building.type).max_health) {
                                 unit.mode = UNIT_MODE_REPAIR;
@@ -874,6 +875,7 @@ xy unit_get_target_cell(const match_state_t& state, const unit_t& unit) {
             return get_nearest_cell_around_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), rect_t(state.units[target_unit_index].cell, unit_cell_size(state.units[target_unit_index].type)));
         }
         case UNIT_TARGET_BUILDING:
+        case UNIT_TARGET_REPAIR:
         case UNIT_TARGET_CAMP: {
             rect_t camp_rect = rect_t(state.buildings.get_by_id(unit.target.id).cell, building_cell_size(BUILDING_CAMP));
             return get_nearest_cell_around_rect(state, rect_t(unit.cell, unit_cell_size(unit.type)), camp_rect, unit.target.type == UNIT_TARGET_CAMP);
@@ -927,6 +929,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
                         ? unit_rect.is_adjacent_to(building_rect) 
                         : unit_rect.euclidean_distance_squared_to(building_rect) <= UNIT_DATA.at(unit.type).range_squared;
         }
+        case UNIT_TARGET_REPAIR:
         case UNIT_TARGET_CAMP: {
             uint32_t camp_index = state.buildings.get_index_of(unit.target.id);
             GOLD_ASSERT(camp_index != INDEX_INVALID);
@@ -938,7 +941,7 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
 }
 
 bool unit_is_target_dead_or_ferried(const match_state_t& state, const unit_t& unit) {
-    GOLD_ASSERT(unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING || unit.target.type == UNIT_TARGET_BUILD_ASSIST);
+    GOLD_ASSERT(unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILDING || unit.target.type == UNIT_TARGET_BUILD_ASSIST || unit.target.type == UNIT_TARGET_REPAIR);
 
     uint32_t target_index = (unit.target.type == UNIT_TARGET_UNIT || unit.target.type == UNIT_TARGET_BUILD_ASSIST) ? state.units.get_index_of(unit.target.id) : state.buildings.get_index_of(unit.target.id);
     if (target_index == INDEX_INVALID) {

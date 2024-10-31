@@ -556,73 +556,7 @@ void match_update(match_state_t& state) {
     bool is_player_ordering_move = (input_is_mouse_button_just_pressed(MOUSE_BUTTON_RIGHT) && state.ui_mode == UI_MODE_NONE) ||
                                        (input_is_mouse_button_just_pressed(MOUSE_BUTTON_LEFT) && ui_is_ui_mode_target(state.ui_mode)) ;
     if (is_player_ordering_move && state.selection.type == SELECTION_TYPE_UNITS && (MINIMAP_RECT.has_point(mouse_pos) || !ui_is_mouse_in_ui())) {
-        xy move_target;
-        if (ui_is_mouse_in_ui()) {
-            xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
-            move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
-                                (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
-        } else {
-            move_target = mouse_world_pos;
-        }
-
-        // Create the move event
-        input_t input;
-        input.move.target_cell = move_target / TILE_SIZE;
-        input.move.target_entity_id = ID_NULL;
-        CellType cell_type = map_get_cell(state, input.move.target_cell).type;
-        FogType fog_type = map_get_fog(state, network_get_player_id(), input.move.target_cell);
-        if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || ((cell_type == CELL_BUILDING || cell_type == CELL_MINE) && fog_type != FOG_HIDDEN)) {
-            input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
-            // If the cell is a building or a mine and the player has not seen this cell or mine, then treat this movement like a normal cell move
-            if ((cell_type == CELL_BUILDING && state.remembered_buildings[network_get_player_id()].find(input.move.target_entity_id) == state.remembered_buildings[network_get_player_id()].end()) ||
-                (cell_type == CELL_MINE && state.remembered_mines[network_get_player_id()].find(input.move.target_entity_id) == state.remembered_mines[network_get_player_id()].end())) {
-                input.move.target_entity_id = ID_NULL;
-            }
-        }
-
-        //                                          This is so that if they directly click their target, it acts the same as a regular right click on the target
-        if (state.ui_mode == UI_MODE_TARGET_ATTACK && (input.move.target_entity_id == ID_NULL || map_get_fog(state, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN)) {
-            input.type = INPUT_ATTACK_MOVE;
-        } else if (state.ui_mode == UI_MODE_TARGET_UNLOAD) {
-            input.type = INPUT_UNLOAD_MOVE;
-        } else if (map_get_fog(state, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN) {
-            input.type = INPUT_BLIND_MOVE;
-        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_UNIT) {
-            input.type = INPUT_MOVE_UNIT;
-        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_BUILDING) {
-            input.type = INPUT_MOVE_BUILDING;
-        } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_MINE) {
-            input.type = INPUT_MOVE_MINE;
-        } else {
-            input.type = INPUT_MOVE;
-        }
-
-        input.move.unit_count = 0;
-        memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
-        input.move.unit_count = state.selection.ids.size();
-        // The unit count should be greater than 0 because the selection type is SELECTION_TYPE_UNITS
-        GOLD_ASSERT(input.move.unit_count != 0);
-        state.input_queue.push_back(input);
-
-        // Provide instant user feedback
-        state.ui_move_cell = input.move.target_entity_id == ID_NULL
-                                ? (cell_t) {
-                                    .type = CELL_EMPTY,
-                                    .value = 0
-                                }
-                                : map_get_cell(state, input.move.target_cell);
-        if (input.type == INPUT_BLIND_MOVE || input.type == INPUT_UNLOAD_MOVE || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
-            state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
-            state.ui_move_position = mouse_world_pos;
-        } else {
-            state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_GOLD);
-            state.ui_move_position = cell_center(input.move.target_cell).to_xy();
-        }
-
-        if (ui_is_ui_mode_target(state.ui_mode)) {
-            state.ui_mode = UI_MODE_NONE;
-            ui_set_selection(state, state.selection);
-        }
+        match_order_move(state, mouse_pos, mouse_world_pos);
     }
 
     // RALLY POINT
@@ -825,6 +759,86 @@ void match_update(match_state_t& state) {
     }
 }
 
+void match_order_move(match_state_t& state, xy mouse_pos, xy mouse_world_pos) {
+    xy move_target;
+    if (ui_is_mouse_in_ui()) {
+        xy minimap_pos = mouse_pos - MINIMAP_RECT.position;
+        move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.size.x, 
+                            (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.size.y);
+    } else {
+        move_target = mouse_world_pos;
+    }
+
+    // Create the move event
+    input_t input;
+    input.move.target_cell = move_target / TILE_SIZE;
+    input.move.target_entity_id = ID_NULL;
+    CellType cell_type = map_get_cell(state, input.move.target_cell).type;
+    FogType fog_type = map_get_fog(state, network_get_player_id(), input.move.target_cell);
+    if ((cell_type == CELL_UNIT && fog_type == FOG_REVEALED) || ((cell_type == CELL_BUILDING || cell_type == CELL_MINE) && fog_type != FOG_HIDDEN)) {
+        input.move.target_entity_id = map_get_cell(state, input.move.target_cell).value;
+        // If the cell is a building or a mine and the player has not seen this cell or mine, then treat this movement like a normal cell move
+        if ((cell_type == CELL_BUILDING && state.remembered_buildings[network_get_player_id()].find(input.move.target_entity_id) == state.remembered_buildings[network_get_player_id()].end()) ||
+            (cell_type == CELL_MINE && state.remembered_mines[network_get_player_id()].find(input.move.target_entity_id) == state.remembered_mines[network_get_player_id()].end())) {
+            input.move.target_entity_id = ID_NULL;
+        }
+    }
+
+    // If player is repair moving, check to make sure they have targeted one of their own buildings
+    if (state.ui_mode == UI_MODE_TARGET_REPAIR && 
+        (input.move.target_entity_id == ID_NULL || cell_type != CELL_BUILDING || 
+         state.buildings.get_by_id(input.move.target_entity_id).player_id != network_get_player_id())) {
+        ui_show_status(state, UI_STATUS_REPAIR_TARGET_INVALID);
+        return;
+    }
+
+    // This is so that if they directly click their target, it acts the same as a regular right click on the target
+    if (state.ui_mode == UI_MODE_TARGET_ATTACK && (input.move.target_entity_id == ID_NULL || map_get_fog(state, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN)) {
+        input.type = INPUT_MOVE_ATTACK;
+    } else if (state.ui_mode == UI_MODE_TARGET_UNLOAD) {
+        input.type = INPUT_MOVE_UNLOAD;
+    } else if (state.ui_mode == UI_MODE_TARGET_REPAIR) {
+        input.type = INPUT_MOVE_REPAIR;
+    } else if (map_get_fog(state, network_get_player_id(), input.move.target_cell) == FOG_HIDDEN) {
+        input.type = INPUT_MOVE_BLIND;
+    } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_UNIT) {
+        input.type = INPUT_MOVE_UNIT;
+    } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_BUILDING) {
+        input.type = INPUT_MOVE_BUILDING;
+    } else if (input.move.target_entity_id != ID_NULL && map_get_cell(state, input.move.target_cell).type == CELL_MINE) {
+        input.type = INPUT_MOVE_MINE;
+    } else {
+        input.type = INPUT_MOVE;
+    }
+    
+    input.move.unit_count = 0;
+    memcpy(input.move.unit_ids, &state.selection.ids[0], state.selection.ids.size() * sizeof(uint16_t));
+    input.move.unit_count = state.selection.ids.size();
+    // The unit count should be greater than 0 because the selection type is SELECTION_TYPE_UNITS
+    GOLD_ASSERT(input.move.unit_count != 0);
+    state.input_queue.push_back(input);
+
+    // Provide instant user feedback
+    state.ui_move_cell = input.move.target_entity_id == ID_NULL
+                            ? (cell_t) {
+                                .type = CELL_EMPTY,
+                                .value = 0
+                            }
+                            : map_get_cell(state, input.move.target_cell);
+    if (input.type == INPUT_MOVE_BLIND || input.type == INPUT_MOVE_UNLOAD || map_get_cell(state, input.move.target_cell).type == CELL_EMPTY) {
+        state.ui_move_animation = animation_create(ANIMATION_UI_MOVE);
+        state.ui_move_position = mouse_world_pos;
+    } else {
+        state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_GOLD);
+        state.ui_move_position = cell_center(input.move.target_cell).to_xy();
+    }
+
+    if (ui_is_ui_mode_target(state.ui_mode)) {
+        state.ui_mode = UI_MODE_NONE;
+        ui_set_selection(state, state.selection);
+    }
+}
+
 uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id) {
     uint32_t population = 0;
     for (const unit_t& unit : state.units) {
@@ -854,12 +868,13 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
     out_buffer_length++;
 
     switch (input.type) {
-        case INPUT_ATTACK_MOVE:
-        case INPUT_UNLOAD_MOVE:
-        case INPUT_BLIND_MOVE:
+        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_UNLOAD:
+        case INPUT_MOVE_BLIND:
         case INPUT_MOVE_UNIT:
         case INPUT_MOVE_BUILDING:
         case INPUT_MOVE_MINE:
+        case INPUT_MOVE_REPAIR:
         case INPUT_MOVE: {
             memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
             out_buffer_length += sizeof(xy);
@@ -961,12 +976,13 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
     in_buffer_head++;
 
     switch (input.type) {
-        case INPUT_ATTACK_MOVE:
-        case INPUT_UNLOAD_MOVE:
-        case INPUT_BLIND_MOVE:
+        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_UNLOAD:
+        case INPUT_MOVE_BLIND:
         case INPUT_MOVE_UNIT:
         case INPUT_MOVE_BUILDING:
         case INPUT_MOVE_MINE:
+        case INPUT_MOVE_REPAIR:
         case INPUT_MOVE: {
             memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
@@ -1063,12 +1079,13 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input) {
     switch (input.type) {
-        case INPUT_BLIND_MOVE:
-        case INPUT_ATTACK_MOVE:
-        case INPUT_UNLOAD_MOVE:
+        case INPUT_MOVE_BLIND:
+        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_UNLOAD:
         case INPUT_MOVE_UNIT:
         case INPUT_MOVE_BUILDING:
         case INPUT_MOVE_MINE:
+        case INPUT_MOVE_REPAIR:
         case INPUT_MOVE: {
             // If we tried to move towards a unit, try and find the unit
             uint32_t target_index;
@@ -1077,7 +1094,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 if (target_index != INDEX_INVALID && state.units[target_index].health == 0) {
                     target_index = INDEX_INVALID;
                 }
-            } else if (input.type == INPUT_MOVE_BUILDING) {
+            } else if (input.type == INPUT_MOVE_BUILDING || input.type == INPUT_MOVE_REPAIR) {
                 target_index = state.buildings.get_index_of(input.move.target_entity_id);
                 if (target_index != INDEX_INVALID && state.buildings[target_index].health == 0) {
                     target_index = INDEX_INVALID;
@@ -1141,17 +1158,17 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
 
                 // Set the units target
-                if (input.type == INPUT_BLIND_MOVE) {
+                if (input.type == INPUT_MOVE_BLIND) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_CELL,
                         .cell = unit_target
                     });
-                } else if (input.type == INPUT_ATTACK_MOVE) {
+                } else if (input.type == INPUT_MOVE_ATTACK) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_ATTACK,
                         .cell = unit_target
                     });
-                } else if (input.type == INPUT_UNLOAD_MOVE) {
+                } else if (input.type == INPUT_MOVE_UNLOAD) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_UNLOAD,
                         .cell = unit_target
@@ -1176,6 +1193,11 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 } else if (input.type == INPUT_MOVE_MINE && unit.type == UNIT_MINER) {
                     unit_set_target(state, unit, (unit_target_t) {
                         .type = UNIT_TARGET_MINE,
+                        .id = input.move.target_entity_id
+                    });
+                } else if (input.type == INPUT_MOVE_REPAIR && target_index != INDEX_INVALID) {
+                    unit_set_target(state, unit, (unit_target_t) {
+                        .type = UNIT_TARGET_REPAIR,
                         .id = input.move.target_entity_id
                     });
                 } else {

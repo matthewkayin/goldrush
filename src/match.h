@@ -24,6 +24,7 @@
 #define UI_STATUS_UNDER_ATTACK "You're under attack!"
 #define UI_STATUS_MINE_EXIT_BLOCKED "Mine exit is blocked."
 #define UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
+#define UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
 
 const rect_t MINIMAP_RECT = rect_t(xy(4, SCREEN_HEIGHT - 132), xy(128, 128));
 
@@ -126,6 +127,7 @@ enum UiMode {
     UI_MODE_BUILDING_PLACE,
     UI_MODE_TARGET_ATTACK,
     UI_MODE_TARGET_UNLOAD,
+    UI_MODE_TARGET_REPAIR,
     UI_MODE_CHAT,
     UI_MODE_WAITING_FOR_PLAYERS,
     UI_MODE_MENU,
@@ -227,7 +229,8 @@ enum UnitTargetType {
     UNIT_TARGET_CAMP,
     UNIT_TARGET_MINE,
     UNIT_TARGET_ATTACK,
-    UNIT_TARGET_UNLOAD
+    UNIT_TARGET_UNLOAD,
+    UNIT_TARGET_REPAIR
 };
 
 enum UnitMode {
@@ -407,9 +410,10 @@ enum InputType {
     INPUT_MOVE_UNIT,
     INPUT_MOVE_BUILDING,
     INPUT_MOVE_MINE,
-    INPUT_BLIND_MOVE,
-    INPUT_ATTACK_MOVE,
-    INPUT_UNLOAD_MOVE,
+    INPUT_MOVE_BLIND,
+    INPUT_MOVE_ATTACK,
+    INPUT_MOVE_UNLOAD,
+    INPUT_MOVE_REPAIR,
     INPUT_STOP,
     INPUT_DEFEND,
     INPUT_BUILD,
@@ -553,6 +557,7 @@ struct match_state_t {
 
 match_state_t match_init();
 void match_update(match_state_t& state);
+void match_order_move(match_state_t& state, xy mouse_pos, xy mouse_world_pos);
 
 uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id);
 uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id);

@@ -166,6 +166,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_ATTACK, SDLK_a },
     { UI_BUTTON_DEFEND, SDLK_d },
     { UI_BUTTON_BUILD, SDLK_b },
+    { UI_BUTTON_REPAIR, SDLK_r },
     { UI_BUTTON_CANCEL, SDLK_ESCAPE },
     { UI_BUTTON_UNLOAD, SDLK_x },
     { UI_BUTTON_BUILD_HOUSE, SDLK_e },
@@ -1604,7 +1605,9 @@ void render_match(const match_state_t& state) {
             }
 
             Sprite destroyed_sprite;
-            if (building_cell_size(building.type) == xy(3, 3)) {
+            if (building.type == BUILDING_BUNKER) {
+                destroyed_sprite = SPRITE_BUILDING_DESTROYED_BUNKER;
+            } else if (building_cell_size(building.type) == xy(3, 3)) {
                 destroyed_sprite = SPRITE_BUILDING_DESTROYED_3;
             } else {
                 destroyed_sprite = SPRITE_BUILDING_DESTROYED_2;
@@ -2321,6 +2324,8 @@ void render_match(const match_state_t& state) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Stop");
         } else if (button == UI_BUTTON_BUILD) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Build");
+        } else if (button == UI_BUTTON_REPAIR) {
+            tooltip_text_ptr += sprintf(tooltip_text_ptr, "Repair");
         } else if (button == UI_BUTTON_DEFEND) {
             tooltip_text_ptr += sprintf(tooltip_text_ptr, "Defend");
         } else if (button == UI_BUTTON_CANCEL) {

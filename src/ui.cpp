@@ -12,7 +12,7 @@ const std::unordered_map<UiButtonset, std::array<UiButton, 6>> UI_BUTTONS = {
     { UI_BUTTONSET_UNIT, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_MINER, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
-                      UI_BUTTON_BUILD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
+                      UI_BUTTON_REPAIR, UI_BUTTON_BUILD, UI_BUTTON_NONE }},
     { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_CAMP, UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_SALOON,
                       UI_BUTTON_BUILD_BUNKER, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
@@ -75,7 +75,7 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
 };
 
 bool ui_is_ui_mode_target(UiMode mode) {
-    return mode >= UI_MODE_TARGET_ATTACK && mode <= UI_MODE_TARGET_UNLOAD;
+    return mode >= UI_MODE_TARGET_ATTACK && mode <= UI_MODE_TARGET_REPAIR;
 }
 
 void ui_show_status(match_state_t& state, const char* message) {
@@ -160,8 +160,16 @@ void ui_handle_button_pressed(match_state_t& state, UiButton button) {
             state.ui_buttonset = UI_BUTTONSET_BUILD;
             break;
         }
+        case UI_BUTTON_REPAIR: {
+            state.ui_mode = UI_MODE_TARGET_REPAIR;
+            state.ui_buttonset = UI_BUTTONSET_CANCEL;
+            break;
+        }
         case UI_BUTTON_CANCEL: {
             if (state.ui_buttonset == UI_BUTTONSET_BUILD) {
+                state.ui_buttonset = UI_BUTTONSET_MINER;
+            } else if (state.ui_mode == UI_MODE_TARGET_REPAIR) {
+                state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_MINER;
             } else if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
                 state.ui_mode = UI_MODE_NONE;

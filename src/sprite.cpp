@@ -241,6 +241,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .options = 0
     }},
+    { SPRITE_BUILDING_DESTROYED_BUNKER, (sprite_params_t) {
+        .path = "sprite/building_destroyed_bunker.png",
+        .hframes = 1,
+        .vframes = 1,
+        .options = 0
+    }},
     { SPRITE_FOG_OF_WAR, (sprite_params_t) {
         .path = "sprite/fog_of_war.png",
         .hframes = 47 * 2,
