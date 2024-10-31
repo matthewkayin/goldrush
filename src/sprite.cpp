@@ -264,6 +264,12 @@ const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 4,
         .vframes = 3,
         .options = 0
+    }},
+    { SPRITE_PARTICLE_BUNKER_COWBOY, (sprite_params_t) {
+        .path = "sprite/particle_bunker_cowboy.png",
+        .hframes = 2,
+        .vframes = 1,
+        .options = 0
     }}  
 };
 
@@ -545,6 +551,12 @@ const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
         .vframe = -1,
         .hframe_start = 0, .hframe_end = 3,
         .frame_duration = 3,
+        .loops = 1
+    }},
+    { ANIMATION_PARTICLE_BUNKER_COWBOY, (animation_data_t) {
+        .vframe = -1,
+        .hframe_start = 0, .hframe_end = 1,
+        .frame_duration = 8,
         .loops = 1
     }}
 };

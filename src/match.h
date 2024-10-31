@@ -39,6 +39,13 @@ const uint32_t BUILDING_QUEUE_EXIT_BLOCKED = UINT32_MAX - 1;
 const uint32_t BUILDING_QUEUE_MAX = 5;
 const uint32_t BUILDING_FADE_DURATION = 300;
 const uint32_t BUILDING_BUNKER_GARRISON_CAPACITY = 4;
+const uint32_t BUILDING_BUNKER_FIRE_OFFSET = 10;
+const xy BUILDING_BUNKER_PARTICLE_OFFSETS[4] = {
+    xy(3, 23), 
+    xy(11, 26),
+    xy(20, 25),
+    xy(28, 23)
+};
 const uint32_t MINE_SIZE = 3;
 
 extern const xy UI_FRAME_BOTTOM_POSITION;
@@ -635,6 +642,7 @@ unit_target_t unit_target_nearest_camp(const match_state_t& state, xy unit_cell,
 unit_target_t unit_target_nearest_mine(const match_state_t& state, const unit_t& unit);
 unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, const unit_t& unit);
 xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy cell_size);
+void unit_attack_target(match_state_t& state, entity_id unit_id, unit_target_t target);
 
 // Building
 entity_id building_create(match_state_t& state, uint8_t player_id, BuildingType type, xy cell);

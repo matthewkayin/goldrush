@@ -741,124 +741,7 @@ void unit_update(match_state_t& state, uint32_t unit_index) {
                 }
 
                 if (!animation_is_playing(unit.animation)) {
-                    bool attack_missed = false;
-
-                    rect_t enemy_rect;
-                    if (unit.target.type == UNIT_TARGET_UNIT) {
-                        uint32_t enemy_index = state.units.get_index_of(unit.target.id);
-                        GOLD_ASSERT(enemy_index != INDEX_INVALID);
-                        unit_t& enemy = state.units[enemy_index];
-                        enemy_rect = unit_get_rect(enemy);
-
-                        int damage = std::max(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
-                        // Elevation accuracy disadvantage - If unit is on lower elevation than target, unit has 50% chance to miss
-                        if (unit_get_elevation(state, unit) < unit_get_elevation(state, enemy)) {
-                            if (lcg_rand() % 2 == 0) {
-                                damage = 0;
-                                attack_missed = true;
-                            }
-                        }
-                        enemy.health = std::max(0, enemy.health - damage);
-                        if (enemy.taking_damage_timer == 0) {
-                            // Only show the alert if the enemy being attacked belongs to the current player
-                            if (enemy.player_id == network_get_player_id()) {
-                                // Only show the alert if the enemy being attacked is not on screen
-                                rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT - UI_HEIGHT));
-                                rect_t enemy_rect = unit_get_rect(enemy);
-                                if (!screen_rect.intersects(enemy_rect)) {
-                                    bool is_existing_attack_alert_close_by = false;
-                                    for (const alert_t& alert : state.alerts) {
-                                        if (xy::manhattan_distance(alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
-                                            is_existing_attack_alert_close_by = true;
-                                            break;
-                                        }
-                                    }
-
-                                    // Only show the alert if this is the first enemy being attacked
-                                    if (!is_existing_attack_alert_close_by) {
-                                        state.alerts.push_back((alert_t) {
-                                            .type = ALERT_RED,
-                                            .status = ALERT_STATUS_SHOW,
-                                            .cell = enemy.cell,
-                                            .cell_size = unit_cell_size(enemy.type),
-                                            .timer = MATCH_ALERT_DURATION
-                                        });
-                                        ui_show_status(state, UI_STATUS_UNDER_ATTACK);
-                                    }
-                                }
-                            }
-
-                            enemy.taking_damage_flicker = true;
-                            enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
-                        }
-                        enemy.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
-
-                        // Make the enemy attack back
-                        if (enemy.mode == UNIT_MODE_IDLE && enemy.target.type == UNIT_TARGET_NONE && UNIT_DATA.at(enemy.type).damage != 0 && unit_can_see_rect(enemy, rect_t(unit.cell, unit_cell_size(unit.type)))) {
-                            enemy.target = (unit_target_t) {
-                                .type = UNIT_TARGET_UNIT,
-                                .id = unit_id
-                            };
-                        }
-                    } else if (unit.target.type == UNIT_TARGET_BUILDING) {
-                        uint32_t enemy_index = state.buildings.get_index_of(unit.target.id);
-                        GOLD_ASSERT(enemy_index != INDEX_INVALID);
-                        building_t& enemy = state.buildings[enemy_index];
-                        enemy_rect = building_get_rect(enemy);
-
-                        // NOTE: Buildings have no armor 
-                        int damage = std::min(1, unit_get_damage(state, unit));
-                        enemy.health = std::max(0, enemy.health - damage);
-                        if (enemy.taking_damage_timer == 0) {
-                            // Only show the alert if the enemy being attacked belongs to the current player
-                            if (enemy.player_id == network_get_player_id()) {
-                                // Only show the alert if the enemy being attacked is not on screen
-                                rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT - UI_HEIGHT));
-                                rect_t enemy_rect = building_get_rect(enemy);
-                                if (!screen_rect.intersects(enemy_rect)) {
-                                    bool is_existing_attack_alert_close_by = false;
-                                    for (const alert_t& alert : state.alerts) {
-                                        if (alert.type == ALERT_RED && xy::manhattan_distance(alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
-                                            is_existing_attack_alert_close_by = true;
-                                            break;
-                                        }
-                                    }
-
-                                    // Only show the alert if this is the first enemy being attacked
-                                    if (!is_existing_attack_alert_close_by) {
-                                        state.alerts.push_back((alert_t) {
-                                            .type = ALERT_RED,
-                                            .status = ALERT_STATUS_SHOW,
-                                            .cell = enemy.cell,
-                                            .cell_size = building_cell_size(enemy.type),
-                                            .timer = MATCH_ALERT_DURATION
-                                        });
-                                        ui_show_status(state, UI_STATUS_UNDER_ATTACK);
-                                    }
-                                }
-                            }
-
-                            enemy.taking_damage_flicker = true;
-                            enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
-                        }
-                        enemy.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
-                    }
-
-                    // Create particle effects
-                    if (!attack_missed) {
-                        if (unit.type == UNIT_COWBOY) {
-                            xy particle_position;
-                            particle_position.x = enemy_rect.position.x + (enemy_rect.size.x / 4) + (lcg_rand() % (enemy_rect.size.x / 2));
-                            particle_position.y = enemy_rect.position.y + (enemy_rect.size.y / 4) + (lcg_rand() % (enemy_rect.size.y / 2));
-                            state.particles.push_back((particle_t) {
-                                .sprite = SPRITE_PARTICLE_SPARKS,
-                                .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
-                                .vframe = lcg_rand() % 3,
-                                .position = particle_position
-                            });
-                        }
-                    }
-
+                    unit_attack_target(state, unit_id, unit.target);
                     unit.timer = unit_data.attack_cooldown;
                     unit.mode = UNIT_MODE_ATTACK_COOLDOWN;
                 } // End if animation not playing
@@ -934,6 +817,7 @@ rect_t unit_get_rect(const unit_t& unit) {
 
 int8_t unit_get_elevation(const match_state_t& state, const unit_t& unit) {
     int8_t elevation = map_get_elevation(state, unit.cell);
+    // TODO when unit is in bunker, elevation is based on bunker elevation
     for (int x = unit.cell.x; x < unit.cell.x + unit_cell_size(unit.type).x; x++) {
         for (int y = unit.cell.y; y < unit.cell.y + unit_cell_size(unit.type).y; y++) {
             elevation = std::max(elevation, map_get_elevation(state, xy(x, y)));
@@ -1355,4 +1239,122 @@ xy unit_get_best_unload_cell(const match_state_t& state, const unit_t& unit, xy 
     }
 
     return xy(-1, -1);
+}
+
+void unit_attack_target(match_state_t& state, entity_id unit_id, unit_target_t target) {
+    unit_t& unit = state.units.get_by_id(unit_id);
+    bool attack_missed = false;
+    rect_t enemy_rect;
+    if (target.type == UNIT_TARGET_UNIT) {
+        uint32_t enemy_index = state.units.get_index_of(target.id);
+        GOLD_ASSERT(enemy_index != INDEX_INVALID);
+        unit_t& enemy = state.units[enemy_index];
+        enemy_rect = unit_get_rect(enemy);
+
+        int damage = std::max(1, unit_get_damage(state, unit) - unit_get_armor(state, enemy));
+        // Elevation accuracy disadvantage - If unit is on lower elevation than target, unit has 50% chance to miss
+        if (unit_get_elevation(state, unit) < unit_get_elevation(state, enemy)) {
+            if (lcg_rand() % 2 == 0) {
+                damage = 0;
+                attack_missed = true;
+            }
+        }
+        enemy.health = std::max(0, enemy.health - damage);
+        if (enemy.taking_damage_timer == 0) {
+            // Only show the alert if the enemy being attacked belongs to the current player
+            if (enemy.player_id == network_get_player_id()) {
+                // Only show the alert if the enemy being attacked is not on screen
+                rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT - UI_HEIGHT));
+                if (!screen_rect.intersects(enemy_rect)) {
+                    bool is_existing_attack_alert_close_by = false;
+                    for (const alert_t& alert : state.alerts) {
+                        if (xy::manhattan_distance(alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
+                            is_existing_attack_alert_close_by = true;
+                            break;
+                        }
+                    }
+
+                    // Only show the alert if this is the first enemy being attacked
+                    if (!is_existing_attack_alert_close_by) {
+                        state.alerts.push_back((alert_t) {
+                            .type = ALERT_RED,
+                            .status = ALERT_STATUS_SHOW,
+                            .cell = enemy.cell,
+                            .cell_size = unit_cell_size(enemy.type),
+                            .timer = MATCH_ALERT_DURATION
+                        });
+                        ui_show_status(state, UI_STATUS_UNDER_ATTACK);
+                    }
+                }
+            }
+
+            enemy.taking_damage_flicker = true;
+            enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
+        }
+        enemy.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
+
+        // Make the enemy attack back
+        if (enemy.mode == UNIT_MODE_IDLE && enemy.target.type == UNIT_TARGET_NONE && UNIT_DATA.at(enemy.type).damage != 0 && unit_can_see_rect(enemy, rect_t(unit.cell, unit_cell_size(unit.type)))) {
+            enemy.target = (unit_target_t) {
+                .type = UNIT_TARGET_UNIT,
+                .id = unit_id
+            };
+        }
+    } else if (target.type == UNIT_TARGET_BUILDING) {
+        uint32_t enemy_index = state.buildings.get_index_of(target.id);
+        GOLD_ASSERT(enemy_index != INDEX_INVALID);
+        building_t& enemy = state.buildings[enemy_index];
+        enemy_rect = building_get_rect(enemy);
+
+        // NOTE: Buildings have no armor 
+        int damage = std::min(1, unit_get_damage(state, unit));
+        enemy.health = std::max(0, enemy.health - damage);
+        if (enemy.taking_damage_timer == 0) {
+            // Only show the alert if the enemy being attacked belongs to the current player
+            if (enemy.player_id == network_get_player_id()) {
+                // Only show the alert if the enemy being attacked is not on screen
+                rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT - UI_HEIGHT));
+                if (!screen_rect.intersects(enemy_rect)) {
+                    bool is_existing_attack_alert_close_by = false;
+                    for (const alert_t& alert : state.alerts) {
+                        if (alert.type == ALERT_RED && xy::manhattan_distance(alert.cell, enemy.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
+                            is_existing_attack_alert_close_by = true;
+                            break;
+                        }
+                    }
+
+                    // Only show the alert if this is the first enemy being attacked
+                    if (!is_existing_attack_alert_close_by) {
+                        state.alerts.push_back((alert_t) {
+                            .type = ALERT_RED,
+                            .status = ALERT_STATUS_SHOW,
+                            .cell = enemy.cell,
+                            .cell_size = building_cell_size(enemy.type),
+                            .timer = MATCH_ALERT_DURATION
+                        });
+                        ui_show_status(state, UI_STATUS_UNDER_ATTACK);
+                    }
+                }
+            }
+
+            enemy.taking_damage_flicker = true;
+            enemy.taking_damage_flicker_timer = MATCH_TAKING_DAMAGE_FLICKER_TIMER_DURATION;
+        }
+        enemy.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
+    }
+
+    // Create particle effects
+    if (!attack_missed) {
+        if (unit.type == UNIT_COWBOY) {
+            xy particle_position;
+            particle_position.x = enemy_rect.position.x + (enemy_rect.size.x / 4) + (lcg_rand() % (enemy_rect.size.x / 2));
+            particle_position.y = enemy_rect.position.y + (enemy_rect.size.y / 4) + (lcg_rand() % (enemy_rect.size.y / 2));
+            state.particles.push_back((particle_t) {
+                .sprite = SPRITE_PARTICLE_SPARKS,
+                .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
+                .vframe = lcg_rand() % 3,
+                .position = particle_position
+            });
+        }
+    }
 }

@@ -454,7 +454,7 @@ void ui_set_selection(match_state_t& state, selection_t& selection) {
             if (id_unit.type != selected_unit_type) {
                 all_unit_types_are_same = false;
             }
-            if (!id_unit.ferried_units.empty()) {
+            if (!id_unit.garrisoned_units.empty()) {
                 at_least_one_selected_unit_is_ferrying = true;
             }
         }
@@ -636,7 +636,7 @@ int ui_get_ferried_unit_index_hovered(const match_state_t& state) {
     }
 
     int ferried_units_size = state.selection.type == SELECTION_TYPE_UNITS
-                                                ? state.units.get_by_id(state.selection.ids[0]).ferried_units.size()
+                                                ? state.units.get_by_id(state.selection.ids[0]).garrisoned_units.size()
                                                 : state.buildings.get_by_id(state.selection.ids[0]).garrisoned_units.size();
     for (int ferried_unit_index = 0; ferried_unit_index < ferried_units_size; ferried_unit_index++) {
         if (rect_t(ui_ferried_unit_icon_position(ferried_unit_index), xy(32, 32)).has_point(input_get_mouse_position())) {

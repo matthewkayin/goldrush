@@ -2,6 +2,7 @@
 
 #include "network.h"
 #include "logger.h"
+#include "lcg.h"
 #include <algorithm>
 
 const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
@@ -141,7 +142,7 @@ void building_update(match_state_t& state, building_t& building) {
         return;
     }
 
-    if (building.queue_timer != 0 && building.mode == BUILDING_MODE_FINISHED) {
+    if (building.queue_timer != 0 && building.mode == BUILDING_MODE_FINISHED && building.type != BUILDING_BUNKER) {
         if (building.queue_timer == BUILDING_QUEUE_BLOCKED && !building_is_supply_blocked(state, building)) {
             building.queue_timer = building_queue_item_duration(building.queue[0]);
         } else if (building.queue_timer != BUILDING_QUEUE_BLOCKED && building_is_supply_blocked(state, building)) {
@@ -217,6 +218,91 @@ void building_update(match_state_t& state, building_t& building) {
             building_dequeue(state, building);
         }
     }
+
+    if (building.type == BUILDING_BUNKER) {
+        if (building.queue_timer > 0) {
+            building.queue_timer--;
+        }
+        if (building.queue_timer == 0) {
+            for (entity_id id : building.garrisoned_units) {
+                unit_t& unit = state.units.get_by_id(id);
+                // Melee units don't attack in bunkers
+                if (UNIT_DATA.at(unit.type).range_squared <= 1) {
+                    continue;
+                }
+                if (unit.timer > 0) {
+                    unit.timer--;
+                }
+                if (unit.timer == 0) {
+                    log_trace("unit timer 0, finding attack target in bunker");
+                    unit_target_t attack_target = (unit_target_t) {
+                        .type = UNIT_TARGET_NONE
+                    };
+                    int squared_distance_to_attack_target = 0;
+                    rect_t bunker_rect = rect_t(building.cell, building_cell_size(building.type));
+                    for (uint32_t enemy_index = 0; enemy_index < state.units.size(); enemy_index++) {
+                        const unit_t& enemy = state.units[enemy_index];
+                        // Check that enemy is a valid target
+                        if (enemy.player_id == unit.player_id || enemy.mode == UNIT_MODE_FERRY || 
+                            enemy.mode == UNIT_MODE_IN_MINE || enemy.mode == UNIT_MODE_BUILD || enemy.health == 0) {
+                            continue;
+                        }
+                        rect_t enemy_rect = rect_t(enemy.cell, unit_cell_size(enemy.type));
+                        int squared_distance_to_enemy = bunker_rect.euclidean_distance_squared_to(enemy_rect);
+                        if (squared_distance_to_enemy <= UNIT_DATA.at(unit.type).range_squared && 
+                        (attack_target.type == UNIT_TARGET_NONE || 
+                            squared_distance_to_enemy < squared_distance_to_attack_target)) {
+                            attack_target = (unit_target_t) {
+                                .type = UNIT_TARGET_UNIT,
+                                .id = state.units.get_id_of(enemy_index)
+                            };
+                            squared_distance_to_attack_target = squared_distance_to_enemy;
+                        }
+                    } // End for each enemy
+
+                    // Check enemy buildings only if we did not find an enemy unit. This way attacking units is prioritized
+                    if (attack_target.type == UNIT_TARGET_NONE) {
+                        for (uint32_t enemy_index = 0; enemy_index < state.buildings.size(); enemy_index++) {
+                            const building_t& enemy_building = state.buildings[enemy_index];
+                            if (enemy_building.player_id == unit.player_id || enemy_building.health == 0) {
+                                continue;
+                            }
+                            rect_t enemy_building_rect = rect_t(enemy_building.cell, building_cell_size(enemy_building.type));
+                            int squared_distance_to_enemy = bunker_rect.euclidean_distance_squared_to(enemy_building_rect);
+                            if (squared_distance_to_enemy <= UNIT_DATA.at(unit.type).range_squared && 
+                                (attack_target.type == UNIT_TARGET_NONE ||
+                                squared_distance_to_enemy < squared_distance_to_attack_target)) {
+                                attack_target = (unit_target_t) {
+                                    .type = UNIT_TARGET_BUILDING,
+                                    .id = state.buildings.get_id_of(enemy_index)
+                                };
+                                squared_distance_to_attack_target = squared_distance_to_enemy;
+                            }
+                        } // End for each enemy building
+                    } // End if attack target is unit target none
+
+                    log_trace("attack target type %u", attack_target.type);
+                    if (attack_target.type != UNIT_TARGET_NONE) {
+                        unit_attack_target(state, id, attack_target);
+                        unit.timer = UNIT_DATA.at(unit.type).attack_cooldown;
+
+                        // Add particle
+                        int particle_index = lcg_rand() % 4;
+                        state.particles.push_back((particle_t) {
+                            .sprite = SPRITE_PARTICLE_BUNKER_COWBOY,
+                            .animation = animation_create(ANIMATION_PARTICLE_BUNKER_COWBOY),
+                            .vframe = 0,
+                            .position = (building.cell * TILE_SIZE) + BUILDING_BUNKER_PARTICLE_OFFSETS[particle_index]
+                        });
+
+                        // Make sure the not all units fire at once
+                        building.queue_timer = BUILDING_BUNKER_FIRE_OFFSET;
+                        break;
+                    }
+                } // End if unit timer is 0
+            } // End for each garrisoned unit
+        } // End if building queue timer is 0
+    } // End if building is bunker
 
     if (building.taking_damage_timer > 0) {
         building.taking_damage_timer--;
