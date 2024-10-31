@@ -1648,6 +1648,28 @@ void render_match(const match_state_t& state) {
                             SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
                             SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
                         }
+
+                        // Render the garrisoned units bar
+                        if (building.player_id == network_get_player_id() && building.type == BUILDING_BUNKER) {
+                            healthbar_rect.y += healthbar_rect.h + 1;
+                            healthbar_subrect.y = healthbar_rect.y;
+                            healthbar_subrect.w = (healthbar_rect.w * building.garrisoned_units.size()) / BUILDING_BUNKER_GARRISON_CAPACITY;
+                            if (!(healthbar_rect.x + healthbar_rect.w < 0 || 
+                                healthbar_rect.y + healthbar_rect.h < 0 || 
+                                healthbar_rect.x >= SCREEN_WIDTH || 
+                                healthbar_rect.y >= SCREEN_HEIGHT)) {
+                                // Render the healthbar
+                                SDL_Color subrect_color = COLOR_WHITE;
+                                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                                SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+                                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+                                for (int line_index = 1; line_index < BUILDING_BUNKER_GARRISON_CAPACITY; line_index++) {
+                                    int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / BUILDING_BUNKER_GARRISON_CAPACITY);
+                                    SDL_RenderDrawLine(engine.renderer, line_x, healthbar_rect.y, line_x, healthbar_rect.y + healthbar_rect.h - 1);
+                                }
+                            }
+                        }
                     } // End if building is on current elevation
                 } // End if building is valid
             } // End for each building ID
@@ -1676,17 +1698,32 @@ void render_match(const match_state_t& state) {
                 SDL_Rect healthbar_subrect = healthbar_rect;
                 healthbar_subrect.w = (healthbar_rect.w * unit.health) / UNIT_DATA.at(unit.type).max_health;
 
-                // Cull the healthbar
-                if (healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT ) {
-                    continue;
+                // Cull and render the healthbar
+                if (!(healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT)) {
+                    SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                    SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                    SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                    SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+                    SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
                 }
 
-                // Render the healthbar
-                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
-                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
-                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
-                SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
-                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+                // Render the garrisoned capacity bar
+                if (unit.player_id == network_get_player_id() && UNIT_DATA.at(unit.type).ferry_capacity != 0) {
+                    healthbar_rect.y += healthbar_rect.h + 1;
+                    healthbar_subrect.y = healthbar_rect.y;
+                    healthbar_subrect.w = (healthbar_rect.w * unit.garrisoned_units.size()) / UNIT_DATA.at(unit.type).ferry_capacity;
+                    if (!(healthbar_rect.x + healthbar_rect.w < 0 || healthbar_rect.y + healthbar_rect.h < 0 || healthbar_rect.x >= SCREEN_WIDTH || healthbar_rect.y >= SCREEN_HEIGHT)) {
+                        SDL_Color subrect_color = COLOR_WHITE;
+                        SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                        SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                        SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
+                        SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+                        for (int line_index = 1; line_index < UNIT_DATA.at(unit.type).ferry_capacity; line_index++) {
+                            int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / UNIT_DATA.at(unit.type).ferry_capacity);
+                            SDL_RenderDrawLine(engine.renderer, line_x, healthbar_rect.y, line_x, healthbar_rect.y + healthbar_rect.h - 1);
+                        }
+                    }
+                }
             }
         // End if selection type is unit or enemy unit
         } else if (state.selection.type == SELECTION_TYPE_MINE) {
@@ -2232,7 +2269,7 @@ void render_match(const match_state_t& state) {
     // UI Ferried units
     if (ui_should_render_ferried_units(state)) {
         const std::vector<entity_id>& ferried_units = state.selection.type == SELECTION_TYPE_UNITS
-                                    ? state.units.get_by_id(state.selection.ids[0]).ferried_units
+                                    ? state.units.get_by_id(state.selection.ids[0]).garrisoned_units
                                     : state.buildings.get_by_id(state.selection.ids[0]).garrisoned_units;
         for (int i = 0; i < ferried_units.size(); i++) {
             const unit_t& ferried_unit = state.units.get_by_id(ferried_units[i]);
