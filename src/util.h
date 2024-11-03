@@ -230,6 +230,11 @@ struct xy_fixed {
     }
 };
 
+struct xy_float {
+    float x;
+    float y;
+};
+
 struct rect_t {
     xy position;
     xy size;

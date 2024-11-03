@@ -3,6 +3,7 @@
 #include "network.h"
 #include "logger.h"
 #include "lcg.h"
+#include "noise.h"
 
 static const uint32_t MINE_GOLD_AMOUNT_LOW = 1000;
 static const uint32_t MINE_GOLD_AMOUNT_HIGH = 3000;
@@ -272,6 +273,7 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
             DIRECTION_XY[i].y * ((state.map_height / 2) - spawn_margin)));
     }
 
+/*
     log_trace("Generating crater...");
     int lake_radius = 16;
     int crater_radius = 42;
@@ -292,11 +294,6 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
         }
         crater_explored[index] = 1;
         map_tiles_prebaked[index].elevation = -1;
-        if (xy::euclidean_distance_squared(next, xy(state.map_width / 2, state.map_height / 2)) <= lake_radius * lake_radius &&
-            std::abs((next - xy(state.map_width / 2, state.map_height / 2)).x) != lake_radius &&
-            std::abs((next - xy(state.map_width / 2, state.map_height / 2)).y) != lake_radius) {
-            map_tiles_prebaked[index].index = TILE_WATER;
-        } 
         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
             xy child = next + DIRECTION_XY[direction];
             crater_frontier.push_back(child);
@@ -335,6 +332,12 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
         map_tiles_prebaked[x + (y * state.map_width)].index = right_tile;
         map_tiles_prebaked[y + (x * state.map_width)].index = bottom_tile;
     }
+    map_paint_circle(state, map_tiles_prebaked, (tile_t) {
+        .index = TILE_WATER,
+        .elevation = -1,
+        .is_ramp = 0
+    },
+    xy(state.map_width / 2, state.map_height / 2), lake_radius - 3, lake_radius);
 
     log_trace("Generating high value mines...");
     std::vector<xy> mine_cells = {
@@ -401,6 +404,30 @@ void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::ve
     }
 
     log_trace("Map Oasis complete.");
+    */
+
+    const double FREQUENCY = 1.0 / 32.0;
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            // Generates result from -1 to 1
+            double perlin_result = ((1.0 + simplex_noise(0, x * FREQUENCY, y * FREQUENCY)) * 1.5) - 2.0;
+            int8_t rounded_result = (int8_t)round(perlin_result);
+            if (rounded_result == -2) {
+                map_tiles_prebaked[x + (y * state.map_width)] = (tile_t) {
+                    .index = TILE_WATER,
+                    .elevation = -1,
+                    .is_ramp = 0
+                };
+            } else {
+                map_tiles_prebaked[x + (y * state.map_width)] = (tile_t) {
+                    .index = TILE_SAND,
+                    .elevation = rounded_result,
+                    .is_ramp = 0
+                };
+            }
+            log_trace("%i,%i: %f vs %i", x, y, perlin_result, map_tiles_prebaked[x + (y * state.map_width)].elevation);
+        }
+    }
 }
 
 void map_gen_gold_test(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked) {
