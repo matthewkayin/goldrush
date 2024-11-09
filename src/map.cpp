@@ -88,31 +88,67 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
     });
 
     log_trace("Generating pre-baked tiles...");
-    const double FREQUENCY = 1.0 / 50.0;
+    const double FREQUENCY = 1.0 / 46.0;
     uint64_t seed = (uint64_t)lcg_rand();
     for (int x = 0; x < state.map_width; x++) {
         for (int y = 0; y < state.map_height; y++) {
             // Generates result from -1 to 1
-            double perlin_result = ((1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 1.5) - 2.0;
-            int8_t rounded_result = (int8_t)round(perlin_result);
-            if (rounded_result == -2) {
+            double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
+            if (perlin_result < 0.15) {
                 prebaked[x + (y * state.map_width)] = (tile_t) {
                     .index = TILE_WATER,
                     .elevation = -1,
                     .is_ramp = 0
                 };
             } else {
+                int8_t elevation;
+                if (perlin_result < 0.45) {
+                    elevation = -1;
+                } else if (perlin_result < 0.8) {
+                    elevation = 0;
+                } else {
+                    elevation = 1;
+                }
                 prebaked[x + (y * state.map_width)] = (tile_t) {
                     .index = TILE_SAND,
-                    .elevation = rounded_result,
+                    .elevation = elevation,
                     .is_ramp = 0
                 };
             }
         }
     }
 
+    // Clear out water that is too close to walls
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            if (prebaked[x + (y * state.map_width)].index != TILE_WATER) {
+                continue;
+            }
+
+            bool is_too_close_to_wall = false;
+            for (int nx = x - 2; nx < x + 3; nx++) {
+                for (int ny = y - 2; ny < y + 3; ny++) {
+                    if (!map_is_cell_in_bounds(state, xy(nx, ny))) {
+                        continue;
+                    }
+                    if (prebaked[nx + (ny * state.map_width)].elevation != -1 && 
+                        xy::manhattan_distance(xy(x, y), xy(nx, ny)) <= 2) {
+                        is_too_close_to_wall = true;
+                    }
+                }
+                if (is_too_close_to_wall) {
+                    continue;
+                }
+            }
+            if (is_too_close_to_wall) {
+                prebaked[x + (y * state.map_width)].index = TILE_SAND;
+            }
+        }
+    }
+
     // Bake map tiles
     std::vector<xy> artifacts;
+    uint32_t elevation_artifact_count;
     do {
         state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
             .index = 0,
@@ -124,6 +160,33 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
             prebaked[artifact.x + (artifact.y * state.map_width)].elevation--;
         }
         artifacts.clear();
+
+        // Remove elevation artifacts
+        elevation_artifact_count = 0;
+        for (int x = 0; x < state.map_width; x++) {
+            for (int y = 0; y < state.map_height; y++) {
+                if (prebaked[x + (y * state.map_width)].elevation == 1) {
+                    bool is_highground_valid = true;
+                    int8_t ne[8];
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                        xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
+                        if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                            ne[direction] = -2;
+                            continue;
+                        }
+                        ne[direction] = prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation;
+                        if (prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation == -1) {
+                            is_highground_valid = false;
+                            break;
+                        }
+                    }
+                    if (!is_highground_valid) {
+                        prebaked[x + (y * state.map_width)].elevation--;
+                        elevation_artifact_count++;
+                    }
+                }
+            }
+        }
 
         log_trace("Wall pass...");
         for (int y = 0; y < state.map_height; y++) {
@@ -216,14 +279,6 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
                     } else {
                         state.map_tiles[index].index = TILE_DATA[wall_autotile_lookup(neighbors)].index;
                         if (state.map_tiles[index].index == TILE_DATA[TILE_NULL].index) {
-                            int nb[8];
-                            for (int i = 0; i < 8; i++) {
-                                nb[i] = (int)((neighbors & DIRECTION_MASK[i]) == DIRECTION_MASK[i]);
-                            }
-                            log_trace("null tile found at %i,%i. neighbors: %u\n%i %i %i\n%i   %i\n%i %i %i", x, y, neighbors,
-                                        nb[7], nb[0], nb[1], 
-                                        nb[6],        nb[2],
-                                        nb[5], nb[4], nb[3]);
                             artifacts.push_back(xy(x, y));
                         }
                     }
@@ -261,7 +316,7 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
         } // end for each y
 
         log_trace("Artifacts count: %u", artifacts.size());
-    } while (!artifacts.empty());
+    } while (!artifacts.empty() || elevation_artifact_count != 0);
 
     for (int y = 0; y < state.map_height; y++) {
         for (int x = 0; x < state.map_width; x++) {
@@ -278,12 +333,6 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
             if (expected_edge_index != TILE_NULL && (y == 0 || state.map_tiles[x + ((y - 1) * state.map_width)].index != expected_edge_index)) { 
                 state.map_tiles[index].index = TILE_DATA[TILE_SAND].index;
                 state.map_tiles[index].elevation--;
-                log_trace("cleaned");
-            }
-
-            // Mark the stairs as ramps
-            if (state.map_tiles[index].index >= TILE_DATA[TILE_WALL_SOUTH_STAIR_LEFT].index && state.map_tiles[index].index <= TILE_DATA[TILE_WALL_WEST_STAIR_BOTTOM].index) {
-                state.map_tiles[index].is_ramp = 1;
             }
 
             // Block every wall on the cell grid
@@ -293,6 +342,138 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
             }
         }
     }
+
+    // Generate ramps
+    std::vector<xy> stair_cells;
+    for (int pass = 0; pass < 2; pass++) {
+        for (int x = 0; x < state.map_width; x++) {
+            for (int y = 0; y < state.map_height; y++) {
+                tile_t tile = state.map_tiles[x + (y * state.map_width)];
+                // Only generate ramps on straight edged walls
+                if (!(tile.index == TILE_DATA[TILE_WALL_SOUTH_EDGE].index ||
+                    tile.index == TILE_DATA[TILE_WALL_NORTH_EDGE].index ||
+                    tile.index == TILE_DATA[TILE_WALL_WEST_EDGE].index ||
+                    tile.index == TILE_DATA[TILE_WALL_EAST_EDGE].index)) {
+                    continue;
+                }
+                // Determine whether this is a horizontal or vertical stair
+                xy step_direction = (tile.index == TILE_DATA[TILE_WALL_SOUTH_EDGE].index ||
+                                    tile.index == TILE_DATA[TILE_WALL_NORTH_EDGE].index)
+                                        ? xy(-1, 0)
+                                        : xy(0, -1);
+                xy stair_min = xy(x, y);
+                while (map_is_cell_in_bounds(state, stair_min) && state.map_tiles[stair_min.x + (stair_min.y * state.map_width)].index == tile.index) {
+                    stair_min += step_direction;
+                    if (tile.index == TILE_DATA[TILE_WALL_EAST_EDGE].index || tile.index == TILE_DATA[TILE_WALL_WEST_EDGE].index) {
+                        xy adjacent_cell = stair_min + xy(tile.index == TILE_DATA[TILE_WALL_EAST_EDGE].index ? 1 : -1, 0);
+                        if (!map_is_cell_in_bounds(state, adjacent_cell) || map_is_cell_blocked(state, adjacent_cell)) {
+                            break;
+                        }
+                    }
+                }
+                xy stair_max = xy(x, y);
+                stair_min -= step_direction;
+                step_direction = xy(step_direction.x * -1, step_direction.y * -1);
+                while (map_is_cell_in_bounds(state, stair_max) && state.map_tiles[stair_max.x + (stair_max.y * state.map_width)].index == tile.index) {
+                    stair_max += step_direction;
+                    if (tile.index == TILE_DATA[TILE_WALL_EAST_EDGE].index || tile.index == TILE_DATA[TILE_WALL_WEST_EDGE].index) {
+                        xy adjacent_cell = stair_min + xy(tile.index == TILE_DATA[TILE_WALL_EAST_EDGE].index ? 1 : -1, 0);
+                        if (!map_is_cell_in_bounds(state, adjacent_cell) || map_is_cell_blocked(state, adjacent_cell)) {
+                            break;
+                        }
+                    }
+                }
+                stair_max -= step_direction;
+
+                int stair_length = xy::manhattan_distance(stair_max, stair_min);
+                int min_stair_length = pass == 0 ? 3 : 2;
+                if (stair_length < min_stair_length) {
+                    continue;
+                }
+
+                bool chop_from_max = true;
+                while (stair_length > 4)  {
+                    if (chop_from_max) {
+                        stair_max -= step_direction;
+                    } else {
+                        stair_min += step_direction;
+                    }
+                    chop_from_max = !chop_from_max;
+                    stair_length--;
+                }
+
+                bool is_stair_too_close_to_other_stairs = false;
+                for (xy stair_cell : stair_cells) {
+                    int dist = std::min(xy::manhattan_distance(stair_cell, stair_min), xy::manhattan_distance(stair_cell, stair_max));
+                    if (dist < 16) {
+                        is_stair_too_close_to_other_stairs = true;
+                        break;
+                    }
+                }
+                if (is_stair_too_close_to_other_stairs) {
+                    continue;
+                }
+
+                stair_cells.push_back(stair_min);
+                stair_cells.push_back(stair_max);
+                for (xy cell = stair_min; cell != stair_max + step_direction; cell += step_direction) {
+                    Tile stair_tile = TILE_NULL;
+                    if (tile.index == TILE_DATA[TILE_WALL_NORTH_EDGE].index) {
+                        if (cell == stair_min) {
+                            stair_tile = TILE_WALL_NORTH_STAIR_LEFT;
+                        } else if (cell == stair_max) {
+                            stair_tile = TILE_WALL_NORTH_STAIR_RIGHT;
+                        } else {
+                            stair_tile = TILE_WALL_NORTH_STAIR_CENTER;
+                        }
+                    } else if (tile.index == TILE_DATA[TILE_WALL_EAST_EDGE].index) {
+                        if (cell == stair_min) {
+                            stair_tile = TILE_WALL_EAST_STAIR_TOP;
+                        } else if (cell == stair_max) {
+                            stair_tile = TILE_WALL_EAST_STAIR_BOTTOM;
+                        } else {
+                            stair_tile = TILE_WALL_EAST_STAIR_CENTER;
+                        }
+                    } else if (tile.index == TILE_DATA[TILE_WALL_WEST_EDGE].index) {
+                        if (cell == stair_min) {
+                            stair_tile = TILE_WALL_WEST_STAIR_TOP;
+                        } else if (cell == stair_max) {
+                            stair_tile = TILE_WALL_WEST_STAIR_BOTTOM;
+                        } else {
+                            stair_tile = TILE_WALL_WEST_STAIR_CENTER;
+                        }
+                    } else if (tile.index == TILE_DATA[TILE_WALL_SOUTH_EDGE].index) {
+                        if (cell == stair_min) {
+                            stair_tile = TILE_WALL_SOUTH_STAIR_LEFT;
+                        } else if (cell == stair_max) {
+                            stair_tile = TILE_WALL_SOUTH_STAIR_RIGHT;
+                        } else {
+                            stair_tile = TILE_WALL_SOUTH_STAIR_CENTER;
+                        }
+                    }
+
+                    state.map_tiles[cell.x + (cell.y * state.map_width)].index = TILE_DATA[stair_tile].index;
+                    state.map_tiles[cell.x + (cell.y * state.map_width)].is_ramp = 1;
+                    map_set_cell(state, cell, CELL_EMPTY);
+                    Tile south_front_tile = TILE_NULL;
+                    if (stair_tile == TILE_WALL_SOUTH_STAIR_LEFT) {
+                        south_front_tile = TILE_WALL_SOUTH_STAIR_FRONT_LEFT;
+                    } else if (stair_tile == TILE_WALL_SOUTH_STAIR_RIGHT) {
+                        south_front_tile = TILE_WALL_SOUTH_STAIR_FRONT_RIGHT;
+                    } else if (stair_tile == TILE_WALL_SOUTH_STAIR_CENTER) {
+                        south_front_tile = TILE_WALL_SOUTH_STAIR_FRONT_CENTER;
+                    }
+                    if (south_front_tile != TILE_NULL) {
+                        state.map_tiles[cell.x + ((cell.y + 1) * state.map_width)].index = TILE_DATA[south_front_tile].index;
+                        state.map_tiles[cell.x + ((cell.y + 1) * state.map_width)].is_ramp = 1;
+                        map_set_cell(state, cell + xy(0, 1), CELL_EMPTY);
+                    }
+                } // End for cell in ramp
+            } // End for each y
+        } // End for each x
+    } // End for each pass
+    // End create ramps
+
     // End bake tiles
 
     // Generate spawn points

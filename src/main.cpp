@@ -2628,4 +2628,12 @@ void render_match(const match_state_t& state) {
     SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = (int)state.map_width, .h = (int)state.map_height };
     SDL_Rect dst_rect = (SDL_Rect) { .x = MINIMAP_RECT.position.x, .y = MINIMAP_RECT.position.y, .w = MINIMAP_RECT.size.x, .h = MINIMAP_RECT.size.y };
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, &src_rect, &dst_rect);
+
+    if (!ui_is_mouse_in_ui()) {
+        xy hovered_tile = (input_get_mouse_position() + state.camera_offset) / TILE_SIZE;
+        char hovered_tile_text[128];
+        tile_t hovered_tile_tile = state.map_tiles[hovered_tile.x + (hovered_tile.y * state.map_width)];
+        sprintf(hovered_tile_text, "%i,%i: index %u / elevation %i", hovered_tile.x, hovered_tile.y, hovered_tile_tile.index, hovered_tile_tile.elevation);
+        render_text(FONT_HACK, hovered_tile_text, COLOR_WHITE, xy(0, 16));
+    }
 }
