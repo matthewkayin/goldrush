@@ -14,57 +14,61 @@ Tile wall_autotile_lookup(uint32_t neighbors) {
         case 3:
         case 129:
         case 131:
-            return TILE_WALL_SOUTH_EDGE;
+            return TILE_WALL_NORTH_EDGE;
         case 4:
         case 6:
         case 12:
         case 14:
-            return TILE_WALL_WEST_EDGE;
+            return TILE_WALL_EAST_EDGE;
         case 16:
         case 24:
         case 48:
         case 56:
-            return TILE_WALL_NORTH_EDGE;
+            return TILE_WALL_SOUTH_EDGE;
         case 64:
         case 96:
         case 192:
         case 224:
-            return TILE_WALL_EAST_EDGE;
-        case 2:
-            return TILE_WALL_SW_CORNER;
-        case 8:
-            return TILE_WALL_NW_CORNER;
-        case 32:
-            return TILE_WALL_NE_CORNER;
-        case 128:
-            return TILE_WALL_SE_CORNER;
+            return TILE_WALL_WEST_EDGE;
         case 7:
         case 15:
         case 135:
         case 143:
-            return TILE_WALL_SW_INNER_CORNER;
-        case 28:
-        case 30:
-        case 60:
-        case 62:
-            return TILE_WALL_NW_INNER_CORNER;
-        case 112:
-        case 120:
-        case 240:
-        case 248:
-            return TILE_WALL_NE_INNER_CORNER;
+        case 66:
+            return TILE_WALL_NE_CORNER;
         case 193:
         case 195:
         case 225:
         case 227:
+        case 132:
+            return TILE_WALL_NW_CORNER;
+        case 112:
+        case 120:
+        case 240:
+        case 248:
+        case 72:
+            return TILE_WALL_SW_CORNER;
+        case 28:
+        case 30:
+        case 60:
+        case 62:
+        case 36:
+            return TILE_WALL_SE_CORNER;
+        case 2:
+            return TILE_WALL_NE_INNER_CORNER;
+        case 8:
             return TILE_WALL_SE_INNER_CORNER;
+        case 32:
+            return TILE_WALL_SW_INNER_CORNER;
+        case 128:
+            return TILE_WALL_NW_INNER_CORNER;
         default:
             return TILE_NULL;
     }
 }
 
-void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_name, uint32_t width, uint32_t height) {
-    log_trace("Generating map. Map name: %u. Map size: %ux%u", map_name, width, height);
+void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t width, uint32_t height) {
+    log_trace("Generating map. Map size: %ux%u", width, height);
     state.map_width = width;
     state.map_height = height;
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
@@ -77,116 +81,240 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_
         .value = 0
     });
 
-    std::vector<tile_t> map_tiles_prebaked(state.map_width * state.map_height, (tile_t) {
+    std::vector<tile_t> prebaked(state.map_width * state.map_height, (tile_t) {
         .index = TILE_SAND,
         .elevation = 0,
         .is_ramp = 0
     });
-    switch (map_name) {
-        case MAP_OASIS:
-            map_gen_oasis(state, player_spawns, map_tiles_prebaked);
-            break;
-        case MAP_GOLD_TEST:
-            map_gen_gold_test(state, player_spawns, map_tiles_prebaked);
-            break;
-        default:
-            log_error("Map name of %i not handled", map_name);
-            GOLD_ASSERT_MESSAGE(false, "Map name not handled");
-            return;
+
+    log_trace("Generating pre-baked tiles...");
+    const double FREQUENCY = 1.0 / 50.0;
+    uint64_t seed = (uint64_t)lcg_rand();
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            // Generates result from -1 to 1
+            double perlin_result = ((1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 1.5) - 2.0;
+            int8_t rounded_result = (int8_t)round(perlin_result);
+            if (rounded_result == -2) {
+                prebaked[x + (y * state.map_width)] = (tile_t) {
+                    .index = TILE_WATER,
+                    .elevation = -1,
+                    .is_ramp = 0
+                };
+            } else {
+                prebaked[x + (y * state.map_width)] = (tile_t) {
+                    .index = TILE_SAND,
+                    .elevation = rounded_result,
+                    .is_ramp = 0
+                };
+            }
+        }
     }
 
     // Bake map tiles
-    log_trace("Baking map tiles...");
-    for (int y = 0; y < state.map_height; y++) {
-        for (int x = 0; x < state.map_width; x++) {
-            int index = x + (y * state.map_width);
-            state.map_tiles[index] = map_tiles_prebaked[index];
-            if (map_tiles_prebaked[index].index == TILE_SAND) {
-                // First check if we need to place a regular wall here
+    std::vector<xy> artifacts;
+    do {
+        state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
+            .index = 0,
+            .elevation = 0,
+            .is_ramp = 0
+        });
+        
+        for (xy artifact : artifacts) {
+            prebaked[artifact.x + (artifact.y * state.map_width)].elevation--;
+        }
+        artifacts.clear();
+
+        log_trace("Wall pass...");
+        for (int y = 0; y < state.map_height; y++) {
+            for (int x = 0; x < state.map_width; x++) {
+                int index = x + (y * state.map_width);
+                if (prebaked[index].index != TILE_SAND) {
+                    continue;
+                }
+
                 uint32_t neighbors = 0;
                 for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                     xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
                     if (!map_is_cell_in_bounds(state, neighbor_cell)) {
                         continue;
                     }
-                    if (map_tiles_prebaked[x + (y * state.map_width)].elevation < map_tiles_prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation &&
-                        map_tiles_prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].is_ramp == 0) {
+                    if (prebaked[x + (y * state.map_width)].elevation > prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation &&
+                        prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].is_ramp == 0) {
                         neighbors += DIRECTION_MASK[direction];
                     }
                 }
-
-                // Regular sand tile 
                 if (neighbors == 0) {
-                    int new_index = lcg_rand() % 7;
-                    if (new_index < 4 && index % 3 == 0) {
-                        state.map_tiles[index].index = new_index == 1 ? TILE_DATA[TILE_SAND3].index : TILE_DATA[TILE_SAND2].index;
+                    continue;
+                }
+                uint16_t tile_index = wall_autotile_lookup(neighbors);
+                if (tile_index == TILE_WALL_SOUTH_EDGE ||
+                    tile_index == TILE_WALL_SE_CORNER ||
+                    tile_index == TILE_WALL_SW_CORNER) {
+                    uint16_t front_index;
+                    switch (tile_index) {
+                        case TILE_WALL_SOUTH_EDGE:
+                            front_index = TILE_WALL_SOUTH_FRONT;
+                            break;
+                        case TILE_WALL_SE_CORNER:
+                            front_index = TILE_WALL_SE_FRONT;
+                            break;
+                        case TILE_WALL_SW_CORNER:
+                            front_index = TILE_WALL_SW_FRONT;
+                            break;
+                        default:
+                            front_index = 0;
+                            break;
+                    }
+                    state.map_tiles[index] = (tile_t) {
+                        .index = TILE_DATA[front_index].index,
+                        .elevation = prebaked[index].elevation,
+                        .is_ramp = prebaked[index].is_ramp
+                    };
+                } 
+            }
+        }
+        log_trace("Baking map tiles...");
+        for (int y = 0; y < state.map_height; y++) {
+            for (int x = 0; x < state.map_width; x++) {
+                int index = x + (y * state.map_width);
+                if (state.map_tiles[index].index == TILE_DATA[TILE_WALL_SOUTH_FRONT].index ||
+                    state.map_tiles[index].index == TILE_DATA[TILE_WALL_SW_FRONT].index ||
+                    state.map_tiles[index].index == TILE_DATA[TILE_WALL_SE_FRONT].index) {
+                    continue;
+                }
+                state.map_tiles[index] = prebaked[index];
+                if (prebaked[index].index == TILE_SAND) {
+                    // First check if we need to place a regular wall here
+                    uint32_t neighbors = 0;
+                    int8_t tile_elevation = prebaked[index].elevation;
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                        xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
+                        if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                            continue;
+                        }
+                        int neighbor_index = neighbor_cell.x + (neighbor_cell.y * state.map_width);
+                        int8_t neighbor_elevation = prebaked[neighbor_index].elevation;
+                        bool neighbor_is_front = state.map_tiles[neighbor_index].index == TILE_DATA[TILE_WALL_SOUTH_FRONT].index ||
+                                                state.map_tiles[neighbor_index].index == TILE_DATA[TILE_WALL_SW_FRONT].index ||
+                                                state.map_tiles[neighbor_index].index == TILE_DATA[TILE_WALL_SE_FRONT].index;
+                        if ((tile_elevation > neighbor_elevation || (neighbor_is_front && tile_elevation == neighbor_elevation)) &&
+                            prebaked[neighbor_index].is_ramp == 0) {
+                            neighbors += DIRECTION_MASK[direction];
+                        }
+                    }
+
+                    // Regular sand tile 
+                    if (neighbors == 0) {
+                        int new_index = lcg_rand() % 7;
+                        if (new_index < 4 && index % 3 == 0) {
+                            state.map_tiles[index].index = new_index == 1 ? TILE_DATA[TILE_SAND3].index : TILE_DATA[TILE_SAND2].index;
+                        } else {
+                            state.map_tiles[index].index = TILE_DATA[TILE_SAND].index;
+                        }
+                    // Wall tile 
                     } else {
-                        state.map_tiles[index].index = TILE_DATA[TILE_SAND].index;
+                        state.map_tiles[index].index = TILE_DATA[wall_autotile_lookup(neighbors)].index;
+                        if (state.map_tiles[index].index == TILE_DATA[TILE_NULL].index) {
+                            int nb[8];
+                            for (int i = 0; i < 8; i++) {
+                                nb[i] = (int)((neighbors & DIRECTION_MASK[i]) == DIRECTION_MASK[i]);
+                            }
+                            log_trace("null tile found at %i,%i. neighbors: %u\n%i %i %i\n%i   %i\n%i %i %i", x, y, neighbors,
+                                        nb[7], nb[0], nb[1], 
+                                        nb[6],        nb[2],
+                                        nb[5], nb[4], nb[3]);
+                            artifacts.push_back(xy(x, y));
+                        }
                     }
-                // Wall tile 
+                } else if (prebaked[index].index == TILE_WATER) {
+                    uint32_t neighbors = 0;
+                    // Check adjacent neighbors
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                        xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
+                        if (!map_is_cell_in_bounds(state, neighbor_cell) || 
+                            prebaked[index].index == prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index) {
+                            neighbors += DIRECTION_MASK[direction];
+                        }
+                    }
+                    // Check diagonal neighbors
+                    for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                        xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
+                        int prev_direction = direction - 1;
+                        int next_direction = (direction + 1) % DIRECTION_COUNT;
+                        if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                            (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                            continue;
+                        }
+                        if (!map_is_cell_in_bounds(state, neighbor_cell) || 
+                            prebaked[index].index == prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index) {
+                            neighbors += DIRECTION_MASK[direction];
+                        }
+                    }
+                    // Set the map tile based on the neighbors
+                    state.map_tiles[index].index = TILE_DATA[TILE_WATER].index + neighbors_to_autotile_index[neighbors];
+                // End else if tile is water
                 } else {
-                    state.map_tiles[index].index = TILE_DATA[wall_autotile_lookup(neighbors)].index;
+                    state.map_tiles[index].index = TILE_DATA[prebaked[index].index].index;
                 }
-            } else if (map_tiles_prebaked[index].index == TILE_WATER) {
-                uint32_t neighbors = 0;
-                // Check adjacent neighbors
-                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                    xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
-                    if (!map_is_cell_in_bounds(state, neighbor_cell) || 
-                        map_tiles_prebaked[index].index == map_tiles_prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index) {
-                        neighbors += DIRECTION_MASK[direction];
-                    }
-                }
-                // Check diagonal neighbors
-                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
-                    xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
-                    int prev_direction = direction - 1;
-                    int next_direction = (direction + 1) % DIRECTION_COUNT;
-                    if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
-                        (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
-                        continue;
-                    }
-                    if (!map_is_cell_in_bounds(state, neighbor_cell) || 
-                        map_tiles_prebaked[index].index == map_tiles_prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].index) {
-                        neighbors += DIRECTION_MASK[direction];
-                    }
-                }
-                // Set the map tile based on the neighbors
-                state.map_tiles[index].index = TILE_DATA[TILE_WATER].index + neighbors_to_autotile_index[neighbors];
-            // End else if tile is water
-            } else {
-                state.map_tiles[index].index = TILE_DATA[map_tiles_prebaked[index].index].index;
+            } // end for each x
+        } // end for each y
+
+        log_trace("Artifacts count: %u", artifacts.size());
+    } while (!artifacts.empty());
+
+    for (int y = 0; y < state.map_height; y++) {
+        for (int x = 0; x < state.map_width; x++) {
+            int index = x + (y * state.map_width);
+            // Remove any wall front that doesn't have an edge tile above it
+            uint16_t expected_edge_index = TILE_NULL;
+            if (state.map_tiles[index].index == TILE_DATA[TILE_WALL_SOUTH_FRONT].index) {
+                expected_edge_index = TILE_DATA[TILE_WALL_SOUTH_EDGE].index;
+            } else if (state.map_tiles[index].index == TILE_DATA[TILE_WALL_SE_FRONT].index) {
+                expected_edge_index = TILE_DATA[TILE_WALL_SE_CORNER].index;
+            } else if (state.map_tiles[index].index == TILE_DATA[TILE_WALL_SW_FRONT].index) {
+                expected_edge_index = TILE_DATA[TILE_WALL_SW_CORNER].index;
+            }
+            if (expected_edge_index != TILE_NULL && (y == 0 || state.map_tiles[x + ((y - 1) * state.map_width)].index != expected_edge_index)) { 
+                state.map_tiles[index].index = TILE_DATA[TILE_SAND].index;
+                state.map_tiles[index].elevation--;
+                log_trace("cleaned");
             }
 
-            if (y != 0) {
-                // Add the extended walls
-                if (state.map_tiles[index - state.map_width].index == TILE_DATA[TILE_WALL_SW_CORNER].index) {
-                    state.map_tiles[index].index = TILE_DATA[TILE_WALL_SW_FRONT].index;
-                } else if (state.map_tiles[index - state.map_width].index == TILE_DATA[TILE_WALL_SOUTH_EDGE].index) {
-                    state.map_tiles[index].index = TILE_DATA[TILE_WALL_SOUTH_FRONT].index;
-                } else if (state.map_tiles[index - state.map_width].index == TILE_DATA[TILE_WALL_SE_CORNER].index) {
-                    state.map_tiles[index].index = TILE_DATA[TILE_WALL_SE_FRONT].index;
-                }
-            }
-
-            // Increase the elevation of every wall
-            // Walls are created on lower elevation than the highground because of how the algorithm works, 
-            // but we want them on higher elevation so that they y-sort with units properly
-            if (state.map_tiles[index].index >= TILE_DATA[TILE_WALL_NW_CORNER].index) {
-                state.map_tiles[index].elevation++;
-            }
-
-            // Block every wall on the cell grid
+            // Mark the stairs as ramps
             if (state.map_tiles[index].index >= TILE_DATA[TILE_WALL_SOUTH_STAIR_LEFT].index && state.map_tiles[index].index <= TILE_DATA[TILE_WALL_WEST_STAIR_BOTTOM].index) {
                 state.map_tiles[index].is_ramp = 1;
             }
+
+            // Block every wall on the cell grid
             if ((state.map_tiles[index].index >= TILE_DATA[TILE_WALL_NW_CORNER].index && state.map_tiles[index].is_ramp != 1) ||
                 (state.map_tiles[index].index >= TILE_DATA[TILE_WATER].index && state.map_tiles[index].index < TILE_DATA[TILE_WATER].index + 47)) {
                 state.map_cells[index].type = CELL_BLOCKED;
             }
-        } // end for each x
-    } // end for each y
+        }
+    }
     // End bake tiles
+
+    // Generate spawn points
+    log_trace("Generating spawn points...");
+    int spawn_margin = 8;
+    xy map_center = xy(state.map_width / 2, state.map_height / 2);
+    int player_count = 0;
+    for (uint8_t i = 0; i < MAX_PLAYERS; i++) {
+        if (network_get_player(i).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        player_count++;
+    }
+    for (int i = 0; i < DIRECTION_COUNT; i++) {
+        // For player count < 5, generate corner spawns only
+        if (player_count < 5 && i % 2 == 0) {
+            continue;
+        }
+        player_spawns.push_back(map_center + xy(
+            DIRECTION_XY[i].x * ((state.map_width / 2) - spawn_margin), 
+            DIRECTION_XY[i].y * ((state.map_height / 2) - spawn_margin)));
+    }
 
     // Generate decorations
     log_trace("Generating decorations...");
@@ -247,196 +375,6 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_
     }
     log_trace("Elevation low: %i / high: %i", state.map_lowest_elevation, state.map_highest_elevation);
     log_trace("Map generation complete.");
-}
-
-void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked) {
-    log_trace("Generating map oasis...");
-
-    // Generate spawn points
-    log_trace("Generating spawn points...");
-    int spawn_margin = 8;
-    xy map_center = xy(state.map_width / 2, state.map_height / 2);
-    int player_count = 0;
-    for (uint8_t i = 0; i < MAX_PLAYERS; i++) {
-        if (network_get_player(i).status == PLAYER_STATUS_NONE) {
-            continue;
-        }
-        player_count++;
-    }
-    for (int i = 0; i < DIRECTION_COUNT; i++) {
-        // For player count < 5, generate corner spawns only
-        if (player_count < 5 && i % 2 == 0) {
-            continue;
-        }
-        player_spawns.push_back(map_center + xy(
-            DIRECTION_XY[i].x * ((state.map_width / 2) - spawn_margin), 
-            DIRECTION_XY[i].y * ((state.map_height / 2) - spawn_margin)));
-    }
-
-/*
-    log_trace("Generating crater...");
-    int lake_radius = 16;
-    int crater_radius = 42;
-    std::vector<xy> crater_frontier;
-    std::unordered_map<int, int> crater_explored;
-    crater_frontier.push_back(xy(state.map_width / 2, state.map_height / 2));
-    while (!crater_frontier.empty()) {
-        xy next = crater_frontier[0];
-        crater_frontier.erase(crater_frontier.begin());
-        int index = next.x + (next.y * state.map_width);
-        if (xy::euclidean_distance_squared(next, xy(state.map_width / 2, state.map_height / 2)) > crater_radius * crater_radius ||
-            std::abs((next - xy(state.map_width / 2, state.map_height / 2)).x) == crater_radius || 
-            std::abs((next - xy(state.map_width / 2, state.map_height / 2)).y) == crater_radius) {
-            continue;
-        }
-        if (crater_explored.find(index) != crater_explored.end()) {
-            continue;
-        }
-        crater_explored[index] = 1;
-        map_tiles_prebaked[index].elevation = -1;
-        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-            xy child = next + DIRECTION_XY[direction];
-            crater_frontier.push_back(child);
-        }
-    }
-    for (int y = (state.map_height / 2) - 2; y < (state.map_height / 2) + 3; y++) {
-        uint16_t left_tile;
-        uint16_t right_tile;
-        uint16_t top_tile;
-        uint16_t top_tile_front;
-        uint16_t bottom_tile;
-        if (y == (state.map_height / 2) - 2) {
-            left_tile = TILE_WALL_EAST_STAIR_TOP;
-            right_tile = TILE_WALL_WEST_STAIR_TOP;
-            bottom_tile = TILE_WALL_NORTH_STAIR_LEFT;
-            top_tile = TILE_WALL_SOUTH_STAIR_LEFT;
-            top_tile_front = TILE_WALL_SOUTH_STAIR_FRONT_LEFT;
-        } else if (y == (state.map_height / 2) + 2) {
-            left_tile = TILE_WALL_EAST_STAIR_BOTTOM;
-            right_tile = TILE_WALL_WEST_STAIR_BOTTOM;
-            bottom_tile = TILE_WALL_NORTH_STAIR_RIGHT;
-            top_tile = TILE_WALL_SOUTH_STAIR_RIGHT;
-            top_tile_front = TILE_WALL_SOUTH_STAIR_FRONT_RIGHT;
-        } else {
-            left_tile = TILE_WALL_EAST_STAIR_CENTER;
-            right_tile = TILE_WALL_WEST_STAIR_CENTER;
-            bottom_tile = TILE_WALL_NORTH_STAIR_CENTER;
-            top_tile = TILE_WALL_SOUTH_STAIR_CENTER;
-            top_tile_front = TILE_WALL_SOUTH_STAIR_FRONT_CENTER;
-        }
-        int x = (state.map_width / 2) - (crater_radius - 1);
-        map_tiles_prebaked[x + (y * state.map_width)].index = left_tile;
-        map_tiles_prebaked[y + (x * state.map_width)].index = top_tile;
-        map_tiles_prebaked[y + ((x + 1) * state.map_width)].index = top_tile_front;
-        x = (state.map_width / 2) + (crater_radius - 1);
-        map_tiles_prebaked[x + (y * state.map_width)].index = right_tile;
-        map_tiles_prebaked[y + (x * state.map_width)].index = bottom_tile;
-    }
-    map_paint_circle(state, map_tiles_prebaked, (tile_t) {
-        .index = TILE_WATER,
-        .elevation = -1,
-        .is_ramp = 0
-    },
-    xy(state.map_width / 2, state.map_height / 2), lake_radius - 3, lake_radius);
-
-    log_trace("Generating high value mines...");
-    std::vector<xy> mine_cells = {
-        xy((state.map_width / 2) + lake_radius + 1, (state.map_height / 2) + lake_radius + 1),
-        xy((state.map_width / 2) - (lake_radius + 1 + MINE_SIZE), (state.map_height / 2) + lake_radius + 1),
-        xy((state.map_width / 2) + lake_radius + 1, (state.map_height / 2) - (lake_radius + 1 + MINE_SIZE)),
-        xy((state.map_width / 2) - (lake_radius + 1 + MINE_SIZE), (state.map_height / 2) - (lake_radius + 1 + MINE_SIZE)),
-    };
-    for (xy cell : mine_cells) {
-        entity_id mine_id = state.mines.push_back((mine_t) {
-            .cell = cell,
-            .gold_left = MINE_GOLD_AMOUNT_HIGH,
-            .occupancy = OCCUPANCY_EMPTY
-        });
-        map_set_cell_rect(state, rect_t(cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
-    }
-
-    log_trace("Generating low value mines...");
-    mine_cells.clear();
-    int mine_cell_target = player_count + 2;
-    int iterations = 0;
-    while (mine_cells.size() < mine_cell_target) {
-        xy mine_cell;
-        mine_cell.x = lcg_rand() % (state.map_width - MINE_SIZE);
-        mine_cell.y = lcg_rand() % (state.map_height - MINE_SIZE);
-        if (xy::euclidean_distance_squared(mine_cell, xy(state.map_width / 2, state.map_height / 2)) <= (crater_radius + 1) * (crater_radius + 1)) {
-            continue;
-        }
-        bool mine_cell_too_close = false;
-        for (xy cell : mine_cells) {
-            if (xy::manhattan_distance(cell, mine_cell) < 24) {
-                mine_cell_too_close = true;
-                break;
-            }
-        }
-        if (mine_cell_too_close) {
-            continue;
-        }
-        for (xy cell : player_spawns) {
-            if (xy::manhattan_distance(cell, mine_cell) < 24) {
-                mine_cell_too_close = true;
-                break;
-            }
-            continue;
-        }
-        if (mine_cell_too_close) {
-            continue;
-        }
-        mine_cells.push_back(mine_cell);
-        iterations++;
-        if (iterations > 20) {
-            log_trace("Reached max iterations. Restarting...");
-            mine_cells.clear();
-            iterations = 0;
-        }
-    }
-    for (xy cell : mine_cells) {
-        entity_id mine_id = state.mines.push_back((mine_t) {
-            .cell = cell,
-            .gold_left = MINE_GOLD_AMOUNT_LOW,
-            .occupancy = OCCUPANCY_EMPTY
-        });
-        map_set_cell_rect(state, rect_t(cell, xy(MINE_SIZE, MINE_SIZE)), CELL_MINE, mine_id);
-    }
-
-    log_trace("Map Oasis complete.");
-    */
-
-    const double FREQUENCY = 1.0 / 32.0;
-    for (int x = 0; x < state.map_width; x++) {
-        for (int y = 0; y < state.map_height; y++) {
-            // Generates result from -1 to 1
-            double perlin_result = ((1.0 + simplex_noise(0, x * FREQUENCY, y * FREQUENCY)) * 1.5) - 2.0;
-            int8_t rounded_result = (int8_t)round(perlin_result);
-            if (rounded_result == -2) {
-                map_tiles_prebaked[x + (y * state.map_width)] = (tile_t) {
-                    .index = TILE_WATER,
-                    .elevation = -1,
-                    .is_ramp = 0
-                };
-            } else {
-                map_tiles_prebaked[x + (y * state.map_width)] = (tile_t) {
-                    .index = TILE_SAND,
-                    .elevation = rounded_result,
-                    .is_ramp = 0
-                };
-            }
-            log_trace("%i,%i: %f vs %i", x, y, perlin_result, map_tiles_prebaked[x + (y * state.map_width)].elevation);
-        }
-    }
-}
-
-void map_gen_gold_test(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked) {
-    player_spawns.push_back(xy(12, 12));
-    for (int x = 6; x < state.map_width - 6; x += 18) {
-        for (int y = 6; y < state.map_height - 6; y += 18) {
-            map_create_mine(state, xy(x, y), 1000);
-        }
-    }
 }
 
 void map_create_mine(match_state_t& state, xy cell, uint32_t gold_amount) {

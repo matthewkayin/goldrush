@@ -69,12 +69,6 @@ extern const rect_t MATCH_CHAT_RECT;
 
 // Map
 
-enum MapName {
-    MAP_OASIS,
-    MAP_GOLD_TEST,
-    MAP_COUNT
-};
-
 struct tile_t {
     uint16_t index;
     int8_t elevation;
@@ -604,9 +598,7 @@ rect_t ui_menu_get_parchment_button_rect(UiMenuButton button);
 UiMenuButton ui_menu_get_parchment_button_hovered();
 
 // Map
-void map_init(match_state_t& state, std::vector<xy>& player_spawns, MapName map_name, uint32_t width, uint32_t height);
-void map_gen_oasis(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked);
-void map_gen_gold_test(match_state_t& state, std::vector<xy>& player_spawns, std::vector<tile_t>& map_tiles_prebaked);
+void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t width, uint32_t height);
 void map_create_mine(match_state_t& state, xy cell, uint32_t gold_amount);
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_rect_in_bounds(const match_state_t& state, rect_t cell_rect);
