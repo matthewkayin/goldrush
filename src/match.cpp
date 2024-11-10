@@ -100,10 +100,10 @@ match_state_t match_init() {
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
         // Place player starting units
-        unit_create(state, player_id, UNIT_WAGON, player_spawn + xy(0, 0));
-        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(-2, -1));
-        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(-2, 0));
-        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(2, 2));
+        unit_create(state, player_id, UNIT_WAGON, player_spawn + xy(1, 0));
+        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(0, 0));
+        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(0, 1));
+        unit_create(state, player_id, UNIT_MINER, player_spawn + xy(3, 0));
         // Fog is updated twice at the start of the match
         // First update reveals cells, second update remembers buildings
         map_update_fog(state, player_id);

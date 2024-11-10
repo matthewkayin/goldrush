@@ -67,6 +67,32 @@ Tile wall_autotile_lookup(uint32_t neighbors) {
     }
 }
 
+bool map_is_cell_isolated(const match_state_t& state, xy cell) {
+    std::vector<xy> frontier;
+    std::unordered_map<uint32_t, uint32_t> explored;
+    frontier.push_back(cell);
+
+    while (!frontier.empty()) {
+        xy next = frontier[0];
+        frontier.erase(frontier.begin());
+
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            xy child = next + DIRECTION_XY[direction];
+            if (!map_is_cell_in_bounds(state, child) || map_is_cell_blocked(state, child)) {
+                continue;
+            }
+            uint32_t index = child.x + (child.y * state.map_width);
+            if (explored.find(index) != explored.end()) {
+                continue;
+            }
+            explored[index] = 1;
+            frontier.push_back(child);
+        }
+    }
+
+    return explored.size() < ((state.map_width * state.map_height) / 2);
+}
+
 void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t width, uint32_t height) {
     log_trace("Generating map. Map size: %ux%u", width, height);
     state.map_width = width;
@@ -119,6 +145,7 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
     }
 
     // Clear out water that is too close to walls
+    const int WATER_WALL_DIST = 4;
     for (int x = 0; x < state.map_width; x++) {
         for (int y = 0; y < state.map_height; y++) {
             if (prebaked[x + (y * state.map_width)].index != TILE_WATER) {
@@ -126,13 +153,13 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
             }
 
             bool is_too_close_to_wall = false;
-            for (int nx = x - 2; nx < x + 3; nx++) {
-                for (int ny = y - 2; ny < y + 3; ny++) {
+            for (int nx = x - WATER_WALL_DIST; nx < x + WATER_WALL_DIST + 1; nx++) {
+                for (int ny = y - WATER_WALL_DIST; ny < y + WATER_WALL_DIST + 1; ny++) {
                     if (!map_is_cell_in_bounds(state, xy(nx, ny))) {
                         continue;
                     }
                     if (prebaked[nx + (ny * state.map_width)].elevation != -1 && 
-                        xy::manhattan_distance(xy(x, y), xy(nx, ny)) <= 2) {
+                        xy::manhattan_distance(xy(x, y), xy(nx, ny)) <= WATER_WALL_DIST) {
                         is_too_close_to_wall = true;
                     }
                 }
@@ -476,10 +503,9 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
 
     // End bake tiles
 
-    // Generate spawn points
+    // Generate player spawns
     log_trace("Generating spawn points...");
-    int spawn_margin = 8;
-    xy map_center = xy(state.map_width / 2, state.map_height / 2);
+    // Determine player count
     int player_count = 0;
     for (uint8_t i = 0; i < MAX_PLAYERS; i++) {
         if (network_get_player(i).status == PLAYER_STATUS_NONE) {
@@ -487,17 +513,134 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
         }
         player_count++;
     }
+    // Determine valid spawn directions
+    std::vector<int> spawn_directions;
     for (int i = 0; i < DIRECTION_COUNT; i++) {
         // For player count < 5, generate corner spawns only
         if (player_count < 5 && i % 2 == 0) {
             continue;
         }
-        player_spawns.push_back(map_center + xy(
-            DIRECTION_XY[i].x * ((state.map_width / 2) - spawn_margin), 
-            DIRECTION_XY[i].y * ((state.map_height / 2) - spawn_margin)));
+        spawn_directions.push_back(i);
+    }
+    // Determine spawn points
+    const int spawn_margin = 4;
+    const xy map_center = xy(state.map_width / 2, state.map_height / 2);
+    const xy player_spawn_size = xy(4, 2);
+    const xy spawn_search_rect_size = xy(12, 12);
+    for (uint8_t i = 0; i < MAX_PLAYERS; i++) {
+        if (network_get_player(i).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        int spawn_direction_index = lcg_rand() % spawn_directions.size();
+        int spawn_direction = spawn_directions[spawn_direction_index];
+        spawn_directions.erase(spawn_directions.begin() + spawn_direction_index);
+
+        xy spawn_search_rect_position = map_center + xy(
+            DIRECTION_XY[spawn_direction].x * ((state.map_width / 2) - (spawn_margin + (DIRECTION_XY[i].x == 1 ? spawn_search_rect_size.x : 0))),
+            DIRECTION_XY[spawn_direction].y * ((state.map_height / 2) - (spawn_margin + (DIRECTION_XY[i].y == 1 ? spawn_search_rect_size.y : 0))));
+        xy start;
+        xy end;
+        xy step;
+        if (DIRECTION_XY[spawn_direction].x == -1 || i == DIRECTION_NORTH) {
+            start.x = spawn_search_rect_position.x;
+            end.x = spawn_search_rect_position.x + spawn_search_rect_size.x;
+            step.x = 1;
+        } else {
+            start.x = spawn_search_rect_position.x;
+            end.x = spawn_search_rect_position.x - spawn_search_rect_size.x;;
+            step.x = -1;
+        }
+        if (DIRECTION_XY[spawn_direction].y == -1 || i == DIRECTION_WEST) {
+            start.y = spawn_search_rect_position.y;
+            end.y = spawn_search_rect_position.y + spawn_search_rect_size.y;
+            step.y = 1;
+        } else {
+            start.y = spawn_search_rect_position.y;
+            end.y = spawn_search_rect_position.y - spawn_search_rect_size.y;
+            step.y = -1;
+        }
+        for (int search_x = start.x; search_x != end.x; search_x += step.x) {
+            for (int search_y = start.y; search_y != end.y; search_y += step.y) {
+                if (!map_is_cell_rect_occupied(state, rect_t(xy(search_x, search_y), player_spawn_size))) {
+                    player_spawns.push_back(xy(search_x, search_y));
+                    search_x = end.x - step.x;
+                    search_y = end.y - step.y;
+                }
+            }
+        }
     }
 
+    // Generate gold mines
+    log_trace("Generating mines...");
+    uint32_t target_gold_mines = 8;
+    const int MINE_STAIR_DIST = 8;
+    const int MINE_MINE_DIST = 48;
+    while (state.mines.size() < target_gold_mines) {
+        bool mine_cell_is_valid = false;
+        xy mine_cell;
+        while (!mine_cell_is_valid) {
+            mine_cell.x = 1 + (lcg_rand() % (state.map_width - 2));
+            mine_cell.y = 1 + (lcg_rand() % (state.map_height - 2));
+
+            if (map_is_cell_rect_occupied(state, rect_t(mine_cell, xy(MINE_SIZE, MINE_SIZE)))) {
+                mine_cell_is_valid = false;
+                continue;
+            }
+            bool is_too_close_to_ramp = false;
+            for (int nx = mine_cell.x - MINE_STAIR_DIST; nx < mine_cell.x + MINE_SIZE + MINE_STAIR_DIST; nx++) {
+                for (int ny = mine_cell.y - MINE_STAIR_DIST; ny < mine_cell.y + MINE_SIZE + MINE_STAIR_DIST; ny++) {
+                    if (!map_is_cell_in_bounds(state, xy(nx, ny))) {
+                        continue;
+                    }
+                    if (state.map_tiles[nx + (ny * state.map_width)].is_ramp == 1 && 
+                        xy::manhattan_distance(mine_cell, xy(nx, ny)) < MINE_STAIR_DIST) {
+                        is_too_close_to_ramp = true;
+                        break;
+                    }
+                }
+                if (is_too_close_to_ramp) {
+                    break;
+                }
+            }
+            if (is_too_close_to_ramp) {
+                continue;
+            }
+
+            bool is_too_close_to_mine = false;
+            for (mine_t mine : state.mines) {
+                if (xy::manhattan_distance(mine.cell, mine_cell) < MINE_MINE_DIST) {
+                    is_too_close_to_mine = true;
+                    break;
+                }
+            }
+            if (is_too_close_to_mine) {
+                continue;
+            }
+
+            bool is_too_close_to_player = false;
+            for (xy player_spawn : player_spawns) {
+                if (xy::manhattan_distance(mine_cell, player_spawn) < MINE_MINE_DIST) {
+                    is_too_close_to_player = true;
+                    break;
+                }
+            }
+            if (is_too_close_to_player) {
+                continue;
+            }
+
+            if (map_is_cell_isolated(state, mine_cell)) {
+                continue;
+            }
+
+            mine_cell_is_valid = true;
+        }
+
+        map_create_mine(state, mine_cell, 5000);
+    }
+
+    // Generate spawn points
     // Generate decorations
+    /*
     log_trace("Generating decorations...");
     for (int i = 0; i < state.map_width * state.map_height; i++) {
         if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map_cells[i].type == CELL_EMPTY) {
@@ -546,6 +689,7 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
             map_set_cell(state, decoration_cell, CELL_BLOCKED);
         }
     }
+    */
 
     // Set map elevation
     state.map_lowest_elevation = 0;
