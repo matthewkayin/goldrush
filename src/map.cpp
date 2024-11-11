@@ -638,58 +638,168 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
         map_create_mine(state, mine_cell, 5000);
     }
 
-    // Generate spawn points
     // Generate decorations
-    /*
+    // Uses Poisson disk sampling
     log_trace("Generating decorations...");
-    for (int i = 0; i < state.map_width * state.map_height; i++) {
-        if (lcg_rand() % 40 == 0 && i % 5 == 0 && state.map_cells[i].type == CELL_EMPTY) {
-            xy decoration_cell = xy(i % state.map_width, i / state.map_width);
-            if (map_is_cell_blocked(state, decoration_cell)) {
+    {
+        std::vector<xy> decoration_cells;
+        std::vector<xy> frontier;
+        xy first_cell;
+        bool first_is_valid = false;
+        while (!first_is_valid) {
+            first_cell.x = 1 + (lcg_rand() % (state.map_width - 2));
+            first_cell.y = 1 + (lcg_rand() % (state.map_height - 2));
+            if (map_is_cell_blocked(state, first_cell) || state.map_tiles[first_cell.x + (first_cell.y * state.map_width)].is_ramp == 1) {
                 continue;
             }
-            bool is_adjacent_to_ramp = false;
+            bool is_too_near = false;
+            for (mine_t mine : state.mines) {
+                if (mine_get_block_building_rect(mine.cell).has_point(first_cell)) {
+                    is_too_near = true;
+                    break;
+                }
+            }
+            if (is_too_near) {
+                continue;
+            }
+            for (xy player_spawn : player_spawns) {
+                if (rect_t(player_spawn, player_spawn_size).has_point(first_cell)) {
+                    is_too_near = true;
+                    break;
+                }
+            }
+            if (is_too_near) {
+                continue;
+            }
             for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                xy neighbor_cell = decoration_cell + DIRECTION_XY[direction];
-                if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                xy adjacent = first_cell + DIRECTION_XY[direction];
+                if (!map_is_cell_in_bounds(state, adjacent)) {
                     continue;
                 }
-                if (state.map_tiles[neighbor_cell.x + (neighbor_cell.y * state.map_width)].is_ramp == 1) {
-                    is_adjacent_to_ramp = true;
-                    break;
+                if (state.map_tiles[adjacent.x + (adjacent.y * state.map_width)].is_ramp == 1) {
+                    is_too_near = true;
                 }
             }
-            if (is_adjacent_to_ramp) {
+            if (is_too_near) {
                 continue;
             }
-            bool is_gold_nearby = false;
-            for (mine_t& mine : state.mines) {
-                if (mine_get_block_building_rect(mine.cell).has_point(decoration_cell)) {
-                    is_gold_nearby = true;
-                    break;
+
+            first_is_valid = true;
+        }
+        frontier.push_back(first_cell);
+        decoration_cells.push_back(first_cell);
+        int disk_radius = 16;
+
+        std::vector<xy> circle_offset_points;
+        {
+            int x = 0;
+            int y = disk_radius;
+            int d = 3 - 2 * disk_radius;
+            circle_offset_points.push_back(xy(x, y));
+            circle_offset_points.push_back(xy(-x, y));
+            circle_offset_points.push_back(xy(x, -y));
+            circle_offset_points.push_back(xy(-x, -y));
+            circle_offset_points.push_back(xy(y, x));
+            circle_offset_points.push_back(xy(-y, x));
+            circle_offset_points.push_back(xy(y, -x));
+            circle_offset_points.push_back(xy(-y, -x));
+            while (y >= x) {
+                if (d > 0) {
+                    y--;
+                    d += 4 * (x - y) + 10;
+                } else {
+                    d += 4 * x + 6;
                 }
+                x++;
+                circle_offset_points.push_back(xy(x, y));
+                circle_offset_points.push_back(xy(-x, y));
+                circle_offset_points.push_back(xy(x, -y));
+                circle_offset_points.push_back(xy(-x, -y));
+                circle_offset_points.push_back(xy(y, x));
+                circle_offset_points.push_back(xy(-y, x));
+                circle_offset_points.push_back(xy(y, -x));
+                circle_offset_points.push_back(xy(-y, -x));
             }
-            if (is_gold_nearby) {
-                continue;
-            }
-            bool is_too_close_to_player = false;
-            for (xy cell : player_spawns) {
-                if (xy::manhattan_distance(cell, decoration_cell) < 4) {
-                    is_too_close_to_player = true;
-                    break;
+        }
+
+        while (!frontier.empty()) {
+            int next_index = lcg_rand() % frontier.size();
+            xy next = frontier[next_index];
+
+            int child_attempts = 0;
+            bool child_is_valid = false;
+            xy child;
+            while (!child_is_valid && child_attempts < 30) {
+                child_attempts++;
+
+                child = next + circle_offset_points[lcg_rand() % circle_offset_points.size()];
+                if (!map_is_cell_in_bounds(state, child)) {
+                    continue;
                 }
+                if (map_is_cell_blocked(state, child) || state.map_tiles[child.x + (child.y * state.map_width)].is_ramp == 1) {
+                    continue;
+                }
+                // Check that it's not too close to a mine
+                bool is_too_near = false;
+                for (mine_t mine : state.mines) {
+                    if (mine_get_block_building_rect(mine.cell).has_point(child)) {
+                        is_too_near = true;
+                        break;
+                    }
+                }
+                if (is_too_near) {
+                    continue;
+                }
+                // Check that it's not inside a player spawn
+                for (xy player_spawn : player_spawns) {
+                    if (rect_t(player_spawn, player_spawn_size).has_point(child)) {
+                        is_too_near = true;
+                        break;
+                    }
+                }
+                if (is_too_near) {
+                    continue;
+                }
+                // Check that it's not in front of a ramp
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    xy adjacent = first_cell + DIRECTION_XY[direction];
+                    if (!map_is_cell_in_bounds(state, adjacent)) {
+                        continue;
+                    }
+                    if (state.map_tiles[adjacent.x + (adjacent.y * state.map_width)].is_ramp == 1) {
+                        is_too_near = true;
+                    }
+                }
+                if (is_too_near) {
+                    continue;
+                }
+                // Check that it's not too close to other decorations
+                for (xy cell : decoration_cells) {
+                    if (xy::euclidean_distance_squared(cell, child) < (disk_radius - 2) * (disk_radius - 2)) {
+                        is_too_near = true;
+                        break;
+                    }
+                }
+                if (is_too_near) {
+                    continue;
+                }
+
+                child_is_valid = true;
             }
-            if (is_too_close_to_player) {
-                continue;
+            if (child_is_valid) {
+                frontier.push_back(child);
+                decoration_cells.push_back(child);
+            } else {
+                frontier.erase(frontier.begin() + next_index);
             }
+        }
+        for (xy cell : decoration_cells) {
             state.map_decorations.push_back((decoration_t) {
                 .index = (uint16_t)(lcg_rand() % 5),
-                .cell = decoration_cell
+                .cell = cell
             });
-            map_set_cell(state, decoration_cell, CELL_BLOCKED);
         }
     }
-    */
 
     // Set map elevation
     state.map_lowest_elevation = 0;
