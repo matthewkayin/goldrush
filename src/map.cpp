@@ -93,10 +93,10 @@ bool map_is_cell_isolated(const match_state_t& state, xy cell) {
     return explored.size() < ((state.map_width * state.map_height) / 2);
 }
 
-void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t width, uint32_t height) {
-    log_trace("Generating map. Map size: %ux%u", width, height);
-    state.map_width = width;
-    state.map_height = height;
+void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
+    state.map_width = noise_get_width();
+    state.map_height = noise_get_height();
+    log_trace("Generating map. Map size: %ux%u", state.map_width, state.map_height);
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
         .index = 0,
         .elevation = 0,
@@ -114,30 +114,19 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns, uint32_t wid
     });
 
     log_trace("Generating pre-baked tiles...");
-    const double FREQUENCY = 1.0 / 46.0;
-    uint64_t seed = (uint64_t)lcg_rand();
+    int8_t* noise_map = noise_get_map();
     for (int x = 0; x < state.map_width; x++) {
         for (int y = 0; y < state.map_height; y++) {
-            // Generates result from -1 to 1
-            double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
-            if (perlin_result < 0.15) {
+            if (noise_map[x + (y * state.map_width)] == -2) {
                 prebaked[x + (y * state.map_width)] = (tile_t) {
                     .index = TILE_WATER,
                     .elevation = -1,
                     .is_ramp = 0
                 };
             } else {
-                int8_t elevation;
-                if (perlin_result < 0.45) {
-                    elevation = -1;
-                } else if (perlin_result < 0.8) {
-                    elevation = 0;
-                } else {
-                    elevation = 1;
-                }
                 prebaked[x + (y * state.map_width)] = (tile_t) {
                     .index = TILE_SAND,
-                    .elevation = elevation,
+                    .elevation = noise_map[x + (y * state.map_width)],
                     .is_ramp = 0
                 };
             }

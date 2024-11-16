@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "asserts.h"
 #include "lcg.h"
+#include "noise.h"
 #include <enet/enet.h>
 #include <cstdint>
 #include <string>
@@ -74,6 +75,8 @@ struct message_match_load_t {
     const uint8_t type = MESSAGE_MATCH_LOAD;
     uint8_t padding[3];
     int32_t random_seed;
+    uint32_t map_width;
+    uint32_t map_height;
 };
 
 struct message_match_start_t {
@@ -374,12 +377,27 @@ void network_server_start_loading() {
 #else
     match_load.random_seed = (uint32_t)time(NULL);
 #endif
-    ENetPacket* packet = enet_packet_create(&match_load, sizeof(message_match_load_t), ENET_PACKET_FLAG_RELIABLE);
-    enet_host_broadcast(state.host, 0, packet);
-    enet_host_flush(state.host);
+    match_load.map_width = 128;
+    match_load.map_height = 128;
 
     lcg_srand(match_load.random_seed);
-    log_info("Set random seed to %u", match_load.random_seed);
+    uint64_t seed = (uint64_t)lcg_rand();
+    log_info("Noise seed %u", seed);
+    noise_generate(seed, match_load.map_width, match_load.map_height);
+    lcg_srand(match_load.random_seed);
+    log_info("LCG seed %i", match_load.random_seed);
+
+    size_t data_length = 1 + 12 + (match_load.map_width * match_load.map_height);
+    uint8_t* data = (uint8_t*)malloc(data_length);
+    memcpy(data, &match_load.type, sizeof(uint8_t));
+    memcpy(data + 1, &match_load.random_seed, sizeof(int32_t));
+    memcpy(data + 5, &match_load.map_width, sizeof(int32_t));
+    memcpy(data + 9, &match_load.map_height, sizeof(int32_t));
+    memcpy(data + 13, noise_get_map(), match_load.map_width * match_load.map_height);
+
+    ENetPacket* packet = enet_packet_create(data, data_length, ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
 }
 
 void network_server_start_match() {
@@ -456,9 +474,14 @@ void client_handle_message(uint8_t* data, size_t length) {
         }
         case MESSAGE_MATCH_LOAD: {
             int32_t random_seed;
-            memcpy(&random_seed, data + 4, sizeof(int32_t)); 
+            uint32_t map_width;
+            uint32_t map_height;
+            memcpy(&random_seed, data + 1, sizeof(int32_t)); 
+            memcpy(&map_width, data + 5, sizeof(uint32_t));
+            memcpy(&map_height, data + 9, sizeof(uint32_t));
+            noise_init(map_width, map_height, (int8_t*)(data + 13));
             lcg_srand(random_seed);
-            log_info("Set random seed to %i", random_seed);
+            log_info("LCG seed %i", random_seed);
 
             network_event_t event;
             event.type = NETWORK_EVENT_MATCH_LOAD;

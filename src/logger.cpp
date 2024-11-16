@@ -75,16 +75,20 @@ void logger_output(LogLevel log_level, const char* message, ...) {
             case 'b': {
                 uint8_t* data = va_arg(arg_ptr, uint8_t*);
                 size_t length = va_arg(arg_ptr, size_t);
+                size_t printed_length = length > 256 ? 256 : length;
 
                 static char str[1024];
                 char* str_ptr = str;
-                for (size_t i = 0; i < length; i++) {
+                for (size_t i = 0; i < printed_length; i++) {
                     sprintf(str_ptr, " %02x", data[i]);
                     str_ptr += 3;
                 }
                 str_ptr[0] = '\0';
                 
                 out_ptr += sprintf(out_ptr, "%s", str);
+                if (printed_length < length) {
+                    out_ptr += sprintf(out_ptr, " ... (printed %zu of %zu bytes)", printed_length, length);
+                }
                 break;
             }
             case 'r': {

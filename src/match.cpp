@@ -72,7 +72,7 @@ match_state_t match_init() {
 
     // Init map
     std::vector<xy> player_spawns;
-    map_init(state, player_spawns, 128, 128);
+    map_init(state, player_spawns);
 
     // Init fog of war
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
