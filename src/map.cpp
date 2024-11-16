@@ -524,39 +524,56 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
         int spawn_direction = spawn_directions[spawn_direction_index];
         spawn_directions.erase(spawn_directions.begin() + spawn_direction_index);
 
-        xy spawn_search_rect_position = map_center + xy(
+        xy start = map_center + xy(
             DIRECTION_XY[spawn_direction].x * ((state.map_width / 2) - (spawn_margin + (DIRECTION_XY[i].x == 1 ? spawn_search_rect_size.x : 0))),
             DIRECTION_XY[spawn_direction].y * ((state.map_height / 2) - (spawn_margin + (DIRECTION_XY[i].y == 1 ? spawn_search_rect_size.y : 0))));
-        xy start;
-        xy end;
-        xy step;
-        if (DIRECTION_XY[spawn_direction].x == -1 || i == DIRECTION_NORTH) {
-            start.x = spawn_search_rect_position.x;
-            end.x = spawn_search_rect_position.x + spawn_search_rect_size.x;
-            step.x = 1;
-        } else {
-            start.x = spawn_search_rect_position.x;
-            end.x = spawn_search_rect_position.x - spawn_search_rect_size.x;;
-            step.x = -1;
-        }
-        if (DIRECTION_XY[spawn_direction].y == -1 || i == DIRECTION_WEST) {
-            start.y = spawn_search_rect_position.y;
-            end.y = spawn_search_rect_position.y + spawn_search_rect_size.y;
-            step.y = 1;
-        } else {
-            start.y = spawn_search_rect_position.y;
-            end.y = spawn_search_rect_position.y - spawn_search_rect_size.y;
-            step.y = -1;
-        }
-        for (int search_x = start.x; search_x != end.x; search_x += step.x) {
-            for (int search_y = start.y; search_y != end.y; search_y += step.y) {
-                if (!map_is_cell_rect_occupied(state, rect_t(xy(search_x, search_y), player_spawn_size))) {
-                    player_spawns.push_back(xy(search_x, search_y));
-                    search_x = end.x - step.x;
-                    search_y = end.y - step.y;
+        std::vector<xy> frontier;
+        std::unordered_map<uint32_t, uint32_t> explored;
+        frontier.push_back(start);
+        xy spawn_point = xy(-1, -1);
+
+        while (!frontier.empty() && spawn_point.x == -1) {
+            uint32_t next_index = 0;
+            for (uint32_t index = 1; index < frontier.size(); index++) {
+                if (xy::manhattan_distance(frontier[index], start) < xy::manhattan_distance(frontier[next_index], start)) {
+                    next_index = index;
                 }
             }
+            xy next = frontier[next_index];
+            frontier.erase(frontier.begin() + next_index);
+
+            rect_t spawn_rect = rect_t(next, player_spawn_size);
+            if (map_is_cell_rect_same_elevation(state, spawn_rect) && !map_is_cell_rect_occupied(state, spawn_rect) && !map_is_cell_isolated(state, next)) {
+                spawn_point = next;
+                break;
+            }
+
+            explored[next.x + (next.y * state.map_width)] = 1;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                xy child = next + DIRECTION_XY[direction];
+                if (!map_is_cell_in_bounds(state, child)) {
+                    continue;
+                }
+                if (explored.find(child.x + (child.y * state.map_width)) != explored.end()) {
+                    continue;
+                }
+                bool is_in_frontier = false;
+                for (xy cell : frontier) {
+                    if (child == cell) {
+                        is_in_frontier = true;
+                    }
+                }
+                if (is_in_frontier) {
+                    continue;
+                }
+                frontier.push_back(child);
+            }
         }
+        if (spawn_point.x == -1) {
+            log_error("Unable to find valid spawn point for spawn direction %i", spawn_direction);
+            spawn_point = start;
+        }
+        player_spawns.push_back(spawn_point);
     }
 
     // Generate gold mines
@@ -568,8 +585,8 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
         bool mine_cell_is_valid = false;
         xy mine_cell;
         while (!mine_cell_is_valid) {
-            mine_cell.x = 1 + (lcg_rand() % (state.map_width - 2));
-            mine_cell.y = 1 + (lcg_rand() % (state.map_height - 2));
+            mine_cell.x = 1 + (lcg_rand() % (state.map_width - 2 - MINE_SIZE));
+            mine_cell.y = 1 + (lcg_rand() % (state.map_height - 2 - MINE_SIZE));
 
             if (map_is_cell_rect_occupied(state, rect_t(mine_cell, xy(MINE_SIZE, MINE_SIZE)))) {
                 mine_cell_is_valid = false;
@@ -787,6 +804,7 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
                 .index = (uint16_t)(lcg_rand() % 5),
                 .cell = cell
             });
+            map_set_cell(state, cell, CELL_BLOCKED);
         }
     }
 
@@ -865,13 +883,13 @@ bool map_is_cell_rect_occupied(const match_state_t& state, rect_t cell_rect, xy 
 bool map_is_cell_rect_same_elevation(const match_state_t& state, rect_t cell_rect) {
     for (int x = cell_rect.position.x; x < cell_rect.position.x + cell_rect.size.x; x++) {
         for (int y = cell_rect.position.y; y < cell_rect.position.y + cell_rect.size.y; y++) {
-            if (map_get_elevation(state, xy(x, y)) != map_get_elevation(state, cell_rect.position)) {
-                return true;
+            if (map_get_elevation(state, xy(x, y)) != map_get_elevation(state, cell_rect.position) || state.map_tiles[x + (y * state.map_width)].is_ramp == 1) {
+                return false;
             }
         }
     }
     
-    return false;
+    return true;
 }
 
 cell_t map_get_cell(const match_state_t& state, xy cell) {
