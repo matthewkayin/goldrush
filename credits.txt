@@ -9,3 +9,11 @@ https://opengameart.org/content/gold-treasure-icons-16x16
 m3x6 Font
 Daniel Linssen
 https://managore.itch.io/m3x6
+
+Hammer Sound (Modified to create building sound)
+Eelke
+https://freesound.org/people/Eelke
+
+Proto-Germanic Voices
+Manuel Senfft (Submitted by Andrettin on OpenGameArt)
+https://opengameart.org/content/proto-germanic-voices
