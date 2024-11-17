@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <vector>
 #include <filesystem>
+#include <thread>
 
 #ifdef PLATFORM_WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -242,8 +243,16 @@ void render_match(const match_state_t& state);
 
 enum Mode {
     MODE_MENU,
+    MODE_LOADING,
     MODE_MATCH
 };
+
+void load_match(match_state_t& state, Mode& mode) {
+    state = match_init();
+    engine_create_minimap_texture(state);
+    mode = MODE_MATCH;
+    log_trace("Loading finished");
+}
 
 int gold_main(int argc, char** argv) {
     if (!std::filesystem::exists("./logs")) {
@@ -335,6 +344,8 @@ int gold_main(int argc, char** argv) {
     Mode mode = MODE_MENU;
     menu_state_t menu_state = menu_init();
     match_state_t match_state;
+    std::thread loading_thread;
+    animation_t loading_animation;
 
     double last_time = platform_get_absolute_time();
     double last_second = last_time;
@@ -459,9 +470,9 @@ int gold_main(int argc, char** argv) {
                 case MODE_MENU: {
                     menu_update(menu_state);
                     if (menu_state.mode == MENU_MODE_MATCH_START) {
-                        match_state = match_init();
-                        mode = MODE_MATCH;
-                        engine_create_minimap_texture(match_state);
+                        mode = MODE_LOADING;
+                        loading_animation = animation_create(ANIMATION_UNIT_BUILD);
+                        loading_thread = std::thread(load_match, std::ref(match_state), std::ref(mode));
                     } else if (menu_state.mode == MENU_MODE_EXIT) {
                         engine.is_running = false;
                         break;
@@ -477,6 +488,10 @@ int gold_main(int argc, char** argv) {
                         }
                         menu_state.option_menu_state.mode = OPTION_MENU_OPEN;
                     }
+                    break;
+                }
+                case MODE_LOADING: {
+                    animation_update(loading_animation);
                     break;
                 }
                 case MODE_MATCH: {
@@ -502,6 +517,23 @@ int gold_main(int argc, char** argv) {
             case MODE_MENU:
                 render_menu(menu_state);
                 break;
+            case MODE_LOADING: {
+                SDL_Rect src_rect = (SDL_Rect) {
+                    .x = loading_animation.frame.x * engine.sprites[SPRITE_MINER_BUILDING].frame_size.x,
+                    .y = 2 * engine.sprites[SPRITE_MINER_BUILDING].frame_size.y,
+                    .w = engine.sprites[SPRITE_MINER_BUILDING].frame_size.x,
+                    .h = engine.sprites[SPRITE_MINER_BUILDING].frame_size.y
+                };
+                SDL_Rect dst_rect = (SDL_Rect) {
+                    .x = (SCREEN_WIDTH / 2) - engine.sprites[SPRITE_MINER_BUILDING].frame_size.x,
+                    .y = (SCREEN_HEIGHT / 2) - engine.sprites[SPRITE_MINER_BUILDING].frame_size.y - 16,
+                    .w = src_rect.w * 2,
+                    .h = src_rect.h * 2
+                };
+                SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_MINER_BUILDING].colored_texture[network_get_player_id()], &src_rect, &dst_rect);
+                render_text(FONT_WESTERN16, "Loading...", COLOR_WHITE, xy(SCREEN_WIDTH / 2, (SCREEN_HEIGHT / 2) + 16), TEXT_ANCHOR_TOP_CENTER);
+                break;
+            }
             case MODE_MATCH:
                 render_match(match_state);
                 break;
