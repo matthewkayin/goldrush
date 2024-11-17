@@ -16,7 +16,7 @@
 static const uint32_t TICK_DURATION = 4;
 static const uint8_t TICK_OFFSET = 4;
 
-static const int CAMERA_DRAG_MARGIN = 16;
+static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
 
 static const uint32_t CONTROL_GROUP_DOUBLE_CLICK_DURATION = 16;
@@ -724,6 +724,23 @@ void match_update(match_state_t& state) {
                 continue;
             }
             map_update_fog(state, player_id);
+            if (network_get_player_id() == player_id) {
+                if (state.selection.type == SELECTION_TYPE_ENEMY_UNIT || state.selection.type == SELECTION_TYPE_ENEMY_BUILDING) {
+                    rect_t enemy_rect;
+                    if (state.selection.type == SELECTION_TYPE_ENEMY_UNIT) {
+                        unit_t selected_enemy = state.units.get_by_id(state.selection.ids[0]);
+                        enemy_rect = rect_t(selected_enemy.cell, unit_cell_size(selected_enemy.type));
+                    } else {
+                        building_t selected_enemy = state.buildings.get_by_id(state.selection.ids[0]);
+                        enemy_rect = rect_t(selected_enemy.cell, building_cell_size(selected_enemy.type));
+                    }
+                    if (!map_is_cell_rect_revealed(state, player_id, enemy_rect)) {
+                        selection_t empty_selection;
+                        empty_selection.type = SELECTION_TYPE_NONE;
+                        ui_set_selection(state, empty_selection);
+                    }
+                }
+            }
         }
     }
 

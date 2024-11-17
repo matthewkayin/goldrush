@@ -31,10 +31,10 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .ferry_size = 1
     }},
     { UNIT_COWBOY, (unit_data_t) {
-        .name = "Cowboy",
+        .name = "Outlaw",
         .sprite = SPRITE_UNIT_COWBOY,
         .cell_size = 1,
-        .max_health = 40,
+        .max_health = 60,
         .damage = 4,
         .armor = 1,
         .range_squared = 25,
@@ -68,12 +68,12 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .name = "Bandit",
         .sprite = SPRITE_UNIT_BANDIT,
         .cell_size = 1,
-        .max_health = 30,
-        .damage = 7,
+        .max_health = 40,
+        .damage = 4,
         .armor = 0,
         .range_squared = 1,
-        .attack_cooldown = 10,
-        .speed = fixed::from_int_and_raw_decimal(1, 0),
+        .attack_cooldown = 20,
+        .speed = fixed::from_int_and_raw_decimal(0, 225),
         .sight = 7,
         .cost = 75,
         .population_cost = 1,
@@ -914,6 +914,9 @@ bool unit_has_reached_target(const match_state_t& state, const unit_t& unit) {
             uint32_t target_unit_index = state.units.get_index_of(unit.target.id);
             GOLD_ASSERT(target_unit_index != INDEX_INVALID);
             rect_t unit_rect = rect_t(unit.cell, unit_cell_size(unit.type));
+            if (!map_is_cell_rect_revealed(state, unit.player_id, unit_rect)) {
+                return false;
+            }
             rect_t target_unit_rect = rect_t(state.units[target_unit_index].cell, unit_cell_size(state.units[target_unit_index].type));
             return state.units[target_unit_index].player_id == unit.player_id || UNIT_DATA.at(unit.type).range_squared == 1
                         ? unit_rect.is_adjacent_to(target_unit_rect) 
@@ -1142,6 +1145,9 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, cons
         if (!unit_can_see_rect(unit, rect_t(other_unit.cell, unit_cell_size(other_unit.type)))) {
             continue;
         }
+        if (!map_is_cell_rect_revealed(state, unit.player_id, rect_t(other_unit.cell, unit_cell_size(other_unit.type)))) {
+            continue;
+        }
         if (nearest_enemy_index == INDEX_INVALID || xy::manhattan_distance(unit.cell, other_unit.cell) < xy::manhattan_distance(unit.cell, state.units[nearest_enemy_index].cell)) {
             nearest_enemy_index = unit_index;
         }
@@ -1163,6 +1169,9 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, cons
             continue;
         }
         if (!unit_can_see_rect(unit, rect_t(building.cell, building_cell_size(building.type)))) {
+            continue;
+        }
+        if (!map_is_cell_rect_revealed(state, unit.player_id, rect_t(building.cell, building_cell_size(building.type)))) {
             continue;
         }
         if (nearest_enemy_index == INDEX_INVALID || xy::manhattan_distance(unit.cell, building.cell) < xy::manhattan_distance(unit.cell, state.buildings[nearest_enemy_index].cell)) {

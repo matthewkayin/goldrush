@@ -174,7 +174,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkey_keymap = {
     { UI_BUTTON_BUILD_SALOON, SDLK_s },
     { UI_BUTTON_BUILD_BUNKER, SDLK_b },
     { UI_BUTTON_UNIT_MINER, SDLK_r },
-    { UI_BUTTON_UNIT_COWBOY, SDLK_c },
+    { UI_BUTTON_UNIT_COWBOY, SDLK_t },
     { UI_BUTTON_UNIT_BANDIT, SDLK_b }
 };
 std::unordered_map<SDL_Keycode, std::vector<UiButton>> hotkeys;

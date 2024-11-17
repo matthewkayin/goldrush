@@ -5,9 +5,6 @@
 #include "lcg.h"
 #include "noise.h"
 
-static const uint32_t MINE_GOLD_AMOUNT_LOW = 1000;
-static const uint32_t MINE_GOLD_AMOUNT_HIGH = 3000;
-
 Tile wall_autotile_lookup(uint32_t neighbors) {
     switch (neighbors) {
         case 1:
