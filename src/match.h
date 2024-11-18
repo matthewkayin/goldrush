@@ -295,6 +295,7 @@ struct unit_data_t {
     int attack_cooldown;
     fixed speed;
     int sight;
+    uint32_t attack_priority;
     uint32_t cost;
     uint32_t population_cost;
     uint32_t train_duration;

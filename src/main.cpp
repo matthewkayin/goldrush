@@ -1611,6 +1611,12 @@ void render_match(const match_state_t& state) {
                     .w = TILE_SIZE,
                     .h = TILE_SIZE
                 };
+                // Render a sand tile below front walls
+                if (map_tile_index != 1 && elevation == state.map_lowest_elevation) {
+                    SDL_Rect below_tile_src_rect = tile_src_rect;
+                    below_tile_src_rect.x = TILE_SIZE;
+                    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &below_tile_src_rect, &tile_dst_rect);
+                }
                 SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &tile_src_rect, &tile_dst_rect);
             } // End for x of visible tiles
         } // End for y of visible tiles

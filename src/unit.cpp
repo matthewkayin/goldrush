@@ -24,6 +24,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .attack_cooldown = 16,
         .speed = fixed::from_int_and_raw_decimal(0, 200),
         .sight = 7,
+        .attack_priority = 0,
         .cost = 50,
         .population_cost = 1,
         .train_duration = 20,
@@ -35,13 +36,14 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .sprite = SPRITE_UNIT_COWBOY,
         .cell_size = 1,
         .max_health = 60,
-        .damage = 4,
+        .damage = 6,
         .armor = 1,
         .range_squared = 25,
         .attack_cooldown = 30,
         .speed = fixed::from_int_and_raw_decimal(0, 200),
         .sight = 7,
-        .cost = 75,
+        .attack_priority = 1,
+        .cost = 100,
         .population_cost = 1,
         .train_duration = 25,
         .ferry_capacity = 0,
@@ -58,6 +60,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .attack_cooldown = 0,
         .speed = fixed::from_int_and_raw_decimal(1, 80),
         .sight = 10,
+        .attack_priority = 0,
         .cost = 100,
         .population_cost = 2,
         .train_duration = 30,
@@ -75,6 +78,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .attack_cooldown = 20,
         .speed = fixed::from_int_and_raw_decimal(0, 225),
         .sight = 7,
+        .attack_priority = 1,
         .cost = 75,
         .population_cost = 1,
         .train_duration = 20,
@@ -1148,7 +1152,8 @@ unit_target_t unit_target_nearest_insight_enemy(const match_state_t& state, cons
         if (!map_is_cell_rect_revealed(state, unit.player_id, rect_t(other_unit.cell, unit_cell_size(other_unit.type)))) {
             continue;
         }
-        if (nearest_enemy_index == INDEX_INVALID || xy::manhattan_distance(unit.cell, other_unit.cell) < xy::manhattan_distance(unit.cell, state.units[nearest_enemy_index].cell)) {
+        if (nearest_enemy_index == INDEX_INVALID || xy::manhattan_distance(unit.cell, other_unit.cell) < xy::manhattan_distance(unit.cell, state.units[nearest_enemy_index].cell) ||
+            UNIT_DATA.at(other_unit.type).attack_priority > UNIT_DATA.at(state.units[nearest_enemy_index].type).attack_priority) {
             nearest_enemy_index = unit_index;
         }
     }

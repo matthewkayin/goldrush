@@ -356,6 +356,14 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
         }
     }
 
+    // Move all the front walls down one elevation so that they Y-sort properly
+    for (int index = 0; index < state.map_width * state.map_height; index++) {
+        if (state.map_tiles[index].index >= TILE_DATA[TILE_WALL_SE_FRONT].index &&
+            state.map_tiles[index].index <= TILE_DATA[TILE_WALL_SW_FRONT].index) {
+            state.map_tiles[index].elevation--;
+        }
+    }
+
     // Generate ramps
     std::vector<xy> stair_cells;
     for (int pass = 0; pass < 2; pass++) {
@@ -764,13 +772,19 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
                     continue;
                 }
                 // Check that it's not in front of a ramp
-                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                    xy adjacent = first_cell + DIRECTION_XY[direction];
-                    if (!map_is_cell_in_bounds(state, adjacent)) {
-                        continue;
+                for (int nx = first_cell.x - 2; nx < first_cell.x + 3; nx++) {
+                    for (int ny = first_cell.y - 2; ny < first_cell.y + 3; ny++) {
+                        xy near_cell = xy(nx, ny);
+                        if (!map_is_cell_in_bounds(state, near_cell) || xy::manhattan_distance(first_cell, near_cell) > 2) {
+                            continue;
+                        }
+                        if (state.map_tiles[near_cell.x + (near_cell.y * state.map_width)].is_ramp == 1) {
+                            is_too_near = true;
+                            break;
+                        }
                     }
-                    if (state.map_tiles[adjacent.x + (adjacent.y * state.map_width)].is_ramp == 1) {
-                        is_too_near = true;
+                    if (is_too_near) {
+                        break;
                     }
                 }
                 if (is_too_near) {
