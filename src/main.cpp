@@ -21,6 +21,7 @@
 #include <vector>
 #include <filesystem>
 #include <thread>
+#include <atomic>
 
 #ifdef PLATFORM_WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -247,13 +248,6 @@ enum Mode {
     MODE_MATCH
 };
 
-void load_match(match_state_t& state, Mode& mode) {
-    state = match_init();
-    engine_create_minimap_texture(state);
-    mode = MODE_MATCH;
-    log_trace("Loading finished");
-}
-
 int gold_main(int argc, char** argv) {
     if (!std::filesystem::exists("./logs")) {
         std::filesystem::create_directory("./logs");
@@ -345,6 +339,7 @@ int gold_main(int argc, char** argv) {
     menu_state_t menu_state = menu_init();
     match_state_t match_state;
     std::thread loading_thread;
+    std::atomic<bool> loading_is_finished(false);
     animation_t loading_animation;
 
     double last_time = platform_get_absolute_time();
@@ -471,8 +466,13 @@ int gold_main(int argc, char** argv) {
                     menu_update(menu_state);
                     if (menu_state.mode == MENU_MODE_MATCH_START) {
                         mode = MODE_LOADING;
+                        loading_is_finished.store(false);
                         loading_animation = animation_create(ANIMATION_UNIT_BUILD);
-                        loading_thread = std::thread(load_match, std::ref(match_state), std::ref(mode));
+                        loading_thread = std::thread([&match_state, &loading_is_finished]  {
+                            match_state = match_init();
+                            loading_is_finished.store(true);
+                            log_trace("Loading thread finished.");
+                        });
                     } else if (menu_state.mode == MENU_MODE_EXIT) {
                         engine.is_running = false;
                         break;
@@ -492,6 +492,10 @@ int gold_main(int argc, char** argv) {
                 }
                 case MODE_LOADING: {
                     animation_update(loading_animation);
+                    if (loading_is_finished.load()) {
+                        engine_create_minimap_texture(match_state);
+                        mode = MODE_MATCH;
+                    }
                     break;
                 }
                 case MODE_MATCH: {
@@ -980,6 +984,7 @@ void engine_create_minimap_texture(const match_state_t& state) {
         }
     }
     SDL_SetRenderTarget(engine.renderer, NULL);
+    log_trace("Created minimap texture.");
 }
 
 void engine_quit() {
