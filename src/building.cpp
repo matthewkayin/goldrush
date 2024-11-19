@@ -234,7 +234,6 @@ void building_update(match_state_t& state, building_t& building) {
                     unit.timer--;
                 }
                 if (unit.timer == 0) {
-                    log_trace("unit timer 0, finding attack target in bunker");
                     unit_target_t attack_target = (unit_target_t) {
                         .type = UNIT_TARGET_NONE
                     };
@@ -281,7 +280,6 @@ void building_update(match_state_t& state, building_t& building) {
                         } // End for each enemy building
                     } // End if attack target is unit target none
 
-                    log_trace("attack target type %u", attack_target.type);
                     if (attack_target.type != UNIT_TARGET_NONE) {
                         unit_attack_target(state, id, attack_target);
                         unit.timer = UNIT_DATA.at(unit.type).attack_cooldown;

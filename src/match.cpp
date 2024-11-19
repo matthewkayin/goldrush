@@ -33,6 +33,46 @@ const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
 const uint32_t MATCH_DISCONNECT_GRACE = 10;
 const rect_t MATCH_CHAT_RECT = rect_t(xy(16, MINIMAP_RECT.position.y - 24), xy(128, 16));
 
+#ifdef GOLD_DEBUG_SANDBOX
+void match_init_sandbox(match_state_t& state) {
+    state.map_width = 64;
+    state.map_height = 64;
+    state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
+        .index = TILE_DATA[TILE_SAND].index,
+        .elevation = 0,
+        .is_ramp = 0
+    });
+    state.map_cells = std::vector<cell_t>(state.map_width * state.map_height, (cell_t) {
+        .type = CELL_EMPTY,
+        .value = 0
+    });
+    xy player_spawns[2] = { xy (2, 2), xy(18, 2) };
+    for (uint8_t player_id = 0; player_id < 2; player_id++) {
+        xy player_spawn = player_spawns[player_id];
+        state.player_gold[player_id] = 2000;
+
+        if (player_id == network_get_player_id()) {
+            state.camera_offset = camera_centered_on_cell(player_spawn, state.map_width, state.map_height);
+        }
+    }
+
+    unit_create(state, 0, UNIT_MINER, player_spawns[0]);
+    unit_create(state, 0, UNIT_MINER, player_spawns[0] + xy(0, 1));
+    unit_create(state, 0, UNIT_COWBOY, player_spawns[0] + xy(0, 2));
+    unit_create(state, 0, UNIT_COWBOY, player_spawns[0] + xy(0, 3));
+    unit_create(state, 1, UNIT_BANDIT, player_spawns[1]);
+    unit_create(state, 1, UNIT_BANDIT, player_spawns[1] + xy(0, 1));
+    unit_create(state, 1, UNIT_BANDIT, player_spawns[1] + xy(0, 2));
+    unit_create(state, 1, UNIT_BANDIT, player_spawns[1] + xy(0, 3));
+
+    for (uint8_t player_id = 0; player_id < 2; player_id++) {
+        state.player_fog[player_id] = std::vector<FogType>(state.map_width * state.map_height, FOG_HIDDEN);
+        map_update_fog(state, player_id);
+        map_update_fog(state, player_id);
+    }
+}
+#endif
+
 match_state_t match_init() {
     match_state_t state;
 
@@ -71,18 +111,14 @@ match_state_t match_init() {
     state.tick_timer = 0;
 
     // Init map
+#ifndef GOLD_DEBUG_SANDBOX
     std::vector<xy> player_spawns;
     map_init(state, player_spawns);
 
-    // Init fog of war
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
-            continue;
-        }
-        state.player_fog[player_id] = std::vector<FogType>(state.map_width * state.map_height, FOG_HIDDEN);
-    }
+#endif
 
     // Init players
+#ifndef GOLD_DEBUG_SANDBOX
     log_trace("Initializing players...");
     int player_count = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -104,11 +140,24 @@ match_state_t match_init() {
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(0, 0));
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(0, 1));
         unit_create(state, player_id, UNIT_MINER, player_spawn + xy(3, 0));
+
+        // Init fog of war
         // Fog is updated twice at the start of the match
         // First update reveals cells, second update remembers buildings
+        state.player_fog[player_id] = std::vector<FogType>(state.map_width * state.map_height, FOG_HIDDEN);
         map_update_fog(state, player_id);
         map_update_fog(state, player_id);
     }
+#else
+    match_init_sandbox(state);
+    int player_count = 0;
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        player_count++;
+    }
+#endif
 
     state.is_fog_dirty = false;
 
