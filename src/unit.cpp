@@ -27,7 +27,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .attack_priority = 0,
         .cost = 50,
         .population_cost = 1,
-        .train_duration = 20,
+        .train_duration = 15,
         .ferry_capacity = 0,
         .ferry_size = 1
     }},
@@ -45,7 +45,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .attack_priority = 1,
         .cost = 100,
         .population_cost = 1,
-        .train_duration = 25,
+        .train_duration = 20,
         .ferry_capacity = 0,
         .ferry_size = 1
     }},
@@ -81,7 +81,7 @@ const std::unordered_map<uint32_t, unit_data_t> UNIT_DATA = {
         .attack_priority = 1,
         .cost = 50,
         .population_cost = 1,
-        .train_duration = 20,
+        .train_duration = 15,
         .ferry_capacity = 0,
         .ferry_size = 1
     }},

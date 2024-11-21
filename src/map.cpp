@@ -517,7 +517,7 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
         spawn_directions.push_back(i);
     }
     // Determine spawn points
-    const int spawn_margin = 4;
+    const int spawn_margin = 8;
     const xy map_center = xy(state.map_width / 2, state.map_height / 2);
     const xy player_spawn_size = xy(4, 2);
     const xy spawn_search_rect_size = xy(12, 12);

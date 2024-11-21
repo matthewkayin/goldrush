@@ -56,14 +56,24 @@ void match_init_sandbox(match_state_t& state) {
         }
     }
 
-    unit_create(state, 0, UNIT_MINER, player_spawns[0]);
-    unit_create(state, 0, UNIT_MINER, player_spawns[0] + xy(0, 1));
+    unit_create(state, 0, UNIT_COWBOY, player_spawns[0] + xy(0, 1));
     unit_create(state, 0, UNIT_COWBOY, player_spawns[0] + xy(0, 2));
     unit_create(state, 0, UNIT_COWBOY, player_spawns[0] + xy(0, 3));
-    unit_create(state, 1, UNIT_BANDIT, player_spawns[1]);
-    unit_create(state, 1, UNIT_BANDIT, player_spawns[1] + xy(0, 1));
-    unit_create(state, 1, UNIT_BANDIT, player_spawns[1] + xy(0, 2));
-    unit_create(state, 1, UNIT_BANDIT, player_spawns[1] + xy(0, 3));
+    unit_create(state, 0, UNIT_COWBOY, player_spawns[0] + xy(0, 4));
+    uint8_t building_id = building_create(state, 0, BUILDING_BUNKER, xy(3, 1));
+    building_t& building = state.buildings.get_by_id(building_id);
+    building.health = BUILDING_DATA.at(building.type).max_health;
+    building.mode = BUILDING_MODE_FINISHED;
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1]);
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(1, 0));
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(0, 1));
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(1, 1));
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(0, 2));
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(1, 2));
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(0, 3));
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(1, 3));
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(0, 4));
+    unit_create(state, 1, UNIT_COWBOY, player_spawns[1] + xy(1, 4));
 
     for (uint8_t player_id = 0; player_id < 2; player_id++) {
         state.player_fog[player_id] = std::vector<FogType>(state.map_width * state.map_height, FOG_HIDDEN);

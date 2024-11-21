@@ -41,8 +41,8 @@ const std::unordered_map<uint32_t, building_data_t> BUILDING_DATA = {
         .cell_size = 2,
         .cost = 100,
         .max_health = 100,
-        .builder_positions_x = { 1, 17, 4 },
-        .builder_positions_y = { 15, 0, -8 },
+        .builder_positions_x = { 1, 14, 5 },
+        .builder_positions_y = { 15, 9, -3 },
         .builder_flip_h = { false, true, false },
         .can_rally = false
     }}
@@ -129,9 +129,24 @@ void building_update(match_state_t& state, building_t& building) {
                 }
             }
         }
+
         building.mode = BUILDING_MODE_DESTROYED;
         building.queue.clear();
         building.queue_timer = BUILDING_FADE_DURATION;
+
+        // Eject all garrisoned units
+        if (building.type == BUILDING_BUNKER) {
+            for (uint32_t garrison_index = 0; garrison_index < building.garrisoned_units.size(); garrison_index++) {
+                entity_id unit_id = building.garrisoned_units[garrison_index];
+                unit_t& unit = state.units.get_by_id(unit_id);
+                unit.garrison_id = ID_NULL;
+                unit.mode = UNIT_MODE_IDLE;
+                unit.cell = building.cell + xy(garrison_index % BUILDING_DATA.at(building.type).cell_size, garrison_index / BUILDING_DATA.at(building.type).cell_size);
+                unit.position = cell_center(unit.cell);
+                map_set_cell(state, unit.cell, CELL_UNIT, unit_id);
+            }
+            building.garrisoned_units.clear();
+        }
     }
 
     // This code uses the queue_timer in order to handle building decay

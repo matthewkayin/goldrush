@@ -1696,7 +1696,7 @@ void render_match(const match_state_t& state) {
                         }
 
                         // Render the garrisoned units bar
-                        if (building.player_id == network_get_player_id() && building.type == BUILDING_BUNKER) {
+                        if (building.player_id == network_get_player_id() && building.type == BUILDING_BUNKER && building.mode == BUILDING_MODE_FINISHED) {
                             healthbar_rect.y += healthbar_rect.h + 1;
                             healthbar_subrect.y = healthbar_rect.y;
                             healthbar_subrect.w = (healthbar_rect.w * building.garrisoned_units.size()) / BUILDING_BUNKER_GARRISON_CAPACITY;

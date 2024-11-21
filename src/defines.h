@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #define APP_NAME "GOLD RUSH"
-#define APP_VERSION "0.2.6"
+#define APP_VERSION "0.3"
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 8
@@ -13,13 +13,14 @@
 #ifdef GOLD_DEBUG
     // #define GOLD_DEBUG_FAST_BUILD
     // #define GOLD_DEBUG_FAST_TRAIN
-    // #define GOLD_DEBUG_SANDBOX
+    #define GOLD_DEBUG_SANDBOX
     // #define GOLD_DEBUG_UNIT_PATHS
     // #define GOLD_DEBUG_MOUSE
     // #define GOLD_DEBUG_FOG_DISABLED
+    // #define GOLD_DEBUG_RES_PATH
 #endif
 
-#ifdef GOLD_DEBUG
+#ifdef GOLD_DEBUG_RES_PATH
     #define RESOURCE_BASE_PATH "../res/"
 #else
     #define RESOURCE_BASE_PATH "./res/"
