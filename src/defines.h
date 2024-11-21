@@ -9,14 +9,14 @@
 #define MAX_PLAYERS 8
 #define TILE_SIZE 16
 #define UI_HEIGHT 88
-// #define GOLD_RAND_SEED 1731777156
+// #define GOLD_RAND_SEED 1732187361
 #ifdef GOLD_DEBUG
     // #define GOLD_DEBUG_FAST_BUILD
     // #define GOLD_DEBUG_FAST_TRAIN
-    #define GOLD_DEBUG_SANDBOX
+    // #define GOLD_DEBUG_SANDBOX
     // #define GOLD_DEBUG_UNIT_PATHS
     // #define GOLD_DEBUG_MOUSE
-    // #define GOLD_DEBUG_FOG_DISABLED
+    #define GOLD_DEBUG_FOG_DISABLED
     // #define GOLD_DEBUG_RES_PATH
 #endif
 

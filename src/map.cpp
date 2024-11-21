@@ -160,8 +160,36 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
     }
 
     // Bake map tiles
-    std::vector<xy> artifacts;
     uint32_t elevation_artifact_count;
+    do {
+        // Remove elevation artifacts
+        elevation_artifact_count = 0;
+        for (int x = 0; x < state.map_width; x++) {
+            for (int y = 0; y < state.map_height; y++) {
+                if (prebaked[x + (y * state.map_width)].elevation == 1) {
+                    bool is_highground_valid = true;
+                    for (int nx = x - 4; nx < x + 5; nx++) {
+                        for (int ny = y - 4; ny < y + 5; ny++) {
+                            xy neighbor_cell = xy(nx, ny);
+                            if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                                continue;
+                            }
+                            if (prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation == -1) {
+                                is_highground_valid = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!is_highground_valid) {
+                        prebaked[x + (y * state.map_width)].elevation--;
+                        elevation_artifact_count++;
+                    }
+                } 
+            }
+        }
+    } while (elevation_artifact_count != 0);
+
+    std::vector<xy> artifacts;
     do {
         state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
             .index = 0,
@@ -173,33 +201,6 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
             prebaked[artifact.x + (artifact.y * state.map_width)].elevation--;
         }
         artifacts.clear();
-
-        // Remove elevation artifacts
-        elevation_artifact_count = 0;
-        for (int x = 0; x < state.map_width; x++) {
-            for (int y = 0; y < state.map_height; y++) {
-                if (prebaked[x + (y * state.map_width)].elevation == 1) {
-                    bool is_highground_valid = true;
-                    int8_t ne[8];
-                    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                        xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
-                        if (!map_is_cell_in_bounds(state, neighbor_cell)) {
-                            ne[direction] = -2;
-                            continue;
-                        }
-                        ne[direction] = prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation;
-                        if (prebaked[neighbor_cell.x + (neighbor_cell.y * state.map_width)].elevation == -1) {
-                            is_highground_valid = false;
-                            break;
-                        }
-                    }
-                    if (!is_highground_valid) {
-                        prebaked[x + (y * state.map_width)].elevation--;
-                        elevation_artifact_count++;
-                    }
-                }
-            }
-        }
 
         log_trace("Wall pass...");
         for (int y = 0; y < state.map_height; y++) {
@@ -329,7 +330,7 @@ void map_init(match_state_t& state, std::vector<xy>& player_spawns) {
         } // end for each y
 
         log_trace("Artifacts count: %u", artifacts.size());
-    } while (!artifacts.empty() || elevation_artifact_count != 0);
+    } while (!artifacts.empty());
 
     for (int y = 0; y < state.map_height; y++) {
         for (int x = 0; x < state.map_width; x++) {
