@@ -7,7 +7,6 @@ else
 	endif
 endif
 
-IS_DEBUG := true
 ASSEMBLY := gold
 EXTENSION :=
 DIR := $(subst /,\,${CURDIR})
@@ -21,7 +20,6 @@ DEFINES := -D_CRT_SECURE_NO_WARNINGS
 ifeq ($(IS_DEBUG),true)
 	COMPILER_FLAGS += -g -O0
 	LINKER_FLAGS += -g
-	DEFINES += -DGOLD_DEBUG
 else
 	COMPILER_FLAGS += -O3
 endif
