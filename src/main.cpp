@@ -1,11 +1,10 @@
 #include "defines.h"
 #include "logger.h"
 #include "platform.h"
+#include "engine.h"
+#include "menu.h"
 #include <ctime>
 #include <cstdio>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
 
 int gold_main(int argc, char** argv);
 
@@ -20,16 +19,10 @@ int main(int argc, char** argv) {
 }
 #endif
 
-struct engine_t {
-    SDL_Window* window;
-    SDL_Renderer* renderer;
+enum GameMode {
+    GAME_MODE_MENU,
+    GAME_MODE_MATCH
 };
-static engine_t engine;
-
-bool engine_init();
-bool engine_init_renderer();
-void engine_destroy_renderer();
-void engine_quit();
 
 int gold_main(int argc, char** argv) {
     char logfile_path[128];
@@ -51,6 +44,9 @@ int gold_main(int argc, char** argv) {
     uint32_t ups = 0;
 
     bool game_is_running = true;
+    GameMode game_mode = GAME_MODE_MENU;
+    menu_state_t menu_state = menu_init();
+
     while (game_is_running) {
         // TIMEKEEP
         double current_time = platform_get_absolute_time();
@@ -76,6 +72,33 @@ int gold_main(int argc, char** argv) {
                     game_is_running = false;
                     break;
                 }
+                // Capture mouse
+                if (SDL_GetWindowGrab(engine.window) == SDL_FALSE) {
+                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+                        SDL_SetWindowGrab(engine.window, SDL_TRUE);
+                        continue;
+                    }
+                    // If the mouse is not captured, don't handle any other input
+                    break;
+                }
+                // Release mouse
+                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_TAB) {
+                    SDL_SetWindowGrab(engine.window, SDL_FALSE);
+                    break;
+                }
+                // Update mouse position
+                if (event.type == SDL_MOUSEMOTION) {
+                    engine.mouse_position = xy(event.motion.x, event.motion.y);
+                    continue;
+                }
+                // If input not handled, pass event to current game mode
+                switch (game_mode) {
+                    case GAME_MODE_MENU: 
+                        menu_handle_input(menu_state, event);
+                        break;
+                    case GAME_MODE_MATCH:
+                        break;
+                }
             } // End while PollEvent
         } // End if should handle input
 
@@ -83,77 +106,35 @@ int gold_main(int argc, char** argv) {
         while (update_accumulator >= UPDATE_TIME) {
             update_accumulator -= UPDATE_TIME;
             updates++;
-        }
+
+            switch (game_mode) {
+                case GAME_MODE_MENU: 
+                    menu_update(menu_state);
+                    break;
+                case GAME_MODE_MATCH:
+                    break;
+            }
+        } // End while update
 
         // RENDER
         SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
         SDL_RenderClear(engine.renderer);
+
+        switch (game_mode) {
+            case GAME_MODE_MENU: 
+                menu_render(menu_state);
+                break;
+            case GAME_MODE_MATCH:
+                break;
+        }
 
         SDL_RenderPresent(engine.renderer);
     }
 
     engine_quit();
     logger_quit();
+
+    log_info("%s quit gracefully.", APP_NAME);
     
     return 0;
-}
-
-bool engine_init() {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        log_error("SDL failed to initialize: %s", SDL_GetError());
-        return false;
-    }
-
-    // Init TTF
-    if (TTF_Init() == -1) {
-        log_error("SDL_ttf failed to initialize: %s", TTF_GetError());
-        return false;
-    }
-
-    // Init IMG
-    int img_flags = IMG_INIT_PNG;
-    if (!(IMG_Init(img_flags) & img_flags)) {
-        log_error("SDL_image failed to initialize: %s", IMG_GetError());
-        return false;
-    }
-
-    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
-    if (engine.window == NULL) {
-        log_error("Error creating window: %s", SDL_GetError());
-        return false;
-    }
-
-    if (!engine_init_renderer()) {
-        return false;
-    }
-
-    log_info("%s initialized.", APP_NAME);
-    return true;
-}
-
-bool engine_init_renderer() {
-    uint32_t renderer_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
-    engine.renderer = SDL_CreateRenderer(engine.window, -1, renderer_flags);
-    if (engine.renderer == NULL) {
-        log_error("Error creating renderer: %s", SDL_GetError());
-        return false;
-    }
-    SDL_RenderSetLogicalSize(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
-    SDL_SetRenderTarget(engine.renderer, NULL);
-
-    log_info("Initialized renderer.");
-    return true;
-}
-
-void engine_destroy_renderer() {
-    SDL_DestroyRenderer(engine.renderer);
-    log_info("Destroyed renderer");
-}
-
-void engine_quit() {
-    engine_destroy_renderer();
-    SDL_DestroyWindow(engine.window);
-    IMG_Quit();
-    TTF_Quit();
-    SDL_Quit();
 }

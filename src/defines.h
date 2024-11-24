@@ -22,3 +22,4 @@
 #define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
 #define GOLD_ASSERTS_ENABLED
+#define GOLD_RESOURCE_PATH "../res/"
