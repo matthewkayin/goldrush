@@ -59,7 +59,6 @@ int gold_main(int argc, char** argv) {
             ups = updates;
             updates = 0;
             last_second += 1.0;
-            log_info("FPS: %u / UPS: %u", fps, ups);
         }
         frames++;
 
@@ -110,6 +109,9 @@ int gold_main(int argc, char** argv) {
             switch (game_mode) {
                 case GAME_MODE_MENU: 
                     menu_update(menu_state);
+                    if (menu_state.mode == MENU_MODE_EXIT) {
+                        game_is_running = false;
+                    }
                     break;
                 case GAME_MODE_MATCH:
                     break;
