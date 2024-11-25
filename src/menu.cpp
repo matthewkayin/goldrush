@@ -1,7 +1,5 @@
 #include "menu.h"
 
-#define USERNAME_MAX_LENGTH 16
-
 #include <cstring>
 #include <unordered_map>
 
@@ -108,8 +106,8 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
     } else if (event.type == SDL_TEXTINPUT) {
         if (state.mode == MENU_MODE_PLAY) {
             state.username += std::string(event.text.text);
-            if (state.username.length() > USERNAME_MAX_LENGTH) {
-                state.username = state.username.substr(0, USERNAME_MAX_LENGTH);
+            if (state.username.length() > MAX_USERNAME_LENGTH) {
+                state.username = state.username.substr(0, MAX_USERNAME_LENGTH);
             }
         }
     } else if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {

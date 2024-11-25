@@ -7,6 +7,7 @@
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 4
+#define MAX_USERNAME_LENGTH 14
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1
