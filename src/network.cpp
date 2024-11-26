@@ -1,6 +1,7 @@
 #include "network.h"
 
 #include "logger.h"
+#include <cstring>
 #include <enet/enet.h>
 
 static const uint16_t PORT = 6530;
@@ -26,8 +27,8 @@ static network_state_t state;
 
 enum MessageType {
     MESSAGE_GREET,
-    MESSAGE_GREET_RESPONSE_INVALID_VERSION,
-    MESSAGE_GREET_RESPONSE_ACCEPTED,
+    MESSAGE_INVALID_VERSION,
+    MESSAGE_WELCOME,
     MESSAGE_NEW_PLAYER,
     MESSAGE_READY
 };
@@ -38,11 +39,11 @@ struct message_greet_t {
     char app_version[sizeof(APP_VERSION)];
 };
 
-struct message_greet_response_accepted_t {
-    const uint8_t type = MESSAGE_GREET_RESPONSE_ACCEPTED;
+struct message_welcome_t {
+    const uint8_t type = MESSAGE_WELCOME;
     uint8_t player_id;
-    uint8_t padding[3];
-    char server_username[24];
+    uint8_t padding[2];
+    player_t players[4];
 };
 
 struct message_new_player_t {
@@ -130,32 +131,49 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t peer_id) {
             memcpy(&greet, data, sizeof(message_greet_t));
 
             // I think that ENET will handle the lobby-full case
-            message_greet_response_t response;
+
+            // Check the client version
+            if (strcmp(greet.app_version, APP_VERSION) != 0) {
+                log_info("Client app version mismatch. Rejecting client...");
+                uint8_t message = MESSAGE_INVALID_VERSION;
+                ENetPacket* packet = enet_packet_create(&message, sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
+                enet_peer_send(&state.host->peers[peer_id], 0, packet);
+                enet_host_flush(state.host);
+                return;
+            } 
+
             uint8_t player_id;
             for (player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (state.players[player_id].status == PLAYER_STATUS_NONE) {
                     break;
                 }
             }
-            response.player_id = player_id;
-            if (strcmp(greet.app_version, APP_VERSION) != 0) {
-                log_info("Client app version mismatch. Rejecting client...");
-                response.status = GREET_RESPONSE_INVALID_VERSION;
-            } else {
-                strncpy(state.players[player_id].name, greet.username, MAX_USERNAME_LENGTH + 1);
-                state.players[player_id].status = PLAYER_STATUS_NOT_READY;
-                log_info("Client is now player %u", player_id);
+            log_info("Client has greeted us and is now player %u", player_id);
+            strncpy(state.players[player_id].name, greet.username, MAX_USERNAME_LENGTH + 1);
+            enet_address_get_host_ip(&state.host->peers[peer_id].address, state.players[player_id].ip, 24);
+            state.players[player_id].status = PLAYER_STATUS_NOT_READY;
 
-                response.status = GREET_RESPONSE_ACCEPTED;
-            }
+            // Prepare the welcome packet
+            message_welcome_t welcome;
+            memcpy(welcome.players, state.players, sizeof(state.players));
+            welcome.player_id = player_id;
 
-            ENetPacket* packet = enet_packet_create(&response, sizeof(message_greet_response_t), ENET_PACKET_FLAG_RELIABLE);
+            ENetPacket* packet = enet_packet_create(&welcome, sizeof(message_welcome_t), ENET_PACKET_FLAG_RELIABLE);
             enet_peer_send(&state.host->peers[peer_id], 0, packet);
             state.host->peers[peer_id].address;
-            if (response.status == GREET_RESPONSE_ACCEPTED) {
-
-            }
             enet_host_flush(state.host);
+            break;
+        }
+        case MESSAGE_INVALID_VERSION: {
+            log_info("Client version does not match the server.");
+            break;
+        }
+        case MESSAGE_WELCOME: {
+            log_info("Joined lobby.");
+            message_welcome_t welcome;
+            memcpy(&welcome, data, sizeof(message_welcome_t));
+            state.player_id = welcome.player_id;
+            for (uint8_t
             break;
         }
     }
