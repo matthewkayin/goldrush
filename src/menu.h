@@ -11,6 +11,7 @@ enum MenuMode {
     MENU_MODE_JOIN,
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
+    MENU_MODE_LOBBY_HOST,
     MENU_MODE_EXIT,
     MENU_MODE_OPTIONS
 };
@@ -22,7 +23,11 @@ enum MenuButton {
     MENU_BUTTON_EXIT,
     MENU_BUTTON_HOST,
     MENU_BUTTON_JOIN,
-    MENU_BUTTON_BACK
+    MENU_BUTTON_PLAY_BACK,
+    MENU_BUTTON_LOBBY_BACK,
+    MENU_BUTTON_LOBBY_READY,
+    MENU_BUTTON_LOBBY_START,
+    MENU_BUTTON_CONNECTING_BACK
 };
 
 struct menu_state_t {
@@ -38,4 +43,5 @@ struct menu_state_t {
 menu_state_t menu_init();
 void menu_handle_input(menu_state_t& state, SDL_Event event);
 void menu_update(menu_state_t& state);
+void menu_show_status(menu_state_t& state, const char* text);
 void menu_render(const menu_state_t& state);

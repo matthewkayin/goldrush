@@ -3,6 +3,7 @@
 #include "platform.h"
 #include "engine.h"
 #include "menu.h"
+#include "network.h"
 #include <ctime>
 #include <cstdio>
 
@@ -30,9 +31,24 @@ int gold_main(int argc, char** argv) {
     tm _tm = *localtime(&_time);
     sprintf(logfile_path, "./logs/%d-%02d-%02dT%02d%02d%02d.log", _tm.tm_year + 1900, _tm.tm_mon + 1, _tm.tm_mday, _tm.tm_hour, _tm.tm_min, _tm.tm_sec);
 
+    // Parse system arguments
+    for (int argn = 1; argn < argc; argn++) {
+        if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
+            argn++;
+            strcpy(logfile_path, argv[argn]);
+        }
+    }
+
     logger_init(logfile_path);
     platform_clock_init();
-    engine_init();
+    if (!network_init()) {
+        logger_quit();
+        return -1;
+    }
+    if (!engine_init()) {
+        logger_quit();
+        return -1;
+    }
 
     const double UPDATE_TIME = 1.0 / 60;
     double last_time = platform_get_absolute_time();
@@ -133,6 +149,7 @@ int gold_main(int argc, char** argv) {
         SDL_RenderPresent(engine.renderer);
     }
 
+    network_quit();
     engine_quit();
     logger_quit();
 

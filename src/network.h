@@ -2,6 +2,8 @@
 
 #include "defines.h"
 
+#define NAME_BUFFER_SIZE 20
+
 enum NetworkStatus {
     NETWORK_STATUS_OFFLINE,
     NETWORK_STATUS_SERVER,
@@ -18,16 +20,47 @@ enum PlayerStatus {
     PLAYER_STATUS_DISCONNECTED
 };
 
+struct player_t {
+    uint8_t status;
+    uint8_t padding;
+    char name[NAME_BUFFER_SIZE];
+};
+
+enum NetworkEventType {
+    NETWORK_EVENT_CONNECTION_FAILED,
+    NETWORK_EVENT_PLAYER_DISCONNECTED,
+    NETWORK_EVENT_JOINED_LOBBY,
+    NETWORK_EVENT_LOBBY_FULL,
+    NETWORK_EVENT_INVALID_VERSION,
+    NETWORK_EVENT_MATCH_LOAD,
+    NETWORK_EVENT_MATCH_START,
+    NETWORK_EVENT_INPUT
+};
+
+struct network_event_player_disconnected_t {
+    uint8_t player_id;
+};
+
+struct network_event_t {
+    NetworkEventType type;
+    union {
+        network_event_player_disconnected_t player_disconnected;
+    };
+};
+
+bool network_init();
 void network_quit();
 void network_disconnect();
 
+bool network_server_create(const char* username);
+bool network_client_create(const char* username, const char* server_ip, uint16_t port);
+
 bool network_is_server();
 NetworkStatus network_get_status();
-PlayerStatus network_get_player_status(uint8_t player_id);
-const char* network_get_player_name(uint8_t player_id);
+const player_t& network_get_player(uint8_t player_id);
+
+void network_toggle_ready();
 
 void network_service();
 void network_handle_message(uint8_t* data, size_t length, uint16_t peer_id);
-
-bool network_server_create(const char* username);
-bool network_client_create(const char* username, const char* server_ip);
+bool network_poll_events(network_event_t* event);
