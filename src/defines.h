@@ -9,6 +9,7 @@
 #define MAX_PLAYERS 4
 #define MAX_USERNAME_LENGTH 14
 #define BASE_PORT 6530
+#define SCANNER_PORT 6529
 #define TILE_SIZE 16
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)

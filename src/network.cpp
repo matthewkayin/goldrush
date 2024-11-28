@@ -8,6 +8,7 @@
 
 struct network_state_t {
     ENetHost* host;
+    ENetSocket scanner;
     NetworkStatus status;
 
     char client_username[NAME_BUFFER_SIZE];
@@ -17,6 +18,7 @@ struct network_state_t {
     ENetPeer* peers[MAX_PLAYERS];
 
     std::queue<network_event_t> event_queue;
+    std::vector<lobby_info_full_t> lobbies;
 };
 static network_state_t state;
 
@@ -80,6 +82,11 @@ void network_disconnect() {
         return;
     }
 
+    if (state.scanner != ENET_SOCKET_NULL) {
+        enet_socket_shutdown(state.scanner, ENET_SOCKET_SHUTDOWN_READ_WRITE);
+        enet_socket_destroy(state.scanner);
+    }
+
     for (uint8_t peer_id = 0; peer_id < state.host->peerCount; peer_id++) {
         if (state.host->peers[peer_id].state == ENET_PEER_STATE_CONNECTED) {
             if (state.status == NETWORK_STATUS_SERVER || state.status == NETWORK_STATUS_CONNECTED) {
@@ -98,6 +105,33 @@ void network_disconnect() {
     } else if (state.status == NETWORK_STATUS_CONNECTED) {
         log_info("Client attempted gentle disconnect...");
         state.status = NETWORK_STATUS_DISCONNECTING;
+    }
+}
+
+bool network_scanner_create() {
+    state.scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (state.scanner == ENET_SOCKET_NULL) {
+        log_error("Failed to create scanner socket.");
+        return false;
+    }
+    enet_socket_set_option(state.scanner, ENET_SOCKOPT_BROADCAST, 1);
+
+    return true;
+}
+
+void network_scanner_search() {
+    state.lobbies.clear();
+
+    ENetAddress scan_address;
+    scan_address.host = ENET_HOST_BROADCAST;
+    scan_address.port = SCANNER_PORT;
+
+    char buffer = 3;
+    ENetBuffer send_buffer;
+    send_buffer.data = &buffer;
+    send_buffer.dataLength = 1;
+    if (enet_socket_send(state.scanner, &scan_address, &send_buffer, 1) != 1) {
+        log_error("Failed to scan for LAN servers.");
     }
 }
 
@@ -128,6 +162,25 @@ bool network_host_create() {
 bool network_server_create(const char* username) {
     if (!network_host_create()) {
         log_error("Could not create enet host.");
+        return false;
+    }
+
+    if (state.scanner != ENET_SOCKET_NULL) {
+        enet_socket_shutdown(state.scanner, ENET_SOCKET_SHUTDOWN_READ_WRITE);
+        enet_socket_destroy(state.scanner);
+    }
+
+    state.scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (state.scanner == ENET_SOCKET_NULL) {
+        log_error("Failed to create scanner socket.");
+        return false;
+    }
+    enet_socket_set_option(state.scanner, ENET_SOCKOPT_REUSEADDR, 1);
+    ENetAddress scanner_address;
+    scanner_address.host = ENET_HOST_ANY;
+    scanner_address.port = SCANNER_PORT;
+    if (enet_socket_bind(state.scanner, &scanner_address) != 0) {
+        log_error("Failed to bind scanner socket.");
         return false;
     }
 
@@ -189,9 +242,59 @@ void network_toggle_ready() {
     enet_host_flush(state.host);
 }
 
+const size_t network_get_lobby_count() {
+    return state.lobbies.size();
+}
+
+const lobby_info_full_t& network_get_lobby(size_t index) {
+    return state.lobbies[index];
+}
+
 // POLL EVENTS
 
 void network_service() {
+    if (state.scanner != ENET_SOCKET_NULL) {
+        ENetSocketSet set;
+        ENET_SOCKETSET_EMPTY(set);
+        ENET_SOCKETSET_ADD(set, state.scanner);
+        while (enet_socketset_select(state.scanner, &set, NULL, 0) > 0) {
+            ENetAddress receive_address;
+            ENetBuffer receive_buffer;
+            char buffer[64];
+            receive_buffer.data = &buffer;
+            receive_buffer.dataLength = sizeof(buffer);
+            if (enet_socket_receive(state.scanner, &receive_address, &receive_buffer, 1) <= 0) {
+                continue;
+            }
+
+            if (state.status == NETWORK_STATUS_SERVER) {
+                // Tell the client about this game
+                lobby_info_t lobby_info;
+                sprintf(lobby_info.name, "%s's Game", state.players[0].name);
+                lobby_info.player_count = 0;
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (state.players[player_id].status != PLAYER_STATUS_NONE) {
+                        lobby_info.player_count++;
+                    }
+                }
+
+                ENetBuffer response_buffer;
+                response_buffer.data = &lobby_info;
+                response_buffer.dataLength = sizeof(lobby_info_t);
+                enet_socket_send(state.scanner, &receive_address, &response_buffer, 1);
+            } else {
+                lobby_info_t lobby_info;
+                memcpy(&lobby_info, buffer, sizeof(lobby_info_t));
+                lobby_info_full_t lobby_info_full;
+                memcpy(&lobby_info_full.name, lobby_info.name, 32);
+                lobby_info_full.player_count = lobby_info.player_count;
+                lobby_info_full.port = receive_address.port;
+                enet_address_get_host_ip(&receive_address, lobby_info_full.ip, NAME_BUFFER_SIZE);
+                state.lobbies.push_back(lobby_info_full);
+            }
+        }
+    }
+
     ENetEvent event;
     while (state.status != NETWORK_STATUS_OFFLINE && enet_host_service(state.host, &event, 0) > 0) {
         switch (event.type) {

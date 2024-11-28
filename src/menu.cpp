@@ -142,6 +142,11 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     break;
                 }
 
+                if (!network_scanner_create()) {
+                    break;
+                }
+                network_scanner_search();
+
                 state.mode = MENU_MODE_MATCHLIST;
                 break;
             }
@@ -314,6 +319,23 @@ void menu_render(const menu_state_t& state) {
         render_text(FONT_WESTERN16, "Connecting...", COLOR_OFFBLACK, xy(48, TEXT_INPUT_RECT.y));
     }
 
+    if (state.mode == MENU_MODE_MATCHLIST) {
+        SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+        SDL_RenderDrawRect(engine.renderer, &PLAYERLIST_RECT);
+
+        for (size_t lobby_index = 0; lobby_index < network_get_lobby_count(); lobby_index++) {
+            const lobby_info_full_t& lobby_info = network_get_lobby(lobby_index);
+
+            char lobby_text[64];
+            sprintf(lobby_text, "%s (%u/%u)", lobby_info.name, lobby_info.player_count, MAX_PLAYERS);
+
+            int line_y = 16 * (lobby_index + 1);
+            render_text(FONT_WESTERN8, lobby_text, COLOR_OFFBLACK, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
+            SDL_RenderDrawLine(engine.renderer, PLAYERLIST_RECT.x, PLAYERLIST_RECT.y + line_y, PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - 1, PLAYERLIST_RECT.y + line_y);
+        }
+    }
+
+    // Player list
     if (state.mode == MENU_MODE_LOBBY || state.mode == MENU_MODE_LOBBY_HOST) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
         SDL_RenderDrawRect(engine.renderer, &PLAYERLIST_RECT);

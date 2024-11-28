@@ -26,6 +26,19 @@ struct player_t {
     char name[NAME_BUFFER_SIZE];
 };
 
+struct lobby_info_t {
+    char name[32];
+    uint8_t player_count;
+    uint8_t padding[3];
+};
+
+struct lobby_info_full_t {
+    char name[32];
+    char ip[32];
+    uint16_t port;
+    uint8_t player_count;
+};
+
 enum NetworkEventType {
     NETWORK_EVENT_CONNECTION_FAILED,
     NETWORK_EVENT_PLAYER_DISCONNECTED,
@@ -52,12 +65,16 @@ bool network_init();
 void network_quit();
 void network_disconnect();
 
+bool network_scanner_create();
+void network_scanner_search();
 bool network_server_create(const char* username);
 bool network_client_create(const char* username, const char* server_ip, uint16_t port);
 
 bool network_is_server();
 NetworkStatus network_get_status();
 const player_t& network_get_player(uint8_t player_id);
+const size_t network_get_lobby_count();
+const lobby_info_full_t& network_get_lobby(size_t index);
 
 void network_toggle_ready();
 
