@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include <cstddef>
 
 #define NAME_BUFFER_SIZE 20
 

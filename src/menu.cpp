@@ -1,6 +1,7 @@
 #include "menu.h"
 
 #include "network.h"
+#include "logger.h"
 #include <cstring>
 #include <unordered_map>
 
@@ -18,12 +19,13 @@ struct menu_button_t {
     SDL_Rect rect;
 };
 
-static const SDL_Rect TEXT_INPUT_RECT = (SDL_Rect) {
+static SDL_Rect TEXT_INPUT_RECT = (SDL_Rect) {
     .x = 48, .y = 120, .w = 264, .h = 35 
 };
 static const SDL_Rect PLAYERLIST_RECT = (SDL_Rect) {
     .x = 24, .y = 32, .w = 256, .h = 128
 };
+static const int PLAYERLIST_ITEM_HEIGHT = 16;
 
 static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
     { MENU_BUTTON_PLAY, (menu_button_t) {
@@ -47,19 +49,19 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
     { MENU_BUTTON_HOST, (menu_button_t) {
         .text = "HOST",
         .rect = (SDL_Rect) {
-            .x = 48, .y = 128 + 42,
+            .x = PLAYERLIST_RECT.x, .y = 128 + 42,
             .w = 76, .h = 30
     }}},
     { MENU_BUTTON_JOIN, (menu_button_t) {
         .text = "JOIN",
         .rect = (SDL_Rect) {
-            .x = 48 + 76 + 8, .y = 128 + 42,
+            .x = PLAYERLIST_RECT.x + 76 + 8, .y = 128 + 42,
             .w = 72, .h = 30
     }}},
     { MENU_BUTTON_MATCHLIST_BACK, (menu_button_t) {
         .text = "BACK",
         .rect = (SDL_Rect) {
-            .x = 48, .y = 128 + 42 + 42,
+            .x = PLAYERLIST_RECT.x, .y = 128 + 42 + 42,
             .w = 78, .h = 30
     }}},
     { MENU_BUTTON_USERNAME_BACK, (menu_button_t) {
@@ -110,6 +112,7 @@ menu_state_t menu_init() {
     state.username = "";
     state.status_timer = 0;
     state.button_hovered = MENU_BUTTON_NONE;
+    state.item_hovered = -1;
 
     state.parallax_x = 0;
 
@@ -120,6 +123,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
     // Mouse pressed
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         // Button pressed
+        state.item_selected = -1;
         switch (state.button_hovered) {
             case MENU_BUTTON_PLAY: {
                 state.mode = MENU_MODE_USERNAME;
@@ -187,6 +191,10 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                 break;
         }
 
+        if (state.mode == MENU_MODE_MATCHLIST && state.item_hovered != -1) {
+            state.item_selected = state.item_hovered;
+        }
+
         // Text input pressed
         if (state.button_hovered == MENU_BUTTON_NONE && state.mode == MENU_MODE_USERNAME &&
             sdl_rect_has_point(TEXT_INPUT_RECT, engine.mouse_position)) {
@@ -218,6 +226,7 @@ void menu_update(menu_state_t& state) {
         switch (network_event.type) {
             case NETWORK_EVENT_CONNECTION_FAILED: {
                 state.mode = MENU_MODE_MATCHLIST;
+                state.item_selected = -1;
                 menu_show_status(state, "Failed to connect to server.");
                 break;
             }
@@ -239,6 +248,7 @@ void menu_update(menu_state_t& state) {
                 if (network_event.player_disconnected.player_id == 0) {
                     network_disconnect();
                     state.mode = MENU_MODE_MATCHLIST;
+                    state.item_selected = -1;
                 }
             }
             default:
@@ -247,6 +257,7 @@ void menu_update(menu_state_t& state) {
     }
 
     state.button_hovered = MENU_BUTTON_NONE;
+    state.item_hovered = -1;
     if (SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
         auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
         if (mode_buttons_it != MODE_BUTTONS.end()) {
@@ -255,6 +266,21 @@ void menu_update(menu_state_t& state) {
                     state.button_hovered = button;
                     break;
                 }
+            }
+        }
+    }
+    if (state.mode == MENU_MODE_MATCHLIST && state.button_hovered == MENU_BUTTON_NONE && SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
+        for (int match_index = 0; match_index < network_get_lobby_count(); match_index++) {
+            SDL_Rect item_rect = (SDL_Rect) { 
+                .x = PLAYERLIST_RECT.x, 
+                .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * match_index), 
+                .w = PLAYERLIST_RECT.w, 
+                .h = PLAYERLIST_ITEM_HEIGHT 
+            };
+            if (sdl_rect_has_point(item_rect, engine.mouse_position)) {
+                state.item_hovered = match_index;
+                log_trace("item hovered %i", state.item_hovered);
+                break;
             }
         }
     }
@@ -323,15 +349,37 @@ void menu_render(const menu_state_t& state) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
         SDL_RenderDrawRect(engine.renderer, &PLAYERLIST_RECT);
 
-        for (size_t lobby_index = 0; lobby_index < network_get_lobby_count(); lobby_index++) {
+        for (int lobby_index = 0; lobby_index < network_get_lobby_count(); lobby_index++) {
             const lobby_info_full_t& lobby_info = network_get_lobby(lobby_index);
 
             char lobby_text[64];
             sprintf(lobby_text, "%s (%u/%u)", lobby_info.name, lobby_info.player_count, MAX_PLAYERS);
 
             int line_y = 16 * (lobby_index + 1);
+            if (lobby_index == state.item_selected) {
+                SDL_Rect item_rect = (SDL_Rect) {
+                    .x = PLAYERLIST_RECT.x,
+                    .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * lobby_index),
+                    .w = PLAYERLIST_RECT.w,
+                    .h = PLAYERLIST_ITEM_HEIGHT
+                };
+                SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+                SDL_RenderFillRect(engine.renderer, &item_rect);
+                SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+            } 
             render_text(FONT_WESTERN8, lobby_text, COLOR_OFFBLACK, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
             SDL_RenderDrawLine(engine.renderer, PLAYERLIST_RECT.x, PLAYERLIST_RECT.y + line_y, PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - 1, PLAYERLIST_RECT.y + line_y);
+        }
+
+        if (state.item_hovered != -1) {
+            SDL_Rect item_rect = (SDL_Rect) {
+                .x = PLAYERLIST_RECT.x,
+                .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * state.item_hovered),
+                .w = PLAYERLIST_RECT.w,
+                .h = PLAYERLIST_ITEM_HEIGHT
+            };
+            SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+            SDL_RenderDrawRect(engine.renderer, &item_rect);
         }
     }
 
@@ -358,7 +406,7 @@ void menu_render(const menu_state_t& state) {
                 player_name_text_ptr += sprintf(player_name_text_ptr, ": READY");
             }
 
-            int line_y = 16 * (player_index + 1);
+            int line_y = PLAYERLIST_ITEM_HEIGHT * (player_index + 1);
             render_text(FONT_WESTERN8, player_name_text, COLOR_OFFBLACK, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
             SDL_RenderDrawLine(engine.renderer, PLAYERLIST_RECT.x, PLAYERLIST_RECT.y + line_y, PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - 1, PLAYERLIST_RECT.y + line_y);
             player_index++;

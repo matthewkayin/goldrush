@@ -40,6 +40,8 @@ struct menu_state_t {
     uint32_t status_timer;
 
     std::string username;
+    int item_hovered;
+    int item_selected;
 
     int parallax_x;
     int parallax_cloud_x;
