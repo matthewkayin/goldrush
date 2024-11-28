@@ -7,8 +7,8 @@
 
 enum MenuMode {
     MENU_MODE_MAIN,
-    MENU_MODE_PLAY,
-    MENU_MODE_JOIN,
+    MENU_MODE_USERNAME,
+    MENU_MODE_MATCHLIST,
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
     MENU_MODE_LOBBY_HOST,
@@ -23,7 +23,9 @@ enum MenuButton {
     MENU_BUTTON_EXIT,
     MENU_BUTTON_HOST,
     MENU_BUTTON_JOIN,
-    MENU_BUTTON_PLAY_BACK,
+    MENU_BUTTON_MATCHLIST_BACK,
+    MENU_BUTTON_USERNAME_BACK,
+    MENU_BUTTON_USERNAME_OK,
     MENU_BUTTON_LOBBY_BACK,
     MENU_BUTTON_LOBBY_READY,
     MENU_BUTTON_LOBBY_START,
@@ -38,6 +40,11 @@ struct menu_state_t {
     uint32_t status_timer;
 
     std::string username;
+
+    int parallax_x;
+    int parallax_cloud_x;
+    int parallax_timer;
+    int parallax_cactus_offset;
 };
 
 menu_state_t menu_init();
