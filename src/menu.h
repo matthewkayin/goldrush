@@ -5,7 +5,6 @@
 #include "network.h"
 
 #include <string>
-#include <vector>
 
 enum MenuMode {
     MENU_MODE_MAIN,
@@ -33,18 +32,29 @@ enum MenuButton {
     MENU_BUTTON_CONNECTING_BACK
 };
 
+enum MenuHoverType {
+    MENU_HOVER_NONE,
+    MENU_HOVER_BUTTON,
+    MENU_HOVER_ITEM,
+    MENU_HOVER_REFRESH
+};
+
+struct menu_hover_t {
+    MenuHoverType type;
+    union {
+        MenuButton button;
+        int item;
+    };
+};
+
 struct menu_state_t {
     MenuMode mode;
-    MenuButton button_hovered;
+    struct menu_hover_t hover;
 
     std::string status_text;
     uint32_t status_timer;
 
-    std::vector<lobby_info_full_t> lobby_info;
-    uint32_t refresh_timer;
-
     std::string username;
-    int item_hovered;
     int item_selected;
 
     int parallax_x;

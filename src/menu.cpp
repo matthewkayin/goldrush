@@ -25,6 +25,7 @@ static const SDL_Rect PLAYERLIST_RECT = (SDL_Rect) {
     .x = 24, .y = 32, .w = 256, .h = 128
 };
 static const int PLAYERLIST_ITEM_HEIGHT = 16;
+static const xy REFRESH_BUTTON_POSITION = xy(PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 8, PLAYERLIST_RECT.y);
 
 static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
     { MENU_BUTTON_PLAY, (menu_button_t) {
@@ -102,7 +103,6 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
 };
 
 static const uint32_t STATUS_TIMER_DURATION = 60;
-static const uint32_t REFRESH_TIMER_DURATION = 10;
 
 menu_state_t menu_init() {
     menu_state_t state;
@@ -110,8 +110,9 @@ menu_state_t menu_init() {
     state.status_text = "";
     state.username = "";
     state.status_timer = 0;
-    state.button_hovered = MENU_BUTTON_NONE;
-    state.item_hovered = -1;
+    state.hover = (menu_hover_t) {
+        .type = MENU_HOVER_NONE
+    };
     menu_set_mode(state, MENU_MODE_MAIN);
 
     state.parallax_x = 0;
@@ -123,78 +124,84 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
     // Mouse pressed
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         // Button pressed
-        switch (state.button_hovered) {
-            case MENU_BUTTON_PLAY: {
-                menu_set_mode(state, MENU_MODE_USERNAME);
-                break;
-            }
-            case MENU_BUTTON_OPTIONS: {
-                break;
-            }
-            case MENU_BUTTON_EXIT: {
-                menu_set_mode(state, MENU_MODE_EXIT);
-                break;
-            }
-            case MENU_BUTTON_USERNAME_BACK: {
-                menu_set_mode(state, MENU_MODE_MAIN);
-                break;
-            }
-            case MENU_BUTTON_USERNAME_OK: {
-                if (state.username.empty()) {
-                    menu_show_status(state, "Invalid username.");
+        if (state.hover.type == MENU_HOVER_BUTTON) {
+            switch (state.hover.button) {
+                case MENU_BUTTON_PLAY: {
+                    menu_set_mode(state, MENU_MODE_USERNAME);
                     break;
                 }
-
-                menu_set_mode(state, MENU_MODE_MATCHLIST);
-                break;
-            }
-            case MENU_BUTTON_MATCHLIST_BACK: {
-                menu_set_mode(state, MENU_MODE_MAIN);
-                break;
-            }
-            case MENU_BUTTON_HOST: {
-                if(!network_server_create(state.username.c_str())) {
-                    menu_show_status(state, "Could not create server.");
+                case MENU_BUTTON_OPTIONS: {
                     break;
                 }
+                case MENU_BUTTON_EXIT: {
+                    menu_set_mode(state, MENU_MODE_EXIT);
+                    break;
+                }
+                case MENU_BUTTON_USERNAME_BACK: {
+                    menu_set_mode(state, MENU_MODE_MAIN);
+                    break;
+                }
+                case MENU_BUTTON_USERNAME_OK: {
+                    if (state.username.empty()) {
+                        menu_show_status(state, "Invalid username.");
+                        break;
+                    }
 
-                menu_set_mode(state, MENU_MODE_LOBBY);
-                break;
+                    menu_set_mode(state, MENU_MODE_MATCHLIST);
+                    break;
+                }
+                case MENU_BUTTON_MATCHLIST_BACK: {
+                    menu_set_mode(state, MENU_MODE_MAIN);
+                    break;
+                }
+                case MENU_BUTTON_HOST: {
+                    if(!network_server_create(state.username.c_str())) {
+                        menu_show_status(state, "Could not create server.");
+                        break;
+                    }
+
+                    menu_set_mode(state, MENU_MODE_LOBBY);
+                    break;
+                }
+                case MENU_BUTTON_JOIN: {
+                    GOLD_ASSERT(state.item_selected != -1 && state.item_selected < network_get_lobby_count());
+                    const lobby_t& lobby = network_get_lobby(state.item_selected);
+                    network_client_create(state.username.c_str(), lobby.ip, lobby.port);
+                    menu_set_mode(state, MENU_MODE_CONNECTING);
+                    break;
+                }
+                case MENU_BUTTON_LOBBY_BACK: {
+                    network_disconnect();
+                    menu_set_mode(state, MENU_MODE_MATCHLIST);
+                    break;
+                }
+                case MENU_BUTTON_CONNECTING_BACK: {
+                    network_disconnect();
+                    menu_set_mode(state, MENU_MODE_MATCHLIST);
+                    break;
+                }
+                case MENU_BUTTON_LOBBY_READY: {
+                    network_toggle_ready();
+                    break;
+                }
+                default:
+                    break;
             }
-            case MENU_BUTTON_JOIN: {
-                GOLD_ASSERT(state.item_selected != -1 && state.item_selected < state.lobby_info.size());
-                network_client_create(state.username.c_str(), state.lobby_info[state.item_selected].ip, state.lobby_info[state.item_selected].port);
-                menu_set_mode(state, MENU_MODE_CONNECTING);
-                break;
-            }
-            case MENU_BUTTON_LOBBY_BACK: {
-                network_disconnect();
-                menu_set_mode(state, MENU_MODE_MATCHLIST);
-                break;
-            }
-            case MENU_BUTTON_CONNECTING_BACK: {
-                network_disconnect();
-                menu_set_mode(state, MENU_MODE_MATCHLIST);
-                break;
-            }
-            case MENU_BUTTON_LOBBY_READY: {
-                network_toggle_ready();
-                break;
-            }
-            default:
-                break;
         }
 
-        state.item_selected = -1;
-        if (state.mode == MENU_MODE_MATCHLIST && state.item_hovered != -1) {
-            state.item_selected = state.item_hovered;
-        }
+        state.item_selected = state.mode == MENU_MODE_MATCHLIST && state.hover.type == MENU_HOVER_ITEM
+                                ?  state.item_selected = state.hover.item
+                                : -1;
 
         // Text input pressed
-        if (state.button_hovered == MENU_BUTTON_NONE && state.mode == MENU_MODE_USERNAME &&
+        if (state.hover.type == MENU_HOVER_NONE && state.mode == MENU_MODE_USERNAME &&
             sdl_rect_has_point(TEXT_INPUT_RECT, engine.mouse_position)) {
             SDL_SetTextInputRect(&TEXT_INPUT_RECT);
             SDL_StartTextInput();
+        }
+
+        if (state.hover.type == MENU_HOVER_REFRESH) {
+            network_scanner_search();
         }
     } else if (event.type == SDL_TEXTINPUT) {
         if (state.mode == MENU_MODE_USERNAME) {
@@ -213,20 +220,6 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
 void menu_update(menu_state_t& state) {
     if (state.status_timer > 0) {
         state.status_timer--;
-    }
-    if (state.mode == MENU_MODE_MATCHLIST && state.refresh_timer > 0) {
-        state.refresh_timer--;
-        if (state.refresh_timer == 0) {
-            state.lobby_info.clear();
-            for (int i = 0; i < network_get_lobby_count(); i++) {
-                state.lobby_info.push_back(network_get_lobby(i));
-            }
-            if (state.item_selected >= state.lobby_info.size()) {
-                state.item_selected = -1;
-            }
-            network_scanner_search();
-            state.refresh_timer = REFRESH_TIMER_DURATION;
-        }
     }
 
     network_service();
@@ -267,8 +260,9 @@ void menu_update(menu_state_t& state) {
         }
     }
 
-    state.button_hovered = MENU_BUTTON_NONE;
-    state.item_hovered = -1;
+    state.hover = (menu_hover_t) {
+        .type = MENU_HOVER_NONE
+    };
     if (SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
         auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
         if (mode_buttons_it != MODE_BUTTONS.end()) {
@@ -278,14 +272,17 @@ void menu_update(menu_state_t& state) {
                 }
 
                 if (sdl_rect_has_point(MENU_BUTTON_DATA.at(button).rect, engine.mouse_position)) {
-                    state.button_hovered = button;
+                    state.hover = (menu_hover_t) {
+                        .type = MENU_HOVER_BUTTON,
+                        .button = button
+                    };
                     break;
                 }
             }
         }
     }
-    if (state.mode == MENU_MODE_MATCHLIST && state.button_hovered == MENU_BUTTON_NONE && SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
-        for (int match_index = 0; match_index < state.lobby_info.size(); match_index++) {
+    if (state.mode == MENU_MODE_MATCHLIST && state.hover.type == MENU_HOVER_NONE && SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
+        for (int match_index = 0; match_index < network_get_lobby_count(); match_index++) {
             SDL_Rect item_rect = (SDL_Rect) { 
                 .x = PLAYERLIST_RECT.x, 
                 .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * match_index), 
@@ -293,8 +290,25 @@ void menu_update(menu_state_t& state) {
                 .h = PLAYERLIST_ITEM_HEIGHT 
             };
             if (sdl_rect_has_point(item_rect, engine.mouse_position)) {
-                state.item_hovered = match_index;
+                state.hover = (menu_hover_t) {
+                    .type = MENU_HOVER_ITEM,
+                    .item = match_index
+                };
                 break;
+            }
+        }
+
+        if (state.hover.type == MENU_HOVER_NONE) {
+            SDL_Rect refresh_button_rect = (SDL_Rect) { 
+                .x = REFRESH_BUTTON_POSITION.x, 
+                .y = REFRESH_BUTTON_POSITION.y, 
+                .w = engine.sprites[SPRITE_MENU_REFRESH].frame_size.x,
+                .h = engine.sprites[SPRITE_MENU_REFRESH].frame_size.y
+            };
+            if (sdl_rect_has_point(refresh_button_rect, engine.mouse_position)) {
+                state.hover = (menu_hover_t) {
+                    .type = MENU_HOVER_REFRESH
+                };
             }
         }
     }
@@ -316,9 +330,7 @@ void menu_set_mode(menu_state_t& state, MenuMode mode) {
             menu_show_status(state, "Error occurred while scanning for LAN games.");
             return;
         }
-        state.lobby_info.clear();
         network_scanner_search();
-        state.refresh_timer = REFRESH_TIMER_DURATION;
     }
 }
 
@@ -393,11 +405,11 @@ void menu_render(const menu_state_t& state) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
         SDL_RenderDrawRect(engine.renderer, &PLAYERLIST_RECT);
 
-        for (int lobby_index = 0; lobby_index < state.lobby_info.size(); lobby_index++) {
-            const lobby_info_full_t& lobby_info = state.lobby_info[lobby_index];
+        for (int lobby_index = 0; lobby_index < network_get_lobby_count(); lobby_index++) {
+            const lobby_t& lobby = network_get_lobby(lobby_index);
 
             char lobby_text[64];
-            sprintf(lobby_text, "%s (%u/%u)", lobby_info.name, lobby_info.player_count, MAX_PLAYERS);
+            sprintf(lobby_text, "%s (%u/%u)", lobby.name, lobby.player_count, MAX_PLAYERS);
 
             int line_y = 16 * (lobby_index + 1);
             if (lobby_index == state.item_selected) {
@@ -415,16 +427,31 @@ void menu_render(const menu_state_t& state) {
             SDL_RenderDrawLine(engine.renderer, PLAYERLIST_RECT.x, PLAYERLIST_RECT.y + line_y, PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - 1, PLAYERLIST_RECT.y + line_y);
         }
 
-        if (state.item_hovered != -1) {
+        if (state.hover.type == MENU_HOVER_ITEM) {
             SDL_Rect item_rect = (SDL_Rect) {
                 .x = PLAYERLIST_RECT.x,
-                .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * state.item_hovered),
+                .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * state.hover.item),
                 .w = PLAYERLIST_RECT.w,
                 .h = PLAYERLIST_ITEM_HEIGHT
             };
             SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
             SDL_RenderDrawRect(engine.renderer, &item_rect);
         }
+
+        // Refresh button
+        SDL_Rect refresh_src_rect = (SDL_Rect) { 
+            .x = state.hover.type == MENU_HOVER_REFRESH ? engine.sprites[SPRITE_MENU_REFRESH].frame_size.x : 0,
+            .y = 0,
+            .w = engine.sprites[SPRITE_MENU_REFRESH].frame_size.x,
+            .h = engine.sprites[SPRITE_MENU_REFRESH].frame_size.y
+        };
+        SDL_Rect refresh_dst_rect = (SDL_Rect) {
+            .x = REFRESH_BUTTON_POSITION.x,
+            .y = REFRESH_BUTTON_POSITION.y,
+            .w = refresh_src_rect.w,
+            .h = refresh_src_rect.h
+        };
+        SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_MENU_REFRESH].texture, &refresh_src_rect, &refresh_dst_rect);
     }
 
     // Player list
@@ -468,7 +495,7 @@ void menu_render(const menu_state_t& state) {
                 continue;
             }
             
-            SDL_Color button_color = button == state.button_hovered ? COLOR_WHITE : COLOR_OFFBLACK;
+            SDL_Color button_color = state.hover.type == MENU_HOVER_BUTTON && button == state.hover.button ? COLOR_WHITE : COLOR_OFFBLACK;
             SDL_SetRenderDrawColor(engine.renderer, button_color.r, button_color.g, button_color.b, button_color.a);
 
             const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);

@@ -18,7 +18,7 @@ struct network_state_t {
     ENetPeer* peers[MAX_PLAYERS];
 
     std::queue<network_event_t> event_queue;
-    std::vector<lobby_info_full_t> lobbies;
+    std::vector<lobby_t> lobbies;
 };
 static network_state_t state;
 
@@ -247,7 +247,7 @@ const size_t network_get_lobby_count() {
     return state.lobbies.size();
 }
 
-const lobby_info_full_t& network_get_lobby(size_t index) {
+const lobby_t& network_get_lobby(size_t index) {
     return state.lobbies[index];
 }
 
@@ -287,12 +287,12 @@ void network_service() {
             } else {
                 lobby_info_t lobby_info;
                 memcpy(&lobby_info, buffer, sizeof(lobby_info_t));
-                lobby_info_full_t lobby_info_full;
-                memcpy(&lobby_info_full.name, lobby_info.name, 32);
-                lobby_info_full.player_count = lobby_info.player_count;
-                lobby_info_full.port = lobby_info.port;
-                enet_address_get_host_ip(&receive_address, lobby_info_full.ip, NAME_BUFFER_SIZE);
-                state.lobbies.push_back(lobby_info_full);
+                lobby_t lobby;
+                memcpy(&lobby.name, lobby_info.name, 32);
+                lobby.player_count = lobby_info.player_count;
+                lobby.port = lobby_info.port;
+                enet_address_get_host_ip(&receive_address, lobby.ip, NAME_BUFFER_SIZE);
+                state.lobbies.push_back(lobby);
             }
         }
     }

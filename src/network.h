@@ -34,7 +34,7 @@ struct lobby_info_t {
     uint8_t padding[2];
 };
 
-struct lobby_info_full_t {
+struct lobby_t {
     char name[32];
     char ip[32];
     uint16_t port;
@@ -76,7 +76,7 @@ bool network_is_server();
 NetworkStatus network_get_status();
 const player_t& network_get_player(uint8_t player_id);
 const size_t network_get_lobby_count();
-const lobby_info_full_t& network_get_lobby(size_t index);
+const lobby_t& network_get_lobby(size_t index);
 
 void network_toggle_ready();
 
