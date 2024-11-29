@@ -48,7 +48,6 @@ enum NetworkEventType {
     NETWORK_EVENT_LOBBY_FULL,
     NETWORK_EVENT_INVALID_VERSION,
     NETWORK_EVENT_MATCH_LOAD,
-    NETWORK_EVENT_MATCH_START,
     NETWORK_EVENT_INPUT
 };
 
@@ -69,16 +68,20 @@ void network_disconnect();
 
 bool network_scanner_create();
 void network_scanner_search();
+void network_scanner_destroy();
 bool network_server_create(const char* username);
 bool network_client_create(const char* username, const char* server_ip, uint16_t port);
 
 bool network_is_server();
 NetworkStatus network_get_status();
 const player_t& network_get_player(uint8_t player_id);
+uint8_t network_get_player_id();
+bool network_are_all_players_ready();
 const size_t network_get_lobby_count();
 const lobby_t& network_get_lobby(size_t index);
 
 void network_toggle_ready();
+void network_begin_loading_match();
 
 void network_service();
 void network_handle_message(uint8_t* data, size_t length, uint16_t peer_id);

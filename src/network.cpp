@@ -31,7 +31,8 @@ enum MessageType {
     MESSAGE_NEW_PLAYER,
     MESSAGE_GREET,
     MESSAGE_READY,
-    MESSAGE_NOT_READY
+    MESSAGE_NOT_READY,
+    MESSAGE_MATCH_LOAD
 };
 
 struct message_greet_server_t {
@@ -82,10 +83,7 @@ void network_disconnect() {
         return;
     }
 
-    if (state.scanner != ENET_SOCKET_NULL) {
-        enet_socket_shutdown(state.scanner, ENET_SOCKET_SHUTDOWN_READ_WRITE);
-        enet_socket_destroy(state.scanner);
-    }
+    network_scanner_destroy();
 
     for (uint8_t peer_id = 0; peer_id < state.host->peerCount; peer_id++) {
         if (state.host->peers[peer_id].state == ENET_PEER_STATE_CONNECTED) {
@@ -135,6 +133,14 @@ void network_scanner_search() {
     }
 }
 
+void network_scanner_destroy() {
+    if (state.scanner != ENET_SOCKET_NULL) {
+        enet_socket_shutdown(state.scanner, ENET_SOCKET_SHUTDOWN_READ_WRITE);
+        enet_socket_destroy(state.scanner);
+        state.scanner = ENET_SOCKET_NULL;
+    }
+}
+
 bool network_host_create() {
     ENetAddress address;
     address.host = ENET_HOST_ANY;
@@ -165,10 +171,7 @@ bool network_server_create(const char* username) {
         return false;
     }
 
-    if (state.scanner != ENET_SOCKET_NULL) {
-        enet_socket_shutdown(state.scanner, ENET_SOCKET_SHUTDOWN_READ_WRITE);
-        enet_socket_destroy(state.scanner);
-    }
+    network_scanner_destroy();
 
     state.scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
     if (state.scanner == ENET_SOCKET_NULL) {
@@ -235,10 +238,38 @@ const player_t& network_get_player(uint8_t player_id) {
     return state.players[player_id];
 }
 
+uint8_t network_get_player_id() {
+    return state.player_id;
+}
+
+bool network_are_all_players_ready() {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status == PLAYER_STATUS_NOT_READY) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void network_toggle_ready() {
     state.players[state.player_id].status = state.players[state.player_id].status == PLAYER_STATUS_NOT_READY ? PLAYER_STATUS_READY : PLAYER_STATUS_NOT_READY;
     uint8_t message = state.players[state.player_id].status == PLAYER_STATUS_READY ? MESSAGE_READY : MESSAGE_NOT_READY;
     ENetPacket* packet = enet_packet_create(&message, sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_begin_loading_match() {
+    // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status != PLAYER_STATUS_NONE) {
+            state.players[player_id].status = PLAYER_STATUS_NOT_READY;
+        }
+    }
+
+    uint8_t match_load = MESSAGE_MATCH_LOAD;
+    ENetPacket* packet = enet_packet_create(&match_load, sizeof(match_load), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
 }
@@ -487,6 +518,12 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
         case MESSAGE_NOT_READY: {
             uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
             state.players[*player_id].status = message_type == MESSAGE_READY ? PLAYER_STATUS_READY : PLAYER_STATUS_NOT_READY;
+            break;
+        }
+        case MESSAGE_MATCH_LOAD: {
+            state.event_queue.push((network_event_t) {
+                .type = NETWORK_EVENT_MATCH_LOAD
+            });
             break;
         }
     }

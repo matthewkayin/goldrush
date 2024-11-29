@@ -3,6 +3,7 @@
 #include "platform.h"
 #include "engine.h"
 #include "menu.h"
+#include "match.h"
 #include "network.h"
 #include <ctime>
 #include <cstdio>
@@ -62,6 +63,7 @@ int gold_main(int argc, char** argv) {
     bool game_is_running = true;
     GameMode game_mode = GAME_MODE_MENU;
     menu_state_t menu_state = menu_init();
+    match_state_t match_state;
 
     while (game_is_running) {
         // TIMEKEEP
@@ -112,6 +114,7 @@ int gold_main(int argc, char** argv) {
                         menu_handle_input(menu_state, event);
                         break;
                     case GAME_MODE_MATCH:
+                        match_handle_input(match_state, event);
                         break;
                 }
             } // End while PollEvent
@@ -127,9 +130,13 @@ int gold_main(int argc, char** argv) {
                     menu_update(menu_state);
                     if (menu_state.mode == MENU_MODE_EXIT) {
                         game_is_running = false;
+                    } else if (menu_state.mode == MENU_MODE_LOAD_MATCH) {
+                        match_state = match_init();
+                        game_mode = GAME_MODE_MATCH;
                     }
                     break;
                 case GAME_MODE_MATCH:
+                    match_update(match_state);
                     break;
             }
         } // End while update
@@ -143,6 +150,7 @@ int gold_main(int argc, char** argv) {
                 menu_render(menu_state);
                 break;
             case GAME_MODE_MATCH:
+                match_render(match_state);
                 break;
         }
 

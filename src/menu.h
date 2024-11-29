@@ -13,7 +13,8 @@ enum MenuMode {
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
     MENU_MODE_EXIT,
-    MENU_MODE_OPTIONS
+    MENU_MODE_OPTIONS,
+    MENU_MODE_LOAD_MATCH
 };
 
 enum MenuButton {

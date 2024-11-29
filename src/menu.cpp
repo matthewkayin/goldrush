@@ -184,6 +184,15 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     network_toggle_ready();
                     break;
                 }
+                case MENU_BUTTON_LOBBY_START: {
+                    if (!network_are_all_players_ready()) {
+                        break;
+                    }
+                    network_scanner_destroy();
+                    network_begin_loading_match();
+                    menu_set_mode(state, MENU_MODE_LOAD_MATCH);
+                    break;
+                }
                 default:
                     break;
             }
@@ -254,6 +263,10 @@ void menu_update(menu_state_t& state) {
                     menu_set_mode(state, MENU_MODE_MATCHLIST);
                     state.item_selected = -1;
                 }
+            }
+            case NETWORK_EVENT_MATCH_LOAD: {
+                network_scanner_destroy();
+                menu_set_mode(state, MENU_MODE_LOAD_MATCH);
             }
             default:
                 break;
