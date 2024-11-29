@@ -195,6 +195,7 @@ bool network_server_create(const char* username) {
 }
 
 bool network_client_create(const char* username, const char* server_ip, uint16_t server_port) {
+    log_info("Connecting to %s:%u", server_ip, server_port);
     if (!network_host_create()) {
         log_error("Could not create enet host.");
         return false;
@@ -272,6 +273,7 @@ void network_service() {
                 lobby_info_t lobby_info;
                 sprintf(lobby_info.name, "%s's Game", state.players[0].name);
                 lobby_info.player_count = 0;
+                lobby_info.port = state.host->address.port;
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if (state.players[player_id].status != PLAYER_STATUS_NONE) {
                         lobby_info.player_count++;
@@ -288,7 +290,7 @@ void network_service() {
                 lobby_info_full_t lobby_info_full;
                 memcpy(&lobby_info_full.name, lobby_info.name, 32);
                 lobby_info_full.player_count = lobby_info.player_count;
-                lobby_info_full.port = receive_address.port;
+                lobby_info_full.port = lobby_info.port;
                 enet_address_get_host_ip(&receive_address, lobby_info_full.ip, NAME_BUFFER_SIZE);
                 state.lobbies.push_back(lobby_info_full);
             }

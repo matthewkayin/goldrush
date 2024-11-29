@@ -29,8 +29,9 @@ struct player_t {
 
 struct lobby_info_t {
     char name[32];
+    uint16_t port;
     uint8_t player_count;
-    uint8_t padding[3];
+    uint8_t padding[2];
 };
 
 struct lobby_info_full_t {

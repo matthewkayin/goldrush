@@ -1,7 +1,7 @@
 #include "menu.h"
 
-#include "network.h"
 #include "logger.h"
+#include "asserts.h"
 #include <cstring>
 #include <unordered_map>
 
@@ -9,8 +9,7 @@ static const std::unordered_map<MenuMode, std::vector<MenuButton>> MODE_BUTTONS 
     { MENU_MODE_MAIN, { MENU_BUTTON_PLAY, MENU_BUTTON_OPTIONS, MENU_BUTTON_EXIT } },
     { MENU_MODE_USERNAME, { MENU_BUTTON_USERNAME_BACK, MENU_BUTTON_USERNAME_OK } },
     { MENU_MODE_MATCHLIST, { MENU_BUTTON_HOST, MENU_BUTTON_JOIN, MENU_BUTTON_MATCHLIST_BACK } },
-    { MENU_MODE_LOBBY, { MENU_BUTTON_LOBBY_BACK, MENU_BUTTON_LOBBY_READY } },
-    { MENU_MODE_LOBBY_HOST, { MENU_BUTTON_LOBBY_BACK, MENU_BUTTON_LOBBY_START } },
+    { MENU_MODE_LOBBY, { MENU_BUTTON_LOBBY_BACK, MENU_BUTTON_LOBBY_READY, MENU_BUTTON_LOBBY_START } },
     { MENU_MODE_CONNECTING, { MENU_BUTTON_CONNECTING_BACK } }
 };
 
@@ -103,16 +102,17 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
 };
 
 static const uint32_t STATUS_TIMER_DURATION = 60;
+static const uint32_t REFRESH_TIMER_DURATION = 10;
 
 menu_state_t menu_init() {
     menu_state_t state;
 
-    state.mode = MENU_MODE_MAIN;
     state.status_text = "";
     state.username = "";
     state.status_timer = 0;
     state.button_hovered = MENU_BUTTON_NONE;
     state.item_hovered = -1;
+    menu_set_mode(state, MENU_MODE_MAIN);
 
     state.parallax_x = 0;
 
@@ -123,21 +123,20 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
     // Mouse pressed
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         // Button pressed
-        state.item_selected = -1;
         switch (state.button_hovered) {
             case MENU_BUTTON_PLAY: {
-                state.mode = MENU_MODE_USERNAME;
+                menu_set_mode(state, MENU_MODE_USERNAME);
                 break;
             }
             case MENU_BUTTON_OPTIONS: {
                 break;
             }
             case MENU_BUTTON_EXIT: {
-                state.mode = MENU_MODE_EXIT;
+                menu_set_mode(state, MENU_MODE_EXIT);
                 break;
             }
             case MENU_BUTTON_USERNAME_BACK: {
-                state.mode = MENU_MODE_MAIN;
+                menu_set_mode(state, MENU_MODE_MAIN);
                 break;
             }
             case MENU_BUTTON_USERNAME_OK: {
@@ -146,16 +145,11 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     break;
                 }
 
-                if (!network_scanner_create()) {
-                    break;
-                }
-                network_scanner_search();
-
-                state.mode = MENU_MODE_MATCHLIST;
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
                 break;
             }
             case MENU_BUTTON_MATCHLIST_BACK: {
-                state.mode = MENU_MODE_MAIN;
+                menu_set_mode(state, MENU_MODE_MAIN);
                 break;
             }
             case MENU_BUTTON_HOST: {
@@ -164,23 +158,23 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     break;
                 }
 
-                state.mode = MENU_MODE_LOBBY_HOST;
+                menu_set_mode(state, MENU_MODE_LOBBY);
                 break;
             }
             case MENU_BUTTON_JOIN: {
-                // Temporary
-                network_client_create(state.username.c_str(), "127.0.0.1", BASE_PORT);
-                state.mode = MENU_MODE_CONNECTING;
+                GOLD_ASSERT(state.item_selected != -1 && state.item_selected < state.lobby_info.size());
+                network_client_create(state.username.c_str(), state.lobby_info[state.item_selected].ip, state.lobby_info[state.item_selected].port);
+                menu_set_mode(state, MENU_MODE_CONNECTING);
                 break;
             }
             case MENU_BUTTON_LOBBY_BACK: {
                 network_disconnect();
-                state.mode = MENU_MODE_MATCHLIST;
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
                 break;
             }
             case MENU_BUTTON_CONNECTING_BACK: {
                 network_disconnect();
-                state.mode = MENU_MODE_MATCHLIST;
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
                 break;
             }
             case MENU_BUTTON_LOBBY_READY: {
@@ -191,6 +185,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                 break;
         }
 
+        state.item_selected = -1;
         if (state.mode == MENU_MODE_MATCHLIST && state.item_hovered != -1) {
             state.item_selected = state.item_hovered;
         }
@@ -219,35 +214,51 @@ void menu_update(menu_state_t& state) {
     if (state.status_timer > 0) {
         state.status_timer--;
     }
+    if (state.mode == MENU_MODE_MATCHLIST && state.refresh_timer > 0) {
+        state.refresh_timer--;
+        if (state.refresh_timer == 0) {
+            state.lobby_info.clear();
+            for (int i = 0; i < network_get_lobby_count(); i++) {
+                state.lobby_info.push_back(network_get_lobby(i));
+            }
+            if (state.item_selected >= state.lobby_info.size()) {
+                state.item_selected = -1;
+            }
+            network_scanner_search();
+            state.refresh_timer = REFRESH_TIMER_DURATION;
+        }
+    }
 
     network_service();
     network_event_t network_event;
     while (network_poll_events(&network_event)) {
         switch (network_event.type) {
             case NETWORK_EVENT_CONNECTION_FAILED: {
-                state.mode = MENU_MODE_MATCHLIST;
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
                 state.item_selected = -1;
                 menu_show_status(state, "Failed to connect to server.");
                 break;
             }
             case NETWORK_EVENT_LOBBY_FULL: {
-                state.mode = MENU_MODE_MAIN;
+                network_disconnect();
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
                 menu_show_status(state, "The lobby is full.");
                 break;
             }
             case NETWORK_EVENT_INVALID_VERSION: {
-                state.mode = MENU_MODE_MAIN;
+                network_disconnect();
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
                 menu_show_status(state, "Client version does not match.");
                 break;
             }
             case NETWORK_EVENT_JOINED_LOBBY: {
-                state.mode = MENU_MODE_LOBBY;
+                menu_set_mode(state, MENU_MODE_LOBBY);
                 break;
             }
             case NETWORK_EVENT_PLAYER_DISCONNECTED: {
                 if (network_event.player_disconnected.player_id == 0) {
                     network_disconnect();
-                    state.mode = MENU_MODE_MATCHLIST;
+                    menu_set_mode(state, MENU_MODE_MATCHLIST);
                     state.item_selected = -1;
                 }
             }
@@ -262,6 +273,10 @@ void menu_update(menu_state_t& state) {
         auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
         if (mode_buttons_it != MODE_BUTTONS.end()) {
             for (MenuButton button : mode_buttons_it->second) {
+                if (menu_is_button_disabled(state, button)) {
+                    continue;
+                }
+
                 if (sdl_rect_has_point(MENU_BUTTON_DATA.at(button).rect, engine.mouse_position)) {
                     state.button_hovered = button;
                     break;
@@ -270,7 +285,7 @@ void menu_update(menu_state_t& state) {
         }
     }
     if (state.mode == MENU_MODE_MATCHLIST && state.button_hovered == MENU_BUTTON_NONE && SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
-        for (int match_index = 0; match_index < network_get_lobby_count(); match_index++) {
+        for (int match_index = 0; match_index < state.lobby_info.size(); match_index++) {
             SDL_Rect item_rect = (SDL_Rect) { 
                 .x = PLAYERLIST_RECT.x, 
                 .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * match_index), 
@@ -279,7 +294,6 @@ void menu_update(menu_state_t& state) {
             };
             if (sdl_rect_has_point(item_rect, engine.mouse_position)) {
                 state.item_hovered = match_index;
-                log_trace("item hovered %i", state.item_hovered);
                 break;
             }
         }
@@ -289,6 +303,36 @@ void menu_update(menu_state_t& state) {
 void menu_show_status(menu_state_t& state, const char* text) {
     state.status_text = text;
     state.status_timer = STATUS_TIMER_DURATION;
+}
+
+void menu_set_mode(menu_state_t& state, MenuMode mode) {
+    state.mode = mode;
+
+    if (state.mode == MENU_MODE_MATCHLIST) {
+        state.item_selected = -1;
+
+        if (!network_scanner_create()) {
+            menu_set_mode(state, MENU_MODE_MAIN);
+            menu_show_status(state, "Error occurred while scanning for LAN games.");
+            return;
+        }
+        state.lobby_info.clear();
+        network_scanner_search();
+        state.refresh_timer = REFRESH_TIMER_DURATION;
+    }
+}
+
+bool menu_is_button_disabled(const menu_state_t& state, MenuButton button) {
+    switch (button) {
+        case MENU_BUTTON_LOBBY_START:
+            return !network_is_server();
+        case MENU_BUTTON_LOBBY_READY:
+            return network_is_server();
+        case MENU_BUTTON_JOIN:
+            return state.item_selected == -1;
+        default:
+            return false;
+    }
 }
 
 void menu_render(const menu_state_t& state) {
@@ -321,7 +365,7 @@ void menu_render(const menu_state_t& state) {
         }
     }
 
-    if (state.mode != MENU_MODE_LOBBY && state.mode != MENU_MODE_LOBBY_HOST && state.mode != MENU_MODE_MATCHLIST) {
+    if (state.mode != MENU_MODE_LOBBY && state.mode != MENU_MODE_MATCHLIST) {
         render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_OFFBLACK, xy(24, 24));
     }
 
@@ -349,8 +393,8 @@ void menu_render(const menu_state_t& state) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
         SDL_RenderDrawRect(engine.renderer, &PLAYERLIST_RECT);
 
-        for (int lobby_index = 0; lobby_index < network_get_lobby_count(); lobby_index++) {
-            const lobby_info_full_t& lobby_info = network_get_lobby(lobby_index);
+        for (int lobby_index = 0; lobby_index < state.lobby_info.size(); lobby_index++) {
+            const lobby_info_full_t& lobby_info = state.lobby_info[lobby_index];
 
             char lobby_text[64];
             sprintf(lobby_text, "%s (%u/%u)", lobby_info.name, lobby_info.player_count, MAX_PLAYERS);
@@ -384,7 +428,7 @@ void menu_render(const menu_state_t& state) {
     }
 
     // Player list
-    if (state.mode == MENU_MODE_LOBBY || state.mode == MENU_MODE_LOBBY_HOST) {
+    if (state.mode == MENU_MODE_LOBBY) {
         SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
         SDL_RenderDrawRect(engine.renderer, &PLAYERLIST_RECT);
 
@@ -412,7 +456,7 @@ void menu_render(const menu_state_t& state) {
             player_index++;
         } // End for each player id
 
-        if (state.mode == MENU_MODE_LOBBY_HOST) {
+        if (state.mode == MENU_MODE_LOBBY && network_is_server()) {
             render_text(FONT_WESTERN8, "You are the host.", COLOR_OFFBLACK, xy(PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 2, PLAYERLIST_RECT.y));
         }
     }
@@ -420,6 +464,10 @@ void menu_render(const menu_state_t& state) {
     auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
     if (mode_buttons_it != MODE_BUTTONS.end()) {
         for (MenuButton button : mode_buttons_it->second) {
+            if (menu_is_button_disabled(state, button)) {
+                continue;
+            }
+            
             SDL_Color button_color = button == state.button_hovered ? COLOR_WHITE : COLOR_OFFBLACK;
             SDL_SetRenderDrawColor(engine.renderer, button_color.r, button_color.g, button_color.b, button_color.a);
 

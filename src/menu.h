@@ -2,8 +2,10 @@
 
 #include "defines.h"
 #include "engine.h"
+#include "network.h"
 
 #include <string>
+#include <vector>
 
 enum MenuMode {
     MENU_MODE_MAIN,
@@ -11,7 +13,6 @@ enum MenuMode {
     MENU_MODE_MATCHLIST,
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
-    MENU_MODE_LOBBY_HOST,
     MENU_MODE_EXIT,
     MENU_MODE_OPTIONS
 };
@@ -39,6 +40,9 @@ struct menu_state_t {
     std::string status_text;
     uint32_t status_timer;
 
+    std::vector<lobby_info_full_t> lobby_info;
+    uint32_t refresh_timer;
+
     std::string username;
     int item_hovered;
     int item_selected;
@@ -53,4 +57,6 @@ menu_state_t menu_init();
 void menu_handle_input(menu_state_t& state, SDL_Event event);
 void menu_update(menu_state_t& state);
 void menu_show_status(menu_state_t& state, const char* text);
+void menu_set_mode(menu_state_t& state, MenuMode mode);
+bool menu_is_button_disabled(const menu_state_t& state, MenuButton button);
 void menu_render(const menu_state_t& state);
