@@ -51,6 +51,12 @@ enum NetworkEventType {
     NETWORK_EVENT_INPUT
 };
 
+struct network_event_input_t {
+    uint8_t in_buffer[INPUT_BUFFER_SIZE];
+    uint8_t in_buffer_length;
+    uint8_t player_id;
+};
+
 struct network_event_player_disconnected_t {
     uint8_t player_id;
 };
@@ -59,6 +65,7 @@ struct network_event_t {
     NetworkEventType type;
     union {
         network_event_player_disconnected_t player_disconnected;
+        network_event_input_t input;
     };
 };
 
@@ -82,6 +89,7 @@ const lobby_t& network_get_lobby(size_t index);
 
 void network_toggle_ready();
 void network_begin_loading_match();
+void network_send_input(uint8_t* out_buffer, size_t out_buffer_length);
 
 void network_service();
 void network_handle_message(uint8_t* data, size_t length, uint16_t peer_id);

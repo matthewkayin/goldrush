@@ -32,7 +32,8 @@ enum MessageType {
     MESSAGE_GREET,
     MESSAGE_READY,
     MESSAGE_NOT_READY,
-    MESSAGE_MATCH_LOAD
+    MESSAGE_MATCH_LOAD,
+    MESSAGE_INPUT
 };
 
 struct message_greet_server_t {
@@ -270,6 +271,13 @@ void network_begin_loading_match() {
 
     uint8_t match_load = MESSAGE_MATCH_LOAD;
     ENetPacket* packet = enet_packet_create(&match_load, sizeof(match_load), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
+    out_buffer[0] = MESSAGE_INPUT;
+    ENetPacket* packet = enet_packet_create(out_buffer, out_buffer_length, ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
 }
@@ -524,6 +532,18 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             state.event_queue.push((network_event_t) {
                 .type = NETWORK_EVENT_MATCH_LOAD
             });
+            break;
+        }
+        case MESSAGE_INPUT: {
+            uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
+
+            network_event_t network_event;
+            network_event.type = NETWORK_EVENT_INPUT;
+            network_event.input.in_buffer_length = length;
+            network_event.input.player_id = *player_id;
+            memcpy(network_event.input.in_buffer, data, length);
+
+            state.event_queue.push(network_event);
             break;
         }
     }

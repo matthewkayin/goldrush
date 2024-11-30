@@ -11,6 +11,7 @@
 #define BASE_PORT 6530
 #define SCANNER_PORT 6529
 #define TILE_SIZE 16
+#define INPUT_BUFFER_SIZE 1024
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1
