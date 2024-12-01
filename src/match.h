@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include "util.h"
+#include "id_array.h"
 #include <SDL2/SDL.h>
 #include <queue>
 
@@ -38,6 +39,32 @@ struct tile_t {
     uint16_t elevation;
 };
 
+// Units
+
+enum UnitTargetType {
+    UNIT_TARGET_NONE,
+    
+};
+
+struct unit_t {
+
+};
+
+// Entities
+
+const entity_id CELL_EMPTY = ID_NULL;
+const entity_id CELL_BLOCKED = ID_MAX + 2;
+
+enum EntityType {
+    UNIT_MINER
+};
+
+struct entity_t {
+    EntityType type;
+    xy cell;
+    xy_fixed position;
+};
+
 // Input
 
 enum InputType: uint8_t {
@@ -61,6 +88,9 @@ struct match_state_t {
     uint32_t map_width;
     uint32_t map_height;
     std::vector<tile_t> map_tiles;
+
+    // Entities
+    id_array<entity_t> entities;
 };
 
 match_state_t match_init();
@@ -77,3 +107,5 @@ void match_camera_center_on_cell(match_state_t& state, xy cell);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
+
+// Entities
