@@ -107,6 +107,7 @@ struct match_state_t {
     xy camera_offset;
     xy select_rect_origin;
     SDL_Rect select_rect;
+    std::vector<entity_id> selection;
 
     // Map
     uint32_t map_width;
@@ -133,6 +134,8 @@ xy match_get_mouse_world_pos(const match_state_t& state);
 
 // UI
 bool ui_is_mouse_in_ui();
+std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state);
+void ui_set_selection(match_state_t& state, const std::vector<entity_id>& selection);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
@@ -144,4 +147,6 @@ bool entity_is_unit(EntityType entity);
 int entity_cell_size(EntityType entity);
 SDL_Rect entity_get_rect(const entity_t& entity);
 Sprite entity_get_sprite(const entity_t entity);
+Sprite entity_get_select_ring(const entity_t entity);
 uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity);
+bool entity_is_selectable(const entity_t& entity);

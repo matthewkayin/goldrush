@@ -60,6 +60,8 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     } else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
         if (state.ui_mode == UI_MODE_SELECTING) {
             state.ui_mode = UI_MODE_NONE;
+            std::vector<entity_id> selection = ui_create_selection_from_rect(state);
+            ui_set_selection(state, selection);
         }
     }
 }
@@ -286,6 +288,24 @@ void match_render(const match_state_t& state) {
         } // End for y of visible tiles
         // End render map
 
+        // Select rings and healthbars
+        for (entity_id id : state.selection) {
+            const entity_t& entity = state.entities.get_by_id(id);
+            if (entity_get_elevation(state, entity) != elevation) {
+                continue;
+            }
+
+            // Select ring
+            xy render_pos;
+            if (entity_is_unit(entity.type)) {
+                render_pos = entity.position.to_xy();
+            } else {
+                SDL_Rect entity_rect = entity_get_rect(entity);
+                render_pos = xy(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2));
+            }
+            render_sprite(entity_get_select_ring(entity), xy(0, 0), render_pos - state.camera_offset, RENDER_SPRITE_CENTERED);
+        }
+
         for (entity_t entity : state.entities) {
             if (entity_get_elevation(state, entity) != elevation) {
                 continue;
@@ -293,8 +313,8 @@ void match_render(const match_state_t& state) {
 
             render_sprite_params_t render_params = (render_sprite_params_t) {
                 .sprite = entity_get_sprite(entity),
-                .position = entity.position.to_xy() - state.camera_offset,
                 .frame = xy(0, 0), // TODO
+                .position = entity.position.to_xy() - state.camera_offset,
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_id = entity.player_id
             };

@@ -162,25 +162,25 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 2,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
-    { SPRITE_SELECT_RING, (sprite_params_t) {
+    { SPRITE_SELECT_RING_UNIT_1, (sprite_params_t) {
         .path = "sprite/select_ring.png",
         .hframes = 1,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
-    { SPRITE_SELECT_RING_ATTACK, (sprite_params_t) {
+    { SPRITE_SELECT_RING_UNIT_1_ENEMY, (sprite_params_t) {
         .path = "sprite/select_ring_attack.png",
         .hframes = 1,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
-    { SPRITE_SELECT_RING_WAGON, (sprite_params_t) {
+    { SPRITE_SELECT_RING_UNIT_2, (sprite_params_t) {
         .path = "sprite/select_ring_wagon.png",
         .hframes = 1,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
-    { SPRITE_SELECT_RING_WAGON_ATTACK, (sprite_params_t) {
+    { SPRITE_SELECT_RING_UNIT_2_ENEMY, (sprite_params_t) {
         .path = "sprite/select_ring_wagon_attack.png",
         .hframes = 1,
         .vframes = 1,
@@ -192,7 +192,7 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
-    { SPRITE_SELECT_RING_BUILDING_2_ATTACK, (sprite_params_t) {
+    { SPRITE_SELECT_RING_BUILDING_2_ENEMY, (sprite_params_t) {
         .path = "sprite/select_ring_building2x2_attack.png",
         .hframes = 1,
         .vframes = 1,
@@ -204,14 +204,8 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
-    { SPRITE_SELECT_RING_BUILDING_3_ATTACK, (sprite_params_t) {
+    { SPRITE_SELECT_RING_BUILDING_3_ENEMY, (sprite_params_t) {
         .path = "sprite/select_ring_building3x3_attack.png",
-        .hframes = 1,
-        .vframes = 1,
-        .strategy = SPRITE_IMPORT_DEFAULT
-    }},
-    { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
-        .path = "sprite/select_ring_gold.png",
         .hframes = 1,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
