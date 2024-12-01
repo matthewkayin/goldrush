@@ -41,6 +41,9 @@ match_state_t match_init() {
     }
     state.camera_offset = xy(0, 0);
 
+    entity_create_unit(state, UNIT_MINER, 0, xy(1, 1));
+    entity_create_unit(state, UNIT_MINER, 0, xy(2, 2));
+
     return state;
 }
 
@@ -219,6 +222,8 @@ void match_render(const match_state_t& state) {
 
     // Begin elevation passes
     for (uint16_t elevation = 0; elevation < 3; elevation++) {
+        std::vector<render_sprite_params_t> ysorted_render_params;
+
         // Render map
         for (int y = 0; y < max_visible_tiles.y; y++) {
             for (int x = 0; x < max_visible_tiles.x; x++) {
@@ -254,6 +259,44 @@ void match_render(const match_state_t& state) {
             } // End for x of visible tiles
         } // End for y of visible tiles
         // End render map
+
+        for (entity_t entity : state.entities) {
+            if (entity_get_elevation(state, entity) != elevation) {
+                continue;
+            }
+
+            render_sprite_params_t render_params = (render_sprite_params_t) {
+                .sprite = entity_get_sprite(entity),
+                .position = entity.position.to_xy() - state.camera_offset,
+                .frame = xy(0, 0), // TODO
+                .options = RENDER_SPRITE_NO_CULL,
+                .recolor_id = entity.player_id
+            };
+            SDL_Rect render_rect = (SDL_Rect) {
+                .x = render_params.position.x,
+                .y = render_params.position.y,
+                .w = engine.sprites[render_params.sprite].frame_size.x,
+                .h = engine.sprites[render_params.sprite].frame_size.y
+            };
+            // Adjust the render rect for units because units are centered when rendering
+            if (entity_is_unit(entity.type)) {
+                render_rect.x -= render_rect.w / 2;
+                render_rect.y -= render_rect.h / 2;
+                render_params.options |= RENDER_SPRITE_CENTERED;
+            }
+
+            if (SDL_HasIntersection(&render_rect, &SCREEN_RECT) != SDL_TRUE) {
+                continue;
+            }
+
+            ysorted_render_params.push_back(render_params);
+        }
+
+        // End Ysort
+        ysort_render_params(ysorted_render_params, 0, ysorted_render_params.size() - 1);
+        for (const render_sprite_params_t& params : ysorted_render_params) {
+            render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+        }
     } // End for each elevation
 
     // UI frames

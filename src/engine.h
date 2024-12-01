@@ -168,6 +168,11 @@ struct sprite_t {
     int vframes;
 };
 
+const SDL_Rect SCREEN_RECT = (SDL_Rect) {
+    .x = 0, .y = 0, 
+    .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT
+};
+
 struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -198,8 +203,8 @@ void render_text(Font font, const char* text, SDL_Color color, xy position, Text
 
 struct render_sprite_params_t {
     Sprite sprite;
-    const xy& frame;
-    const xy& position;
+    xy frame;
+    xy position;
     uint32_t options;
     uint8_t recolor_id;
 };
@@ -207,4 +212,5 @@ const uint32_t RENDER_SPRITE_FLIP_H = 1;
 const uint32_t RENDER_SPRITE_CENTERED = 2;
 const uint32_t RENDER_SPRITE_NO_CULL = 4;
 
+void ysort_render_params(std::vector<render_sprite_params_t>& params, int low, int high);
 void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, uint8_t recolor_id = RECOLOR_NONE);

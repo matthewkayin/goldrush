@@ -3,10 +3,12 @@
 #include "defines.h"
 #include "util.h"
 #include "id_array.h"
+#include "engine.h"
 #include <SDL2/SDL.h>
 #include <queue>
 
 #define UI_HEIGHT 88
+#define PLAYER_NONE UINT8_MAX
 
 // UI
 
@@ -41,13 +43,27 @@ struct tile_t {
 
 // Units
 
-enum UnitTargetType {
-    UNIT_TARGET_NONE,
-    
+enum UnitOrderType {
+    UNIT_ORDER_NONE,
+    UNIT_ORDER_MOVE_UNIT,
+    UNIT_ORDER_MOVE_CELL,
+    UNIT_ORDER_ATTACK_MOVE_CELL,
+    UNIT_ORDER_BUILD,
+    UNIT_ORDER_BUILD_ASSIST,
+    UNIT_ORDER_REPAIR,
+    UNIT_ORDER_UNLOAD
+};
+
+struct unit_order_t {
+    UnitOrderType type;
+    union {
+        entity_id target_id;
+        xy target_cell;
+    };
 };
 
 struct unit_t {
-
+    unit_order_t order;
 };
 
 // Entities
@@ -61,8 +77,14 @@ enum EntityType {
 
 struct entity_t {
     EntityType type;
+    uint8_t player_id;
+
     xy cell;
     xy_fixed position;
+
+    union {
+        unit_t unit;
+    };
 };
 
 // Input
@@ -88,6 +110,7 @@ struct match_state_t {
     uint32_t map_width;
     uint32_t map_height;
     std::vector<tile_t> map_tiles;
+    std::vector<entity_id> map_cells;
 
     // Entities
     id_array<entity_t> entities;
@@ -107,5 +130,11 @@ void match_camera_center_on_cell(match_state_t& state, xy cell);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
+void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value);
 
 // Entities
+entity_id entity_create_unit(match_state_t& state, EntityType type, uint8_t player_id, xy cell);
+bool entity_is_unit(EntityType entity);
+int entity_cell_size(EntityType entity);
+Sprite entity_get_sprite(const entity_t entity);
+uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity);

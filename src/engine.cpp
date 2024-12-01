@@ -964,6 +964,34 @@ void render_text(Font font, const char* text, SDL_Color color, xy position, Text
     SDL_DestroyTexture(text_texture);
 }
 
+int ysort_render_params_partition(std::vector<render_sprite_params_t>& params, int low, int high) {
+    render_sprite_params_t pivot = params[high];
+    int i = low - 1;
+
+    for (int j = low; j <= high - 1; j++) {
+        if (params[j].position.y < pivot.position.y) {
+            i++;
+            render_sprite_params_t temp = params[j];
+            params[j] = params[i];
+            params[i] = temp;
+        }
+    }
+
+    render_sprite_params_t temp = params[high];
+    params[high] = params[i + 1];
+    params[i + 1] = temp;
+
+    return i + 1;
+}
+
+void ysort_render_params(std::vector<render_sprite_params_t>& params, int low, int high) {
+    if (low < high) {
+        int partition_index = ysort_render_params_partition(params, low, high);
+        ysort_render_params(params, low, partition_index - 1);
+        ysort_render_params(params, partition_index + 1, high);
+    }
+}
+
 void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options, uint8_t recolor_id) {
     GOLD_ASSERT(frame.x < engine.sprites[sprite].hframes && frame.y < engine.sprites[sprite].vframes);
 
