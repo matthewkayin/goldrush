@@ -3,14 +3,20 @@
 #include "engine.h"
 #include "network.h"
 #include "logger.h"
+#include <algorithm>
 
 static const uint32_t TICK_DURATION = 4;
 static const uint32_t TICK_OFFSET = 4;
+
+static const int CAMERA_DRAG_MARGIN = 4;
+static const int CAMERA_DRAG_SPEED = 16;
 
 match_state_t match_init() {
     match_state_t state;
 
     state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
+
+    map_init(state, 64, 64);
 
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -33,12 +39,12 @@ match_state_t match_init() {
         log_info("Beginning singleplayer game.");
         state.ui_mode = UI_MODE_NONE;
     }
+    state.camera_offset = xy(0, 0);
 
     return state;
 }
 
 void match_handle_input(match_state_t& state, SDL_Event e) {
-
     if (state.ui_mode == UI_MODE_MATCH_NOT_STARTED) {
         return;
     }
@@ -139,6 +145,34 @@ void match_update(match_state_t& state) {
     } // End if tick timer is 0
 
     state.tick_timer--;
+
+    // CAMERA DRAG
+    if (state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
+        xy camera_drag_direction = xy(0, 0);
+        if (engine.mouse_position.x < CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.x = -1;
+        } else if (engine.mouse_position.x > SCREEN_WIDTH - CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.x = 1;
+        }
+        if (engine.mouse_position.y < CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.y = -1;
+        } else if (engine.mouse_position.y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.y = 1;
+        }
+        state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
+        match_camera_clamp(state);
+    }
+}
+
+void match_camera_clamp(match_state_t& state) {
+    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, ((int)state.map_width * TILE_SIZE) - SCREEN_WIDTH);
+    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, ((int)state.map_height * TILE_SIZE) - SCREEN_HEIGHT + UI_HEIGHT);
+}
+
+void match_camera_center_on_cell(match_state_t& state, xy cell) {
+    state.camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2);
+    match_camera_clamp(state);
 }
 
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input) {
@@ -172,6 +206,58 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 }
 
 void match_render(const match_state_t& state) {
-    SDL_SetRenderDrawColor(engine.renderer, 0, 255, 255, 255);
-    SDL_RenderClear(engine.renderer);
+    // Prepare map render
+    xy base_pos = xy(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
+    xy base_coords = xy(state.camera_offset.x / TILE_SIZE, state.camera_offset.y / TILE_SIZE);
+    xy max_visible_tiles = xy(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE);
+    if (base_pos.x != 0) {
+        max_visible_tiles.x++;
+    }
+    if (base_pos.y != 0) {
+        max_visible_tiles.y++;
+    }
+
+    // Begin elevation passes
+    for (uint16_t elevation = 0; elevation < 3; elevation++) {
+        // Render map
+        for (int y = 0; y < max_visible_tiles.y; y++) {
+            for (int x = 0; x < max_visible_tiles.x; x++) {
+                int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map_width);
+                // If current elevation is above the tile, then skip it
+                if (state.map_tiles[map_index].elevation < elevation) {
+                    continue;
+                }
+
+                // If current elevation is equal to the tile, then render the tile, otherwise render default ground tile beneath it
+                uint16_t map_tile_index = state.map_tiles[map_index].elevation == elevation
+                                            ? state.map_tiles[map_index].index
+                                            : 1;
+                SDL_Rect tile_src_rect = (SDL_Rect) {
+                    .x = map_tile_index * TILE_SIZE,
+                    .y = 0,
+                    .w = TILE_SIZE,
+                    .h = TILE_SIZE
+                };
+                SDL_Rect tile_dst_rect = (SDL_Rect) {
+                    .x = base_pos.x + (x * TILE_SIZE),
+                    .y = base_pos.y + (y * TILE_SIZE),
+                    .w = TILE_SIZE,
+                    .h = TILE_SIZE
+                };
+                // Render a sand tile below front walls
+                if (map_tile_index != 1 && elevation == 0) {
+                    SDL_Rect below_tile_src_rect = tile_src_rect;
+                    below_tile_src_rect.x = TILE_SIZE;
+                    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &below_tile_src_rect, &tile_dst_rect);
+                }
+                SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &tile_src_rect, &tile_dst_rect);
+            } // End for x of visible tiles
+        } // End for y of visible tiles
+        // End render map
+    } // End for each elevation
+
+    // UI frames
+    render_sprite(SPRITE_UI_MINIMAP, xy(0, 0), xy(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
+    render_sprite(SPRITE_UI_FRAME_BOTTOM, xy(0, 0), UI_FRAME_BOTTOM_POSITION);
+    render_sprite(SPRITE_UI_FRAME_BUTTONS, xy(0, 0), xy(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x + engine.sprites[SPRITE_UI_FRAME_BOTTOM].frame_size.x, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y));
 }

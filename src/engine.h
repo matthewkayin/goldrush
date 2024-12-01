@@ -6,8 +6,10 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <vector>
+#include <unordered_map>
 
 #define RENDER_TEXT_CENTERED -1
+#define RECOLOR_NONE UINT8_MAX
 
 // COLORS
 
@@ -193,3 +195,16 @@ enum TextAnchor {
 
 xy autotile_edge_lookup(uint32_t edge, uint8_t neighbors);
 void render_text(Font font, const char* text, SDL_Color color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
+
+struct render_sprite_params_t {
+    Sprite sprite;
+    const xy& frame;
+    const xy& position;
+    uint32_t options;
+    uint8_t recolor_id;
+};
+const uint32_t RENDER_SPRITE_FLIP_H = 1;
+const uint32_t RENDER_SPRITE_CENTERED = 2;
+const uint32_t RENDER_SPRITE_NO_CULL = 4;
+
+void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, uint8_t recolor_id = RECOLOR_NONE);

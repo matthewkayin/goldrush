@@ -542,7 +542,7 @@ bool engine_init() {
         return false;
     }
 
-    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, SDL_WINDOW_SHOWN);
     if (engine.window == NULL) {
         log_error("Error creating window: %s", SDL_GetError());
         return false;
@@ -962,4 +962,40 @@ void render_text(Font font, const char* text, SDL_Color color, xy position, Text
 
     SDL_FreeSurface(text_surface);
     SDL_DestroyTexture(text_texture);
+}
+
+void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options, uint8_t recolor_id) {
+    GOLD_ASSERT(frame.x < engine.sprites[sprite].hframes && frame.y < engine.sprites[sprite].vframes);
+
+    bool flip_h = (options & RENDER_SPRITE_FLIP_H) == RENDER_SPRITE_FLIP_H;
+    bool centered = (options & RENDER_SPRITE_CENTERED) == RENDER_SPRITE_CENTERED;
+    bool cull = !((options & RENDER_SPRITE_NO_CULL) == RENDER_SPRITE_NO_CULL);
+
+    SDL_Rect src_rect = (SDL_Rect) {
+        .x = frame.x * engine.sprites[sprite].frame_size.x, 
+        .y = frame.y * engine.sprites[sprite].frame_size.y, 
+        .w = engine.sprites[sprite].frame_size.x, 
+        .h = engine.sprites[sprite].frame_size.y 
+    };
+    SDL_Rect dst_rect = (SDL_Rect) {
+        .x = position.x, .y = position.y,
+        .w = src_rect.w, .h = src_rect.h
+    };
+    if (cull) {
+        if (dst_rect.x + dst_rect.w < 0 || dst_rect.x > SCREEN_WIDTH || dst_rect.y + dst_rect.h < 0 || dst_rect.y > SCREEN_HEIGHT) {
+            return;
+        }
+    }
+    if (centered) {
+        dst_rect.x -= (dst_rect.w / 2);
+        dst_rect.y -= (dst_rect.h / 2);
+    }
+
+    SDL_Texture* texture;
+    if (recolor_id == RECOLOR_NONE) {
+        texture = engine.sprites[sprite].texture;
+    } else {
+        texture = engine.sprites[sprite].colored_texture[recolor_id];
+    }
+    SDL_RenderCopyEx(engine.renderer, texture, &src_rect, &dst_rect, 0.0, NULL, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 }
