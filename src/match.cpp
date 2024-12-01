@@ -47,9 +47,20 @@ match_state_t match_init() {
     return state;
 }
 
-void match_handle_input(match_state_t& state, SDL_Event e) {
+void match_handle_input(match_state_t& state, SDL_Event event) {
     if (state.ui_mode == UI_MODE_MATCH_NOT_STARTED) {
         return;
+    }
+
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        if (state.ui_mode == UI_MODE_NONE && !ui_is_mouse_in_ui()) {
+            state.select_rect_origin = match_get_mouse_world_pos(state);
+            state.ui_mode = UI_MODE_SELECTING;
+        }
+    } else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
+        if (state.ui_mode == UI_MODE_SELECTING) {
+            state.ui_mode = UI_MODE_NONE;
+        }
     }
 }
 
@@ -165,6 +176,17 @@ void match_update(match_state_t& state) {
         state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
         match_camera_clamp(state);
     }
+
+    // SELECT RECT
+    if (state.ui_mode == UI_MODE_SELECTING) {
+        // Update select rect
+        state.select_rect = (SDL_Rect) {
+            .x = std::min(state.select_rect_origin.x, match_get_mouse_world_pos(state).x),
+            .y = std::min(state.select_rect_origin.y, match_get_mouse_world_pos(state).y),
+            .w = std::max(1, std::abs(state.select_rect_origin.x - match_get_mouse_world_pos(state).x)), 
+            .h = std::max(1, std::abs(state.select_rect_origin.y - match_get_mouse_world_pos(state).y))
+        };
+    }
 }
 
 void match_camera_clamp(match_state_t& state) {
@@ -176,6 +198,10 @@ void match_camera_center_on_cell(match_state_t& state, xy cell) {
     state.camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
     state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2);
     match_camera_clamp(state);
+}
+
+xy match_get_mouse_world_pos(const match_state_t& state) {
+    return engine.mouse_position + state.camera_offset;
 }
 
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input) {
@@ -298,6 +324,15 @@ void match_render(const match_state_t& state) {
             render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
     } // End for each elevation
+
+    // Select rect
+    if (state.ui_mode == UI_MODE_SELECTING) {
+        SDL_Rect select_rect = state.select_rect;
+        select_rect.x -= state.camera_offset.x;
+        select_rect.y -= state.camera_offset.y;
+        SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+        SDL_RenderDrawRect(engine.renderer, &select_rect);
+    }
 
     // UI frames
     render_sprite(SPRITE_UI_MINIMAP, xy(0, 0), xy(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));

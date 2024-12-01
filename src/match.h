@@ -105,6 +105,8 @@ struct match_state_t {
     // UI
     UiMode ui_mode;
     xy camera_offset;
+    xy select_rect_origin;
+    SDL_Rect select_rect;
 
     // Map
     uint32_t map_width;
@@ -127,6 +129,10 @@ void match_render(const match_state_t& state);
 // Generic
 void match_camera_clamp(match_state_t& state);
 void match_camera_center_on_cell(match_state_t& state, xy cell);
+xy match_get_mouse_world_pos(const match_state_t& state);
+
+// UI
+bool ui_is_mouse_in_ui();
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
@@ -136,5 +142,6 @@ void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id v
 entity_id entity_create_unit(match_state_t& state, EntityType type, uint8_t player_id, xy cell);
 bool entity_is_unit(EntityType entity);
 int entity_cell_size(EntityType entity);
+SDL_Rect entity_get_rect(const entity_t& entity);
 Sprite entity_get_sprite(const entity_t entity);
 uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity);

@@ -30,6 +30,15 @@ int entity_cell_size(EntityType entity) {
     return 1;
 }
 
+SDL_Rect entity_get_rect(const entity_t& entity) {
+    return (SDL_Rect) {
+        .x = entity.position.x.integer_part(),
+        .y = entity.position.y.integer_part(),
+        .w = entity_cell_size(entity.type) * TILE_SIZE,
+        .h = entity_cell_size(entity.type) * TILE_SIZE
+    };
+}
+
 Sprite entity_get_sprite(const entity_t entity) {
     if (entity_is_unit(entity.type)) {
         return (Sprite)(SPRITE_UNIT_MINER + entity.type);
