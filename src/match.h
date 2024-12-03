@@ -223,6 +223,7 @@ struct match_state_t {
     std::vector<entity_id> selection;
     animation_t ui_move_animation;
     xy ui_move_position;
+    entity_id ui_move_entity_id;
 
     // Map
     uint32_t map_width;

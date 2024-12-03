@@ -71,9 +71,11 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         if (move_input.type == INPUT_MOVE_CELL) {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
             state.ui_move_position = match_get_mouse_world_pos(state);
+            state.ui_move_entity_id = ID_NULL;
         } else {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
             state.ui_move_position = cell_center(move_input.move.target_cell).to_xy();
+            state.ui_move_entity_id = move_input.move.target_id;
         }
 
         // Reset UI mode if targeting
@@ -260,13 +262,20 @@ input_t match_create_move_input(const match_state_t& state) {
     // Create move input
     input_t input;
     input.move.target_cell = move_target / TILE_SIZE;
-    input.move.target_id = map_get_cell(state, input.move.target_cell);
+    input.move.target_id = ID_NULL;
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        SDL_Rect entity_rect = entity_get_rect(state.entities[entity_index]);
+        if (sdl_rect_has_point(entity_rect, move_target)) {
+            input.move.target_id = state.entities.get_id_of(entity_index);
+            break;
+        }
+    }
 
     if (state.ui_mode == UI_MODE_TARGET_UNLOAD) {
 
     } else if (state.ui_mode == UI_MODE_TARGET_REPAIR) {
 
-    } else if (input.move.target_id != CELL_EMPTY && input.move.target_id != CELL_BLOCKED) {
+    } else if (input.move.target_id != ID_NULL) {
         // INPUT_MOVE_ENTITY is given priority over attack move because attack move is treated as a cell move
         // If they are A-moving and directly click their target, then it should be an entity move instead
         input.type = INPUT_MOVE_ENTITY;
@@ -528,14 +537,13 @@ void match_render(const match_state_t& state) {
         // UI move animation
         if (animation_is_playing(state.ui_move_animation) && 
             map_get_tile(state, state.ui_move_position / TILE_SIZE).elevation == elevation) {
-            entity_id cell_entity = map_get_cell(state, state.ui_move_position / TILE_SIZE);
-            if (cell_entity == CELL_EMPTY || cell_entity == CELL_BLOCKED) {
+            if (state.ui_move_animation.name == ANIMATION_UI_MOVE_CELL) {
                 render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
             } else if (state.ui_move_animation.frame.x % 2 == 0) {
-                uint32_t entity_index = state.entities.get_index_of(cell_entity);
+                uint32_t entity_index = state.entities.get_index_of(state.ui_move_entity_id);
                 if (entity_index != INDEX_INVALID) {
                     const entity_t& entity = state.entities[entity_index];
-                    render_sprite(entity_get_select_ring(entity), xy(0, 0), entity_get_center_position(entity), RENDER_SPRITE_CENTERED);
+                    render_sprite(entity_get_select_ring(entity), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
                 }
             }
         }
