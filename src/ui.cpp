@@ -68,5 +68,26 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
         }
     }
 
+    while (state.selection.size() > SELECTION_LIMIT) {
+        state.selection.pop_back();
+    }
+
     // TODO set buttonset based on selection
+}
+
+SelectionType ui_get_selection_type(const match_state_t& state) {
+    if (state.selection.empty()) {
+        return SELECTION_TYPE_NONE;
+    }
+
+    if (entity_is_unit(state.entities.get_by_id(state.selection[0]).type)) {
+        return SELECTION_TYPE_UNITS;
+    }
+
+    // TODO
+    return SELECTION_TYPE_NONE;
+}
+
+bool ui_is_targeting(const match_state_t& state) {
+    return state.ui_mode >= UI_MODE_TARGET_ATTACK && state.ui_mode < UI_MODE_CHAT;
 }

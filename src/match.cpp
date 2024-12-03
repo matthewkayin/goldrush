@@ -52,7 +52,27 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         return;
     }
 
-    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+    if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state) == SELECTION_TYPE_UNITS && 
+            ((event.button.button == SDL_BUTTON_LEFT && ui_is_targeting(state)) ||
+            (event.button.button == SDL_BUTTON_RIGHT && state.ui_mode == UI_MODE_NONE))) {
+        input_t move_input = match_create_move_input(state);
+        state.input_queue.push_back(move_input);
+
+        // Provide instant user feedback
+        if (move_input.type == INPUT_MOVE_CELL) {
+            state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
+            state.ui_move_position = match_get_mouse_world_pos(state);
+        } else {
+            state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
+            state.ui_move_position = cell_center(move_input.move.target_cell).to_xy();
+        }
+
+        // Reset UI mode if targeting
+        if (ui_is_targeting(state)) {
+            state.ui_mode = UI_MODE_NONE;
+            ui_set_selection(state, state.selection);
+        }
+    } else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         if (state.ui_mode == UI_MODE_NONE && !ui_is_mouse_in_ui()) {
             state.select_rect_origin = match_get_mouse_world_pos(state);
             state.ui_mode = UI_MODE_SELECTING;
@@ -189,6 +209,16 @@ void match_update(match_state_t& state) {
             .h = std::max(1, std::abs(state.select_rect_origin.y - match_get_mouse_world_pos(state).y))
         };
     }
+
+    // Update timers
+    if (animation_is_playing(state.ui_move_animation)) {
+        animation_update(state.ui_move_animation);
+    }
+
+    // Update entities
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        entity_update(state, entity_index);
+    }
 }
 
 void match_camera_clamp(match_state_t& state) {
@@ -206,11 +236,66 @@ xy match_get_mouse_world_pos(const match_state_t& state) {
     return engine.mouse_position + state.camera_offset;
 }
 
+input_t match_create_move_input(const match_state_t& state) {
+    // Determine move target
+    xy move_target;
+    if (ui_is_mouse_in_ui()) {
+        xy minimap_pos = engine.mouse_position - xy(MINIMAP_RECT.x, MINIMAP_RECT.y);
+        move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                            (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+    } else {
+        move_target = match_get_mouse_world_pos(state);
+    }
+
+    // Create move input
+    input_t input;
+    input.move.target_cell = move_target / TILE_SIZE;
+    input.move.target_id = map_get_cell(state, input.move.target_cell);
+
+    if (state.ui_mode == UI_MODE_TARGET_UNLOAD) {
+
+    } else if (state.ui_mode == UI_MODE_TARGET_REPAIR) {
+
+    } else if (input.move.target_id != CELL_EMPTY && input.move.target_id != CELL_BLOCKED) {
+        // INPUT_MOVE_ENTITY is given priority over attack move because attack move is treated as a cell move
+        // If they are A-moving and directly click their target, then it should be an entity move instead
+        input.type = INPUT_MOVE_ENTITY;
+    } else if (state.ui_mode == UI_MODE_TARGET_ATTACK) {
+        input.type = INPUT_MOVE_ATTACK;
+    } else {
+        input.type = INPUT_MOVE_CELL;
+    }
+
+    // Populate move input entity ids
+    input.move.entity_count = (uint16_t)state.selection.size();
+    memcpy(input.move.entity_ids, &state.selection[0], state.selection.size() * sizeof(entity_id));
+
+    return input;
+}
+
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input) {
     out_buffer[out_buffer_length] = input.type;
     out_buffer_length++;
 
     switch (input.type) {
+        case INPUT_MOVE_CELL:
+        case INPUT_MOVE_ENTITY:
+        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_REPAIR:
+        case INPUT_MOVE_UNLOAD: {
+            memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
+            out_buffer_length += sizeof(xy);
+
+            memcpy(out_buffer + out_buffer_length, &input.move.target_id, sizeof(entity_id));
+            out_buffer_length += sizeof(entity_id);
+
+            memcpy(out_buffer + out_buffer_length, &input.move.entity_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.move.entity_ids, input.move.entity_count * sizeof(entity_id));
+            out_buffer_length += input.move.entity_count * sizeof(entity_id);
+            break;
+        }
         default:
             break;
     }
@@ -222,6 +307,24 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
     in_buffer_head++;
 
     switch (input.type) {
+        case INPUT_MOVE_CELL:
+        case INPUT_MOVE_ENTITY:
+        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_REPAIR:
+        case INPUT_MOVE_UNLOAD: {
+            memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
+            in_buffer_head += sizeof(xy);
+
+            memcpy(&input.move.target_id, in_buffer + in_buffer_head, sizeof(entity_id));
+            in_buffer_head += sizeof(entity_id);
+
+            memcpy(&input.move.entity_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(&input.move.entity_ids, in_buffer + in_buffer_head, input.move.entity_count * sizeof(entity_id));
+            in_buffer_head += input.move.entity_count * sizeof(entity_id);
+            break;
+        }
         default:
             break;
     }
@@ -231,6 +334,91 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input) {
     switch (input.type) {
+        case INPUT_MOVE_CELL:
+        case INPUT_MOVE_ENTITY:
+        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_REPAIR:
+        case INPUT_MOVE_UNLOAD: {
+            // Determine the target index
+            uint32_t target_index = INDEX_INVALID;
+            if (input.type == INPUT_MOVE_ENTITY || input.type == INPUT_MOVE_REPAIR) {
+                target_index = state.entities.get_index_of(input.move.target_id);
+                if (target_index != INDEX_INVALID && !entity_is_selectable(state.entities[target_index])) {
+                    target_index = INDEX_INVALID;
+                }
+            }
+
+            // Calculate group center
+            xy group_center;
+            bool should_move_as_group = target_index == INDEX_INVALID;
+            uint32_t unit_count = 0;
+            if (should_move_as_group) {
+                std::vector<xy> unit_cells;
+                unit_cells.reserve(input.move.entity_count);
+                xy group_min;
+                xy group_max;
+                for (uint32_t id_index = 0; id_index < input.move.entity_count; id_index++) {
+                    uint32_t entity_index = state.entities.get_index_of(input.move.entity_ids[id_index]);
+                    if (entity_index == INDEX_INVALID || !entity_is_selectable(state.entities[entity_index])) {
+                        continue;
+                    }
+
+                    xy entity_cell = state.entities[entity_index].cell;
+                    if (unit_count == 0) {
+                        group_min = entity_cell;
+                        group_max = entity_cell;
+                    } else {
+                        group_min.x = std::min(group_min.x, entity_cell.x);
+                        group_min.y = std::min(group_min.y, entity_cell.y);
+                        group_max.x = std::max(group_max.x, entity_cell.x);
+                        group_max.y = std::max(group_max.y, entity_cell.y);
+                    }
+
+                    unit_count++;
+                }
+
+                SDL_Rect group_rect = (SDL_Rect) { 
+                    .x = group_min.x, .y = group_min.y,
+                    .w = group_max.x - group_min.x, .h = group_max.y - group_min.y
+                };
+                group_center = xy(group_rect.x + (group_rect.w / 2), group_rect.y + (group_rect.h / 2));
+
+                // Don't move as group if we're not in a group
+                // Also don't move as a group if the target is inside the group rect (this allows units to converge in on a cell)
+                if (unit_count < 2 || sdl_rect_has_point(group_rect, input.move.target_cell)) {
+                    should_move_as_group = false;
+                }
+            } // End calculate group center
+
+            // Give each unit the move command
+            for (uint32_t id_index = 0; id_index < input.move.entity_count; id_index++) {
+                uint32_t entity_index = state.entities.get_index_of(input.move.entity_ids[id_index]);
+                if (entity_index == INDEX_INVALID || !entity_is_selectable(state.entities[entity_index])) {
+                    continue;
+                }
+                entity_t& entity = state.entities[entity_index];
+
+                // Set the unit's target
+                target_t target;
+                target.type = (TargetType)input.type;
+                if (target_index == INDEX_INVALID) {
+                    target.cell = input.move.target_cell;
+                    // If group-moving, use the group move cell, but only if the cell is valid
+                    if (should_move_as_group) {
+                        xy group_move_cell = input.move.target_cell + (entity.cell - group_center);
+                        if (map_is_cell_in_bounds(state, group_move_cell) && 
+                                xy::manhattan_distance(group_move_cell, input.move.target_cell) <= 3 &&
+                                map_get_tile(state, group_move_cell).elevation == map_get_tile(state, input.move.target_cell).elevation) {
+                            target.cell = group_move_cell;
+                        }
+                    }
+                } else {
+                    target.id = input.move.target_id;
+                }
+                entity_set_target(entity, target);
+            } // End for each unit in move input
+            break;
+        } // End handle INPUT_MOVE
         default:
             break;
     }
@@ -296,16 +484,25 @@ void match_render(const match_state_t& state) {
             }
 
             // Select ring
-            xy render_pos;
-            if (entity_is_unit(entity.type)) {
-                render_pos = entity.position.to_xy();
-            } else {
-                SDL_Rect entity_rect = entity_get_rect(entity);
-                render_pos = xy(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2));
-            }
-            render_sprite(entity_get_select_ring(entity), xy(0, 0), render_pos - state.camera_offset, RENDER_SPRITE_CENTERED);
+            render_sprite(entity_get_select_ring(entity), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
         }
 
+        // UI move animation
+        if (animation_is_playing(state.ui_move_animation) && 
+            map_get_tile(state, state.ui_move_position / TILE_SIZE).elevation == elevation) {
+            entity_id cell_entity = map_get_cell(state, state.ui_move_position / TILE_SIZE);
+            if (cell_entity == CELL_EMPTY || cell_entity == CELL_BLOCKED) {
+                render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
+            } else if (state.ui_move_animation.frame.x % 2 == 0) {
+                uint32_t entity_index = state.entities.get_index_of(cell_entity);
+                if (entity_index != INDEX_INVALID) {
+                    const entity_t& entity = state.entities[entity_index];
+                    render_sprite(entity_get_select_ring(entity), xy(0, 0), entity_get_center_position(entity), RENDER_SPRITE_CENTERED);
+                }
+            }
+        }
+
+        // Entities
         for (entity_t entity : state.entities) {
             if (entity_get_elevation(state, entity) != elevation) {
                 continue;
@@ -313,7 +510,7 @@ void match_render(const match_state_t& state) {
 
             render_sprite_params_t render_params = (render_sprite_params_t) {
                 .sprite = entity_get_sprite(entity),
-                .frame = xy(0, 0), // TODO
+                .frame = entity_get_animation_frame(entity),
                 .position = entity.position.to_xy() - state.camera_offset,
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_id = entity.player_id
@@ -329,6 +526,9 @@ void match_render(const match_state_t& state) {
                 render_rect.x -= render_rect.w / 2;
                 render_rect.y -= render_rect.h / 2;
                 render_params.options |= RENDER_SPRITE_CENTERED;
+            }
+            if (entity_should_flip_h(entity)) {
+                render_params.options |= RENDER_SPRITE_FLIP_H;
             }
 
             if (SDL_HasIntersection(&render_rect, &SCREEN_RECT) != SDL_TRUE) {

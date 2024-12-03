@@ -1,5 +1,6 @@
 #pragma once
 
+#include "defines.h"
 #include <cmath>
 #include <SDL2/SDL.h>
 
@@ -253,3 +254,58 @@ const uint8_t AUTOTILE_EDGE_MASK[4] = {
     (uint8_t)(DIRECTION_MASK[DIRECTION_WEST] + DIRECTION_MASK[DIRECTION_SOUTHWEST] + DIRECTION_MASK[DIRECTION_SOUTH]),
     (uint8_t)(DIRECTION_MASK[DIRECTION_EAST] + DIRECTION_MASK[DIRECTION_SOUTHEAST] + DIRECTION_MASK[DIRECTION_SOUTH])
 };
+
+inline Direction enum_from_xy_direction(xy xy_direction) {
+    for (int enum_direction = 0; enum_direction < DIRECTION_COUNT; enum_direction++) {
+        if (DIRECTION_XY[enum_direction] == xy_direction) {
+            return (Direction)enum_direction;
+        }
+    }
+    return DIRECTION_COUNT;
+}
+
+inline xy_fixed cell_center(xy cell) {
+    return xy_fixed(
+        fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)),
+        fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2))
+    );
+}
+
+inline bool sdl_rects_are_adjacent(const SDL_Rect& a, const SDL_Rect& b) {
+    if (a.x + a.w == b.x || b.x + b.w == a.x) {
+        return (a.y >= b.y && a.y + a.h <= b.y + b.h) ||
+               (b.y >= a.y && b.y + b.h <= a.y + a.h);
+    } else if (a.y + a.h == b.y || b.y + b.h == a.y) {
+        return (a.x >= b.x && a.x + a.w <= b.x + b.w) ||
+               (b.x >= a.x && b.x + b.h <= a.x + a.w);
+    } else {
+        return false;
+    }
+}
+
+inline xy cell_within_rect_a_nearest_to_rect_b(const SDL_Rect& a, const SDL_Rect& b) {
+    xy cell;
+    if (a.y > b.y) {
+        cell.y = a.y;
+    } else if (a.y + a.h <= b.y) {
+        cell.y = a.y + a.h - 1;
+    } else {
+        cell.y = a.y;
+    }
+
+    if (a.x > b.x) {
+        cell.x = a.x;
+    } else if (a.x + a.w <= b.x) {
+        cell.x = a.x + a.w - 1;
+    } else {
+        cell.x = b.x;
+    }
+    
+    return cell;
+}
+
+inline int euclidean_distance_squared_between(const SDL_Rect& a, const SDL_Rect& b) {
+    xy cell_in_a_nearest_to_b = cell_within_rect_a_nearest_to_rect_b(a, b);
+    xy cell_in_b_nearest_to_a = cell_within_rect_a_nearest_to_rect_b(b, a);
+    return xy::euclidean_distance_squared(cell_in_a_nearest_to_b, cell_in_b_nearest_to_a);
+}
