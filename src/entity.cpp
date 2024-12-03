@@ -50,6 +50,8 @@ entity_id entity_create_unit(match_state_t& state, EntityType type, uint8_t play
     };
     unit.timer = 0;
 
+    unit.animation = animation_create(ANIMATION_UNIT_IDLE);
+
     entity_id id = state.entities.push_back(unit);
     map_set_cell_rect(state, unit.cell, entity_cell_size(unit.type), id);
 

@@ -172,6 +172,7 @@ struct entity_data_t {
         building_data_t building_data;
     };
 };
+extern std::unordered_map<EntityType, entity_data_t> ENTITY_DATA;
 
 // Input
 

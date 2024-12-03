@@ -18,19 +18,32 @@ match_state_t match_init() {
 
     map_init(state, 64, 64);
 
-    // Init input queues
+    Direction spawn_directions[MAX_PLAYERS] = { DIRECTION_NORTHWEST, DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST };
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
             continue;
         }
 
+        // Init input queues
         input_t empty_input;
         empty_input.type = INPUT_NONE;
         std::vector<input_t> empty_input_list = { empty_input };
         for (uint8_t i = 0; i < TICK_OFFSET - 1; i++) {
             state.inputs[player_id].push_back(empty_input_list);
         }
+
+        // Determine player spawn
+        xy player_spawn = xy(state.map_width / 2, state.map_height / 2) + (DIRECTION_XY[spawn_directions[player_id]] * ((state.map_width / 2) - 16));
+        if (player_id == network_get_player_id()) {
+            match_camera_center_on_cell(state, player_spawn);
+        }
+        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(-1, -1));
+        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(1, -1));
+        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(-2, 0));
+        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(2, 0));
+        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(-1, 1));
+        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(1, 1));
     }
     state.tick_timer = 0;
 
@@ -39,10 +52,6 @@ match_state_t match_init() {
         log_info("Beginning singleplayer game.");
         state.ui_mode = UI_MODE_NONE;
     }
-    state.camera_offset = xy(0, 0);
-
-    entity_create_unit(state, UNIT_MINER, 0, xy(1, 1));
-    entity_create_unit(state, UNIT_MINER, 0, xy(2, 2));
 
     return state;
 }
@@ -90,6 +99,7 @@ void match_update(match_state_t& state) {
     network_service();
 
     if (state.ui_mode == UI_MODE_MATCH_NOT_STARTED && network_are_all_players_ready()) {
+        log_trace("Match started.");
         state.ui_mode = UI_MODE_NONE;
     }
     if (state.ui_mode == UI_MODE_MATCH_NOT_STARTED) {
@@ -477,6 +487,9 @@ void match_render(const match_state_t& state) {
         // End render map
 
         // Select rings and healthbars
+        static const int HEALTHBAR_HEIGHT = 4;
+        static const int HEALTHBAR_PADDING = 3;
+        static const int BUILDING_HEALTHBAR_PADDING = 5;
         for (entity_id id : state.selection) {
             const entity_t& entity = state.entities.get_by_id(id);
             if (entity_get_elevation(state, entity) != elevation) {
@@ -485,6 +498,31 @@ void match_render(const match_state_t& state) {
 
             // Select ring
             render_sprite(entity_get_select_ring(entity), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+
+            // TOOD ignore all this code if is gold mine
+
+            // Determine the healthbar rect
+            SDL_Rect entity_rect = entity_get_rect(entity);
+            entity_rect.x -= state.camera_offset.x;
+            entity_rect.y -= state.camera_offset.y;
+            SDL_Rect healthbar_rect = (SDL_Rect) {
+                .x = entity_rect.x,
+                .y = entity_rect.y + entity_rect.h + (entity_is_unit(entity.type) ? HEALTHBAR_PADDING : BUILDING_HEALTHBAR_PADDING),
+                .w = entity_rect.w,
+                .h = HEALTHBAR_HEIGHT
+            };
+            SDL_Rect healthbar_subrect = healthbar_rect;
+            healthbar_subrect.w = (healthbar_rect.w * entity.health) / ENTITY_DATA.at(entity.type).max_health;
+
+            // Cull the healthbar
+            if (SDL_HasIntersection(&healthbar_rect, &SCREEN_RECT) == SDL_TRUE) {
+                // Render the healthbar
+                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+                SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+            }
         }
 
         // UI move animation

@@ -529,6 +529,12 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             break;
         }
         case MESSAGE_MATCH_LOAD: {
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (state.players[player_id].status != PLAYER_STATUS_NONE) {
+                    state.players[player_id].status = PLAYER_STATUS_NOT_READY;
+                }
+            }
+
             state.event_queue.push((network_event_t) {
                 .type = NETWORK_EVENT_MATCH_LOAD
             });
