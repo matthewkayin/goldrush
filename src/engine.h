@@ -213,3 +213,4 @@ const uint32_t RENDER_SPRITE_NO_CULL = 4;
 
 void ysort_render_params(std::vector<render_sprite_params_t>& params, int low, int high);
 void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, uint8_t recolor_id = RECOLOR_NONE);
+void render_ninepatch(Sprite sprite, const SDL_Rect& rect, int patch_margin);

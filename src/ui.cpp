@@ -2,6 +2,8 @@
 
 #include "network.h"
 
+static const uint32_t UI_CHAT_MESSAGE_DURATION = 180;
+
 bool ui_is_mouse_in_ui() {
     return (engine.mouse_position.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
            (engine.mouse_position.x <= 136 && engine.mouse_position.y >= SCREEN_HEIGHT - 136) ||
@@ -90,4 +92,11 @@ SelectionType ui_get_selection_type(const match_state_t& state) {
 
 bool ui_is_targeting(const match_state_t& state) {
     return state.ui_mode >= UI_MODE_TARGET_ATTACK && state.ui_mode < UI_MODE_CHAT;
+}
+
+void ui_add_chat_message(match_state_t& state, std::string message) {
+    state.ui_chat.push_back((chat_message_t) {
+        .message = message,
+        .timer = UI_CHAT_MESSAGE_DURATION
+    });
 }

@@ -380,15 +380,12 @@ void network_service() {
 
                     state.players[*player_id_ptr].status = PLAYER_STATUS_NONE;
 
-                    if (*player_id_ptr == 0) {
-                        // This is used in lobby so that players know just to exit the game
-                        state.event_queue.push((network_event_t) {
-                            .type = NETWORK_EVENT_PLAYER_DISCONNECTED,
-                            .player_disconnected = {
-                                .player_id = *player_id_ptr
-                            }
-                        });
-                    }
+                    state.event_queue.push((network_event_t) {
+                        .type = NETWORK_EVENT_PLAYER_DISCONNECTED,
+                        .player_disconnected = {
+                            .player_id = *player_id_ptr
+                        }
+                    });
                 }
                 break;
             }

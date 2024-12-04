@@ -5,16 +5,38 @@
 #include "logger.h"
 #include <algorithm>
 
-static const uint32_t TICK_DURATION = 4;
-static const uint32_t TICK_OFFSET = 4;
+static const uint32_t TURN_DURATION = 4;
+static const uint32_t TURN_OFFSET = 4;
+static const uint32_t MATCH_DISCONNECT_GRACE = 10;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
+
+static const SDL_Rect UI_DISCONNECT_FRAME_RECT = (SDL_Rect) {
+    .x = (SCREEN_WIDTH / 2) - 100, .y = 32,
+    .w = 200, .h = 200
+};
+static const SDL_Rect UI_MATCH_OVER_FRAME_RECT = (SDL_Rect) {
+    .x = (SCREEN_WIDTH / 2) - (250 / 2), .y = 128,
+    .w = 250, .h = 60
+};
+static const SDL_Rect UI_MATCH_OVER_EXIT_BUTTON_RECT = (SDL_Rect) {
+    .x = (SCREEN_WIDTH / 2) - 32, .y = UI_MATCH_OVER_FRAME_RECT.y + 32,
+    .w = 63, .h = 21
+};
+static const SDL_Rect UI_MENU_BUTTON_RECT = (SDL_Rect) {
+    .x = 1, .y = 1, .w = 19, .h = 18
+};
+static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
+    .x = (SCREEN_WIDTH / 2) - (150 / 2), .y = 64,
+    .w = 150, .h = 100
+};
 
 match_state_t match_init() {
     match_state_t state;
 
     state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
+    state.ui_status_timer = 0;
 
     map_init(state, 64, 64);
 
@@ -29,7 +51,7 @@ match_state_t match_init() {
         input_t empty_input;
         empty_input.type = INPUT_NONE;
         std::vector<input_t> empty_input_list = { empty_input };
-        for (uint8_t i = 0; i < TICK_OFFSET - 1; i++) {
+        for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
             state.inputs[player_id].push_back(empty_input_list);
         }
 
@@ -45,7 +67,8 @@ match_state_t match_init() {
         entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(-1, 1));
         entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(1, 1));
     }
-    state.tick_timer = 0;
+    state.turn_timer = 0;
+    state.ui_disconnect_timer = 0;
 
     network_toggle_ready();
     if (network_are_all_players_ready()) {
@@ -57,10 +80,25 @@ match_state_t match_init() {
 }
 
 void match_handle_input(match_state_t& state, SDL_Event event) {
-    if (state.ui_mode == UI_MODE_MATCH_NOT_STARTED) {
+    if (state.ui_mode == UI_MODE_MATCH_NOT_STARTED || state.ui_disconnect_timer > 0) {
         return;
     }
 
+    // Match over button press
+    if ((state.ui_mode == UI_MODE_MATCH_OVER_VICTORY || state.ui_mode == UI_MODE_MATCH_OVER_DEFEAT)) {
+        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && sdl_rect_has_point(UI_MATCH_OVER_EXIT_BUTTON_RECT, engine.mouse_position)) {
+            network_disconnect();
+            state.ui_mode = UI_MODE_LEAVE_MATCH;
+        }
+        return;
+    }
+
+    // Menu button press
+    if (state.ui_mode == UI_MODE_MENU) {
+        return;
+    }
+
+    // Order movement
     if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state) == SELECTION_TYPE_UNITS && 
             ((event.button.button == SDL_BUTTON_LEFT && ui_is_targeting(state)) ||
             (event.button.button == SDL_BUTTON_RIGHT && state.ui_mode == UI_MODE_NONE))) {
@@ -83,17 +121,26 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
             state.ui_mode = UI_MODE_NONE;
             ui_set_selection(state, state.selection);
         }
-    } else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        return;
+    } 
+
+    // Begin selecting
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         if (state.ui_mode == UI_MODE_NONE && !ui_is_mouse_in_ui()) {
             state.select_rect_origin = match_get_mouse_world_pos(state);
             state.ui_mode = UI_MODE_SELECTING;
         }
-    } else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
+        return;
+    } 
+
+    // End selecting
+    if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
         if (state.ui_mode == UI_MODE_SELECTING) {
             state.ui_mode = UI_MODE_NONE;
             std::vector<entity_id> selection = ui_create_selection_from_rect(state);
             ui_set_selection(state, selection);
         }
+        return;
     }
 }
 
@@ -127,6 +174,18 @@ void match_update(match_state_t& state) {
                 break;
             }
             case NETWORK_EVENT_PLAYER_DISCONNECTED: {
+                ui_add_chat_message(state, std::string(network_get_player(network_event.player_disconnected.player_id).name) + " disconnected.");
+
+                // Determine if we should exit the match
+                uint32_t player_count = 0;
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (network_get_player(player_id).status != PLAYER_STATUS_NONE) {
+                        player_count++;
+                    }
+                }
+                if (player_count < 2) {
+                    state.ui_mode = UI_MODE_MATCH_OVER_VICTORY;
+                }
                 break;
             }
             default: 
@@ -134,8 +193,8 @@ void match_update(match_state_t& state) {
         }
     }
 
-    // Tick loop
-    if (state.tick_timer == 0) {
+    // Turn loop
+    if (state.turn_timer == 0) {
         bool all_inputs_received = true;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
@@ -152,10 +211,14 @@ void match_update(match_state_t& state) {
         }
 
         if (!all_inputs_received) {
+            state.ui_disconnect_timer++;
             return;
         }
 
-        // All inputs received. Begin next tick
+        // Reset the disconnect timer if we received inputs
+        state.ui_disconnect_timer = 0;
+
+        // All inputs received. Begin next turn
         // HANDLE INPUT
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
@@ -169,7 +232,7 @@ void match_update(match_state_t& state) {
             state.inputs[player_id].erase(state.inputs[player_id].begin());
         }
 
-        state.tick_timer = TICK_DURATION;
+        state.turn_timer = TURN_DURATION;
 
         // FLUSH INPUT
         // Always send at least one input per tick
@@ -192,7 +255,7 @@ void match_update(match_state_t& state) {
         network_send_input(out_buffer, out_buffer_length);
     } // End if tick timer is 0
 
-    state.tick_timer--;
+    state.turn_timer--;
 
     // CAMERA DRAG
     if (state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
@@ -230,6 +293,17 @@ void match_update(match_state_t& state) {
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         entity_update(state, entity_index);
+    }
+
+    if (state.ui_status_timer > 0) {
+        state.ui_status_timer--;
+    }
+    for (uint32_t chat_index = 0; chat_index < state.ui_chat.size(); chat_index++) {
+        state.ui_chat[chat_index].timer--;
+        if (state.ui_chat[chat_index].timer == 0) {
+            state.ui_chat.erase(state.ui_chat.begin() + chat_index);
+            chat_index--;
+        }
     }
 }
 
@@ -598,6 +672,52 @@ void match_render(const match_state_t& state) {
         select_rect.y -= state.camera_offset.y;
         SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
         SDL_RenderDrawRect(engine.renderer, &select_rect);
+    }
+
+    // UI Chat
+    for (uint32_t chat_index = 0; chat_index < state.ui_chat.size(); chat_index++) {
+        log_trace("Rendering chat message: %s", state.ui_chat[chat_index].message.c_str());
+        render_text(FONT_HACK, state.ui_chat[chat_index].message.c_str(), COLOR_WHITE, xy(16, MINIMAP_RECT.y - 40 - (chat_index * 16)));
+    }
+
+    // UI Status message
+    if (state.ui_status_timer != 0) {
+        render_text(FONT_HACK, state.ui_status_message.c_str(), COLOR_WHITE, xy(RENDER_SPRITE_CENTERED, SCREEN_HEIGHT - 148));
+    }
+
+    // UI Disconnect frame
+    if (state.ui_disconnect_timer > MATCH_DISCONNECT_GRACE) {
+        render_ninepatch(SPRITE_UI_FRAME, UI_DISCONNECT_FRAME_RECT, 16);
+        render_text(FONT_WESTERN8, "Waiting for players...", COLOR_GOLD, xy(UI_DISCONNECT_FRAME_RECT.x + 16, UI_DISCONNECT_FRAME_RECT.y + 8));
+        int player_text_y = 32;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status == PLAYER_STATUS_NONE || !(state.inputs[player_id].empty() || state.inputs[player_id][0].empty())) {
+                continue;
+            }
+
+            render_text(FONT_WESTERN8, network_get_player(player_id).name, COLOR_GOLD, xy(UI_DISCONNECT_FRAME_RECT.x + 24, UI_DISCONNECT_FRAME_RECT.y + player_text_y));
+            player_text_y += 24;
+        }
+    }
+
+    // UI Match over
+    if (state.ui_mode == UI_MODE_MATCH_OVER_VICTORY || state.ui_mode == UI_MODE_MATCH_OVER_DEFEAT) {
+        render_ninepatch(SPRITE_UI_FRAME, UI_MATCH_OVER_FRAME_RECT, 16);
+        render_text(FONT_WESTERN8, state.ui_mode == UI_MODE_MATCH_OVER_VICTORY ? "Victory!" : "Defeat!", COLOR_GOLD, xy(RENDER_TEXT_CENTERED, UI_MATCH_OVER_FRAME_RECT.y + 10));
+        bool exit_button_hovered = sdl_rect_has_point(UI_MATCH_OVER_EXIT_BUTTON_RECT, engine.mouse_position);
+        render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(2, exit_button_hovered ? 1 : 0), xy(UI_MATCH_OVER_EXIT_BUTTON_RECT.x, UI_MATCH_OVER_EXIT_BUTTON_RECT.y + (exit_button_hovered ? -1 : 0)), RENDER_SPRITE_NO_CULL);
+    }
+
+    // Menu button
+    render_sprite(SPRITE_UI_MENU_BUTTON, xy(sdl_rect_has_point(UI_MENU_BUTTON_RECT, engine.mouse_position) || state.ui_mode == UI_MODE_MENU ? 1 : 0, 0), xy(UI_MENU_BUTTON_RECT.x, UI_MENU_BUTTON_RECT.y), RENDER_SPRITE_NO_CULL);
+    if (state.ui_mode == UI_MODE_MENU) {
+        /*
+        render_ninepatch(SPRITE_UI_FRAME, UI_MENU_RECT, 16);
+        render_text(FONT_WESTERN8, "Game Menu", COLOR_GOLD, xy(RENDER_TEXT_CENTERED, UI_MENU_RECT.position.y + 10));
+        for (int i = UI_MENU_BUTTON_NONE + 1; i < UI_MENU_BUTTON_COUNT; i++) {
+            render_sprite(SPRITE_UI_MENU_PARCHMENT_BUTTONS, xy(i - (UI_MENU_BUTTON_NONE + 1), ui_menu_get_parchment_button_hovered() == i ? 1 : 0), ui_menu_get_parchment_button_rect((UiMenuButton)i).position, RENDER_SPRITE_NO_CULL);
+        }
+        */
     }
 
     // UI frames

@@ -1021,3 +1021,74 @@ void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t 
     }
     SDL_RenderCopyEx(engine.renderer, texture, &src_rect, &dst_rect, 0.0, NULL, flip_h ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 }
+
+void render_ninepatch(Sprite sprite, const SDL_Rect& rect, int patch_margin) {
+    GOLD_ASSERT(rect.w > patch_margin * 2 && rect.h > patch_margin * 2);
+
+    SDL_Rect src_rect = (SDL_Rect) {
+        .x = 0,
+        .y = 0,
+        .w = patch_margin,
+        .h = patch_margin
+    };
+    SDL_Rect dst_rect = (SDL_Rect) {
+        .x = rect.x, 
+        .y = rect.y,
+        .w = patch_margin,
+        .h = patch_margin
+    };
+
+    // Top left
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+
+    // Top right
+    src_rect.x = patch_margin * 2;
+    dst_rect.x = rect.x + rect.w - patch_margin;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+
+    // Bottom right
+    src_rect.y = patch_margin * 2;
+    dst_rect.y = rect.y + rect.h - patch_margin;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+    
+    // Bottom left
+    src_rect.x = 0;
+    dst_rect.x = rect.x;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+
+    // Top edge
+    src_rect.x = patch_margin;
+    src_rect.y = 0;
+    dst_rect.x = rect.x + patch_margin;
+    dst_rect.y = rect.y;
+    dst_rect.w = rect.w - (patch_margin * 2);
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+
+    // Bottom edge
+    src_rect.y = patch_margin * 2;
+    dst_rect.y = rect.y + rect.h - patch_margin;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+
+    // Left edge
+    src_rect.x = 0;
+    src_rect.y = patch_margin;
+    dst_rect.x = rect.x;
+    dst_rect.y = rect.y + patch_margin;
+    dst_rect.w = patch_margin;
+    dst_rect.h = rect.h - (patch_margin * 2);
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+
+    // Right edge
+    src_rect.x = patch_margin * 2;
+    dst_rect.x = rect.x + rect.w - patch_margin;
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+
+    // Center
+    src_rect.x = patch_margin;
+    src_rect.y = patch_margin;
+    dst_rect.x = rect.x + patch_margin;
+    dst_rect.y = rect.y + patch_margin;
+    dst_rect.w = rect.w - (patch_margin * 2);
+    dst_rect.h = rect.h - (patch_margin * 2);
+    SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+}

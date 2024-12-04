@@ -120,6 +120,10 @@ int gold_main(int argc, char** argv) {
                         break;
                     case GAME_MODE_MATCH:
                         match_handle_input(match_state, event);
+                        if (match_state.ui_mode == UI_MODE_LEAVE_MATCH) {
+                            menu_state = menu_init();
+                            game_mode = GAME_MODE_MENU;
+                        }
                         break;
                 }
             } // End while PollEvent

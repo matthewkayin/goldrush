@@ -7,6 +7,7 @@
 #include "animation.h"
 #include <SDL2/SDL.h>
 #include <queue>
+#include <string>
 
 #define UI_HEIGHT 88
 #define PLAYER_NONE UINT8_MAX
@@ -31,13 +32,10 @@ enum UiMode {
     UI_MODE_TARGET_UNLOAD,
     UI_MODE_TARGET_REPAIR,
     UI_MODE_CHAT,
-    UI_MODE_WAITING_FOR_PLAYERS,
     UI_MODE_MENU,
     UI_MODE_MENU_SURRENDER,
-    UI_MODE_MATCH_OVER_PLAYERS_DISCONNECTED,
-    UI_MODE_MATCH_OVER_SERVER_DISCONNECTED,
-    UI_MODE_MATCH_OVER_PLAYER_WINS,
-    UI_MODE_MATCH_OVER_PLAYER_LOST,
+    UI_MODE_MATCH_OVER_VICTORY,
+    UI_MODE_MATCH_OVER_DEFEAT,
     UI_MODE_LEAVE_MATCH
 };
 
@@ -48,6 +46,11 @@ enum SelectionType {
     SELECTION_TYPE_ENEMY_UNIT,
     SELECTION_TYPE_ENEMY_BUILDING,
     SELECTION_TYPE_GOLD_MINE
+};
+
+struct chat_message_t {
+    std::string message;
+    uint32_t timer;
 };
 
 // Map
@@ -213,7 +216,7 @@ struct input_t {
 struct match_state_t {
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
     std::vector<input_t> input_queue;
-    uint32_t tick_timer;
+    uint32_t turn_timer;
 
     // UI
     UiMode ui_mode;
@@ -224,6 +227,10 @@ struct match_state_t {
     animation_t ui_move_animation;
     xy ui_move_position;
     entity_id ui_move_entity_id;
+    std::string ui_status_message;
+    uint32_t ui_status_timer;
+    std::vector<chat_message_t> ui_chat;
+    uint32_t ui_disconnect_timer;
 
     // Map
     uint32_t map_width;
@@ -255,6 +262,7 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
 void ui_set_selection(match_state_t& state, const std::vector<entity_id>& selection);
 SelectionType ui_get_selection_type(const match_state_t& state);
 bool ui_is_targeting(const match_state_t& state);
+void ui_add_chat_message(match_state_t& state, std::string message);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
