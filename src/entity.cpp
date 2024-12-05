@@ -97,14 +97,14 @@ Sprite entity_get_sprite(const entity_t entity) {
     return SPRITE_UNIT_MINER;
 }
 
-Sprite entity_get_select_ring(const entity_t entity) {
+Sprite entity_get_select_ring(const entity_t entity, bool is_ally) {
     Sprite select_ring; 
     if (entity_is_unit(entity.type)) {
         select_ring = (Sprite)(SPRITE_SELECT_RING_UNIT_1 + ((entity_cell_size(entity.type) - 1) * 2));
     } else {
         select_ring = (Sprite)(SPRITE_SELECT_RING_BUILDING_2 + ((entity_cell_size(entity.type) - 2) * 2));
     }
-    if (entity.player_id != PLAYER_NONE && entity.player_id != network_get_player_id()) {
+    if (!is_ally) {
         select_ring = (Sprite)(select_ring + 1);
     }
     return select_ring;
@@ -154,7 +154,7 @@ void entity_set_flag(entity_t& entity, uint32_t flag, bool value) {
 }
 
 bool entity_is_target_invalid(const match_state_t& state, const entity_t& entity) {
-    if (!(entity.target.type == TARGET_ENTITY || entity.target.type == TARGET_REPAIR || entity.target.type == TARGET_BUILD_ASSIST)) {
+    if (!(entity.target.type == TARGET_ENTITY || entity.target.type == TARGET_ATTACK_ENTITY || entity.target.type == TARGET_REPAIR || entity.target.type == TARGET_BUILD_ASSIST)) {
         return false;
     }
 
@@ -169,7 +169,7 @@ bool entity_has_reached_target(const match_state_t& state, const entity_t& entit
         case TARGET_NONE:
             return true;
         case TARGET_CELL:
-        case TARGET_ATTACK_MOVE:
+        case TARGET_ATTACK_CELL:
             return entity.cell == entity.target.cell;
         case TARGET_BUILD:
             return entity.cell == entity.target.build.unit_cell;
@@ -188,6 +188,7 @@ bool entity_has_reached_target(const match_state_t& state, const entity_t& entit
         case TARGET_UNLOAD:
             return entity.path.empty() && xy::manhattan_distance(entity.cell, entity.target.cell) < 3;
         case TARGET_ENTITY:
+        case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {
             SDL_Rect entity_rect = (SDL_Rect) {
                 .x = entity.cell.x, .y = entity.cell.y,
@@ -201,7 +202,7 @@ bool entity_has_reached_target(const match_state_t& state, const entity_t& entit
 
             int entity_range_squared = ENTITY_DATA.at(entity.type).unit_data.range_squared;
             // TODO mines
-            return entity.player_id == target.player_id || entity_range_squared == 1
+            return entity.target.type != TARGET_ATTACK_ENTITY || entity_range_squared == 1
                         ? sdl_rects_are_adjacent(entity_rect, target_rect)
                         : euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
         }
@@ -218,10 +219,11 @@ xy entity_get_target_cell(const match_state_t& state, const entity_t& entity) {
             // TODO
             return entity.cell;
         case TARGET_CELL:
-        case TARGET_ATTACK_MOVE:
+        case TARGET_ATTACK_CELL:
         case TARGET_UNLOAD:
             return entity.target.cell;
         case TARGET_ENTITY:
+        case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR:
             return state.entities.get_by_id(entity.target.id).cell;
     }
@@ -299,6 +301,21 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
     entity_id id = state.entities.get_id_of(entity_index);
     entity_t& entity = state.entities[entity_index];
     const entity_data_t& entity_data = ENTITY_DATA.at(entity.type);
+
+                                                                                                         // Don't play death animation for ferried units
+    if (entity.health == 0 && !(entity.mode == MODE_UNIT_DEATH || entity.mode == MODE_UNIT_DEATH_FADE || entity_check_flag(entity, ENTITY_FLAG_IS_GARRISONED))) {
+        entity.mode = MODE_UNIT_DEATH;
+        entity.animation = animation_create(entity_get_expected_animation(entity));
+        ui_deselect_entity_if_selected(state, id);
+
+        // TODO
+        /*
+        for (entity_id garrisoned_unit_id : entity.garrisoned_units) {
+
+        }
+        */
+        return;
+    }
 
     bool update_finished = false;
     fixed movement_left = entity_is_unit(entity.type) ? entity_data.unit_data.speed : fixed::from_raw(0);
@@ -384,7 +401,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         movement_left -= entity.position.distance_to(entity_get_target_position(entity));
                         entity.position = entity_get_target_position(entity);
                         // On step finished
-                        if (entity.target.type == TARGET_ATTACK_MOVE) {
+                        if (entity.target.type == TARGET_ATTACK_CELL) {
                             // check for nearby target
                         }
                         if (entity_has_reached_target(state, entity)) {
@@ -412,7 +429,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             case MODE_UNIT_MOVE_FINISHED: {
                 switch (entity.target.type) {
                     case TARGET_NONE:
-                    case TARGET_ATTACK_MOVE:
+                    case TARGET_ATTACK_CELL:
                     case TARGET_CELL: {
                         entity.target = (target_t) {
                             .type = TARGET_NONE
@@ -430,7 +447,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         break;
                     }
                     case TARGET_REPAIR:
-                    case TARGET_ENTITY: {
+                    case TARGET_ENTITY: 
+                    case TARGET_ATTACK_ENTITY: {
                         if (entity_is_target_invalid(state, entity)) {
                             entity.target = (target_t) {
                                 .type = TARGET_NONE
@@ -446,6 +464,18 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         entity_t& target = state.entities.get_by_id(entity.target.id);
+
+                        if (entity.target.type == TARGET_ATTACK_ENTITY && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
+                            SDL_Rect target_rect = (SDL_Rect) {
+                                .x = target.cell.x, .y = target.cell.y,
+                                .w = entity_cell_size(target.type), .h = entity_cell_size(target.type)
+                            };
+                            entity.direction = enum_direction_to_rect(entity.cell, target_rect);
+                            entity.mode = MODE_UNIT_ATTACK_WINDUP;
+                            update_finished = true;
+                            break;
+                        }
+
                         // TODO garrison
                         // TODO repair
 
@@ -458,16 +488,68 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             update_finished = true;
                             break;
                         }
-                        
-                        // TODO attack
 
                         break;
                     }
                 }
                 update_finished = !(entity.mode == MODE_UNIT_MOVE && movement_left.raw_value > 0);
                 break;
+            } // End mode move finished
+            case MODE_UNIT_ATTACK_WINDUP: {
+                if (entity_is_target_invalid(state, entity)) {
+                    // TOOD target = nearest insight enemy
+                    entity.target = (target_t) {
+                        .type = TARGET_NONE
+                    };
+                    entity.mode = MODE_UNIT_IDLE;
+                    break;
+                }
+
+                if (!animation_is_playing(entity.animation)) {
+                    entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
+                    entity.timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
+                    entity.mode = MODE_UNIT_ATTACK_COOLDOWN;
+                }
+
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_ATTACK_COOLDOWN: {
+                if (entity_is_target_invalid(state, entity)) {
+                    // TODO target = nearest insight enemy
+                    entity.timer = 0;
+                    entity.target = (target_t) {
+                        .type = TARGET_NONE
+                    };
+                    entity.mode = MODE_UNIT_IDLE;
+                    break;
+                }
+
+                if (!entity_has_reached_target(state, entity)) {
+                    // Repath to target
+                    entity.timer = 0;
+                    entity.mode = MODE_UNIT_IDLE;
+                    break;
+                }
+
+                entity.timer--;
+                if (entity.timer == 0) {
+                    entity.mode = MODE_UNIT_ATTACK_WINDUP;
+                }
+
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_DEATH: {
+                if (!animation_is_playing(entity.animation)) {
+                    map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
+                    entity.mode = MODE_UNIT_DEATH_FADE;
+                }
+                update_finished = true;
+                break;
             }
             default:
+                update_finished = true;
                 break;
         }
     } // End while !update_finished
@@ -480,4 +562,29 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         }
         animation_update(entity.animation);
     }
+}
+
+void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender) {
+    entity_t& attacker = state.entities.get_by_id(attacker_id);
+    bool attack_missed = false; // TODO
+
+    int attacker_damage = ENTITY_DATA.at(attacker.type).unit_data.damage;
+    int defender_armor = ENTITY_DATA.at(defender.type).armor;
+    int damage = std::max(1, attacker_damage - defender_armor);
+
+    defender.health = std::max(0, defender.health - damage);
+
+    // Make the enemy attack back
+    // TODO && defender can see attacker
+    if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE && 
+        defender.target.type == TARGET_NONE && ENTITY_DATA.at(defender.type).unit_data.damage != 0 && 
+        defender.player_id != attacker.player_id) {
+            defender.target = (target_t) {
+                .type = TARGET_ATTACK_ENTITY,
+                .id = attacker_id
+            };
+    }
+
+    // TODO attack alerts
+    // TOOD create particle effects for cowboys
 }

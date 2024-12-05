@@ -15,6 +15,12 @@ const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
         .frame_duration = 8,
         .loops = 2
     }},
+    { ANIMATION_UI_MOVE_ATTACK_ENTITY, (animation_data_t) {
+        .vframe = 0,
+        .hframe_start = 0, .hframe_end = 1,
+        .frame_duration = 8,
+        .loops = 2
+    }},
     { ANIMATION_UNIT_IDLE, (animation_data_t) {
         .vframe = -1,
         .hframe_start = 0, .hframe_end = 0,

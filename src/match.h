@@ -117,7 +117,8 @@ enum TargetType {
     // Make sure that move targets stay in the same order as their inputs
     TARGET_CELL, 
     TARGET_ENTITY,
-    TARGET_ATTACK_MOVE,
+    TARGET_ATTACK_CELL,
+    TARGET_ATTACK_ENTITY,
     TARGET_REPAIR,
     TARGET_UNLOAD,
     TARGET_BUILD,
@@ -203,7 +204,8 @@ enum InputType: uint8_t {
     // Make sure that move inputs stay in the same order as their targets
     INPUT_MOVE_CELL,
     INPUT_MOVE_ENTITY,
-    INPUT_MOVE_ATTACK,
+    INPUT_MOVE_ATTACK_CELL,
+    INPUT_MOVE_ATTACK_ENTITY,
     INPUT_MOVE_REPAIR,
     INPUT_MOVE_UNLOAD,
     INPUT_STOP,
@@ -221,7 +223,12 @@ enum InputType: uint8_t {
 struct input_move_t {
     xy target_cell;
     entity_id target_id;
-    uint16_t entity_count;
+    uint8_t entity_count;
+    entity_id entity_ids[SELECTION_LIMIT];
+};
+
+struct input_stop_t {
+    uint8_t entity_count;
     entity_id entity_ids[SELECTION_LIMIT];
 };
 
@@ -229,6 +236,8 @@ struct input_t {
     uint8_t type;
     union {
         input_move_t move;
+        input_stop_t stop;
+        input_stop_t defend;
     };
 };
 
@@ -286,6 +295,8 @@ bool ui_is_targeting(const match_state_t& state);
 void ui_add_chat_message(match_state_t& state, std::string message);
 int ui_get_ui_button_hovered(const match_state_t& state);
 bool ui_button_requirements_met(const match_state_t& state, UiButton button);
+void ui_handle_ui_button_press(match_state_t& state, UiButton button);
+void ui_deselect_entity_if_selected(match_state_t& state, entity_id id);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
@@ -305,7 +316,7 @@ int entity_cell_size(EntityType entity);
 SDL_Rect entity_get_rect(const entity_t& entity);
 xy entity_get_center_position(const entity_t& entity);
 Sprite entity_get_sprite(const entity_t entity);
-Sprite entity_get_select_ring(const entity_t entity);
+Sprite entity_get_select_ring(const entity_t entity, bool is_ally);
 uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity);
 bool entity_is_selectable(const entity_t& entity);
 bool entity_check_flag(const entity_t& entity, uint32_t flag);
@@ -320,3 +331,4 @@ bool entity_should_flip_h(const entity_t& entity);
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_update(match_state_t& state, uint32_t entity_index);
+void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);

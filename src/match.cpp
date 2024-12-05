@@ -32,6 +32,25 @@ static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
     .w = 150, .h = 100
 };
 
+static const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
+    { UI_BUTTON_STOP, SDLK_s },
+    { UI_BUTTON_ATTACK, SDLK_a },
+    { UI_BUTTON_DEFEND, SDLK_d },
+    { UI_BUTTON_BUILD, SDLK_b },
+    { UI_BUTTON_REPAIR, SDLK_r },
+    { UI_BUTTON_CANCEL, SDLK_ESCAPE },
+    { UI_BUTTON_UNLOAD, SDLK_x },
+    { UI_BUTTON_BUILD_HOUSE, SDLK_e },
+    { UI_BUTTON_BUILD_CAMP, SDLK_c },
+    { UI_BUTTON_BUILD_SALOON, SDLK_s },
+    { UI_BUTTON_BUILD_BUNKER, SDLK_b },
+    { UI_BUTTON_UNIT_MINER, SDLK_r },
+    { UI_BUTTON_UNIT_MINER, SDLK_e },
+    { UI_BUTTON_UNIT_COWBOY, SDLK_c },
+    { UI_BUTTON_UNIT_WAGON, SDLK_w },
+    { UI_BUTTON_UNIT_BANDIT, SDLK_b }
+};
+
 match_state_t match_init() {
     match_state_t state;
 
@@ -102,12 +121,30 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     // UI button press
     if (state.ui_button_pressed == -1 && event.type == SDL_MOUSEBUTTONDOWN && ui_get_ui_button_hovered(state) != -1) {
         state.ui_button_pressed = ui_get_ui_button_hovered(state);
+        return;
+    }
+    // UI button hotkey press
+    if (state.ui_button_pressed == -1 && event.type == SDL_KEYDOWN) {
+        for (int button_index = 0; button_index < UI_BUTTONSET_SIZE; button_index++) {
+            UiButton button = UI_BUTTONS.at(state.ui_buttonset)[button_index];
+            if (button == UI_BUTTON_NONE) {
+                continue;
+            }
+            if (hotkeys.at(button) == event.key.keysym.sym) {
+                state.ui_button_pressed = button_index;
+                return;
+            }
+        }
     }
 
     // UI button release
-    if (state.ui_button_pressed != -1 && event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
-        // TODO handle button press
+    if (state.ui_button_pressed != -1 && 
+        ((event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) || 
+         (event.type == SDL_KEYUP && event.key.keysym.sym == hotkeys.at(UI_BUTTONS.at(state.ui_buttonset)[state.ui_button_pressed])))) {
+        UiButton button_pressed = UI_BUTTONS.at(state.ui_buttonset)[state.ui_button_pressed];
         state.ui_button_pressed = -1;
+        ui_handle_ui_button_press(state, button_pressed);
+        return;
     }
 
     // Order movement
@@ -118,12 +155,12 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         state.input_queue.push_back(move_input);
 
         // Provide instant user feedback
-        if (move_input.type == INPUT_MOVE_CELL) {
+        if (move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_UNLOAD) {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
             state.ui_move_position = match_get_mouse_world_pos(state);
             state.ui_move_entity_id = ID_NULL;
         } else {
-            state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
+            state.ui_move_animation = animation_create(move_input.type == INPUT_MOVE_ATTACK_ENTITY ? ANIMATION_UI_MOVE_ATTACK_ENTITY : ANIMATION_UI_MOVE_ENTITY);
             state.ui_move_position = cell_center(move_input.move.target_cell).to_xy();
             state.ui_move_entity_id = move_input.move.target_id;
         }
@@ -305,6 +342,20 @@ void match_update(match_state_t& state) {
         entity_update(state, entity_index);
     }
 
+    // Remove any dead entities
+    {
+        uint32_t entity_index = 0;
+        while (entity_index < state.entities.size()) {
+            if ((state.entities[entity_index].mode == MODE_UNIT_DEATH_FADE && !animation_is_playing(state.entities[entity_index].animation)) || 
+                    (entity_check_flag(state.entities[entity_index], ENTITY_FLAG_IS_GARRISONED) && state.entities[entity_index].health == 0)) {
+                state.entities.remove_at(entity_index);
+                // state.is_fog_dirty = true;
+            } else {
+                entity_index++;
+            }
+        }
+    }
+
     if (state.ui_status_timer > 0) {
         state.ui_status_timer--;
     }
@@ -350,6 +401,10 @@ input_t match_create_move_input(const match_state_t& state) {
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        // TODO if they can't see this boi, then don't target him
+        if (!entity_is_selectable(state.entities[entity_index])) {
+            continue;
+        }
         SDL_Rect entity_rect = entity_get_rect(state.entities[entity_index]);
         if (sdl_rect_has_point(entity_rect, move_target)) {
             input.move.target_id = state.entities.get_id_of(entity_index);
@@ -358,15 +413,17 @@ input_t match_create_move_input(const match_state_t& state) {
     }
 
     if (state.ui_mode == UI_MODE_TARGET_UNLOAD) {
-
+        input.type = INPUT_MOVE_UNLOAD;
     } else if (state.ui_mode == UI_MODE_TARGET_REPAIR) {
-
+        input.type = INPUT_MOVE_REPAIR;
+    } else if (input.move.target_id != ID_NULL && 
+               (state.ui_mode == UI_MODE_TARGET_ATTACK || 
+               state.entities.get_by_id(input.move.target_id).player_id != network_get_player_id())) {
+        input.type = INPUT_MOVE_ATTACK_ENTITY;
+    } else if (input.move.target_id == ID_NULL && state.ui_mode == UI_MODE_TARGET_ATTACK) {
+        input.type = INPUT_MOVE_ATTACK_CELL;
     } else if (input.move.target_id != ID_NULL) {
-        // INPUT_MOVE_ENTITY is given priority over attack move because attack move is treated as a cell move
-        // If they are A-moving and directly click their target, then it should be an entity move instead
         input.type = INPUT_MOVE_ENTITY;
-    } else if (state.ui_mode == UI_MODE_TARGET_ATTACK) {
-        input.type = INPUT_MOVE_ATTACK;
     } else {
         input.type = INPUT_MOVE_CELL;
     }
@@ -385,7 +442,8 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
     switch (input.type) {
         case INPUT_MOVE_CELL:
         case INPUT_MOVE_ENTITY:
-        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_ATTACK_CELL:
+        case INPUT_MOVE_ATTACK_ENTITY:
         case INPUT_MOVE_REPAIR:
         case INPUT_MOVE_UNLOAD: {
             memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
@@ -394,11 +452,20 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             memcpy(out_buffer + out_buffer_length, &input.move.target_id, sizeof(entity_id));
             out_buffer_length += sizeof(entity_id);
 
-            memcpy(out_buffer + out_buffer_length, &input.move.entity_count, sizeof(uint16_t));
-            out_buffer_length += sizeof(uint16_t);
+            memcpy(out_buffer + out_buffer_length, &input.move.entity_count, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
 
             memcpy(out_buffer + out_buffer_length, &input.move.entity_ids, input.move.entity_count * sizeof(entity_id));
             out_buffer_length += input.move.entity_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_STOP:
+        case INPUT_DEFEND: {
+            memcpy(out_buffer + out_buffer_length, &input.stop.entity_count, sizeof(uint8_t));
+            out_buffer += sizeof(uint8_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.stop.entity_ids, input.stop.entity_count * sizeof(entity_id));
+            out_buffer += input.stop.entity_count * sizeof(entity_id);
             break;
         }
         default:
@@ -414,7 +481,8 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
     switch (input.type) {
         case INPUT_MOVE_CELL:
         case INPUT_MOVE_ENTITY:
-        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_ATTACK_CELL:
+        case INPUT_MOVE_ATTACK_ENTITY:
         case INPUT_MOVE_REPAIR:
         case INPUT_MOVE_UNLOAD: {
             memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
@@ -423,11 +491,20 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             memcpy(&input.move.target_id, in_buffer + in_buffer_head, sizeof(entity_id));
             in_buffer_head += sizeof(entity_id);
 
-            memcpy(&input.move.entity_count, in_buffer + in_buffer_head, sizeof(uint16_t));
-            in_buffer_head += sizeof(uint16_t);
+            memcpy(&input.move.entity_count, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
 
             memcpy(&input.move.entity_ids, in_buffer + in_buffer_head, input.move.entity_count * sizeof(entity_id));
             in_buffer_head += input.move.entity_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_STOP:
+        case INPUT_DEFEND: {
+            memcpy(&input.stop.entity_count, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
+            memcpy(&input.stop.entity_ids, in_buffer + in_buffer_head, input.stop.entity_count * sizeof(entity_id));
+            in_buffer_head += input.stop.entity_count * sizeof(entity_id);
             break;
         }
         default:
@@ -441,12 +518,13 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
     switch (input.type) {
         case INPUT_MOVE_CELL:
         case INPUT_MOVE_ENTITY:
-        case INPUT_MOVE_ATTACK:
+        case INPUT_MOVE_ATTACK_CELL:
+        case INPUT_MOVE_ATTACK_ENTITY:
         case INPUT_MOVE_REPAIR:
         case INPUT_MOVE_UNLOAD: {
             // Determine the target index
             uint32_t target_index = INDEX_INVALID;
-            if (input.type == INPUT_MOVE_ENTITY || input.type == INPUT_MOVE_REPAIR) {
+            if (input.type == INPUT_MOVE_ENTITY || input.type == INPUT_MOVE_ATTACK_ENTITY || input.type == INPUT_MOVE_REPAIR) {
                 target_index = state.entities.get_index_of(input.move.target_id);
                 if (target_index != INDEX_INVALID && !entity_is_selectable(state.entities[target_index])) {
                     target_index = INDEX_INVALID;
@@ -524,6 +602,24 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             } // End for each unit in move input
             break;
         } // End handle INPUT_MOVE
+        case INPUT_STOP:
+        case INPUT_DEFEND: {
+            for (uint8_t id_index = 0; id_index < input.stop.entity_count; id_index++) {
+                uint32_t entity_index = state.entities.get_index_of(input.stop.entity_ids[id_index]);
+                if (entity_index == INDEX_INVALID || !entity_is_selectable(state.entities[entity_index])) {
+                    continue;
+                }
+                entity_t& entity = state.entities[entity_index];
+
+                entity.path.clear();
+                entity_set_target(entity, (target_t) {
+                    .type = TARGET_NONE
+                });
+                if (input.type == INPUT_DEFEND) {
+                    entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, true);
+                }
+            }
+        }
         default:
             break;
     }
@@ -581,6 +677,46 @@ void match_render(const match_state_t& state) {
         } // End for y of visible tiles
         // End render map
 
+        // Render entity corpses
+        for (entity_t entity : state.entities) {
+            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
+                continue;
+            }
+
+            if (entity_get_elevation(state, entity) != elevation) {
+                continue;
+            }
+
+            render_sprite_params_t render_params = (render_sprite_params_t) {
+                .sprite = entity_get_sprite(entity),
+                .frame = entity_get_animation_frame(entity),
+                .position = entity.position.to_xy() - state.camera_offset,
+                .options = RENDER_SPRITE_NO_CULL,
+                .recolor_id = entity.player_id
+            };
+            SDL_Rect render_rect = (SDL_Rect) {
+                .x = render_params.position.x,
+                .y = render_params.position.y,
+                .w = engine.sprites[render_params.sprite].frame_size.x,
+                .h = engine.sprites[render_params.sprite].frame_size.y
+            };
+            // Adjust the render rect for units because units are centered when rendering
+            if (entity_is_unit(entity.type)) {
+                render_rect.x -= render_rect.w / 2;
+                render_rect.y -= render_rect.h / 2;
+                render_params.options |= RENDER_SPRITE_CENTERED;
+            }
+            if (entity_should_flip_h(entity)) {
+                render_params.options |= RENDER_SPRITE_FLIP_H;
+            }
+
+            if (SDL_HasIntersection(&render_rect, &SCREEN_RECT) != SDL_TRUE) {
+                continue;
+            }
+
+            render_sprite(render_params.sprite, render_params.frame, render_params.position, render_params.options, render_params.recolor_id);
+        }
+
         // Select rings and healthbars
         static const int HEALTHBAR_HEIGHT = 4;
         static const int HEALTHBAR_PADDING = 3;
@@ -592,7 +728,7 @@ void match_render(const match_state_t& state) {
             }
 
             // Select ring
-            render_sprite(entity_get_select_ring(entity), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+            render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || entity.player_id == network_get_player_id()), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
             // TOOD ignore all this code if is gold mine
 
@@ -620,22 +756,11 @@ void match_render(const match_state_t& state) {
             }
         }
 
-        // UI move animation
-        if (animation_is_playing(state.ui_move_animation) && 
-            map_get_tile(state, state.ui_move_position / TILE_SIZE).elevation == elevation) {
-            if (state.ui_move_animation.name == ANIMATION_UI_MOVE_CELL) {
-                render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
-            } else if (state.ui_move_animation.frame.x % 2 == 0) {
-                uint32_t entity_index = state.entities.get_index_of(state.ui_move_entity_id);
-                if (entity_index != INDEX_INVALID) {
-                    const entity_t& entity = state.entities[entity_index];
-                    render_sprite(entity_get_select_ring(entity), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
-                }
-            }
-        }
-
         // Entities
         for (entity_t entity : state.entities) {
+            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+                continue;
+            }
             if (entity_get_elevation(state, entity) != elevation) {
                 continue;
             }
@@ -669,6 +794,21 @@ void match_render(const match_state_t& state) {
 
             ysorted_render_params.push_back(render_params);
         }
+
+        // UI move animation
+        if (animation_is_playing(state.ui_move_animation) && 
+            map_get_tile(state, state.ui_move_position / TILE_SIZE).elevation == elevation) {
+            if (state.ui_move_animation.name == ANIMATION_UI_MOVE_CELL) {
+                render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
+            } else if (state.ui_move_animation.frame.x % 2 == 0) {
+                uint32_t entity_index = state.entities.get_index_of(state.ui_move_entity_id);
+                if (entity_index != INDEX_INVALID) {
+                    const entity_t& entity = state.entities[entity_index];
+                    render_sprite(entity_get_select_ring(entity, state.ui_move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                }
+            }
+        }
+
 
         // End Ysort
         ysort_render_params(ysorted_render_params, 0, ysorted_render_params.size() - 1);

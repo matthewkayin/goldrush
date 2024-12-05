@@ -232,3 +232,61 @@ bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
     }
     */
 }
+
+void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
+    switch (button) {
+        case UI_BUTTON_ATTACK: {
+            state.ui_mode = UI_MODE_TARGET_ATTACK;
+            state.ui_buttonset = UI_BUTTONSET_CANCEL;
+            break;
+        }
+        case UI_BUTTON_REPAIR: {
+            state.ui_mode = UI_MODE_TARGET_REPAIR;
+            state.ui_buttonset = UI_BUTTONSET_CANCEL;
+            break;
+        }
+        case UI_BUTTON_UNLOAD: {
+            state.ui_mode = UI_MODE_TARGET_UNLOAD;
+            state.ui_buttonset = UI_BUTTONSET_CANCEL;
+            break;
+        }
+        case UI_BUTTON_STOP:
+        case UI_BUTTON_DEFEND: {
+            input_t input;
+            input.type = button == UI_BUTTON_STOP ? INPUT_STOP : INPUT_DEFEND;
+            input.stop.entity_count = (uint8_t)state.selection.size();
+            memcpy(&input.stop.entity_ids, &state.selection[0], input.stop.entity_count * sizeof(entity_id));
+            state.input_queue.push_back(input);
+            break;
+        }
+        case UI_BUTTON_BUILD: {
+            state.ui_buttonset = UI_BUTTONSET_BUILD;
+            break;
+        }
+        case UI_BUTTON_CANCEL: {
+            if (state.ui_buttonset == UI_BUTTONSET_BUILD) {
+                state.ui_buttonset = UI_BUTTONSET_MINER;
+            } else if (state.ui_mode == UI_MODE_TARGET_REPAIR || state.ui_mode == UI_MODE_TARGET_ATTACK || state.ui_mode == UI_MODE_TARGET_UNLOAD) {
+                state.ui_mode = UI_MODE_NONE;
+                ui_set_selection(state, state.selection);
+            } else if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
+                state.ui_mode = UI_MODE_NONE;
+                state.ui_buttonset = UI_BUTTONSET_BUILD;
+            }
+        }
+        default:
+            break;
+    }
+}
+
+void ui_deselect_entity_if_selected(match_state_t& state, entity_id id) {
+    for (uint32_t id_index = 0; id_index < state.selection.size(); id_index++) {
+        if (state.selection[id_index] == id) {
+            state.selection.erase(state.selection.begin() + id_index);
+            if (state.ui_mode == UI_MODE_NONE) {
+                ui_set_selection(state, state.selection);
+            }
+            return;
+        }
+    }
+}

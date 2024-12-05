@@ -264,6 +264,30 @@ inline Direction enum_from_xy_direction(xy xy_direction) {
     return DIRECTION_COUNT;
 }
 
+inline Direction enum_direction_to_rect(xy from, const SDL_Rect& rect) {
+    if (from.y < rect.y) {
+        if (from.x < rect.x) {
+            return DIRECTION_SOUTHEAST;
+        } else if (from.x >= rect.x + rect.w) {
+            return DIRECTION_SOUTHWEST;
+        } else {
+            return DIRECTION_SOUTH;
+        }
+    } else if (from.y >= rect.y + rect.h) {
+        if (from.x < rect.x) {
+            return DIRECTION_NORTHEAST;
+        } else if (from.x >= rect.x + rect.w) {
+            return DIRECTION_NORTHWEST;
+        } else {
+            return DIRECTION_NORTH;
+        }
+    } else if (from.x < rect.x) {
+        return DIRECTION_EAST;
+    } else {
+        return DIRECTION_WEST;
+    }
+}
+
 inline xy_fixed cell_center(xy cell) {
     return xy_fixed(
         fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)),
