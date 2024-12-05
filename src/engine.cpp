@@ -515,6 +515,23 @@ static const std::unordered_map<uint32_t, tile_data_t> TILE_DATA = {
     }},
 };
 
+struct cursor_params_t {
+    const char* path;
+    int hot_x;
+    int hot_y;
+};
+
+static const std::unordered_map<Cursor, cursor_params_t> CURSOR_PARAMS = {
+    { CURSOR_DEFAULT, (cursor_params_t) {
+        .path = "sprite/ui_cursor.png",
+        .hot_x = 0, .hot_y = 0
+    }},
+    { CURSOR_TARGET, (cursor_params_t) {
+        .path = "sprite/ui_cursor_target.png",
+        .hot_x = 9, .hot_y = 9
+    }},
+};
+
 engine_t engine;
 
 bool engine_init() {
@@ -824,6 +841,34 @@ bool engine_init_renderer() {
         SDL_FreeSurface(sprite_surface);
     } // End for each sprite
 
+    engine.cursors.reserve(CURSOR_COUNT);
+    for (uint32_t i = 0; i < CURSOR_COUNT; i++) {
+        auto it = CURSOR_PARAMS.find((Cursor)i);
+        if (it == CURSOR_PARAMS.end()) {
+            log_error("Cursor params not defined for cursor %u", i);
+            return false;
+        }
+
+        char cursor_path[128];
+        sprintf(cursor_path, "%s%s", GOLD_RESOURCE_PATH, it->second.path);
+        SDL_Surface* cursor_image = IMG_Load(cursor_path);
+        if (cursor_image == NULL) {
+            log_error("Unable to load cursor image at path %s: %s", it->second.path, IMG_GetError());
+            return false;
+        }
+
+        SDL_Cursor* cursor = SDL_CreateColorCursor(cursor_image, it->second.hot_x, it->second.hot_y);
+        if (cursor == NULL) {
+            log_error("Unable to create cursor %u: %s", i, SDL_GetError());
+            return false;
+        }
+
+        engine.cursors.push_back(cursor);
+        SDL_FreeSurface(cursor_image);
+    }
+    engine.current_cursor = CURSOR_DEFAULT;
+    SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
+
     log_info("Initialized renderer.");
     return true;
 }
@@ -848,6 +893,11 @@ void engine_destroy_renderer() {
     engine.sprites.clear();
     engine.tile_index.clear();
 
+    for (SDL_Cursor* cursor : engine.cursors) {
+        SDL_FreeCursor(cursor);
+    }
+    engine.cursors.clear();
+
     SDL_DestroyRenderer(engine.renderer);
     log_info("Destroyed renderer.");
 }
@@ -859,6 +909,14 @@ void engine_quit() {
     TTF_Quit();
     SDL_Quit();
     log_info("Quit engine.");
+}
+
+void engine_set_cursor(Cursor cursor) {
+    if (engine.current_cursor == cursor) {
+        return;
+    }
+    engine.current_cursor = cursor;
+    SDL_SetCursor(engine.cursors[cursor]);
 }
 
 // RENDER

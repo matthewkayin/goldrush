@@ -305,6 +305,8 @@ void match_update(match_state_t& state) {
             chat_index--;
         }
     }
+
+    engine_set_cursor(ui_is_targeting(state) ? CURSOR_TARGET : CURSOR_DEFAULT);
 }
 
 void match_camera_clamp(match_state_t& state) {

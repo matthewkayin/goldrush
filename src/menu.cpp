@@ -325,6 +325,8 @@ void menu_update(menu_state_t& state) {
             }
         }
     }
+
+    engine_set_cursor(CURSOR_DEFAULT);
 }
 
 void menu_show_status(menu_state_t& state, const char* text) {

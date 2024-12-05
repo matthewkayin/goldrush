@@ -172,6 +172,12 @@ const SDL_Rect SCREEN_RECT = (SDL_Rect) {
     .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT
 };
 
+enum Cursor {
+    CURSOR_DEFAULT,
+    CURSOR_TARGET,
+    CURSOR_COUNT
+};
+
 struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -179,8 +185,10 @@ struct engine_t {
     std::vector<TTF_Font*> fonts;
     std::vector<sprite_t> sprites;
     std::vector<uint16_t> tile_index;
+    std::vector<SDL_Cursor*> cursors;
 
     xy mouse_position;
+    Cursor current_cursor;
 };
 extern engine_t engine;
 
@@ -188,6 +196,8 @@ bool engine_init();
 bool engine_init_renderer();
 void engine_destroy_renderer();
 void engine_quit();
+
+void engine_set_cursor(Cursor cursor);
 
 enum TextAnchor {
     TEXT_ANCHOR_TOP_LEFT,
