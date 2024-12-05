@@ -37,6 +37,7 @@ match_state_t match_init() {
 
     state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
     state.ui_status_timer = 0;
+    state.ui_buttonset = UI_BUTTONSET_NONE;
 
     map_init(state, 64, 64);
 
@@ -98,6 +99,17 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         return;
     }
 
+    // UI button press
+    if (state.ui_button_pressed == -1 && event.type == SDL_MOUSEBUTTONDOWN && ui_get_ui_button_hovered(state) != -1) {
+        state.ui_button_pressed = ui_get_ui_button_hovered(state);
+    }
+
+    // UI button release
+    if (state.ui_button_pressed != -1 && event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
+        // TODO handle button press
+        state.ui_button_pressed = -1;
+    }
+
     // Order movement
     if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state) == SELECTION_TYPE_UNITS && 
             ((event.button.button == SDL_BUTTON_LEFT && ui_is_targeting(state)) ||
@@ -134,12 +146,10 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     } 
 
     // End selecting
-    if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
-        if (state.ui_mode == UI_MODE_SELECTING) {
-            state.ui_mode = UI_MODE_NONE;
-            std::vector<entity_id> selection = ui_create_selection_from_rect(state);
-            ui_set_selection(state, selection);
-        }
+    if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT && state.ui_mode == UI_MODE_SELECTING) {
+        state.ui_mode = UI_MODE_NONE;
+        std::vector<entity_id> selection = ui_create_selection_from_rect(state);
+        ui_set_selection(state, selection);
         return;
     }
 }
@@ -726,4 +736,24 @@ void match_render(const match_state_t& state) {
     render_sprite(SPRITE_UI_MINIMAP, xy(0, 0), xy(0, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_MINIMAP].frame_size.y));
     render_sprite(SPRITE_UI_FRAME_BOTTOM, xy(0, 0), UI_FRAME_BOTTOM_POSITION);
     render_sprite(SPRITE_UI_FRAME_BUTTONS, xy(0, 0), xy(engine.sprites[SPRITE_UI_MINIMAP].frame_size.x + engine.sprites[SPRITE_UI_FRAME_BOTTOM].frame_size.x, SCREEN_HEIGHT - engine.sprites[SPRITE_UI_FRAME_BUTTONS].frame_size.y));
+
+    // UI Buttons
+    for (int i = 0; i < UI_BUTTONSET_SIZE; i++) {
+        UiButton ui_button = UI_BUTTONS.at(state.ui_buttonset)[i];
+        if (ui_button == UI_BUTTON_NONE) {
+            continue;
+        }
+
+        bool is_button_hovered = ui_get_ui_button_hovered(state) == i && ui_button_requirements_met(state, ui_button);
+        bool is_button_pressed = state.ui_button_pressed == i;
+        xy offset = is_button_pressed ? xy(1, 1) : (is_button_hovered ? xy(0, -1) : xy(0, 0));
+        int button_state = 0;
+        if (!ui_button_requirements_met(state, ui_button)) {
+            button_state = 2;
+        } else if (is_button_hovered) {
+            button_state = 1;
+        }
+        render_sprite(SPRITE_UI_BUTTON, xy(button_state, 0), xy(UI_BUTTON_RECT[i].x, UI_BUTTON_RECT[i].y) + offset);
+        render_sprite(SPRITE_UI_BUTTON_ICON, xy(ui_button - 1, button_state), xy(UI_BUTTON_RECT[i].x, UI_BUTTON_RECT[i].y) + offset);
+    }
 }

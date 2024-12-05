@@ -7,10 +7,14 @@
 #include "animation.h"
 #include <SDL2/SDL.h>
 #include <queue>
+#include <vector>
 #include <string>
+#include <array>
+#include <unordered_map>
 
 #define UI_HEIGHT 88
 #define PLAYER_NONE UINT8_MAX
+#define UI_BUTTONSET_SIZE 6
 
 // UI
 
@@ -39,6 +43,18 @@ enum UiMode {
     UI_MODE_LEAVE_MATCH
 };
 
+enum UiButtonset {
+    UI_BUTTONSET_NONE,
+    UI_BUTTONSET_UNIT,
+    UI_BUTTONSET_MINER,
+    UI_BUTTONSET_BUILD,
+    UI_BUTTONSET_CANCEL,
+    UI_BUTTONSET_CAMP,
+    UI_BUTTONSET_SALOON,
+    UI_BUTTONSET_WAGON,
+    UI_BUTTONSET_BUNKER
+};
+
 enum SelectionType {
     SELECTION_TYPE_NONE,
     SELECTION_TYPE_UNITS,
@@ -52,6 +68,9 @@ struct chat_message_t {
     std::string message;
     uint32_t timer;
 };
+
+extern const std::unordered_map<UiButtonset, std::array<UiButton, UI_BUTTONSET_SIZE>> UI_BUTTONS;
+extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
 
 // Map
 
@@ -220,6 +239,8 @@ struct match_state_t {
 
     // UI
     UiMode ui_mode;
+    UiButtonset ui_buttonset;
+    int ui_button_pressed;
     xy camera_offset;
     xy select_rect_origin;
     SDL_Rect select_rect;
@@ -263,6 +284,8 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
 SelectionType ui_get_selection_type(const match_state_t& state);
 bool ui_is_targeting(const match_state_t& state);
 void ui_add_chat_message(match_state_t& state, std::string message);
+int ui_get_ui_button_hovered(const match_state_t& state);
+bool ui_button_requirements_met(const match_state_t& state, UiButton button);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
