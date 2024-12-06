@@ -10,6 +10,7 @@ std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
     { UNIT_MINER, (entity_data_t) {
         .name = "Miner",
         .sprite = SPRITE_UNIT_MINER,
+        .ui_button = UI_BUTTON_UNIT_MINER,
         .cell_size = 1,
 
         .gold_cost = 50,

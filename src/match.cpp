@@ -736,24 +736,8 @@ void match_render(const match_state_t& state) {
             SDL_Rect entity_rect = entity_get_rect(entity);
             entity_rect.x -= state.camera_offset.x;
             entity_rect.y -= state.camera_offset.y;
-            SDL_Rect healthbar_rect = (SDL_Rect) {
-                .x = entity_rect.x,
-                .y = entity_rect.y + entity_rect.h + (entity_is_unit(entity.type) ? HEALTHBAR_PADDING : BUILDING_HEALTHBAR_PADDING),
-                .w = entity_rect.w,
-                .h = HEALTHBAR_HEIGHT
-            };
-            SDL_Rect healthbar_subrect = healthbar_rect;
-            healthbar_subrect.w = (healthbar_rect.w * entity.health) / ENTITY_DATA.at(entity.type).max_health;
-
-            // Cull the healthbar
-            if (SDL_HasIntersection(&healthbar_rect, &SCREEN_RECT) == SDL_TRUE) {
-                // Render the healthbar
-                SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
-                SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
-                SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
-                SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
-                SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
-            }
+            xy healthbar_position = xy(entity_rect.x, entity_rect.y + entity_rect.h + (entity_is_unit(entity.type) ? HEALTHBAR_PADDING : BUILDING_HEALTHBAR_PADDING));
+            match_render_healthbar(healthbar_position, xy(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, ENTITY_DATA.at(entity.type).max_health);
         }
 
         // Entities
@@ -896,4 +880,101 @@ void match_render(const match_state_t& state) {
         render_sprite(SPRITE_UI_BUTTON, xy(button_state, 0), xy(UI_BUTTON_RECT[i].x, UI_BUTTON_RECT[i].y) + offset);
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(ui_button - 1, button_state), xy(UI_BUTTON_RECT[i].x, UI_BUTTON_RECT[i].y) + offset);
     }
+
+    // UI Selection list
+    const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
+    if (state.selection.size() == 1) {
+        const entity_t& entity = state.entities.get_by_id(state.selection[0]);
+        const entity_data_t& entity_data = ENTITY_DATA.at(entity.type);
+
+        match_render_text_with_text_frame(entity_data.name, SELECTION_LIST_TOP_LEFT);
+        render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
+        render_sprite(SPRITE_UI_BUTTON_ICON, xy(entity_data.ui_button - 1, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
+
+        // TODO don't render healthbar for gold mine
+        xy healthbar_position = SELECTION_LIST_TOP_LEFT + xy(0, 18 + 35);
+        xy healthbar_size = xy(64, 12);
+        match_render_healthbar(healthbar_position, healthbar_size, entity.health, entity_data.max_health);
+
+        char health_text[10];
+        sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
+        SDL_Surface* health_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_HACK], health_text, COLOR_WHITE);
+        GOLD_ASSERT(health_text_surface != NULL);
+        SDL_Texture* health_text_texture = SDL_CreateTextureFromSurface(engine.renderer, health_text_surface);
+        GOLD_ASSERT(health_text_texture != NULL);
+        SDL_Rect health_text_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = health_text_surface->w, .h = health_text_surface->h };
+        SDL_Rect health_text_dst_rect = (SDL_Rect) {
+            .x = healthbar_position.x + (healthbar_size.x / 2) - (health_text_surface->w / 2),
+            .y = healthbar_position.y + (healthbar_size.y / 2) - (health_text_surface->h / 2),
+            .w = health_text_src_rect.w,
+            .h = health_text_src_rect.h
+        };
+        SDL_RenderCopy(engine.renderer, health_text_texture, &health_text_src_rect, &health_text_dst_rect);
+        SDL_DestroyTexture(health_text_texture);
+        SDL_FreeSurface(health_text_surface);
+    } else {
+        for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+            const entity_t& entity = state.entities.get_by_id(state.selection[0]);
+            const entity_data_t& entity_data = ENTITY_DATA.at(entity.type);
+
+            xy icon_position = SELECTION_LIST_TOP_LEFT + xy(((selection_index % 10) * 34) - 12, (selection_index / 10) * 34);
+            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(entity_data.ui_button - 1, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            match_render_healthbar(icon_position + xy(1, 32 - 5), xy(32- 2, 4), entity.health, entity_data.max_health);
+        }
+    }
+}
+
+void match_render_healthbar(xy position, xy size, int health, int max_health) {
+    GOLD_ASSERT(max_health != 0);
+
+    SDL_Rect healthbar_rect = (SDL_Rect) { .x = position.x, .y = position.y, .w = size.x, .h = size.y };
+    if (SDL_HasIntersection(&healthbar_rect, &SCREEN_RECT) != SDL_TRUE) {
+        return;
+    }
+
+    SDL_Rect healthbar_subrect = healthbar_rect;
+    healthbar_subrect.w = (healthbar_rect.w * health) / max_health;
+    SDL_Color subrect_color = healthbar_subrect.w <= healthbar_rect.w / 3 ? COLOR_RED : COLOR_GREEN;
+
+    SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+    SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+    SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+}
+
+void match_render_text_with_text_frame(const char* text, xy position) {
+    SDL_Surface* text_surface = TTF_RenderText_Solid(engine.fonts[FONT_WESTERN8], text, COLOR_OFFBLACK);
+    if (text_surface == NULL) {
+        log_error("Unable to render text to surface: %s", TTF_GetError());
+        return;
+    }
+
+    int frame_width = (text_surface->w / 15) + 1;
+    if (text_surface->w % 15 != 0) {
+        frame_width++;
+    }
+    for (int frame_x = 0; frame_x < frame_width; frame_x++) {
+        int x_frame = 1;
+        if (frame_x == 0) {
+            x_frame = 0;
+        } else if (frame_x == frame_width - 1) {
+            x_frame = 2;
+        }
+        render_sprite(SPRITE_UI_TEXT_FRAME, xy(x_frame, 0), position + xy(frame_x * 15, 0), RENDER_SPRITE_NO_CULL);
+    }
+
+    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(engine.renderer, text_surface);
+    if (text_texture == NULL) {
+        log_error("Unable to creature texture from text surface: %s", SDL_GetError());
+        return;
+    }
+
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, . y = 0, .w = text_surface->w, .h = text_surface->h };
+    SDL_Rect dst_rect = (SDL_Rect) { .x = position.x + ((frame_width * 15) / 2) - (text_surface->w / 2), .y = position.y + 2, .w = src_rect.w, .h = src_rect.h };
+
+    SDL_RenderCopy(engine.renderer, text_texture, &src_rect, &dst_rect);
+
+    SDL_DestroyTexture(text_texture);
+    SDL_FreeSurface(text_surface);
 }

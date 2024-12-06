@@ -263,10 +263,12 @@ void menu_update(menu_state_t& state) {
                     menu_set_mode(state, MENU_MODE_MATCHLIST);
                     state.item_selected = -1;
                 }
+                break;
             }
             case NETWORK_EVENT_MATCH_LOAD: {
                 network_scanner_destroy();
                 menu_set_mode(state, MENU_MODE_LOAD_MATCH);
+                break;
             }
             default:
                 break;

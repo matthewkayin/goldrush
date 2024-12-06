@@ -178,6 +178,7 @@ struct building_data_t {
 struct entity_data_t {
     const char* name;
     Sprite sprite;
+    UiButton ui_button;
     int cell_size;
 
     uint32_t gold_cost;
@@ -279,6 +280,8 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
 input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input);
 void match_render(const match_state_t& state);
+void match_render_healthbar(xy position, xy size, int health, int max_health);
+void match_render_text_with_text_frame(const char* text, xy position);
 
 // Generic
 void match_camera_clamp(match_state_t& state);
