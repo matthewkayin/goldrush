@@ -1,6 +1,7 @@
 #include "match.h"
 
 #include "network.h"
+#include "logger.h"
 
 static const uint32_t UI_CHAT_MESSAGE_DURATION = 180;
 
@@ -73,8 +74,25 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
         return selection;
     }
 
-    // TODO 
     // Select player buildings
+    for (uint32_t index = 0; index < state.entities.size(); index++) {
+        const entity_t& entity = state.entities[index];
+        if (entity.player_id != network_get_player_id() || 
+            !entity_is_building(entity.type) || 
+            !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        log_trace("considering building");
+        SDL_Rect entity_rect = entity_get_rect(entity);
+        if (SDL_HasIntersection(&entity_rect, &state.select_rect) == SDL_TRUE) {
+            log_trace("adding building to selection");
+            selection.push_back(state.entities.get_id_of(index));
+        }
+    }
+    if (!selection.empty()) {
+        return selection;
+    }
 
     // Select enemy unit
     for (uint32_t index = 0; index < state.entities.size(); index++) {
@@ -92,8 +110,22 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
         }
     }
 
-    // TODO 
-    // Select enemy building
+    // Select enemy buildings
+    for (uint32_t index = 0; index < state.entities.size(); index++) {
+        const entity_t& entity = state.entities[index];
+        if (entity.player_id == network_get_player_id() || 
+            !entity_is_building(entity.type) || 
+            !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        SDL_Rect entity_rect = entity_get_rect(entity);
+        if (SDL_HasIntersection(&entity_rect, &state.select_rect) == SDL_TRUE) {
+            selection.push_back(state.entities.get_id_of(index));
+            return selection;
+        }
+    }
+
 
     // TODO
     // Select mines

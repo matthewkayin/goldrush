@@ -6,7 +6,7 @@
 
 const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 
-std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
+const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
     { UNIT_MINER, (entity_data_t) {
         .name = "Miner",
         .sprite = SPRITE_UNIT_MINER,
@@ -31,40 +31,73 @@ std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .attack_cooldown = 16,
             .range_squared = 1
         }
+    }},
+    { BUILDING_CAMP, (entity_data_t) {
+        .name = "Mining Camp",
+        .sprite = SPRITE_BUILDING_CAMP,
+        .ui_button = UI_BUTTON_BUILD_CAMP,
+        .cell_size = 2,
+
+        .gold_cost = 200,
+        .train_duration = 60,
+        .max_health = 200,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = 0,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 1, 15, 14 },
+            .builder_positions_y = { 13, 13, 2 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
     }}
 };
 
-entity_id entity_create_unit(match_state_t& state, EntityType type, uint8_t player_id, xy cell) {
-    entity_t unit;
-    unit.type = type;
-    unit.mode = MODE_UNIT_IDLE;
-    unit.player_id = player_id;
-    unit.flags = 0;
+entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id, xy cell) {
+    auto entity_data_it = ENTITY_DATA.find(type);
+    GOLD_ASSERT_MESSAGE(entity_data_it != ENTITY_DATA.end(), "Entity data not defined for this entity");
+    const entity_data_t& entity_data = entity_data_it->second;
 
-    unit.cell = cell;
-    unit.position = cell_center(unit.cell);
-    unit.direction = DIRECTION_SOUTH;
+    entity_t entity;
+    entity.type = type;
+    entity.mode = entity_is_unit(type) ? MODE_UNIT_IDLE : MODE_BUILDING_IN_PROGRESS;
+    entity.player_id = player_id;
+    entity.flags = 0;
 
-    unit.health = ENTITY_DATA.at(unit.type).max_health;
-    unit.target = (target_t) {
+    entity.cell = cell;
+    entity.position = entity_is_unit(type) 
+                        ? cell_center(entity.cell) 
+                        : xy_fixed(entity.cell * TILE_SIZE);
+    entity.direction = DIRECTION_SOUTH;
+
+    entity.health = entity_data.max_health;
+    entity.target = (target_t) {
         .type = TARGET_NONE
     };
-    unit.timer = 0;
+    entity.timer = 0;
 
-    unit.animation = animation_create(ANIMATION_UNIT_IDLE);
+    entity.animation = animation_create(ANIMATION_UNIT_IDLE);
 
-    entity_id id = state.entities.push_back(unit);
-    map_set_cell_rect(state, unit.cell, entity_cell_size(unit.type), id);
+    entity_id id = state.entities.push_back(entity);
+    map_set_cell_rect(state, entity.cell, entity_cell_size(type), id);
 
     return id;
 }
 
-bool entity_is_unit(EntityType entity) {
-    return true;
+bool entity_is_unit(EntityType type) {
+    return type < BUILDING_CAMP;
 }
 
-int entity_cell_size(EntityType entity) {
-    return 1;
+bool entity_is_building(EntityType type) {
+    return type >= BUILDING_CAMP;
+}
+
+int entity_cell_size(EntityType type) {
+    return ENTITY_DATA.at(type).cell_size;
 }
 
 SDL_Rect entity_get_rect(const entity_t& entity) {
@@ -91,11 +124,7 @@ xy entity_get_center_position(const entity_t& entity) {
 }
 
 Sprite entity_get_sprite(const entity_t entity) {
-    if (entity_is_unit(entity.type)) {
-        return (Sprite)(SPRITE_UNIT_MINER + entity.type);
-    }
-    log_warn("Unhandled condition in entity_get_sprite()");
-    return SPRITE_UNIT_MINER;
+    return ENTITY_DATA.at(entity.type).sprite;
 }
 
 Sprite entity_get_select_ring(const entity_t entity, bool is_ally) {
@@ -274,8 +303,13 @@ xy entity_get_animation_frame(const entity_t& entity) {
         }
 
         return frame;
+    } else if (entity_is_building(entity.type)) {
+        int hframe = entity.mode == MODE_BUILDING_IN_PROGRESS
+                    ? ((3 * entity.health) / ENTITY_DATA.at(entity.type).max_health)
+                    : 3;
+        return xy(hframe, 0);
     } else {
-        // TODO
+        // TODO mines
         return xy(0, 0);
     }
 }

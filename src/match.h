@@ -84,8 +84,10 @@ struct tile_t {
 const entity_id CELL_EMPTY = ID_NULL;
 const entity_id CELL_BLOCKED = ID_MAX + 2;
 
+// If you change this, make sure that entity_is_unit() and entity_is_building() still work
 enum EntityType {
-    UNIT_MINER
+    UNIT_MINER,
+    BUILDING_CAMP
 };
 
 enum EntityMode {
@@ -196,7 +198,7 @@ struct entity_data_t {
         building_data_t building_data;
     };
 };
-extern std::unordered_map<EntityType, entity_data_t> ENTITY_DATA;
+extern const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA;
 
 // Input
 
@@ -312,9 +314,10 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_siz
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool ignore_miners);
 
 // Entities
-entity_id entity_create_unit(match_state_t& state, EntityType type, uint8_t player_id, xy cell);
+entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id, xy cell);
 
 bool entity_is_unit(EntityType entity);
+bool entity_is_building(EntityType type);
 int entity_cell_size(EntityType entity);
 SDL_Rect entity_get_rect(const entity_t& entity);
 xy entity_get_center_position(const entity_t& entity);

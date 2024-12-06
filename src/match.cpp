@@ -50,6 +50,7 @@ static const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_WAGON, SDLK_w },
     { UI_BUTTON_UNIT_BANDIT, SDLK_b }
 };
+static std::unordered_map<UiButton, EntityType> UI_BUTTON_TO_ENTITY_TYPE;
 
 match_state_t match_init() {
     match_state_t state;
@@ -57,6 +58,11 @@ match_state_t match_init() {
     state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
     state.ui_status_timer = 0;
     state.ui_buttonset = UI_BUTTONSET_NONE;
+    if (UI_BUTTON_TO_ENTITY_TYPE.empty()) {
+        for (auto it : ENTITY_DATA) {
+            UI_BUTTON_TO_ENTITY_TYPE[it.second.ui_button] = it.first;
+        }
+    }
 
     map_init(state, 64, 64);
 
@@ -80,12 +86,12 @@ match_state_t match_init() {
         if (player_id == network_get_player_id()) {
             match_camera_center_on_cell(state, player_spawn);
         }
-        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(-1, -1));
-        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(1, -1));
-        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(-2, 0));
-        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(2, 0));
-        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(-1, 1));
-        entity_create_unit(state, UNIT_MINER, player_id, player_spawn + xy(1, 1));
+        entity_id camp_id = entity_create(state, BUILDING_CAMP, player_id, player_spawn);
+        entity_t& camp = state.entities.get_by_id(camp_id);
+        camp.health = ENTITY_DATA.at(camp.type).max_health;
+        camp.mode = MODE_BUILDING_FINISHED;
+        entity_create(state, UNIT_MINER, player_id, player_spawn + xy(-1, 0));
+        entity_create(state, UNIT_MINER, player_id, player_spawn + xy(-1, 1));
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
