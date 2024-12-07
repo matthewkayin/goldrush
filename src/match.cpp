@@ -96,6 +96,9 @@ match_state_t match_init() {
         entity_create(state, UNIT_MINER, player_id, player_spawn + xy(-1, 0));
         entity_create(state, UNIT_MINER, player_id, player_spawn + xy(-1, 1));
     }
+    for (uint32_t eindex = 0; eindex < state.entities.size(); eindex++) {
+        log_trace("id %u type %u mode %u", state.entities.get_id_of(eindex), state.entities[eindex].type, state.entities[eindex].mode);
+    }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
 
@@ -780,33 +783,7 @@ void match_render(const match_state_t& state) {
                 continue;
             }
 
-            render_sprite_params_t render_params = (render_sprite_params_t) {
-                .sprite = entity_get_sprite(entity),
-                .frame = entity_get_animation_frame(entity),
-                .position = entity.position.to_xy() - state.camera_offset,
-                .options = RENDER_SPRITE_NO_CULL,
-                .recolor_id = entity.player_id
-            };
-            SDL_Rect render_rect = (SDL_Rect) {
-                .x = render_params.position.x,
-                .y = render_params.position.y,
-                .w = engine.sprites[render_params.sprite].frame_size.x,
-                .h = engine.sprites[render_params.sprite].frame_size.y
-            };
-            // Adjust the render rect for units because units are centered when rendering
-            if (entity_is_unit(entity.type)) {
-                render_rect.x -= render_rect.w / 2;
-                render_rect.y -= render_rect.h / 2;
-                render_params.options |= RENDER_SPRITE_CENTERED;
-            }
-            if (entity_should_flip_h(entity)) {
-                render_params.options |= RENDER_SPRITE_FLIP_H;
-            }
-
-            if (SDL_HasIntersection(&render_rect, &SCREEN_RECT) != SDL_TRUE) {
-                continue;
-            }
-
+            render_sprite_params_t render_params = match_create_entity_render_params(state, entity);
             render_sprite(render_params.sprite, render_params.frame, render_params.position, render_params.options, render_params.recolor_id);
         }
 
@@ -842,32 +819,18 @@ void match_render(const match_state_t& state) {
                 continue;
             }
 
-            render_sprite_params_t render_params = (render_sprite_params_t) {
-                .sprite = entity_get_sprite(entity),
-                .frame = entity_get_animation_frame(entity),
-                .position = entity.position.to_xy() - state.camera_offset,
-                .options = RENDER_SPRITE_NO_CULL,
-                .recolor_id = entity.player_id
-            };
+            render_sprite_params_t render_params = match_create_entity_render_params(state, entity);
             SDL_Rect render_rect = (SDL_Rect) {
                 .x = render_params.position.x,
                 .y = render_params.position.y,
                 .w = engine.sprites[render_params.sprite].frame_size.x,
                 .h = engine.sprites[render_params.sprite].frame_size.y
             };
-            // Adjust the render rect for units because units are centered when rendering
-            if (entity_is_unit(entity.type)) {
-                render_rect.x -= render_rect.w / 2;
-                render_rect.y -= render_rect.h / 2;
-                render_params.options |= RENDER_SPRITE_CENTERED;
-            }
-            if (entity_should_flip_h(entity)) {
-                render_params.options |= RENDER_SPRITE_FLIP_H;
-            }
-
+            // Perform culling in advance so that we can minimize y-sorting
             if (SDL_HasIntersection(&render_rect, &SCREEN_RECT) != SDL_TRUE) {
                 continue;
             }
+            render_params.options |= RENDER_SPRITE_NO_CULL;
 
             ysorted_render_params.push_back(render_params);
         }
@@ -1059,6 +1022,26 @@ void match_render(const match_state_t& state) {
     sprintf(population_text, "%u/%u", match_get_player_population(state, network_get_player_id()), match_get_player_max_population(state, network_get_player_id()));
     render_text(FONT_WESTERN8, population_text, COLOR_WHITE, xy(SCREEN_WIDTH - 88 + 22, 4));
     render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL);
+}
+
+render_sprite_params_t match_create_entity_render_params(const match_state_t& state, const entity_t& entity) {
+    render_sprite_params_t render_params = (render_sprite_params_t) {
+        .sprite = entity_get_sprite(entity),
+        .frame = entity_get_animation_frame(entity),
+        .position = entity.position.to_xy() - state.camera_offset,
+        .options = 0,
+        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED ? RECOLOR_NONE : entity.player_id
+    };
+    // Adjust render position for units because they are centered
+    if (entity_is_unit(entity.type)) {
+        render_params.position.x -= engine.sprites[render_params.sprite].frame_size.x / 2;
+        render_params.position.y -= engine.sprites[render_params.sprite].frame_size.y / 2;
+    }
+    if (entity_should_flip_h(entity)) {
+        render_params.options |= RENDER_SPRITE_FLIP_H;
+    }
+
+    return render_params;
 }
 
 void match_render_healthbar(xy position, xy size, int health, int max_health) {

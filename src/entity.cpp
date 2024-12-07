@@ -124,6 +124,17 @@ xy entity_get_center_position(const entity_t& entity) {
 }
 
 Sprite entity_get_sprite(const entity_t entity) {
+    if (entity.mode == MODE_BUILDING_DESTROYED) {
+        switch (entity_cell_size(entity.type)) {
+            case 2:
+                return SPRITE_BUILDING_DESTROYED_2;
+            case 3:
+                return SPRITE_BUILDING_DESTROYED_3;
+            default:
+                GOLD_ASSERT_MESSAGE(false, "Destroyed sprite needed for building of this size");
+                return SPRITE_BUILDING_DESTROYED_2;
+        }
+    }
     return ENTITY_DATA.at(entity.type).sprite;
 }
 
@@ -304,10 +315,14 @@ xy entity_get_animation_frame(const entity_t& entity) {
 
         return frame;
     } else if (entity_is_building(entity.type)) {
-        int hframe = entity.mode == MODE_BUILDING_IN_PROGRESS
-                    ? ((3 * entity.health) / ENTITY_DATA.at(entity.type).max_health)
-                    : 3;
-        return xy(hframe, 0);
+        if (entity.mode == MODE_BUILDING_DESTROYED) {
+            return xy(0, 0);
+        }
+        if (entity.mode == MODE_BUILDING_FINISHED) {
+            return xy(3, 0);
+        }
+        // In-progress frame
+        return xy((3 * entity.health) / ENTITY_DATA.at(entity.type).max_health, 0);
     } else {
         // TODO mines
         return xy(0, 0);
@@ -363,6 +378,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             entity.mode = MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
         } else {
+            log_trace("building mode is destroyed.");
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;
             entity.queue.clear();
