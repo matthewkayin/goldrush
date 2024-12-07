@@ -642,7 +642,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         xy exit_cell = entity_get_exit_cell(state, entity.cell, entity_cell_size(entity.type), entity_cell_size(entity.queue[0].unit_type), rally_cell);
                         if (exit_cell.x == -1) {
                             if (entity.timer == 0 && entity.player_id == network_get_player_id()) {
-                                // ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                                ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
                             }
                             entity.timer = BUILDING_QUEUE_EXIT_BLOCKED;
                             update_finished = true;
@@ -758,7 +758,7 @@ void entity_building_enqueue(match_state_t& state, entity_t& building, building_
     if (building.queue.size() == 1) {
         if (entity_building_is_supply_blocked(state, building)) {
             if (building.player_id == network_get_player_id() && building.timer != BUILDING_QUEUE_BLOCKED) {
-                // ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
+                ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
             }
             building.timer = BUILDING_QUEUE_BLOCKED;
         } else {
@@ -775,7 +775,7 @@ void entity_building_dequeue(match_state_t& state, entity_t& building) {
     } else {
         if (entity_building_is_supply_blocked(state, building)) {
             if (building.player_id == network_get_player_id() && building.timer != BUILDING_QUEUE_BLOCKED) {
-                // ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
+                ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
             }
             building.timer = BUILDING_QUEUE_BLOCKED;
         } else {

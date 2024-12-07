@@ -140,7 +140,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
                 continue;
             }
             if (hotkeys.at(button) == event.key.keysym.sym) {
-                state.ui_button_pressed = button_index;
+                ui_handle_ui_button_press(state, button);
                 return;
             }
         }
@@ -907,7 +907,7 @@ void match_render(const match_state_t& state) {
 
     // UI Status message
     if (state.ui_status_timer != 0) {
-        render_text(FONT_HACK, state.ui_status_message.c_str(), COLOR_WHITE, xy(RENDER_SPRITE_CENTERED, SCREEN_HEIGHT - 148));
+        render_text(FONT_HACK, state.ui_status_message.c_str(), COLOR_WHITE, xy(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 148));
     }
 
     // UI Disconnect frame

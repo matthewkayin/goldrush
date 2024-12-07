@@ -12,7 +12,7 @@
 #define SCANNER_PORT 6529
 #define TILE_SIZE 16
 #define INPUT_BUFFER_SIZE 1024
-#define SELECTION_LIMIT 16
+#define SELECTION_LIMIT 20
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1
@@ -29,3 +29,4 @@
 #define GOLD_LOG_LEVEL 3
 #define GOLD_ASSERTS_ENABLED
 #define GOLD_RESOURCE_PATH "../res/"
+#define GOLD_DEBUG_FAST_TRAIN

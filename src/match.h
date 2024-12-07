@@ -21,6 +21,16 @@
 #define BUILDING_QUEUE_EXIT_BLOCKED UINT32_MAX - 1
 #define BUILDING_FADE_DURATION 300
 
+#define UI_STATUS_CANT_BUILD "You can't build there."
+#define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
+#define UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."
+#define UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
+#define UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
+#define UI_STATUS_UNDER_ATTACK "You're under attack!"
+#define UI_STATUS_MINE_EXIT_BLOCKED "Mine exit is blocked."
+#define UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
+#define UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
+
 // UI
 
 const SDL_Rect MINIMAP_RECT = (SDL_Rect) {
@@ -332,6 +342,7 @@ UiButton ui_get_ui_button(const match_state_t& state, int index);
 bool ui_button_requirements_met(const match_state_t& state, UiButton button);
 void ui_handle_ui_button_press(match_state_t& state, UiButton button);
 void ui_deselect_entity_if_selected(match_state_t& state, entity_id id);
+void ui_show_status(match_state_t& state, const char* message);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);

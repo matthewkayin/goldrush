@@ -4,6 +4,7 @@
 #include "logger.h"
 
 static const uint32_t UI_CHAT_MESSAGE_DURATION = 180;
+static const uint32_t UI_STATUS_DURATION = 60;
 
 static const std::unordered_map<UiButtonset, std::array<UiButton, UI_BUTTONSET_SIZE>> UI_BUTTONS = {
     { UI_BUTTONSET_NONE, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
@@ -83,10 +84,8 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
             continue;
         }
 
-        log_trace("considering building");
         SDL_Rect entity_rect = entity_get_rect(entity);
         if (SDL_HasIntersection(&entity_rect, &state.select_rect) == SDL_TRUE) {
-            log_trace("adding building to selection");
             selection.push_back(state.entities.get_id_of(index));
         }
     }
@@ -307,7 +306,15 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_CANCEL: {
-            if (state.ui_buttonset == UI_BUTTONSET_BUILD) {
+            if (state.selection.size() == 1 && !state.entities.get_by_id(state.selection[0]).queue.empty()) {
+                state.input_queue.push_back((input_t) {
+                    .type = INPUT_BUILDING_DEQUEUE,
+                    .building_dequeue = (input_building_dequeue_t) {
+                        .building_id = state.selection[0],
+                        .index = BUILDING_DEQUEUE_POP_FRONT
+                    }
+                });
+            } else if (state.ui_buttonset == UI_BUTTONSET_BUILD) {
                 state.ui_buttonset = UI_BUTTONSET_MINER;
             } else if (state.ui_mode == UI_MODE_TARGET_REPAIR || state.ui_mode == UI_MODE_TARGET_ATTACK || state.ui_mode == UI_MODE_TARGET_UNLOAD) {
                 state.ui_mode = UI_MODE_NONE;
@@ -341,7 +348,7 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
                 };
 
                 if (building.queue.size() == BUILDING_QUEUE_MAX) {
-                    // ui_show_status(state, UI_STATUS_BUILDING_QUEUE_FULL);
+                    ui_show_status(state, UI_STATUS_BUILDING_QUEUE_FULL);
                 // } else if (state.player_gold[network_get_player_id()] < building_queue_item_cost(item)) {
                     // ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
                 } else {
@@ -371,4 +378,9 @@ void ui_deselect_entity_if_selected(match_state_t& state, entity_id id) {
             return;
         }
     }
+}
+
+void ui_show_status(match_state_t& state, const char* message) {
+    state.ui_status_message = std::string(message);
+    state.ui_status_timer = UI_STATUS_DURATION;
 }
