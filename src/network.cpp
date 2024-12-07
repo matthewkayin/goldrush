@@ -390,7 +390,10 @@ void network_service() {
                 break;
             }
             case ENET_EVENT_TYPE_RECEIVE: {
-                log_info("Received message %b", event.packet->data, event.packet->dataLength);
+                bool message_is_empty_input = event.packet->dataLength == 2 && event.packet->data[0] == MESSAGE_INPUT && event.packet->data[1] == 0;
+                if (!message_is_empty_input) {
+                    log_info("Received message %b", event.packet->data, event.packet->dataLength);
+                }
                 network_handle_message(event.packet->data, event.packet->dataLength, event.peer->incomingPeerID);
                 enet_packet_destroy(event.packet);
                 break;
