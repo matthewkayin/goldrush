@@ -1030,7 +1030,7 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
         .frame = entity_get_animation_frame(entity),
         .position = entity.position.to_xy() - state.camera_offset,
         .options = 0,
-        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED ? RECOLOR_NONE : entity.player_id
+        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED ? (uint8_t)RECOLOR_NONE : entity.player_id
     };
     // Adjust render position for units because they are centered
     if (entity_is_unit(entity.type)) {
