@@ -677,6 +677,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, true);
                 }
             }
+            break;
         }
         case INPUT_BUILDING_ENQUEUE: {
             uint32_t building_index = state.entities.get_index_of(input.building_enqueue.building_id);
