@@ -15,10 +15,14 @@
 #define UI_HEIGHT 88
 #define PLAYER_NONE UINT8_MAX
 #define UI_BUTTONSET_SIZE 6
+#define BUILDING_QUEUE_MAX 5
+#define BUILDING_DEQUEUE_POP_FRONT BUILDING_QUEUE_MAX
+#define BUILDING_QUEUE_BLOCKED UINT32_MAX
+#define BUILDING_QUEUE_EXIT_BLOCKED UINT32_MAX - 1
+#define BUILDING_FADE_DURATION 300
 
 // UI
 
-const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
 const SDL_Rect MINIMAP_RECT = (SDL_Rect) {
     .x = 4,
     .y = SCREEN_HEIGHT - 132,
@@ -69,7 +73,6 @@ struct chat_message_t {
     uint32_t timer;
 };
 
-extern const std::unordered_map<UiButtonset, std::array<UiButton, UI_BUTTONSET_SIZE>> UI_BUTTONS;
 extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
 
 // Map
@@ -143,6 +146,17 @@ struct target_t {
     };
 };
 
+enum BuildingQueueItemType: uint8_t {
+    BUILDING_QUEUE_ITEM_UNIT
+};
+
+struct building_queue_item_t {
+    BuildingQueueItemType type;
+    union {
+        EntityType unit_type;
+    };
+};
+
 struct entity_t {
     EntityType type;
     EntityMode mode;
@@ -156,6 +170,7 @@ struct entity_t {
     int health;
     target_t target;
     std::vector<xy> path;
+    std::vector<building_queue_item_t> queue;
     uint32_t timer;
 
     animation_t animation;
@@ -235,12 +250,24 @@ struct input_stop_t {
     entity_id entity_ids[SELECTION_LIMIT];
 };
 
+struct input_building_enqueue_t {
+    entity_id building_id;
+    building_queue_item_t item;
+};
+
+struct input_building_dequeue_t {
+    entity_id building_id;
+    uint16_t index;
+};
+
 struct input_t {
     uint8_t type;
     union {
         input_move_t move;
         input_stop_t stop;
         input_stop_t defend;
+        input_building_enqueue_t building_enqueue;
+        input_building_dequeue_t building_dequeue;
     };
 };
 
@@ -272,12 +299,14 @@ struct match_state_t {
     std::vector<entity_id> map_cells;
 
     // Entities
-    id_array<entity_t> entities;
+    id_array<entity_t, 400 * MAX_PLAYERS> entities;
 };
 
 match_state_t match_init();
 void match_handle_input(match_state_t& state, SDL_Event e);
 void match_update(match_state_t& state);
+uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id);
+uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id);
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
 input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input);
@@ -299,6 +328,7 @@ SelectionType ui_get_selection_type(const match_state_t& state);
 bool ui_is_targeting(const match_state_t& state);
 void ui_add_chat_message(match_state_t& state, std::string message);
 int ui_get_ui_button_hovered(const match_state_t& state);
+UiButton ui_get_ui_button(const match_state_t& state, int index);
 bool ui_button_requirements_met(const match_state_t& state, UiButton button);
 void ui_handle_ui_button_press(match_state_t& state, UiButton button);
 void ui_deselect_entity_if_selected(match_state_t& state, entity_id id);
@@ -334,7 +364,18 @@ xy_fixed entity_get_target_position(const entity_t& entity);
 AnimationName entity_get_expected_animation(const entity_t& entity);
 xy entity_get_animation_frame(const entity_t& entity);
 bool entity_should_flip_h(const entity_t& entity);
+bool entity_should_die(const entity_t& entity);
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_update(match_state_t& state, uint32_t entity_index);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);
+xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell);
+
+void entity_building_enqueue(match_state_t& state, entity_t& building, building_queue_item_t item);
+void entity_building_dequeue(match_state_t& state, entity_t& building);
+bool entity_building_is_supply_blocked(const match_state_t& state, const entity_t& building);
+
+UiButton building_queue_item_icon(const building_queue_item_t& item);
+uint32_t building_queue_item_duration(const building_queue_item_t& item);
+uint32_t building_queue_item_cost(const building_queue_item_t& item);
+uint32_t building_queue_population_cost(const building_queue_item_t& item);

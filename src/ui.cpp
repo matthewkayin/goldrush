@@ -5,7 +5,7 @@
 
 static const uint32_t UI_CHAT_MESSAGE_DURATION = 180;
 
-const std::unordered_map<UiButtonset, std::array<UiButton, UI_BUTTONSET_SIZE>> UI_BUTTONS = {
+static const std::unordered_map<UiButtonset, std::array<UiButton, UI_BUTTONSET_SIZE>> UI_BUTTONS = {
     { UI_BUTTONSET_NONE, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_UNIT, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
@@ -177,6 +177,9 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
             case UNIT_MINER:
                 state.ui_buttonset = UI_BUTTONSET_MINER;
                 return;
+            case BUILDING_CAMP:
+                state.ui_buttonset = UI_BUTTONSET_CAMP;
+                return;
             default:
                 break;
         }
@@ -230,7 +233,7 @@ int ui_get_ui_button_hovered(const match_state_t& state) {
     }
 
     for (int i = 0; i < 6; i++) {
-        if (UI_BUTTONS.at(state.ui_buttonset)[i] == UI_BUTTON_NONE) {
+        if (ui_get_ui_button(state, i) == UI_BUTTON_NONE) {
             continue;
         }
 
@@ -240,6 +243,14 @@ int ui_get_ui_button_hovered(const match_state_t& state) {
     }
 
     return -1;
+}
+
+UiButton ui_get_ui_button(const match_state_t& state, int index) {
+    if (index == 5 && state.selection.size() == 1 && state.entities.get_by_id(state.selection[0]).queue.size() > 0) {
+        return UI_BUTTON_CANCEL;
+    }
+
+    return UI_BUTTONS.at(state.ui_buttonset)[index];
 }
 
 bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
@@ -308,6 +319,45 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
         }
         default:
             break;
+    }
+
+    for (auto it : ENTITY_DATA) {
+        if (it.second.ui_button == button) {
+            EntityType entity_type = it.first;
+            // Enqueue unit into building
+            if (entity_is_unit(entity_type)) {
+                 // Decide which building to enqueue
+                uint32_t selected_building_index = state.entities.get_index_of(state.selection[0]);
+                for (int id_index = 1; id_index < state.selection.size(); id_index++) {
+                    if (state.entities.get_by_id(state.selection[id_index]).queue.size() < state.entities[selected_building_index].queue.size()) {
+                        selected_building_index = state.entities.get_index_of(state.selection[id_index]);
+                    }
+                }
+                entity_t& building = state.entities[selected_building_index];
+
+                building_queue_item_t item = (building_queue_item_t) {
+                    .type = BUILDING_QUEUE_ITEM_UNIT,
+                    .unit_type = entity_type
+                };
+
+                if (building.queue.size() == BUILDING_QUEUE_MAX) {
+                    // ui_show_status(state, UI_STATUS_BUILDING_QUEUE_FULL);
+                // } else if (state.player_gold[network_get_player_id()] < building_queue_item_cost(item)) {
+                    // ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
+                } else {
+                    input_t input = (input_t) {
+                        .type = INPUT_BUILDING_ENQUEUE,
+                        .building_enqueue = (input_building_enqueue_t) {
+                            .building_id = state.entities.get_id_of(selected_building_index),
+                            .item = item
+                        }
+                    };
+                    state.input_queue.push_back(input);
+                }
+            } // End if entity is unit
+
+            return;
+        }
     }
 }
 

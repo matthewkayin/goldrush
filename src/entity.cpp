@@ -318,6 +318,27 @@ bool entity_should_flip_h(const entity_t& entity) {
     return entity_is_unit(entity.type) && entity.direction > DIRECTION_SOUTH;
 }
 
+bool entity_should_die(const entity_t& entity) {
+    if (entity.health != 0) {
+        return false;
+    }
+
+    if (entity_is_unit(entity.type)) {
+        if (entity.mode == MODE_UNIT_DEATH || entity.mode == MODE_UNIT_DEATH_FADE) {
+            return false;
+        }
+        if(entity_check_flag(entity, ENTITY_FLAG_IS_GARRISONED)) {
+            return false;
+        }
+
+        return true;
+    } else if (entity_is_building(entity.type)) {
+        return entity.mode != MODE_BUILDING_DESTROYED;
+    }
+
+    return false;
+}
+
 void entity_set_target(entity_t& entity, target_t target) {
     GOLD_ASSERT(entity.mode != MODE_UNIT_BUILD);
     entity.target = target;
@@ -337,10 +358,26 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
     entity_t& entity = state.entities[entity_index];
     const entity_data_t& entity_data = ENTITY_DATA.at(entity.type);
 
-                                                                                                         // Don't play death animation for ferried units
-    if (entity.health == 0 && !(entity.mode == MODE_UNIT_DEATH || entity.mode == MODE_UNIT_DEATH_FADE || entity_check_flag(entity, ENTITY_FLAG_IS_GARRISONED))) {
-        entity.mode = MODE_UNIT_DEATH;
-        entity.animation = animation_create(entity_get_expected_animation(entity));
+    if (entity_should_die(entity)) {
+        if (entity_is_unit(entity.type)) {
+            entity.mode = MODE_UNIT_DEATH;
+            entity.animation = animation_create(entity_get_expected_animation(entity));
+        } else {
+            entity.mode = MODE_BUILDING_DESTROYED;
+            entity.timer = BUILDING_FADE_DURATION;
+            entity.queue.clear();
+
+            // Set building cells to empty, done a special way to avoid overriding the miner cell
+            // in the case of a building cancel where the builder is placed on top of the building's old location
+            for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size(entity.type); x++) {
+                for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
+                    if (map_get_cell(state, xy(x, y)) == id) {
+                        state.map_cells[x + (y * state.map_width)] = CELL_EMPTY;
+                    }
+                }
+            }
+        }
+
         ui_deselect_entity_if_selected(state, id);
 
         // TODO
@@ -350,7 +387,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         }
         */
         return;
-    }
+    } // End if entity_should_die
 
     bool update_finished = false;
     fixed movement_left = entity_is_unit(entity.type) ? entity_data.unit_data.speed : fixed::from_raw(0);
@@ -583,6 +620,54 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 update_finished = true;
                 break;
             }
+            case MODE_BUILDING_FINISHED: {
+                if (!entity.queue.empty() && entity.timer != 0) {
+                    if (entity.timer == BUILDING_QUEUE_BLOCKED && !entity_building_is_supply_blocked(state, entity)) {
+                        entity.timer = building_queue_item_duration(entity.queue[0]);
+                    } else if (entity.timer != BUILDING_QUEUE_BLOCKED && entity_building_is_supply_blocked(state, entity)) {
+                        entity.timer = BUILDING_QUEUE_BLOCKED;
+                    }
+
+                    if (entity.timer != BUILDING_QUEUE_BLOCKED && entity.timer != BUILDING_QUEUE_EXIT_BLOCKED) {
+                        #ifdef GOLD_DEBUG_FAST_TRAIN
+                            entity.timer = std::max((int)entity.timer - 10, 0);
+                        #else
+                            entity.timer--;
+                        #endif
+                    }
+
+                    if ((entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) || entity.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
+                        // TODO rally points
+                        xy rally_cell = entity.cell + xy(0, entity_cell_size(entity.type));
+                        xy exit_cell = entity_get_exit_cell(state, entity.cell, entity_cell_size(entity.type), entity_cell_size(entity.queue[0].unit_type), rally_cell);
+                        if (exit_cell.x == -1) {
+                            if (entity.timer == 0 && entity.player_id == network_get_player_id()) {
+                                // ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                            }
+                            entity.timer = BUILDING_QUEUE_EXIT_BLOCKED;
+                            update_finished = true;
+                            break;
+                        } 
+
+                        entity.timer = 0;
+                        entity_id unit_id = entity_create(state, entity.queue[0].unit_type, entity.player_id, exit_cell);
+
+                        // TODO on create alert
+                        // TODO rally point sets unit target
+                        entity_building_dequeue(state, entity);
+                    }
+                }
+
+                update_finished = true;
+                break;
+            }
+            case MODE_BUILDING_DESTROYED: {
+                if (entity.timer != 0) {
+                    entity.timer--;
+                }
+                update_finished = true;
+                break;
+            }
             default:
                 update_finished = true;
                 break;
@@ -622,4 +707,124 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
 
     // TODO attack alerts
     // TOOD create particle effects for cowboys
+}
+
+xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell) {
+    xy exit_cell = xy(-1, -1);
+    int exit_cell_dist = -1;
+    for (int x = building_cell.x - unit_size; x < building_cell.x + building_size + unit_size; x++) {
+        xy cell = xy(x, building_cell.y - unit_size);
+        int cell_dist = xy::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(state, cell, unit_size) && 
+           !map_is_cell_rect_occupied(state, cell, unit_size) && 
+           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+        cell = xy(x, building_cell.y + building_size + (unit_size - 1));
+        cell_dist = xy::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(state, cell, unit_size) && 
+           !map_is_cell_rect_occupied(state, cell, unit_size) && 
+           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+    }
+    for (int y = building_cell.y - unit_size; y < building_cell.y + building_size + unit_size; y++) {
+        xy cell = xy(building_cell.x - unit_size, y);
+        int cell_dist = xy::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(state, cell, unit_size) && 
+           !map_is_cell_rect_occupied(state, cell, unit_size) && 
+           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+        cell = xy(building_cell.x + building_size + (unit_size - 1), y);
+        cell_dist = xy::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(state, cell, unit_size) && 
+           !map_is_cell_rect_occupied(state, cell, unit_size) && 
+           (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+    }
+
+    return exit_cell;
+}
+
+void entity_building_enqueue(match_state_t& state, entity_t& building, building_queue_item_t item) {
+    GOLD_ASSERT(building.queue.size() < BUILDING_QUEUE_MAX);
+    building.queue.push_back(item);
+    if (building.queue.size() == 1) {
+        if (entity_building_is_supply_blocked(state, building)) {
+            if (building.player_id == network_get_player_id() && building.timer != BUILDING_QUEUE_BLOCKED) {
+                // ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
+            }
+            building.timer = BUILDING_QUEUE_BLOCKED;
+        } else {
+            building.timer = building_queue_item_duration(item);
+        }
+    }
+}
+
+void entity_building_dequeue(match_state_t& state, entity_t& building) {
+    GOLD_ASSERT(!building.queue.empty());
+    building.queue.erase(building.queue.begin());
+    if (building.queue.empty()) {
+        building.timer = 0;
+    } else {
+        if (entity_building_is_supply_blocked(state, building)) {
+            if (building.player_id == network_get_player_id() && building.timer != BUILDING_QUEUE_BLOCKED) {
+                // ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
+            }
+            building.timer = BUILDING_QUEUE_BLOCKED;
+        } else {
+            building.timer = building_queue_item_duration(building.queue[0]);
+        }
+    }
+}
+
+bool entity_building_is_supply_blocked(const match_state_t& state, const entity_t& building) {
+    const building_queue_item_t& item = building.queue[0];
+    if (item.type == BUILDING_QUEUE_ITEM_UNIT) {
+        uint32_t required_population = match_get_player_population(state, building.player_id) + ENTITY_DATA.at(item.unit_type).unit_data.population_cost;
+        if (match_get_player_max_population(state, building.player_id) < required_population) {
+            return true;
+        }
+    }
+    return false;
+}
+
+UiButton building_queue_item_icon(const building_queue_item_t& item) {
+    switch (item.type) {
+        case BUILDING_QUEUE_ITEM_UNIT: {
+            return ENTITY_DATA.at(item.unit_type).ui_button;
+        }
+    }
+}
+
+uint32_t building_queue_item_duration(const building_queue_item_t& item) {
+    switch (item.type) {
+        case BUILDING_QUEUE_ITEM_UNIT: {
+            return ENTITY_DATA.at(item.unit_type).train_duration * 60;
+        }
+    }
+}
+
+uint32_t building_queue_item_cost(const building_queue_item_t& item) {
+    switch (item.type) {
+        case BUILDING_QUEUE_ITEM_UNIT: {
+            return ENTITY_DATA.at(item.unit_type).gold_cost;
+        }
+    }
+}
+
+uint32_t building_queue_population_cost(const building_queue_item_t& item) {
+    switch (item.type) {
+        case BUILDING_QUEUE_ITEM_UNIT: {
+            return ENTITY_DATA.at(item.unit_type).unit_data.population_cost;
+        }
+        default:
+            return 0;
+    }
 }

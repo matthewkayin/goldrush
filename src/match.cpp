@@ -31,6 +31,15 @@ static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
     .x = (SCREEN_WIDTH / 2) - (150 / 2), .y = 64,
     .w = 150, .h = 100
 };
+static const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
+static const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
+static const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT,
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(0, 35),
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36, 35),
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 2, 35),
+    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 3, 35)
+};
 
 static const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_STOP, SDLK_s },
@@ -50,7 +59,6 @@ static const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_WAGON, SDLK_w },
     { UI_BUTTON_UNIT_BANDIT, SDLK_b }
 };
-static std::unordered_map<UiButton, EntityType> UI_BUTTON_TO_ENTITY_TYPE;
 
 match_state_t match_init() {
     match_state_t state;
@@ -58,11 +66,6 @@ match_state_t match_init() {
     state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
     state.ui_status_timer = 0;
     state.ui_buttonset = UI_BUTTONSET_NONE;
-    if (UI_BUTTON_TO_ENTITY_TYPE.empty()) {
-        for (auto it : ENTITY_DATA) {
-            UI_BUTTON_TO_ENTITY_TYPE[it.second.ui_button] = it.first;
-        }
-    }
 
     map_init(state, 64, 64);
 
@@ -132,7 +135,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     // UI button hotkey press
     if (state.ui_button_pressed == -1 && event.type == SDL_KEYDOWN) {
         for (int button_index = 0; button_index < UI_BUTTONSET_SIZE; button_index++) {
-            UiButton button = UI_BUTTONS.at(state.ui_buttonset)[button_index];
+            UiButton button = ui_get_ui_button(state, button_index);
             if (button == UI_BUTTON_NONE) {
                 continue;
             }
@@ -146,8 +149,8 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     // UI button release
     if (state.ui_button_pressed != -1 && 
         ((event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) || 
-         (event.type == SDL_KEYUP && event.key.keysym.sym == hotkeys.at(UI_BUTTONS.at(state.ui_buttonset)[state.ui_button_pressed])))) {
-        UiButton button_pressed = UI_BUTTONS.at(state.ui_buttonset)[state.ui_button_pressed];
+         (event.type == SDL_KEYUP && event.key.keysym.sym == hotkeys.at(ui_get_ui_button(state, state.ui_button_pressed))))) {
+        UiButton button_pressed = ui_get_ui_button(state, state.ui_button_pressed);
         state.ui_button_pressed = -1;
         ui_handle_ui_button_press(state, button_pressed);
         return;
@@ -353,7 +356,8 @@ void match_update(match_state_t& state) {
         uint32_t entity_index = 0;
         while (entity_index < state.entities.size()) {
             if ((state.entities[entity_index].mode == MODE_UNIT_DEATH_FADE && !animation_is_playing(state.entities[entity_index].animation)) || 
-                    (entity_check_flag(state.entities[entity_index], ENTITY_FLAG_IS_GARRISONED) && state.entities[entity_index].health == 0)) {
+                    (entity_check_flag(state.entities[entity_index], ENTITY_FLAG_IS_GARRISONED) && state.entities[entity_index].health == 0) ||
+                    (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0)) {
                 state.entities.remove_at(entity_index);
                 // state.is_fog_dirty = true;
             } else {
@@ -389,6 +393,31 @@ void match_camera_center_on_cell(match_state_t& state, xy cell) {
 
 xy match_get_mouse_world_pos(const match_state_t& state) {
     return engine.mouse_position + state.camera_offset;
+}
+
+uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id) {
+    uint32_t population = 0;
+    for (const entity_t& entity : state.entities) {
+        if (entity.player_id == player_id && entity_is_unit(entity.type) && entity.health != 0) {
+            population += ENTITY_DATA.at(entity.type).unit_data.population_cost;
+        }
+    }
+    
+    return population;
+}
+
+uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id) {
+    /*
+    uint32_t max_population = 10;
+    for (const entity_t& building : state.entities) {
+        if (building.player_id == player_id && building.type == BUILDING_HOUSE && building_is_finished(building)) {
+            max_population += 10;
+        }
+    }
+
+    return max_population;
+    */
+   return 200;
 }
 
 input_t match_create_move_input(const match_state_t& state) {
@@ -474,6 +503,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer += input.stop.entity_count * sizeof(entity_id);
             break;
         }
+        case INPUT_BUILDING_ENQUEUE: {
+            memcpy(out_buffer + out_buffer_length, &input.building_enqueue, sizeof(input_building_enqueue_t));
+            out_buffer += sizeof(input_building_enqueue_t);
+        }
+        case INPUT_BUILDING_DEQUEUE: {
+            memcpy(out_buffer + out_buffer_length, &input.building_dequeue, sizeof(input_building_dequeue_t));
+            out_buffer += sizeof(input_building_dequeue_t);
+        }
         default:
             break;
     }
@@ -512,6 +549,14 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             memcpy(&input.stop.entity_ids, in_buffer + in_buffer_head, input.stop.entity_count * sizeof(entity_id));
             in_buffer_head += input.stop.entity_count * sizeof(entity_id);
             break;
+        }
+        case INPUT_BUILDING_ENQUEUE: {
+            memcpy(&input.building_enqueue, in_buffer + in_buffer_head, sizeof(input_building_enqueue_t));
+            in_buffer_head += sizeof(input_building_enqueue_t);
+        }
+        case INPUT_BUILDING_DEQUEUE: {
+            memcpy(&input.building_dequeue, in_buffer + in_buffer_head, sizeof(input_building_dequeue_t));
+            in_buffer_head += sizeof(input_building_dequeue_t);
         }
         default:
             break;
@@ -625,6 +670,44 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, true);
                 }
             }
+        }
+        case INPUT_BUILDING_ENQUEUE: {
+            uint32_t building_index = state.entities.get_index_of(input.building_enqueue.building_id);
+            if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
+                return;
+            }
+            // if (state.player_gold[player_id] < building_queue_item_cost(input.building_enqueue.item)) {
+                // return;
+            // }
+            if (state.entities[building_index].queue.size() == BUILDING_QUEUE_MAX) {
+                return;
+            }
+
+            // state.player_gold[player_id] -= building_queue_item_cost(input.building_enqueue.item);
+            entity_building_enqueue(state, state.entities[building_index], input.building_enqueue.item);
+            break;
+        }
+        case INPUT_BUILDING_DEQUEUE: {
+            uint32_t building_index = state.entities.get_index_of(input.building_dequeue.building_id);
+            if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
+                return;
+            }
+            entity_t& building = state.entities[building_index];
+            if (building.queue.empty()) {
+                return;
+            }
+
+            uint32_t index = input.building_dequeue.index == BUILDING_DEQUEUE_POP_FRONT
+                                    ? building.queue.size() - 1
+                                    : input.building_dequeue.index;
+            
+            // state.player_gold[player_id] += building_queue_item_cost(building.queue[index]);
+            if (index == 0) {
+                entity_building_dequeue(state, building);
+            } else {
+                building.queue.erase(building.queue.begin() + index);
+            }
+            break;
         }
         default:
             break;
@@ -869,7 +952,7 @@ void match_render(const match_state_t& state) {
 
     // UI Buttons
     for (int i = 0; i < UI_BUTTONSET_SIZE; i++) {
-        UiButton ui_button = UI_BUTTONS.at(state.ui_buttonset)[i];
+        UiButton ui_button = ui_get_ui_button(state, i); 
         if (ui_button == UI_BUTTON_NONE) {
             continue;
         }
@@ -929,6 +1012,49 @@ void match_render(const match_state_t& state) {
             match_render_healthbar(icon_position + xy(1, 32 - 5), xy(32- 2, 4), entity.health, entity_data.max_health);
         }
     }
+
+    // UI Building queues
+    if (state.selection.size() == 1 && !state.entities.get_by_id(state.selection[0]).queue.empty()) {
+        const entity_t& building = state.entities.get_by_id(state.selection[0]);
+        for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
+            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_BUILDING_QUEUE_POSITIONS[building_queue_index], RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_BUILDING_QUEUE_POSITIONS[building_queue_index], RENDER_SPRITE_NO_CULL);
+        }
+
+        static const SDL_Rect BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT = (SDL_Rect) {
+            .x = UI_FRAME_BOTTOM_POSITION.x + BUILDING_QUEUE_TOP_LEFT.x + 32 + 4,
+            .y = UI_FRAME_BOTTOM_POSITION.y + BUILDING_QUEUE_TOP_LEFT.y + 32 - 8,
+            .w = 32 * 3 + (4 * 2), .h = 6
+        };
+        if (building.timer == BUILDING_QUEUE_BLOCKED) {
+            render_text(FONT_WESTERN8, "Build more houses.", COLOR_GOLD, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
+        } else if (building.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
+            render_text(FONT_WESTERN8, "Exit is blocked.", COLOR_GOLD, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
+        } else {
+            SDL_Rect building_queue_progress_bar_rect = (SDL_Rect) {
+                .x = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x,
+                .y = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y,
+                .w = (BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.w * (int)(building_queue_item_duration(building.queue[0]) - building.timer)) / (int)building_queue_item_duration(building.queue[0]),
+                .h = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.h,
+            };
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_WHITE.r, COLOR_WHITE.g, COLOR_WHITE.b, COLOR_WHITE.a);
+            SDL_RenderFillRect(engine.renderer, &building_queue_progress_bar_rect);
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_BLACK.r, COLOR_BLACK.g, COLOR_BLACK.b, COLOR_BLACK.a);
+            SDL_RenderDrawRect(engine.renderer, &BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT);
+        }
+    }
+
+    // Resource counters
+    char gold_text[8];
+    // sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);
+    sprintf(gold_text, "0 haha");
+    render_text(FONT_WESTERN8, gold_text, COLOR_WHITE, xy(SCREEN_WIDTH - 172 + 18, 4));
+    render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 172, 2), RENDER_SPRITE_NO_CULL);
+
+    char population_text[8];
+    sprintf(population_text, "%u/%u", match_get_player_population(state, network_get_player_id()), match_get_player_max_population(state, network_get_player_id()));
+    render_text(FONT_WESTERN8, population_text, COLOR_WHITE, xy(SCREEN_WIDTH - 88 + 22, 4));
+    render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL);
 }
 
 void match_render_healthbar(xy position, xy size, int health, int max_health) {

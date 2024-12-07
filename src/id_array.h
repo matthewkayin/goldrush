@@ -12,7 +12,7 @@ const entity_id ID_MAX = 4096;
 const entity_id ID_NULL = ID_MAX + 1;
 const uint32_t INDEX_INVALID = 65535;
 
-template <typename T>
+template <typename T, size_t capacity>
 struct id_array {
     using iterator = typename std::vector<T>::iterator;
     using const_iterator = typename std::vector<T>::const_iterator;
@@ -26,6 +26,8 @@ struct id_array {
         for (entity_id id = 0; id < ID_MAX; id++) {
             available_ids.push(id);
         }
+        data.reserve(capacity);
+        ids.reserve(capacity);
     }
 
     T& operator[](uint32_t index) { 
@@ -67,6 +69,7 @@ struct id_array {
 
     entity_id push_back(const T& value) {
         GOLD_ASSERT(!available_ids.empty());
+        GOLD_ASSERT(data.size() < capacity);
 
         entity_id id = available_ids.front();
         available_ids.pop();
