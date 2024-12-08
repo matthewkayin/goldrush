@@ -166,6 +166,25 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         input_t move_input = match_create_move_input(state);
         state.input_queue.push_back(move_input);
 
+        if (move_input.type == INPUT_MOVE_REPAIR) {
+            bool is_repair_target_valid = true;
+            if (move_input.move.target_id == ID_NULL) {
+                is_repair_target_valid = false;
+            } else {
+                const entity_t& repair_target = state.entities.get_by_id(move_input.move.target_id);
+                if (repair_target.player_id != network_get_player_id() || !entity_is_building(repair_target.type)) {
+                    is_repair_target_valid = false;
+                }
+            }
+
+            if (!is_repair_target_valid) {
+                ui_show_status(state, UI_STATUS_REPAIR_TARGET_INVALID);
+                state.ui_mode = UI_MODE_NONE;
+                ui_set_selection(state, state.selection);
+                return;
+            }
+        }
+
         // Provide instant user feedback
         if (move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_UNLOAD) {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
@@ -471,6 +490,48 @@ input_t match_create_move_input(const match_state_t& state) {
     memcpy(input.move.entity_ids, &state.selection[0], state.selection.size() * sizeof(entity_id));
 
     return input;
+}
+
+// Returns the nearest cell around the rect relative to start_cell
+// If there are no free cells around the rect in a radius of 1, then this returns the start cell
+xy match_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells) {
+    xy nearest_cell;
+    int nearest_cell_dist = -1;
+
+    xy cell_begin[4] = { 
+        rect_position + xy(-start_size, -(start_size - 1)),
+        rect_position + xy(-(start_size - 1), rect_size),
+        rect_position + xy(rect_size, rect_size - 1),
+        rect_position + xy(rect_size - 1, -start_size)
+    };
+    xy cell_end[4] = { 
+        xy(cell_begin[0].x, rect_position.y + rect_size - 1),
+        xy(rect_position.x + rect_size - 1, cell_begin[1].y),
+        xy(cell_begin[2].x, cell_begin[0].y),
+        xy(cell_begin[0].x + 1, cell_begin[3].y)
+    };
+    xy cell_step[4] = { xy(0, 1), xy(1, 0), xy(0, -1), xy(-1, 0) };
+    uint32_t index = 0;
+    xy cell = cell_begin[index];
+    while (index < 4) {
+        if (map_is_cell_rect_in_bounds(state, cell, start_size)) {
+            if (!map_is_cell_rect_occupied(state, cell, start_size, xy(-1, -1), allow_blocked_cells) && (nearest_cell_dist == -1 || xy::manhattan_distance(start, cell) < nearest_cell_dist)) {
+                nearest_cell = cell;
+                nearest_cell_dist = xy::manhattan_distance(start, cell);
+            }
+        } 
+
+        if (cell == cell_end[index]) {
+            index++;
+            if (index < 4) {
+                cell = cell_begin[index];
+            }
+        } else {
+            cell += cell_step[index];
+        }
+    }
+
+    return nearest_cell_dist != -1 ? nearest_cell : start;
 }
 
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input) {

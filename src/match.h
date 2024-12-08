@@ -330,6 +330,7 @@ void match_camera_clamp(match_state_t& state);
 void match_camera_center_on_cell(match_state_t& state, xy cell);
 xy match_get_mouse_world_pos(const match_state_t& state);
 input_t match_create_move_input(const match_state_t& state);
+xy match_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
 
 // UI
 bool ui_is_mouse_in_ui();
@@ -377,6 +378,9 @@ AnimationName entity_get_expected_animation(const entity_t& entity);
 xy entity_get_animation_frame(const entity_t& entity);
 bool entity_should_flip_h(const entity_t& entity);
 bool entity_should_die(const entity_t& entity);
+SDL_Rect entity_get_sight_rect(const entity_t& entity);
+bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);
+target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity);
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_update(match_state_t& state, uint32_t entity_index);

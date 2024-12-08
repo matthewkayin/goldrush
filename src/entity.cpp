@@ -4,7 +4,8 @@
 #include "logger.h"
 #include <unordered_map>
 
-const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
+static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
+static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 
 const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
     { UNIT_MINER, (entity_data_t) {
@@ -18,7 +19,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .max_health = 30,
         .sight = 7,
         .armor = 0,
-        .attack_priority = 0,
+        .attack_priority = 1,
 
         .garrison_capacity = 0,
         .garrison_size = 1,
@@ -134,6 +135,9 @@ Sprite entity_get_sprite(const entity_t entity) {
                 GOLD_ASSERT_MESSAGE(false, "Destroyed sprite needed for building of this size");
                 return SPRITE_BUILDING_DESTROYED_2;
         }
+    }
+    if (entity.mode == MODE_UNIT_BUILD || entity.mode == MODE_UNIT_REPAIR) {
+        return SPRITE_MINER_BUILDING;
     }
     return ENTITY_DATA.at(entity.type).sprite;
 }
@@ -266,7 +270,9 @@ xy entity_get_target_cell(const match_state_t& state, const entity_t& entity) {
         case TARGET_ENTITY:
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR:
-            return state.entities.get_by_id(entity.target.id).cell;
+            const entity_t& target = state.entities.get_by_id(entity.target.id);
+            // TODO: allow blocked cells if it's a camp
+            return match_get_nearest_cell_around_rect(state, entity.cell, entity_cell_size(entity.type), target.cell, entity_cell_size(target.type), false);
     }
 }
 
@@ -354,6 +360,55 @@ bool entity_should_die(const entity_t& entity) {
     return false;
 }
 
+SDL_Rect entity_get_sight_rect(const entity_t& entity) {
+    int entity_sight = ENTITY_DATA.at(entity.type).sight;
+    return (SDL_Rect) { .x = entity.cell.x - entity_sight, .y = entity.cell.y - entity_sight, .w = (2 * entity_sight) + 1, .h = (2 * entity_sight) + 1 };
+}
+
+bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size) {
+    SDL_Rect sight_rect = entity_get_sight_rect(entity);
+    SDL_Rect rect = (SDL_Rect) { .x = rect_position.x, .y = rect_position.y, .w = rect_size, .h = rect_size };
+    return SDL_HasIntersection(&sight_rect, &rect) == SDL_TRUE;
+}
+
+target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity) {
+    SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type),. h = entity_cell_size(entity.type) };
+    SDL_Rect entity_sight_rect = entity_get_sight_rect(entity);
+    uint32_t nearest_enemy_index = INDEX_INVALID;
+    int nearest_enemy_dist = -1;
+    uint32_t nearest_attack_priority;
+
+    for (uint32_t other_index = 0; other_index < state.entities.size(); other_index++) {
+        const entity_t& other = state.entities[other_index];
+
+        SDL_Rect other_rect = (SDL_Rect) { .x = other.cell.x, .y = other.cell.y, .w = entity_cell_size(other.type),. h = entity_cell_size(other.type) };
+        if (other.player_id == entity.player_id || !entity_is_selectable(other) || SDL_HasIntersection(&entity_sight_rect, &other_rect) != SDL_TRUE) {
+            continue;
+        }
+        // TODO consider fog of war
+        // TODO ignore mines
+
+        int other_dist = euclidean_distance_squared_between(entity_rect, other_rect);
+        uint32_t other_attack_priority = ENTITY_DATA.at(other.type).attack_priority;
+        if (nearest_enemy_index == INDEX_INVALID || other_dist < nearest_enemy_dist || other_attack_priority > nearest_attack_priority) {
+            nearest_enemy_index = other_index;
+            nearest_enemy_dist = other_dist;
+            nearest_attack_priority = other_attack_priority;
+        }
+    }
+
+    if (nearest_enemy_index == INDEX_INVALID) {
+        return (target_t) {
+            .type = TARGET_NONE
+        };
+    }
+
+    return (target_t) {
+        .type = TARGET_ATTACK_ENTITY,
+        .id = state.entities.get_id_of(nearest_enemy_index)
+    };
+}
+
 void entity_set_target(entity_t& entity, target_t target) {
     GOLD_ASSERT(entity.mode != MODE_UNIT_BUILD);
     entity.target = target;
@@ -410,6 +465,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
     while (!update_finished) {
         switch (entity.mode) {
             case MODE_UNIT_IDLE: {
+                // If unit is idle, try to find a nearby target
+                if (entity.target.type == TARGET_NONE && entity.type != UNIT_MINER && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
+                    entity.target = entity_target_nearest_enemy(state, entity);
+                }
+
                 if (entity.target.type == TARGET_NONE) {
                     update_finished = true;
                     break;
@@ -490,7 +550,14 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.position = entity_get_target_position(entity);
                         // On step finished
                         if (entity.target.type == TARGET_ATTACK_CELL) {
-                            // check for nearby target
+                            target_t attack_target = entity_target_nearest_enemy(state, entity);
+                            if (attack_target.type != TARGET_NONE) {
+                                entity.target = attack_target;
+                                entity.path.clear();
+                                entity.mode = entity_has_reached_target(state, entity) ? MODE_UNIT_MOVE_FINISHED : MODE_UNIT_IDLE;
+                                // breaks out of while movement left > 0
+                                break;
+                            }
                         }
                         if (entity_has_reached_target(state, entity)) {
                             entity.mode = MODE_UNIT_MOVE_FINISHED;
@@ -553,12 +620,17 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         entity_t& target = state.entities.get_by_id(entity.target.id);
 
+                        // Begin repair
+                        if (entity.player_id == target.player_id && entity.type == UNIT_MINER && entity_is_building(target.type) && target.health < ENTITY_DATA.at(target.type).max_health) {
+                            entity.mode = MODE_UNIT_REPAIR;
+                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
+                            entity.timer = UNIT_BUILD_TICK_DURATION;
+                            break;
+                        }
+
+                        // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
-                            SDL_Rect target_rect = (SDL_Rect) {
-                                .x = target.cell.x, .y = target.cell.y,
-                                .w = entity_cell_size(target.type), .h = entity_cell_size(target.type)
-                            };
-                            entity.direction = enum_direction_to_rect(entity.cell, target_rect);
+                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
                             entity.mode = MODE_UNIT_ATTACK_WINDUP;
                             update_finished = true;
                             break;
@@ -583,6 +655,54 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 update_finished = !(entity.mode == MODE_UNIT_MOVE && movement_left.raw_value > 0);
                 break;
             } // End mode move finished
+            case MODE_UNIT_BUILD: {
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_REPAIR: {
+                // Stop repairing if the building is destroyed
+                if (entity_is_target_invalid(state, entity)) {
+                    entity.target = (target_t) {
+                        .type = TARGET_NONE
+                    };
+                    entity.mode = MODE_UNIT_IDLE;
+                    update_finished = true;
+                    break;
+                }
+
+                entity_t& target = state.entities.get_by_id(entity.target.id);
+                if (target.health == ENTITY_DATA.at(target.type).max_health) {
+                    entity.target = (target_t) {
+                        .type = TARGET_NONE
+                    };
+                    entity.mode = MODE_UNIT_IDLE;
+                }
+
+                entity.timer--;
+                if (entity.timer == 0) {
+                    int building_hframe = entity_get_animation_frame(target).x;
+                    target.health++;
+                    if (target.health == ENTITY_DATA.at(target.type).max_health) {
+                        if (target.mode == MODE_BUILDING_IN_PROGRESS) {
+                            // entity_finish_building(state, entity.target.id);
+                        } 
+
+                        entity.target = (target_t) {
+                            .type = TARGET_NONE
+                        };
+                        entity.mode = MODE_UNIT_IDLE;
+                    } else {
+                        entity.timer = UNIT_BUILD_TICK_DURATION;
+                    }
+
+                    if (entity_get_animation_frame(target).x != building_hframe) {
+                        // state.is_fog_dirty = true;
+                    }
+                }
+
+                update_finished = true;
+                break;
+            }
             case MODE_UNIT_ATTACK_WINDUP: {
                 if (entity_is_target_invalid(state, entity)) {
                     // TOOD target = nearest insight enemy
