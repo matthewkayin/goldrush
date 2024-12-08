@@ -267,6 +267,10 @@ struct input_build_t {
     entity_id entity_ids[SELECTION_LIMIT];
 };
 
+struct input_build_cancel_t {
+    entity_id building_id;
+};
+
 struct input_building_enqueue_t {
     entity_id building_id;
     building_queue_item_t item;
@@ -284,6 +288,7 @@ struct input_t {
         input_stop_t stop;
         input_stop_t defend;
         input_build_t build;
+        input_build_cancel_t build_cancel;
         input_building_enqueue_t building_enqueue;
         input_building_dequeue_t building_dequeue;
     };

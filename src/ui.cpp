@@ -161,6 +161,7 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
 
     if (state.selection.size() == 1 && entity.mode == MODE_BUILDING_IN_PROGRESS) {
         state.ui_buttonset = UI_BUTTONSET_CANCEL;
+        return;
     }
 
     EntityType selected_entity_type = entity.type;
@@ -309,6 +310,13 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
                 state.ui_mode = UI_MODE_NONE;
                 state.ui_buttonset = UI_BUTTONSET_BUILD;
+            } else if (state.selection.size() == 1 && state.entities.get_by_id(state.selection[0]).mode == MODE_BUILDING_IN_PROGRESS) {
+                state.input_queue.push_back((input_t) {
+                    .type = INPUT_BUILD_CANCEL,
+                    .build_cancel = (input_build_cancel_t) {
+                        .building_id = state.selection[0]
+                    }
+                });
             } else if (state.selection.size() == 1 && !state.entities.get_by_id(state.selection[0]).queue.empty()) {
                 state.input_queue.push_back((input_t) {
                     .type = INPUT_BUILDING_DEQUEUE,

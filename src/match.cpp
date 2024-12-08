@@ -160,7 +160,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     }
 
     // UI building place
-    if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
+    if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui() && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         if (!ui_building_can_be_placed(state)) {
             ui_show_status(state, UI_STATUS_CANT_BUILD);
             return;
@@ -176,6 +176,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
         state.ui_buttonset = UI_BUTTONSET_NONE;
         state.ui_mode = UI_MODE_NONE;
+        return;
     }
 
     // Order movement
@@ -558,6 +559,11 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.build.entity_count * sizeof(entity_id);
             break;
         }
+        case INPUT_BUILD_CANCEL: {
+            memcpy(out_buffer + out_buffer_length, &input.build_cancel, sizeof(input_build_cancel_t));
+            out_buffer_length += sizeof(input_build_cancel_t);
+            break;
+        }
         case INPUT_BUILDING_ENQUEUE: {
             memcpy(out_buffer + out_buffer_length, &input.building_enqueue, sizeof(input_building_enqueue_t));
             out_buffer_length += sizeof(input_building_enqueue_t);
@@ -620,6 +626,10 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             memcpy(&input.build.entity_ids, in_buffer + in_buffer_head, input.build.entity_count * sizeof(entity_id));
             in_buffer_head += input.build.entity_count * sizeof(entity_id);
             break;
+        }
+        case INPUT_BUILD_CANCEL: {
+            memcpy(&input.build_cancel, in_buffer + in_buffer_head, sizeof(input_build_cancel_t));
+            in_buffer_head += sizeof(input_build_cancel_t);
         }
         case INPUT_BUILDING_ENQUEUE: {
             memcpy(&input.building_enqueue, in_buffer + in_buffer_head, sizeof(input_building_enqueue_t));
@@ -753,7 +763,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 if (entity_index == INDEX_INVALID || !entity_is_selectable(state.entities[entity_index])) {
                     continue;
                 }
-                builder_ids.push_back(id_index);
+                builder_ids.push_back(input.build.entity_ids[id_index]);
             }
 
             // Assign the lead builder's target
@@ -779,6 +789,33 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     .id = lead_builder_id
                 };
             }
+            break;
+        }
+        case INPUT_BUILD_CANCEL: {
+            uint32_t building_index = state.entities.get_index_of(input.build_cancel.building_id);
+            if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
+                break;
+            }
+
+            // TODO Refund the player
+
+            // Tell the builder to stop building
+            for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                if (state.entities[entity_index].target.type == TARGET_BUILD && state.entities[entity_index].target.build.building_id == input.build_cancel.building_id) {
+                    entity_t& builder = state.entities[entity_index];
+                    builder.cell = builder.target.build.building_cell;
+                    builder.position = cell_center(builder.cell);
+                    builder.target = (target_t) {
+                        .type = TARGET_NONE
+                    };
+                    builder.mode = MODE_UNIT_IDLE;
+                    map_set_cell_rect(state, builder.cell, entity_cell_size(builder.type), state.entities.get_id_of(entity_index));
+                    break;
+                }
+            }
+
+            // Destroy the building
+            state.entities[building_index].health = 0;
             break;
         }
         case INPUT_BUILDING_ENQUEUE: {
@@ -1176,9 +1213,19 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
     if (entity_is_unit(entity.type)) {
         render_params.position.x -= engine.sprites[render_params.sprite].frame_size.x / 2;
         render_params.position.y -= engine.sprites[render_params.sprite].frame_size.y / 2;
-    }
-    if (entity_should_flip_h(entity)) {
-        render_params.options |= RENDER_SPRITE_FLIP_H;
+
+        bool should_flip_h = entity_should_flip_h(entity);
+        if (entity.mode == MODE_UNIT_BUILD) {
+            const entity_t& building = state.entities.get_by_id(entity.target.build.building_id);
+            const entity_data_t& building_data = ENTITY_DATA.at(building.type);
+            int building_hframe = entity_get_animation_frame(building).x;
+            render_params.position = building.position.to_xy() + xy(building_data.building_data.builder_positions_x[building_hframe], building_data.building_data.builder_positions_y[building_hframe]) - state.camera_offset;
+            should_flip_h = building_data.building_data.builder_flip_h[building_hframe];
+        }
+
+        if (should_flip_h) {
+            render_params.options |= RENDER_SPRITE_FLIP_H;
+        }
     }
 
     return render_params;

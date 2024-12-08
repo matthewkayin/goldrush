@@ -75,7 +75,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
                         : xy_fixed(entity.cell * TILE_SIZE);
     entity.direction = DIRECTION_SOUTH;
 
-    entity.health = entity_data.max_health;
+    entity.health = entity_is_unit(type) ? entity_data.max_health : entity_data.max_health / 10;
     entity.target = (target_t) {
         .type = TARGET_NONE
     };
@@ -203,10 +203,16 @@ bool entity_is_target_invalid(const match_state_t& state, const entity_t& entity
         return false;
     }
 
-    uint32_t entity_index = state.entities.get_index_of(entity.target.id);
-    return entity_index == INDEX_INVALID || 
-           !entity_is_selectable(state.entities[entity_index]) || 
-           (entity.target.type == TARGET_BUILD_ASSIST && state.entities[entity_index].target.type != TARGET_BUILD);
+    uint32_t target_index = state.entities.get_index_of(entity.target.id);
+    if (target_index == INDEX_INVALID) {
+        return true;
+    }
+    
+    if (entity.target.type == TARGET_BUILD_ASSIST) {
+        return state.entities[target_index].health == 0 || state.entities[target_index].target.type != TARGET_BUILD;
+    }
+
+    return !entity_is_selectable(state.entities[target_index]);
 }
 
 bool entity_has_reached_target(const match_state_t& state, const entity_t& entity) {
@@ -632,6 +638,20 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.timer = UNIT_BUILD_TICK_DURATION;
                         ui_deselect_entity_if_selected(state, id);
 
+                        bool is_targeting_only_builders = true;
+                        for (entity_id selected_id : state.selection) {
+                            entity_t& selected_entity = state.entities.get_by_id(selected_id);
+                            if (!(selected_entity.target.type == TARGET_BUILD_ASSIST && selected_entity.target.id == id)) {
+                                is_targeting_only_builders = false;
+                                break;
+                            }
+                        }
+                        if (is_targeting_only_builders) {
+                            state.selection.clear();
+                            state.selection.push_back(entity.target.build.building_id);
+                            ui_set_selection(state, state.selection);
+                        }
+
                         break;
                     }
                     case TARGET_BUILD_ASSIST: {
@@ -673,19 +693,19 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         entity_t& target = state.entities.get_by_id(entity.target.id);
 
-                        // Begin repair
-                        if (entity.player_id == target.player_id && entity.type == UNIT_MINER && entity_is_building(target.type) && target.health < ENTITY_DATA.at(target.type).max_health) {
-                            entity.mode = MODE_UNIT_REPAIR;
-                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
-                            entity.timer = UNIT_BUILD_TICK_DURATION;
-                            break;
-                        }
-
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
                             entity.mode = MODE_UNIT_ATTACK_WINDUP;
                             update_finished = true;
+                            break;
+                        }
+
+                        // Begin repair
+                        if (entity.player_id == target.player_id && entity.type == UNIT_MINER && entity_is_building(target.type) && target.health < ENTITY_DATA.at(target.type).max_health) {
+                            entity.mode = MODE_UNIT_REPAIR;
+                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
+                            entity.timer = UNIT_BUILD_TICK_DURATION;
                             break;
                         }
 
