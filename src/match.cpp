@@ -159,6 +159,25 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         return;
     }
 
+    // UI building place
+    if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
+        if (!ui_building_can_be_placed(state)) {
+            ui_show_status(state, UI_STATUS_CANT_BUILD);
+            return;
+        }
+
+        input_t input;
+        input.type = INPUT_BUILD;
+        input.build.building_type = state.ui_building_type;
+        input.build.entity_count = state.selection.size();
+        memcpy(&input.build.entity_ids, &state.selection[0], state.selection.size() * sizeof(entity_id));
+        input.build.target_cell = ui_get_building_cell(state);
+        state.input_queue.push_back(input);
+
+        state.ui_buttonset = UI_BUTTONSET_NONE;
+        state.ui_mode = UI_MODE_NONE;
+    }
+
     // Order movement
     if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state) == SELECTION_TYPE_UNITS && 
             ((event.button.button == SDL_BUTTON_LEFT && ui_is_targeting(state)) ||
@@ -492,48 +511,6 @@ input_t match_create_move_input(const match_state_t& state) {
     return input;
 }
 
-// Returns the nearest cell around the rect relative to start_cell
-// If there are no free cells around the rect in a radius of 1, then this returns the start cell
-xy match_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells) {
-    xy nearest_cell;
-    int nearest_cell_dist = -1;
-
-    xy cell_begin[4] = { 
-        rect_position + xy(-start_size, -(start_size - 1)),
-        rect_position + xy(-(start_size - 1), rect_size),
-        rect_position + xy(rect_size, rect_size - 1),
-        rect_position + xy(rect_size - 1, -start_size)
-    };
-    xy cell_end[4] = { 
-        xy(cell_begin[0].x, rect_position.y + rect_size - 1),
-        xy(rect_position.x + rect_size - 1, cell_begin[1].y),
-        xy(cell_begin[2].x, cell_begin[0].y),
-        xy(cell_begin[0].x + 1, cell_begin[3].y)
-    };
-    xy cell_step[4] = { xy(0, 1), xy(1, 0), xy(0, -1), xy(-1, 0) };
-    uint32_t index = 0;
-    xy cell = cell_begin[index];
-    while (index < 4) {
-        if (map_is_cell_rect_in_bounds(state, cell, start_size)) {
-            if (!map_is_cell_rect_occupied(state, cell, start_size, xy(-1, -1), allow_blocked_cells) && (nearest_cell_dist == -1 || xy::manhattan_distance(start, cell) < nearest_cell_dist)) {
-                nearest_cell = cell;
-                nearest_cell_dist = xy::manhattan_distance(start, cell);
-            }
-        } 
-
-        if (cell == cell_end[index]) {
-            index++;
-            if (index < 4) {
-                cell = cell_begin[index];
-            }
-        } else {
-            cell += cell_step[index];
-        }
-    }
-
-    return nearest_cell_dist != -1 ? nearest_cell : start;
-}
-
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input) {
     out_buffer[out_buffer_length] = input.type;
     out_buffer_length++;
@@ -565,6 +542,20 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
 
             memcpy(out_buffer + out_buffer_length, &input.stop.entity_ids, input.stop.entity_count * sizeof(entity_id));
             out_buffer_length += input.stop.entity_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_BUILD: {
+            memcpy(out_buffer + out_buffer_length, &input.build.building_type, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.build.target_cell, sizeof(xy));
+            out_buffer_length += sizeof(xy);
+            
+            memcpy(out_buffer + out_buffer_length, &input.build.entity_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.build.entity_ids, input.build.entity_count * sizeof(entity_id));
+            out_buffer_length += input.build.entity_count * sizeof(entity_id);
             break;
         }
         case INPUT_BUILDING_ENQUEUE: {
@@ -614,6 +605,20 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             memcpy(&input.stop.entity_ids, in_buffer + in_buffer_head, input.stop.entity_count * sizeof(entity_id));
             in_buffer_head += input.stop.entity_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_BUILD: {
+            memcpy(&input.build.building_type, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
+            memcpy(&input.build.target_cell, in_buffer + in_buffer_head, sizeof(xy));
+            in_buffer_head += sizeof(xy);
+
+            memcpy(&input.build.entity_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(&input.build.entity_ids, in_buffer + in_buffer_head, input.build.entity_count * sizeof(entity_id));
+            in_buffer_head += input.build.entity_count * sizeof(entity_id);
             break;
         }
         case INPUT_BUILDING_ENQUEUE: {
@@ -737,6 +742,42 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 if (input.type == INPUT_DEFEND) {
                     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, true);
                 }
+            }
+            break;
+        }
+        case INPUT_BUILD: {
+            // Determine the list of viable builders
+            std::vector<entity_id> builder_ids;
+            for (uint32_t id_index = 0; id_index < input.build.entity_count; id_index++) {
+                uint32_t entity_index = state.entities.get_index_of(input.build.entity_ids[id_index]);
+                if (entity_index == INDEX_INVALID || !entity_is_selectable(state.entities[entity_index])) {
+                    continue;
+                }
+                builder_ids.push_back(id_index);
+            }
+
+            // Assign the lead builder's target
+            entity_id lead_builder_id = ui_get_nearest_builder(state, builder_ids, input.build.target_cell);
+            entity_t& lead_builder = state.entities.get_by_id(lead_builder_id);
+            lead_builder.target = (target_t) {
+                .type = TARGET_BUILD,
+                .build = (target_build_t) {
+                    .unit_cell = get_nearest_cell_in_rect(lead_builder.cell, input.build.target_cell, entity_cell_size((EntityType)input.build.building_type)),
+                    .building_cell = input.build.target_cell,
+                    .building_type = (EntityType)input.build.building_type,
+                    .building_id = ID_NULL
+                }
+            };
+
+            // Assign the helpers' target
+            for (entity_id builder_id : builder_ids) {
+                if (builder_id == lead_builder_id) {
+                    continue;
+                } 
+                state.entities.get_by_id(builder_id).target = (target_t) {
+                    .type = TARGET_BUILD_ASSIST,
+                    .id = lead_builder_id
+                };
             }
             break;
         }
@@ -926,6 +967,43 @@ void match_render(const match_state_t& state) {
         select_rect.y -= state.camera_offset.y;
         SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
         SDL_RenderDrawRect(engine.renderer, &select_rect);
+    }
+
+    // UI Building Placement
+    if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
+        const entity_data_t& building_data = ENTITY_DATA.at(state.ui_building_type);
+        xy ui_building_cell = ui_get_building_cell(state);
+        render_sprite(building_data.sprite, xy(3, 0), (ui_building_cell * TILE_SIZE) - state.camera_offset, 0, network_get_player_id());
+
+        bool is_placement_out_of_bounds = ui_building_cell.x + building_data.cell_size >= state.map_width ||
+                                          ui_building_cell.y + building_data.cell_size >= state.map_height;
+        SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+        xy miner_cell = state.entities.get_by_id(ui_get_nearest_builder(state, state.selection, ui_building_cell)).cell;
+        for (int x = ui_building_cell.x; x < ui_building_cell.x + building_data.cell_size; x++) {
+            for (int y = ui_building_cell.y; y < ui_building_cell.y + building_data.cell_size; y++) {
+                bool is_cell_green = true;
+                if (is_placement_out_of_bounds) {
+                    is_cell_green = false;
+                }
+                // TODO if map fog at cell is not revealed, cell green is false
+                // TODO if building is camp and is too close to gold mine, cell green is false
+                // TOOD is tile is a ramp then cell green is false
+                if (xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
+                    is_cell_green = false;
+                }
+
+                SDL_Color cell_color = is_cell_green ? COLOR_GREEN : COLOR_RED;
+                SDL_SetRenderDrawColor(engine.renderer, cell_color.r, cell_color.g, cell_color.b, 128);
+                SDL_Rect cell_rect = (SDL_Rect) { 
+                    .x = (x * TILE_SIZE) - state.camera_offset.x, 
+                    .y = (y * TILE_SIZE) - state.camera_offset.y,
+                    .w = TILE_SIZE,
+                    .h = TILE_SIZE
+                };
+                SDL_RenderFillRect(engine.renderer, &cell_rect);
+            }
+        }
+        SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
     }
 
     // UI Chat

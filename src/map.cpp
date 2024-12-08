@@ -71,6 +71,48 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_siz
     return false;
 }
 
+// Returns the nearest cell around the rect relative to start_cell
+// If there are no free cells around the rect in a radius of 1, then this returns the start cell
+xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells) {
+    xy nearest_cell;
+    int nearest_cell_dist = -1;
+
+    xy cell_begin[4] = { 
+        rect_position + xy(-start_size, -(start_size - 1)),
+        rect_position + xy(-(start_size - 1), rect_size),
+        rect_position + xy(rect_size, rect_size - 1),
+        rect_position + xy(rect_size - 1, -start_size)
+    };
+    xy cell_end[4] = { 
+        xy(cell_begin[0].x, rect_position.y + rect_size - 1),
+        xy(rect_position.x + rect_size - 1, cell_begin[1].y),
+        xy(cell_begin[2].x, cell_begin[0].y),
+        xy(cell_begin[0].x + 1, cell_begin[3].y)
+    };
+    xy cell_step[4] = { xy(0, 1), xy(1, 0), xy(0, -1), xy(-1, 0) };
+    uint32_t index = 0;
+    xy cell = cell_begin[index];
+    while (index < 4) {
+        if (map_is_cell_rect_in_bounds(state, cell, start_size)) {
+            if (!map_is_cell_rect_occupied(state, cell, start_size, xy(-1, -1), allow_blocked_cells) && (nearest_cell_dist == -1 || xy::manhattan_distance(start, cell) < nearest_cell_dist)) {
+                nearest_cell = cell;
+                nearest_cell_dist = xy::manhattan_distance(start, cell);
+            }
+        } 
+
+        if (cell == cell_end[index]) {
+            index++;
+            if (index < 4) {
+                cell = cell_begin[index];
+            }
+        } else {
+            cell += cell_step[index];
+        }
+    }
+
+    return nearest_cell_dist != -1 ? nearest_cell : start;
+}
+
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool ignore_miners) {
     struct node_t {
         int cost;

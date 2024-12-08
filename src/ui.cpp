@@ -306,7 +306,10 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_CANCEL: {
-            if (state.selection.size() == 1 && !state.entities.get_by_id(state.selection[0]).queue.empty()) {
+            if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
+                state.ui_mode = UI_MODE_NONE;
+                state.ui_buttonset = UI_BUTTONSET_BUILD;
+            } else if (state.selection.size() == 1 && !state.entities.get_by_id(state.selection[0]).queue.empty()) {
                 state.input_queue.push_back((input_t) {
                     .type = INPUT_BUILDING_DEQUEUE,
                     .building_dequeue = (input_building_dequeue_t) {
@@ -361,7 +364,11 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
                     };
                     state.input_queue.push_back(input);
                 }
-            } // End if entity is unit
+            } else {
+                state.ui_mode = UI_MODE_BUILDING_PLACE;
+                state.ui_building_type = entity_type;
+                state.ui_buttonset = UI_BUTTONSET_CANCEL;
+            }
 
             return;
         }
@@ -383,4 +390,50 @@ void ui_deselect_entity_if_selected(match_state_t& state, entity_id id) {
 void ui_show_status(match_state_t& state, const char* message) {
     state.ui_status_message = std::string(message);
     state.ui_status_timer = UI_STATUS_DURATION;
+}
+
+xy ui_get_building_cell(const match_state_t& state) {
+    int building_cell_size = entity_cell_size(state.ui_building_type);
+    xy offset = xy(building_cell_size, building_cell_size) - xy(2, 2);
+    xy building_cell = ((engine.mouse_position + state.camera_offset) / TILE_SIZE) - offset;
+    building_cell.x = std::max(0, building_cell.x);
+    building_cell.y = std::max(0, building_cell.y);
+    return building_cell;
+}
+
+entity_id ui_get_nearest_builder(const match_state_t& state, const std::vector<entity_id>& builders, xy cell) {
+    entity_id nearest_unit_id; 
+    int nearest_unit_dist = -1;
+    for (entity_id id : builders) {
+        int selection_dist = xy::manhattan_distance(cell, state.entities.get_by_id(id).cell);
+        if (nearest_unit_dist == -1 || selection_dist < nearest_unit_dist) {
+            nearest_unit_id = id;
+            nearest_unit_dist = selection_dist;
+        }
+    }
+
+    return nearest_unit_id;
+}
+
+bool ui_building_can_be_placed(const match_state_t& state) {
+    xy building_cell = ui_get_building_cell(state);
+    int building_cell_size = ENTITY_DATA.at(state.ui_building_type).cell_size;
+    xy miner_cell = state.entities.get_by_id(ui_get_nearest_builder(state, state.selection, building_cell)).cell;
+
+    if (!map_is_cell_rect_in_bounds(state, building_cell, building_cell_size)) {
+        return false;
+    }
+
+    // TODO check camps against mines
+    // TODO check fog of war
+
+    for (int x = building_cell.x; x < building_cell.x + building_cell_size; x++) {
+        for (int y = building_cell.y; y < building_cell.y + building_cell_size; y++) {
+            if (xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }

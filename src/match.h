@@ -260,6 +260,13 @@ struct input_stop_t {
     entity_id entity_ids[SELECTION_LIMIT];
 };
 
+struct input_build_t {
+    uint8_t building_type;
+    xy target_cell;
+    uint16_t entity_count;
+    entity_id entity_ids[SELECTION_LIMIT];
+};
+
 struct input_building_enqueue_t {
     entity_id building_id;
     building_queue_item_t item;
@@ -276,6 +283,7 @@ struct input_t {
         input_move_t move;
         input_stop_t stop;
         input_stop_t defend;
+        input_build_t build;
         input_building_enqueue_t building_enqueue;
         input_building_dequeue_t building_dequeue;
     };
@@ -301,6 +309,7 @@ struct match_state_t {
     uint32_t ui_status_timer;
     std::vector<chat_message_t> ui_chat;
     uint32_t ui_disconnect_timer;
+    EntityType ui_building_type;
 
     // Map
     uint32_t map_width;
@@ -330,7 +339,6 @@ void match_camera_clamp(match_state_t& state);
 void match_camera_center_on_cell(match_state_t& state, xy cell);
 xy match_get_mouse_world_pos(const match_state_t& state);
 input_t match_create_move_input(const match_state_t& state);
-xy match_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
 
 // UI
 bool ui_is_mouse_in_ui();
@@ -345,6 +353,9 @@ bool ui_button_requirements_met(const match_state_t& state, UiButton button);
 void ui_handle_ui_button_press(match_state_t& state, UiButton button);
 void ui_deselect_entity_if_selected(match_state_t& state, entity_id id);
 void ui_show_status(match_state_t& state, const char* message);
+xy ui_get_building_cell(const match_state_t& state);
+entity_id ui_get_nearest_builder(const match_state_t& state, const std::vector<entity_id>& builders, xy cell);
+bool ui_building_can_be_placed(const match_state_t& state);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
@@ -354,6 +365,7 @@ tile_t map_get_tile(const match_state_t& state, xy cell);
 entity_id map_get_cell(const match_state_t& state, xy cell);
 void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value);
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
+xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool ignore_miners);
 
 // Entities
@@ -386,6 +398,8 @@ void entity_set_target(entity_t& entity, target_t target);
 void entity_update(match_state_t& state, uint32_t entity_index);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);
 xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell);
+void entity_stop_building(match_state_t& state, entity_id id);
+void entity_building_finish(match_state_t& state, entity_id building_id);
 
 void entity_building_enqueue(match_state_t& state, entity_t& building, building_queue_item_t item);
 void entity_building_dequeue(match_state_t& state, entity_t& building);

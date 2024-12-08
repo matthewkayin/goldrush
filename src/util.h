@@ -333,3 +333,20 @@ inline int euclidean_distance_squared_between(const SDL_Rect& a, const SDL_Rect&
     xy cell_in_b_nearest_to_a = cell_within_rect_a_nearest_to_rect_b(b, a);
     return xy::euclidean_distance_squared(cell_in_a_nearest_to_b, cell_in_b_nearest_to_a);
 }
+
+inline xy get_nearest_cell_in_rect(xy start_cell, xy rect_position, int rect_size) {
+    xy nearest_cell = rect_position;
+    uint32_t nearest_cell_dist = xy::manhattan_distance(start_cell, nearest_cell);
+
+    for (int y = rect_position.y; y < rect_position.y + rect_size; y++) {
+        for (int x = rect_position.x; x < rect_position.x + rect_size; x++) {
+            uint32_t cell_dist = xy::manhattan_distance(start_cell, xy(x, y));
+            if (cell_dist < nearest_cell_dist) {
+                nearest_cell = xy(x, y);
+                nearest_cell_dist = cell_dist;
+            }
+        }
+    }
+
+    return nearest_cell;
+}
