@@ -16,6 +16,7 @@ struct network_state_t {
     uint8_t player_id;
     player_t players[MAX_PLAYERS];
     ENetPeer* peers[MAX_PLAYERS];
+    bool server_lobby_closed;
 
     std::queue<network_event_t> event_queue;
     std::vector<lobby_t> lobbies;
@@ -27,6 +28,7 @@ static network_state_t state;
 enum MessageType {
     MESSAGE_GREET_SERVER,
     MESSAGE_INVALID_VERSION,
+    MESSAGE_GAME_ALREADY_STARTED,
     MESSAGE_WELCOME,
     MESSAGE_NEW_PLAYER,
     MESSAGE_GREET,
@@ -414,6 +416,16 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
 
             // I think that ENET will handle the lobby-full case
 
+            // Check that we're not already in a game
+            if (state.players[state.player_id].status != PLAYER_STATUS_HOST) {
+                log_info("Client tried to connect while we are no longer in lobby. Rejecting...");
+                uint8_t message = MESSAGE_GAME_ALREADY_STARTED;
+                ENetPacket* packet = enet_packet_create(&message, sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
+                enet_peer_send(&state.host->peers[incoming_peer_id], 0, packet);
+                enet_host_flush(state.host);
+                return;
+            }
+
             // Check the client version
             if (strcmp(greet.app_version, APP_VERSION) != 0) {
                 log_info("Client app version mismatch. Rejecting client...");
@@ -471,6 +483,13 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             });
             break;
         }
+        case MESSAGE_GAME_ALREADY_STARTED: {
+            log_info("Server rejected this client because the game already started.");
+            state.event_queue.push((network_event_t) {
+                .type = NETWORK_EVENT_GAME_ALREADY_STARTED
+            });
+            break;
+        }
         case MESSAGE_WELCOME: {
             log_info("Joined lobby.");
             state.status = NETWORK_STATUS_CONNECTED;
@@ -498,6 +517,10 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             break;
         }
         case MESSAGE_NEW_PLAYER: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
             message_new_player_t new_player;
             memcpy(&new_player, data, sizeof(message_new_player_t));
 
@@ -513,6 +536,10 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             break;
         }
         case MESSAGE_GREET: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
             message_greet_t greet;
             memcpy(&greet, data, sizeof(message_greet_t));
             memcpy(&state.players[greet.player_id], &greet.player, sizeof(player_t));
@@ -524,11 +551,19 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
         }
         case MESSAGE_READY: 
         case MESSAGE_NOT_READY: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
             uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
             state.players[*player_id].status = message_type == MESSAGE_READY ? PLAYER_STATUS_READY : PLAYER_STATUS_NOT_READY;
             break;
         }
         case MESSAGE_MATCH_LOAD: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (state.players[player_id].status != PLAYER_STATUS_NONE) {
                     state.players[player_id].status = PLAYER_STATUS_NOT_READY;
@@ -541,6 +576,10 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             break;
         }
         case MESSAGE_INPUT: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
             uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
 
             network_event_t network_event;

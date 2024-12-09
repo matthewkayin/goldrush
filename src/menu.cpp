@@ -243,14 +243,20 @@ void menu_update(menu_state_t& state) {
             }
             case NETWORK_EVENT_LOBBY_FULL: {
                 network_disconnect();
-                menu_set_mode(state, MENU_MODE_MATCHLIST);
+                menu_set_mode(state, MENU_MODE_MAIN);
                 menu_show_status(state, "The lobby is full.");
                 break;
             }
             case NETWORK_EVENT_INVALID_VERSION: {
                 network_disconnect();
-                menu_set_mode(state, MENU_MODE_MATCHLIST);
+                menu_set_mode(state, MENU_MODE_MAIN);
                 menu_show_status(state, "Client version does not match.");
+                break;
+            }
+            case NETWORK_EVENT_GAME_ALREADY_STARTED: {
+                network_disconnect();
+                menu_set_mode(state, MENU_MODE_MAIN);
+                menu_show_status(state, "That game has already started.");
                 break;
             }
             case NETWORK_EVENT_JOINED_LOBBY: {
