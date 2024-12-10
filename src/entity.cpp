@@ -413,8 +413,16 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             break;
                         }
 
-                        // Begin enter mine
-                        if (entity.type == ENTITY_MINER && target.type == ENTITY_MINE && entity.gold_held == 0 && target.gold_held > 0) {
+                        // Reached mine
+                        if (entity.type == ENTITY_MINER && target.type == ENTITY_MINE && target.gold_held > 0) {
+                            if (entity.gold_held) {
+                                entity.target = entity_target_nearest_camp(state, entity);
+                                entity.mode = MODE_UNIT_IDLE;
+                                update_finished = true;
+                                break;
+                            }
+
+                            // Begin enter mine
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
                             xy next_cell = get_nearest_cell_in_rect(entity.cell, target.cell, entity_cell_size(target.type));
                             entity.direction = enum_from_xy_direction(next_cell - entity.cell);
@@ -447,6 +455,15 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         // TODO garrison
                         // TODO repair
+
+                        if (entity.player_id == target.player_id && entity.type == ENTITY_MINER && target.type == ENTITY_CAMP && entity.gold_held) {
+                            state.player_gold[entity.player_id] += entity.gold_held;
+                            entity.gold_held = 0;
+                            entity.target = entity_target_nearest_mine(state, entity);
+                            entity.mode = MODE_UNIT_IDLE;
+                            update_finished = true;
+                            break;
+                        }
 
                         // Don't attack allied units
                         if (entity.player_id == target.player_id || ENTITY_DATA.at(entity.type).unit_data.damage == 0) {
@@ -599,7 +616,34 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 if (entity.timer == 0) {
                     entity_t& mine = state.entities.get_by_id(entity.garrison_id);
 
-                    xy exit_cell = entity_get_exit_cell(state, mine.cell, entity_cell_size(mine.type), entity_cell_size(entity.type), mine.cell + xy(0, entity_cell_size(mine.type)));
+                    xy preferred_exit_cell = mine.cell + xy(0, entity_cell_size(mine.type));
+                    target_t camp_target = entity_target_nearest_camp(state, entity);
+                    if (camp_target.type != TARGET_NONE) {
+                        entity_t& camp = state.entities.get_by_id(camp_target.id);
+                        SDL_Rect camp_rect = (SDL_Rect) { .x = camp.cell.x, .y = camp.cell.y, .w = entity_cell_size(camp.type), .h = entity_cell_size(camp.type) };
+                        SDL_Rect mine_rect = (SDL_Rect) { .x = mine.cell.x, .y = mine.cell.y, .w = entity_cell_size(mine.type), .h = entity_cell_size(mine.type) };
+
+                        bool y_overlaps = !(camp_rect.y < mine_rect.y || camp_rect.y + camp_rect.h - 1 > mine_rect.y + mine_rect.y - 1);
+                        bool x_overlaps = !(camp_rect.x < mine_rect.x || camp_rect.x + camp_rect.w - 1 > mine_rect.x + mine_rect.w - 1);
+                        if (x_overlaps) {
+                            preferred_exit_cell = camp_rect.y > mine_rect.y
+                                                    ? xy(mine_rect.x + 1, mine_rect.y + mine_rect.h)
+                                                    : xy(mine_rect.x + 1, mine_rect.y - 1);
+                        } else if (y_overlaps) {
+                            preferred_exit_cell = camp_rect.x > mine_rect.x
+                                                    ? xy(mine_rect.x + mine_rect.w, mine_rect.y + 1)
+                                                    : xy(mine_rect.x - 1, mine_rect.y + 1);
+                        } else {
+                            preferred_exit_cell.y = camp_rect.y > mine_rect.y
+                                                        ? mine_rect.y + mine_rect.h
+                                                        : mine_rect.y - 1;
+                            preferred_exit_cell.x = camp_rect.x > mine_rect.x
+                                                        ? mine_rect.x + mine_rect.w - 1
+                                                        : mine_rect.x;
+                        }
+                    }
+
+                    xy exit_cell = entity_get_exit_cell(state, mine.cell, entity_cell_size(mine.type), entity_cell_size(entity.type), preferred_exit_cell);
                     if (exit_cell.x == -1) {
                         if (timer_just_ended && entity.player_id == network_get_player_id()) {
                             ui_show_status(state, UI_STATUS_MINE_EXIT_BLOCKED);
@@ -616,6 +660,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     entity.position = cell_center(entity.cell);
                     entity.mode = MODE_UNIT_MOVE_BLOCKED;
                     entity.timer = UNIT_OUT_DURATION;
+                    entity.target = entity_target_nearest_camp(state, entity);
                     map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
                 }
                 update_finished = true;
@@ -1035,6 +1080,79 @@ target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t&
 
     return (target_t) {
         .type = TARGET_ATTACK_ENTITY,
+        .id = state.entities.get_id_of(nearest_enemy_index)
+    };
+}
+
+target_t entity_target_nearest_mine(const match_state_t& state, const entity_t& entity) {
+    SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type),. h = entity_cell_size(entity.type) };
+    uint32_t nearest_enemy_index = INDEX_INVALID;
+    int nearest_enemy_dist = -1;
+    uint32_t nearest_attack_priority;
+
+    for (uint32_t other_index = 0; other_index < state.entities.size(); other_index++) {
+        const entity_t& other = state.entities[other_index];
+
+        if (other.type != ENTITY_MINE || other.gold_held == 0) {
+            continue;
+        }
+        // TODO consider fog of war
+
+        SDL_Rect other_rect = (SDL_Rect) { .x = other.cell.x, .y = other.cell.y, .w = entity_cell_size(other.type),. h = entity_cell_size(other.type) };
+        int other_dist = euclidean_distance_squared_between(entity_rect, other_rect);
+        uint32_t other_attack_priority = ENTITY_DATA.at(other.type).attack_priority;
+        if (nearest_enemy_index == INDEX_INVALID || other_dist < nearest_enemy_dist || other_attack_priority > nearest_attack_priority) {
+            nearest_enemy_index = other_index;
+            nearest_enemy_dist = other_dist;
+            nearest_attack_priority = other_attack_priority;
+        }
+    }
+
+    if (nearest_enemy_index == INDEX_INVALID) {
+        return (target_t) {
+            .type = TARGET_NONE
+        };
+    }
+
+    return (target_t) {
+        .type = TARGET_ENTITY,
+        .id = state.entities.get_id_of(nearest_enemy_index)
+    };
+}
+
+target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity) {
+    SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type),. h = entity_cell_size(entity.type) };
+    uint32_t nearest_enemy_index = INDEX_INVALID;
+    int nearest_enemy_dist = -1;
+    uint32_t nearest_attack_priority;
+
+    for (uint32_t other_index = 0; other_index < state.entities.size(); other_index++) {
+        const entity_t& other = state.entities[other_index];
+
+        if (other.player_id != entity.player_id || other.type != ENTITY_CAMP || other.mode != MODE_BUILDING_FINISHED) {
+            continue;
+        }
+        // TODO consider fog of war
+
+        SDL_Rect other_rect = (SDL_Rect) { .x = other.cell.x, .y = other.cell.y, .w = entity_cell_size(other.type),. h = entity_cell_size(other.type) };
+
+        int other_dist = euclidean_distance_squared_between(entity_rect, other_rect);
+        uint32_t other_attack_priority = ENTITY_DATA.at(other.type).attack_priority;
+        if (nearest_enemy_index == INDEX_INVALID || other_dist < nearest_enemy_dist || other_attack_priority > nearest_attack_priority) {
+            nearest_enemy_index = other_index;
+            nearest_enemy_dist = other_dist;
+            nearest_attack_priority = other_attack_priority;
+        }
+    }
+
+    if (nearest_enemy_index == INDEX_INVALID) {
+        return (target_t) {
+            .type = TARGET_NONE
+        };
+    }
+
+    return (target_t) {
+        .type = TARGET_ENTITY,
         .id = state.entities.get_id_of(nearest_enemy_index)
     };
 }

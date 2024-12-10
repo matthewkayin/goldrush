@@ -8,6 +8,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
+static const uint32_t PLAYER_STARTING_GOLD = 200;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
@@ -89,6 +90,9 @@ match_state_t match_init() {
         if (player_id == network_get_player_id()) {
             match_camera_center_on_cell(state, player_spawn);
         }
+
+        state.player_gold[player_id] = PLAYER_STARTING_GOLD;
+
         entity_create_mine(state, player_spawn - xy(4, -4), 5000);
         entity_id camp_id = entity_create(state, ENTITY_CAMP, player_id, player_spawn);
         entity_t& camp = state.entities.get_by_id(camp_id);
@@ -96,9 +100,6 @@ match_state_t match_init() {
         camp.mode = MODE_BUILDING_FINISHED;
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 1));
-    }
-    for (uint32_t eindex = 0; eindex < state.entities.size(); eindex++) {
-        log_trace("id %u type %u mode %u", state.entities.get_id_of(eindex), state.entities[eindex].type, state.entities[eindex].mode);
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
@@ -1191,8 +1192,7 @@ void match_render(const match_state_t& state) {
 
     // Resource counters
     char gold_text[8];
-    // sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);
-    sprintf(gold_text, "0 haha");
+    sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);
     render_text(FONT_WESTERN8, gold_text, COLOR_WHITE, xy(SCREEN_WIDTH - 172 + 18, 4));
     render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 172, 2), RENDER_SPRITE_NO_CULL);
 

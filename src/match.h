@@ -328,6 +328,8 @@ struct match_state_t {
 
     // Entities
     id_array<entity_t, 400 * MAX_PLAYERS> entities;
+
+    uint32_t player_gold[MAX_PLAYERS];
 };
 
 match_state_t match_init();
@@ -404,6 +406,8 @@ bool entity_should_die(const entity_t& entity);
 SDL_Rect entity_get_sight_rect(const entity_t& entity);
 bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);
 target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity);
+target_t entity_target_nearest_mine(const match_state_t& state, const entity_t& entity);
+target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity);
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);
