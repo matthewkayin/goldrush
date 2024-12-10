@@ -125,9 +125,19 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
         }
     }
 
+    for (uint32_t index = 0; index < state.entities.size(); index++) {
+        const entity_t& entity = state.entities[index];
+        if (entity.type != ENTITY_MINE) {
+            continue;
+        }
 
-    // TODO
-    // Select mines
+        SDL_Rect entity_rect = entity_get_rect(entity);
+        if (SDL_HasIntersection(&entity_rect, &state.select_rect) == SDL_TRUE) {
+            selection.push_back(state.entities.get_id_of(index));
+            return selection;
+        }
+    }
+
     return selection;
 }
 
@@ -174,10 +184,10 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
 
     if (selected_entities_are_all_the_same_type) {
         switch (selected_entity_type) {
-            case UNIT_MINER:
+            case ENTITY_MINER:
                 state.ui_buttonset = UI_BUTTONSET_MINER;
                 return;
-            case BUILDING_CAMP:
+            case ENTITY_CAMP:
                 state.ui_buttonset = UI_BUTTONSET_CAMP;
                 return;
             default:
@@ -198,14 +208,13 @@ SelectionType ui_get_selection_type(const match_state_t& state) {
     }
 
     const entity_t& entity = state.entities.get_by_id(state.selection[0]);
-    // TODO check gold mine type
     if (entity_is_unit(entity.type)) {
         if (entity.player_id == network_get_player_id()) {
             return SELECTION_TYPE_UNITS;
         } else {
             return SELECTION_TYPE_ENEMY_UNIT;
         }
-    } else {
+    } else if (entity_is_building(entity.type)) {
         if (entity.player_id == network_get_player_id()) {
             return SELECTION_TYPE_BUILDINGS;
         } else {

@@ -99,8 +99,9 @@ const entity_id CELL_BLOCKED = ID_MAX + 2;
 
 // If you change this, make sure that entity_is_unit() and entity_is_building() still work
 enum EntityType {
-    UNIT_MINER,
-    BUILDING_CAMP
+    ENTITY_MINER,
+    ENTITY_CAMP,
+    ENTITY_MINE
 };
 
 enum EntityMode {
@@ -124,8 +125,7 @@ enum EntityMode {
 };
 
 const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
-const uint32_t ENTITY_FLAG_IS_GARRISONED = 2;
-const uint32_t ENTITY_FLAG_GOLD_HELD = 4;
+const uint32_t ENTITY_FLAG_ENTERING_MINE = 2;
 
 enum TargetType {
     TARGET_NONE,
@@ -184,6 +184,10 @@ struct entity_t {
     uint32_t timer;
 
     animation_t animation;
+
+    std::vector<entity_id> garrisoned_units;
+    entity_id garrison_id;
+    uint32_t gold_held;
 };
 
 struct unit_data_t {
@@ -375,6 +379,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
 
 // Entities
 entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id, xy cell);
+entity_id entity_create_mine(match_state_t& state, xy cell, uint32_t gold_left);
+void entity_update(match_state_t& state, uint32_t entity_index);
 
 bool entity_is_unit(EntityType entity);
 bool entity_is_building(EntityType type);
@@ -400,9 +406,9 @@ bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size
 target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity);
 
 void entity_set_target(entity_t& entity, target_t target);
-void entity_update(match_state_t& state, uint32_t entity_index);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);
 xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell);
+void entity_remove_garrisoned_unit(entity_t& entity, entity_id garrisoned_unit_id);
 void entity_stop_building(match_state_t& state, entity_id id);
 void entity_building_finish(match_state_t& state, entity_id building_id);
 

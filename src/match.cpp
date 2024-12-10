@@ -89,12 +89,13 @@ match_state_t match_init() {
         if (player_id == network_get_player_id()) {
             match_camera_center_on_cell(state, player_spawn);
         }
-        entity_id camp_id = entity_create(state, BUILDING_CAMP, player_id, player_spawn);
+        entity_create_mine(state, player_spawn - xy(4, -4), 5000);
+        entity_id camp_id = entity_create(state, ENTITY_CAMP, player_id, player_spawn);
         entity_t& camp = state.entities.get_by_id(camp_id);
         camp.health = ENTITY_DATA.at(camp.type).max_health;
         camp.mode = MODE_BUILDING_FINISHED;
-        entity_create(state, UNIT_MINER, player_id, player_spawn + xy(-1, 0));
-        entity_create(state, UNIT_MINER, player_id, player_spawn + xy(-1, 1));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 0));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 1));
     }
     for (uint32_t eindex = 0; eindex < state.entities.size(); eindex++) {
         log_trace("id %u type %u mode %u", state.entities.get_id_of(eindex), state.entities[eindex].type, state.entities[eindex].mode);
@@ -398,7 +399,7 @@ void match_update(match_state_t& state) {
         uint32_t entity_index = 0;
         while (entity_index < state.entities.size()) {
             if ((state.entities[entity_index].mode == MODE_UNIT_DEATH_FADE && !animation_is_playing(state.entities[entity_index].animation)) || 
-                    (entity_check_flag(state.entities[entity_index], ENTITY_FLAG_IS_GARRISONED) && state.entities[entity_index].health == 0) ||
+                    (state.entities[entity_index].garrison_id != ID_NULL && state.entities[entity_index].health == 0) ||
                     (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0)) {
                 state.entities.remove_at(entity_index);
                 // state.is_fog_dirty = true;
@@ -493,9 +494,9 @@ input_t match_create_move_input(const match_state_t& state) {
         input.type = INPUT_MOVE_UNLOAD;
     } else if (state.ui_mode == UI_MODE_TARGET_REPAIR) {
         input.type = INPUT_MOVE_REPAIR;
-    } else if (input.move.target_id != ID_NULL && 
+    } else if (input.move.target_id != ID_NULL && state.entities.get_by_id(input.move.target_id).type != ENTITY_MINE &&
                (state.ui_mode == UI_MODE_TARGET_ATTACK || 
-               state.entities.get_by_id(input.move.target_id).player_id != network_get_player_id())) {
+                state.entities.get_by_id(input.move.target_id).player_id != network_get_player_id())) {
         input.type = INPUT_MOVE_ATTACK_ENTITY;
     } else if (input.move.target_id == ID_NULL && state.ui_mode == UI_MODE_TARGET_ATTACK) {
         input.type = INPUT_MOVE_ATTACK_CELL;
@@ -940,8 +941,9 @@ void match_render(const match_state_t& state) {
             // Select ring
             render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || entity.player_id == network_get_player_id()), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
-            // TOOD ignore all this code if is gold mine
-
+            if (entity.type == ENTITY_MINE) {
+                continue;
+            }
             // Determine the healthbar rect
             SDL_Rect entity_rect = entity_get_rect(entity);
             entity_rect.x -= state.camera_offset.x;
@@ -952,10 +954,8 @@ void match_render(const match_state_t& state) {
 
         // Entities
         for (entity_t entity : state.entities) {
-            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
-                continue;
-            }
-            if (entity_get_elevation(state, entity) != elevation) {
+            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || 
+                    entity.garrison_id != ID_NULL || entity_get_elevation(state, entity) != elevation) {
                 continue;
             }
 
@@ -1124,27 +1124,28 @@ void match_render(const match_state_t& state) {
         render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(entity_data.ui_button - 1, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
 
-        // TODO don't render healthbar for gold mine
-        xy healthbar_position = SELECTION_LIST_TOP_LEFT + xy(0, 18 + 35);
-        xy healthbar_size = xy(64, 12);
-        match_render_healthbar(healthbar_position, healthbar_size, entity.health, entity_data.max_health);
+        if (entity.type != ENTITY_MINE) {
+            xy healthbar_position = SELECTION_LIST_TOP_LEFT + xy(0, 18 + 35);
+            xy healthbar_size = xy(64, 12);
+            match_render_healthbar(healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 
-        char health_text[10];
-        sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
-        SDL_Surface* health_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_HACK], health_text, COLOR_WHITE);
-        GOLD_ASSERT(health_text_surface != NULL);
-        SDL_Texture* health_text_texture = SDL_CreateTextureFromSurface(engine.renderer, health_text_surface);
-        GOLD_ASSERT(health_text_texture != NULL);
-        SDL_Rect health_text_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = health_text_surface->w, .h = health_text_surface->h };
-        SDL_Rect health_text_dst_rect = (SDL_Rect) {
-            .x = healthbar_position.x + (healthbar_size.x / 2) - (health_text_surface->w / 2),
-            .y = healthbar_position.y + (healthbar_size.y / 2) - (health_text_surface->h / 2),
-            .w = health_text_src_rect.w,
-            .h = health_text_src_rect.h
-        };
-        SDL_RenderCopy(engine.renderer, health_text_texture, &health_text_src_rect, &health_text_dst_rect);
-        SDL_DestroyTexture(health_text_texture);
-        SDL_FreeSurface(health_text_surface);
+            char health_text[10];
+            sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
+            SDL_Surface* health_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_HACK], health_text, COLOR_WHITE);
+            GOLD_ASSERT(health_text_surface != NULL);
+            SDL_Texture* health_text_texture = SDL_CreateTextureFromSurface(engine.renderer, health_text_surface);
+            GOLD_ASSERT(health_text_texture != NULL);
+            SDL_Rect health_text_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = health_text_surface->w, .h = health_text_surface->h };
+            SDL_Rect health_text_dst_rect = (SDL_Rect) {
+                .x = healthbar_position.x + (healthbar_size.x / 2) - (health_text_surface->w / 2),
+                .y = healthbar_position.y + (healthbar_size.y / 2) - (health_text_surface->h / 2),
+                .w = health_text_src_rect.w,
+                .h = health_text_src_rect.h
+            };
+            SDL_RenderCopy(engine.renderer, health_text_texture, &health_text_src_rect, &health_text_dst_rect);
+            SDL_DestroyTexture(health_text_texture);
+            SDL_FreeSurface(health_text_surface);
+        }
     } else {
         for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
             const entity_t& entity = state.entities.get_by_id(state.selection[0]);
@@ -1207,7 +1208,7 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
         .frame = entity_get_animation_frame(entity),
         .position = entity.position.to_xy() - state.camera_offset,
         .options = 0,
-        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED ? (uint8_t)RECOLOR_NONE : entity.player_id
+        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_MINE ? (uint8_t)RECOLOR_NONE : entity.player_id
     };
     // Adjust render position for units because they are centered
     if (entity_is_unit(entity.type)) {
