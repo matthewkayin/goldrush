@@ -60,6 +60,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 16,
         .strategy = SPRITE_IMPORT_TILE_SIZE
     }},
+    { SPRITE_TILE_GOLD, (sprite_params_t) {
+        .path = "sprite/tile_gold.png",
+        .hframes = 3,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
     { SPRITE_UI_FRAME, (sprite_params_t) {
         .path = "sprite/ui_frame.png",
         .hframes = 3,
@@ -263,12 +269,6 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 4,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_RECOLOR
-    }},
-    { SPRITE_BUILDING_MINE, (sprite_params_t) {
-        .path = "sprite/building_mine.png",
-        .hframes = 3,
-        .vframes = 1,
-        .strategy = SPRITE_IMPORT_DEFAULT
     }},
     { SPRITE_BUILDING_DESTROYED_2, (sprite_params_t) {
         .path = "sprite/building_destroyed2x2.png",

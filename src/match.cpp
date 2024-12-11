@@ -93,7 +93,10 @@ match_state_t match_init() {
 
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
-        entity_create_mine(state, player_spawn - xy(4, -4), 5000);
+        entity_create_gold(state, player_spawn + xy(4, 4), 100);
+        entity_create_gold(state, player_spawn + xy(5, 4), 100);
+        entity_create_gold(state, player_spawn + xy(6, 5), 100);
+        entity_create_gold(state, player_spawn + xy(7, 4), 100);
         entity_id camp_id = entity_create(state, ENTITY_CAMP, player_id, player_spawn);
         entity_t& camp = state.entities.get_by_id(camp_id);
         camp.health = ENTITY_DATA.at(camp.type).max_health;
@@ -495,7 +498,7 @@ input_t match_create_move_input(const match_state_t& state) {
         input.type = INPUT_MOVE_UNLOAD;
     } else if (state.ui_mode == UI_MODE_TARGET_REPAIR) {
         input.type = INPUT_MOVE_REPAIR;
-    } else if (input.move.target_id != ID_NULL && state.entities.get_by_id(input.move.target_id).type != ENTITY_MINE &&
+    } else if (input.move.target_id != ID_NULL && state.entities.get_by_id(input.move.target_id).type != ENTITY_GOLD &&
                (state.ui_mode == UI_MODE_TARGET_ATTACK || 
                 state.entities.get_by_id(input.move.target_id).player_id != network_get_player_id())) {
         input.type = INPUT_MOVE_ATTACK_ENTITY;
@@ -942,7 +945,7 @@ void match_render(const match_state_t& state) {
             // Select ring
             render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || entity.player_id == network_get_player_id()), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
-            if (entity.type == ENTITY_MINE) {
+            if (entity.type == ENTITY_GOLD) {
                 continue;
             }
             // Determine the healthbar rect
@@ -1125,7 +1128,7 @@ void match_render(const match_state_t& state) {
         render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(entity_data.ui_button - 1, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
 
-        if (entity.type != ENTITY_MINE) {
+        if (entity.type != ENTITY_GOLD) {
             xy healthbar_position = SELECTION_LIST_TOP_LEFT + xy(0, 18 + 35);
             xy healthbar_size = xy(64, 12);
             match_render_healthbar(healthbar_position, healthbar_size, entity.health, entity_data.max_health);
@@ -1208,7 +1211,7 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
         .frame = entity_get_animation_frame(entity),
         .position = entity.position.to_xy() - state.camera_offset,
         .options = 0,
-        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_MINE ? (uint8_t)RECOLOR_NONE : entity.player_id
+        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : entity.player_id
     };
     // Adjust render position for units because they are centered
     if (entity_is_unit(entity.type)) {

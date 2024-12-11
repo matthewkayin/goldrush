@@ -48,7 +48,7 @@ void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id v
     }
 }
 
-bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin, bool ignore_miners) {
+bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin, bool gold_walk) {
     entity_id origin_id = origin.x == -1 ? ID_NULL : map_get_cell(state, origin);
 
     for (int y = cell.y; y < cell.y + cell_size; y++) {
@@ -60,8 +60,8 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_siz
             if (origin_id != ID_NULL && xy::manhattan_distance(origin, xy(x, y)) > 3) {
                 continue;
             }
-            if (ignore_miners) {
-                // TODO
+            if (gold_walk && entity_is_unit(state.entities.get_by_id(cell_id).type)) {
+                continue;
             }
 
             return true;
@@ -113,7 +113,7 @@ xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int st
     return nearest_cell_dist != -1 ? nearest_cell : start;
 }
 
-void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool ignore_miners) {
+void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk) {
     struct node_t {
         int cost;
         int distance;
@@ -134,7 +134,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
     }
 
     // Find an alternate cell for large units
-    if (cell_size > 1 && map_is_cell_rect_occupied(state, to, cell_size, from, ignore_miners)) {
+    if (cell_size > 1 && map_is_cell_rect_occupied(state, to, cell_size, from, gold_walk)) {
         xy nearest_alternative;
         int nearest_alternative_distance = -1;
         for (int x = 0; x < cell_size; x++) {
@@ -145,7 +145,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
 
                 xy alternative = to - xy(x, y);
                 if (map_is_cell_rect_in_bounds(state, alternative, cell_size) &&
-                    !map_is_cell_rect_occupied(state, alternative, cell_size, from, ignore_miners)) {
+                    !map_is_cell_rect_occupied(state, alternative, cell_size, from, gold_walk)) {
                     if (nearest_alternative_distance == -1 || xy::manhattan_distance(from, alternative) < nearest_alternative_distance) {
                         nearest_alternative = alternative;
                         nearest_alternative_distance = xy::manhattan_distance(from, alternative);
@@ -226,7 +226,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
             }
 
             // Skip occupied cells (unless the child is the goal. this avoids worst-case pathing)
-            if (map_is_cell_rect_occupied(state, child.cell, cell_size, from, ignore_miners) &&
+            if (map_is_cell_rect_occupied(state, child.cell, cell_size, from, gold_walk) &&
                 !(child.cell == to && xy::manhattan_distance(smallest.cell, child.cell) == 1)) {
                 continue;
             }
@@ -280,7 +280,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
     if (!path->empty()) {
         // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,
         // but if the target_cell really is blocked, we need to remove it from the path. The unit will path as close as they can.
-        if ((*path)[path->size() - 1] == to && map_is_cell_rect_occupied(state, to, cell_size, from, ignore_miners)) {
+        if ((*path)[path->size() - 1] == to && map_is_cell_rect_occupied(state, to, cell_size, from, gold_walk)) {
             path->pop_back();
         }
     }

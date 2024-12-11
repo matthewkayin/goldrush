@@ -127,7 +127,7 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
 
     for (uint32_t index = 0; index < state.entities.size(); index++) {
         const entity_t& entity = state.entities[index];
-        if (entity.type != ENTITY_MINE) {
+        if (entity.type != ENTITY_GOLD) {
             continue;
         }
 

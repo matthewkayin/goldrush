@@ -101,7 +101,7 @@ const entity_id CELL_BLOCKED = ID_MAX + 2;
 enum EntityType {
     ENTITY_MINER,
     ENTITY_CAMP,
-    ENTITY_MINE
+    ENTITY_GOLD
 };
 
 enum EntityMode {
@@ -113,7 +113,7 @@ enum EntityMode {
     MODE_UNIT_REPAIR,
     MODE_UNIT_ATTACK_WINDUP,
     MODE_UNIT_ATTACK_COOLDOWN,
-    MODE_UNIT_IN_MINE,
+    MODE_UNIT_MINE,
     MODE_UNIT_DEATH,
     MODE_UNIT_DEATH_FADE,
     MODE_BUILDING_IN_PROGRESS,
@@ -125,7 +125,6 @@ enum EntityMode {
 };
 
 const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
-const uint32_t ENTITY_FLAG_ENTERING_MINE = 2;
 
 enum TargetType {
     TARGET_NONE,
@@ -187,6 +186,7 @@ struct entity_t {
 
     std::vector<entity_id> garrisoned_units;
     entity_id garrison_id;
+
     uint32_t gold_held;
 };
 
@@ -377,11 +377,11 @@ entity_id map_get_cell(const match_state_t& state, xy cell);
 void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value);
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
 xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
-void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool ignore_miners);
+void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
 
 // Entities
 entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id, xy cell);
-entity_id entity_create_mine(match_state_t& state, xy cell, uint32_t gold_left);
+entity_id entity_create_gold(match_state_t& state, xy cell, uint32_t gold_left);
 void entity_update(match_state_t& state, uint32_t entity_index);
 
 bool entity_is_unit(EntityType entity);
@@ -406,8 +406,9 @@ bool entity_should_die(const entity_t& entity);
 SDL_Rect entity_get_sight_rect(const entity_t& entity);
 bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);
 target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity);
-target_t entity_target_nearest_mine(const match_state_t& state, const entity_t& entity);
+target_t entity_target_nearest_gold(const match_state_t& state, const entity_t& entity);
 target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity);
+bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity);
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);
