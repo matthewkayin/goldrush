@@ -737,6 +737,26 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 } else {
                     target.id = input.move.target_id;
                 }
+                if (entity.type == ENTITY_MINER && target_index != INDEX_INVALID && state.entities[target_index].type == ENTITY_GOLD) {
+                    target = (target_t) {
+                        .type = TARGET_GOLD,
+                        .gold = (target_gold_t) {
+                            .gold_id = input.move.target_id,
+                            .unit_cell = state.entities[target_index].cell
+                        }
+                    };
+                    int nearest_dist = -1;
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                        xy gold_cell = state.entities[target_index].cell + DIRECTION_XY[direction];
+                        if (!map_is_cell_in_bounds(state, gold_cell)) {
+                            continue;
+                        }
+                        if (nearest_dist == -1 || xy::manhattan_distance(entity.cell, gold_cell) < nearest_dist) {
+                            target.gold.unit_cell = gold_cell;
+                            nearest_dist = xy::manhattan_distance(entity.cell, gold_cell);
+                        }
+                    }
+                }
                 entity_set_target(entity, target);
             } // End for each unit in move input
             break;

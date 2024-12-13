@@ -40,6 +40,18 @@ entity_id map_get_cell(const match_state_t& state, xy cell) {
     return state.map_cells[cell.x + (cell.y * state.map_width)];
 }
 
+bool map_is_cell_rect_equal_to(const match_state_t& state, xy cell, int cell_size, entity_id value) {
+    for (int y = cell.y; y < cell.y + cell_size; y++) {
+        for (int x = cell.x; x < cell.x + cell_size; x++) {
+            if (state.map_cells[x + (y * state.map_width)] != value) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {

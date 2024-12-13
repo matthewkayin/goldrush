@@ -241,16 +241,19 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     // If the unit is not moving between tiles, then pop the next cell off the path
                     if (entity.position == entity_get_target_position(entity) && !entity.path.empty()) {
                         entity.direction = enum_from_xy_direction(entity.path[0] - entity.cell);
-                        bool gold_walk = entity_should_gold_walk(state, entity) && entity.path.size() > 1;
-                        if (map_is_cell_rect_occupied(state, entity.path[0], entity_cell_size(entity.type), entity.cell, gold_walk)) {
+                        if (map_is_cell_rect_occupied(state, entity.path[0], entity_cell_size(entity.type), entity.cell, entity_should_gold_walk(state, entity))) {
                             path_is_blocked = true;
                             // breaks out of while movement left
                             break;
                         }
 
-                        map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
+                        if (map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id)) {
+                            map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
+                        }
                         entity.cell = entity.path[0];
-                        map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
+                        if (map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY)) {
+                            map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
+                        }
                         entity.path.erase(entity.path.begin());
                     }
 
@@ -287,6 +290,14 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 } // End while movement left
 
                 if (path_is_blocked) {
+                    if (entity.target.type == TARGET_GOLD) {
+                        entity.target = entity_target_nearest_gold(state, entity);
+                        if (entity.target.type == TARGET_NONE || map_get_cell(state, entity.target.gold.unit_cell) == CELL_EMPTY) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+                        // else, if the new target was also blocked, then just path pause
+                    }
                     entity.mode = MODE_UNIT_MOVE_BLOCKED;
                     entity.timer = UNIT_MOVE_BLOCKED_DURATION;
                 }
@@ -382,17 +393,21 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     }
                     case TARGET_REPAIR:
                     case TARGET_ENTITY: 
-                    case TARGET_ATTACK_ENTITY: {
+                    case TARGET_ATTACK_ENTITY: 
+                    case TARGET_GOLD: {
                         if (entity_is_target_invalid(state, entity)) {
-                            entity.target = (target_t) {
-                                .type = TARGET_NONE
-                            };
+                            entity.target = entity.target.type == TARGET_GOLD
+                                                ? entity_target_nearest_gold(state, entity)
+                                                : entity.target = (target_t) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
 
                         if (!entity_has_reached_target(state, entity)) {
                             // This will trigger a repath
+                            if (entity.target.type == TARGET_GOLD) {
+                                entity.target = entity_target_nearest_gold(state, entity);
+                            }
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
@@ -400,17 +415,18 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity_t& target = state.entities.get_by_id(entity.target.id);
 
                         // Reached gold
-                        if (entity.type == ENTITY_MINER && target.type == ENTITY_GOLD) {
+                        if (entity.target.type == TARGET_GOLD) {
                             if (entity.gold_held == UNIT_MAX_GOLD_HELD) {
                                 entity.target = entity_target_nearest_camp(state, entity);
                                 entity.mode = MODE_UNIT_IDLE;
-                                update_finished = true;
-                                break;
+                            } else {
+                                entity.timer = UNIT_MINE_TICK_DURATION;
+                                entity.mode = MODE_UNIT_MINE;
+                                entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
                             }
 
-                            entity.timer = UNIT_MINE_TICK_DURATION;
-                            entity.mode = MODE_UNIT_MINE;
-                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
+                            update_finished = true;
+                            break;
                         }
 
                         // Begin attack
@@ -849,6 +865,9 @@ bool entity_has_reached_target(const match_state_t& state, const entity_t& entit
                         ? sdl_rects_are_adjacent(entity_rect, target_rect)
                         : euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
         }
+        case TARGET_GOLD: {
+            return entity.cell == entity.target.gold.unit_cell;
+        }
     }
 }
 
@@ -872,6 +891,9 @@ xy entity_get_target_cell(const match_state_t& state, const entity_t& entity) {
             const entity_t& target = state.entities.get_by_id(entity.target.id);
             // TODO: allow blocked cells if it's a camp
             return map_get_nearest_cell_around_rect(state, entity.cell, entity_cell_size(entity.type), target.cell, entity_cell_size(target.type), false);
+        }
+        case TARGET_GOLD: {
+            return entity.target.gold.unit_cell;
         }
     }
 }
@@ -1017,48 +1039,54 @@ target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t&
 }
 
 target_t entity_target_nearest_gold(const match_state_t& state, const entity_t& entity) {
-    SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type),. h = entity_cell_size(entity.type) };
-    uint32_t nearest_enemy_index = INDEX_INVALID;
-    int nearest_enemy_dist = -1;
-    uint32_t nearest_free_cells;
+    uint32_t nearest_index = INDEX_INVALID;
+    xy nearest_cell = xy(-1, -1);
+    int nearest_dist = -1;
 
-    for (uint32_t other_index = 0; other_index < state.entities.size(); other_index++) {
-        const entity_t& other = state.entities[other_index];
+    for (uint32_t gold_index = 0; gold_index < state.entities.size(); gold_index++) {
+        const entity_t& gold = state.entities[gold_index];
 
-        if (other.type != ENTITY_GOLD) {
+        if (gold.type != ENTITY_GOLD) {
             continue;
         }
 
-        uint32_t free_cells = 0;
         for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-            xy gold_neighbor_cell = other.cell + DIRECTION_XY[direction];
+            xy gold_neighbor_cell = gold.cell + DIRECTION_XY[direction];
             if (!map_is_cell_in_bounds(state, gold_neighbor_cell)) {
                 continue;
             }
-            if (map_get_cell(state, gold_neighbor_cell) == CELL_EMPTY) {
-                free_cells++;
+            if (nearest_dist == -1) {
+                nearest_index = gold_index;
+                nearest_dist = xy::manhattan_distance(entity.cell, gold_neighbor_cell);
+                nearest_cell = gold_neighbor_cell;
+                continue;
+            }
+            // Don't choose a blocked cell if we've already found an empty cell
+            if (map_get_cell(state, gold_neighbor_cell) != CELL_EMPTY && map_get_cell(state, nearest_cell) == CELL_EMPTY) {
+                continue;
+            }
+            if ((map_get_cell(state, gold_neighbor_cell) == CELL_EMPTY && map_get_cell(state, nearest_cell) != CELL_EMPTY) ||
+                    xy::manhattan_distance(entity.cell, gold_neighbor_cell) < nearest_dist) {
+                nearest_index = gold_index;
+                nearest_dist = xy::manhattan_distance(entity.cell, gold_neighbor_cell);
+                nearest_cell = gold_neighbor_cell;
             }
         }
         // TODO consider fog of war
-
-        SDL_Rect other_rect = (SDL_Rect) { .x = other.cell.x, .y = other.cell.y, .w = entity_cell_size(other.type),. h = entity_cell_size(other.type) };
-        int other_dist = euclidean_distance_squared_between(entity_rect, other_rect);
-        if (nearest_enemy_index == INDEX_INVALID || free_cells > nearest_free_cells || (other_dist < nearest_enemy_dist && free_cells == nearest_free_cells)) {
-            nearest_enemy_index = other_index;
-            nearest_enemy_dist = other_dist;
-            nearest_free_cells = free_cells;
-        }
     }
 
-    if (nearest_enemy_index == INDEX_INVALID) {
+    if (nearest_index == INDEX_INVALID) {
         return (target_t) {
             .type = TARGET_NONE
         };
     }
 
     return (target_t) {
-        .type = TARGET_ENTITY,
-        .id = state.entities.get_id_of(nearest_enemy_index)
+        .type = TARGET_GOLD,
+        .gold = (target_gold_t) {
+            .gold_id = state.entities.get_id_of(nearest_index),
+            .unit_cell = nearest_cell
+        }
     };
 }
 
@@ -1097,15 +1125,23 @@ target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& 
 }
 
 bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity) {
-    if (entity.target.type != TARGET_ENTITY || entity.type != ENTITY_MINER) {
+    if (!(entity.target.type == TARGET_ENTITY || entity.target.type == TARGET_GOLD) || entity.type != ENTITY_MINER) {
         return false;
     }
-    uint32_t target_index = state.entities.get_index_of(entity.target.id);
+    uint32_t target_index = state.entities.get_index_of(entity.target.type == TARGET_GOLD ? entity.target.gold.gold_id : entity.target.id);
     if (target_index == INDEX_INVALID) {
         return false;
     }
 
-    return state.entities[target_index].type == ENTITY_GOLD || (state.entities[target_index].type == ENTITY_CAMP && entity.gold_held != 0);
+    if (state.entities[target_index].type == ENTITY_GOLD) {
+        if (!entity.path.empty() && entity.path[0] == entity.target.gold.unit_cell) {
+            return false;
+        }
+        return true;
+    } else {
+        // target type is camp
+        return entity.gold_held != 0;
+    }
 }
 
 void entity_set_target(entity_t& entity, target_t target) {
