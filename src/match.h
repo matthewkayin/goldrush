@@ -140,25 +140,23 @@ enum TargetType {
     TARGET_GOLD
 };
 
-struct target_gold_t {
-    entity_id gold_id;
-    xy unit_cell;
-};
-
 struct target_build_t {
     xy unit_cell;
     xy building_cell;
     EntityType building_type;
-    entity_id building_id;
+};
+
+struct target_repair_t {
+    uint32_t health_repaired;
 };
 
 struct target_t {
     TargetType type;
+    entity_id id;
+    xy cell;
     union {
-        entity_id id;
-        xy cell;
         target_build_t build;
-        target_gold_t gold;
+        target_repair_t repair;
     };
 };
 

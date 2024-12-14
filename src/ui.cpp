@@ -369,8 +369,8 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
 
                 if (building.queue.size() == BUILDING_QUEUE_MAX) {
                     ui_show_status(state, UI_STATUS_BUILDING_QUEUE_FULL);
-                // } else if (state.player_gold[network_get_player_id()] < building_queue_item_cost(item)) {
-                    // ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
+                } else if (state.player_gold[network_get_player_id()] < building_queue_item_cost(item)) {
+                    ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
                 } else {
                     input_t input = (input_t) {
                         .type = INPUT_BUILDING_ENQUEUE,
@@ -382,6 +382,11 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
                     state.input_queue.push_back(input);
                 }
             } else {
+                if (state.player_gold[network_get_player_id()] < it.second.gold_cost) {
+                    ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
+                    return;
+                }
+
                 state.ui_mode = UI_MODE_BUILDING_PLACE;
                 state.ui_building_type = entity_type;
                 state.ui_buttonset = UI_BUTTONSET_CANCEL;

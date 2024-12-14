@@ -8,7 +8,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
-static const uint32_t PLAYER_STARTING_GOLD = 200;
+static const uint32_t PLAYER_STARTING_GOLD = 300;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
@@ -93,20 +93,16 @@ match_state_t match_init() {
 
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
-        entity_create_gold(state, player_spawn + xy(4, 4), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(5, 4), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(6, 5), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(7, 4), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(-4, 4), 15, 1);
-        entity_create_gold(state, player_spawn + xy(-5, 4), 15, 1);
-        entity_create_gold(state, player_spawn + xy(-6, 5), 15, 1);
-        entity_create_gold(state, player_spawn + xy(-7, 4), 15, 1);
-        entity_id camp_id = entity_create(state, ENTITY_CAMP, player_id, player_spawn);
-        entity_t& camp = state.entities.get_by_id(camp_id);
-        camp.health = ENTITY_DATA.at(camp.type).max_health;
-        camp.mode = MODE_BUILDING_FINISHED;
+        entity_create_gold(state, player_spawn + xy(0, 4), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(1, 4), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(2, 5), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(3, 4), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(4, 5), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(5, 5), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(6, 4), 1500, 0);
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 1));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 2));
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
@@ -739,16 +735,11 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                             target.cell = group_move_cell;
                         }
                     }
-                } else {
-                    target.id = input.move.target_id;
-                }
-                if (entity.type == ENTITY_MINER && target_index != INDEX_INVALID && state.entities[target_index].type == ENTITY_GOLD) {
+                } else if (entity.type == ENTITY_MINER && state.entities[target_index].type == ENTITY_GOLD) {
                     target = (target_t) {
                         .type = TARGET_GOLD,
-                        .gold = (target_gold_t) {
-                            .gold_id = input.move.target_id,
-                            .unit_cell = state.entities[target_index].cell
-                        }
+                        .id = input.move.target_id,
+                        .cell = state.entities[target_index].cell
                     };
                     int nearest_dist = -1;
                     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
@@ -757,20 +748,27 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                             continue;
                         }
                         if (nearest_dist == -1 || xy::manhattan_distance(entity.cell, gold_cell) < nearest_dist) {
-                            target.gold.unit_cell = gold_cell;
+                            target.cell = gold_cell;
                             nearest_dist = xy::manhattan_distance(entity.cell, gold_cell);
                         }
                     }
+                } else if (target.type == TARGET_REPAIR) {
+                    target.id = input.move.target_id;
+                    target.repair = (target_repair_t) {
+                        .health_repaired = 0
+                    };
+                } else {
+                    target.id = input.move.target_id;
                 }
                 entity_set_target(entity, target);
 
                 if (entity.target.type == TARGET_GOLD) {
-                    entity.gold_patch_id = state.entities.get_by_id(entity.target.gold.gold_id).gold_patch_id;
+                    entity.gold_patch_id = state.entities.get_by_id(entity.target.id).gold_patch_id;
                 } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY && state.entities[target_index].type == ENTITY_CAMP && entity.gold_held) {
                     target_t nearest_gold_target = entity_target_nearest_gold(state, state.entities[target_index].cell, GOLD_PATCH_ID_NULL);
                     entity.gold_patch_id = nearest_gold_target.type == TARGET_NONE
                                             ? GOLD_PATCH_ID_NULL
-                                            : state.entities.get_by_id(nearest_gold_target.gold.gold_id).gold_patch_id;
+                                            : state.entities.get_by_id(nearest_gold_target.id).gold_patch_id;
                 }
             } // End for each unit in move input
             break;
@@ -810,11 +808,11 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             entity_t& lead_builder = state.entities.get_by_id(lead_builder_id);
             lead_builder.target = (target_t) {
                 .type = TARGET_BUILD,
+                .id = ID_NULL,
                 .build = (target_build_t) {
                     .unit_cell = get_nearest_cell_in_rect(lead_builder.cell, input.build.target_cell, entity_cell_size((EntityType)input.build.building_type)),
                     .building_cell = input.build.target_cell,
-                    .building_type = (EntityType)input.build.building_type,
-                    .building_id = ID_NULL
+                    .building_type = (EntityType)input.build.building_type
                 }
             };
 
@@ -840,7 +838,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 
             // Tell the builder to stop building
             for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-                if (state.entities[entity_index].target.type == TARGET_BUILD && state.entities[entity_index].target.build.building_id == input.build_cancel.building_id) {
+                if (state.entities[entity_index].target.type == TARGET_BUILD && state.entities[entity_index].target.id == input.build_cancel.building_id) {
                     entity_t& builder = state.entities[entity_index];
                     builder.cell = builder.target.build.building_cell;
                     builder.position = cell_center(builder.cell);
@@ -1254,7 +1252,7 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
 
         bool should_flip_h = entity_should_flip_h(entity);
         if (entity.mode == MODE_UNIT_BUILD) {
-            const entity_t& building = state.entities.get_by_id(entity.target.build.building_id);
+            const entity_t& building = state.entities.get_by_id(entity.target.id);
             const entity_data_t& building_data = ENTITY_DATA.at(building.type);
             int building_hframe = entity_get_animation_frame(building).x;
             render_params.position = building.position.to_xy() + xy(building_data.building_data.builder_positions_x[building_hframe], building_data.building_data.builder_positions_y[building_hframe]) - state.camera_offset;
