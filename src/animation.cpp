@@ -2,86 +2,127 @@
 
 #include "asserts.h"
 
-const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA = {
-    { ANIMATION_UI_MOVE_CELL, (animation_data_t) {
+static std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA; 
+
+void animation_init() {
+    ANIMATION_DATA[ANIMATION_UI_MOVE_CELL] = (animation_data_t) {
         .vframe = 0,
-        .hframe_start = 0, .hframe_end = 4,
-        .frame_duration = 4,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 4 },
+            (animation_frame_t) { .hframe = 1, .duration = 4 },
+            (animation_frame_t) { .hframe = 2, .duration = 4 },
+            (animation_frame_t) { .hframe = 3, .duration = 4 }
+        },
         .loops = 1
-    }},
-    { ANIMATION_UI_MOVE_ENTITY, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_UI_MOVE_ENTITY] = (animation_data_t) {
         .vframe = 0,
-        .hframe_start = 0, .hframe_end = 1,
-        .frame_duration = 8,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 8 },
+            (animation_frame_t) { .hframe = 1, .duration = 8 }
+        },
         .loops = 2
-    }},
-    { ANIMATION_UI_MOVE_ATTACK_ENTITY, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_UI_MOVE_ATTACK_ENTITY] = (animation_data_t) {
         .vframe = 0,
-        .hframe_start = 0, .hframe_end = 1,
-        .frame_duration = 8,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 8 },
+            (animation_frame_t) { .hframe = 1, .duration = 8 }
+        },
         .loops = 2
-    }},
-    { ANIMATION_UNIT_IDLE, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_UNIT_IDLE] = (animation_data_t) {
         .vframe = -1,
-        .hframe_start = 0, .hframe_end = 0,
-        .frame_duration = 0,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 0 }
+        },
         .loops = 0
-    }},
-    { ANIMATION_UNIT_MOVE, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_UNIT_MOVE] = (animation_data_t) {
         .vframe = -1,
-        .hframe_start = 1, .hframe_end = 4,
-        .frame_duration = 8,
+        .frames = {
+            (animation_frame_t) { .hframe = 1, .duration = 8 },
+            (animation_frame_t) { .hframe = 2, .duration = 8 },
+            (animation_frame_t) { .hframe = 3, .duration = 8 },
+            (animation_frame_t) { .hframe = 4, .duration = 8 }
+        },
         .loops = ANIMATION_LOOPS_INDEFINITELY
-    }},
-    { ANIMATION_UNIT_MOVE_HALF_SPEED, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_UNIT_ATTACK] = (animation_data_t) {
         .vframe = -1,
-        .hframe_start = 1, .hframe_end = 4,
-        .frame_duration = 10,
-        .loops = ANIMATION_LOOPS_INDEFINITELY
-    }},
-    { ANIMATION_UNIT_ATTACK, (animation_data_t) {
-        .vframe = -1,
-        .hframe_start = 5, .hframe_end = 7,
-        .frame_duration = 8,
+        .frames = {
+            (animation_frame_t) { .hframe = 5, .duration = 8 },
+            (animation_frame_t) { .hframe = 6, .duration = 8 },
+            (animation_frame_t) { .hframe = 7, .duration = 8 }
+        },
         .loops = 1
-    }},
-    { ANIMATION_UNIT_BUILD, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_UNIT_MINE] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 5, .duration = 8 },
+            (animation_frame_t) { .hframe = 6, .duration = 8 },
+            (animation_frame_t) { .hframe = 7, .duration = 16 }
+        },
+        .loops = 1
+    };
+    ANIMATION_DATA[ANIMATION_UNIT_BUILD] = (animation_data_t) {
         .vframe = 0,
-        .hframe_start = 0, .hframe_end = 1,
-        .frame_duration = 8,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 8 },
+            (animation_frame_t) { .hframe = 1, .duration = 8 }
+        },
         .loops = ANIMATION_LOOPS_INDEFINITELY
-    }},
-    { ANIMATION_UNIT_DEATH, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_UNIT_DEATH] = (animation_data_t) {
         .vframe = -1,
-        .hframe_start = 8, .hframe_end = 11,
-        .frame_duration = 4,
+        .frames = {
+            (animation_frame_t) { .hframe = 8, .duration = 4 },
+            (animation_frame_t) { .hframe = 10, .duration = 4 },
+            (animation_frame_t) { .hframe = 11, .duration = 4 }
+        },
         .loops = 1
-    }},
-    { ANIMATION_UNIT_DEATH_FADE, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_UNIT_DEATH_FADE] = (animation_data_t) {
         .vframe = -1,
-        .hframe_start = 12, .hframe_end = 14,
-        .frame_duration = 180,
+        .frames = {
+            (animation_frame_t) { .hframe = 12, .duration = 180 },
+            (animation_frame_t) { .hframe = 13, .duration = 180 },
+            (animation_frame_t) { .hframe = 14, .duration = 180 }
+        },
         .loops = 1
-    }},
-    { ANIMATION_RALLY_FLAG, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_RALLY_FLAG] = (animation_data_t) {
         .vframe = 0,
-        .hframe_start = 0, .hframe_end = 5,
-        .frame_duration = 6,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 6 },
+            (animation_frame_t) { .hframe = 1, .duration = 6 },
+            (animation_frame_t) { .hframe = 2, .duration = 6 },
+            (animation_frame_t) { .hframe = 3, .duration = 6 },
+            (animation_frame_t) { .hframe = 4, .duration = 6 },
+            (animation_frame_t) { .hframe = 5, .duration = 6 },
+        },
         .loops = ANIMATION_LOOPS_INDEFINITELY
-    }},
-    { ANIMATION_PARTICLE_SPARKS, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_PARTICLE_SPARKS] = (animation_data_t) {
         .vframe = -1,
-        .hframe_start = 0, .hframe_end = 3,
-        .frame_duration = 3,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 3 },
+            (animation_frame_t) { .hframe = 1, .duration = 3 },
+            (animation_frame_t) { .hframe = 2, .duration = 3 },
+            (animation_frame_t) { .hframe = 3, .duration = 3 },
+        },
         .loops = 1
-    }},
-    { ANIMATION_PARTICLE_BUNKER_COWBOY, (animation_data_t) {
+    };
+    ANIMATION_DATA[ANIMATION_PARTICLE_BUNKER_COWBOY] = (animation_data_t) {
         .vframe = -1,
-        .hframe_start = 0, .hframe_end = 1,
-        .frame_duration = 8,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 8 },
+            (animation_frame_t) { .hframe = 1, .duration = 8 },
+        },
         .loops = 1
-    }}
-};
+    };
+}
 
 animation_t animation_create(AnimationName name) {
     auto it = ANIMATION_DATA.find(name);
@@ -90,7 +131,8 @@ animation_t animation_create(AnimationName name) {
     animation_t animation;
     animation.name = name;
     animation.timer = 0;
-    animation.frame = xy(it->second.hframe_start, it->second.vframe != -1 ? it->second.vframe : 0);
+    animation.frame_index = 0;
+    animation.frame = xy(it->second.frames[0].hframe, it->second.vframe != -1 ? it->second.vframe : 0);
     animation.loops_remaining = it->second.loops;
 
     return animation;
@@ -105,9 +147,10 @@ void animation_update(animation_t& animation) {
     GOLD_ASSERT(it != ANIMATION_DATA.end());
 
     animation.timer++;
-    if (animation.timer == it->second.frame_duration) {
+    if (animation.timer == it->second.frames[animation.frame_index].duration) {
         animation.timer = 0;
-        if (animation.frame.x < it->second.hframe_end) {
+        if (animation.frame_index < it->second.frames.size() - 1) {
+            animation.frame_index++;
             animation.frame.x++;
         } else {
             if (it->second.loops != ANIMATION_LOOPS_INDEFINITELY) {
@@ -115,9 +158,10 @@ void animation_update(animation_t& animation) {
             }
             if (animation.loops_remaining != 0) {
                 // Restart animation
-                animation.frame.x = it->second.hframe_start;
+                animation.frame_index = 0;
             }
         }
+        animation.frame.x = it->second.frames[animation.frame_index].hframe;
     }
 }
 

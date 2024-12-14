@@ -66,13 +66,20 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_siz
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
             entity_id cell_id = map_get_cell(state, xy(x, y));
-            if (cell_id == origin_id || cell_id == CELL_EMPTY || cell_id == CELL_BLOCKED) {
+            if (cell_id == CELL_BLOCKED) {
+                return true;
+            }
+            if (cell_id == origin_id || cell_id == CELL_EMPTY) {
                 continue;
             }  
+            const entity_t& entity = state.entities.get_by_id(cell_id);
+            if (!entity_is_unit(entity.type)) {
+                return true;
+            }
             if (origin_id != ID_NULL && xy::manhattan_distance(origin, xy(x, y)) > 3) {
                 continue;
             }
-            if (gold_walk && entity_is_unit(state.entities.get_by_id(cell_id).type)) {
+            if (gold_walk) {
                 continue;
             }
 

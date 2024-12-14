@@ -20,6 +20,7 @@
 #define BUILDING_QUEUE_BLOCKED UINT32_MAX
 #define BUILDING_QUEUE_EXIT_BLOCKED UINT32_MAX - 1
 #define BUILDING_FADE_DURATION 300
+#define GOLD_PATCH_ID_NULL UINT32_MAX
 
 #define UI_STATUS_CANT_BUILD "You can't build there."
 #define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
@@ -119,9 +120,8 @@ enum EntityMode {
     MODE_BUILDING_IN_PROGRESS,
     MODE_BUILDING_FINISHED,
     MODE_BUILDING_DESTROYED,
-    MODE_MINE_UNOCCUPIED,
-    MODE_MINE_OCCUPIED,
-    MODE_MINE_COLLAPSED
+    MODE_GOLD,
+    MODE_GOLD_MINED_OUT
 };
 
 const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
@@ -185,6 +185,7 @@ struct entity_t {
 
     int health;
     target_t target;
+    target_t remembered_gold_target;
     std::vector<xy> path;
     std::vector<building_queue_item_t> queue;
     uint32_t timer;
@@ -195,6 +196,7 @@ struct entity_t {
     entity_id garrison_id;
 
     uint32_t gold_held;
+    uint32_t gold_patch_id;
 };
 
 struct unit_data_t {
@@ -389,7 +391,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
 
 // Entities
 entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id, xy cell);
-entity_id entity_create_gold(match_state_t& state, xy cell, uint32_t gold_left);
+entity_id entity_create_gold(match_state_t& state, xy cell, uint32_t gold_left, uint32_t gold_patch_id);
 void entity_update(match_state_t& state, uint32_t entity_index);
 
 bool entity_is_unit(EntityType entity);
@@ -414,7 +416,7 @@ bool entity_should_die(const entity_t& entity);
 SDL_Rect entity_get_sight_rect(const entity_t& entity);
 bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);
 target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity);
-target_t entity_target_nearest_gold(const match_state_t& state, const entity_t& entity);
+target_t entity_target_nearest_gold(const match_state_t& state, xy start_cell, uint32_t gold_patch_id);
 target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity);
 bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity);
 

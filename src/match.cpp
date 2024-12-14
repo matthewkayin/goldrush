@@ -93,10 +93,14 @@ match_state_t match_init() {
 
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
-        entity_create_gold(state, player_spawn + xy(4, 4), 100);
-        entity_create_gold(state, player_spawn + xy(5, 4), 100);
-        entity_create_gold(state, player_spawn + xy(6, 5), 100);
-        entity_create_gold(state, player_spawn + xy(7, 4), 100);
+        entity_create_gold(state, player_spawn + xy(4, 4), 15, 0);
+        entity_create_gold(state, player_spawn + xy(5, 4), 15, 0);
+        entity_create_gold(state, player_spawn + xy(6, 5), 15, 0);
+        entity_create_gold(state, player_spawn + xy(7, 4), 15, 0);
+        entity_create_gold(state, player_spawn + xy(-4, 4), 15, 1);
+        entity_create_gold(state, player_spawn + xy(-5, 4), 15, 1);
+        entity_create_gold(state, player_spawn + xy(-6, 5), 15, 1);
+        entity_create_gold(state, player_spawn + xy(-7, 4), 15, 1);
         entity_id camp_id = entity_create(state, ENTITY_CAMP, player_id, player_spawn);
         entity_t& camp = state.entities.get_by_id(camp_id);
         camp.health = ENTITY_DATA.at(camp.type).max_health;
@@ -404,7 +408,8 @@ void match_update(match_state_t& state) {
         while (entity_index < state.entities.size()) {
             if ((state.entities[entity_index].mode == MODE_UNIT_DEATH_FADE && !animation_is_playing(state.entities[entity_index].animation)) || 
                     (state.entities[entity_index].garrison_id != ID_NULL && state.entities[entity_index].health == 0) ||
-                    (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0)) {
+                    (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0) ||
+                    (state.entities[entity_index].type == ENTITY_GOLD && state.entities[entity_index].mode == MODE_GOLD_MINED_OUT)) {
                 state.entities.remove_at(entity_index);
                 // state.is_fog_dirty = true;
             } else {
@@ -758,6 +763,15 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     }
                 }
                 entity_set_target(entity, target);
+
+                if (entity.target.type == TARGET_GOLD) {
+                    entity.gold_patch_id = state.entities.get_by_id(entity.target.gold.gold_id).gold_patch_id;
+                } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY && state.entities[target_index].type == ENTITY_CAMP && entity.gold_held) {
+                    target_t nearest_gold_target = entity_target_nearest_gold(state, state.entities[target_index].cell, GOLD_PATCH_ID_NULL);
+                    entity.gold_patch_id = nearest_gold_target.type == TARGET_NONE
+                                            ? GOLD_PATCH_ID_NULL
+                                            : state.entities.get_by_id(nearest_gold_target.gold.gold_id).gold_patch_id;
+                }
             } // End for each unit in move input
             break;
         } // End handle INPUT_MOVE
@@ -977,7 +991,7 @@ void match_render(const match_state_t& state) {
         }
 
         // Entities
-        for (entity_t entity : state.entities) {
+        for (const entity_t& entity : state.entities) {
             if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || 
                     entity.garrison_id != ID_NULL || entity_get_elevation(state, entity) != elevation) {
                 continue;
@@ -1020,6 +1034,25 @@ void match_render(const match_state_t& state) {
             render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
     } // End for each elevation
+
+    for (const entity_t& entity : state.entities) {
+        if (!entity_is_unit(entity.type) || entity.path.empty()) {
+            continue;
+        }
+
+        if (entity_should_gold_walk(state, entity)) {
+            SDL_SetRenderDrawColor(engine.renderer, 255, 255, 0, 255);
+        } else {
+            SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+        }
+        for (uint32_t path_index = 0; path_index < entity.path.size(); path_index++) {
+            xy previous = path_index == 0 
+                            ? entity.position.to_xy() - state.camera_offset
+                            : cell_center(entity.path[path_index - 1]).to_xy() - state.camera_offset;
+            xy current = cell_center(entity.path[path_index]).to_xy() - state.camera_offset;
+            SDL_RenderDrawLine(engine.renderer, previous.x, previous.y, current.x, current.y);
+        }
+    }
 
     // Select rect
     if (state.ui_mode == UI_MODE_SELECTING) {

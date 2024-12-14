@@ -3,6 +3,7 @@
 #include "util.h"
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 enum AnimationName {
     ANIMATION_UI_MOVE_CELL,
@@ -10,8 +11,8 @@ enum AnimationName {
     ANIMATION_UI_MOVE_ATTACK_ENTITY,
     ANIMATION_UNIT_IDLE,
     ANIMATION_UNIT_MOVE,
-    ANIMATION_UNIT_MOVE_HALF_SPEED,
     ANIMATION_UNIT_ATTACK,
+    ANIMATION_UNIT_MINE,
     ANIMATION_UNIT_BUILD,
     ANIMATION_UNIT_DEATH,
     ANIMATION_UNIT_DEATH_FADE,
@@ -22,23 +23,26 @@ enum AnimationName {
 
 const int ANIMATION_LOOPS_INDEFINITELY = -1;
 
-struct animation_data_t {
-    int vframe;
-    int hframe_start;
-    int hframe_end;
-    uint32_t frame_duration;
-    int loops;
+struct animation_frame_t {
+    int hframe;
+    uint32_t duration;
 };
 
-extern const std::unordered_map<uint32_t, animation_data_t> ANIMATION_DATA;
+struct animation_data_t {
+    int vframe;
+    std::vector<animation_frame_t> frames;
+    int loops;
+};
 
 struct animation_t {
     AnimationName name;
     uint32_t timer;
+    uint32_t frame_index;
     xy frame;
     int loops_remaining = 0;
 };
 
+void animation_init();
 animation_t animation_create(AnimationName name);
 bool animation_is_playing(const animation_t& animation);
 void animation_update(animation_t& animation);

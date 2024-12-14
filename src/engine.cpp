@@ -2,6 +2,7 @@
 
 #include "logger.h"
 #include "asserts.h"
+#include "animation.h"
 #include <unordered_map>
 
 struct font_params_t {
@@ -212,6 +213,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_SELECT_RING_BUILDING_3_ENEMY, (sprite_params_t) {
         .path = "sprite/select_ring_building3x3_attack.png",
+        .hframes = 1,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
+        .path = "sprite/select_ring_gold.png",
         .hframes = 1,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
@@ -558,6 +565,8 @@ bool engine_init() {
         log_error("Error creating window: %s", SDL_GetError());
         return false;
     }
+
+    animation_init();
 
     if (!engine_init_renderer()) {
         return false;
