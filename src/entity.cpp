@@ -2,12 +2,14 @@
 
 #include "network.h"
 #include "logger.h"
+#include "lcg.h"
 #include <unordered_map>
 
 static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_MINE_TICK_DURATION = 60;
 static const uint32_t UNIT_MAX_GOLD_HELD = 7;
+static const uint32_t GOLD_LOW_THRESHOLD = 500;
 
 const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
     { ENTITY_MINER, (entity_data_t) {
@@ -125,7 +127,7 @@ entity_id entity_create_gold(match_state_t& state, xy cell, uint32_t gold_left, 
     entity.gold_held = gold_left;
     entity.gold_patch_id = gold_patch_id;
 
-    entity.animation.frame = xy(0, 0);
+    entity.animation.frame = xy(lcg_rand() % 3, 0);
 
     entity_id id = state.entities.push_back(entity);
     map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
@@ -987,7 +989,7 @@ xy entity_get_animation_frame(const entity_t& entity) {
         return xy(3, 0);
     } else {
         // Mines
-        return xy(entity.animation.frame.x, 0);
+        return xy(entity.animation.frame.x, entity.gold_held < GOLD_LOW_THRESHOLD ? 1 : 0);
     }
 }
 

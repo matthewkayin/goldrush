@@ -64,7 +64,7 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     { SPRITE_TILE_GOLD, (sprite_params_t) {
         .path = "sprite/tile_gold.png",
         .hframes = 3,
-        .vframes = 1,
+        .vframes = 2,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
     { SPRITE_UI_FRAME, (sprite_params_t) {

@@ -2,9 +2,11 @@
 
 #include "logger.h"
 #include "asserts.h"
+#include "lcg.h"
 #include <cstring>
 #include <enet/enet.h>
 #include <queue>
+#include <ctime>
 
 struct network_state_t {
     ENetHost* host;
@@ -63,6 +65,12 @@ struct message_greet_t {
     uint8_t player_id;
     uint8_t padding[2];
     player_t player;
+};
+
+struct message_match_load_t {
+    const uint8_t type = MESSAGE_MATCH_LOAD;
+    uint8_t padding[3];
+    int32_t random_seed;
 };
 
 bool network_init() {
@@ -271,8 +279,12 @@ void network_begin_loading_match() {
         }
     }
 
-    uint8_t match_load = MESSAGE_MATCH_LOAD;
-    ENetPacket* packet = enet_packet_create(&match_load, sizeof(match_load), ENET_PACKET_FLAG_RELIABLE);
+    message_match_load_t message;
+    message.random_seed = (int)time(NULL);
+    lcg_srand(message.random_seed);
+    log_trace("Host: set random seed to %i", message.random_seed);
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message_match_load_t), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
 }
@@ -563,6 +575,11 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             if (state.status != NETWORK_STATUS_CONNECTED) {
                 return;
             }
+
+            message_match_load_t match_load;
+            memcpy(&match_load, data, sizeof(message_match_load_t));
+            lcg_srand(match_load.random_seed);
+            log_trace("Set random seed to %i", match_load.random_seed);
 
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (state.players[player_id].status != PLAYER_STATUS_NONE) {

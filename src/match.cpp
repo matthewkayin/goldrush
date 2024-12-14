@@ -93,10 +93,10 @@ match_state_t match_init() {
 
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
-        entity_create_gold(state, player_spawn + xy(4, 4), 15, 0);
-        entity_create_gold(state, player_spawn + xy(5, 4), 15, 0);
-        entity_create_gold(state, player_spawn + xy(6, 5), 15, 0);
-        entity_create_gold(state, player_spawn + xy(7, 4), 15, 0);
+        entity_create_gold(state, player_spawn + xy(4, 4), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(5, 4), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(6, 5), 1500, 0);
+        entity_create_gold(state, player_spawn + xy(7, 4), 1500, 0);
         entity_create_gold(state, player_spawn + xy(-4, 4), 15, 1);
         entity_create_gold(state, player_spawn + xy(-5, 4), 15, 1);
         entity_create_gold(state, player_spawn + xy(-6, 5), 15, 1);
@@ -1034,25 +1034,6 @@ void match_render(const match_state_t& state) {
             render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
     } // End for each elevation
-
-    for (const entity_t& entity : state.entities) {
-        if (!entity_is_unit(entity.type) || entity.path.empty()) {
-            continue;
-        }
-
-        if (entity_should_gold_walk(state, entity)) {
-            SDL_SetRenderDrawColor(engine.renderer, 255, 255, 0, 255);
-        } else {
-            SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
-        }
-        for (uint32_t path_index = 0; path_index < entity.path.size(); path_index++) {
-            xy previous = path_index == 0 
-                            ? entity.position.to_xy() - state.camera_offset
-                            : cell_center(entity.path[path_index - 1]).to_xy() - state.camera_offset;
-            xy current = cell_center(entity.path[path_index]).to_xy() - state.camera_offset;
-            SDL_RenderDrawLine(engine.renderer, previous.x, previous.y, current.x, current.y);
-        }
-    }
 
     // Select rect
     if (state.ui_mode == UI_MODE_SELECTING) {
