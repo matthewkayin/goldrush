@@ -707,6 +707,7 @@ bool engine_init_renderer() {
                     log_error("Unable to create tileset texture: %s", SDL_GetError());
                     return false;
                 }
+                sprite.frame_size = xy(TILE_SIZE, TILE_SIZE);
                 SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
                 SDL_SetRenderTarget(engine.renderer, sprite.texture);
                 int tileset_index = 0;
@@ -791,6 +792,7 @@ bool engine_init_renderer() {
                     log_error("Unable to create tileset texture: %s", SDL_GetError());
                     return false;
                 }
+                sprite.frame_size = xy(TILE_SIZE, TILE_SIZE);
                 SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
                 SDL_SetRenderTarget(engine.renderer, sprite.texture);
                 int tileset_index = 0;

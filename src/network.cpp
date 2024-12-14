@@ -279,6 +279,8 @@ void network_begin_loading_match() {
         }
     }
 
+    state.status = NETWORK_STATUS_CONNECTED;
+
     message_match_load_t message;
     message.random_seed = (int)time(NULL);
     lcg_srand(message.random_seed);
@@ -563,7 +565,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
         }
         case MESSAGE_READY: 
         case MESSAGE_NOT_READY: {
-            if (state.status != NETWORK_STATUS_CONNECTED) {
+            if (!(state.status == NETWORK_STATUS_CONNECTED || state.status == NETWORK_STATUS_SERVER)) {
                 return;
             }
 
@@ -594,6 +596,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
         }
         case MESSAGE_INPUT: {
             if (state.status != NETWORK_STATUS_CONNECTED) {
+                log_trace("network is not connecting, ignoring input.");
                 return;
             }
 

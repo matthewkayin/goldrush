@@ -180,8 +180,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
 
     std::vector<node_t> frontier;
     std::vector<node_t> explored;
-    int explored_indices[state.map_width * state.map_height];
-    memset(explored_indices, -1, state.map_width * state.map_height * sizeof(int));
+    std::vector<int> explored_indices = std::vector<int>(state.map_width * state.map_height, -1);
     uint32_t closest_explored = 0;
     bool found_path = false;
     node_t path_end;

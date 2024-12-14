@@ -109,7 +109,7 @@ match_state_t match_init() {
 
     network_toggle_ready();
     if (network_are_all_players_ready()) {
-        log_info("Beginning singleplayer game.");
+        log_info("Match started.");
         state.ui_mode = UI_MODE_NONE;
     }
 
@@ -308,7 +308,6 @@ void match_update(match_state_t& state) {
             // We didn't receive inputs, start the timer
             if (state.inputs[player_id].empty() || state.inputs[player_id][0].empty()) {
                 all_inputs_received = false;
-                log_trace("Inputs not received for player %u", player_id);
                 continue;
             }
         }
