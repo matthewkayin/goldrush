@@ -863,14 +863,14 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
                 return;
             }
-            // if (state.player_gold[player_id] < building_queue_item_cost(input.building_enqueue.item)) {
-                // return;
-            // }
+            if (state.player_gold[player_id] < building_queue_item_cost(input.building_enqueue.item)) {
+                return;
+            }
             if (state.entities[building_index].queue.size() == BUILDING_QUEUE_MAX) {
                 return;
             }
 
-            // state.player_gold[player_id] -= building_queue_item_cost(input.building_enqueue.item);
+            state.player_gold[player_id] -= building_queue_item_cost(input.building_enqueue.item);
             entity_building_enqueue(state, state.entities[building_index], input.building_enqueue.item);
             break;
         }
@@ -888,7 +888,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                                     ? building.queue.size() - 1
                                     : input.building_dequeue.index;
             
-            // state.player_gold[player_id] += building_queue_item_cost(building.queue[index]);
+            state.player_gold[player_id] += building_queue_item_cost(building.queue[index]);
             if (index == 0) {
                 entity_building_dequeue(state, building);
             } else {

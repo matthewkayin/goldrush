@@ -10,7 +10,7 @@ static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_MINE_TICK_DURATION = 60;
 static const uint32_t UNIT_MAX_GOLD_HELD = 7;
-static const uint32_t UNIT_REPAIR_RATE = 3;
+static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
 
 const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
