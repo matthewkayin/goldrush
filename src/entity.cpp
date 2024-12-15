@@ -456,18 +456,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             break;
                         }
 
-                        // Begin repair
-                        if (entity.player_id == target.player_id && entity.type == ENTITY_MINER && entity_is_building(target.type) && target.health < ENTITY_DATA.at(target.type).max_health) {
-                            entity.mode = MODE_UNIT_REPAIR;
-                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
-                            entity.timer = UNIT_BUILD_TICK_DURATION;
-                            break;
-                        }
-
-                        // TODO garrison
-                        // TODO repair
-
-                        if (entity.type == ENTITY_MINER && target.type == ENTITY_CAMP && entity.player_id == target.player_id && entity.gold_held != 0) {
+                        // Return gold
+                        if (entity.type == ENTITY_MINER && target.type == ENTITY_CAMP && entity.player_id == target.player_id && entity.gold_held != 0 && entity.target.type != TARGET_REPAIR) {
                             state.player_gold[entity.player_id] += entity.gold_held;
                             entity.gold_held = 0;
                             entity.target = entity.remembered_gold_target.type != TARGET_NONE 
@@ -477,6 +467,16 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             update_finished = true;
                             break;
                         }
+
+                        // Begin repair
+                        if (entity.player_id == target.player_id && entity.type == ENTITY_MINER && entity_is_building(target.type) && target.health < ENTITY_DATA.at(target.type).max_health) {
+                            entity.mode = MODE_UNIT_REPAIR;
+                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
+                            entity.timer = UNIT_BUILD_TICK_DURATION;
+                            break;
+                        }
+
+                        // TODO garrison
 
                         // Don't attack allied units
                         if (entity.player_id == target.player_id || ENTITY_DATA.at(entity.type).unit_data.damage == 0) {
@@ -596,11 +596,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             }
             case MODE_UNIT_ATTACK_COOLDOWN: {
                 if (entity_is_target_invalid(state, entity)) {
-                    // TODO target = nearest insight enemy
                     entity.timer = 0;
-                    entity.target = (target_t) {
-                        .type = TARGET_NONE
-                    };
+                    entity.target = entity_target_nearest_enemy(state, entity);
                     entity.mode = MODE_UNIT_IDLE;
                     break;
                 }
@@ -893,7 +890,6 @@ bool entity_has_reached_target(const match_state_t& state, const entity_t& entit
             };
 
             int entity_range_squared = ENTITY_DATA.at(entity.type).unit_data.range_squared;
-            // TODO mines
             return entity.target.type != TARGET_ATTACK_ENTITY || entity_range_squared == 1
                         ? sdl_rects_are_adjacent(entity_rect, target_rect)
                         : euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
@@ -1195,23 +1191,31 @@ void entity_set_target(entity_t& entity, target_t target) {
 
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender) {
     entity_t& attacker = state.entities.get_by_id(attacker_id);
-    bool attack_missed = false; // TODO
+    bool attack_missed = false;
 
     int attacker_damage = ENTITY_DATA.at(attacker.type).unit_data.damage;
     int defender_armor = ENTITY_DATA.at(defender.type).armor;
     int damage = std::max(1, attacker_damage - defender_armor);
 
-    defender.health = std::max(0, defender.health - damage);
+    if (entity_get_elevation(state, attacker) < entity_get_elevation(state, defender)) {
+        if (lcg_rand() % 2 == 0) {
+            attack_missed = true;
+        }
+    }
+
+    if (!attack_missed) {
+        defender.health = std::max(0, defender.health - damage);
+    }
 
     // Make the enemy attack back
     // TODO && defender can see attacker
     if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE && 
-        defender.target.type == TARGET_NONE && ENTITY_DATA.at(defender.type).unit_data.damage != 0 && 
-        defender.player_id != attacker.player_id) {
-            defender.target = (target_t) {
-                .type = TARGET_ATTACK_ENTITY,
-                .id = attacker_id
-            };
+            defender.target.type == TARGET_NONE && ENTITY_DATA.at(defender.type).unit_data.damage != 0 && 
+            defender.player_id != attacker.player_id) {
+        defender.target = (target_t) {
+            .type = TARGET_ATTACK_ENTITY,
+            .id = attacker_id
+        };
     }
 
     // TODO attack alerts

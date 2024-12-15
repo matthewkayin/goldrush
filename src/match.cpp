@@ -635,6 +635,7 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
         case INPUT_BUILD_CANCEL: {
             memcpy(&input.build_cancel, in_buffer + in_buffer_head, sizeof(input_build_cancel_t));
             in_buffer_head += sizeof(input_build_cancel_t);
+            break;
         }
         case INPUT_BUILDING_ENQUEUE: {
             memcpy(&input.building_enqueue, in_buffer + in_buffer_head, sizeof(input_building_enqueue_t));
@@ -833,7 +834,10 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 break;
             }
 
-            // TODO Refund the player
+            // TODO ? make this based on percent completion and not just health i.e. separation percent completion from health somehow
+            const entity_data_t& building_data = ENTITY_DATA.at(state.entities[building_index].type);
+            uint32_t gold_refund = building_data.gold_cost - (((uint32_t)state.entities[building_index].health * building_data.gold_cost) / (uint32_t)building_data.max_health);
+            state.player_gold[state.entities[building_index].player_id] += gold_refund;
 
             // Tell the builder to stop building
             for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
