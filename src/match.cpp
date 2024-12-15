@@ -1036,6 +1036,22 @@ void match_render(const match_state_t& state) {
         }
     } // End for each elevation
 
+    // Debug pathing 
+    #ifdef GOLD_DEBUG_UNIT_PATHS
+    for (const entity_t& entity : state.entities) {
+        if (!entity_is_unit(entity.type) || entity.path.empty()) {
+            continue;
+        }
+        SDL_Color line_color = entity_should_gold_walk(state, entity) ? COLOR_GOLD : COLOR_WHITE;
+        SDL_SetRenderDrawColor(engine.renderer, line_color.r, line_color.g, line_color.b, line_color.a);
+        for (uint32_t path_index = 0; path_index < entity.path.size(); path_index++) {
+            xy start = (path_index == 0 ? entity.position.to_xy() : cell_center(entity.path[path_index - 1]).to_xy()) - state.camera_offset;
+            xy end = cell_center(entity.path[path_index]).to_xy() - state.camera_offset;
+            SDL_RenderDrawLine(engine.renderer, start.x, start.y, end.x, end.y);
+        }
+    }
+    #endif
+
     // Select rect
     if (state.ui_mode == UI_MODE_SELECTING) {
         SDL_Rect select_rect = state.select_rect;
@@ -1062,10 +1078,19 @@ void match_render(const match_state_t& state) {
                     is_cell_green = false;
                 }
                 // TODO if map fog at cell is not revealed, cell green is false
-                // TODO if building is camp and is too close to gold mine, cell green is false
                 // TOOD is tile is a ramp then cell green is false
                 if (xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
                     is_cell_green = false;
+                }
+
+                for (const entity_t& gold : state.entities) {
+                    if (gold.type != ENTITY_GOLD || gold.gold_held == 0) {
+                        continue;
+                    }
+                    if (sdl_rect_has_point(entity_gold_get_block_building_rect(gold.cell), xy(x, y))) {
+                        is_cell_green = false;
+                        break;
+                    }
                 }
 
                 SDL_Color cell_color = is_cell_green ? COLOR_GREEN : COLOR_RED;
@@ -1184,6 +1209,10 @@ void match_render(const match_state_t& state) {
             SDL_RenderCopy(engine.renderer, health_text_texture, &health_text_src_rect, &health_text_dst_rect);
             SDL_DestroyTexture(health_text_texture);
             SDL_FreeSurface(health_text_surface);
+        } else {
+            char gold_left_str[17];
+            sprintf(gold_left_str, "Gold Left: %u", entity.gold_held);
+            render_text(FONT_WESTERN8, gold_left_str, COLOR_GOLD, SELECTION_LIST_TOP_LEFT + xy(36, 22));
         }
     } else {
         for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {

@@ -417,6 +417,7 @@ target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t&
 target_t entity_target_nearest_gold(const match_state_t& state, xy start_cell, uint32_t gold_patch_id);
 target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity);
 bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity);
+SDL_Rect entity_gold_get_block_building_rect(xy cell);
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);

@@ -446,8 +446,18 @@ bool ui_building_can_be_placed(const match_state_t& state) {
         return false;
     }
 
-    // TODO check camps against mines
     // TODO check fog of war
+
+    SDL_Rect building_rect = (SDL_Rect) { .x = building_cell.x, .y = building_cell.y, .w = building_cell_size, .h = building_cell_size };
+    for (const entity_t& gold : state.entities) {
+        if (gold.type != ENTITY_GOLD || gold.gold_held == 0) {
+            continue;
+        }
+        SDL_Rect gold_block_rect = entity_gold_get_block_building_rect(gold.cell);
+        if (SDL_HasIntersection(&building_rect, &gold_block_rect) == SDL_TRUE) {
+            return false;
+        }
+    }
 
     for (int x = building_cell.x; x < building_cell.x + building_cell_size; x++) {
         for (int y = building_cell.y; y < building_cell.y + building_cell_size; y++) {

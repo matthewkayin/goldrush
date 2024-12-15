@@ -431,8 +431,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                 entity.target = entity_target_nearest_camp(state, entity);
                                 entity.mode = MODE_UNIT_IDLE;
                             } else {
-                                // If this gold cell is not empty, find another one
-                                if (!map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY)) {
+                                // The cell should either be empty (meaning we mineral walked to this cell) or filled with the current entity ID (meaning we started at this cell)
+                                // If it's not then we should find another gold cell to mine
+                                if (!(map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY) || 
+                                        map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id))) {
                                     entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
                                     entity.mode = MODE_UNIT_IDLE;
                                     break;
@@ -918,8 +920,7 @@ xy entity_get_target_cell(const match_state_t& state, const entity_t& entity) {
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {
             const entity_t& target = state.entities.get_by_id(entity.target.id);
-            // TODO: allow blocked cells if it's a camp
-            return map_get_nearest_cell_around_rect(state, entity.cell, entity_cell_size(entity.type), target.cell, entity_cell_size(target.type), false);
+            return map_get_nearest_cell_around_rect(state, entity.cell, entity_cell_size(entity.type), target.cell, entity_cell_size(target.type), entity_should_gold_walk(state, entity));
         }
         case TARGET_GOLD: {
             return entity.target.cell;
@@ -1173,6 +1174,10 @@ bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity)
         // target type is camp
         return entity.gold_held != 0 && entity.path.size() > 1;
     }
+}
+
+SDL_Rect entity_gold_get_block_building_rect(xy cell) {
+    return (SDL_Rect) { .x = cell.x - 3, .y = cell.y - 3, .w = 7, .h = 7 };
 }
 
 void entity_set_target(entity_t& entity, target_t target) {
