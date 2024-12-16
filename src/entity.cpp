@@ -13,6 +13,10 @@ static const uint32_t UNIT_MAX_GOLD_HELD = 7;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
 
+// Building train time = (HP * 0.9) / 10
+// Make the house 300 HP
+// Make the saloon 600 HP
+
 const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
     { ENTITY_MINER, (entity_data_t) {
         .name = "Miner",
@@ -39,15 +43,40 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .range_squared = 1
         }
     }},
+    { ENTITY_HALL, (entity_data_t) {
+        .name = "Town Hall",
+        .sprite = SPRITE_BUILDING_HALL,
+        .ui_button = UI_BUTTON_BUILD_HALL,
+        .cell_size = 4,
+
+        .gold_cost = 400,
+        .train_duration = 0,
+        .max_health = 1000,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = 0,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 19, 43, 7 },
+            .builder_positions_y = { 58, 35, 23 },
+            .builder_flip_h = { false, true, false },
+            .render_offset_x = 0,
+            .render_offset_y = -11,
+            .can_rally = true
+        }
+    }},
     { ENTITY_CAMP, (entity_data_t) {
         .name = "Mining Camp",
         .sprite = SPRITE_BUILDING_CAMP,
         .ui_button = UI_BUTTON_BUILD_CAMP,
         .cell_size = 2,
 
-        .gold_cost = 200,
-        .train_duration = 60,
-        .max_health = 200,
+        .gold_cost = 100,
+        .train_duration = 0,
+        .max_health = 400,
         .sight = 7,
         .armor = 1,
         .attack_priority = 0,
@@ -59,6 +88,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .builder_positions_x = { 1, 15, 14 },
             .builder_positions_y = { 13, 13, 2 },
             .builder_flip_h = { false, true, false },
+            .render_offset_x = 0,
+            .render_offset_y = 0,
             .can_rally = true
         }
     }},
@@ -459,7 +490,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         // Return gold
-                        if (entity.type == ENTITY_MINER && target.type == ENTITY_CAMP && entity.player_id == target.player_id && entity.gold_held != 0 && entity.target.type != TARGET_REPAIR) {
+                        if (entity.type == ENTITY_MINER && (target.type == ENTITY_HALL || target.type == ENTITY_CAMP) && entity.player_id == target.player_id && entity.gold_held != 0 && entity.target.type != TARGET_REPAIR) {
                             state.player_gold[entity.player_id] += entity.gold_held;
                             entity.gold_held = 0;
                             entity.target = entity.remembered_gold_target.type != TARGET_NONE 
@@ -472,6 +503,15 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         // Begin repair
                         if (entity.player_id == target.player_id && entity.type == ENTITY_MINER && entity_is_building(target.type) && target.health < ENTITY_DATA.at(target.type).max_health) {
+                            if (entity.target.type != TARGET_REPAIR) {
+                                entity.target = (target_t) {
+                                    .type = TARGET_REPAIR,
+                                    .id = entity.target.id,
+                                    .repair = (target_repair_t) {
+                                        .health_repaired = 0
+                                    }
+                                };
+                            }
                             entity.mode = MODE_UNIT_REPAIR;
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
                             entity.timer = UNIT_BUILD_TICK_DURATION;
@@ -548,6 +588,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         .type = TARGET_NONE
                     };
                     entity.mode = MODE_UNIT_IDLE;
+                    update_finished = true;
+                    break;
                 }
 
                 entity.timer--;
@@ -562,9 +604,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     if (target.health == ENTITY_DATA.at(target.type).max_health) {
                         if (target.mode == MODE_BUILDING_IN_PROGRESS) {
                             entity_building_finish(state, entity.target.id);
-                        } 
-
-                        entity.mode = MODE_UNIT_IDLE;
+                        } else {
+                            entity.target = (target_t) { .type = TARGET_NONE };
+                            entity.mode = MODE_UNIT_IDLE;
+                        }
                     } else {
                         entity.timer = UNIT_BUILD_TICK_DURATION;
                     }
@@ -720,7 +763,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 }
 
 bool entity_is_unit(EntityType type) {
-    return type < ENTITY_CAMP;
+    return type < ENTITY_HALL;
 }
 
 bool entity_is_building(EntityType type) {
@@ -981,9 +1024,6 @@ xy entity_get_animation_frame(const entity_t& entity) {
         if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
             return xy((3 * entity.health) / ENTITY_DATA.at(entity.type).max_health, 0);
         } 
-        if (entity.type == ENTITY_CAMP && !entity.garrisoned_units.empty()) {
-            return xy(4, 0);
-        }
         // Building finished frame
         return xy(3, 0);
     } else {
@@ -1133,7 +1173,7 @@ target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& 
     for (uint32_t other_index = 0; other_index < state.entities.size(); other_index++) {
         const entity_t& other = state.entities[other_index];
 
-        if (other.player_id != entity.player_id || other.type != ENTITY_CAMP || other.mode != MODE_BUILDING_FINISHED) {
+        if (other.player_id != entity.player_id || !(other.type == ENTITY_CAMP || other.type == ENTITY_HALL) || other.mode != MODE_BUILDING_FINISHED) {
             continue;
         }
         // TODO consider fog of war
@@ -1357,7 +1397,7 @@ void entity_building_finish(match_state_t& state, entity_id building_id) {
             entity.mode = MODE_UNIT_IDLE;
         }
 
-        entity.target = building.type == ENTITY_CAMP
+        entity.target = building.type == ENTITY_CAMP || building.type == ENTITY_HALL
                             ? entity_target_nearest_gold(state, entity.cell, GOLD_PATCH_ID_NULL)
                             : (target_t) { .type = TARGET_NONE };
     }

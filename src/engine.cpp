@@ -217,6 +217,18 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
+    { SPRITE_SELECT_RING_BUILDING_4, (sprite_params_t) {
+        .path = "sprite/select_ring_building4x4.png",
+        .hframes = 1,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_SELECT_RING_BUILDING_4_ENEMY, (sprite_params_t) {
+        .path = "sprite/select_ring_building4x4_attack.png",
+        .hframes = 1,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
     { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
         .path = "sprite/select_ring_gold.png",
         .hframes = 1,
@@ -251,6 +263,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .path = "sprite/unit_bandit.png",
         .hframes = 15,
         .vframes = 3,
+        .strategy = SPRITE_IMPORT_RECOLOR
+    }},
+    { SPRITE_BUILDING_HALL, (sprite_params_t) {
+        .path = "sprite/building_hall.png",
+        .hframes = 4,
+        .vframes = 1,
         .strategy = SPRITE_IMPORT_RECOLOR
     }},
     { SPRITE_BUILDING_HOUSE, (sprite_params_t) {
