@@ -807,7 +807,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             // Assign the lead builder's target
             entity_id lead_builder_id = ui_get_nearest_builder(state, builder_ids, input.build.target_cell);
             entity_t& lead_builder = state.entities.get_by_id(lead_builder_id);
-            lead_builder.target = (target_t) {
+            entity_set_target(lead_builder, (target_t) {
                 .type = TARGET_BUILD,
                 .id = ID_NULL,
                 .build = (target_build_t) {
@@ -815,17 +815,17 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     .building_cell = input.build.target_cell,
                     .building_type = (EntityType)input.build.building_type
                 }
-            };
+            });
 
             // Assign the helpers' target
             for (entity_id builder_id : builder_ids) {
                 if (builder_id == lead_builder_id) {
                     continue;
                 } 
-                state.entities.get_by_id(builder_id).target = (target_t) {
+                entity_set_target(state.entities.get_by_id(builder_id), (target_t) {
                     .type = TARGET_BUILD_ASSIST,
                     .id = lead_builder_id
-                };
+                });
             }
             break;
         }
