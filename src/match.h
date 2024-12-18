@@ -211,8 +211,6 @@ struct building_data_t {
     int builder_positions_x[3];
     int builder_positions_y[3];
     int builder_flip_h[3];
-    int render_offset_x;
-    int render_offset_y;
     bool can_rally; // If you add any more flags, use a uint32
 };
 

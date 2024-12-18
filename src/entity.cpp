@@ -60,11 +60,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .garrison_size = 0,
 
         .building_data = (building_data_t) {
-            .builder_positions_x = { 19, 43, 7 },
-            .builder_positions_y = { 58, 35, 23 },
+            .builder_positions_x = { 16, 23, 7 },
+            .builder_positions_y = { 43, 25, 22 },
             .builder_flip_h = { false, true, false },
-            .render_offset_x = 0,
-            .render_offset_y = -11,
             .can_rally = true
         }
     }},
@@ -88,8 +86,6 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .builder_positions_x = { 1, 15, 14 },
             .builder_positions_y = { 13, 13, 2 },
             .builder_flip_h = { false, true, false },
-            .render_offset_x = 0,
-            .render_offset_y = 0,
             .can_rally = true
         }
     }},

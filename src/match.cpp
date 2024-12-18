@@ -1066,7 +1066,7 @@ void match_render(const match_state_t& state) {
     if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
         const entity_data_t& building_data = ENTITY_DATA.at(state.ui_building_type);
         xy ui_building_cell = ui_get_building_cell(state);
-        render_sprite(building_data.sprite, xy(3, 0), (ui_building_cell * TILE_SIZE) + xy(building_data.building_data.render_offset_x, building_data.building_data.render_offset_y) - state.camera_offset, 0, network_get_player_id());
+        render_sprite(building_data.sprite, xy(3, 0), (ui_building_cell * TILE_SIZE) + - state.camera_offset, 0, network_get_player_id());
 
         bool is_placement_out_of_bounds = ui_building_cell.x + building_data.cell_size >= state.map_width ||
                                           ui_building_cell.y + building_data.cell_size >= state.map_height;
@@ -1288,17 +1288,14 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
             const entity_t& building = state.entities.get_by_id(entity.target.id);
             const entity_data_t& building_data = ENTITY_DATA.at(building.type);
             int building_hframe = entity_get_animation_frame(building).x;
-            render_params.position = building.position.to_xy() + xy(building_data.building_data.render_offset_x, building_data.building_data.render_offset_y) + xy(building_data.building_data.builder_positions_x[building_hframe], building_data.building_data.builder_positions_y[building_hframe]) - state.camera_offset;
+            render_params.position = building.position.to_xy() + xy(building_data.building_data.builder_positions_x[building_hframe], building_data.building_data.builder_positions_y[building_hframe]) - state.camera_offset;
             should_flip_h = building_data.building_data.builder_flip_h[building_hframe];
         }
 
         if (should_flip_h) {
             render_params.options |= RENDER_SPRITE_FLIP_H;
         }
-    } else if (entity_is_building(entity.type)) {
-        render_params.position.x += ENTITY_DATA.at(entity.type).building_data.render_offset_x;
-        render_params.position.y += ENTITY_DATA.at(entity.type).building_data.render_offset_y;
-    }
+    } 
 
     return render_params;
 }
