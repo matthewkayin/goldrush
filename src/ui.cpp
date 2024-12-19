@@ -48,6 +48,21 @@ const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE] = {
                  .w = UI_BUTTON_SIZE, .h = UI_BUTTON_SIZE },
 };
 
+const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS = {
+    { UI_BUTTON_BUILD_HOUSE, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_HALL
+    }},
+    { UI_BUTTON_BUILD_SALOON, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_HALL
+    }},
+    { UI_BUTTON_BUILD_BUNKER, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_SALOON
+    }}
+};
+
 bool ui_is_mouse_in_ui() {
     return (engine.mouse_position.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
            (engine.mouse_position.x <= 136 && engine.mouse_position.y >= SCREEN_HEIGHT - 136) ||
@@ -263,8 +278,6 @@ UiButton ui_get_ui_button(const match_state_t& state, int index) {
 }
 
 bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
-    return true;
-    /*
     auto ui_button_requirements_it = UI_BUTTON_REQUIREMENTS.find(button);
 
     // Buttons with no defined requirements are enabled by default
@@ -274,18 +287,21 @@ bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
 
     switch (ui_button_requirements_it->second.type) {
         case UI_BUTTON_REQUIRES_BUILDING: {
-            for (const building_t& building : state.buildings) {
-                if (building.player_id == network_get_player_id() && building_is_finished(building) && building.type == ui_button_requirements_it->second.building_type) {
+            for (const entity_t& building : state.entities) {
+                if (building.player_id == network_get_player_id() && building.mode == MODE_BUILDING_FINISHED && building.type == ui_button_requirements_it->second.building_type) {
                     return true;
                 }
             }
             return false;
         }
     }
-    */
 }
 
 void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
+    if (!ui_button_requirements_met(state, button)) {
+        return;
+    }
+
     switch (button) {
         case UI_BUTTON_ATTACK: {
             state.ui_mode = UI_MODE_TARGET_ATTACK;

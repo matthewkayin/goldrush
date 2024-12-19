@@ -456,17 +456,14 @@ uint32_t match_get_player_population(const match_state_t& state, uint8_t player_
 }
 
 uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id) {
-    /*
-    uint32_t max_population = 10;
+    uint32_t max_population = 0;
     for (const entity_t& building : state.entities) {
-        if (building.player_id == player_id && building.type == BUILDING_HOUSE && building_is_finished(building)) {
+        if (building.player_id == player_id && building.mode == MODE_BUILDING_FINISHED && (building.type == ENTITY_HOUSE || building.type == ENTITY_HALL)) {
             max_population += 10;
         }
     }
 
     return max_population;
-    */
-   return 200;
 }
 
 input_t match_create_move_input(const match_state_t& state) {

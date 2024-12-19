@@ -9,7 +9,7 @@
 static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_MINE_TICK_DURATION = 40;
-static const uint32_t UNIT_MAX_GOLD_HELD = 8;
+static const uint32_t UNIT_MAX_GOLD_HELD = 9;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
 
@@ -618,7 +618,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                     int building_hframe = entity_get_animation_frame(building).x;
                     #ifdef GOLD_DEBUG_FAST_BUILD
-                        building.health = std::min(building.health + 20, BUILDING_DATA.at(building.type).max_health);
+                        building.health = std::min(building.health + 20, ENTITY_DATA.at(building.type).max_health);
                     #else
                         building.health++;
                     #endif

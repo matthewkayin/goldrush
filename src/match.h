@@ -32,60 +32,6 @@
 #define UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
 #define UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
 
-// UI
-
-const SDL_Rect MINIMAP_RECT = (SDL_Rect) {
-    .x = 4,
-    .y = SCREEN_HEIGHT - 132,
-    .w = 128,
-    .h = 128
-};
-
-enum UiMode {
-    UI_MODE_MATCH_NOT_STARTED,
-    UI_MODE_NONE,
-    UI_MODE_SELECTING,
-    UI_MODE_MINIMAP_DRAG,
-    UI_MODE_BUILDING_PLACE,
-    UI_MODE_TARGET_ATTACK,
-    UI_MODE_TARGET_UNLOAD,
-    UI_MODE_TARGET_REPAIR,
-    UI_MODE_CHAT,
-    UI_MODE_MENU,
-    UI_MODE_MENU_SURRENDER,
-    UI_MODE_MATCH_OVER_VICTORY,
-    UI_MODE_MATCH_OVER_DEFEAT,
-    UI_MODE_LEAVE_MATCH
-};
-
-enum UiButtonset {
-    UI_BUTTONSET_NONE,
-    UI_BUTTONSET_UNIT,
-    UI_BUTTONSET_MINER,
-    UI_BUTTONSET_BUILD,
-    UI_BUTTONSET_CANCEL,
-    UI_BUTTONSET_HALL,
-    UI_BUTTONSET_SALOON,
-    UI_BUTTONSET_WAGON,
-    UI_BUTTONSET_BUNKER
-};
-
-enum SelectionType {
-    SELECTION_TYPE_NONE,
-    SELECTION_TYPE_UNITS,
-    SELECTION_TYPE_BUILDINGS,
-    SELECTION_TYPE_ENEMY_UNIT,
-    SELECTION_TYPE_ENEMY_BUILDING,
-    SELECTION_TYPE_GOLD_MINE
-};
-
-struct chat_message_t {
-    std::string message;
-    uint32_t timer;
-};
-
-extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
-
 // Map
 
 struct tile_t {
@@ -239,6 +185,74 @@ struct entity_data_t {
     };
 };
 extern const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA;
+
+// UI
+
+const SDL_Rect MINIMAP_RECT = (SDL_Rect) {
+    .x = 4,
+    .y = SCREEN_HEIGHT - 132,
+    .w = 128,
+    .h = 128
+};
+
+enum UiMode {
+    UI_MODE_MATCH_NOT_STARTED,
+    UI_MODE_NONE,
+    UI_MODE_SELECTING,
+    UI_MODE_MINIMAP_DRAG,
+    UI_MODE_BUILDING_PLACE,
+    UI_MODE_TARGET_ATTACK,
+    UI_MODE_TARGET_UNLOAD,
+    UI_MODE_TARGET_REPAIR,
+    UI_MODE_CHAT,
+    UI_MODE_MENU,
+    UI_MODE_MENU_SURRENDER,
+    UI_MODE_MATCH_OVER_VICTORY,
+    UI_MODE_MATCH_OVER_DEFEAT,
+    UI_MODE_LEAVE_MATCH
+};
+
+enum UiButtonset {
+    UI_BUTTONSET_NONE,
+    UI_BUTTONSET_UNIT,
+    UI_BUTTONSET_MINER,
+    UI_BUTTONSET_BUILD,
+    UI_BUTTONSET_CANCEL,
+    UI_BUTTONSET_HALL,
+    UI_BUTTONSET_SALOON,
+    UI_BUTTONSET_WAGON,
+    UI_BUTTONSET_BUNKER
+};
+
+enum UiButtonRequirementsType {
+    UI_BUTTON_REQUIRES_BUILDING
+};
+
+struct ui_button_requirements_t {
+    UiButtonRequirementsType type;
+    union {
+        EntityType building_type;
+    };
+};
+
+extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
+
+enum SelectionType {
+    SELECTION_TYPE_NONE,
+    SELECTION_TYPE_UNITS,
+    SELECTION_TYPE_BUILDINGS,
+    SELECTION_TYPE_ENEMY_UNIT,
+    SELECTION_TYPE_ENEMY_BUILDING,
+    SELECTION_TYPE_GOLD_MINE
+};
+
+struct chat_message_t {
+    std::string message;
+    uint32_t timer;
+};
+
+extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
+
 
 // Input
 
