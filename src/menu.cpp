@@ -417,7 +417,7 @@ void menu_render(const menu_state_t& state) {
         render_text(FONT_WESTERN8, prompt_text, COLOR_OFFBLACK, xy(TEXT_INPUT_RECT.x + 1, TEXT_INPUT_RECT.y - 13));
         SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
         SDL_RenderDrawRect(engine.renderer, &TEXT_INPUT_RECT);
-        render_text(FONT_WESTERN16, state.username.c_str(), COLOR_BLACK, xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 31), TEXT_ANCHOR_BOTTOM_LEFT);
+        render_text(FONT_WESTERN16, state.username.c_str(), COLOR_OFFBLACK, xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 31), TEXT_ANCHOR_BOTTOM_LEFT);
     }
 
     if (state.mode == MENU_MODE_CONNECTING) {

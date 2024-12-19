@@ -235,7 +235,11 @@ struct ui_button_requirements_t {
     };
 };
 
-extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
+struct ui_tooltip_info_t {
+    char text[64];
+    uint32_t gold_cost;
+    uint32_t population_cost;
+};
 
 enum SelectionType {
     SELECTION_TYPE_NONE,
@@ -252,7 +256,8 @@ struct chat_message_t {
 };
 
 extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
-
+extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
+extern const std::unordered_map<UiButton, SDL_Keycode> hotkeys;
 
 // Input
 
@@ -392,6 +397,7 @@ void ui_show_status(match_state_t& state, const char* message);
 xy ui_get_building_cell(const match_state_t& state);
 entity_id ui_get_nearest_builder(const match_state_t& state, const std::vector<entity_id>& builders, xy cell);
 bool ui_building_can_be_placed(const match_state_t& state);
+ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);

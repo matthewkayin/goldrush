@@ -53,6 +53,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_HALL
     }},
+    { UI_BUTTON_BUILD_CAMP, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_HALL
+    }},
     { UI_BUTTON_BUILD_SALOON, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_HALL
@@ -484,4 +488,76 @@ bool ui_building_can_be_placed(const match_state_t& state) {
     }
 
     return true;
+}
+
+ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
+    ui_tooltip_info_t info;
+    memset(&info, 0, sizeof(info));
+    char* info_text_ptr = info.text;
+
+    UiButton button = ui_get_ui_button(state, ui_get_ui_button_hovered(state));
+    if (!ui_button_requirements_met(state, button)) {
+        auto button_requirements_it = UI_BUTTON_REQUIREMENTS.find(button);
+        info_text_ptr += sprintf(info_text_ptr, "Requires ");
+        switch (button_requirements_it->second.type) {
+            case UI_BUTTON_REQUIRES_BUILDING: {
+                info_text_ptr += sprintf(info_text_ptr, "%s", ENTITY_DATA.at(button_requirements_it->second.building_type).name);
+                break;
+            }
+        }
+
+        return info;
+    }
+
+    switch (button) {
+        case UI_BUTTON_ATTACK:
+            info_text_ptr += sprintf(info_text_ptr, "Attack");
+            break;
+        case UI_BUTTON_STOP:
+            info_text_ptr += sprintf(info_text_ptr, "Stop");
+            break;
+        case UI_BUTTON_BUILD:
+            info_text_ptr += sprintf(info_text_ptr, "Build");
+            break;
+        case UI_BUTTON_REPAIR:
+            info_text_ptr += sprintf(info_text_ptr, "Repair");
+            break;
+        case UI_BUTTON_DEFEND:
+            info_text_ptr += sprintf(info_text_ptr, "Defend");
+            break;
+        case UI_BUTTON_UNLOAD:
+            info_text_ptr += sprintf(info_text_ptr, "Unload");
+            break;
+        case UI_BUTTON_CANCEL:
+            info_text_ptr += sprintf(info_text_ptr, "Cancel");
+            break;
+        default: {
+            for (auto entity_data_it : ENTITY_DATA) {
+                if (entity_data_it.second.ui_button == button) {
+                    info_text_ptr += sprintf(info_text_ptr, "%s %s", entity_is_unit(entity_data_it.first) ? "Hire" : "Build", entity_data_it.second.name);
+                    info.gold_cost = entity_data_it.second.gold_cost;
+                    if (entity_is_unit(entity_data_it.first)) {
+                        info.population_cost = entity_data_it.second.unit_data.population_cost;
+                    }
+                    break; // breaks for entity_data_it
+                }
+            }
+            break;
+        }
+    }
+
+    if (ui_button_requirements_met(state, button)) {
+        info_text_ptr += sprintf(info_text_ptr, " (");
+        SDL_Keycode hotkey = hotkeys.at(button);
+        if (hotkey == SDLK_ESCAPE) {
+            info_text_ptr += sprintf(info_text_ptr, "ESC");
+        } else if (hotkey >= SDLK_a && hotkey <= SDLK_z) {
+            info_text_ptr += sprintf(info_text_ptr, "%c", (char)(hotkey - 32));
+        } else {
+            log_error("Unhandled hotkey %u in ui_get_hovered_tooltip_info()", hotkey);
+        }
+        info_text_ptr += sprintf(info_text_ptr, ")");
+    }
+
+    return info;
 }
