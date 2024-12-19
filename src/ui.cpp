@@ -17,7 +17,7 @@ static const std::unordered_map<UiButtonset, std::array<UiButton, UI_BUTTONSET_S
                       UI_BUTTON_BUILD_BUNKER, UI_BUTTON_BUILD_CAMP, UI_BUTTON_CANCEL }},
     { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
                       UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
-    { UI_BUTTONSET_CAMP, { UI_BUTTON_UNIT_MINER, UI_BUTTON_NONE, UI_BUTTON_NONE,
+    { UI_BUTTONSET_HALL, { UI_BUTTON_UNIT_MINER, UI_BUTTON_NONE, UI_BUTTON_NONE,
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
     { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_COWBOY, UI_BUTTON_UNIT_BANDIT, UI_BUTTON_NONE,
                              UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
@@ -187,8 +187,8 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
             case ENTITY_MINER:
                 state.ui_buttonset = UI_BUTTONSET_MINER;
                 return;
-            case ENTITY_CAMP:
-                state.ui_buttonset = UI_BUTTONSET_CAMP;
+            case ENTITY_HALL:
+                state.ui_buttonset = UI_BUTTONSET_HALL;
                 return;
             default:
                 break;
@@ -454,7 +454,7 @@ bool ui_building_can_be_placed(const match_state_t& state) {
             continue;
         }
         SDL_Rect gold_block_rect = entity_gold_get_block_building_rect(gold.cell);
-        if (SDL_HasIntersection(&building_rect, &gold_block_rect) == SDL_TRUE) {
+        if ((state.ui_building_type == ENTITY_CAMP || state.ui_building_type == ENTITY_HALL) && SDL_HasIntersection(&building_rect, &gold_block_rect) == SDL_TRUE) {
             return false;
         }
     }

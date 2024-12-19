@@ -8,7 +8,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
-static const uint32_t PLAYER_STARTING_GOLD = 1000;
+static const uint32_t PLAYER_STARTING_GOLD = 450;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
@@ -104,6 +104,7 @@ match_state_t match_init() {
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 1));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 2));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 3));
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
@@ -1084,13 +1085,15 @@ void match_render(const match_state_t& state) {
                     is_cell_green = false;
                 }
 
-                for (const entity_t& gold : state.entities) {
-                    if (gold.type != ENTITY_GOLD || gold.gold_held == 0) {
-                        continue;
-                    }
-                    if (sdl_rect_has_point(entity_gold_get_block_building_rect(gold.cell), xy(x, y))) {
-                        is_cell_green = false;
-                        break;
+                if (state.ui_building_type == ENTITY_CAMP || state.ui_building_type == ENTITY_HALL) {
+                    for (const entity_t& gold : state.entities) {
+                        if (gold.type != ENTITY_GOLD || gold.gold_held == 0) {
+                            continue;
+                        }
+                        if (sdl_rect_has_point(entity_gold_get_block_building_rect(gold.cell), xy(x, y))) {
+                            is_cell_green = false;
+                            break;
+                        }
                     }
                 }
 

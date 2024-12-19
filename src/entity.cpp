@@ -8,8 +8,8 @@
 
 static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
-static const uint32_t UNIT_MINE_TICK_DURATION = 60;
-static const uint32_t UNIT_MAX_GOLD_HELD = 7;
+static const uint32_t UNIT_MINE_TICK_DURATION = 40;
+static const uint32_t UNIT_MAX_GOLD_HELD = 8;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
 
@@ -72,7 +72,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_BUILD_CAMP,
         .cell_size = 2,
 
-        .gold_cost = 100,
+        .gold_cost = 150,
         .train_duration = 0,
         .max_health = 400,
         .sight = 7,
@@ -85,6 +85,75 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .building_data = (building_data_t) {
             .builder_positions_x = { 1, 15, 14 },
             .builder_positions_y = { 13, 13, 2 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_HOUSE, (entity_data_t) {
+        .name = "House",
+        .sprite = SPRITE_BUILDING_HOUSE,
+        .ui_button = UI_BUTTON_BUILD_HOUSE,
+        .cell_size = 2,
+
+        .gold_cost = 100,
+        .train_duration = 0,
+        .max_health = 300,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = 0,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 3, 16, -4 },
+            .builder_positions_y = { 15, 15, 3 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_SALOON, (entity_data_t) {
+        .name = "Saloon",
+        .sprite = SPRITE_BUILDING_SALOON,
+        .ui_button = UI_BUTTON_BUILD_SALOON,
+        .cell_size = 3,
+
+        .gold_cost = 150,
+        .train_duration = 0,
+        .max_health = 300,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = 0,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 6, 27, 9 },
+            .builder_positions_y = { 32, 27, 9 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_BUNKER, (entity_data_t) {
+        .name = "Bunker",
+        .sprite = SPRITE_BUILDING_BUNKER,
+        .ui_button = UI_BUTTON_BUILD_BUNKER,
+        .cell_size = 2,
+
+        .gold_cost = 100,
+        .train_duration = 0,
+        .max_health = 200,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = 0,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 1, 14, 5 },
+            .builder_positions_y = { 15, 9, -3 },
             .builder_flip_h = { false, true, false },
             .can_rally = true
         }
@@ -569,7 +638,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             }
             case MODE_UNIT_REPAIR: {
                 // Stop repairing if the building is destroyed
-                if (entity_is_target_invalid(state, entity) || state.player_gold[entity.player_id] == 0) {
+                if (entity_is_target_invalid(state, entity)) {
                     entity.target = (target_t) {
                         .type = TARGET_NONE
                     };
@@ -579,7 +648,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 }
 
                 entity_t& target = state.entities.get_by_id(entity.target.id);
-                if (target.health == ENTITY_DATA.at(target.type).max_health) {
+                if (target.health == ENTITY_DATA.at(target.type).max_health || (target.mode == MODE_BUILDING_FINISHED && state.player_gold[entity.player_id] == 0)) {
                     entity.target = (target_t) {
                         .type = TARGET_NONE
                     };
@@ -592,10 +661,12 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 if (entity.timer == 0) {
                     int building_hframe = entity_get_animation_frame(target).x;
                     target.health++;
-                    entity.target.repair.health_repaired++;
-                    if (entity.target.repair.health_repaired == UNIT_REPAIR_RATE) {
-                        state.player_gold[entity.player_id]--;
-                        entity.target.repair.health_repaired = 0;
+                    if (target.mode == MODE_BUILDING_FINISHED) {
+                        entity.target.repair.health_repaired++;
+                        if (entity.target.repair.health_repaired == UNIT_REPAIR_RATE) {
+                            state.player_gold[entity.player_id]--;
+                            entity.target.repair.health_repaired = 0;
+                        }
                     }
                     if (target.health == ENTITY_DATA.at(target.type).max_health) {
                         if (target.mode == MODE_BUILDING_IN_PROGRESS) {
@@ -795,11 +866,16 @@ xy entity_get_center_position(const entity_t& entity) {
 
 Sprite entity_get_sprite(const entity_t entity) {
     if (entity.mode == MODE_BUILDING_DESTROYED) {
+        if (entity.type == ENTITY_BUNKER) {
+            return SPRITE_BUILDING_DESTROYED_BUNKER;
+        }
         switch (entity_cell_size(entity.type)) {
             case 2:
                 return SPRITE_BUILDING_DESTROYED_2;
             case 3:
                 return SPRITE_BUILDING_DESTROYED_3;
+            case 4:
+                return SPRITE_BUILDING_DESTROYED_4;
             default:
                 GOLD_ASSERT_MESSAGE(false, "Destroyed sprite needed for building of this size");
                 return SPRITE_BUILDING_DESTROYED_2;
