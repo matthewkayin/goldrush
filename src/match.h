@@ -47,6 +47,8 @@ const entity_id CELL_BLOCKED = ID_MAX + 2;
 // If you change this, make sure that entity_is_unit() and entity_is_building() still work
 enum EntityType {
     ENTITY_MINER,
+    ENTITY_COWBOY,
+    ENTITY_BANDIT,
     ENTITY_HALL,
     ENTITY_CAMP,
     ENTITY_HOUSE,

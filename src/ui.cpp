@@ -209,6 +209,9 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
             case ENTITY_HALL:
                 state.ui_buttonset = UI_BUTTONSET_HALL;
                 return;
+            case ENTITY_SALOON:
+                state.ui_buttonset = UI_BUTTONSET_SALOON;
+                return;
             default:
                 break;
         }

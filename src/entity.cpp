@@ -14,8 +14,6 @@ static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
 
 // Building train time = (HP * 0.9) / 10
-// Make the house 300 HP
-// Make the saloon 600 HP
 
 const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
     { ENTITY_MINER, (entity_data_t) {
@@ -40,6 +38,56 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
             .damage = 3,
             .attack_cooldown = 16,
+            .range_squared = 1
+        }
+    }},
+    { ENTITY_COWBOY, (entity_data_t) {
+        .name = "Cowboy",
+        .sprite = SPRITE_UNIT_COWBOY,
+        .ui_button = UI_BUTTON_UNIT_COWBOY,
+        .cell_size = 1,
+
+        .gold_cost = 75,
+        .train_duration = 25,
+        .max_health = 50,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 200),
+
+            .damage = 6,
+            .attack_cooldown = 30,
+            .range_squared = 25
+        }
+    }},
+    { ENTITY_BANDIT, (entity_data_t) {
+        .name = "Bandit",
+        .sprite = SPRITE_UNIT_BANDIT,
+        .ui_button = UI_BUTTON_UNIT_BANDIT,
+        .cell_size = 1,
+
+        .gold_cost = 50,
+        .train_duration = 25,
+        .max_health = 50,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 225),
+
+            .damage = 5,
+            .attack_cooldown = 15,
             .range_squared = 1
         }
     }},
@@ -120,7 +168,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 150,
         .train_duration = 0,
-        .max_health = 300,
+        .max_health = 600,
         .sight = 7,
         .armor = 1,
         .attack_priority = 0,
