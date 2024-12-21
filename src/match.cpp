@@ -935,6 +935,32 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             break;
         }
         case INPUT_UNLOAD: {
+            for (uint32_t input_index = 0; input_index < input.unload.entity_count; input_index++) {
+                uint32_t carrier_index = state.entities.get_index_of(input.unload.entity_ids[input_index]);
+                if (carrier_index == INDEX_INVALID || !entity_is_selectable(state.entities[carrier_index]) || state.entities[carrier_index].garrisoned_units.empty()) {
+                    continue;
+                }
+
+                entity_t& carrier = state.entities[carrier_index];
+                while (!carrier.garrisoned_units.empty()) {
+                    entity_t& garrisoned_unit = state.entities.get_by_id(carrier.garrisoned_units[0]);
+                    xy exit_cell = entity_get_exit_cell(state, carrier.cell, entity_cell_size(carrier.type), entity_cell_size(garrisoned_unit.type), carrier.cell + xy(0, entity_cell_size(carrier.type)));
+                    if (exit_cell.x == -1) {
+                        if (garrisoned_unit.player_id == network_get_player_id()) {
+                            ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                            break; // breaks out of while garrisoned units not empty
+                        }
+                    }
+
+                    garrisoned_unit.cell = exit_cell;
+                    garrisoned_unit.position = cell_center(garrisoned_unit.cell);
+                    map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), carrier.garrisoned_units[0]);
+                    garrisoned_unit.mode = MODE_UNIT_IDLE;
+                    garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
+                    garrisoned_unit.garrison_id = ID_NULL;
+                    carrier.garrisoned_units.erase(carrier.garrisoned_units.begin());
+                }
+            }
             break;
         }
         case INPUT_SINGLE_UNLOAD: {

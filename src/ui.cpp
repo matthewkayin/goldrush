@@ -323,7 +323,17 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_UNLOAD: {
-            state.ui_mode = UI_MODE_TARGET_UNLOAD;
+            if (ui_get_selection_type(state) == SELECTION_TYPE_UNITS) {
+                state.ui_mode = UI_MODE_TARGET_UNLOAD;
+            } else {
+                input_t input;
+                input.type = INPUT_UNLOAD;
+                input.unload.entity_count = state.selection.size();
+                for (int selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+                    input.unload.entity_ids[selection_index] = state.selection[selection_index];
+                }
+                state.input_queue.push_back(input);
+            }
             break;
         }
         case UI_BUTTON_STOP:
