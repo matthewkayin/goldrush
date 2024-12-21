@@ -1426,6 +1426,21 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
 
     if (!attack_missed) {
         defender.health = std::max(0, defender.health - damage);
+
+        // Create particle effect
+        if (attacker.type == ENTITY_COWBOY) {
+            SDL_Rect defender_rect = entity_get_rect(defender);
+
+            xy particle_position;
+            particle_position.x = defender_rect.x + (defender_rect.w / 4) + (lcg_rand() % (defender_rect.w / 2));
+            particle_position.y = defender_rect.y + (defender_rect.h / 4) + (lcg_rand() % (defender_rect.h / 2));
+            state.particles.push_back((particle_t) {
+                .sprite = SPRITE_PARTICLE_SPARKS,
+                .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
+                .vframe = lcg_rand() % 3,
+                .position = particle_position
+            });
+        }
     }
 
     // Make the enemy attack back

@@ -406,6 +406,19 @@ void match_update(match_state_t& state) {
         animation_update(state.ui_move_animation);
     }
 
+    // Update particles
+    {
+        uint32_t particle_index = 0;
+        while (particle_index < state.particles.size()) {
+            animation_update(state.particles[particle_index].animation);
+            if (!animation_is_playing(state.particles[particle_index].animation)) {
+                state.particles.erase(state.particles.begin() + particle_index);
+            } else {
+                particle_index++;
+            }
+        }
+    }
+
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         entity_update(state, entity_index);
@@ -1137,6 +1150,11 @@ void match_render(const match_state_t& state) {
             render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
     } // End for each elevation
+
+    // Particles
+    for (const particle_t& particle : state.particles) {
+        render_sprite(particle.sprite, xy(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED);
+    }
 
     // Debug pathing 
     #ifdef GOLD_DEBUG_UNIT_PATHS

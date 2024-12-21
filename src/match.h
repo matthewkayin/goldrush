@@ -262,6 +262,15 @@ extern const xy BUILDING_QUEUE_TOP_LEFT;
 extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
 extern const std::unordered_map<UiButton, SDL_Keycode> hotkeys;
 
+// Particles
+
+struct particle_t {
+    Sprite sprite;
+    animation_t animation;
+    int vframe;
+    xy position;
+};
+
 // Input
 
 enum InputType: uint8_t {
@@ -373,6 +382,7 @@ struct match_state_t {
 
     // Entities
     id_array<entity_t, 400 * MAX_PLAYERS> entities;
+    std::vector<particle_t> particles;
 
     uint32_t player_gold[MAX_PLAYERS];
 };
