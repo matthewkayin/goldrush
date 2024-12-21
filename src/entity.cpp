@@ -8,8 +8,8 @@
 
 static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
-static const uint32_t UNIT_MINE_TICK_DURATION = 40;
-static const uint32_t UNIT_MAX_GOLD_HELD = 9;
+static const uint32_t UNIT_MINE_TICK_DURATION = 60;
+static const uint32_t UNIT_MAX_GOLD_HELD = 8;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
 
@@ -196,7 +196,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .armor = 1,
         .attack_priority = 0,
 
-        .garrison_capacity = 0,
+        .garrison_capacity = 4,
         .garrison_size = 0,
 
         .building_data = (building_data_t) {
@@ -318,12 +318,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
         ui_deselect_entity_if_selected(state, id);
 
-        /*
-        Kill garrisoned untis
+        // Kill garrisoned untis
         for (entity_id garrisoned_unit_id : entity.garrisoned_units) {
-
+            entity_t& garrisoned_unit = state.entities.get_by_id(garrisoned_unit_id);
+            garrisoned_unit.health = 0;
         }
-        */
         return;
     } // End if entity_should_die
 
@@ -548,51 +547,20 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     }
                     case TARGET_REPAIR:
                     case TARGET_ENTITY: 
-                    case TARGET_ATTACK_ENTITY: 
-                    case TARGET_GOLD: {
+                    case TARGET_ATTACK_ENTITY: {
                         if (entity_is_target_invalid(state, entity)) {
-                            entity.target = entity.target.type == TARGET_GOLD
-                                                ? entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id)
-                                                : entity.target = (target_t) { .type = TARGET_NONE };
+                            entity.target = entity.target = (target_t) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
 
                         if (!entity_has_reached_target(state, entity)) {
                             // This will trigger a repath
-                            if (entity.target.type == TARGET_GOLD) {
-                                entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
-                            }
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
 
                         entity_t& target = state.entities.get_by_id(entity.target.id);
-
-                        // Reached gold
-                        if (entity.target.type == TARGET_GOLD) {
-                            if (entity.gold_held == UNIT_MAX_GOLD_HELD) {
-                                entity.target = entity_target_nearest_camp(state, entity);
-                                entity.mode = MODE_UNIT_IDLE;
-                            } else {
-                                // The cell should either be empty (meaning we mineral walked to this cell) or filled with the current entity ID (meaning we started at this cell)
-                                // If it's not then we should find another gold cell to mine
-                                if (!(map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY) || 
-                                        map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id))) {
-                                    entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
-                                    entity.mode = MODE_UNIT_IDLE;
-                                    break;
-                                }
-                                // Occupy this cell and begin mining
-                                map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
-                                entity.timer = UNIT_MINE_TICK_DURATION;
-                                entity.mode = MODE_UNIT_MINE;
-                                entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
-                            }
-
-                            update_finished = true;
-                            break;
-                        }
 
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
@@ -614,6 +582,18 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             break;
                         }
 
+                        // Garrison
+                        if (entity.player_id == target.player_id && entity_get_garrisoned_occupancy(state, target) + ENTITY_DATA.at(entity.type).garrison_size <= ENTITY_DATA.at(target.type).garrison_capacity && entity.target.type != TARGET_REPAIR) {
+                            target.garrisoned_units.push_back(id);
+                            entity.garrison_id = entity.target.id;
+                            entity.mode = MODE_UNIT_IDLE;
+                            entity.target = (target_t) { .type = TARGET_NONE };
+                            map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
+                            ui_deselect_entity_if_selected(state, id);
+                            update_finished = true;
+                            break;
+                        }
+
                         // Begin repair
                         if (entity.player_id == target.player_id && entity.type == ENTITY_MINER && entity_is_building(target.type) && target.health < ENTITY_DATA.at(target.type).max_health) {
                             if (entity.target.type != TARGET_REPAIR) {
@@ -631,8 +611,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             break;
                         }
 
-                        // TODO garrison
-
                         // Don't attack allied units
                         if (entity.player_id == target.player_id || ENTITY_DATA.at(entity.type).unit_data.damage == 0) {
                             entity.mode = MODE_UNIT_IDLE;
@@ -643,6 +621,43 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             break;
                         }
 
+                        break;
+                    }
+                    case TARGET_GOLD: {
+                        if (entity_is_target_invalid(state, entity)) {
+                            entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
+                        if (!entity_has_reached_target(state, entity)) {
+                            // This will trigger a repath
+                            entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
+                        entity_t& target = state.entities.get_by_id(entity.target.id);
+                        if (entity.gold_held == UNIT_MAX_GOLD_HELD) {
+                            entity.target = entity_target_nearest_camp(state, entity);
+                            entity.mode = MODE_UNIT_IDLE;
+                        } else {
+                            // The cell should either be empty (meaning we mineral walked to this cell) or filled with the current entity ID (meaning we started at this cell)
+                            // If it's not then we should find another gold cell to mine
+                            if (!(map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY) || 
+                                    map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id))) {
+                                entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                                entity.mode = MODE_UNIT_IDLE;
+                                break;
+                            }
+                            // Occupy this cell and begin mining
+                            map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
+                            entity.timer = UNIT_MINE_TICK_DURATION;
+                            entity.mode = MODE_UNIT_MINE;
+                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
+                        }
+
+                        update_finished = true;
                         break;
                     }
                 }
@@ -1338,6 +1353,14 @@ bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity)
 
 SDL_Rect entity_gold_get_block_building_rect(xy cell) {
     return (SDL_Rect) { .x = cell.x - 3, .y = cell.y - 3, .w = 7, .h = 7 };
+}
+
+uint32_t entity_get_garrisoned_occupancy(const match_state_t& state, const entity_t& entity) {
+    uint32_t occupancy = 0;
+    for (entity_id id : entity.garrisoned_units) {
+        occupancy += ENTITY_DATA.at(state.entities.get_by_id(id).type).garrison_size;
+    }
+    return occupancy;
 }
 
 void entity_set_target(entity_t& entity, target_t target) {

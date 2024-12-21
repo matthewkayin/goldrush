@@ -76,8 +76,6 @@ enum EntityMode {
     MODE_GOLD_MINED_OUT
 };
 
-const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
-
 enum TargetType {
     TARGET_NONE,
     // Make sure that move targets stay in the same order as their inputs
@@ -122,6 +120,8 @@ struct building_queue_item_t {
         EntityType unit_type;
     };
 };
+
+const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
 
 struct entity_t {
     EntityType type;
@@ -258,6 +258,8 @@ struct chat_message_t {
 };
 
 extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
+extern const xy UI_FRAME_BOTTOM_POSITION; 
+extern const xy BUILDING_QUEUE_TOP_LEFT; 
 extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
 extern const std::unordered_map<UiButton, SDL_Keycode> hotkeys;
 
@@ -317,6 +319,15 @@ struct input_building_dequeue_t {
     uint16_t index;
 };
 
+struct input_unload_t {
+    uint16_t entity_count;
+    entity_id entity_ids[SELECTION_LIMIT];
+};
+
+struct input_single_unload_t {
+    entity_id unit_id;
+};
+
 struct input_t {
     uint8_t type;
     union {
@@ -327,6 +338,8 @@ struct input_t {
         input_build_cancel_t build_cancel;
         input_building_enqueue_t building_enqueue;
         input_building_dequeue_t building_dequeue;
+        input_unload_t unload;
+        input_single_unload_t single_unload;
     };
 };
 
@@ -400,6 +413,8 @@ xy ui_get_building_cell(const match_state_t& state);
 entity_id ui_get_nearest_builder(const match_state_t& state, const std::vector<entity_id>& builders, xy cell);
 bool ui_building_can_be_placed(const match_state_t& state);
 ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state);
+xy ui_garrisoned_icon_position(int index);
+int ui_get_garrisoned_index_hovered(const match_state_t& state);
 
 // Map
 void map_init(match_state_t& state, uint32_t width, uint32_t height);
@@ -444,6 +459,7 @@ target_t entity_target_nearest_gold(const match_state_t& state, xy start_cell, u
 target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity);
 bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity);
 SDL_Rect entity_gold_get_block_building_rect(xy cell);
+uint32_t entity_get_garrisoned_occupancy(const match_state_t& state, const entity_t& entity);
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);

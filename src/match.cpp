@@ -32,8 +32,8 @@ static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
     .x = (SCREEN_WIDTH / 2) - (150 / 2), .y = 64,
     .w = 150, .h = 100
 };
-static const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
-static const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
+const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
+const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
 static const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT,
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(0, 35),
@@ -155,6 +155,16 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
                 return;
             }
         }
+    }
+
+    // Garrisoned unit icon press
+    if (ui_get_garrisoned_index_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN) {
+        state.input_queue.push_back((input_t) {
+            .type = INPUT_SINGLE_UNLOAD,
+            .single_unload = (input_single_unload_t) {
+                .unit_id = state.entities.get_by_id(state.selection[0]).garrisoned_units[ui_get_garrisoned_index_hovered(state)]
+            }
+        });
     }
 
     // UI button release
@@ -579,6 +589,19 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += sizeof(input_building_dequeue_t);
             break;
         }
+        case INPUT_UNLOAD: {
+            memcpy(out_buffer + out_buffer_length, &input.unload.entity_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.unload.entity_ids, input.unload.entity_count * sizeof(entity_id));
+            out_buffer_length += input.unload.entity_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_SINGLE_UNLOAD: {
+            memcpy(out_buffer + out_buffer_length, &input.single_unload, sizeof(input_single_unload_t));
+            out_buffer_length += sizeof(input_single_unload_t);
+            break;
+        }
         default:
             break;
     }
@@ -645,6 +668,19 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
         case INPUT_BUILDING_DEQUEUE: {
             memcpy(&input.building_dequeue, in_buffer + in_buffer_head, sizeof(input_building_dequeue_t));
             in_buffer_head += sizeof(input_building_dequeue_t);
+            break;
+        }
+        case INPUT_UNLOAD: {
+            memcpy(&input.unload.entity_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(&input.unload.entity_ids, in_buffer + in_buffer_head, input.unload.entity_count * sizeof(entity_id));
+            in_buffer_head += input.unload.entity_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_SINGLE_UNLOAD: {
+            memcpy(&input.single_unload, in_buffer + in_buffer_head, sizeof(input_single_unload_t));
+            in_buffer_head += sizeof(input_single_unload_t);
             break;
         }
         default:
@@ -894,6 +930,50 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             } else {
                 building.queue.erase(building.queue.begin() + index);
             }
+            break;
+        }
+        case INPUT_UNLOAD: {
+            break;
+        }
+        case INPUT_SINGLE_UNLOAD: {
+            uint32_t garrisoned_unit_index = state.entities.get_index_of(input.single_unload.unit_id);
+            if (garrisoned_unit_index == INDEX_INVALID || state.entities[garrisoned_unit_index].health == 0 || state.entities[garrisoned_unit_index].garrison_id == ID_NULL) {
+                return;
+            }
+            entity_t& garrisoned_unit = state.entities[garrisoned_unit_index];
+            entity_id carrier_id = garrisoned_unit.garrison_id;
+            entity_t& carrier = state.entities.get_by_id(carrier_id);
+
+            // Find the exit cell
+            xy exit_cell = entity_get_exit_cell(state, carrier.cell, entity_cell_size(carrier.type), entity_cell_size(garrisoned_unit.type), carrier.cell + xy(0, entity_cell_size(carrier.type)));
+            if (exit_cell.x == -1) {
+                if (garrisoned_unit.player_id == network_get_player_id() && entity_is_building(carrier.type)) {
+                    ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                }
+                return;
+            }
+
+            // Place the unit in the world
+            garrisoned_unit.cell = exit_cell;
+            garrisoned_unit.position = cell_center(garrisoned_unit.cell);
+            map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), input.single_unload.unit_id);
+            garrisoned_unit.mode = MODE_UNIT_IDLE;
+            garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
+            garrisoned_unit.garrison_id = ID_NULL;
+
+            // Remove the unit from the carrier's garrison list
+            auto garrisoned_unit_it = std::find(carrier.garrisoned_units.begin(), carrier.garrisoned_units.end(), input.single_unload.unit_id);
+            if (garrisoned_unit_it == carrier.garrisoned_units.end()) {
+                log_warn("match_input_handle::single_unload: unit id %u not found in garrisoned units of %u", input.single_unload.unit_id, carrier_id);
+                return;
+            } 
+            carrier.garrisoned_units.erase(garrisoned_unit_it);
+
+            // If selecting the carrier, refresh selection so that the unload button disappears if necessary
+            if (std::find(state.selection.begin(), state.selection.end(), carrier_id) != state.selection.end()) {
+                ui_set_selection(state, state.selection);
+            }
+
             break;
         }
         default:
@@ -1256,6 +1336,20 @@ void match_render(const match_state_t& state) {
             SDL_RenderFillRect(engine.renderer, &building_queue_progress_bar_rect);
             SDL_SetRenderDrawColor(engine.renderer, COLOR_BLACK.r, COLOR_BLACK.g, COLOR_BLACK.b, COLOR_BLACK.a);
             SDL_RenderDrawRect(engine.renderer, &BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT);
+        }
+    }
+
+    // UI Garrisoned units
+    if (state.selection.size() == 1) {
+        const entity_t& entity = state.entities.get_by_id(state.selection[0]);
+        for (int index = 0; index < entity.garrisoned_units.size(); index++) {
+            const entity_t& garrisoned_unit = state.entities.get_by_id(entity.garrisoned_units[index]);
+            bool icon_hovered = ui_get_garrisoned_index_hovered(state) == index;
+            xy icon_position = ui_garrisoned_icon_position(index) + (icon_hovered ? xy(0, -1) : xy(0, 0));
+
+            render_sprite(SPRITE_UI_BUTTON, xy(icon_hovered ? 1 : 0, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(ENTITY_DATA.at(garrisoned_unit.type).ui_button, icon_hovered ? 1 : 0), icon_position, RENDER_SPRITE_NO_CULL);
+            match_render_healthbar(icon_position + xy(1, 32 - 5), xy(32 - 2, 4), garrisoned_unit.health, ENTITY_DATA.at(garrisoned_unit.type).max_health);
         }
     }
 

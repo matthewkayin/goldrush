@@ -564,3 +564,23 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
 
     return info;
 }
+
+xy ui_garrisoned_icon_position(int index) {
+    return UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(index * 34, 0);
+}
+
+int ui_get_garrisoned_index_hovered(const match_state_t& state) {
+    if (state.ui_mode != UI_MODE_NONE || state.selection.size() != 1) {
+        return -1;
+    }
+
+    const entity_t& entity = state.entities.get_by_id(state.selection[0]);
+    for (int index = 0; index < entity.garrisoned_units.size(); index++) {
+        SDL_Rect icon_rect = (SDL_Rect) { .x = ui_garrisoned_icon_position(index).x, .y = ui_garrisoned_icon_position(index).y, .w = 32, .h = 32 };
+        if (sdl_rect_has_point(icon_rect, engine.mouse_position)) {
+            return index;
+        }
+    }
+
+    return -1;
+}
