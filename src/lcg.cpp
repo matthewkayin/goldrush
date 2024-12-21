@@ -13,5 +13,6 @@ void lcg_srand(int seed) {
 
 int lcg_rand() {
     previous = ((previous * 1103515245U) + 12345U) & 0x7fffffff;
+    log_trace("lcg_rand(): %u", previous);
     return previous;
 }

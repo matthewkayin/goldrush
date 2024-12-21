@@ -12,6 +12,13 @@ static const uint32_t UNIT_MINE_TICK_DURATION = 60;
 static const uint32_t UNIT_MAX_GOLD_HELD = 8;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
+static const uint32_t ENTITY_BUNKER_FIRE_OFFSET = 10;
+static const xy ENTITY_BUNKER_PARTICLE_OFFSETS[4] = {
+    xy(3, 23), 
+    xy(11, 26),
+    xy(20, 25),
+    xy(28, 23)
+};
 
 // Building train time = (HP * 0.9) / 10
 
@@ -357,9 +364,18 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
     while (!update_finished) {
         switch (entity.mode) {
             case MODE_UNIT_IDLE: {
+                // Unit is garrisoned
+                if (entity.garrison_id != ID_NULL) {
+                    const entity_t& carrier = state.entities.get_by_id(entity.garrison_id);
+                    if (carrier.type != ENTITY_BUNKER) {
+                        update_finished = true;
+                        break;
+                    } 
+                }
+
                 // If unit is idle, try to find a nearby target
                 if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
-                    entity.target = entity_target_nearest_enemy(state, entity);
+                    entity.target = entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
                 }
 
                 if (entity.target.type == TARGET_NONE) {
@@ -380,7 +396,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     break;
                 }
 
-                if (entity_check_flag(entity, ENTITY_FLAG_HOLD_POSITION)) {
+                if (entity_check_flag(entity, ENTITY_FLAG_HOLD_POSITION) || entity.garrison_id != ID_NULL) {
                     update_finished = true;
                     break;
                 }
@@ -597,6 +613,17 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
+                            if (entity.garrison_id != ID_NULL) {
+                                entity_t& bunker = state.entities.get_by_id(entity.garrison_id);
+                                // Don't attack during bunker cooldown or if this is a melee unit
+                                if (bunker.timer != 0 || ENTITY_DATA.at(entity.type).unit_data.range_squared == 1) {
+                                    update_finished = true;
+                                    break;
+                                }
+
+                                bunker.timer = ENTITY_BUNKER_FIRE_OFFSET;
+                            }
+
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
                             entity.mode = MODE_UNIT_ATTACK_WINDUP;
                             update_finished = true;
@@ -897,6 +924,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         // TODO rally point sets unit target
                         entity_building_dequeue(state, entity);
                     }
+                } else if (entity.timer != 0) {
+                    entity.timer--;
                 }
 
                 update_finished = true;
@@ -1093,9 +1122,10 @@ bool entity_has_reached_target(const match_state_t& state, const entity_t& entit
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {
             const entity_t& target = state.entities.get_by_id(entity.target.id);
+            const entity_t& reference_entity = entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id);
             SDL_Rect entity_rect = (SDL_Rect) {
-                .x = entity.cell.x, .y = entity.cell.y,
-                .w = entity_cell_size(entity.type), .h = entity_cell_size(entity.type)
+                .x = reference_entity.cell.x, .y = reference_entity.cell.y,
+                .w = entity_cell_size(reference_entity.type), .h = entity_cell_size(reference_entity.type)
             };
             SDL_Rect target_rect = (SDL_Rect) {
                 .x = target.cell.x, .y = target.cell.y,
@@ -1423,7 +1453,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
             attack_missed = true;
         }
     }
-
+    
     if (!attack_missed) {
         defender.health = std::max(0, defender.health - damage);
 
@@ -1441,6 +1471,19 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
                 .position = particle_position
             });
         }
+    }
+
+    // Add bunker particle for garrisoned unit. Happens even if they miss
+    if (attacker.garrison_id != ID_NULL) {
+        entity_t& bunker = state.entities.get_by_id(attacker.garrison_id);
+        int particle_index = lcg_rand() % 4;
+        log_trace("Particle index %i", particle_index);
+        state.particles.push_back((particle_t) {
+            .sprite = SPRITE_PARTICLE_BUNKER_COWBOY,
+            .animation = animation_create(ANIMATION_PARTICLE_BUNKER_COWBOY),
+            .vframe = 0,
+            .position = (bunker.cell * TILE_SIZE) + ENTITY_BUNKER_PARTICLE_OFFSETS[particle_index]
+        });
     }
 
     // Make the enemy attack back
