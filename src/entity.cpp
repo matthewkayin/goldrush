@@ -280,7 +280,7 @@ entity_id entity_create_gold(match_state_t& state, xy cell, uint32_t gold_left, 
     entity.gold_held = gold_left;
     entity.gold_patch_id = gold_patch_id;
 
-    entity.animation.frame = xy(lcg_rand() % 3, 0);
+    entity.animation.frame = xy(lcg_short_rand() % 3, 0);
 
     entity_id id = state.entities.push_back(entity);
     map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
@@ -1467,7 +1467,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
             state.particles.push_back((particle_t) {
                 .sprite = SPRITE_PARTICLE_SPARKS,
                 .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
-                .vframe = lcg_rand() % 3,
+                .vframe = lcg_short_rand() % 3,
                 .position = particle_position
             });
         }
@@ -1476,7 +1476,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
     // Add bunker particle for garrisoned unit. Happens even if they miss
     if (attacker.garrison_id != ID_NULL) {
         entity_t& bunker = state.entities.get_by_id(attacker.garrison_id);
-        int particle_index = lcg_rand() % 4;
+        int particle_index = lcg_short_rand() % 4;
         log_trace("Particle index %i", particle_index);
         state.particles.push_back((particle_t) {
             .sprite = SPRITE_PARTICLE_BUNKER_COWBOY,
