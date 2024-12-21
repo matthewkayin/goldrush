@@ -68,7 +68,11 @@ match_state_t match_init() {
     state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
     state.ui_status_timer = 0;
     state.ui_button_pressed = -1;
-    state.ui_buttonset = UI_BUTTONSET_NONE;
+    state.ui_is_minimap_dragging = false;
+    state.select_rect_origin = xy(-1, -1);
+    for (int i = 0; i < 6; i++) {
+        state.ui_buttons[i] = UI_BUTTON_NONE;
+    }
 
     map_init(state, 64, 64);
 
@@ -146,7 +150,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     // UI button hotkey press
     if (state.ui_button_pressed == -1 && event.type == SDL_KEYDOWN) {
         for (int button_index = 0; button_index < UI_BUTTONSET_SIZE; button_index++) {
-            UiButton button = ui_get_ui_button(state, button_index);
+            UiButton button = state.ui_buttons[button_index];
             if (button == UI_BUTTON_NONE) {
                 continue;
             }
@@ -170,8 +174,8 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     // UI button release
     if (state.ui_button_pressed != -1 && 
         ((event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) || 
-         (event.type == SDL_KEYUP && event.key.keysym.sym == hotkeys.at(ui_get_ui_button(state, state.ui_button_pressed))))) {
-        UiButton button_pressed = ui_get_ui_button(state, state.ui_button_pressed);
+         (event.type == SDL_KEYUP && event.key.keysym.sym == hotkeys.at(state.ui_buttons[state.ui_button_pressed])))) {
+        UiButton button_pressed = state.ui_buttons[state.ui_button_pressed];
         state.ui_button_pressed = -1;
         ui_handle_ui_button_press(state, button_pressed);
         return;
@@ -192,7 +196,6 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         input.build.target_cell = ui_get_building_cell(state);
         state.input_queue.push_back(input);
 
-        state.ui_buttonset = UI_BUTTONSET_NONE;
         state.ui_mode = UI_MODE_NONE;
         return;
     }
@@ -200,9 +203,8 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     // Order movement
     if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state) == SELECTION_TYPE_UNITS && 
             ((event.button.button == SDL_BUTTON_LEFT && ui_is_targeting(state)) ||
-            (event.button.button == SDL_BUTTON_RIGHT && state.ui_mode == UI_MODE_NONE))) {
+            (event.button.button == SDL_BUTTON_RIGHT && !ui_is_selecting(state) && !state.ui_is_minimap_dragging))) {
         input_t move_input = match_create_move_input(state);
-        state.input_queue.push_back(move_input);
 
         if (move_input.type == INPUT_MOVE_REPAIR) {
             bool is_repair_target_valid = true;
@@ -218,10 +220,11 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
             if (!is_repair_target_valid) {
                 ui_show_status(state, UI_STATUS_REPAIR_TARGET_INVALID);
                 state.ui_mode = UI_MODE_NONE;
-                ui_set_selection(state, state.selection);
                 return;
             }
         }
+
+        state.input_queue.push_back(move_input);
 
         // Provide instant user feedback
         if (move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_UNLOAD) {
@@ -237,23 +240,21 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         // Reset UI mode if targeting
         if (ui_is_targeting(state)) {
             state.ui_mode = UI_MODE_NONE;
-            ui_set_selection(state, state.selection);
         }
         return;
     } 
 
     // Begin selecting
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        if (state.ui_mode == UI_MODE_NONE && !ui_is_mouse_in_ui()) {
+        if ((state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD) && !ui_is_mouse_in_ui()) {
             state.select_rect_origin = match_get_mouse_world_pos(state);
-            state.ui_mode = UI_MODE_SELECTING;
         }
         return;
     } 
 
     // End selecting
-    if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT && state.ui_mode == UI_MODE_SELECTING) {
-        state.ui_mode = UI_MODE_NONE;
+    if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT && ui_is_selecting(state)) {
+        state.select_rect_origin = xy(-1, -1);
         std::vector<entity_id> selection = ui_create_selection_from_rect(state);
         ui_set_selection(state, selection);
         return;
@@ -373,7 +374,7 @@ void match_update(match_state_t& state) {
     state.turn_timer--;
 
     // CAMERA DRAG
-    if (state.ui_mode != UI_MODE_SELECTING && state.ui_mode != UI_MODE_MINIMAP_DRAG) {
+    if (!ui_is_selecting(state) && !state.ui_is_minimap_dragging) {
         xy camera_drag_direction = xy(0, 0);
         if (engine.mouse_position.x < CAMERA_DRAG_MARGIN) {
             camera_drag_direction.x = -1;
@@ -390,7 +391,7 @@ void match_update(match_state_t& state) {
     }
 
     // SELECT RECT
-    if (state.ui_mode == UI_MODE_SELECTING) {
+    if (ui_is_selecting(state)) {
         // Update select rect
         state.select_rect = (SDL_Rect) {
             .x = std::min(state.select_rect_origin.x, match_get_mouse_world_pos(state).x),
@@ -438,6 +439,7 @@ void match_update(match_state_t& state) {
     }
 
     engine_set_cursor(ui_is_targeting(state) ? CURSOR_TARGET : CURSOR_DEFAULT);
+    ui_update_buttons(state);
 }
 
 void match_camera_clamp(match_state_t& state) {
@@ -968,12 +970,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 return;
             } 
             carrier.garrisoned_units.erase(garrisoned_unit_it);
-
-            // If selecting the carrier, refresh selection so that the unload button disappears if necessary
-            if (std::find(state.selection.begin(), state.selection.end(), carrier_id) != state.selection.end()) {
-                ui_set_selection(state, state.selection);
-            }
-
             break;
         }
         default:
@@ -1133,7 +1129,7 @@ void match_render(const match_state_t& state) {
     #endif
 
     // Select rect
-    if (state.ui_mode == UI_MODE_SELECTING) {
+    if (ui_is_selecting(state)) {
         SDL_Rect select_rect = state.select_rect;
         select_rect.x -= state.camera_offset.x;
         select_rect.y -= state.camera_offset.y;
@@ -1242,7 +1238,7 @@ void match_render(const match_state_t& state) {
 
     // UI Buttons
     for (int i = 0; i < UI_BUTTONSET_SIZE; i++) {
-        UiButton ui_button = ui_get_ui_button(state, i); 
+        UiButton ui_button = state.ui_buttons[i];
         if (ui_button == UI_BUTTON_NONE) {
             continue;
         }
@@ -1348,7 +1344,7 @@ void match_render(const match_state_t& state) {
             xy icon_position = ui_garrisoned_icon_position(index) + (icon_hovered ? xy(0, -1) : xy(0, 0));
 
             render_sprite(SPRITE_UI_BUTTON, xy(icon_hovered ? 1 : 0, 0), icon_position, RENDER_SPRITE_NO_CULL);
-            render_sprite(SPRITE_UI_BUTTON_ICON, xy(ENTITY_DATA.at(garrisoned_unit.type).ui_button, icon_hovered ? 1 : 0), icon_position, RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(ENTITY_DATA.at(garrisoned_unit.type).ui_button - 1, icon_hovered ? 1 : 0), icon_position, RENDER_SPRITE_NO_CULL);
             match_render_healthbar(icon_position + xy(1, 32 - 5), xy(32 - 2, 4), garrisoned_unit.health, ENTITY_DATA.at(garrisoned_unit.type).max_health);
         }
     }

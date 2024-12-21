@@ -318,10 +318,36 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
         ui_deselect_entity_if_selected(state, id);
 
-        // Kill garrisoned untis
+        // Handle garrisoned untis
         for (entity_id garrisoned_unit_id : entity.garrisoned_units) {
             entity_t& garrisoned_unit = state.entities.get_by_id(garrisoned_unit_id);
-            garrisoned_unit.health = 0;
+            if (entity_is_unit(entity.type)) {
+                garrisoned_unit.health = 0;
+            } else {
+                // For buildings, place garrisoned units inside former-self
+                bool unit_is_placed = false;
+                for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size(entity.type); x++) {
+                    for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
+                        if (!map_is_cell_rect_occupied(state, xy(x, y), entity_cell_size(garrisoned_unit.type))) {
+                            garrisoned_unit.cell = xy(x, y);
+                            garrisoned_unit.position = cell_center(garrisoned_unit.cell);
+                            garrisoned_unit.garrison_id = ID_NULL;
+                            garrisoned_unit.mode = MODE_UNIT_IDLE;
+                            garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
+                            map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), garrisoned_unit_id);
+                            unit_is_placed = true;
+                            break;
+                        }
+                    }
+                    if (unit_is_placed) {
+                        break;
+                    }
+                }
+
+                if (!unit_is_placed) {
+                    log_warn("Unable to place garrisoned unit.");
+                }
+            }
         }
         return;
     } // End if entity_should_die
@@ -429,6 +455,14 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                 break;
                             }
                         }
+                        if (entity_is_target_invalid(state, entity)) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            entity.target = entity.target.type == TARGET_GOLD
+                                                ? entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id) 
+                                                : (target_t) { .type = TARGET_NONE };
+                            entity.path.clear();
+                            break;
+                        }
                         if (entity_has_reached_target(state, entity)) {
                             entity.mode = MODE_UNIT_MOVE_FINISHED;
                             entity.path.clear();
@@ -517,7 +551,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         if (is_targeting_only_builders) {
                             state.selection.clear();
                             state.selection.push_back(entity.target.id);
-                            ui_set_selection(state, state.selection);
                         }
 
                         break;
@@ -1515,11 +1548,6 @@ void entity_building_finish(match_state_t& state, entity_id building_id) {
         }
     }
     */
-
-    // Trigger a re-select so that UI buttons are updated correctly
-    if (state.ui_mode == UI_MODE_NONE) {
-        ui_set_selection(state, state.selection);
-    }
 
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         entity_t& entity = state.entities[entity_index];

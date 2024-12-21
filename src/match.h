@@ -200,8 +200,7 @@ const SDL_Rect MINIMAP_RECT = (SDL_Rect) {
 enum UiMode {
     UI_MODE_MATCH_NOT_STARTED,
     UI_MODE_NONE,
-    UI_MODE_SELECTING,
-    UI_MODE_MINIMAP_DRAG,
+    UI_MODE_BUILD,
     UI_MODE_BUILDING_PLACE,
     UI_MODE_TARGET_ATTACK,
     UI_MODE_TARGET_UNLOAD,
@@ -350,7 +349,8 @@ struct match_state_t {
 
     // UI
     UiMode ui_mode;
-    UiButtonset ui_buttonset;
+    UiButton ui_buttons[6];
+    bool ui_is_minimap_dragging;
     int ui_button_pressed;
     xy camera_offset;
     xy select_rect_origin;
@@ -398,13 +398,14 @@ input_t match_create_move_input(const match_state_t& state);
 
 // UI
 bool ui_is_mouse_in_ui();
+bool ui_is_selecting(const match_state_t& state);
 std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, const std::vector<entity_id>& selection);
+void ui_update_buttons(match_state_t& state);
 SelectionType ui_get_selection_type(const match_state_t& state);
 bool ui_is_targeting(const match_state_t& state);
 void ui_add_chat_message(match_state_t& state, std::string message);
 int ui_get_ui_button_hovered(const match_state_t& state);
-UiButton ui_get_ui_button(const match_state_t& state, int index);
 bool ui_button_requirements_met(const match_state_t& state, UiButton button);
 void ui_handle_ui_button_press(match_state_t& state, UiButton button);
 void ui_deselect_entity_if_selected(match_state_t& state, entity_id id);

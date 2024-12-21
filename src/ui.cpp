@@ -6,27 +6,6 @@
 static const uint32_t UI_CHAT_MESSAGE_DURATION = 180;
 static const uint32_t UI_STATUS_DURATION = 60;
 
-static const std::unordered_map<UiButtonset, std::array<UiButton, UI_BUTTONSET_SIZE>> UI_BUTTONS = {
-    { UI_BUTTONSET_NONE, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_UNIT, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_MINER, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
-                      UI_BUTTON_REPAIR, UI_BUTTON_BUILD, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_BUILD, { UI_BUTTON_BUILD_HALL, UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_SALOON,
-                      UI_BUTTON_BUILD_BUNKER, UI_BUTTON_BUILD_CAMP, UI_BUTTON_CANCEL }},
-    { UI_BUTTONSET_CANCEL, { UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE,
-                      UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }},
-    { UI_BUTTONSET_HALL, { UI_BUTTON_UNIT_MINER, UI_BUTTON_NONE, UI_BUTTON_NONE,
-                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_SALOON, { UI_BUTTON_UNIT_COWBOY, UI_BUTTON_UNIT_BANDIT, UI_BUTTON_NONE,
-                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_WAGON, { UI_BUTTON_ATTACK, UI_BUTTON_STOP, UI_BUTTON_DEFEND,
-                             UI_BUTTON_UNLOAD, UI_BUTTON_NONE, UI_BUTTON_NONE }},
-    { UI_BUTTONSET_BUNKER, { UI_BUTTON_UNLOAD, UI_BUTTON_NONE, UI_BUTTON_NONE,
-                             UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_NONE }}
-};
-
 static const int UI_BUTTON_SIZE = 32;
 static const xy UI_BUTTON_PADDING = xy(4, 6);
 static const int UI_BUTTON_LEFT_PAD = 4;
@@ -71,6 +50,10 @@ bool ui_is_mouse_in_ui() {
     return (engine.mouse_position.y >= SCREEN_HEIGHT - UI_HEIGHT) ||
            (engine.mouse_position.x <= 136 && engine.mouse_position.y >= SCREEN_HEIGHT - 136) ||
            (engine.mouse_position.x >= SCREEN_WIDTH - 132 && engine.mouse_position.y >= SCREEN_HEIGHT - 106);
+}
+
+bool ui_is_selecting(const match_state_t& state) {
+    return state.select_rect_origin.x != -1;
 }
 
 std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state) {
@@ -176,51 +159,80 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
         state.selection.pop_back();
     }
 
+    state.ui_mode = UI_MODE_NONE;
+}
+
+void ui_update_buttons(match_state_t& state) {
+    for (int i = 0; i < 6; i++) {
+        state.ui_buttons[i] = UI_BUTTON_NONE;
+    }
+
+    if (ui_is_targeting(state) || state.ui_mode == UI_MODE_BUILDING_PLACE) {
+        state.ui_buttons[5] = UI_BUTTON_CANCEL;
+        return;
+    }
+    if (state.ui_mode == UI_MODE_BUILD) {
+        state.ui_buttons[0] = UI_BUTTON_BUILD_HALL;
+        state.ui_buttons[1] = UI_BUTTON_BUILD_HOUSE;
+        state.ui_buttons[2] = UI_BUTTON_BUILD_CAMP;
+        state.ui_buttons[3] = UI_BUTTON_BUILD_SALOON;
+        state.ui_buttons[4] = UI_BUTTON_BUILD_BUNKER;
+        state.ui_buttons[5] = UI_BUTTON_CANCEL;
+        return;
+    }
+
     if (state.selection.empty()) {
-        state.ui_buttonset = UI_BUTTONSET_NONE;
         return;
     }
 
     const entity_t entity = state.entities.get_by_id(state.selection[0]);
     // This covers enemy selection and mine selection
     if (entity.player_id != network_get_player_id()) {
-        state.ui_buttonset = UI_BUTTONSET_NONE;
         return;
     }
 
     if (state.selection.size() == 1 && entity.mode == MODE_BUILDING_IN_PROGRESS) {
-        state.ui_buttonset = UI_BUTTONSET_CANCEL;
+        state.ui_buttons[5] = UI_BUTTON_CANCEL;
         return;
     }
 
-    EntityType selected_entity_type = entity.type;
-    bool selected_entities_are_all_the_same_type = true;
+    if (entity_is_unit(entity.type)) {
+        state.ui_buttons[0] = UI_BUTTON_ATTACK;
+        state.ui_buttons[1] = UI_BUTTON_STOP;
+        state.ui_buttons[2] = UI_BUTTON_DEFEND;
+    }
+
+    // This block returns if selected entities are not all the same type
+    uint32_t garrison_count = entity.garrisoned_units.size();
     for (uint32_t id_index = 1; id_index < state.selection.size(); id_index++) {
-        if (state.entities.get_by_id(state.selection[id_index]).type != selected_entity_type) {
-            selected_entities_are_all_the_same_type = false;
+        const entity_t& other = state.entities.get_by_id(state.selection[id_index]);
+        garrison_count += other.garrisoned_units.size();
+        if (other.type != entity.type || (!entity_is_unit(entity.type) && other.mode != entity.mode)) {
+            return;
         }
     }
 
-    if (selected_entities_are_all_the_same_type) {
-        switch (selected_entity_type) {
-            case ENTITY_MINER:
-                state.ui_buttonset = UI_BUTTONSET_MINER;
-                return;
-            case ENTITY_HALL:
-                state.ui_buttonset = UI_BUTTONSET_HALL;
-                return;
-            case ENTITY_SALOON:
-                state.ui_buttonset = UI_BUTTONSET_SALOON;
-                return;
-            default:
-                break;
-        }
-    } 
+    if (garrison_count != 0) {
+        state.ui_buttons[3] = UI_BUTTON_UNLOAD;
+    }
 
-    if (entity_is_unit(entity.type)) {
-        state.ui_buttonset = UI_BUTTONSET_UNIT;
-    } else {
-        state.ui_buttonset = UI_BUTTONSET_NONE;
+    switch (entity.type) {
+        case ENTITY_MINER: {
+            state.ui_buttons[3] = UI_BUTTON_REPAIR;
+            state.ui_buttons[4] = UI_BUTTON_BUILD;
+            break;
+        }
+        case ENTITY_HALL: {
+            state.ui_buttons[0] = UI_BUTTON_UNIT_MINER;
+            break;
+        }
+        case ENTITY_SALOON: {
+            state.ui_buttons[0] = UI_BUTTON_UNIT_COWBOY;
+            state.ui_buttons[1] = UI_BUTTON_UNIT_BANDIT;
+            break;
+        }
+        default:
+            break;
     }
 }
 
@@ -264,7 +276,7 @@ int ui_get_ui_button_hovered(const match_state_t& state) {
     }
 
     for (int i = 0; i < 6; i++) {
-        if (ui_get_ui_button(state, i) == UI_BUTTON_NONE) {
+        if (state.ui_buttons[i] == UI_BUTTON_NONE) {
             continue;
         }
 
@@ -274,14 +286,6 @@ int ui_get_ui_button_hovered(const match_state_t& state) {
     }
 
     return -1;
-}
-
-UiButton ui_get_ui_button(const match_state_t& state, int index) {
-    if (index == 5 && state.selection.size() == 1 && state.entities.get_by_id(state.selection[0]).queue.size() > 0) {
-        return UI_BUTTON_CANCEL;
-    }
-
-    return UI_BUTTONS.at(state.ui_buttonset)[index];
 }
 
 bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
@@ -312,17 +316,14 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
     switch (button) {
         case UI_BUTTON_ATTACK: {
             state.ui_mode = UI_MODE_TARGET_ATTACK;
-            state.ui_buttonset = UI_BUTTONSET_CANCEL;
             break;
         }
         case UI_BUTTON_REPAIR: {
             state.ui_mode = UI_MODE_TARGET_REPAIR;
-            state.ui_buttonset = UI_BUTTONSET_CANCEL;
             break;
         }
         case UI_BUTTON_UNLOAD: {
             state.ui_mode = UI_MODE_TARGET_UNLOAD;
-            state.ui_buttonset = UI_BUTTONSET_CANCEL;
             break;
         }
         case UI_BUTTON_STOP:
@@ -335,13 +336,12 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_BUILD: {
-            state.ui_buttonset = UI_BUTTONSET_BUILD;
+            state.ui_mode = UI_MODE_BUILD;
             break;
         }
         case UI_BUTTON_CANCEL: {
             if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
-                state.ui_mode = UI_MODE_NONE;
-                state.ui_buttonset = UI_BUTTONSET_BUILD;
+                state.ui_mode = UI_MODE_BUILD;
             } else if (state.selection.size() == 1 && state.entities.get_by_id(state.selection[0]).mode == MODE_BUILDING_IN_PROGRESS) {
                 state.input_queue.push_back((input_t) {
                     .type = INPUT_BUILD_CANCEL,
@@ -357,15 +357,11 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
                         .index = BUILDING_DEQUEUE_POP_FRONT
                     }
                 });
-            } else if (state.ui_buttonset == UI_BUTTONSET_BUILD) {
-                state.ui_buttonset = UI_BUTTONSET_MINER;
+            } else if (state.ui_mode == UI_MODE_BUILD) {
+                state.ui_mode = UI_MODE_NONE;
             } else if (state.ui_mode == UI_MODE_TARGET_REPAIR || state.ui_mode == UI_MODE_TARGET_ATTACK || state.ui_mode == UI_MODE_TARGET_UNLOAD) {
                 state.ui_mode = UI_MODE_NONE;
-                ui_set_selection(state, state.selection);
-            } else if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
-                state.ui_mode = UI_MODE_NONE;
-                state.ui_buttonset = UI_BUTTONSET_BUILD;
-            }
+            } 
         }
         default:
             break;
@@ -412,7 +408,6 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
 
                 state.ui_mode = UI_MODE_BUILDING_PLACE;
                 state.ui_building_type = entity_type;
-                state.ui_buttonset = UI_BUTTONSET_CANCEL;
             }
 
             return;
@@ -424,9 +419,6 @@ void ui_deselect_entity_if_selected(match_state_t& state, entity_id id) {
     for (uint32_t id_index = 0; id_index < state.selection.size(); id_index++) {
         if (state.selection[id_index] == id) {
             state.selection.erase(state.selection.begin() + id_index);
-            if (state.ui_mode == UI_MODE_NONE) {
-                ui_set_selection(state, state.selection);
-            }
             return;
         }
     }
@@ -498,7 +490,7 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
     memset(&info, 0, sizeof(info));
     char* info_text_ptr = info.text;
 
-    UiButton button = ui_get_ui_button(state, ui_get_ui_button_hovered(state));
+    UiButton button = state.ui_buttons[ui_get_ui_button_hovered(state)];
     if (!ui_button_requirements_met(state, button)) {
         auto button_requirements_it = UI_BUTTON_REQUIREMENTS.find(button);
         info_text_ptr += sprintf(info_text_ptr, "Requires ");
