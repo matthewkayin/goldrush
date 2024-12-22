@@ -110,6 +110,7 @@ match_state_t match_init() {
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 1));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 2));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 3));
+        entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(-1, -2));
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
@@ -808,6 +809,8 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     target.repair = (target_repair_t) {
                         .health_repaired = 0
                     };
+                } else if (input.move.target_id == input.move.entity_ids[id_index]) {
+                    target = (target_t) { .type = TARGET_NONE };
                 } else {
                     target.id = input.move.target_id;
                 }
@@ -895,7 +898,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 if (state.entities[entity_index].target.type == TARGET_BUILD && state.entities[entity_index].target.id == input.build_cancel.building_id) {
                     entity_t& builder = state.entities[entity_index];
                     builder.cell = builder.target.build.building_cell;
-                    builder.position = cell_center(builder.cell);
+                    builder.position = entity_get_target_position(builder);
                     builder.target = (target_t) {
                         .type = TARGET_NONE
                     };
@@ -955,24 +958,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
 
                 entity_t& carrier = state.entities[carrier_index];
-                while (!carrier.garrisoned_units.empty()) {
-                    entity_t& garrisoned_unit = state.entities.get_by_id(carrier.garrisoned_units[0]);
-                    xy exit_cell = entity_get_exit_cell(state, carrier.cell, entity_cell_size(carrier.type), entity_cell_size(garrisoned_unit.type), carrier.cell + xy(0, entity_cell_size(carrier.type)));
-                    if (exit_cell.x == -1) {
-                        if (garrisoned_unit.player_id == network_get_player_id()) {
-                            ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
-                            break; // breaks out of while garrisoned units not empty
-                        }
-                    }
-
-                    garrisoned_unit.cell = exit_cell;
-                    garrisoned_unit.position = cell_center(garrisoned_unit.cell);
-                    map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), carrier.garrisoned_units[0]);
-                    garrisoned_unit.mode = MODE_UNIT_IDLE;
-                    garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
-                    garrisoned_unit.garrison_id = ID_NULL;
-                    carrier.garrisoned_units.erase(carrier.garrisoned_units.begin());
-                }
+                entity_unload_unit(state, carrier, ENTITY_UNLOAD_ALL);
             }
             break;
         }
@@ -984,31 +970,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             entity_t& garrisoned_unit = state.entities[garrisoned_unit_index];
             entity_id carrier_id = garrisoned_unit.garrison_id;
             entity_t& carrier = state.entities.get_by_id(carrier_id);
-
-            // Find the exit cell
-            xy exit_cell = entity_get_exit_cell(state, carrier.cell, entity_cell_size(carrier.type), entity_cell_size(garrisoned_unit.type), carrier.cell + xy(0, entity_cell_size(carrier.type)));
-            if (exit_cell.x == -1) {
-                if (garrisoned_unit.player_id == network_get_player_id() && entity_is_building(carrier.type)) {
-                    ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
-                }
-                return;
-            }
-
-            // Place the unit in the world
-            garrisoned_unit.cell = exit_cell;
-            garrisoned_unit.position = cell_center(garrisoned_unit.cell);
-            map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), input.single_unload.unit_id);
-            garrisoned_unit.mode = MODE_UNIT_IDLE;
-            garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
-            garrisoned_unit.garrison_id = ID_NULL;
-
-            // Remove the unit from the carrier's garrison list
-            auto garrisoned_unit_it = std::find(carrier.garrisoned_units.begin(), carrier.garrisoned_units.end(), input.single_unload.unit_id);
-            if (garrisoned_unit_it == carrier.garrisoned_units.end()) {
-                log_warn("match_input_handle::single_unload: unit id %u not found in garrisoned units of %u", input.single_unload.unit_id, carrier_id);
-                return;
-            } 
-            carrier.garrisoned_units.erase(garrisoned_unit_it);
+            entity_unload_unit(state, carrier, input.single_unload.unit_id);
             break;
         }
         default:

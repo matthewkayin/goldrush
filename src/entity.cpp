@@ -19,6 +19,7 @@ static const xy ENTITY_BUNKER_PARTICLE_OFFSETS[4] = {
     xy(20, 25),
     xy(28, 23)
 };
+static const uint32_t ENTITY_CANNOT_GARRISON = 0;
 
 // Building train time = (HP * 0.9) / 10
 
@@ -98,6 +99,31 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .range_squared = 1
         }
     }},
+    { ENTITY_WAGON, (entity_data_t) {
+        .name = "Wagon",
+        .sprite = SPRITE_UNIT_WAGON,
+        .ui_button = UI_BUTTON_UNIT_WAGON,
+        .cell_size = 2,
+
+        .gold_cost = 150,
+        .train_duration = 38,
+        .max_health = 100,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 1,
+
+        .garrison_capacity = 4,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(1, 40),
+
+            .damage = 0,
+            .attack_cooldown = 0,
+            .range_squared = 1
+        }
+    }},
     { ENTITY_HALL, (entity_data_t) {
         .name = "Town Hall",
         .sprite = SPRITE_BUILDING_HALL,
@@ -112,7 +138,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .attack_priority = 0,
 
         .garrison_capacity = 0,
-        .garrison_size = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
 
         .building_data = (building_data_t) {
             .builder_positions_x = { 16, 23, 7 },
@@ -135,7 +161,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .attack_priority = 0,
 
         .garrison_capacity = 0,
-        .garrison_size = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
 
         .building_data = (building_data_t) {
             .builder_positions_x = { 1, 15, 14 },
@@ -158,7 +184,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .attack_priority = 0,
 
         .garrison_capacity = 0,
-        .garrison_size = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
 
         .building_data = (building_data_t) {
             .builder_positions_x = { 3, 16, -4 },
@@ -181,7 +207,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .attack_priority = 0,
 
         .garrison_capacity = 0,
-        .garrison_size = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
 
         .building_data = (building_data_t) {
             .builder_positions_x = { 6, 27, 9 },
@@ -204,7 +230,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .attack_priority = 0,
 
         .garrison_capacity = 4,
-        .garrison_size = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
 
         .building_data = (building_data_t) {
             .builder_positions_x = { 1, 14, 5 },
@@ -227,7 +253,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .attack_priority = 0,
 
         .garrison_capacity = 0,
-        .garrison_size = 0
+        .garrison_size = ENTITY_CANNOT_GARRISON
     }}
 };
 
@@ -244,7 +270,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
 
     entity.cell = cell;
     entity.position = entity_is_unit(type) 
-                        ? cell_center(entity.cell) 
+                        ? entity_get_target_position(entity)
                         : xy_fixed(entity.cell * TILE_SIZE);
     entity.direction = DIRECTION_SOUTH;
 
@@ -337,7 +363,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
                         if (!map_is_cell_rect_occupied(state, xy(x, y), entity_cell_size(garrisoned_unit.type))) {
                             garrisoned_unit.cell = xy(x, y);
-                            garrisoned_unit.position = cell_center(garrisoned_unit.cell);
+                            garrisoned_unit.position = entity_get_target_position(entity);
                             garrisoned_unit.garrison_id = ID_NULL;
                             garrisoned_unit.mode = MODE_UNIT_IDLE;
                             garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
@@ -521,6 +547,14 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         break;
                     }
                     case TARGET_UNLOAD: {
+                        if (!entity_has_reached_target(state, entity)) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+                        
+                        entity_unload_unit(state, entity, ENTITY_UNLOAD_ALL);
+                        entity.mode = MODE_UNIT_IDLE;
+                        entity.target = (target_t) { .type = TARGET_NONE };
                         break;
                     }
                     case TARGET_BUILD: {
@@ -612,11 +646,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity_t& target = state.entities.get_by_id(entity.target.id);
 
                         // Begin attack
-                        if (entity.target.type == TARGET_ATTACK_ENTITY && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
+                        if (entity.target.type == TARGET_ATTACK_ENTITY && entity_data.unit_data.damage != 0) {
                             if (entity.garrison_id != ID_NULL) {
                                 entity_t& bunker = state.entities.get_by_id(entity.garrison_id);
                                 // Don't attack during bunker cooldown or if this is a melee unit
-                                if (bunker.timer != 0 || ENTITY_DATA.at(entity.type).unit_data.range_squared == 1) {
+                                if (bunker.timer != 0 || entity_data.unit_data.range_squared == 1) {
                                     update_finished = true;
                                     break;
                                 }
@@ -643,7 +677,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         // Garrison
-                        if (entity.player_id == target.player_id && entity_get_garrisoned_occupancy(state, target) + ENTITY_DATA.at(entity.type).garrison_size <= ENTITY_DATA.at(target.type).garrison_capacity && entity.target.type != TARGET_REPAIR) {
+                        if (entity.player_id == target.player_id && entity_data.garrison_size != ENTITY_CANNOT_GARRISON && entity_get_garrisoned_occupancy(state, target) + entity_data.garrison_size <= ENTITY_DATA.at(target.type).garrison_capacity && entity.target.type != TARGET_REPAIR) {
                             target.garrisoned_units.push_back(id);
                             entity.garrison_id = entity.target.id;
                             entity.mode = MODE_UNIT_IDLE;
@@ -672,7 +706,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         // Don't attack allied units
-                        if (entity.player_id == target.player_id || ENTITY_DATA.at(entity.type).unit_data.damage == 0) {
+                        if (entity.player_id == target.player_id || entity_data.unit_data.damage == 0) {
                             entity.mode = MODE_UNIT_IDLE;
                             entity.target = (target_t) {
                                 .type = TARGET_NONE
@@ -1477,7 +1511,6 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
     if (attacker.garrison_id != ID_NULL) {
         entity_t& bunker = state.entities.get_by_id(attacker.garrison_id);
         int particle_index = lcg_short_rand() % 4;
-        log_trace("Particle index %i", particle_index);
         state.particles.push_back((particle_t) {
             .sprite = SPRITE_PARTICLE_BUNKER_COWBOY,
             .animation = animation_create(ANIMATION_PARTICLE_BUNKER_COWBOY),
@@ -1553,6 +1586,37 @@ void entity_remove_garrisoned_unit(entity_t& entity, entity_id garrisoned_unit_i
     }
 }
 
+void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garrisoned_unit_id) {
+    uint32_t index = 0;
+    while (index < entity.garrisoned_units.size()) {
+        if (garrisoned_unit_id == ENTITY_UNLOAD_ALL || entity.garrisoned_units[index] == garrisoned_unit_id) {
+            entity_t& garrisoned_unit = state.entities.get_by_id(entity.garrisoned_units[index]);
+
+            // Find the exit cell
+            xy exit_cell = entity_get_exit_cell(state, entity.cell, entity_cell_size(entity.type), entity_cell_size(garrisoned_unit.type), entity.cell + xy(0, entity_cell_size(entity.type)));
+            if (exit_cell.x == -1) {
+                if (garrisoned_unit.player_id == network_get_player_id() && entity_is_building(entity.type)) {
+                    ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                }
+                return;
+            }
+
+            // Place the unit in the world
+            garrisoned_unit.cell = exit_cell;
+            garrisoned_unit.position = entity_get_target_position(garrisoned_unit);
+            map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), entity.garrisoned_units[index]);
+            garrisoned_unit.mode = MODE_UNIT_IDLE;
+            garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
+            garrisoned_unit.garrison_id = ID_NULL;
+
+            // Remove the unit from the garrisoned units list
+            entity.garrisoned_units.erase(entity.garrisoned_units.begin() + index);
+        } else {
+            index++;
+        }
+    }
+}
+
 void entity_stop_building(match_state_t& state, entity_id id) {
     entity_t& entity = state.entities.get_by_id(id);
 
@@ -1577,7 +1641,7 @@ void entity_stop_building(match_state_t& state, entity_id id) {
     }
 
     entity.cell = exit_cell;
-    entity.position = cell_center(entity.cell);
+    entity.position = entity_get_target_position(entity);
     entity.target = (target_t) {
         .type = TARGET_NONE
     };
