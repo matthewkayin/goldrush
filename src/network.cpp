@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "asserts.h"
 #include "lcg.h"
+#include "noise.h"
 #include <cstring>
 #include <enet/enet.h>
 #include <queue>
@@ -65,12 +66,6 @@ struct message_greet_t {
     uint8_t player_id;
     uint8_t padding[2];
     player_t player;
-};
-
-struct message_match_load_t {
-    const uint8_t type = MESSAGE_MATCH_LOAD;
-    uint8_t padding[3];
-    int32_t random_seed;
 };
 
 bool network_init() {
@@ -281,14 +276,42 @@ void network_begin_loading_match() {
 
     state.status = NETWORK_STATUS_CONNECTED;
 
-    message_match_load_t message;
-    message.random_seed = (int)time(NULL);
-    lcg_srand(message.random_seed);
-    log_trace("Host: set random seed to %i", message.random_seed);
+    // Set LCG seed
+    #ifdef GOLD_LCG_SEED
+        int32_t lcg_seed = GOLD_LCG_SEED;
+    #else
+        int32_t lcg_seed = (int32_t)time(NULL);
+    #endif
+    lcg_srand(lcg_seed);
+    log_trace("Host: set random seed to %i", lcg_seed);
 
-    ENetPacket* packet = enet_packet_create(&message, sizeof(message_match_load_t), ENET_PACKET_FLAG_RELIABLE);
+    // Generate noise for map generation
+    #ifdef GOLD_NOISE_SEED
+        uint64_t noise_seed = GOLD_NOISE_SEED;
+    #else
+        uint64_t noise_seed = (uint64_t)time(NULL);
+    #endif
+    uint32_t map_width = 128;
+    uint32_t map_height = 128;
+    noise_generate(noise_seed, map_width, map_height);
+    log_trace("Set noise random seed to %u", noise_seed);
+
+    // Build message
+    // Message size is 1 byte for type, 4 bytes for LCG seed, 8 bytes for map width / height, and the rest of the bytes are the generated noise values
+    size_t message_size = 1 + 4 + 8 + (map_width * map_height * sizeof(int8_t));
+    uint8_t* message = (uint8_t*)malloc(message_size);
+    message[0] = MESSAGE_MATCH_LOAD;
+    memcpy(message + 1, &lcg_seed, sizeof(int32_t));
+    memcpy(message + 5, &map_width, sizeof(uint32_t));
+    memcpy(message + 9, &map_width, sizeof(uint32_t));
+    memcpy(message + 13, &noise.map[0], map_width * map_height * sizeof(int8_t));
+
+    // Send the packet
+    ENetPacket* packet = enet_packet_create(message, message_size, ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
+
+    free(message);
 }
 
 void network_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
@@ -578,10 +601,15 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
                 return;
             }
 
-            message_match_load_t match_load;
-            memcpy(&match_load, data, sizeof(message_match_load_t));
-            lcg_srand(match_load.random_seed);
-            log_trace("Set random seed to %i", match_load.random_seed);
+            int32_t lcg_seed;
+            memcpy(&lcg_seed, data + 1, sizeof(int32_t));
+            lcg_srand(lcg_seed);
+            log_trace("Set random seed to %i", lcg_seed);
+
+            memcpy(&noise.width, data + 5, sizeof(uint32_t));
+            memcpy(&noise.height, data + 9, sizeof(uint32_t));
+            noise.map = std::vector<int8_t>(noise.width * noise.height);
+            memcpy(&noise.map[0], data + 13, noise.width * noise.height * sizeof(int8_t));
 
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (state.players[player_id].status != PLAYER_STATUS_NONE) {

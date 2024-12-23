@@ -876,6 +876,30 @@ bool engine_init_renderer() {
         SDL_FreeSurface(sprite_surface);
     } // End for each sprite
 
+    // Setup neighbors to autotile index
+    {
+        uint32_t unique_index = 0;
+        for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
+            bool is_unique = true;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
+                    int prev_direction = direction - 1;
+                    int next_direction = (direction + 1) % DIRECTION_COUNT;
+                    if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                        (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                        is_unique = false;
+                        break;
+                    }
+                }
+            }
+            if (!is_unique) {
+                continue;
+            }
+            engine.neighbors_to_autotile_index[neighbors] = unique_index;
+            unique_index++;
+        }
+    }
+
     engine.cursors.reserve(CURSOR_COUNT);
     for (uint32_t i = 0; i < CURSOR_COUNT; i++) {
         auto it = CURSOR_PARAMS.find((Cursor)i);

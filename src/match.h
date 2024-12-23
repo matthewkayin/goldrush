@@ -418,7 +418,7 @@ xy ui_garrisoned_icon_position(int index);
 int ui_get_garrisoned_index_hovered(const match_state_t& state);
 
 // Map
-void map_init(match_state_t& state, uint32_t width, uint32_t height);
+void map_init(match_state_t& state);
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_rect_in_bounds(const match_state_t& state, xy cell, int cell_size);
 tile_t map_get_tile(const match_state_t& state, xy cell);

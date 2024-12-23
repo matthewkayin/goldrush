@@ -74,7 +74,7 @@ match_state_t match_init() {
         state.ui_buttons[i] = UI_BUTTON_NONE;
     }
 
-    map_init(state, 64, 64);
+    map_init(state);
 
     Direction spawn_directions[MAX_PLAYERS] = { DIRECTION_NORTHWEST, DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST };
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {

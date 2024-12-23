@@ -191,6 +191,7 @@ struct engine_t {
     std::vector<TTF_Font*> fonts;
     std::vector<sprite_t> sprites;
     std::vector<uint16_t> tile_index;
+    std::unordered_map<uint32_t, uint32_t> neighbors_to_autotile_index;
     std::vector<SDL_Cursor*> cursors;
 
     xy mouse_position;
