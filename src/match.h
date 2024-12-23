@@ -369,6 +369,7 @@ struct match_state_t {
     uint32_t map_height;
     std::vector<tile_t> map_tiles;
     std::vector<entity_id> map_cells;
+    std::vector<int> map_tile_islands;
 
     // Entities
     id_array<entity_t, 400 * MAX_PLAYERS> entities;
@@ -418,7 +419,7 @@ xy ui_garrisoned_icon_position(int index);
 int ui_get_garrisoned_index_hovered(const match_state_t& state);
 
 // Map
-void map_init(match_state_t& state);
+std::vector<xy> map_init(match_state_t& state);
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_rect_in_bounds(const match_state_t& state, xy cell, int cell_size);
 tile_t map_get_tile(const match_state_t& state, xy cell);
@@ -426,7 +427,11 @@ entity_id map_get_cell(const match_state_t& state, xy cell);
 bool map_is_cell_rect_equal_to(const match_state_t& state, xy cell, int cell_size, entity_id value);
 void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value);
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
+bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
 xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
+bool map_is_tile_ramp(const match_state_t& state, xy cell);
+bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
+bool map_is_cell_rect_on_same_island(const match_state_t& state, xy cell, xy size);
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
 
 // Entities

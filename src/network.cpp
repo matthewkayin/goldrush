@@ -277,8 +277,8 @@ void network_begin_loading_match() {
     state.status = NETWORK_STATUS_CONNECTED;
 
     // Set LCG seed
-    #ifdef GOLD_LCG_SEED
-        int32_t lcg_seed = GOLD_LCG_SEED;
+    #ifdef GOLD_RAND_SEED
+        int32_t lcg_seed = GOLD_RAND_SEED;
     #else
         int32_t lcg_seed = (int32_t)time(NULL);
     #endif
@@ -286,11 +286,7 @@ void network_begin_loading_match() {
     log_trace("Host: set random seed to %i", lcg_seed);
 
     // Generate noise for map generation
-    #ifdef GOLD_NOISE_SEED
-        uint64_t noise_seed = GOLD_NOISE_SEED;
-    #else
-        uint64_t noise_seed = (uint64_t)time(NULL);
-    #endif
+    uint64_t noise_seed = (uint64_t)lcg_seed;
     uint32_t map_width = 128;
     uint32_t map_height = 128;
     noise_generate(noise_seed, map_width, map_height);

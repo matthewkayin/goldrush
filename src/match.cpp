@@ -3,6 +3,7 @@
 #include "engine.h"
 #include "network.h"
 #include "logger.h"
+#include "lcg.h"
 #include <algorithm>
 
 static const uint32_t TURN_DURATION = 4;
@@ -74,7 +75,7 @@ match_state_t match_init() {
         state.ui_buttons[i] = UI_BUTTON_NONE;
     }
 
-    map_init(state);
+    std::vector<xy> player_spawns = map_init(state);
 
     Direction spawn_directions[MAX_PLAYERS] = { DIRECTION_NORTHWEST, DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST };
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -92,25 +93,20 @@ match_state_t match_init() {
         }
 
         // Determine player spawn
-        xy player_spawn = xy(state.map_width / 2, state.map_height / 2) + (DIRECTION_XY[spawn_directions[player_id]] * ((state.map_width / 2) - 16));
+        int spawn_index = lcg_short_rand() % player_spawns.size();
+        xy player_spawn = player_spawns[spawn_index];
+        player_spawns.erase(player_spawns.begin() + spawn_index);
         if (player_id == network_get_player_id()) {
             match_camera_center_on_cell(state, player_spawn);
         }
 
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
 
-        entity_create_gold(state, player_spawn + xy(0, 4), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(1, 4), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(2, 5), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(3, 4), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(4, 5), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(5, 5), 1500, 0);
-        entity_create_gold(state, player_spawn + xy(6, 4), 1500, 0);
-        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 0));
-        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 1));
-        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 2));
-        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(-1, 3));
-        entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(-1, -2));
+        entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
