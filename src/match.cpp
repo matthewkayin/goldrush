@@ -77,7 +77,6 @@ match_state_t match_init() {
 
     std::vector<xy> player_spawns = map_init(state);
 
-    Direction spawn_directions[MAX_PLAYERS] = { DIRECTION_NORTHWEST, DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST };
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {

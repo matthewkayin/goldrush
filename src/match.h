@@ -44,6 +44,7 @@ struct tile_t {
 
 const entity_id CELL_EMPTY = ID_NULL;
 const entity_id CELL_BLOCKED = ID_MAX + 2;
+const entity_id CELL_UNREACHABLE = ID_MAX + 3;
 
 // If you change this, make sure that entity_is_unit() and entity_is_building() still work
 enum EntityType {
@@ -369,7 +370,6 @@ struct match_state_t {
     uint32_t map_height;
     std::vector<tile_t> map_tiles;
     std::vector<entity_id> map_cells;
-    std::vector<int> map_tile_islands;
 
     // Entities
     id_array<entity_t, 400 * MAX_PLAYERS> entities;
@@ -431,7 +431,6 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy cell_size
 xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
 bool map_is_tile_ramp(const match_state_t& state, xy cell);
 bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
-bool map_is_cell_rect_on_same_island(const match_state_t& state, xy cell, xy size);
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
 
 // Entities

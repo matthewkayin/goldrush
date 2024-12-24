@@ -290,7 +290,6 @@ void network_begin_loading_match() {
     uint32_t map_width = 128;
     uint32_t map_height = 128;
     noise_generate(noise_seed, map_width, map_height);
-    log_trace("Set noise random seed to %u", noise_seed);
 
     // Build message
     // Message size is 1 byte for type, 4 bytes for LCG seed, 8 bytes for map width / height, and the rest of the bytes are the generated noise values

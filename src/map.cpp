@@ -65,6 +65,125 @@ Tile wall_autotile_lookup(uint32_t neighbors) {
     }
 }
 
+static const int POISSON_EMPTY = 0;
+static const int POISSON_AVOID = 1;
+static const int POISSON_OTHER = 2;
+
+struct poisson_disk_params_t {
+    std::vector<int> avoid_values;
+    int avoid_distance;
+    int disk_radius;
+    bool allow_unreachable_cells;
+};
+
+bool poisson_is_point_valid(const match_state_t& state, const poisson_disk_params_t& params, xy point) {
+    if (!map_is_cell_in_bounds(state, point)) {
+        return false;
+    }
+
+    entity_id cell = map_get_cell(state, point);
+    if (cell == CELL_UNREACHABLE) {
+        return params.allow_unreachable_cells;
+    } else if (cell != CELL_EMPTY) {
+        return false;
+    }
+    if (cell == CELL_BLOCKED || (cell == CELL_UNREACHABLE && !params.allow_unreachable_cells)) {
+        return false;
+    }
+    if (map_is_tile_ramp(state, point)) {
+        return false;
+    }
+
+    int radius = std::max(params.avoid_distance, params.disk_radius);
+    for (int nx = point.x - radius; nx < point.x + radius + 1; nx++) {
+        for (int ny = point.y - radius; ny < point.y + radius + 1; ny++) {
+            xy near_point = xy(nx, ny);
+            if (!map_is_cell_in_bounds(state, near_point)) {
+                continue;
+            }
+            int avoid_value = params.avoid_values[near_point.x + (near_point.y * state.map_width)];
+            if (avoid_value == POISSON_AVOID && xy::manhattan_distance(point, near_point) <= params.avoid_distance) {
+                return false;
+            }
+            if (avoid_value == POISSON_OTHER && xy::euclidean_distance_squared(point, near_point) <= params.disk_radius * params.disk_radius) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t params) {
+    std::vector<xy> sample;
+    std::vector<xy> frontier;
+
+    xy first;
+    do {
+        first.x = 1 + (lcg_rand() % (state.map_width - 2));
+        first.y = 1 + (lcg_rand() % (state.map_height - 2));
+    } while (!poisson_is_point_valid(state, params, first));
+
+    frontier.push_back(first);
+    sample.push_back(first);
+    params.avoid_values[first.x + (first.y * state.map_width)] = POISSON_OTHER;
+
+    std::vector<xy> circle_offset_points;
+    {
+        int x = 0;
+        int y = params.disk_radius;
+        int d = 3 - 2 * params.disk_radius;
+        circle_offset_points.push_back(xy(x, y));
+        circle_offset_points.push_back(xy(-x, y));
+        circle_offset_points.push_back(xy(x, -y));
+        circle_offset_points.push_back(xy(-x, -y));
+        circle_offset_points.push_back(xy(y, x));
+        circle_offset_points.push_back(xy(-y, x));
+        circle_offset_points.push_back(xy(y, -x));
+        circle_offset_points.push_back(xy(-y, -x));
+        while (y >= x) {
+            if (d > 0) {
+                y--;
+                d += 4 * (x - y) + 10;
+            } else {
+                d += 4 * x + 6;
+            }
+            x++;
+            circle_offset_points.push_back(xy(x, y));
+            circle_offset_points.push_back(xy(-x, y));
+            circle_offset_points.push_back(xy(x, -y));
+            circle_offset_points.push_back(xy(-x, -y));
+            circle_offset_points.push_back(xy(y, x));
+            circle_offset_points.push_back(xy(-y, x));
+            circle_offset_points.push_back(xy(y, -x));
+            circle_offset_points.push_back(xy(-y, -x));
+        }
+    }
+
+    while (!frontier.empty()) {
+        int next_index = lcg_short_rand() % frontier.size();
+        xy next = frontier[next_index];
+
+        int child_attempts = 0;
+        bool child_is_valid = false;
+        xy child;
+        while (!child_is_valid && child_attempts < 30) {
+            child_attempts++;
+            child = next + circle_offset_points[lcg_short_rand() % circle_offset_points.size()];
+            child_is_valid = poisson_is_point_valid(state, params, child);
+        }
+        if (child_is_valid) {
+            frontier.push_back(child);
+            sample.push_back(child);
+            params.avoid_values[child.x + (child.y * state.map_width)] = POISSON_OTHER;
+        } else {
+            frontier.erase(frontier.begin() + next_index);
+        }
+    }
+
+    return sample;
+}
+
 std::vector<xy> map_init(match_state_t& state) {
     state.map_width = noise.width;
     state.map_height = noise.height;
@@ -378,7 +497,7 @@ std::vector<xy> map_init(match_state_t& state) {
     }
 
     // Determine map "islands"
-    state.map_tile_islands = std::vector<int>(state.map_width * state.map_height, -1);
+    std::vector<int> map_tile_islands = std::vector<int>(state.map_width * state.map_height, -1);
     std::vector<int> island_size;
     while (true) {
         // Set index equal to the index of the first unassigned tile in the array
@@ -388,7 +507,7 @@ std::vector<xy> map_init(match_state_t& state) {
                 continue;
             }
 
-            if (state.map_tile_islands[index] == -1) {
+            if (map_tile_islands[index] == -1) {
                 break;
             }
         }
@@ -414,11 +533,11 @@ std::vector<xy> map_init(match_state_t& state) {
             }
 
             // skip this because we've already explored it
-            if (state.map_tile_islands[next.x + (next.y * state.map_width)] != -1) {
+            if (map_tile_islands[next.x + (next.y * state.map_width)] != -1) {
                 continue;
             }
 
-            state.map_tile_islands[next.x + (next.y * state.map_width)] = island_index;
+            map_tile_islands[next.x + (next.y * state.map_width)] = island_index;
             island_size[island_index]++;
 
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
@@ -430,6 +549,13 @@ std::vector<xy> map_init(match_state_t& state) {
     for (int island_index = 1; island_index < island_size.size(); island_index++) {
         if (island_size[island_index] > island_size[biggest_island]) {
             biggest_island = island_index;
+        }
+    }
+    // Everything that's not on the main "island" is considered blocked
+    // This makes it so that we don't place any player spawns or gold at these locations
+    for (int index = 0; index < state.map_width * state.map_height; index++) {
+        if (map_tile_islands[index] != biggest_island) {
+            state.map_cells[index] = CELL_UNREACHABLE;
         }
     }
 
@@ -464,8 +590,7 @@ std::vector<xy> map_init(match_state_t& state) {
             frontier.erase(frontier.begin() + next_index);
 
             if (map_is_cell_rect_same_elevation(state, next, player_spawn_size) && 
-                    !map_is_cell_rect_occupied(state, next, player_spawn_size) && 
-                     map_is_cell_rect_on_same_island(state, next, player_spawn_size)) {
+                    !map_is_cell_rect_occupied(state, next, player_spawn_size)) {
                 spawn_point = next;
                 break;
             }
@@ -498,6 +623,54 @@ std::vector<xy> map_init(match_state_t& state) {
         }
         player_spawns.push_back(spawn_point);
     }
+
+    log_trace("Generating gold cells...");
+    poisson_disk_params_t params = (poisson_disk_params_t) {
+        .avoid_values = std::vector<int>(state.map_width * state.map_height, POISSON_EMPTY),
+        .avoid_distance = 4,
+        .disk_radius = 32,
+        .allow_unreachable_cells = false
+    };
+
+    // Generate the avoid values
+    params.avoid_values = std::vector<int>(state.map_width * state.map_height, POISSON_EMPTY);
+    for (int index = 0; index < state.map_width * state.map_height; index++) {
+        if (state.map_cells[index] == CELL_BLOCKED || map_is_tile_ramp(state, xy(index % state.map_width, index / state.map_width))) {
+            params.avoid_values[index] = POISSON_AVOID;
+        }
+    }
+    for (xy player_spawn : player_spawns) {
+        params.avoid_values[player_spawn.x + (player_spawn.y * state.map_width)] = POISSON_AVOID;
+    }
+
+    std::vector<xy> gold_sample = poisson_disk(state, params);
+    for (uint32_t patch_id = 0; patch_id < gold_sample.size(); patch_id++) {
+        // Choose an adjacent direction to walk in
+        int patch_size = 0;
+        int patch_goal = 3 + (lcg_short_rand() % 10);
+        std::vector<xy> gold_frontier;
+        gold_frontier.push_back(gold_sample[patch_id]);
+        while (patch_size < patch_goal && !gold_frontier.empty()) {
+            int next_index = lcg_short_rand() % gold_frontier.size();
+            xy next = gold_frontier[next_index];
+            gold_frontier.erase(gold_frontier.begin() + next_index);
+
+            if (!poisson_is_point_valid(state, params, next)) {
+                continue;
+            }
+
+            // Place gold
+            entity_create_gold(state, next, 1500, patch_id);
+            patch_size++;
+
+            // Determine next gold cell
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                gold_frontier.push_back(next + DIRECTION_XY[direction]);
+            }
+        }
+    }
+
+    // The poisson avoid_values array is copied by value so we can re-use it for the next poisson disk
 
     return player_spawns;
 }
@@ -624,18 +797,6 @@ bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy siz
         for (int y = cell.y; y < cell.y + size.y; y++) {
             if (state.map_tiles[x + (y * state.map_width)].elevation != state.map_tiles[cell.x + (cell.y * state.map_width)].elevation || 
                     map_is_tile_ramp(state, xy(x, y))) {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-bool map_is_cell_rect_on_same_island(const match_state_t& state, xy cell, xy size) {
-    for (int x = cell.x; x < cell.x + size.x; x++) {
-        for (int y = cell.y; y < cell.y + size.y; y++) {
-            if (state.map_tile_islands[x + (y * state.map_width)] != state.map_tile_islands[cell.x + (cell.y * state.map_width)]) {
                 return false;
             }
         }
