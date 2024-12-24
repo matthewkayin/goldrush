@@ -371,6 +371,10 @@ struct match_state_t {
     uint32_t ui_disconnect_timer;
     EntityType ui_building_type;
     uint32_t ui_double_click_timer;
+    std::vector<entity_id> control_groups[10];
+    uint32_t control_group_double_tap_timer;
+    SDL_Keycode control_group_double_tap_key;
+    int control_group_selected;
 
     // Map
     uint32_t map_width;

@@ -73,6 +73,9 @@ match_state_t match_init() {
     state.ui_button_pressed = -1;
     state.ui_is_minimap_dragging = false;
     state.select_rect_origin = xy(-1, -1);
+    state.control_group_selected = -1;
+    state.ui_double_click_timer = 0;
+    state.control_group_double_tap_timer = 0;
     for (int i = 0; i < 6; i++) {
         state.ui_buttons[i] = UI_BUTTON_NONE;
     }
@@ -279,6 +282,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
             }
 
             ui_set_selection(state, state.selection);
+            state.control_group_selected = -1;
             return;
         } 
 
@@ -305,6 +309,72 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
         // Regular selection
         ui_set_selection(state, selection);
+        state.control_group_selected = -1;
+        return;
+    }
+
+    // Control group key press
+    if (event.type == SDL_KEYDOWN && event.key.keysym.sym >= SDLK_0 && event.key.keysym.sym <= SDLK_9) {
+        uint32_t control_group_index = event.key.keysym.sym == SDLK_0 ? 9 : (uint32_t)(event.key.keysym.sym - SDLK_1);
+        // Set control group
+        if (engine.keystate[SDL_SCANCODE_LCTRL]) {
+            if (state.selection.empty() || state.entities.get_by_id(state.selection[0]).player_id != network_get_player_id()) {
+                return;
+            }
+            state.control_groups[control_group_index] = state.selection;
+            state.control_group_selected = control_group_index;
+            return;
+        }
+
+        // Append control group
+        if (engine.keystate[SDL_SCANCODE_LSHIFT]) {
+            if (state.selection.empty() || state.entities.get_by_id(state.selection[0]).player_id != network_get_player_id() || 
+                    ui_get_selection_type(state, state.selection) != ui_get_selection_type(state, state.control_groups[control_group_index])) {
+                return;
+            }
+            for (entity_id id : state.selection) {
+                if (std::find(state.control_groups[control_group_index].begin(), state.control_groups[control_group_index].end(), id) == state.control_groups[control_group_index].end()) {
+                    state.control_groups[control_group_index].push_back(id);
+                }
+            }
+            return;
+        }
+
+        // Snap to control group
+        if (state.control_group_double_tap_timer != 0 && state.control_group_double_tap_key == control_group_index) {
+            xy group_min;
+            xy group_max;
+            for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+                const entity_t& entity = state.entities.get_by_id(state.selection[selection_index]);
+                if (selection_index == 0) {
+                    group_min = entity.cell;
+                    group_max = entity.cell;
+                    continue;
+                }
+
+                group_min.x = std::min(group_min.x, entity.cell.x);
+                group_min.y = std::min(group_min.y, entity.cell.y);
+                group_max.x = std::max(group_max.x, entity.cell.x);
+                group_max.y = std::max(group_max.y, entity.cell.y);
+            }
+            SDL_Rect group_rect = (SDL_Rect) { 
+                .x = group_min.x, .y = group_min.y,
+                .w = group_max.x - group_min.x, .h = group_max.y - group_min.y
+            };
+            xy group_center = xy(group_rect.x + (group_rect.w / 2), group_rect.y + (group_rect.h / 2));
+            match_camera_center_on_cell(state, group_center);
+            return;
+        }
+
+        // Select control group
+        if (!state.control_groups[control_group_index].empty()) {
+            ui_set_selection(state, state.control_groups[control_group_index]);
+            if (!state.selection.empty()) {
+                state.control_group_double_tap_timer = UI_DOUBLE_CLICK_DURATION;
+                state.control_group_double_tap_key = control_group_index;
+                state.control_group_selected = control_group_index;
+            }
+        }
         return;
     }
 }
@@ -455,6 +525,9 @@ void match_update(match_state_t& state) {
     }
     if (state.ui_double_click_timer != 0) {
         state.ui_double_click_timer--;
+    }
+    if (state.control_group_double_tap_timer != 0) {
+        state.control_group_double_tap_timer--;
     }
 
     // Update particles
@@ -778,8 +851,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             bool should_move_as_group = target_index == INDEX_INVALID;
             uint32_t unit_count = 0;
             if (should_move_as_group) {
-                std::vector<xy> unit_cells;
-                unit_cells.reserve(input.move.entity_count);
                 xy group_min;
                 xy group_max;
                 for (uint32_t id_index = 0; id_index < input.move.entity_count; id_index++) {
@@ -1299,6 +1370,56 @@ void match_render(const match_state_t& state) {
             render_sprite(SPRITE_UI_MENU_PARCHMENT_BUTTONS, xy(i - (UI_MENU_BUTTON_NONE + 1), ui_menu_get_parchment_button_hovered() == i ? 1 : 0), ui_menu_get_parchment_button_rect((UiMenuButton)i).position, RENDER_SPRITE_NO_CULL);
         }
         */
+    }
+
+    // UI Control Groups
+    for (uint32_t control_group_index = 0; control_group_index < 10; control_group_index++) {
+        // Count the entities in this control group and determine which is the most common
+        uint32_t entity_count = 0;
+        std::unordered_map<EntityType, uint32_t> entity_occurances;
+        EntityType most_common_entity_type = ENTITY_MINER;
+        entity_occurances[ENTITY_MINER] = 0;
+
+        for (entity_id id : state.control_groups[control_group_index]) {
+            uint32_t entity_index = state.entities.get_index_of(id);
+            if (entity_index == INDEX_INVALID || !entity_is_selectable(state.entities[entity_index])) {
+                continue;
+            }
+
+            EntityType entity_type = state.entities[entity_index].type;
+            auto occurances_it = entity_occurances.find(entity_type);
+            if (occurances_it == entity_occurances.end()) {
+                entity_occurances[entity_type] = 1;
+            } else {
+                occurances_it->second++;
+            }
+            if (entity_occurances[entity_type] > entity_occurances[most_common_entity_type]) {
+                most_common_entity_type = entity_type;
+            }
+            entity_count++;
+        }
+
+        if (entity_count == 0) {
+            continue;
+        }
+
+        int button_frame = 0;
+        SDL_Color text_color = COLOR_OFFBLACK;
+        if (state.control_group_selected != control_group_index) {
+            text_color = COLOR_DARKBLACK;
+            button_frame = 2;
+        }
+
+        int button_icon = ENTITY_DATA.at(most_common_entity_type).ui_button;
+        xy render_pos = UI_FRAME_BOTTOM_POSITION + xy(2, 0) + xy((3 + engine.sprites[SPRITE_UI_CONTROL_GROUP_FRAME].frame_size.x) * control_group_index, -32);
+        render_sprite(SPRITE_UI_CONTROL_GROUP_FRAME, xy(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL);
+        render_sprite(SPRITE_UI_BUTTON_ICON, xy(button_icon - 1, button_frame), render_pos + xy(1, 0), RENDER_SPRITE_NO_CULL);
+        char control_group_number_text[4];
+        sprintf(control_group_number_text, "%u", control_group_index == 9 ? 0 : control_group_index + 1);
+        render_text(FONT_M3X6, control_group_number_text, text_color, render_pos + xy(3, -2));
+        char control_group_count_text[4];
+        sprintf(control_group_count_text, "%u", entity_count);
+        render_text(FONT_M3X6, control_group_count_text, text_color, render_pos + xy(32, 30), TEXT_ANCHOR_BOTTOM_RIGHT);
     }
 
     // UI frames
