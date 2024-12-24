@@ -1072,6 +1072,9 @@ void match_render(const match_state_t& state) {
             entity_rect.y -= state.camera_offset.y;
             xy healthbar_position = xy(entity_rect.x, entity_rect.y + entity_rect.h + (entity_is_unit(entity.type) ? HEALTHBAR_PADDING : BUILDING_HEALTHBAR_PADDING));
             match_render_healthbar(healthbar_position, xy(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, ENTITY_DATA.at(entity.type).max_health);
+            if (ENTITY_DATA.at(entity.type).garrison_capacity != 0) {
+                match_render_garrisoned_units_healthbar(healthbar_position + xy(0, HEALTHBAR_HEIGHT + 1), xy(entity_rect.w, HEALTHBAR_HEIGHT), entity.garrisoned_units.size(), ENTITY_DATA.at(entity.type).garrison_capacity);
+            }
         }
 
         // Entities
@@ -1486,6 +1489,27 @@ void match_render_healthbar(xy position, xy size, int health, int max_health) {
     SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
     SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
     SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+}
+
+void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisoned_size, int garrisoned_capacity) {
+    SDL_Rect healthbar_rect = (SDL_Rect) { .x = position.x, .y = position.y, .w = size.x, .h = size.y };
+    if (SDL_HasIntersection(&healthbar_rect, &SCREEN_RECT) != SDL_TRUE) {
+        return;
+    }
+
+    SDL_Rect healthbar_subrect = healthbar_rect;
+    healthbar_subrect.w = (healthbar_rect.w * garrisoned_size) / garrisoned_capacity;
+    SDL_Color subrect_color = COLOR_WHITE;
+
+    SDL_SetRenderDrawColor(engine.renderer, subrect_color.r, subrect_color.g, subrect_color.b, subrect_color.a);
+    SDL_RenderFillRect(engine.renderer, &healthbar_subrect);
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+    SDL_RenderDrawRect(engine.renderer, &healthbar_rect);
+
+    for (int line_index = 1; line_index < garrisoned_capacity; line_index++) {
+        int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / garrisoned_capacity);
+        SDL_RenderDrawLine(engine.renderer, line_x, healthbar_rect.y, line_x, healthbar_rect.y + healthbar_rect.h - 1);
+    }
 }
 
 void match_render_text_with_text_frame(const char* text, xy position) {
