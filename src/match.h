@@ -369,6 +369,7 @@ struct match_state_t {
     std::vector<chat_message_t> ui_chat;
     uint32_t ui_disconnect_timer;
     EntityType ui_building_type;
+    uint32_t ui_double_click_timer;
 
     // Map
     uint32_t map_width;
@@ -409,7 +410,7 @@ bool ui_is_selecting(const match_state_t& state);
 std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, const std::vector<entity_id>& selection);
 void ui_update_buttons(match_state_t& state);
-SelectionType ui_get_selection_type(const match_state_t& state);
+SelectionType ui_get_selection_type(const match_state_t& state, const std::vector<entity_id>& selection);
 bool ui_is_targeting(const match_state_t& state);
 void ui_add_chat_message(match_state_t& state, std::string message);
 int ui_get_ui_button_hovered(const match_state_t& state);

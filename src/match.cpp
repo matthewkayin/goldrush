@@ -42,6 +42,7 @@ static const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 2, 35),
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 3, 35)
 };
+static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 
 const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_STOP, SDLK_s },
@@ -197,7 +198,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     }
 
     // Order movement
-    if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state) == SELECTION_TYPE_UNITS && 
+    if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state, state.selection) == SELECTION_TYPE_UNITS && 
             ((event.button.button == SDL_BUTTON_LEFT && ui_is_targeting(state)) ||
             (event.button.button == SDL_BUTTON_RIGHT && !ui_is_selecting(state) && !state.ui_is_minimap_dragging))) {
         input_t move_input = match_create_move_input(state);
@@ -252,6 +253,45 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT && ui_is_selecting(state)) {
         state.select_rect_origin = xy(-1, -1);
         std::vector<entity_id> selection = ui_create_selection_from_rect(state);
+
+        // Append selection
+        if (engine.keystate[SDL_SCANCODE_LCTRL]) { 
+            // Don't append selection if units are same type
+            if (ui_get_selection_type(state, state.selection) != ui_get_selection_type(state, selection)) {
+                return;
+            }
+            for (entity_id incoming_id : selection) {
+                if (std::find(state.selection.begin(), state.selection.end(), incoming_id) == state.selection.end()) {
+                    state.selection.push_back(incoming_id);
+                }
+            }
+
+            ui_set_selection(state, state.selection);
+            return;
+        } 
+
+        // Double-click selection
+        if (selection.size() == 1) {
+            if (state.ui_double_click_timer == 0) {
+                state.ui_double_click_timer = UI_DOUBLE_CLICK_DURATION;
+            } else if (state.selection.size() == 1 && state.selection[0] == selection[0] && state.entities.get_by_id(state.selection[0]).player_id == network_get_player_id()) {
+                EntityType selected_type = state.entities.get_by_id(state.selection[0]).type;
+                selection.clear();
+                for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                    if (state.entities[entity_index].type != selected_type || state.entities[entity_index].player_id != network_get_player_id()) {
+                        continue;
+                    }
+                    SDL_Rect entity_rect = entity_get_rect(state.entities[entity_index]);
+                    entity_rect.x -= state.camera_offset.x;
+                    entity_rect.y -= state.camera_offset.y;
+                    if (SDL_HasIntersection(&SCREEN_RECT, &entity_rect) == SDL_TRUE) {
+                        selection.push_back(state.entities.get_id_of(entity_index));
+                    }
+                }
+            }
+        }
+
+        // Regular selection
         ui_set_selection(state, selection);
         return;
     }
@@ -400,6 +440,9 @@ void match_update(match_state_t& state) {
     // Update timers
     if (animation_is_playing(state.ui_move_animation)) {
         animation_update(state.ui_move_animation);
+    }
+    if (state.ui_double_click_timer != 0) {
+        state.ui_double_click_timer--;
     }
 
     // Update particles

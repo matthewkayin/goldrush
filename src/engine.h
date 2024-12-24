@@ -187,6 +187,7 @@ enum Cursor {
 struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
+    const uint8_t* keystate;
 
     std::vector<TTF_Font*> fonts;
     std::vector<sprite_t> sprites;

@@ -236,12 +236,12 @@ void ui_update_buttons(match_state_t& state) {
     }
 }
 
-SelectionType ui_get_selection_type(const match_state_t& state) {
-    if (state.selection.empty()) {
+SelectionType ui_get_selection_type(const match_state_t& state, const std::vector<entity_id>& selection) {
+    if (selection.empty()) {
         return SELECTION_TYPE_NONE;
     }
 
-    const entity_t& entity = state.entities.get_by_id(state.selection[0]);
+    const entity_t& entity = state.entities.get_by_id(selection[0]);
     if (entity_is_unit(entity.type)) {
         if (entity.player_id == network_get_player_id()) {
             return SELECTION_TYPE_UNITS;
@@ -323,7 +323,7 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_UNLOAD: {
-            if (ui_get_selection_type(state) == SELECTION_TYPE_UNITS) {
+            if (ui_get_selection_type(state, state.selection) == SELECTION_TYPE_UNITS) {
                 state.ui_mode = UI_MODE_TARGET_UNLOAD;
             } else {
                 input_t input;
