@@ -45,6 +45,11 @@ struct tile_t {
 const entity_id CELL_EMPTY = ID_NULL;
 const entity_id CELL_BLOCKED = ID_MAX + 2;
 const entity_id CELL_UNREACHABLE = ID_MAX + 3;
+const entity_id CELL_DECORATION_1 = ID_MAX + 4;
+const entity_id CELL_DECORATION_2 = ID_MAX + 5;
+const entity_id CELL_DECORATION_3 = ID_MAX + 6;
+const entity_id CELL_DECORATION_4 = ID_MAX + 7;
+const entity_id CELL_DECORATION_5 = ID_MAX + 8;
 
 // If you change this, make sure that entity_is_unit() and entity_is_building() still work
 enum EntityType {

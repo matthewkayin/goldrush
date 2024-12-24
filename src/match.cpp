@@ -1021,6 +1021,17 @@ void match_render(const match_state_t& state) {
                     SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &below_tile_src_rect, &tile_dst_rect);
                 }
                 SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &tile_src_rect, &tile_dst_rect);
+
+                // Render decorations
+                if (state.map_cells[map_index] >= CELL_DECORATION_1 && state.map_cells[map_index] <= CELL_DECORATION_5) {
+                    ysorted_render_params.push_back((render_sprite_params_t) {
+                        .sprite = SPRITE_TILE_DECORATION,
+                        .frame = xy(state.map_cells[map_index] - CELL_DECORATION_1, 0),
+                        .position = xy(tile_dst_rect.x, tile_dst_rect.y),
+                        .options = RENDER_SPRITE_NO_CULL,
+                        .recolor_id = RECOLOR_NONE
+                    });
+                }
             } // End for x of visible tiles
         } // End for y of visible tiles
         // End render map

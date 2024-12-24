@@ -82,12 +82,9 @@ bool poisson_is_point_valid(const match_state_t& state, const poisson_disk_param
     }
 
     entity_id cell = map_get_cell(state, point);
-    if (cell == CELL_UNREACHABLE) {
-        return params.allow_unreachable_cells;
-    } else if (cell != CELL_EMPTY) {
+    if (cell == CELL_UNREACHABLE && !params.allow_unreachable_cells) {
         return false;
-    }
-    if (cell == CELL_BLOCKED || (cell == CELL_UNREACHABLE && !params.allow_unreachable_cells)) {
+    } else if (cell != CELL_EMPTY) {
         return false;
     }
     if (map_is_tile_ramp(state, point)) {
@@ -123,6 +120,8 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
         first.x = 1 + (lcg_rand() % (state.map_width - 2));
         first.y = 1 + (lcg_rand() % (state.map_height - 2));
     } while (!poisson_is_point_valid(state, params, first));
+
+    log_trace("first point %xi", &first);
 
     frontier.push_back(first);
     sample.push_back(first);
@@ -164,6 +163,8 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
         int next_index = lcg_short_rand() % frontier.size();
         xy next = frontier[next_index];
 
+        log_trace("next is %xi", &next);
+
         int child_attempts = 0;
         bool child_is_valid = false;
         xy child;
@@ -172,6 +173,7 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
             child = next + circle_offset_points[lcg_short_rand() % circle_offset_points.size()];
             child_is_valid = poisson_is_point_valid(state, params, child);
         }
+        log_trace("child is %xi valid %i", &child, (int)child_is_valid);
         if (child_is_valid) {
             frontier.push_back(child);
             sample.push_back(child);
@@ -670,7 +672,15 @@ std::vector<xy> map_init(match_state_t& state) {
         }
     }
 
+    // Generate decorations
     // The poisson avoid_values array is copied by value so we can re-use it for the next poisson disk
+    log_trace("Generating decorations...");
+    params.disk_radius = 16;
+    params.allow_unreachable_cells = true;
+    std::vector<xy> decoration_cells = poisson_disk(state, params);
+    for (xy cell : decoration_cells) {
+        state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_DECORATION_1 + (lcg_short_rand() % 5);
+    }
 
     return player_spawns;
 }
@@ -721,7 +731,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy 
     for (int y = cell.y; y < cell.y + size.x; y++) {
         for (int x = cell.x; x < cell.x + size.y; x++) {
             entity_id cell_id = map_get_cell(state, xy(x, y));
-            if (cell_id == CELL_BLOCKED) {
+            if (cell_id > CELL_EMPTY) {
                 return true;
             }
             if (cell_id == origin_id || cell_id == CELL_EMPTY) {
