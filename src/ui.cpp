@@ -52,6 +52,10 @@ bool ui_is_mouse_in_ui() {
            (engine.mouse_position.x >= SCREEN_WIDTH - 132 && engine.mouse_position.y >= SCREEN_HEIGHT - 106);
 }
 
+bool ui_buttons_enabled(const match_state_t& state) {
+    return !ui_is_selecting(state) && (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD);
+}
+
 bool ui_is_selecting(const match_state_t& state) {
     return state.select_rect_origin.x != -1;
 }
@@ -273,6 +277,9 @@ void ui_add_chat_message(match_state_t& state, std::string message) {
 int ui_get_ui_button_hovered(const match_state_t& state) {
     if (state.ui_button_pressed != -1) {
         return state.ui_button_pressed;
+    }
+    if (!ui_buttons_enabled(state)) {
+        return -1;
     }
 
     for (int i = 0; i < 6; i++) {
@@ -572,13 +579,33 @@ xy ui_garrisoned_icon_position(int index) {
 }
 
 int ui_get_garrisoned_index_hovered(const match_state_t& state) {
-    if (state.ui_mode != UI_MODE_NONE || state.selection.size() != 1) {
+    if (!ui_buttons_enabled(state) || state.selection.size() != 1) {
         return -1;
     }
 
     const entity_t& entity = state.entities.get_by_id(state.selection[0]);
     for (int index = 0; index < entity.garrisoned_units.size(); index++) {
         SDL_Rect icon_rect = (SDL_Rect) { .x = ui_garrisoned_icon_position(index).x, .y = ui_garrisoned_icon_position(index).y, .w = 32, .h = 32 };
+        if (sdl_rect_has_point(icon_rect, engine.mouse_position)) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+xy ui_get_selected_unit_icon_position(uint32_t selection_index) {
+    return SELECTION_LIST_TOP_LEFT + xy(((selection_index % 10) * 34) - 12, (selection_index / 10) * 34);
+}
+
+int ui_get_selected_unit_hovered(const match_state_t& state) {
+    if (!ui_buttons_enabled(state) || state.selection.size() < 2) {
+        return -1;
+    }
+
+    for (int index = 0; index < state.selection.size(); index++) {
+        xy icon_position = ui_get_selected_unit_icon_position(index);
+        SDL_Rect icon_rect = (SDL_Rect) { .x = icon_position.x, .y = icon_position.y, .w = 32, .h = 32 };
         if (sdl_rect_has_point(icon_rect, engine.mouse_position)) {
             return index;
         }

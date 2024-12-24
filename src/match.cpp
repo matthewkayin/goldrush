@@ -34,6 +34,7 @@ static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
     .w = 150, .h = 100
 };
 const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
+const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
 const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
 static const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT,
@@ -166,6 +167,17 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
                 .unit_id = state.entities.get_by_id(state.selection[0]).garrisoned_units[ui_get_garrisoned_index_hovered(state)]
             }
         });
+    }
+
+    // Selected unit icon press
+    if (ui_get_selected_unit_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN) {
+        if (engine.keystate[SDL_SCANCODE_LSHIFT]) {
+            ui_deselect_entity_if_selected(state, state.selection[ui_get_selected_unit_hovered(state)]);
+        } else {
+            std::vector<entity_id> selection;
+            selection.push_back(state.selection[ui_get_selected_unit_hovered(state)]);
+            ui_set_selection(state, selection);
+        }
     }
 
     // UI button release
@@ -1315,7 +1327,6 @@ void match_render(const match_state_t& state) {
     }
 
     // UI Selection list
-    const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
     if (state.selection.size() == 1) {
         const entity_t& entity = state.entities.get_by_id(state.selection[0]);
         const entity_data_t& entity_data = ENTITY_DATA.at(entity.type);
@@ -1355,9 +1366,10 @@ void match_render(const match_state_t& state) {
             const entity_t& entity = state.entities.get_by_id(state.selection[selection_index]);
             const entity_data_t& entity_data = ENTITY_DATA.at(entity.type);
 
-            xy icon_position = SELECTION_LIST_TOP_LEFT + xy(((selection_index % 10) * 34) - 12, (selection_index / 10) * 34);
-            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), icon_position, RENDER_SPRITE_NO_CULL);
-            render_sprite(SPRITE_UI_BUTTON_ICON, xy(entity_data.ui_button - 1, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            bool icon_hovered = ui_get_selected_unit_hovered(state) == selection_index;
+            xy icon_position = ui_get_selected_unit_icon_position(selection_index) + (icon_hovered ? xy(0, -1) : xy(0, 0));
+            render_sprite(SPRITE_UI_BUTTON, xy(icon_hovered ? 1 : 0, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(entity_data.ui_button - 1, icon_hovered ? 1 : 0), icon_position, RENDER_SPRITE_NO_CULL);
             match_render_healthbar(icon_position + xy(1, 32 - 5), xy(32- 2, 4), entity.health, entity_data.max_health);
         }
     }

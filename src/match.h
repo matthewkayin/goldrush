@@ -204,6 +204,7 @@ const SDL_Rect MINIMAP_RECT = (SDL_Rect) {
     .w = 128,
     .h = 128
 };
+extern const xy SELECTION_LIST_TOP_LEFT; 
 
 enum UiMode {
     UI_MODE_MATCH_NOT_STARTED,
@@ -406,6 +407,7 @@ input_t match_create_move_input(const match_state_t& state);
 
 // UI
 bool ui_is_mouse_in_ui();
+bool ui_buttons_enabled(const match_state_t& state);
 bool ui_is_selecting(const match_state_t& state);
 std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, const std::vector<entity_id>& selection);
@@ -424,6 +426,8 @@ bool ui_building_can_be_placed(const match_state_t& state);
 ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state);
 xy ui_garrisoned_icon_position(int index);
 int ui_get_garrisoned_index_hovered(const match_state_t& state);
+xy ui_get_selected_unit_icon_position(uint32_t unit_index);
+int ui_get_selected_unit_hovered(const match_state_t& state);
 
 // Map
 std::vector<xy> map_init(match_state_t& state);
