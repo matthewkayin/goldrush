@@ -116,7 +116,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .garrison_size = ENTITY_CANNOT_GARRISON,
 
         .unit_data = (unit_data_t) {
-            .population_cost = 1,
+            .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(1, 40),
 
             .damage = 0,
@@ -1118,8 +1118,20 @@ bool entity_is_target_invalid(const match_state_t& state, const entity_t& entity
         return true;
     }
 
-    if (state.entities[target_index].type == ENTITY_GOLD && state.entities[target_index].gold_held == 0) {
-        return true;
+    if (state.entities[target_index].type == ENTITY_GOLD) {
+        if (state.entities[target_index].gold_held == 0) {
+            return true;
+        }
+        bool is_gold_free = false;
+        for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+            if (map_get_cell(state, state.entities[target_index].cell + DIRECTION_XY[direction]) == CELL_EMPTY) {
+                is_gold_free = true;
+                break;
+            }
+        }
+        if (!is_gold_free) {
+            return true;
+        }
     }
     
     if (entity.target.type == TARGET_BUILD_ASSIST) {

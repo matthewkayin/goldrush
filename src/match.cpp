@@ -1306,7 +1306,7 @@ void match_render(const match_state_t& state) {
         }
     } else {
         for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
-            const entity_t& entity = state.entities.get_by_id(state.selection[0]);
+            const entity_t& entity = state.entities.get_by_id(state.selection[selection_index]);
             const entity_data_t& entity_data = ENTITY_DATA.at(entity.type);
 
             xy icon_position = SELECTION_LIST_TOP_LEFT + xy(((selection_index % 10) * 34) - 12, (selection_index / 10) * 34);

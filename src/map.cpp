@@ -121,8 +121,6 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
         first.y = 1 + (lcg_rand() % (state.map_height - 2));
     } while (!poisson_is_point_valid(state, params, first));
 
-    log_trace("first point %xi", &first);
-
     frontier.push_back(first);
     sample.push_back(first);
     params.avoid_values[first.x + (first.y * state.map_width)] = POISSON_OTHER;
@@ -163,8 +161,6 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
         int next_index = lcg_short_rand() % frontier.size();
         xy next = frontier[next_index];
 
-        log_trace("next is %xi", &next);
-
         int child_attempts = 0;
         bool child_is_valid = false;
         xy child;
@@ -173,7 +169,6 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
             child = next + circle_offset_points[lcg_short_rand() % circle_offset_points.size()];
             child_is_valid = poisson_is_point_valid(state, params, child);
         }
-        log_trace("child is %xi valid %i", &child, (int)child_is_valid);
         if (child_is_valid) {
             frontier.push_back(child);
             sample.push_back(child);
@@ -817,14 +812,14 @@ bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy siz
 
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk) {
     struct node_t {
-        int cost;
-        int distance;
+        fixed cost;
+        fixed distance;
         // The parent is the previous node stepped in the path to reach this node
         // It should be an index in the explored list or -1 if it is the start node
         int parent;
         xy cell;
 
-        int score() const {
+        fixed score() const {
             return cost + distance;
         };
     };
@@ -869,8 +864,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
     node_t path_end;
 
     frontier.push_back((node_t) {
-        .cost = 0,
-        .distance = xy::manhattan_distance(from, to),
+        .cost = fixed::from_int(0),
+        .distance = fixed::from_int(xy::manhattan_distance(from, to)),
         .parent = -1,
         .cell = from
     });
@@ -915,8 +910,8 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
         for (int direction_index = 0; direction_index < DIRECTION_COUNT; direction_index++) {
             int direction = CHILD_DIRECTIONS[direction_index];
             node_t child = (node_t) {
-                .cost = smallest.cost + 1,
-                .distance = xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], to),
+                .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
+                .distance = fixed::from_int(xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], to)),
                 .parent = (int)explored.size() - 1,
                 .cell = smallest.cell + DIRECTION_XY[direction]
             };
@@ -972,7 +967,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
     // Backtrack to build the path
     node_t current = found_path ? path_end : explored[closest_explored];
     path->clear();
-    path->reserve(current.cost);
+    path->reserve(current.cost.integer_part() + 1);
     while (current.parent != -1) {
         path->insert(path->begin(), current.cell);
         current = explored[current.parent];
