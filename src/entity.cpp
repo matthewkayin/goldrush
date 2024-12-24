@@ -167,7 +167,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .builder_positions_x = { 1, 15, 14 },
             .builder_positions_y = { 13, 13, 2 },
             .builder_flip_h = { false, true, false },
-            .can_rally = true
+            .can_rally = false
         }
     }},
     { ENTITY_HOUSE, (entity_data_t) {
@@ -190,7 +190,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .builder_positions_x = { 3, 16, -4 },
             .builder_positions_y = { 15, 15, 3 },
             .builder_flip_h = { false, true, false },
-            .can_rally = true
+            .can_rally = false
         }
     }},
     { ENTITY_SALOON, (entity_data_t) {
@@ -236,7 +236,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .builder_positions_x = { 1, 14, 5 },
             .builder_positions_y = { 15, 9, -3 },
             .builder_flip_h = { false, true, false },
-            .can_rally = true
+            .can_rally = false
         }
     }},
     { ENTITY_GOLD, (entity_data_t) {
@@ -278,6 +278,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.target = (target_t) { .type = TARGET_NONE };
     entity.remembered_gold_target = (target_t) { .type = TARGET_NONE };
     entity.timer = 0;
+    entity.rally_point = xy(-1, -1);
 
     entity.animation = animation_create(ANIMATION_UNIT_IDLE);
 
@@ -939,8 +940,9 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     }
 
                     if ((entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) || entity.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
-                        // TODO rally points
-                        xy rally_cell = entity.cell + xy(0, entity_cell_size(entity.type));
+                        xy rally_cell = entity.rally_point.x == -1 
+                                            ? entity.cell + xy(0, entity_cell_size(entity.type))
+                                            : entity.rally_point / TILE_SIZE;
                         xy exit_cell = entity_get_exit_cell(state, entity.cell, entity_cell_size(entity.type), entity_cell_size(entity.queue[0].unit_type), rally_cell);
                         if (exit_cell.x == -1) {
                             if (entity.timer == 0 && entity.player_id == network_get_player_id()) {
@@ -953,6 +955,34 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         entity.timer = 0;
                         entity_id unit_id = entity_create(state, entity.queue[0].unit_type, entity.player_id, exit_cell);
+
+                        // Rally unit
+                        entity_t& unit = state.entities.get_by_id(unit_id);
+                        if (unit.type == ENTITY_MINER && map_get_cell(state, rally_cell) < CELL_EMPTY && state.entities.get_by_id(map_get_cell(state, rally_cell)).type == ENTITY_GOLD) {
+                            // Rally to gold
+                            unit.target = (target_t) {
+                                .type = TARGET_GOLD,
+                                .id = map_get_cell(state, rally_cell),
+                                .cell = rally_cell
+                            };
+                            int nearest_dist = -1;
+                            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                                xy gold_cell = rally_cell + DIRECTION_XY[direction];
+                                if (!map_is_cell_in_bounds(state, gold_cell)) {
+                                    continue;
+                                }
+                                if (nearest_dist == -1 || xy::manhattan_distance(entity.cell, gold_cell) < nearest_dist) {
+                                    unit.target.cell = gold_cell;
+                                    nearest_dist = xy::manhattan_distance(entity.cell, gold_cell);
+                                }
+                            }
+                        } else {
+                            // Rally to cell
+                            unit.target = (target_t) {
+                                .type = TARGET_CELL,
+                                .cell = rally_cell
+                            };
+                        }
 
                         // TODO on create alert
                         // TODO rally point sets unit target
@@ -985,7 +1015,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             entity.animation = animation_create(expected_animation);
         }
         animation_update(entity.animation);
-    }
+    } 
 }
 
 bool entity_is_unit(EntityType type) {

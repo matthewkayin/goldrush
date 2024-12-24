@@ -146,6 +146,7 @@ struct entity_t {
     target_t remembered_gold_target;
     std::vector<xy> path;
     std::vector<building_queue_item_t> queue;
+    xy rally_point;
     uint32_t timer;
 
     animation_t animation;
@@ -333,6 +334,12 @@ struct input_single_unload_t {
     entity_id unit_id;
 };
 
+struct input_rally_t {
+    xy rally_point;
+    uint16_t building_count;
+    entity_id building_ids[SELECTION_LIMIT];
+};
+
 struct input_t {
     uint8_t type;
     union {
@@ -345,6 +352,7 @@ struct input_t {
         input_building_dequeue_t building_dequeue;
         input_unload_t unload;
         input_single_unload_t single_unload;
+        input_rally_t rally;
     };
 };
 
@@ -363,6 +371,7 @@ struct match_state_t {
     SDL_Rect select_rect;
     std::vector<entity_id> selection;
     animation_t ui_move_animation;
+    animation_t ui_rally_flag_animation;
     xy ui_move_position;
     entity_id ui_move_entity_id;
     std::string ui_status_message;

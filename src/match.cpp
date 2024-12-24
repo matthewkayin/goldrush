@@ -76,6 +76,7 @@ match_state_t match_init() {
     state.control_group_selected = -1;
     state.ui_double_click_timer = 0;
     state.control_group_double_tap_timer = 0;
+    state.ui_rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
     for (int i = 0; i < 6; i++) {
         state.ui_buttons[i] = UI_BUTTON_NONE;
     }
@@ -255,6 +256,25 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         }
         return;
     } 
+
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT &&
+            ui_get_selection_type(state, state.selection) == SELECTION_TYPE_BUILDINGS && 
+            !ui_is_targeting(state) && !ui_is_selecting(state) && !state.ui_is_minimap_dragging) {
+        // Check to make sure that all buildings can rally
+        for (entity_id id : state.selection) {
+            if (!ENTITY_DATA.at(state.entities.get_by_id(id).type).building_data.can_rally) {
+                return;
+            }
+        }
+
+        input_t input;
+        input.type = INPUT_RALLY;
+        input.rally.rally_point = match_get_mouse_world_pos(state);
+        input.rally.building_count = (uint16_t)state.selection.size();
+        memcpy(&input.rally.building_ids, &state.selection[0], state.selection.size() * sizeof(entity_id));
+        state.input_queue.push_back(input);
+        return;
+    }
 
     // Begin selecting
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
@@ -523,6 +543,7 @@ void match_update(match_state_t& state) {
     if (animation_is_playing(state.ui_move_animation)) {
         animation_update(state.ui_move_animation);
     }
+    animation_update(state.ui_rally_flag_animation);
     if (state.ui_double_click_timer != 0) {
         state.ui_double_click_timer--;
     }
@@ -741,6 +762,17 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += sizeof(input_single_unload_t);
             break;
         }
+        case INPUT_RALLY: {
+            memcpy(out_buffer + out_buffer_length, &input.rally.rally_point, sizeof(xy));
+            out_buffer_length += sizeof(xy);
+
+            memcpy(out_buffer + out_buffer_length, &input.rally.building_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+            
+            memcpy(out_buffer + out_buffer_length, &input.rally.building_ids, input.rally.building_count * sizeof(entity_id));
+            out_buffer_length += input.rally.building_count * sizeof(entity_id);
+            break;
+        }
         default:
             break;
     }
@@ -820,6 +852,17 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
         case INPUT_SINGLE_UNLOAD: {
             memcpy(&input.single_unload, in_buffer + in_buffer_head, sizeof(input_single_unload_t));
             in_buffer_head += sizeof(input_single_unload_t);
+            break;
+        }
+        case INPUT_RALLY: {
+            memcpy(&input.rally.rally_point, in_buffer + in_buffer_head, sizeof(xy));
+            in_buffer_head += sizeof(xy);
+
+            memcpy(&input.rally.building_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(&input.rally.building_ids, in_buffer + in_buffer_head, input.rally.building_count * sizeof(entity_id));
+            in_buffer_head += input.rally.building_count * sizeof(entity_id);
             break;
         }
         default:
@@ -1094,6 +1137,16 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             entity_unload_unit(state, carrier, input.single_unload.unit_id);
             break;
         }
+        case INPUT_RALLY: {
+            for (uint32_t id_index = 0; id_index < input.rally.building_count; id_index++) {
+                uint32_t building_index = state.entities.get_index_of(input.rally.building_ids[id_index]);
+                if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
+                    continue;
+                }
+                state.entities[building_index].rally_point = input.rally.rally_point;
+            }
+            break;
+        }
         default:
             break;
     }
@@ -1240,6 +1293,22 @@ void match_render(const match_state_t& state) {
             }
         }
 
+        // Rally points
+        if (ui_get_selection_type(state, state.selection) == SELECTION_TYPE_BUILDINGS) {
+            for (entity_id id : state.selection) {
+                const entity_t& building = state.entities.get_by_id(id);
+                if (building.mode == MODE_BUILDING_FINISHED && building.rally_point.x != -1 &&
+                    map_get_tile(state, building.rally_point / TILE_SIZE).elevation == elevation) {
+                    ysorted_render_params.push_back((render_sprite_params_t) {
+                        .sprite = SPRITE_RALLY_FLAG,
+                        .frame = state.ui_rally_flag_animation.frame,
+                        .position = building.rally_point - xy(4, 15) - state.camera_offset,
+                        .options = 0,
+                        .recolor_id = building.player_id
+                    });
+                } // End if should render rally point
+            } // End for each id
+        } // End if selection type is buildings
 
         // End Ysort
         ysort_render_params(ysorted_render_params, 0, ysorted_render_params.size() - 1);
