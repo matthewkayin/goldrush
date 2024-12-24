@@ -65,13 +65,8 @@ Tile wall_autotile_lookup(uint32_t neighbors) {
     }
 }
 
-static const int POISSON_EMPTY = 0;
-static const int POISSON_AVOID = 1;
-static const int POISSON_OTHER = 2;
-
 struct poisson_disk_params_t {
     std::vector<int> avoid_values;
-    int avoid_distance;
     int disk_radius;
     bool allow_unreachable_cells;
 };
@@ -91,18 +86,14 @@ bool poisson_is_point_valid(const match_state_t& state, const poisson_disk_param
         return false;
     }
 
-    int radius = std::max(params.avoid_distance, params.disk_radius);
-    for (int nx = point.x - radius; nx < point.x + radius + 1; nx++) {
-        for (int ny = point.y - radius; ny < point.y + radius + 1; ny++) {
+    for (int nx = point.x - params.disk_radius; nx < point.x + params.disk_radius + 1; nx++) {
+        for (int ny = point.y - params.disk_radius; ny < point.y + params.disk_radius + 1; ny++) {
             xy near_point = xy(nx, ny);
             if (!map_is_cell_in_bounds(state, near_point)) {
                 continue;
             }
             int avoid_value = params.avoid_values[near_point.x + (near_point.y * state.map_width)];
-            if (avoid_value == POISSON_AVOID && xy::manhattan_distance(point, near_point) <= params.avoid_distance) {
-                return false;
-            }
-            if (avoid_value == POISSON_OTHER && xy::euclidean_distance_squared(point, near_point) <= params.disk_radius * params.disk_radius) {
+            if (avoid_value != 0 && xy::manhattan_distance(point, near_point) <= avoid_value) {
                 return false;
             }
         }
@@ -123,7 +114,7 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
 
     frontier.push_back(first);
     sample.push_back(first);
-    params.avoid_values[first.x + (first.y * state.map_width)] = POISSON_OTHER;
+    params.avoid_values[first.x + (first.y * state.map_width)] = params.disk_radius;
 
     std::vector<xy> circle_offset_points;
     {
@@ -172,7 +163,7 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
         if (child_is_valid) {
             frontier.push_back(child);
             sample.push_back(child);
-            params.avoid_values[child.x + (child.y * state.map_width)] = POISSON_OTHER;
+            params.avoid_values[child.x + (child.y * state.map_width)] = params.disk_radius;
         } else {
             frontier.erase(frontier.begin() + next_index);
         }
@@ -623,21 +614,19 @@ std::vector<xy> map_init(match_state_t& state) {
 
     log_trace("Generating gold cells...");
     poisson_disk_params_t params = (poisson_disk_params_t) {
-        .avoid_values = std::vector<int>(state.map_width * state.map_height, POISSON_EMPTY),
-        .avoid_distance = 4,
+        .avoid_values = std::vector<int>(state.map_width * state.map_height, 0),
         .disk_radius = 32,
         .allow_unreachable_cells = false
     };
 
     // Generate the avoid values
-    params.avoid_values = std::vector<int>(state.map_width * state.map_height, POISSON_EMPTY);
     for (int index = 0; index < state.map_width * state.map_height; index++) {
         if (state.map_cells[index] == CELL_BLOCKED || map_is_tile_ramp(state, xy(index % state.map_width, index / state.map_width))) {
-            params.avoid_values[index] = POISSON_AVOID;
+            params.avoid_values[index] = 4;
         }
     }
     for (xy player_spawn : player_spawns) {
-        params.avoid_values[player_spawn.x + (player_spawn.y * state.map_width)] = POISSON_AVOID;
+        params.avoid_values[player_spawn.x + (player_spawn.y * state.map_width)] = 32;
     }
 
     std::vector<xy> gold_sample = poisson_disk(state, params);
@@ -664,6 +653,14 @@ std::vector<xy> map_init(match_state_t& state) {
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                 gold_frontier.push_back(next + DIRECTION_XY[direction]);
             }
+        }
+    }
+
+    // Fill in the gold values in the poisson avoid table so that decorations are not placed too close to gold
+    for (const entity_t& entity : state.entities) {
+        // All entities should be gold at this point anyways but it doesn't hurt to check
+        if (entity.type == ENTITY_GOLD) {
+            params.avoid_values[entity.cell.x + (entity.cell.y * state.map_width)] = 4;
         }
     }
 
