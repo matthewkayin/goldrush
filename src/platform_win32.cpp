@@ -46,6 +46,7 @@ void platform_console_write(const char* message, int log_level) {
     uint64_t length = strlen(message);
     LPDWORD number_written = 0;
     WriteConsoleA(GetStdHandle(log_level == 0 ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE), message, (DWORD)length, number_written, 0);
+    SetConsoleTextAttribute(console_handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 }
 
 #endif

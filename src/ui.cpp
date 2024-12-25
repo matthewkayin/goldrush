@@ -53,7 +53,7 @@ bool ui_is_mouse_in_ui() {
 }
 
 bool ui_buttons_enabled(const match_state_t& state) {
-    return !ui_is_selecting(state) && (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD);
+    return !ui_is_selecting(state) && (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD) && !state.ui_is_minimap_dragging;
 }
 
 bool ui_is_selecting(const match_state_t& state) {
@@ -218,6 +218,10 @@ void ui_update_buttons(match_state_t& state) {
 
     if (garrison_count != 0) {
         state.ui_buttons[3] = UI_BUTTON_UNLOAD;
+    }
+
+    if (!entity.queue.empty()) {
+        state.ui_buttons[5] = UI_BUTTON_CANCEL;
     }
 
     switch (entity.type) {

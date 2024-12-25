@@ -194,6 +194,8 @@ struct engine_t {
     std::vector<uint16_t> tile_index;
     std::unordered_map<uint32_t, uint32_t> neighbors_to_autotile_index;
     std::vector<SDL_Cursor*> cursors;
+    SDL_Texture* minimap_texture = NULL;
+    SDL_Texture* minimap_tiles_texture = NULL;
 
     xy mouse_position;
     Cursor current_cursor;

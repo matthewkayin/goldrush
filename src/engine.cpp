@@ -930,7 +930,20 @@ bool engine_init_renderer() {
     engine.current_cursor = CURSOR_DEFAULT;
     SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
 
-    log_info("Initialized renderer.");
+    SDL_RendererInfo renderer_info;
+    SDL_GetRendererInfo(engine.renderer, &renderer_info);
+
+    log_info("Initialized %s renderer.", renderer_info.name);
+
+    bool renderer_supports_argb8888 = false;
+    for (uint32_t i = 0; i < renderer_info.num_texture_formats; i++) {
+        if (renderer_info.texture_formats[i] == SDL_PIXELFORMAT_ARGB8888) {
+            renderer_supports_argb8888 = true;
+        }
+    }
+    if (!renderer_supports_argb8888) {
+        log_warn("Renderer does not support ARGB8888.");
+    }
     return true;
 }
 
@@ -958,6 +971,15 @@ void engine_destroy_renderer() {
         SDL_FreeCursor(cursor);
     }
     engine.cursors.clear();
+
+    if (engine.minimap_texture != NULL) {
+        SDL_DestroyTexture(engine.minimap_texture);
+        engine.minimap_texture = NULL;
+    }
+    if (engine.minimap_tiles_texture != NULL) {
+        SDL_DestroyTexture(engine.minimap_tiles_texture);
+        engine.minimap_tiles_texture = NULL;
+    }
 
     SDL_DestroyRenderer(engine.renderer);
     log_info("Destroyed renderer.");

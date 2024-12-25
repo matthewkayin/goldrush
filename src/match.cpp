@@ -116,6 +116,39 @@ match_state_t match_init() {
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
 
+    // Destroy minimap texture if already created
+    if (engine.minimap_texture != NULL) {
+        SDL_DestroyTexture(engine.minimap_texture);
+        engine.minimap_texture = NULL;
+    }
+    if (engine.minimap_tiles_texture != NULL) {
+        SDL_DestroyTexture(engine.minimap_tiles_texture);
+        engine.minimap_tiles_texture = NULL;
+    }
+    // Create new minimap texture
+    engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
+    engine.minimap_tiles_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
+    SDL_SetRenderTarget(engine.renderer, engine.minimap_tiles_texture);
+    for (int y = 0; y < state.map_height; y++) {
+        for (int x = 0; x < state.map_width; x++) {
+            SDL_Color color;
+            int tile_index = state.map_tiles[x + (y * state.map_width)].index;
+            if (tile_index == 0) {
+                color = COLOR_WHITE;
+            } else if (tile_index >= engine.tile_index[TILE_SAND] && tile_index <= engine.tile_index[TILE_SAND3]) {
+                color = COLOR_SAND_DARK;
+            } else if (tile_index >= engine.tile_index[TILE_WATER] && tile_index < engine.tile_index[TILE_WATER] + 47) {
+                color = COLOR_DIM_BLUE;
+            } else {
+                color = COLOR_DARK_GRAY;
+            }
+            SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+            SDL_RenderDrawPoint(engine.renderer, x, y);
+        }
+    }
+    SDL_SetRenderTarget(engine.renderer, NULL);
+    log_trace("Created minimap texture.");
+
     network_toggle_ready();
     if (network_are_all_players_ready()) {
         log_info("Match started.");
@@ -276,13 +309,25 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         return;
     }
 
-    // Begin selecting
-    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        if ((state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD) && !ui_is_mouse_in_ui()) {
-            state.select_rect_origin = match_get_mouse_world_pos(state);
-        }
+    // Begin minimap drag
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && 
+            (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD) && sdl_rect_has_point(MINIMAP_RECT, engine.mouse_position)) {
+        state.ui_is_minimap_dragging = true;
         return;
-    } 
+    }
+
+    // End minimap drag
+    if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT && state.ui_is_minimap_dragging) {
+        state.ui_is_minimap_dragging = false;
+        return;
+    }
+
+    // Begin selecting
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT &&
+            (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD) && !ui_is_mouse_in_ui()) {
+        state.select_rect_origin = match_get_mouse_world_pos(state);
+        return;
+    }
 
     // End selecting
     if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT && ui_is_selecting(state)) {
@@ -526,6 +571,17 @@ void match_update(match_state_t& state) {
         }
         state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
         match_camera_clamp(state);
+    }
+
+    // MINIMAP DRAG
+    if (state.ui_is_minimap_dragging) {
+        xy minimap_pos = xy(
+            std::clamp(engine.mouse_position.x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w), 
+            std::clamp(engine.mouse_position.y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
+        xy map_pos = xy(
+            (state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+            (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+        match_camera_center_on_cell(state, map_pos / TILE_SIZE);
     }
 
     // SELECT RECT
@@ -1686,6 +1742,46 @@ void match_render(const match_state_t& state) {
     sprintf(population_text, "%u/%u", match_get_player_population(state, network_get_player_id()), match_get_player_max_population(state, network_get_player_id()));
     render_text(FONT_WESTERN8, population_text, COLOR_WHITE, xy(SCREEN_WIDTH - 88 + 22, 4));
     render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL);
+
+    // Minimap prepare texture
+    SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
+    SDL_RenderCopy(engine.renderer, engine.minimap_tiles_texture, NULL, NULL);
+
+    // Minimap entities
+    for (const entity_t& entity : state.entities) {
+        if (!entity_is_selectable(entity)) {
+            continue;
+        }
+        SDL_Rect entity_rect = (SDL_Rect) {
+            .x = entity.cell.x, .y = entity.cell.y,
+            .w = entity_cell_size(entity.type) + 1, .h = entity_cell_size(entity.type) + 1
+        };
+        SDL_Color color;
+        if (entity.type == ENTITY_GOLD) {
+            color = COLOR_GOLD;
+        } else if (entity.player_id == network_get_player_id()) {
+            color = COLOR_GREEN;
+        } else {
+            color = PLAYER_COLORS[entity.player_id];
+        }
+        SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+        SDL_RenderFillRect(engine.renderer, &entity_rect);
+    }
+
+    // Minimap camera rect
+    SDL_Rect camera_rect = (SDL_Rect) {
+        .x = state.camera_offset.x / TILE_SIZE,
+        .y = state.camera_offset.y / TILE_SIZE,
+        .w = SCREEN_WIDTH / TILE_SIZE,
+        .h = 1 + ((SCREEN_HEIGHT - UI_HEIGHT) / TILE_SIZE)
+    };
+    SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
+    SDL_RenderDrawRect(engine.renderer, &camera_rect);
+
+    SDL_SetRenderTarget(engine.renderer, NULL);
+
+    // Minimap render texture
+    SDL_RenderCopy(engine.renderer, engine.minimap_texture, NULL, &MINIMAP_RECT);
 }
 
 render_sprite_params_t match_create_entity_render_params(const match_state_t& state, const entity_t& entity) {
