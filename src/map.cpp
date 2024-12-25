@@ -484,68 +484,7 @@ std::vector<xy> map_init(match_state_t& state) {
         }
     }
 
-    // Determine map "islands"
-    std::vector<int> map_tile_islands = std::vector<int>(state.map_width * state.map_height, -1);
-    std::vector<int> island_size;
-    while (true) {
-        // Set index equal to the index of the first unassigned tile in the array
-        int index;
-        for (index = 0; index < state.map_width * state.map_height; index++) {
-            if (state.map_cells[index] == CELL_BLOCKED) {
-                continue;
-            }
-
-            if (map_tile_islands[index] == -1) {
-                break;
-            }
-        }
-        if (index == state.map_width * state.map_height) {
-            break; // island mapping is complete
-        }
-
-        // Determine the next island index
-        int island_index = island_size.size();
-        island_size.push_back(0);
-
-        // Flood fill this island index so that every tile that is reachable from 
-        // the start tile (the tile determined by index) has the same island index
-        std::vector<xy> frontier;
-        frontier.push_back(xy(index % state.map_width, index / state.map_width));
-
-        while (!frontier.empty()) {
-            xy next = frontier[0];
-            frontier.erase(frontier.begin());
-
-            if (!map_is_cell_in_bounds(state, next) || state.map_cells[next.x + (next.y * state.map_width)] != CELL_EMPTY) {
-                continue;
-            }
-
-            // skip this because we've already explored it
-            if (map_tile_islands[next.x + (next.y * state.map_width)] != -1) {
-                continue;
-            }
-
-            map_tile_islands[next.x + (next.y * state.map_width)] = island_index;
-            island_size[island_index]++;
-
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                frontier.push_back(next + DIRECTION_XY[direction]);
-            }
-        }
-    }
-    int biggest_island = 0;
-    for (int island_index = 1; island_index < island_size.size(); island_index++) {
-        if (island_size[island_index] > island_size[biggest_island]) {
-            biggest_island = island_index;
-        }
-    }
-    // Everything that's not on the main "island" is considered blocked
-    // This makes it so that we don't place any player spawns or gold at these locations
-    for (int index = 0; index < state.map_width * state.map_height; index++) {
-        if (map_tile_islands[index] != biggest_island) {
-            state.map_cells[index] = CELL_UNREACHABLE;
-        }
-    }
+    map_calculate_unreachable_cells(state);
 
     // Determine player spawns
     std::vector<xy> player_spawns;
@@ -655,6 +594,8 @@ std::vector<xy> map_init(match_state_t& state) {
             }
         }
     }
+    // Recalculate unreachables in case the gold cells blocked anything
+    map_calculate_unreachable_cells(state);
 
     // Fill in the gold values in the poisson avoid table so that decorations are not placed too close to gold
     for (const entity_t& entity : state.entities) {
@@ -675,6 +616,90 @@ std::vector<xy> map_init(match_state_t& state) {
     }
 
     return player_spawns;
+}
+
+void map_calculate_unreachable_cells(match_state_t& state) {
+    // Assume any previously unreachable cells are now empty / reachable
+    for (int index = 0; index < state.map_width * state.map_height; index++) {
+        if (state.map_cells[index] == CELL_UNREACHABLE) {
+            state.map_cells[index] = CELL_EMPTY;
+        }
+    }
+
+    // Determine map "islands"
+    std::vector<int> map_tile_islands = std::vector<int>(state.map_width * state.map_height, -1);
+    std::vector<int> island_size;
+
+    while (true) {
+        // Set index equal to the index of the first unassigned tile in the array
+        int index;
+        for (index = 0; index < state.map_width * state.map_height; index++) {
+            if (state.map_cells[index] == CELL_BLOCKED) {
+                continue;
+            }
+            if (state.map_cells[index] < CELL_EMPTY && !entity_is_unit(state.entities.get_by_id(state.map_cells[index]).type)) {
+                continue;
+            }
+
+            if (map_tile_islands[index] == -1) {
+                break;
+            }
+        }
+        if (index == state.map_width * state.map_height) {
+            break; // island mapping is complete
+        }
+
+        // Determine the next island index
+        int island_index = island_size.size();
+        island_size.push_back(0);
+
+        // Flood fill this island index so that every tile that is reachable from 
+        // the start tile (the tile determined by index) has the same island index
+        std::vector<xy> frontier;
+        frontier.push_back(xy(index % state.map_width, index / state.map_width));
+
+        while (!frontier.empty()) {
+            xy next = frontier[0];
+            frontier.erase(frontier.begin());
+
+            if (!map_is_cell_in_bounds(state, next)) {
+                continue;
+            }
+            entity_id cell_value = state.map_cells[next.x + (next.y * state.map_width)];
+            if (cell_value == CELL_BLOCKED) {
+                continue;
+            }
+            // If cell is a building or gold, consider it blocked (but ignore units)
+            if (cell_value < CELL_EMPTY && !entity_is_unit(state.entities.get_by_id(cell_value).type)) {
+                continue;
+            }
+
+            // skip this because we've already explored it
+            if (map_tile_islands[next.x + (next.y * state.map_width)] != -1) {
+                continue;
+            }
+
+            map_tile_islands[next.x + (next.y * state.map_width)] = island_index;
+            island_size[island_index]++;
+
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                frontier.push_back(next + DIRECTION_XY[direction]);
+            }
+        }
+    }
+    int biggest_island = 0;
+    for (int island_index = 1; island_index < island_size.size(); island_index++) {
+        if (island_size[island_index] > island_size[biggest_island]) {
+            biggest_island = island_index;
+        }
+    }
+    // Everything that's not on the main "island" is considered blocked
+    // This makes it so that we don't place any player spawns or gold at these locations
+    for (int index = 0; index < state.map_width * state.map_height; index++) {
+        if (state.map_cells[index] == CELL_EMPTY && map_tile_islands[index] != biggest_island) {
+            state.map_cells[index] = CELL_UNREACHABLE;
+        }
+    }
 }
 
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {

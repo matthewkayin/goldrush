@@ -40,8 +40,6 @@ struct tile_t {
     uint16_t elevation;
 };
 
-// Entities
-
 const entity_id CELL_EMPTY = ID_NULL;
 const entity_id CELL_BLOCKED = ID_MAX + 2;
 const entity_id CELL_UNREACHABLE = ID_MAX + 3;
@@ -50,6 +48,9 @@ const entity_id CELL_DECORATION_2 = ID_MAX + 5;
 const entity_id CELL_DECORATION_3 = ID_MAX + 6;
 const entity_id CELL_DECORATION_4 = ID_MAX + 7;
 const entity_id CELL_DECORATION_5 = ID_MAX + 8;
+
+// Entities
+
 
 // If you change this, make sure that entity_is_unit() and entity_is_building() still work
 enum EntityType {
@@ -420,7 +421,6 @@ input_t match_create_move_input(const match_state_t& state);
 
 // UI
 bool ui_is_mouse_in_ui();
-bool ui_buttons_enabled(const match_state_t& state);
 bool ui_is_selecting(const match_state_t& state);
 std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state);
 void ui_set_selection(match_state_t& state, const std::vector<entity_id>& selection);
@@ -444,6 +444,7 @@ int ui_get_selected_unit_hovered(const match_state_t& state);
 
 // Map
 std::vector<xy> map_init(match_state_t& state);
+void map_calculate_unreachable_cells(match_state_t& state);
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_rect_in_bounds(const match_state_t& state, xy cell, int cell_size);
 tile_t map_get_tile(const match_state_t& state, xy cell);
@@ -483,6 +484,7 @@ bool entity_should_flip_h(const entity_t& entity);
 bool entity_should_die(const entity_t& entity);
 SDL_Rect entity_get_sight_rect(const entity_t& entity);
 bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);
+target_t entity_target_gold(const match_state_t& state, const entity_t& entity, entity_id gold_id);
 target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity);
 target_t entity_target_nearest_gold(const match_state_t& state, xy start_cell, uint32_t gold_patch_id);
 target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity);

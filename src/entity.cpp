@@ -672,6 +672,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             entity.target = entity.remembered_gold_target.type != TARGET_NONE 
                                                 ? entity.remembered_gold_target
                                                 : entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                            // Clear the remembered gold target, this way if the remembered target doesn't work out, we don't keep returning to it
+                            entity.remembered_gold_target = (target_t) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                             update_finished = true;
                             break;
@@ -748,6 +750,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             // Occupy this cell and begin mining
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
                             entity.timer = UNIT_MINE_TICK_DURATION;
+                            entity.remembered_gold_target = entity.target;
                             entity.mode = MODE_UNIT_MINE;
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
                         }
@@ -903,7 +906,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     entity_t& gold = state.entities.get_by_id(entity.target.id);
                     gold.gold_held--;
                     if (entity.gold_held == UNIT_MAX_GOLD_HELD) {
-                        entity.remembered_gold_target = entity.target;
                         entity.target = entity_target_nearest_camp(state, entity);
                         entity.mode = MODE_UNIT_IDLE;
                         update_finished = true;
@@ -960,22 +962,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity_t& unit = state.entities.get_by_id(unit_id);
                         if (unit.type == ENTITY_MINER && map_get_cell(state, rally_cell) < CELL_EMPTY && state.entities.get_by_id(map_get_cell(state, rally_cell)).type == ENTITY_GOLD) {
                             // Rally to gold
-                            unit.target = (target_t) {
-                                .type = TARGET_GOLD,
-                                .id = map_get_cell(state, rally_cell),
-                                .cell = rally_cell
-                            };
-                            int nearest_dist = -1;
-                            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                                xy gold_cell = rally_cell + DIRECTION_XY[direction];
-                                if (!map_is_cell_in_bounds(state, gold_cell)) {
-                                    continue;
-                                }
-                                if (nearest_dist == -1 || xy::manhattan_distance(entity.cell, gold_cell) < nearest_dist) {
-                                    unit.target.cell = gold_cell;
-                                    nearest_dist = xy::manhattan_distance(entity.cell, gold_cell);
-                                }
-                            }
+                            unit.target = entity_target_gold(state, entity, map_get_cell(state, rally_cell));
                         } else {
                             // Rally to cell
                             unit.target = (target_t) {
@@ -1148,20 +1135,8 @@ bool entity_is_target_invalid(const match_state_t& state, const entity_t& entity
         return true;
     }
 
-    if (state.entities[target_index].type == ENTITY_GOLD) {
-        if (state.entities[target_index].gold_held == 0) {
-            return true;
-        }
-        bool is_gold_free = false;
-        for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-            if (map_get_cell(state, state.entities[target_index].cell + DIRECTION_XY[direction]) == CELL_EMPTY) {
-                is_gold_free = true;
-                break;
-            }
-        }
-        if (!is_gold_free) {
-            return true;
-        }
+    if (state.entities[target_index].type == ENTITY_GOLD && state.entities[target_index].gold_held == 0) {
+        return true;
     }
     
     if (entity.target.type == TARGET_BUILD_ASSIST) {
@@ -1342,6 +1317,28 @@ bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size
     return SDL_HasIntersection(&sight_rect, &rect) == SDL_TRUE;
 }
 
+target_t entity_target_gold(const match_state_t& state, const entity_t& entity, entity_id gold_id) {
+    const entity_t& gold = state.entities.get_by_id(gold_id);
+    target_t target = (target_t) {
+        .type = TARGET_GOLD,
+        .id = gold_id,
+        .cell = gold.cell
+    };
+    int nearest_dist = -1;
+    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+        xy gold_cell = gold.cell + DIRECTION_XY[direction];
+        if (!map_is_cell_in_bounds(state, gold_cell) || map_get_cell(state, gold_cell) != CELL_EMPTY) {
+            continue;
+        }
+        if (nearest_dist == -1 || xy::manhattan_distance(entity.cell, gold_cell)) {
+            target.cell = gold_cell;
+            nearest_dist = xy::manhattan_distance(entity.cell, gold_cell);
+        }
+    }
+
+    return target;
+}
+
 target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity) {
     SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type),. h = entity_cell_size(entity.type) };
     SDL_Rect entity_sight_rect = entity_get_sight_rect(entity);
@@ -1482,12 +1479,8 @@ bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity)
         return false;
     }
 
-    if (state.entities[target_index].type == ENTITY_GOLD) {
-        return true;
-    } else {
-        // target type is camp
-        return entity.gold_held != 0 && entity.path.size() > 1;
-    }
+    return state.entities[target_index].type == ENTITY_GOLD ||
+           ((state.entities[target_index].type == ENTITY_CAMP || state.entities[target_index].type == ENTITY_HALL) && entity.gold_held != 0);
 }
 
 SDL_Rect entity_gold_get_block_building_rect(xy cell) {

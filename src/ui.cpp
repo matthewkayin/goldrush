@@ -52,10 +52,6 @@ bool ui_is_mouse_in_ui() {
            (engine.mouse_position.x >= SCREEN_WIDTH - 132 && engine.mouse_position.y >= SCREEN_HEIGHT - 106);
 }
 
-bool ui_buttons_enabled(const match_state_t& state) {
-    return !ui_is_selecting(state) && (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD) && !state.ui_is_minimap_dragging;
-}
-
 bool ui_is_selecting(const match_state_t& state) {
     return state.select_rect_origin.x != -1;
 }
@@ -282,9 +278,9 @@ int ui_get_ui_button_hovered(const match_state_t& state) {
     if (state.ui_button_pressed != -1) {
         return state.ui_button_pressed;
     }
-    if (!ui_buttons_enabled(state)) {
+    if (ui_is_selecting(state) || state.ui_is_minimap_dragging || state.ui_mode >= UI_MODE_CHAT) {
         return -1;
-    }
+    } 
 
     for (int i = 0; i < 6; i++) {
         if (state.ui_buttons[i] == UI_BUTTON_NONE) {
@@ -583,9 +579,9 @@ xy ui_garrisoned_icon_position(int index) {
 }
 
 int ui_get_garrisoned_index_hovered(const match_state_t& state) {
-    if (!ui_buttons_enabled(state) || state.selection.size() != 1) {
+    if (state.selection.size() != 1 || ui_is_selecting(state) || state.ui_is_minimap_dragging || !(state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD)) {
         return -1;
-    }
+    } 
 
     const entity_t& entity = state.entities.get_by_id(state.selection[0]);
     for (int index = 0; index < entity.garrisoned_units.size(); index++) {
@@ -603,9 +599,9 @@ xy ui_get_selected_unit_icon_position(uint32_t selection_index) {
 }
 
 int ui_get_selected_unit_hovered(const match_state_t& state) {
-    if (!ui_buttons_enabled(state) || state.selection.size() < 2) {
+    if (state.selection.size() < 2 || ui_is_selecting(state) || state.ui_is_minimap_dragging || !(state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD)) {
         return -1;
-    }
+    } 
 
     for (int index = 0; index < state.selection.size(); index++) {
         xy icon_position = ui_get_selected_unit_icon_position(index);
