@@ -159,6 +159,7 @@ struct entity_t {
     uint32_t gold_patch_id;
 
     uint32_t taking_damage_timer;
+    uint32_t health_regen_timer;
 };
 
 struct unit_data_t {

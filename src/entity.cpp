@@ -20,6 +20,7 @@ static const xy ENTITY_BUNKER_PARTICLE_OFFSETS[4] = {
     xy(28, 23)
 };
 static const uint32_t ENTITY_CANNOT_GARRISON = 0;
+static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 
 // Building train time = (HP * 0.9) / 10
 
@@ -287,6 +288,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.gold_patch_id = GOLD_PATCH_ID_NULL;
 
     entity.taking_damage_timer = 0;
+    entity.health_regen_timer = 0;
 
     entity_id id = state.entities.push_back(entity);
     map_set_cell_rect(state, entity.cell, entity_cell_size(type), id);
@@ -1015,6 +1017,18 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
     if (entity.taking_damage_timer != 0) {
         entity.taking_damage_timer--;
+        entity.health_regen_timer = 0;
+    }
+    if (entity.health != 0) {
+        if (entity_is_unit(entity.type) && entity.taking_damage_timer == 0 && entity.health < ENTITY_DATA.at(entity.type).max_health && entity.health_regen_timer == 0) {
+            entity.health_regen_timer = UNIT_HEALTH_REGEN_DURATION;
+        }
+        if (entity.health_regen_timer != 0) {
+            entity.health_regen_timer--;
+            if (entity.health_regen_timer == 0) {
+                entity.health++;
+            }
+        }
     }
 
     // Update animation
@@ -1601,9 +1615,8 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
                 ui_show_status(state, UI_STATUS_UNDER_ATTACK);
             }
         }
-
-        defender.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
     }
+    defender.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
 
     // Make the enemy attack back
     // TODO && defender can see attacker
