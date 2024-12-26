@@ -131,6 +131,7 @@ struct building_queue_item_t {
 };
 
 const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
+const uint32_t ENTITY_FLAG_DAMAGE_FLICKER = 2;
 
 struct entity_t {
     EntityType type;
