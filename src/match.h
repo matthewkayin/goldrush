@@ -282,6 +282,7 @@ extern const uint32_t MATCH_ALERT_DURATION;
 extern const uint32_t MATCH_ALERT_LINGER_DURATION;
 extern const uint32_t MATCH_ALERT_TOTAL_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
+extern const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX];
 
 // Particles
 
@@ -464,6 +465,7 @@ xy ui_garrisoned_icon_position(int index);
 int ui_get_garrisoned_index_hovered(const match_state_t& state);
 xy ui_get_selected_unit_icon_position(uint32_t unit_index);
 int ui_get_selected_unit_hovered(const match_state_t& state);
+int ui_get_building_queue_item_hovered(const match_state_t& state);
 
 // Map
 std::vector<xy> map_init(match_state_t& state);

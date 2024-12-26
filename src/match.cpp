@@ -36,7 +36,7 @@ static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
 const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
 const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
 const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
-static const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
+const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT,
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(0, 35),
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36, 35),
@@ -203,7 +203,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     }
 
     // Garrisoned unit icon press
-    if (ui_get_garrisoned_index_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN) {
+    if (ui_get_garrisoned_index_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         state.input_queue.push_back((input_t) {
             .type = INPUT_SINGLE_UNLOAD,
             .single_unload = (input_single_unload_t) {
@@ -213,7 +213,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     }
 
     // Selected unit icon press
-    if (ui_get_selected_unit_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN) {
+    if (ui_get_selected_unit_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         if (engine.keystate[SDL_SCANCODE_LSHIFT]) {
             ui_deselect_entity_if_selected(state, state.selection[ui_get_selected_unit_hovered(state)]);
         } else {
@@ -221,6 +221,17 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
             selection.push_back(state.selection[ui_get_selected_unit_hovered(state)]);
             ui_set_selection(state, selection);
         }
+    }
+
+    // Building queue icon press
+    if (ui_get_building_queue_item_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        state.input_queue.push_back((input_t) {
+            .type = INPUT_BUILDING_DEQUEUE,
+            .building_dequeue = (input_building_dequeue_t) {
+                .building_id = state.selection[0],
+                .index = (uint16_t)ui_get_building_queue_item_hovered(state)
+            }
+        });
     }
 
     // UI button release
@@ -1634,8 +1645,10 @@ void match_render(const match_state_t& state) {
     if (state.selection.size() == 1 && !state.entities.get_by_id(state.selection[0]).queue.empty()) {
         const entity_t& building = state.entities.get_by_id(state.selection[0]);
         for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
-            render_sprite(SPRITE_UI_BUTTON, xy(0, 0), UI_BUILDING_QUEUE_POSITIONS[building_queue_index], RENDER_SPRITE_NO_CULL);
-            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, 0), UI_BUILDING_QUEUE_POSITIONS[building_queue_index], RENDER_SPRITE_NO_CULL);
+            bool icon_hovered = ui_get_building_queue_item_hovered(state) == building_queue_index;
+            xy icon_position = UI_BUILDING_QUEUE_POSITIONS[building_queue_index] + (icon_hovered ? xy(0, -1) : xy(0, 0));
+            render_sprite(SPRITE_UI_BUTTON, xy(icon_hovered ? 1 : 0, 0), icon_position, RENDER_SPRITE_NO_CULL);
+            render_sprite(SPRITE_UI_BUTTON_ICON, xy(building_queue_item_icon(building.queue[building_queue_index]) - 1, icon_hovered ? 1 : 0), icon_position, RENDER_SPRITE_NO_CULL);
         }
 
         static const SDL_Rect BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT = (SDL_Rect) {
