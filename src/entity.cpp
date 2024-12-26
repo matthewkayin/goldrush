@@ -721,9 +721,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         break;
                     }
                     case TARGET_GOLD: {
+                        log_trace("%u: move finished. cell %xi target cell %xi", id, &entity.cell, &entity.target.cell);
                         if (entity_is_target_invalid(state, entity)) {
                             entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
                             entity.mode = MODE_UNIT_IDLE;
+                            log_trace("%u: target invalid. new target %xi", id, &entity.target.cell);
                             break;
                         }
 
@@ -731,6 +733,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             // This will trigger a repath
                             entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
                             entity.mode = MODE_UNIT_IDLE;
+                            log_trace("%u: has not reached target. new target %xi", id, &entity.target.cell);
                             break;
                         }
 
@@ -738,22 +741,24 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         if (entity.gold_held == UNIT_MAX_GOLD_HELD) {
                             entity.target = entity_target_nearest_camp(state, entity);
                             entity.mode = MODE_UNIT_IDLE;
-                        } else {
-                            // The cell should either be empty (meaning we mineral walked to this cell) or filled with the current entity ID (meaning we started at this cell)
-                            // If it's not then we should find another gold cell to mine
-                            if (!(map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY) || 
-                                    map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id))) {
-                                entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
-                                entity.mode = MODE_UNIT_IDLE;
-                                break;
-                            }
-                            // Occupy this cell and begin mining
-                            map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
-                            entity.timer = UNIT_MINE_TICK_DURATION;
-                            entity.remembered_gold_target = entity.target;
-                            entity.mode = MODE_UNIT_MINE;
-                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
+                            break;
                         }
+
+                        // The cell should either be empty (meaning we mineral walked to this cell) or filled with the current entity ID (meaning we started at this cell)
+                        // If it's not then we should find another gold cell to mine
+                        if (!(map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY) || 
+                                map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id))) {
+                            entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
+                        // Occupy this cell and begin mining
+                        map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
+                        entity.timer = UNIT_MINE_TICK_DURATION;
+                        entity.remembered_gold_target = entity.target;
+                        entity.mode = MODE_UNIT_MINE;
+                        entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
 
                         update_finished = true;
                         break;
@@ -1327,10 +1332,12 @@ target_t entity_target_gold(const match_state_t& state, const entity_t& entity, 
     int nearest_dist = -1;
     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
         xy gold_cell = gold.cell + DIRECTION_XY[direction];
-        if (!map_is_cell_in_bounds(state, gold_cell) || map_get_cell(state, gold_cell) != CELL_EMPTY) {
+        if (!map_is_cell_in_bounds(state, gold_cell)) {
             continue;
         }
-        if (nearest_dist == -1 || xy::manhattan_distance(entity.cell, gold_cell)) {
+        if (nearest_dist == -1 || 
+                (map_get_cell(state, gold_cell) == CELL_EMPTY && map_get_cell(state, target.cell) != CELL_EMPTY) || 
+                xy::manhattan_distance(entity.cell, gold_cell) < nearest_dist) {
             target.cell = gold_cell;
             nearest_dist = xy::manhattan_distance(entity.cell, gold_cell);
         }
