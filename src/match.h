@@ -157,6 +157,8 @@ struct entity_t {
 
     uint32_t gold_held;
     uint32_t gold_patch_id;
+
+    uint32_t taking_damage_timer;
 };
 
 struct unit_data_t {
@@ -255,11 +257,29 @@ struct chat_message_t {
     uint32_t timer;
 };
 
+enum AlertColor {
+    ALERT_COLOR_GREEN,
+    ALERT_COLOR_RED
+};
+
+struct alert_t {
+    AlertColor color;
+    xy cell;
+    int cell_size;
+    uint32_t timer;
+};
+
 extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
 extern const xy UI_FRAME_BOTTOM_POSITION; 
 extern const xy BUILDING_QUEUE_TOP_LEFT; 
 extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
 extern const std::unordered_map<UiButton, SDL_Keycode> hotkeys;
+extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
+extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION;
+extern const uint32_t MATCH_ALERT_DURATION;
+extern const uint32_t MATCH_ALERT_LINGER_DURATION;
+extern const uint32_t MATCH_ALERT_TOTAL_DURATION;
+extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
 
 // Particles
 
@@ -385,6 +405,7 @@ struct match_state_t {
     uint32_t control_group_double_tap_timer;
     SDL_Keycode control_group_double_tap_key;
     int control_group_selected;
+    std::vector<alert_t> alerts;
 
     // Map
     uint32_t map_width;

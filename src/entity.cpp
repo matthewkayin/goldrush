@@ -286,6 +286,8 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.gold_held = 0;
     entity.gold_patch_id = GOLD_PATCH_ID_NULL;
 
+    entity.taking_damage_timer = 0;
+
     entity_id id = state.entities.push_back(entity);
     map_set_cell_rect(state, entity.cell, entity_cell_size(type), id);
 
@@ -976,8 +978,19 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             };
                         }
 
-                        // TODO on create alert
-                        // TODO rally point sets unit target
+                        // Create alert
+                        SDL_Rect unit_rect = entity_get_rect(unit);
+                        unit_rect.x -= state.camera_offset.x;
+                        unit_rect.y -= state.camera_offset.y;
+                        if (unit.player_id == network_get_player_id() && SDL_HasIntersection(&SCREEN_RECT, &unit_rect) != SDL_TRUE) {
+                            state.alerts.push_back((alert_t) {
+                                .color = ALERT_COLOR_GREEN,
+                                .cell = unit.cell,
+                                .cell_size = entity_cell_size(unit.type),
+                                .timer = MATCH_ALERT_TOTAL_DURATION
+                            });
+                        }
+
                         entity_building_dequeue(state, entity);
                     }
                 } else if (entity.timer != 0) {
@@ -999,6 +1012,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 break;
         }
     } // End while !update_finished
+
+    if (entity.taking_damage_timer != 0) {
+        entity.taking_damage_timer--;
+    }
 
     // Update animation
     if (entity_is_unit(entity.type)) {
@@ -1561,6 +1578,33 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
         });
     }
 
+    if (attacker.player_id != defender.player_id && defender.player_id == network_get_player_id()) {
+        SDL_Rect defender_rect = entity_get_rect(defender);
+        defender_rect.x -= state.camera_offset.x;
+        defender_rect.y -= state.camera_offset.y;
+        if (defender.taking_damage_timer != 0 && SDL_HasIntersection(&SCREEN_RECT, &defender_rect) != SDL_TRUE) {
+            bool is_existing_attack_alert_nearby = false;
+            for (const alert_t& existing_alert : state.alerts) {
+                if (existing_alert.color == ALERT_COLOR_RED && xy::manhattan_distance(existing_alert.cell, defender.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
+                    is_existing_attack_alert_nearby = true;
+                    break;
+                }
+            }
+
+            if (!is_existing_attack_alert_nearby) {
+                state.alerts.push_back((alert_t) {
+                    .color = ALERT_COLOR_RED,
+                    .cell = defender.cell,
+                    .cell_size = entity_cell_size(defender.type),
+                    .timer = MATCH_ALERT_TOTAL_DURATION
+                });
+                ui_show_status(state, UI_STATUS_UNDER_ATTACK);
+            }
+        }
+
+        defender.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
+    }
+
     // Make the enemy attack back
     // TODO && defender can see attacker
     if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE && 
@@ -1571,9 +1615,6 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
             .id = attacker_id
         };
     }
-
-    // TODO attack alerts
-    // TOOD create particle effects for cowboys
 }
 
 xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell) {
@@ -1697,21 +1738,19 @@ void entity_building_finish(match_state_t& state, entity_id building_id) {
     building.mode = MODE_BUILDING_FINISHED;
 
     // Show alert
-    /*
     if (building.player_id == network_get_player_id()) {
-        rect_t screen_rect = rect_t(state.camera_offset, xy(SCREEN_WIDTH, SCREEN_HEIGHT));
-        rect_t building_rect = building_get_rect(building);
-        if (!screen_rect.intersects(building_rect)) {
+        SDL_Rect building_rect = entity_get_rect(building);
+        building_rect.x -= state.camera_offset.x;
+        building_rect.y -= state.camera_offset.y;
+        if (SDL_HasIntersection(&SCREEN_RECT, &building_rect) != SDL_TRUE) {
             state.alerts.push_back((alert_t) {
-                .type = ALERT_GREEN,
-                .status = ALERT_STATUS_SHOW,
+                .color = ALERT_COLOR_GREEN,
                 .cell = building.cell,
-                .cell_size = building_cell_size(building.type),
-                .timer = MATCH_ALERT_DURATION
+                .cell_size = entity_cell_size(building.type),
+                .timer = MATCH_ALERT_TOTAL_DURATION
             });
         }
     }
-    */
 
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         entity_t& entity = state.entities[entity_index];

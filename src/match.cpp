@@ -44,6 +44,12 @@ static const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 3, 35)
 };
 static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
+const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
+const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
+const uint32_t MATCH_ALERT_DURATION = 90;
+const uint32_t MATCH_ALERT_LINGER_DURATION = 60 * 20;
+const uint32_t MATCH_ALERT_TOTAL_DURATION = MATCH_ALERT_DURATION + MATCH_ALERT_LINGER_DURATION;
+const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
 
 const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_STOP, SDLK_s },
@@ -442,6 +448,12 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         }
         return;
     }
+
+    // Jump to latest alert
+    if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE && !state.alerts.empty()) {
+        match_camera_center_on_cell(state, state.alerts[state.alerts.size() - 1].cell);
+        return;
+    }
 }
 
 void match_update(match_state_t& state) {
@@ -605,6 +617,19 @@ void match_update(match_state_t& state) {
     }
     if (state.control_group_double_tap_timer != 0) {
         state.control_group_double_tap_timer--;
+    }
+
+    // Update alerts
+    {
+        uint32_t alert_index = 0;
+        while (alert_index < state.alerts.size()) {
+            state.alerts[alert_index].timer--;
+            if (state.alerts[alert_index].timer == 0) {
+                state.alerts.erase(state.alerts.begin() + alert_index);
+            } else {
+                alert_index++;
+            }
+        }
     }
 
     // Update particles
@@ -1745,12 +1770,42 @@ void match_render(const match_state_t& state) {
         if (entity.type == ENTITY_GOLD) {
             color = COLOR_GOLD;
         } else if (entity.player_id == network_get_player_id()) {
-            color = COLOR_GREEN;
+            /*
+             * This code is too smart for it's own good so let me explain:
+             * entity_damage_timer will begin at 30 and it should cause us to flicker between red and green in intervals of 10 (MATCH_TAKING_DAMAGE_FLICKER_DURATION)
+             * if you take entity_damage_timer / 10 you get an int depending on where in the range you are. 5 / 10 = 0, 15 / 10 = 1, 25 / 10 = 2, so the even numbers
+             * in this range is where we want the flicker to occur and the odd numbers is where we want to not flicker
+            */
+            if (entity.taking_damage_timer != 0 && (entity.taking_damage_timer / MATCH_TAKING_DAMAGE_FLICKER_DURATION) % 2 == 0) {
+                color = COLOR_RED;
+            } else {
+                color = COLOR_GREEN;
+            }
         } else {
             color = PLAYER_COLORS[entity.player_id];
         }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &entity_rect);
+    }
+
+    // Minimap alerts
+    for (const alert_t& alert : state.alerts) {
+        if (alert.timer <= MATCH_ALERT_LINGER_DURATION) {
+            continue;
+        }
+
+        int alert_timer = alert.timer - MATCH_ALERT_LINGER_DURATION;
+        int alert_rect_margin = 3 + (alert_timer <= 60 ? 0 : ((alert_timer - 60) / 3));
+        SDL_Rect alert_rect = (SDL_Rect) {
+            .x = alert.cell.x - alert_rect_margin,
+            .y = alert.cell.y - alert_rect_margin,
+            .w = alert.cell_size + 1 + (alert_rect_margin * 2),
+            .h = alert.cell_size + 1 + (alert_rect_margin * 2)
+        };
+
+        SDL_Color color = alert.color == ALERT_COLOR_GREEN ? COLOR_GREEN : COLOR_RED;
+        SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+        SDL_RenderDrawRect(engine.renderer, &alert_rect);
     }
 
     // Minimap camera rect
