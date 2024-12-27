@@ -327,6 +327,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
     if (entity.type == ENTITY_GOLD) {
         if (entity.gold_held == 0) {
+            ui_deselect_entity_if_selected(state, id);
             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
             // Triggers gold removal from entities list. This is done this way so that we can guarantee that the cell is set empty before deletion
             entity.mode = MODE_GOLD_MINED_OUT;
@@ -357,7 +358,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
         ui_deselect_entity_if_selected(state, id);
 
-        // Handle garrisoned untis
+        // Handle garrisoned units
         for (entity_id garrisoned_unit_id : entity.garrisoned_units) {
             entity_t& garrisoned_unit = state.entities.get_by_id(garrisoned_unit_id);
             if (entity_is_unit(entity.type)) {
@@ -1363,6 +1364,10 @@ target_t entity_target_gold(const match_state_t& state, const entity_t& entity, 
         xy gold_cell = gold.cell + DIRECTION_XY[direction];
         if (!map_is_cell_in_bounds(state, gold_cell)) {
             continue;
+        }
+        if (gold_cell == entity.cell) {
+            target.cell = gold_cell;
+            break;
         }
         if (nearest_dist == -1 || 
                 (map_get_cell(state, gold_cell) == CELL_EMPTY && map_get_cell(state, target.cell) != CELL_EMPTY) || 

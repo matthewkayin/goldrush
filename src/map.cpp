@@ -1005,13 +1005,47 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
     }
 }
 
+bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size) {
+    for (int y = cell.y; y < cell.y + cell_size; y++) {
+        for (int x = cell.x; x < cell.x + cell_size; x++) {
+            if (state.map_fog[player_id][x + (y * state.map_width)] == FOG_REVEALED) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void map_fog_update(match_state_t& state, uint8_t player_id) {
+    // Remember revealed entities
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        entity_t& entity = state.entities[entity_index];
+        if (entity_is_unit(entity.type) || !map_is_cell_rect_revealed(state, player_id, entity.cell, entity_cell_size(entity.type))) {
+            continue;
+        }
+
+        state.remembered_entities[player_id][state.entities.get_id_of(entity_index)] = (remembered_entity_t) {
+            .sprite_params = (render_sprite_params_t) {
+                .sprite = entity_get_sprite(entity),
+                .frame = entity_get_animation_frame(entity),
+                .position = entity.position.to_xy(),
+                .options = 0,
+                .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : entity.player_id
+            },
+            .cell = entity.cell,
+            .cell_size = entity_cell_size(entity.type)
+        };
+    }
+
+    // Dim everything that's revealed
     for (uint32_t map_index = 0; map_index < state.map_width * state.map_height; map_index++) {
         if (state.map_fog[player_id][map_index] == FOG_REVEALED) {
             state.map_fog[player_id][map_index] = FOG_EXPLORED;
         }
     }
 
+    // Reveal based on vision
     for (entity_t& entity : state.entities) {
         if (entity.player_id != player_id || !entity_is_selectable(entity)) {
             continue;
@@ -1058,4 +1092,14 @@ void map_fog_update(match_state_t& state, uint8_t player_id) {
             }
         } // End while !frontier empty
     } // End for each entity
+
+    // Remove any remembered entities (but only if this player can see that they should be removed)
+    auto it = state.remembered_entities[player_id].begin();
+    while (it != state.remembered_entities[player_id].end()) {
+        if (state.entities.get_index_of(it->first) == INDEX_INVALID && map_is_cell_rect_revealed(state, player_id, it->second.cell, it->second.cell_size)) {
+            it = state.remembered_entities[player_id].erase(it);
+        } else {
+            it++;
+        }
+    }
 }

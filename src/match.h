@@ -207,6 +207,12 @@ struct entity_data_t {
 };
 extern const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA;
 
+struct remembered_entity_t {
+    render_sprite_params_t sprite_params;
+    xy cell;
+    int cell_size;
+};
+
 // UI
 
 const SDL_Rect MINIMAP_RECT = (SDL_Rect) {
@@ -421,6 +427,7 @@ struct match_state_t {
     std::vector<tile_t> map_tiles;
     std::vector<entity_id> map_cells;
     std::vector<FogValue> map_fog[MAX_PLAYERS];
+    std::unordered_map<entity_id, remembered_entity_t> remembered_entities[MAX_PLAYERS];
     bool map_is_fog_dirty;
 
     // Entities
@@ -489,6 +496,7 @@ xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int st
 bool map_is_tile_ramp(const match_state_t& state, xy cell);
 bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
+bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size);
 void map_fog_update(match_state_t& state, uint8_t player_id);
 
 // Entities

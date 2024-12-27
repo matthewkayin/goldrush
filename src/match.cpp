@@ -118,6 +118,8 @@ match_state_t match_init() {
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
+        entity_create_gold(state, player_spawn + xy(-2, 0), 505, 123);
+        entity_create_gold(state, player_spawn + xy(-2, 1), 5, 123);
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
@@ -666,7 +668,15 @@ void match_update(match_state_t& state) {
 
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        xy entity_before_frame = entity_get_animation_frame(state.entities[entity_index]);
+        EntityMode entity_before_mode = state.entities[entity_index].mode;
+
         entity_update(state, entity_index);
+
+        if (!entity_is_unit(state.entities[entity_index].type) && 
+                (entity_before_mode != state.entities[entity_index].mode || entity_before_frame != entity_get_animation_frame(state.entities[entity_index]))) {
+            state.map_is_fog_dirty = true;
+        }
     }
 
     // Remove any dead entities
@@ -678,7 +688,7 @@ void match_update(match_state_t& state) {
                     (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0) ||
                     (state.entities[entity_index].type == ENTITY_GOLD && state.entities[entity_index].mode == MODE_GOLD_MINED_OUT)) {
                 state.entities.remove_at(entity_index);
-                // state.is_fog_dirty = true;
+                state.map_is_fog_dirty = true;
             } else {
                 entity_index++;
             }
@@ -1311,16 +1321,26 @@ void match_render(const match_state_t& state) {
         // End render map
 
         // Render entity corpses
-        for (entity_t entity : state.entities) {
-            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
-                continue;
-            }
-
-            if (entity_get_elevation(state, entity) != elevation) {
+        for (const entity_t& entity : state.entities) {
+            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) || 
+                    entity_get_elevation(state, entity) != elevation || 
+                    !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
                 continue;
             }
 
             render_sprite_params_t render_params = match_create_entity_render_params(state, entity);
+            render_sprite(render_params.sprite, render_params.frame, render_params.position, render_params.options, render_params.recolor_id);
+        }
+
+        // Remembered entity corpses
+        for (auto it : state.remembered_entities[network_get_player_id()]) {
+            if (it.second.sprite_params.sprite < SPRITE_BUILDING_DESTROYED_2 || it.second.sprite_params.sprite > SPRITE_BUILDING_DESTROYED_BUNKER ||
+                    map_get_tile(state, it.second.cell).elevation != elevation || map_is_cell_rect_revealed(state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
+                continue;
+            }
+
+            render_sprite_params_t render_params = it.second.sprite_params;
+            render_params.position -= state.camera_offset;
             render_sprite(render_params.sprite, render_params.frame, render_params.position, render_params.options, render_params.recolor_id);
         }
 
@@ -1353,7 +1373,7 @@ void match_render(const match_state_t& state) {
 
         // Entities
         for (const entity_t& entity : state.entities) {
-            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || 
+            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) || 
                     entity.garrison_id != ID_NULL || entity_get_elevation(state, entity) != elevation) {
                 continue;
             }
@@ -1369,6 +1389,31 @@ void match_render(const match_state_t& state) {
             if (SDL_HasIntersection(&render_rect, &SCREEN_RECT) != SDL_TRUE) {
                 continue;
             }
+            render_params.options |= RENDER_SPRITE_NO_CULL;
+
+            ysorted_render_params.push_back(render_params);
+        }
+
+        // Remembered entities
+        for (auto it : state.remembered_entities[network_get_player_id()]) {
+            if ((it.second.sprite_params.sprite >= SPRITE_BUILDING_DESTROYED_2 && it.second.sprite_params.sprite <= SPRITE_BUILDING_DESTROYED_BUNKER) ||
+                    map_get_tile(state, it.second.cell).elevation != elevation || map_is_cell_rect_revealed(state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
+                continue;
+            }
+
+            SDL_Rect render_rect = (SDL_Rect) {
+                .x = it.second.sprite_params.position.x - state.camera_offset.x,
+                .y = it.second.sprite_params.position.y - state.camera_offset.y,
+                .w = engine.sprites[it.second.sprite_params.sprite].frame_size.x,
+                .h = engine.sprites[it.second.sprite_params.sprite].frame_size.y
+            };
+            // Perform culling in advance so that we can minimize y-sorting
+            if (SDL_HasIntersection(&render_rect, &SCREEN_RECT) != SDL_TRUE) {
+                continue;
+            }
+
+            render_sprite_params_t render_params = it.second.sprite_params;
+            render_params.position -= state.camera_offset;
             render_params.options |= RENDER_SPRITE_NO_CULL;
 
             ysorted_render_params.push_back(render_params);
@@ -1414,6 +1459,9 @@ void match_render(const match_state_t& state) {
 
     // Particles
     for (const particle_t& particle : state.particles) {
+        if (!map_is_cell_rect_revealed(state, network_get_player_id(), particle.position / TILE_SIZE, 1)) {
+            continue;
+        }
         render_sprite(particle.sprite, xy(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
@@ -1861,7 +1909,7 @@ void match_render(const match_state_t& state) {
 
     // Minimap entities
     for (const entity_t& entity : state.entities) {
-        if (!entity_is_selectable(entity)) {
+        if (!entity_is_selectable(entity) || !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
             continue;
         }
         SDL_Rect entity_rect = (SDL_Rect) {
@@ -1885,6 +1933,27 @@ void match_render(const match_state_t& state) {
             }
         } else {
             color = PLAYER_COLORS[entity.player_id];
+        }
+        SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
+        SDL_RenderFillRect(engine.renderer, &entity_rect);
+    }
+
+    // Minimap remembered entities
+    for (auto it : state.remembered_entities[network_get_player_id()]) {
+        if (map_is_cell_rect_revealed(state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
+            continue;
+        }
+
+        SDL_Rect entity_rect = (SDL_Rect) {
+            .x = it.second.cell.x, .y = it.second.cell.y,
+            .w = it.second.cell_size, .h = it.second.cell_size
+        };
+        // I'm assuming here that we will never render the player's own units in remembered units
+        SDL_Color color;
+        if (it.second.sprite_params.recolor_id == RECOLOR_NONE) {
+            color = COLOR_GOLD;
+        } else {
+            color = PLAYER_COLORS[it.second.sprite_params.recolor_id];
         }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &entity_rect);
