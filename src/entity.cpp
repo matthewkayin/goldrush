@@ -418,7 +418,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                 if (entity_is_target_invalid(state, entity)) {
                     entity.target = entity.target.type == TARGET_GOLD 
-                                        ? entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id)
+                                        ? entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id)
                                         : (target_t) { .type = TARGET_NONE };
                     update_finished = true;
                     break;
@@ -482,6 +482,9 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.cell = entity.path[0];
                         if (!entity_should_gold_walk(state, entity)) {
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
+                        } else {
+                            // ensures that the fog still updates while gold walking
+                            state.map_is_fog_dirty = true;
                         }
                         entity.path.erase(entity.path.begin());
                     }
@@ -507,7 +510,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         if (entity_is_target_invalid(state, entity)) {
                             entity.mode = MODE_UNIT_IDLE;
                             entity.target = entity.target.type == TARGET_GOLD
-                                                ? entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id) 
+                                                ? entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id) 
                                                 : (target_t) { .type = TARGET_NONE };
                             entity.path.clear();
                             break;
@@ -528,7 +531,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                 if (path_is_blocked) {
                     if (entity.target.type == TARGET_GOLD) {
-                        entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                        entity.target = entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id);
                         if (entity.target.type != TARGET_NONE && map_get_cell(state, entity.target.cell) != CELL_EMPTY) {
                             entity.mode = MODE_UNIT_IDLE;
                             break;
@@ -677,7 +680,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             entity.gold_held = 0;
                             entity.target = entity.remembered_gold_target.type != TARGET_NONE 
                                                 ? entity.remembered_gold_target
-                                                : entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                                                : entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id);
                             // Clear the remembered gold target, this way if the remembered target doesn't work out, we don't keep returning to it
                             entity.remembered_gold_target = (target_t) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
@@ -728,14 +731,14 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     }
                     case TARGET_GOLD: {
                         if (entity_is_target_invalid(state, entity)) {
-                            entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                            entity.target = entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id);
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
 
                         if (!entity_has_reached_target(state, entity)) {
                             // This will trigger a repath
-                            entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                            entity.target = entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id);
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
@@ -751,7 +754,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         // If it's not then we should find another gold cell to mine
                         if (!(map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY) || 
                                 map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id))) {
-                            entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                            entity.target = entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id);
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
@@ -900,7 +903,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             }
             case MODE_UNIT_MINE: {
                 if (entity_is_target_invalid(state, entity)) {
-                    entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
+                    entity.target = entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id);
                     if (entity.target.type == TARGET_NONE && entity.gold_held != 0) {
                         entity.target = entity_target_nearest_camp(state, entity);
                     }
@@ -1395,10 +1398,9 @@ target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t&
         }
 
         SDL_Rect other_rect = (SDL_Rect) { .x = other.cell.x, .y = other.cell.y, .w = entity_cell_size(other.type),. h = entity_cell_size(other.type) };
-        if (other.player_id == entity.player_id || !entity_is_selectable(other) || SDL_HasIntersection(&entity_sight_rect, &other_rect) != SDL_TRUE) {
+        if (other.player_id == entity.player_id || !entity_is_selectable(other) || !map_is_cell_rect_revealed(state, entity.player_id, other.cell, entity_cell_size(other.type)) || SDL_HasIntersection(&entity_sight_rect, &other_rect) != SDL_TRUE) {
             continue;
         }
-        // TODO consider fog of war
 
         int other_dist = euclidean_distance_squared_between(entity_rect, other_rect);
         uint32_t other_attack_priority = ENTITY_DATA.at(other.type).attack_priority;
@@ -1421,7 +1423,7 @@ target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t&
     };
 }
 
-target_t entity_target_nearest_gold(const match_state_t& state, xy start_cell, uint32_t gold_patch_id) {
+target_t entity_target_nearest_gold(const match_state_t& state, uint8_t entity_player_id, xy start_cell, uint32_t gold_patch_id) {
     uint32_t nearest_index = INDEX_INVALID;
     xy nearest_cell = xy(-1, -1);
     int nearest_dist = -1;
@@ -1429,13 +1431,9 @@ target_t entity_target_nearest_gold(const match_state_t& state, xy start_cell, u
     for (uint32_t gold_index = 0; gold_index < state.entities.size(); gold_index++) {
         const entity_t& gold = state.entities[gold_index];
 
-        if (gold.type != ENTITY_GOLD) {
-            continue;
-        }
-        if (gold_patch_id != GOLD_PATCH_ID_NULL && gold_patch_id != gold.gold_patch_id) {
-            continue;
-        }
-        if (gold.gold_held == 0) {
+        if (gold.type != ENTITY_GOLD || gold.gold_held == 0 ||
+                (gold_patch_id != GOLD_PATCH_ID_NULL && gold_patch_id != gold.gold_patch_id) ||
+                (state.map_fog[entity_player_id][gold.cell.x + (gold.cell.y * state.map_width)] == FOG_HIDDEN)) {
             continue;
         }
 
@@ -1625,10 +1623,9 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
     }
 
     // Make the enemy attack back
-    // TODO && defender can see attacker
     if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE && 
             defender.target.type == TARGET_NONE && ENTITY_DATA.at(defender.type).unit_data.damage != 0 && 
-            defender.player_id != attacker.player_id) {
+            defender.player_id != attacker.player_id && map_is_cell_rect_revealed(state, defender.player_id, attacker.cell, entity_cell_size(attacker.type))) {
         defender.target = (target_t) {
             .type = TARGET_ATTACK_ENTITY,
             .id = attacker_id
@@ -1791,7 +1788,7 @@ void entity_building_finish(match_state_t& state, entity_id building_id) {
         }
 
         entity.target = building.type == ENTITY_CAMP || building.type == ENTITY_HALL
-                            ? entity_target_nearest_gold(state, entity.cell, GOLD_PATCH_ID_NULL)
+                            ? entity_target_nearest_gold(state, entity.player_id, entity.cell, GOLD_PATCH_ID_NULL)
                             : (target_t) { .type = TARGET_NONE };
     }
 }

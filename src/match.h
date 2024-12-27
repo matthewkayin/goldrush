@@ -262,7 +262,7 @@ enum SelectionType {
     SELECTION_TYPE_BUILDINGS,
     SELECTION_TYPE_ENEMY_UNIT,
     SELECTION_TYPE_ENEMY_BUILDING,
-    SELECTION_TYPE_GOLD_MINE
+    SELECTION_TYPE_GOLD
 };
 
 struct chat_message_t {
@@ -527,7 +527,7 @@ SDL_Rect entity_get_sight_rect(const entity_t& entity);
 bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);
 target_t entity_target_gold(const match_state_t& state, const entity_t& entity, entity_id gold_id);
 target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity);
-target_t entity_target_nearest_gold(const match_state_t& state, xy start_cell, uint32_t gold_patch_id);
+target_t entity_target_nearest_gold(const match_state_t& state, uint8_t entity_player_id, xy start_cell, uint32_t gold_patch_id);
 target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity);
 bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity);
 SDL_Rect entity_gold_get_block_building_rect(xy cell);

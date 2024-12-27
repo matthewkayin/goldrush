@@ -100,7 +100,8 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
         const entity_t& entity = state.entities[index];
         if (entity.player_id == network_get_player_id() || 
             !entity_is_unit(entity.type) || 
-            !entity_is_selectable(entity)) {
+            !entity_is_selectable(entity) || 
+            !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
             continue;
         }
 
@@ -116,7 +117,8 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
         const entity_t& entity = state.entities[index];
         if (entity.player_id == network_get_player_id() || 
             !entity_is_building(entity.type) || 
-            !entity_is_selectable(entity)) {
+            !entity_is_selectable(entity) || 
+            !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
             continue;
         }
 
@@ -129,7 +131,7 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
 
     for (uint32_t index = 0; index < state.entities.size(); index++) {
         const entity_t& entity = state.entities[index];
-        if (entity.type != ENTITY_GOLD) {
+        if (entity.type != ENTITY_GOLD || !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
             continue;
         }
 
@@ -245,7 +247,7 @@ SelectionType ui_get_selection_type(const match_state_t& state, const std::vecto
         return SELECTION_TYPE_NONE;
     }
 
-    const entity_t& entity = state.entities.get_by_id(selection[0]);
+    const entity_t& entity = state.entities.get_by_id(state.selection[0]);
     if (entity_is_unit(entity.type)) {
         if (entity.player_id == network_get_player_id()) {
             return SELECTION_TYPE_UNITS;
@@ -258,9 +260,9 @@ SelectionType ui_get_selection_type(const match_state_t& state, const std::vecto
         } else {
             return SELECTION_TYPE_ENEMY_BUILDING;
         }
+    } else {
+        return SELECTION_TYPE_GOLD;
     }
-
-    return SELECTION_TYPE_NONE;
 }
 
 bool ui_is_targeting(const match_state_t& state) {
@@ -579,7 +581,10 @@ xy ui_garrisoned_icon_position(int index) {
 }
 
 int ui_get_garrisoned_index_hovered(const match_state_t& state) {
-    if (state.selection.size() != 1 || ui_is_selecting(state) || state.ui_is_minimap_dragging || !(state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD)) {
+    SelectionType selection_type = ui_get_selection_type(state, state.selection);
+    if (!(selection_type == SELECTION_TYPE_UNITS || selection_type == SELECTION_TYPE_BUILDINGS) ||
+            state.selection.size() != 1 || ui_is_selecting(state) || state.ui_is_minimap_dragging || 
+            !(state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD)) {
         return -1;
     } 
 
@@ -615,7 +620,8 @@ int ui_get_selected_unit_hovered(const match_state_t& state) {
 }
 
 int ui_get_building_queue_item_hovered(const match_state_t& state) {
-    if (state.selection.size() != 1 || ui_is_selecting(state) || state.ui_is_minimap_dragging || !(state.ui_mode == UI_MODE_NONE)) {
+    if (state.selection.size() != 1 || ui_get_selection_type(state, state.selection) != SELECTION_TYPE_BUILDINGS || 
+                ui_is_selecting(state) || state.ui_is_minimap_dragging || !(state.ui_mode == UI_MODE_NONE)) {
         return -1;
     } 
 

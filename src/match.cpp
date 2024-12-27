@@ -118,8 +118,6 @@ match_state_t match_init() {
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
-        entity_create_gold(state, player_spawn + xy(-2, 0), 505, 123);
-        entity_create_gold(state, player_spawn + xy(-2, 1), 5, 123);
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
@@ -299,8 +297,39 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
         state.input_queue.push_back(move_input);
 
+        // Check if clicked on remembered building
+        entity_id remembered_entity_id = ID_NULL;
+        if ((move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL) &&
+                state.map_fog[network_get_player_id()][move_input.move.target_cell.x + (move_input.move.target_cell.y * state.map_width)] == FOG_EXPLORED) {
+            xy move_target;
+            if (ui_is_mouse_in_ui()) {
+                xy minimap_pos = engine.mouse_position - xy(MINIMAP_RECT.x, MINIMAP_RECT.y);
+                move_target = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                                    (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+            } else {
+                move_target = match_get_mouse_world_pos(state);
+            }
+
+            for (auto it : state.remembered_entities[network_get_player_id()]) {
+                SDL_Rect remembered_entity_rect = (SDL_Rect) {
+                    .x = it.second.cell.x * TILE_SIZE, .y = it.second.cell.y * TILE_SIZE,
+                    .w = it.second.cell_size * TILE_SIZE, .h = it.second.cell_size * TILE_SIZE
+                };
+                if (sdl_rect_has_point(remembered_entity_rect, engine.mouse_position + state.camera_offset)) {
+                    remembered_entity_id = it.first;
+                    break;
+                }
+            }
+        }
+
         // Provide instant user feedback
-        if (move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_UNLOAD) {
+        if (remembered_entity_id != ID_NULL) {
+            state.ui_move_animation = animation_create(state.remembered_entities[network_get_player_id()][remembered_entity_id].sprite_params.recolor_id != RECOLOR_NONE 
+                                                            ? ANIMATION_UI_MOVE_ATTACK_ENTITY 
+                                                            : ANIMATION_UI_MOVE_ENTITY);
+            state.ui_move_position = cell_center(move_input.move.target_cell).to_xy();
+            state.ui_move_entity_id = remembered_entity_id;
+        } else if (move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_UNLOAD) {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
             state.ui_move_position = match_get_mouse_world_pos(state);
             state.ui_move_entity_id = ID_NULL;
@@ -716,6 +745,12 @@ void match_update(match_state_t& state) {
             }
             map_fog_update(state, player_id);
         }
+        if (state.selection.size() == 1) {
+            entity_t& selected_entity = state.entities.get_by_id(state.selection[0]);
+            if (!map_is_cell_rect_revealed(state, network_get_player_id(), selected_entity.cell, entity_cell_size(selected_entity.type))) {
+                state.selection.clear();
+            }
+        }
         state.map_is_fog_dirty = false;
     }
 }
@@ -772,15 +807,18 @@ input_t match_create_move_input(const match_state_t& state) {
     input_t input;
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
-    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-        // TODO if they can't see this boi, then don't target him
-        if (!entity_is_selectable(state.entities[entity_index])) {
-            continue;
-        }
-        SDL_Rect entity_rect = entity_get_rect(state.entities[entity_index]);
-        if (sdl_rect_has_point(entity_rect, move_target)) {
-            input.move.target_id = state.entities.get_id_of(entity_index);
-            break;
+    FogValue fog_value = state.map_fog[network_get_player_id()][input.move.target_cell.x + (input.move.target_cell.y * state.map_width)];
+    if (fog_value != FOG_HIDDEN) {
+        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+            if (!entity_is_selectable(state.entities[entity_index]) || (fog_value == FOG_EXPLORED && state.entities[entity_index].type != ENTITY_GOLD)) {
+                continue;
+            }
+
+            SDL_Rect entity_rect = entity_get_rect(state.entities[entity_index]);
+            if (sdl_rect_has_point(entity_rect, move_target)) {
+                input.move.target_id = state.entities.get_id_of(entity_index);
+                break;
+            }
         }
     }
 
@@ -1088,7 +1126,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 if (entity.target.type == TARGET_GOLD) {
                     entity.gold_patch_id = state.entities.get_by_id(entity.target.id).gold_patch_id;
                 } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY && (state.entities[target_index].type == ENTITY_CAMP || state.entities[target_index].type == ENTITY_HALL) && entity.gold_held) {
-                    target_t nearest_gold_target = entity_target_nearest_gold(state, state.entities[target_index].cell, GOLD_PATCH_ID_NULL);
+                    target_t nearest_gold_target = entity_target_nearest_gold(state, state.entities[target_index].player_id, state.entities[target_index].cell, GOLD_PATCH_ID_NULL);
                     entity.gold_patch_id = nearest_gold_target.type == TARGET_NONE
                                             ? GOLD_PATCH_ID_NULL
                                             : state.entities.get_by_id(nearest_gold_target.id).gold_patch_id;
@@ -1429,6 +1467,17 @@ void match_render(const match_state_t& state) {
                 if (entity_index != INDEX_INVALID) {
                     const entity_t& entity = state.entities[entity_index];
                     render_sprite(entity_get_select_ring(entity, state.ui_move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                } else {
+                    auto remembered_entities_it = state.remembered_entities[network_get_player_id()].find(state.ui_move_entity_id);
+                    if (remembered_entities_it != state.remembered_entities[network_get_player_id()].end()) {
+                        Sprite select_ring_sprite;
+                        if (remembered_entities_it->second.sprite_params.sprite == SPRITE_TILE_GOLD) {
+                            select_ring_sprite = SPRITE_SELECT_RING_GOLD;
+                        } else {
+                            select_ring_sprite = (Sprite)(SPRITE_SELECT_RING_BUILDING_2 + ((remembered_entities_it->second.cell_size - 2) * 2) + 1);
+                        }
+                        render_sprite(select_ring_sprite, xy(0, 0), (remembered_entities_it->second.cell * TILE_SIZE) + (xy(remembered_entities_it->second.cell_size, remembered_entities_it->second.cell_size) * TILE_SIZE / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                    }
                 }
             }
         }
@@ -1778,8 +1827,10 @@ void match_render(const match_state_t& state) {
         }
     }
 
+    SelectionType ui_selection_type = ui_get_selection_type(state, state.selection);
+
     // UI Building queues
-    if (state.selection.size() == 1 && !state.entities.get_by_id(state.selection[0]).queue.empty()) {
+    if (state.selection.size() == 1 && ui_selection_type == SELECTION_TYPE_BUILDINGS && !state.entities.get_by_id(state.selection[0]).queue.empty()) {
         const entity_t& building = state.entities.get_by_id(state.selection[0]);
         for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
             bool icon_hovered = ui_get_building_queue_item_hovered(state) == building_queue_index;
@@ -1812,7 +1863,7 @@ void match_render(const match_state_t& state) {
     }
 
     // UI Garrisoned units
-    if (state.selection.size() == 1) {
+    if (state.selection.size() == 1 && (ui_selection_type == SELECTION_TYPE_BUILDINGS || ui_selection_type == SELECTION_TYPE_UNITS)) {
         const entity_t& entity = state.entities.get_by_id(state.selection[0]);
         for (int index = 0; index < entity.garrisoned_units.size(); index++) {
             const entity_t& garrisoned_unit = state.entities.get_by_id(entity.garrisoned_units[index]);
