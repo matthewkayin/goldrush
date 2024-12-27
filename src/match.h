@@ -49,8 +49,13 @@ const entity_id CELL_DECORATION_3 = ID_MAX + 6;
 const entity_id CELL_DECORATION_4 = ID_MAX + 7;
 const entity_id CELL_DECORATION_5 = ID_MAX + 8;
 
-// Entities
+enum FogValue {
+    FOG_HIDDEN,
+    FOG_EXPLORED,
+    FOG_REVEALED
+};
 
+// Entities
 
 // If you change this, make sure that entity_is_unit() and entity_is_building() still work
 enum EntityType {
@@ -415,6 +420,8 @@ struct match_state_t {
     uint32_t map_height;
     std::vector<tile_t> map_tiles;
     std::vector<entity_id> map_cells;
+    std::vector<FogValue> map_fog[MAX_PLAYERS];
+    bool map_is_fog_dirty;
 
     // Entities
     id_array<entity_t, 400 * MAX_PLAYERS> entities;
@@ -482,6 +489,7 @@ xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int st
 bool map_is_tile_ramp(const match_state_t& state, xy cell);
 bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
+void map_fog_update(match_state_t& state, uint8_t player_id);
 
 // Entities
 entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id, xy cell);

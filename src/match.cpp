@@ -88,7 +88,7 @@ match_state_t match_init() {
     }
 
     std::vector<xy> player_spawns = map_init(state);
-
+    
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
@@ -121,6 +121,14 @@ match_state_t match_init() {
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
+
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == PLAYER_NONE) {
+            continue;
+        }
+        state.map_fog[player_id] = std::vector<FogValue>(state.map_width * state.map_height, FOG_HIDDEN);
+    }
+    state.map_is_fog_dirty = true;
 
     // Destroy minimap texture if already created
     if (engine.minimap_texture != NULL) {
@@ -690,6 +698,16 @@ void match_update(match_state_t& state) {
 
     engine_set_cursor(ui_is_targeting(state) ? CURSOR_TARGET : CURSOR_DEFAULT);
     ui_update_buttons(state);
+
+    if (state.map_is_fog_dirty) {
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status == PLAYER_NONE) {
+                continue;
+            }
+            map_fog_update(state, player_id);
+        }
+        state.map_is_fog_dirty = false;
+    }
 }
 
 void match_camera_clamp(match_state_t& state) {
@@ -1399,6 +1417,77 @@ void match_render(const match_state_t& state) {
         render_sprite(particle.sprite, xy(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
+    // Fog of War
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+    for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
+        for (int y = 0; y < max_visible_tiles.y; y++) {
+            for (int x = 0; x < max_visible_tiles.x; x++) {
+                xy fog_cell = base_coords + xy(x, y);
+                FogValue fog = state.map_fog[network_get_player_id()][fog_cell.x + (fog_cell.y * state.map_width)];
+                if (fog == FOG_REVEALED) {
+                    continue;
+                }
+                if (fog_pass == 1 && fog == FOG_EXPLORED) {
+                    continue;
+                }
+
+                uint32_t neighbors = 0;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    xy neighbor_cell = fog_cell + DIRECTION_XY[direction];
+                    if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                        neighbors += DIRECTION_MASK[direction];
+                        continue;
+                    }
+                    if (fog_pass == 0 
+                            ? state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] != FOG_REVEALED 
+                            : state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] == FOG_HIDDEN) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+
+                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                    xy neighbor_cell = fog_cell + DIRECTION_XY[direction];
+                    int prev_direction = direction - 1;
+                    int next_direction = (direction + 1) % DIRECTION_COUNT;
+                    if ((neighbors & DIRECTION_MASK[prev_direction]) != DIRECTION_MASK[prev_direction] ||
+                        (neighbors & DIRECTION_MASK[next_direction]) != DIRECTION_MASK[next_direction]) {
+                        continue;
+                    }
+                    if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                        neighbors += DIRECTION_MASK[direction];
+                        continue;
+                    }
+                    if (fog_pass == 0 
+                            ? state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] != FOG_REVEALED 
+                            : state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] == FOG_HIDDEN) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+                int hframe = engine.neighbors_to_autotile_index.at(neighbors);
+                if (fog_pass == 0) {
+                    hframe += 47;
+                }
+
+                SDL_Rect fog_dst_rect = (SDL_Rect) {
+                    .x = base_pos.x + (x * TILE_SIZE),
+                    .y = base_pos.y + (y * TILE_SIZE),
+                    .w = TILE_SIZE,
+                    .h = TILE_SIZE
+                };
+                SDL_Rect fog_src_rect = (SDL_Rect) {
+                    .x = hframe * TILE_SIZE,
+                    .y = 0,
+                    .w = TILE_SIZE,
+                    .h = TILE_SIZE
+                };
+                #ifndef GOLD_DEBUG_FOG_DISABLED
+                    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_FOG_OF_WAR].texture, &fog_src_rect, &fog_dst_rect);
+                #endif
+            }
+        }
+    }
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
+
     // Debug pathing 
     #ifdef GOLD_DEBUG_UNIT_PATHS
     for (const entity_t& entity : state.entities) {
@@ -1820,6 +1909,26 @@ void match_render(const match_state_t& state) {
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderDrawRect(engine.renderer, &alert_rect);
     }
+
+    // Minimap Fog of War
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+    SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 1, .h = 1 };
+    for (int x = 0; x < state.map_width; x++) {
+        for (int y = 0; y < state.map_height; y++) {
+            FogValue fog = state.map_fog[network_get_player_id()][x + (y * state.map_width)];
+            if (fog == FOG_REVEALED) {
+                continue;
+            }
+
+            fog_rect.x = x;
+            fog_rect.y = y; 
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog == FOG_HIDDEN ? 255 : 128);
+            #ifndef GOLD_DEBUG_FOG_DISABLED
+                SDL_RenderFillRect(engine.renderer, &fog_rect);
+            #endif
+        }
+    }
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 
     // Minimap camera rect
     SDL_Rect camera_rect = (SDL_Rect) {

@@ -726,11 +726,9 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         break;
                     }
                     case TARGET_GOLD: {
-                        log_trace("%u: move finished. cell %xi target cell %xi", id, &entity.cell, &entity.target.cell);
                         if (entity_is_target_invalid(state, entity)) {
                             entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
                             entity.mode = MODE_UNIT_IDLE;
-                            log_trace("%u: target invalid. new target %xi", id, &entity.target.cell);
                             break;
                         }
 
@@ -738,7 +736,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             // This will trigger a repath
                             entity.target = entity_target_nearest_gold(state, entity.cell, entity.gold_patch_id);
                             entity.mode = MODE_UNIT_IDLE;
-                            log_trace("%u: has not reached target. new target %xi", id, &entity.target.cell);
                             break;
                         }
 

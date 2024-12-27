@@ -736,6 +736,7 @@ void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id v
             state.map_cells[x + (y * state.map_width)] = value;
         }
     }
+    state.map_is_fog_dirty = true;
 }
 
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin, bool gold_walk) {
@@ -1002,4 +1003,59 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
             path->pop_back();
         }
     }
+}
+
+void map_fog_update(match_state_t& state, uint8_t player_id) {
+    for (uint32_t map_index = 0; map_index < state.map_width * state.map_height; map_index++) {
+        if (state.map_fog[player_id][map_index] == FOG_REVEALED) {
+            state.map_fog[player_id][map_index] = FOG_EXPLORED;
+        }
+    }
+
+    for (entity_t& entity : state.entities) {
+        if (entity.player_id != player_id || !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        std::queue<xy> frontier;
+        std::unordered_map<int, int> explored;
+        frontier.push(entity.cell);
+        int entity_sight = ENTITY_DATA.at(entity.type).sight;
+
+        while (!frontier.empty()) {
+            xy next = frontier.front();
+            frontier.pop();
+
+            // Check explored
+            auto explored_it = explored.find(next.x + (next.y * state.map_width));
+            if (explored_it != explored.end()) {
+                continue;
+            }
+            explored[next.x + (next.y * state.map_width)] = 1;
+
+            if (!map_is_cell_in_bounds(state, next)) {
+                continue;
+            }
+
+            // Check that the cell is in sight range
+            if (std::abs(next.x - entity.cell.x) > entity_sight || std::abs(next.y - entity.cell.y) > entity_sight ||
+                    ((next.x == entity.cell.x - entity_sight || next.x == entity.cell.x + entity_sight) &&
+                     (next.y == entity.cell.y - entity_sight || next.y == entity.cell.y + entity_sight))) {
+                continue;
+            }
+
+            // Reveal the cell
+            state.map_fog[player_id][next.x + (next.y * state.map_width)] = FOG_REVEALED;
+
+            // Decide whether to keep revealing from this cell
+            if (map_get_tile(state, entity.cell).elevation < map_get_tile(state, next).elevation) {
+                continue;
+            }
+
+            // Add children
+            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                frontier.push(next + DIRECTION_XY[direction]);
+            }
+        } // End while !frontier empty
+    } // End for each entity
 }
