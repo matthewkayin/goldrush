@@ -1295,6 +1295,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
     }
 }
 
+#include "platform.h"
 void match_render(const match_state_t& state) {
     // Prepare map render
     xy base_pos = xy(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
@@ -1602,6 +1603,7 @@ void match_render(const match_state_t& state) {
     #endif
 
     // Select rect
+    double timer_ui_start = platform_get_absolute_time();
     if (ui_is_selecting(state)) {
         SDL_Rect select_rect = state.select_rect;
         select_rect.x -= state.camera_offset.x;
@@ -1954,6 +1956,8 @@ void match_render(const match_state_t& state) {
     render_text(FONT_WESTERN8, population_text, COLOR_WHITE, xy(SCREEN_WIDTH - 88 + 22, 4));
     render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL);
 
+    double timer_ui = platform_get_absolute_time() - timer_ui_start;
+
     // Minimap prepare texture
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
     SDL_RenderCopy(engine.renderer, engine.minimap_tiles_texture, NULL, NULL);
@@ -2031,24 +2035,29 @@ void match_render(const match_state_t& state) {
     }
 
     // Minimap Fog of War
-    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
-    SDL_Rect fog_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 1, .h = 1 };
-    for (int x = 0; x < state.map_width; x++) {
-        for (int y = 0; y < state.map_height; y++) {
+    #ifndef GOLD_DEBUG_FOG_DISABLED
+    std::vector<SDL_Point> fog_hidden_points;
+    fog_hidden_points.reserve(state.map_width * state.map_height);
+    std::vector<SDL_Point> fog_explored_points;
+    fog_explored_points.reserve(state.map_width * state.map_height);
+    for (int y = 0; y < state.map_height; y++) {
+        for (int x = 0; x < state.map_width; x++) {
             FogValue fog = state.map_fog[network_get_player_id()][x + (y * state.map_width)];
-            if (fog == FOG_REVEALED) {
-                continue;
+            if (fog == FOG_HIDDEN) {
+                fog_hidden_points.push_back((SDL_Point) { .x = x, .y = y });
+            } else if (fog == FOG_EXPLORED) {
+                fog_explored_points.push_back((SDL_Point) { .x = x, .y = y });
             }
-
-            fog_rect.x = x;
-            fog_rect.y = y; 
-            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, fog == FOG_HIDDEN ? 255 : 128);
-            #ifndef GOLD_DEBUG_FOG_DISABLED
-                SDL_RenderFillRect(engine.renderer, &fog_rect);
-            #endif
         }
     }
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, 255);
+    SDL_RenderDrawPoints(engine.renderer, &fog_hidden_points[0], fog_hidden_points.size());
+
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, 128);
+    SDL_RenderDrawPoints(engine.renderer, &fog_explored_points[0], fog_explored_points.size());
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
+    #endif
 
     // Minimap camera rect
     SDL_Rect camera_rect = (SDL_Rect) {
