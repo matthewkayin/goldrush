@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "engine.h"
 #include "network.h"
+#include "animation.h"
 
 #include <string>
 
@@ -58,6 +59,7 @@ struct menu_state_t {
     std::string username;
     int item_selected;
 
+    animation_t wagon_animation;
     int parallax_x;
     int parallax_cloud_x;
     int parallax_timer;

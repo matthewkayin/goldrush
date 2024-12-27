@@ -48,6 +48,16 @@ void animation_init() {
         },
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
+    ANIMATION_DATA[ANIMATION_UNIT_MOVE_SLOW] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 1, .duration = 10 },
+            (animation_frame_t) { .hframe = 2, .duration = 10 },
+            (animation_frame_t) { .hframe = 3, .duration = 10 },
+            (animation_frame_t) { .hframe = 4, .duration = 10 }
+        },
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
     ANIMATION_DATA[ANIMATION_UNIT_ATTACK] = (animation_data_t) {
         .vframe = -1,
         .frames = {

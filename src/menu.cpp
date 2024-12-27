@@ -103,6 +103,7 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
 };
 
 static const uint32_t STATUS_TIMER_DURATION = 60;
+static const int PARALLAX_TIMER_DURATION = 2;
 
 menu_state_t menu_init() {
     menu_state_t state;
@@ -115,7 +116,11 @@ menu_state_t menu_init() {
     };
     menu_set_mode(state, MENU_MODE_MAIN);
 
+    state.wagon_animation = animation_create(ANIMATION_UNIT_MOVE_SLOW);
     state.parallax_x = 0;
+    state.parallax_cloud_x = 0;
+    state.parallax_timer = PARALLAX_TIMER_DURATION;
+    state.parallax_cactus_offset = 0;
 
     return state;
 }
@@ -335,6 +340,17 @@ void menu_update(menu_state_t& state) {
     }
 
     engine_set_cursor(CURSOR_DEFAULT);
+
+    animation_update(state.wagon_animation);
+    state.parallax_timer--;
+    state.parallax_x = (state.parallax_x + 1) % (SCREEN_WIDTH * 2);
+    if (state.parallax_timer == 0) {
+        state.parallax_cloud_x = (state.parallax_cloud_x + 1) % (SCREEN_WIDTH * 2);
+        if (state.parallax_x == 0) {
+            state.parallax_cactus_offset = (state.parallax_cactus_offset + 1) % 5;
+        }
+        state.parallax_timer = PARALLAX_TIMER_DURATION;
+    }
 }
 
 void menu_show_status(menu_state_t& state, const char* text) {
@@ -398,6 +414,64 @@ void menu_render(const menu_state_t& state) {
             SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILESET_ARIZONA].texture, &src_rect, &dst_rect);
 
         }
+    }
+
+    // Render tile decorations
+    static const xy tile_decoration_coords[3] = { xy(680, TILE_SIZE / 4), xy(920, 2 * (TILE_SIZE * 2)), xy(1250, TILE_SIZE / 4) };
+    for (int i = 0; i < 3; i++) {
+            SDL_Rect src_rect = (SDL_Rect) {
+                .x = (((i * 2) + state.parallax_cactus_offset) % 5) * TILE_SIZE,
+                .y = 0,
+                .w = TILE_SIZE,
+                .h = TILE_SIZE
+            };
+            SDL_Rect dst_rect = (SDL_Rect) {
+                .x = tile_decoration_coords[i].x - state.parallax_x,
+                .y = SCREEN_HEIGHT - (menu_tile_height * TILE_SIZE * 2) + tile_decoration_coords[i].y,
+                .w = TILE_SIZE * 2,
+                .h = TILE_SIZE * 2
+            };
+            if (dst_rect.x > SCREEN_WIDTH || dst_rect.x + (TILE_SIZE * 2) < 0) {
+                continue;
+            }
+            SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_TILE_DECORATION].texture, &src_rect, &dst_rect);
+    }
+    // Render wagon animation
+    SDL_Rect src_rect = (SDL_Rect) {
+        .x = engine.sprites[SPRITE_UNIT_WAGON].frame_size.x * state.wagon_animation.frame.x,
+        .y = engine.sprites[SPRITE_UNIT_WAGON].frame_size.y * 2,
+        .w = engine.sprites[SPRITE_UNIT_WAGON].frame_size.x,
+        .h = engine.sprites[SPRITE_UNIT_WAGON].frame_size.y
+    };
+    SDL_Rect dst_rect = (SDL_Rect) {
+        .x = 380,
+        .y = SCREEN_HEIGHT - (6 * TILE_SIZE),
+        .w = src_rect.w * 2,
+        .h = src_rect.h * 2
+    };
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UNIT_WAGON].colored_texture[network_get_status() == NETWORK_STATUS_CONNECTED ? network_get_player_id() : 0], &src_rect, &dst_rect);
+
+    // Render clouds
+    static const int cloud_count = 6;
+    static const xy cloud_coords[cloud_count] = { xy(640, 16), xy(950, 64), xy(1250, 48), xy(-30, 48), xy(320, 32), xy(1600, 32) };
+    static const int cloud_frame_x[cloud_count] = { 0, 1, 2, 2, 1, 1};
+    for (int i = 0; i < cloud_count; i++) {
+        SDL_Rect src_rect = (SDL_Rect) {
+            .x = cloud_frame_x[i] * engine.sprites[SPRITE_MENU_CLOUDS].frame_size.x,
+            .y = 0,
+            .w = engine.sprites[SPRITE_MENU_CLOUDS].frame_size.x,
+            .h = engine.sprites[SPRITE_MENU_CLOUDS].frame_size.y,
+        };
+        SDL_Rect dst_rect = (SDL_Rect) {
+            .x = cloud_coords[i].x - state.parallax_cloud_x,
+            .y = cloud_coords[i].y,
+            .w = engine.sprites[SPRITE_MENU_CLOUDS].frame_size.x * 2,
+            .h = engine.sprites[SPRITE_MENU_CLOUDS].frame_size.y * 2,
+        };
+        if (dst_rect.x > SCREEN_WIDTH || dst_rect.x + dst_rect.w < 0) {
+            continue;
+        }
+        SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_MENU_CLOUDS].texture, &src_rect, &dst_rect);
     }
 
     if (state.mode != MENU_MODE_LOBBY && state.mode != MENU_MODE_MATCHLIST) {
