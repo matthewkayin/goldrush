@@ -1603,7 +1603,6 @@ void match_render(const match_state_t& state) {
     #endif
 
     // Select rect
-    double timer_ui_start = platform_get_absolute_time();
     if (ui_is_selecting(state)) {
         SDL_Rect select_rect = state.select_rect;
         select_rect.x -= state.camera_offset.x;
@@ -1797,7 +1796,7 @@ void match_render(const match_state_t& state) {
             char health_text[10];
             sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
             xy health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
-            xy health_text_position = healthbar_position + xy((healthbar_size.x / 2) - (health_text_size.x / 2), healthbar_size.y - 4);
+            xy health_text_position = healthbar_position + xy((healthbar_size.x / 2) - (health_text_size.x / 2), (healthbar_size.y / 2) - (health_text_size.y / 2));
             render_text(FONT_HACK_WHITE, health_text, health_text_position, TEXT_ANCHOR_BOTTOM_LEFT);
         } else {
             char gold_left_str[17];

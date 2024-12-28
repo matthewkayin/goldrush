@@ -9,58 +9,69 @@ struct font_params_t {
     const char* path;
     int size;
     SDL_Color color;
+    bool ignore_y_bearing;
 };
 
 static const std::unordered_map<uint32_t, font_params_t> font_params = {
     { FONT_HACK_WHITE, (font_params_t) {
         .path = "font/hack.ttf",
         .size = 10,
-        .color = COLOR_WHITE
+        .color = COLOR_WHITE,
+        .ignore_y_bearing = true
     }},
     { FONT_WESTERN8_OFFBLACK, (font_params_t) {
         .path = "font/western.ttf",
         .size = 8,
-        .color = COLOR_OFFBLACK
+        .color = COLOR_OFFBLACK,
+        .ignore_y_bearing = false
     }},
     { FONT_WESTERN8_WHITE, (font_params_t) {
         .path = "font/western.ttf",
         .size = 8,
-        .color = COLOR_WHITE
+        .color = COLOR_WHITE,
+        .ignore_y_bearing = false
     }},
     { FONT_WESTERN8_RED, (font_params_t) {
         .path = "font/western.ttf",
         .size = 8,
-        .color = COLOR_RED
+        .color = COLOR_RED,
+        .ignore_y_bearing = false
     }},
     { FONT_WESTERN8_GOLD, (font_params_t) {
         .path = "font/western.ttf",
         .size = 8,
-        .color = COLOR_GOLD
+        .color = COLOR_GOLD,
+        .ignore_y_bearing = false
     }},
     { FONT_WESTERN16_OFFBLACK, (font_params_t) {
         .path = "font/western.ttf",
         .size = 16,
-        .color = COLOR_OFFBLACK
+        .color = COLOR_OFFBLACK,
+        .ignore_y_bearing = false
     }},
     { FONT_WESTERN16_WHITE, (font_params_t) {
         .path = "font/western.ttf",
         .size = 16,
-        .color = COLOR_WHITE
+        .color = COLOR_WHITE,
+        .ignore_y_bearing = false
     }},
     { FONT_WESTERN32_OFFBLACK, (font_params_t) {
         .path = "font/western.ttf",
         .size = 32,
-        .color = COLOR_OFFBLACK
+        .color = COLOR_OFFBLACK,
+        .ignore_y_bearing = false
     }},
     { FONT_M3X6_OFFBLACK, (font_params_t) {
         .path = "font/m3x6.ttf",
         .size = 16,
-        .color = COLOR_OFFBLACK
+        .color = COLOR_OFFBLACK,
+        .ignore_y_bearing = false
     }},
     { FONT_M3X6_DARKBLACK, (font_params_t) {
         .path = "font/m3x6.ttf",
         .size = 16,
-        .color = COLOR_DARKBLACK
+        .color = COLOR_DARKBLACK,
+        .ignore_y_bearing = false
     }},
 };
 
@@ -684,6 +695,9 @@ bool engine_init_renderer() {
             font.glyphs[glyph_index].width = glyph_surface->w;
             font.glyphs[glyph_index].height = glyph_surface->h;
             TTF_GlyphMetrics(ttf_font, (char)(32 + glyph_index), &font.glyphs[glyph_index].bearing_x, NULL, NULL, &font.glyphs[glyph_index].bearing_y, &font.glyphs[glyph_index].advance);
+            if (font_params_it->second.ignore_y_bearing) {
+                font.glyphs[glyph_index].bearing_y = 0;
+            }
         }
         engine.fonts.push_back(font);
 
