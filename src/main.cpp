@@ -166,9 +166,9 @@ int gold_main(int argc, char** argv) {
         if (render_fps) {
             char text_buffer[16];
             sprintf(text_buffer, "FPS: %u", fps);
-            render_text(FONT_HACK, text_buffer, COLOR_WHITE, xy(0, 0));
+            render_text(FONT_HACK_WHITE, text_buffer, xy(0, 0));
             sprintf(text_buffer, "UPS: %u", ups);
-            render_text(FONT_HACK, text_buffer, COLOR_WHITE, xy(0, 12));
+            render_text(FONT_HACK_WHITE, text_buffer, xy(0, 12));
         }
 
         SDL_RenderPresent(engine.renderer);

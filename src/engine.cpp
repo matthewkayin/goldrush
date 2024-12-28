@@ -8,28 +8,59 @@
 struct font_params_t {
     const char* path;
     int size;
+    SDL_Color color;
 };
 
 static const std::unordered_map<uint32_t, font_params_t> font_params = {
-    { FONT_HACK, (font_params_t) {
+    { FONT_HACK_WHITE, (font_params_t) {
         .path = "font/hack.ttf",
-        .size = 10
+        .size = 10,
+        .color = COLOR_WHITE
     }},
-    { FONT_WESTERN8, (font_params_t) {
+    { FONT_WESTERN8_OFFBLACK, (font_params_t) {
         .path = "font/western.ttf",
-        .size = 8
+        .size = 8,
+        .color = COLOR_OFFBLACK
     }},
-    { FONT_WESTERN16, (font_params_t) {
+    { FONT_WESTERN8_WHITE, (font_params_t) {
         .path = "font/western.ttf",
-        .size = 16
+        .size = 8,
+        .color = COLOR_WHITE
     }},
-    { FONT_WESTERN32, (font_params_t) {
+    { FONT_WESTERN8_RED, (font_params_t) {
         .path = "font/western.ttf",
-        .size = 32
+        .size = 8,
+        .color = COLOR_RED
     }},
-    { FONT_M3X6, (font_params_t) {
+    { FONT_WESTERN8_GOLD, (font_params_t) {
+        .path = "font/western.ttf",
+        .size = 8,
+        .color = COLOR_GOLD
+    }},
+    { FONT_WESTERN16_OFFBLACK, (font_params_t) {
+        .path = "font/western.ttf",
+        .size = 16,
+        .color = COLOR_OFFBLACK
+    }},
+    { FONT_WESTERN16_WHITE, (font_params_t) {
+        .path = "font/western.ttf",
+        .size = 16,
+        .color = COLOR_WHITE
+    }},
+    { FONT_WESTERN32_OFFBLACK, (font_params_t) {
+        .path = "font/western.ttf",
+        .size = 32,
+        .color = COLOR_OFFBLACK
+    }},
+    { FONT_M3X6_OFFBLACK, (font_params_t) {
         .path = "font/m3x6.ttf",
-        .size = 16
+        .size = 16,
+        .color = COLOR_OFFBLACK
+    }},
+    { FONT_M3X6_DARKBLACK, (font_params_t) {
+        .path = "font/m3x6.ttf",
+        .size = 16,
+        .color = COLOR_DARKBLACK
     }},
 };
 
@@ -626,12 +657,37 @@ bool engine_init_renderer() {
         // Load the font
         char font_path[128];
         sprintf(font_path, "%s%s", GOLD_RESOURCE_PATH, font_params_it->second.path);
-        TTF_Font* font = TTF_OpenFont(font_path, font_params_it->second.size);
-        if (font == NULL) {
+        TTF_Font* ttf_font = TTF_OpenFont(font_path, font_params_it->second.size);
+        if (ttf_font == NULL) {
             log_error("Error loading font %s: %s", font_params.at(i).path, TTF_GetError());
             return false;
         }
+
+        font_t font;
+        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+            char text[2];
+            text[0] = (char)(32 + glyph_index);
+            text[1] = '\0';
+
+            SDL_Surface* glyph_surface = TTF_RenderText_Solid(ttf_font, text, font_params_it->second.color);
+            if (glyph_surface == NULL) {
+                log_error("Error creating glyph surface %s", TTF_GetError());
+                return false;
+            }
+
+            font.glyphs[glyph_index].texture = SDL_CreateTextureFromSurface(engine.renderer, glyph_surface);
+            if (font.glyphs[glyph_index].texture == NULL) {
+                log_error("Unable to create glyph texture from surface %s", SDL_GetError());
+                return false;
+            }
+
+            font.glyphs[glyph_index].width = glyph_surface->w;
+            font.glyphs[glyph_index].height = glyph_surface->h;
+            TTF_GlyphMetrics(ttf_font, (char)(32 + glyph_index), &font.glyphs[glyph_index].bearing_x, NULL, NULL, &font.glyphs[glyph_index].bearing_y, &font.glyphs[glyph_index].advance);
+        }
         engine.fonts.push_back(font);
+
+        TTF_CloseFont(ttf_font);
     }
 
     // Load sprites
@@ -949,8 +1005,10 @@ bool engine_init_renderer() {
 
 void engine_destroy_renderer() {
     // Free fonts
-    for (TTF_Font* font : engine.fonts) {
-        TTF_CloseFont(font);
+    for (font_t font : engine.fonts) {
+        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+            SDL_DestroyTexture(font.glyphs[glyph_index].texture);
+        }
     }
     engine.fonts.clear();
 
@@ -1058,45 +1116,71 @@ xy autotile_edge_lookup(uint32_t edge, uint8_t neighbors) {
     return xy(-1, -1);
 }
 
-void render_text(Font font, const char* text, SDL_Color color, xy position, TextAnchor anchor) {
+xy render_get_text_size(Font font, const char* text) {
+    xy text_size = xy(0, 0);
+    uint32_t text_index = 0;
+    while (text[text_index] != '\0') {
+        int glyph_index = (int)text[text_index] - 32;
+        if (glyph_index < 0 || glyph_index >= FONT_GLYPH_COUNT) {
+            glyph_index = (int)'|' - 32;
+        }
+
+        text_size.x += engine.fonts[font].glyphs[glyph_index].advance;
+        text_size.y = std::max(text_size.y, engine.fonts[font].glyphs[glyph_index].height);
+        text_index++;
+    }
+
+    return text_size;
+}
+
+void render_text(Font font, const char* text, xy position, TextAnchor anchor) {
     // Don't render empty strings
     if (text[0] == '\0') {
         return;
     }
 
-    TTF_Font* font_data = engine.fonts[font];
-    SDL_Surface* text_surface = TTF_RenderText_Solid(font_data, text, color);
-    if (text_surface == NULL) {
-        log_error("Unable to render text to surface. SDL Error: %s", TTF_GetError());
-        return;
-    }
+    xy text_size = render_get_text_size(font, text);
 
-    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(engine.renderer, text_surface);
-    if (text_texture == NULL) {
-        log_error("Unable to create text from text surface. SDL Error: %s", SDL_GetError());
-        return;
-    }
-
-    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = text_surface->w, .h = text_surface->h };
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 0, .h = 0 };
     SDL_Rect dst_rect = (SDL_Rect) {
-        .x = position.x == RENDER_TEXT_CENTERED ? (SCREEN_WIDTH / 2) - (text_surface->w / 2) : position.x,
-        .y = position.y == RENDER_TEXT_CENTERED ? (SCREEN_HEIGHT / 2) - (text_surface->h / 2) : position.y,
-        .w = text_surface->w,
-        .h = text_surface->h
+        .x = position.x == RENDER_TEXT_CENTERED ? (SCREEN_WIDTH / 2) - (text_size.x / 2) : position.x,
+        .y = position.y == RENDER_TEXT_CENTERED ? (SCREEN_HEIGHT / 2) - (text_size.y / 2) : position.y,
+        .w = 0,
+        .h = 0
     };
+    int x_direction = 1;
     if (anchor == TEXT_ANCHOR_BOTTOM_LEFT || anchor == TEXT_ANCHOR_BOTTOM_RIGHT) {
-        dst_rect.y -= dst_rect.h;
+        dst_rect.y -= text_size.y;
     }
     if (anchor == TEXT_ANCHOR_TOP_RIGHT || anchor == TEXT_ANCHOR_BOTTOM_RIGHT) {
-        dst_rect.x -= dst_rect.w;
+        dst_rect.x -= text_size.x;
+        x_direction = -1;
     }
     if (anchor == TEXT_ANCHOR_TOP_CENTER) {
-        dst_rect.x -= (dst_rect.w / 2);
+        dst_rect.x -= (text_size.x / 2);
     }
-    SDL_RenderCopy(engine.renderer, text_texture, &src_rect, &dst_rect);
 
-    SDL_FreeSurface(text_surface);
-    SDL_DestroyTexture(text_texture);
+    int text_index = 0;
+    int dst_y = dst_rect.y;
+    int dst_x = dst_rect.x;
+    while (text[text_index] != 0) {
+        int glyph_index = (int)text[text_index] - 32;
+        if (glyph_index < 0 || glyph_index >= FONT_GLYPH_COUNT) {
+            glyph_index = (int)'|' - 32;
+        }
+
+        src_rect.w = engine.fonts[font].glyphs[glyph_index].width;
+        src_rect.h = engine.fonts[font].glyphs[glyph_index].height;
+
+        dst_rect.x = dst_x + engine.fonts[font].glyphs[glyph_index].bearing_x;
+        dst_rect.y = dst_y + text_size.y - engine.fonts[font].glyphs[glyph_index].bearing_y;
+        dst_rect.w = src_rect.w;
+        dst_rect.h = src_rect.h;
+
+        SDL_RenderCopy(engine.renderer, engine.fonts[font].glyphs[glyph_index].texture, &src_rect, &dst_rect);
+        dst_x += engine.fonts[font].glyphs[glyph_index].advance * x_direction;
+        text_index++;
+    }
 }
 
 int ysort_render_params_partition(std::vector<render_sprite_params_t>& params, int low, int high) {

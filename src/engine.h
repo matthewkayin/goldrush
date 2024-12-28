@@ -36,12 +36,32 @@ const SDL_Color RECOLOR_REF = (SDL_Color) { .r = 255, .g = 0, .b = 255, .a = 255
 // FONT
 
 enum Font {
-    FONT_HACK,
-    FONT_WESTERN8,
-    FONT_WESTERN16,
-    FONT_WESTERN32,
-    FONT_M3X6,
+    FONT_HACK_WHITE,
+    FONT_WESTERN8_OFFBLACK,
+    FONT_WESTERN8_WHITE,
+    FONT_WESTERN8_RED,
+    FONT_WESTERN8_GOLD,
+    FONT_WESTERN16_OFFBLACK,
+    FONT_WESTERN16_WHITE,
+    FONT_WESTERN32_OFFBLACK,
+    FONT_M3X6_OFFBLACK,
+    FONT_M3X6_DARKBLACK,
     FONT_COUNT
+};
+
+const uint32_t FONT_GLYPH_COUNT = 95;
+
+struct font_glyph_t {
+    SDL_Texture* texture;
+    int width;
+    int height;
+    int bearing_x;
+    int bearing_y;
+    int advance;
+};
+
+struct font_t {
+    font_glyph_t glyphs[FONT_GLYPH_COUNT];
 };
 
 // SPRITE
@@ -189,7 +209,7 @@ struct engine_t {
     SDL_Renderer* renderer;
     const uint8_t* keystate;
 
-    std::vector<TTF_Font*> fonts;
+    std::vector<font_t> fonts;
     std::vector<sprite_t> sprites;
     std::vector<uint16_t> tile_index;
     std::unordered_map<uint32_t, uint32_t> neighbors_to_autotile_index;
@@ -218,7 +238,8 @@ enum TextAnchor {
 };
 
 xy autotile_edge_lookup(uint32_t edge, uint8_t neighbors);
-void render_text(Font font, const char* text, SDL_Color color, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
+xy render_get_text_size(Font font, const char* text);
+void render_text(Font font, const char* text, xy position, TextAnchor anchor = TEXT_ANCHOR_TOP_LEFT);
 
 struct render_sprite_params_t {
     Sprite sprite;

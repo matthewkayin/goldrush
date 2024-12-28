@@ -1662,26 +1662,25 @@ void match_render(const match_state_t& state) {
 
     // UI Chat
     for (uint32_t chat_index = 0; chat_index < state.ui_chat.size(); chat_index++) {
-        log_trace("Rendering chat message: %s", state.ui_chat[chat_index].message.c_str());
-        render_text(FONT_HACK, state.ui_chat[chat_index].message.c_str(), COLOR_WHITE, xy(16, MINIMAP_RECT.y - 40 - (chat_index * 16)));
+        render_text(FONT_HACK_WHITE, state.ui_chat[chat_index].message.c_str(), xy(16, MINIMAP_RECT.y - 40 - (chat_index * 16)));
     }
 
     // UI Status message
     if (state.ui_status_timer != 0) {
-        render_text(FONT_HACK, state.ui_status_message.c_str(), COLOR_WHITE, xy(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 148));
+        render_text(FONT_HACK_WHITE, state.ui_status_message.c_str(), xy(RENDER_TEXT_CENTERED, SCREEN_HEIGHT - 148));
     }
 
     // UI Disconnect frame
     if (state.ui_disconnect_timer > MATCH_DISCONNECT_GRACE) {
         render_ninepatch(SPRITE_UI_FRAME, UI_DISCONNECT_FRAME_RECT, 16);
-        render_text(FONT_WESTERN8, "Waiting for players...", COLOR_GOLD, xy(UI_DISCONNECT_FRAME_RECT.x + 16, UI_DISCONNECT_FRAME_RECT.y + 8));
+        render_text(FONT_WESTERN8_GOLD, "Waiting for players...", xy(UI_DISCONNECT_FRAME_RECT.x + 16, UI_DISCONNECT_FRAME_RECT.y + 8));
         int player_text_y = 32;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (network_get_player(player_id).status == PLAYER_STATUS_NONE || !(state.inputs[player_id].empty() || state.inputs[player_id][0].empty())) {
                 continue;
             }
 
-            render_text(FONT_WESTERN8, network_get_player(player_id).name, COLOR_GOLD, xy(UI_DISCONNECT_FRAME_RECT.x + 24, UI_DISCONNECT_FRAME_RECT.y + player_text_y));
+            render_text(FONT_WESTERN8_GOLD, network_get_player(player_id).name, xy(UI_DISCONNECT_FRAME_RECT.x + 24, UI_DISCONNECT_FRAME_RECT.y + player_text_y));
             player_text_y += 24;
         }
     }
@@ -1689,7 +1688,7 @@ void match_render(const match_state_t& state) {
     // UI Match over
     if (state.ui_mode == UI_MODE_MATCH_OVER_VICTORY || state.ui_mode == UI_MODE_MATCH_OVER_DEFEAT) {
         render_ninepatch(SPRITE_UI_FRAME, UI_MATCH_OVER_FRAME_RECT, 16);
-        render_text(FONT_WESTERN8, state.ui_mode == UI_MODE_MATCH_OVER_VICTORY ? "Victory!" : "Defeat!", COLOR_GOLD, xy(RENDER_TEXT_CENTERED, UI_MATCH_OVER_FRAME_RECT.y + 10));
+        render_text(FONT_WESTERN8_GOLD, state.ui_mode == UI_MODE_MATCH_OVER_VICTORY ? "Victory!" : "Defeat!", xy(RENDER_TEXT_CENTERED, UI_MATCH_OVER_FRAME_RECT.y + 10));
         bool exit_button_hovered = sdl_rect_has_point(UI_MATCH_OVER_EXIT_BUTTON_RECT, engine.mouse_position);
         render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(2, exit_button_hovered ? 1 : 0), xy(UI_MATCH_OVER_EXIT_BUTTON_RECT.x, UI_MATCH_OVER_EXIT_BUTTON_RECT.y + (exit_button_hovered ? -1 : 0)), RENDER_SPRITE_NO_CULL);
     }
@@ -1738,9 +1737,9 @@ void match_render(const match_state_t& state) {
         }
 
         int button_frame = 0;
-        SDL_Color text_color = COLOR_OFFBLACK;
+        Font font = FONT_M3X6_OFFBLACK;
         if (state.control_group_selected != control_group_index) {
-            text_color = COLOR_DARKBLACK;
+            font = FONT_M3X6_DARKBLACK;
             button_frame = 2;
         }
 
@@ -1750,10 +1749,10 @@ void match_render(const match_state_t& state) {
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(button_icon - 1, button_frame), render_pos + xy(1, 0), RENDER_SPRITE_NO_CULL);
         char control_group_number_text[4];
         sprintf(control_group_number_text, "%u", control_group_index == 9 ? 0 : control_group_index + 1);
-        render_text(FONT_M3X6, control_group_number_text, text_color, render_pos + xy(3, -2));
+        render_text(font, control_group_number_text, render_pos + xy(3, -2));
         char control_group_count_text[4];
         sprintf(control_group_count_text, "%u", entity_count);
-        render_text(FONT_M3X6, control_group_count_text, text_color, render_pos + xy(32, 30), TEXT_ANCHOR_BOTTOM_RIGHT);
+        render_text(font, control_group_count_text, render_pos + xy(32, 30), TEXT_ANCHOR_BOTTOM_RIGHT);
     }
 
     // UI frames
@@ -1797,24 +1796,13 @@ void match_render(const match_state_t& state) {
 
             char health_text[10];
             sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
-            SDL_Surface* health_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_HACK], health_text, COLOR_WHITE);
-            GOLD_ASSERT(health_text_surface != NULL);
-            SDL_Texture* health_text_texture = SDL_CreateTextureFromSurface(engine.renderer, health_text_surface);
-            GOLD_ASSERT(health_text_texture != NULL);
-            SDL_Rect health_text_src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = health_text_surface->w, .h = health_text_surface->h };
-            SDL_Rect health_text_dst_rect = (SDL_Rect) {
-                .x = healthbar_position.x + (healthbar_size.x / 2) - (health_text_surface->w / 2),
-                .y = healthbar_position.y + (healthbar_size.y / 2) - (health_text_surface->h / 2),
-                .w = health_text_src_rect.w,
-                .h = health_text_src_rect.h
-            };
-            SDL_RenderCopy(engine.renderer, health_text_texture, &health_text_src_rect, &health_text_dst_rect);
-            SDL_DestroyTexture(health_text_texture);
-            SDL_FreeSurface(health_text_surface);
+            xy health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
+            xy health_text_position = healthbar_position + xy((healthbar_size.x / 2) - (health_text_size.x / 2), healthbar_size.y - 4);
+            render_text(FONT_HACK_WHITE, health_text, health_text_position, TEXT_ANCHOR_BOTTOM_LEFT);
         } else {
             char gold_left_str[17];
             sprintf(gold_left_str, "Gold Left: %u", entity.gold_held);
-            render_text(FONT_WESTERN8, gold_left_str, COLOR_GOLD, SELECTION_LIST_TOP_LEFT + xy(36, 22));
+            render_text(FONT_WESTERN8_GOLD, gold_left_str, SELECTION_LIST_TOP_LEFT + xy(36, 22));
         }
     } else {
         for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
@@ -1847,9 +1835,9 @@ void match_render(const match_state_t& state) {
             .w = 32 * 3 + (4 * 2), .h = 6
         };
         if (building.timer == BUILDING_QUEUE_BLOCKED) {
-            render_text(FONT_WESTERN8, "Build more houses.", COLOR_GOLD, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
+            render_text(FONT_WESTERN8_GOLD, "Build more houses.", xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
         } else if (building.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
-            render_text(FONT_WESTERN8, "Exit is blocked.", COLOR_GOLD, xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
+            render_text(FONT_WESTERN8_GOLD, "Exit is blocked.", xy(BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x + 2, BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.y - 12));
         } else {
             SDL_Rect building_queue_progress_bar_rect = (SDL_Rect) {
                 .x = BUILDING_QUEUE_PROGRESS_BAR_FRAME_RECT.x,
@@ -1881,13 +1869,9 @@ void match_render(const match_state_t& state) {
     // UI Tooltip
     if (ui_get_ui_button_hovered(state) != -1) {
         ui_tooltip_info_t tooltip = ui_get_hovered_tooltip_info(state);
-        SDL_Surface* tooltip_text_surface = TTF_RenderText_Solid(engine.fonts[FONT_WESTERN8], tooltip.text, COLOR_OFFBLACK);
-        if (tooltip_text_surface == NULL) {
-            log_error("Unable to create tooltip text surface: %s", TTF_GetError());
-            return;
-        }
+        xy tooltip_text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, tooltip.text);
 
-        int tooltip_min_width = 10 + tooltip_text_surface->w;
+        int tooltip_min_width = 10 + tooltip_text_size.x;
         int tooltip_cell_width = tooltip_min_width / 8;
         int tooltip_cell_height = tooltip.gold_cost != 0 ? 5 : 3;
         if (tooltip_min_width % 8 != 0) {
@@ -1915,48 +1899,32 @@ void match_render(const match_state_t& state) {
             }
         }
 
-        SDL_Texture* tooltip_text_texture = SDL_CreateTextureFromSurface(engine.renderer, tooltip_text_surface);
-        if (tooltip_text_texture == NULL) {
-            log_error("Unable to create texture from tooltip text surface: %s", SDL_GetError());
-            return;
-        }
-        SDL_Rect tooltip_text_rect = (SDL_Rect) {
-            .x = tooltip_top_left.x + 5,
-            .y = tooltip_top_left.y + 5,
-            .w = tooltip_text_surface->w,
-            .h = tooltip_text_surface->h
-        };
-        SDL_RenderCopy(engine.renderer, tooltip_text_texture, NULL, &tooltip_text_rect);
-
-        SDL_DestroyTexture(tooltip_text_texture);
-        SDL_FreeSurface(tooltip_text_surface);
+        render_text(FONT_WESTERN8_OFFBLACK, tooltip.text, tooltip_top_left + xy(5, 5));
 
         if (tooltip.gold_cost != 0) {
             render_sprite(SPRITE_UI_GOLD, xy(0, 0), tooltip_top_left + xy(5, 21), RENDER_SPRITE_NO_CULL);
             char gold_text[4];
             sprintf(gold_text, "%u", tooltip.gold_cost);
-            render_text(FONT_WESTERN8, gold_text, COLOR_OFFBLACK, tooltip_top_left + xy(5 + 18, 23));
+            render_text(FONT_WESTERN8_OFFBLACK, gold_text, tooltip_top_left + xy(5 + 18, 23));
         }
         if (tooltip.population_cost != 0) {
             render_sprite(SPRITE_UI_HOUSE, xy(0, 0), tooltip_top_left + xy(5 + 18 + 32, 19), RENDER_SPRITE_NO_CULL);
             char population_text[4];
             sprintf(population_text, "%u", tooltip.population_cost);
-            render_text(FONT_WESTERN8, population_text, COLOR_OFFBLACK, tooltip_top_left + xy(5 + 18 + 32 + 22, 23));
+            render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + xy(5 + 18 + 32 + 22, 23));
         }
     }
 
     // Resource counters
     char gold_text[8];
     sprintf(gold_text, "%u", state.player_gold[network_get_player_id()]);
-    render_text(FONT_WESTERN8, gold_text, COLOR_WHITE, xy(SCREEN_WIDTH - 172 + 18, 4));
+    render_text(FONT_WESTERN8_WHITE, gold_text, xy(SCREEN_WIDTH - 172 + 18, 4));
     render_sprite(SPRITE_UI_GOLD, xy(0, 0), xy(SCREEN_WIDTH - 172, 2), RENDER_SPRITE_NO_CULL);
 
     char population_text[8];
     sprintf(population_text, "%u/%u", match_get_player_population(state, network_get_player_id()), match_get_player_max_population(state, network_get_player_id()));
-    render_text(FONT_WESTERN8, population_text, COLOR_WHITE, xy(SCREEN_WIDTH - 88 + 22, 4));
+    render_text(FONT_WESTERN8_WHITE, population_text, xy(SCREEN_WIDTH - 88 + 22, 4));
     render_sprite(SPRITE_UI_HOUSE, xy(0, 0), xy(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL);
-
-    double timer_ui = platform_get_absolute_time() - timer_ui_start;
 
     // Minimap prepare texture
     SDL_SetRenderTarget(engine.renderer, engine.minimap_texture);
@@ -2145,14 +2113,9 @@ void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisone
 }
 
 void match_render_text_with_text_frame(const char* text, xy position) {
-    SDL_Surface* text_surface = TTF_RenderText_Solid(engine.fonts[FONT_WESTERN8], text, COLOR_OFFBLACK);
-    if (text_surface == NULL) {
-        log_error("Unable to render text to surface: %s", TTF_GetError());
-        return;
-    }
-
-    int frame_width = (text_surface->w / 15) + 1;
-    if (text_surface->w % 15 != 0) {
+    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
+    int frame_width = (text_size.x / 15) + 1;
+    if (text_size.x % 15 != 0) {
         frame_width++;
     }
     for (int frame_x = 0; frame_x < frame_width; frame_x++) {
@@ -2165,17 +2128,5 @@ void match_render_text_with_text_frame(const char* text, xy position) {
         render_sprite(SPRITE_UI_TEXT_FRAME, xy(x_frame, 0), position + xy(frame_x * 15, 0), RENDER_SPRITE_NO_CULL);
     }
 
-    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(engine.renderer, text_surface);
-    if (text_texture == NULL) {
-        log_error("Unable to creature texture from text surface: %s", SDL_GetError());
-        return;
-    }
-
-    SDL_Rect src_rect = (SDL_Rect) { .x = 0, . y = 0, .w = text_surface->w, .h = text_surface->h };
-    SDL_Rect dst_rect = (SDL_Rect) { .x = position.x + ((frame_width * 15) / 2) - (text_surface->w / 2), .y = position.y + 2, .w = src_rect.w, .h = src_rect.h };
-
-    SDL_RenderCopy(engine.renderer, text_texture, &src_rect, &dst_rect);
-
-    SDL_DestroyTexture(text_texture);
-    SDL_FreeSurface(text_surface);
+    render_text(FONT_WESTERN8_OFFBLACK, text, position + xy(((frame_width * 15) / 2) - (text_size.x / 2), 2));
 }

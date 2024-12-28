@@ -475,27 +475,27 @@ void menu_render(const menu_state_t& state) {
     }
 
     if (state.mode != MENU_MODE_LOBBY && state.mode != MENU_MODE_MATCHLIST) {
-        render_text(FONT_WESTERN32, "GOLD RUSH", COLOR_OFFBLACK, xy(24, 24));
+        render_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH", xy(24, 24));
     }
 
     char version_string[16];
     sprintf(version_string, "Version %s", APP_VERSION);
-    render_text(FONT_WESTERN8, version_string, COLOR_OFFBLACK, xy(4, SCREEN_HEIGHT - 14));
+    render_text(FONT_WESTERN8_OFFBLACK, version_string, xy(4, SCREEN_HEIGHT - 14));
 
     if (state.status_timer > 0) {
-        render_text(FONT_WESTERN8, state.status_text.c_str(), COLOR_RED, xy(48, TEXT_INPUT_RECT.y - 36));
+        render_text(FONT_WESTERN8_RED, state.status_text.c_str(), xy(48, TEXT_INPUT_RECT.y - 36));
     }
 
     if (state.mode == MENU_MODE_USERNAME) {
         const char* prompt_text = "USERNAME";
-        render_text(FONT_WESTERN8, prompt_text, COLOR_OFFBLACK, xy(TEXT_INPUT_RECT.x + 1, TEXT_INPUT_RECT.y - 13));
+        render_text(FONT_WESTERN8_OFFBLACK, prompt_text, xy(TEXT_INPUT_RECT.x + 1, TEXT_INPUT_RECT.y - 13));
         SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
         SDL_RenderDrawRect(engine.renderer, &TEXT_INPUT_RECT);
-        render_text(FONT_WESTERN16, state.username.c_str(), COLOR_OFFBLACK, xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 31), TEXT_ANCHOR_BOTTOM_LEFT);
+        render_text(FONT_WESTERN16_OFFBLACK, state.username.c_str(), xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 31), TEXT_ANCHOR_BOTTOM_LEFT);
     }
 
     if (state.mode == MENU_MODE_CONNECTING) {
-        render_text(FONT_WESTERN16, "Connecting...", COLOR_OFFBLACK, xy(48, TEXT_INPUT_RECT.y));
+        render_text(FONT_WESTERN16_OFFBLACK, "Connecting...", xy(48, TEXT_INPUT_RECT.y));
     }
 
     if (state.mode == MENU_MODE_MATCHLIST) {
@@ -520,7 +520,7 @@ void menu_render(const menu_state_t& state) {
                 SDL_RenderFillRect(engine.renderer, &item_rect);
                 SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
             } 
-            render_text(FONT_WESTERN8, lobby_text, COLOR_OFFBLACK, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
+            render_text(FONT_WESTERN8_OFFBLACK, lobby_text, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
             SDL_RenderDrawLine(engine.renderer, PLAYERLIST_RECT.x, PLAYERLIST_RECT.y + line_y, PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - 1, PLAYERLIST_RECT.y + line_y);
         }
 
@@ -575,13 +575,13 @@ void menu_render(const menu_state_t& state) {
             }
 
             int line_y = PLAYERLIST_ITEM_HEIGHT * (player_index + 1);
-            render_text(FONT_WESTERN8, player_name_text, COLOR_OFFBLACK, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
+            render_text(FONT_WESTERN8_OFFBLACK, player_name_text, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
             SDL_RenderDrawLine(engine.renderer, PLAYERLIST_RECT.x, PLAYERLIST_RECT.y + line_y, PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - 1, PLAYERLIST_RECT.y + line_y);
             player_index++;
         } // End for each player id
 
         if (state.mode == MENU_MODE_LOBBY && network_is_server()) {
-            render_text(FONT_WESTERN8, "You are the host.", COLOR_OFFBLACK, xy(PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 2, PLAYERLIST_RECT.y));
+            render_text(FONT_WESTERN8_OFFBLACK, "You are the host.", xy(PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 2, PLAYERLIST_RECT.y));
         }
     }
 
@@ -593,11 +593,12 @@ void menu_render(const menu_state_t& state) {
             }
             
             SDL_Color button_color = state.hover.type == MENU_HOVER_BUTTON && button == state.hover.button ? COLOR_WHITE : COLOR_OFFBLACK;
+            Font button_font = state.hover.type == MENU_HOVER_BUTTON && button == state.hover.button ? FONT_WESTERN16_WHITE : FONT_WESTERN16_OFFBLACK;
             SDL_SetRenderDrawColor(engine.renderer, button_color.r, button_color.g, button_color.b, button_color.a);
 
             const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);
             SDL_RenderDrawRect(engine.renderer, &button_data.rect);
-            render_text(FONT_WESTERN16, button_data.text, button_color, xy(button_data.rect.x + 4, button_data.rect.y + 4));
+            render_text(button_font, button_data.text, xy(button_data.rect.x + 4, button_data.rect.y + 4));
         }
     }
 }
