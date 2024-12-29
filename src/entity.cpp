@@ -443,6 +443,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         // show can't build message
                         update_finished = true;
                         break;
+                    } else if (entity.target.type == TARGET_GOLD) {
+                        entity.target = entity_target_nearest_gold(state, entity.player_id, entity.cell, entity.gold_patch_id);
+                        entity.mode = MODE_UNIT_IDLE;
+                        update_finished = true;
+                        break;
                     } else {
                         entity.timer = UNIT_MOVE_BLOCKED_DURATION;
                         entity.mode = MODE_UNIT_MOVE_BLOCKED;
@@ -1119,8 +1124,12 @@ Sprite entity_get_select_ring(const entity_t entity, bool is_ally) {
 }
 
 uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity) {
+    // If unit is garrisoned, elevation is based on bunker elevation
+    if (entity.garrison_id != ID_NULL) {
+        return entity_get_elevation(state, state.entities.get_by_id(entity.garrison_id));
+    }
+
     uint16_t elevation = state.map_tiles[entity.cell.x + (entity.cell.y * state.map_width)].elevation;
-    // TODO when unit is in bunker, elevation is based on bunker elevation
     for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size(entity.type); x++) {
         for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
             elevation = std::max(elevation, state.map_tiles[x + (y * state.map_width)].elevation);
@@ -1459,7 +1468,6 @@ target_t entity_target_nearest_gold(const match_state_t& state, uint8_t entity_p
                 nearest_cell = gold_neighbor_cell;
             }
         }
-        // TODO consider fog of war
     }
 
     if (nearest_index == INDEX_INVALID) {
@@ -1486,7 +1494,6 @@ target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& 
         if (other.player_id != entity.player_id || !(other.type == ENTITY_CAMP || other.type == ENTITY_HALL) || other.mode != MODE_BUILDING_FINISHED) {
             continue;
         }
-        // TODO consider fog of war
 
         SDL_Rect other_rect = (SDL_Rect) { .x = other.cell.x, .y = other.cell.y, .w = entity_cell_size(other.type),. h = entity_cell_size(other.type) };
 

@@ -480,8 +480,6 @@ bool ui_building_can_be_placed(const match_state_t& state) {
         return false;
     }
 
-    // TODO check fog of war
-
     SDL_Rect building_rect = (SDL_Rect) { .x = building_cell.x, .y = building_cell.y, .w = building_cell_size, .h = building_cell_size };
     for (const entity_t& gold : state.entities) {
         if (gold.type != ENTITY_GOLD || gold.gold_held == 0) {
@@ -495,7 +493,8 @@ bool ui_building_can_be_placed(const match_state_t& state) {
 
     for (int x = building_cell.x; x < building_cell.x + building_cell_size; x++) {
         for (int y = building_cell.y; y < building_cell.y + building_cell_size; y++) {
-            if (xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
+            if ((xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) || 
+                    state.map_fog[network_get_player_id()][x + (y * state.map_width)] == FOG_HIDDEN || map_is_tile_ramp(state, xy(x, y))) {
                 return false;
             }
         }

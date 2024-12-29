@@ -1195,7 +1195,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 break;
             }
 
-            // TODO ? make this based on percent completion and not just health i.e. separation percent completion from health somehow
             const entity_data_t& building_data = ENTITY_DATA.at(state.entities[building_index].type);
             uint32_t gold_refund = building_data.gold_cost - (((uint32_t)state.entities[building_index].health * building_data.gold_cost) / (uint32_t)building_data.max_health);
             state.player_gold[state.entities[building_index].player_id] += gold_refund;
@@ -1295,7 +1294,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
     }
 }
 
-#include "platform.h"
 void match_render(const match_state_t& state) {
     // Prepare map render
     xy base_pos = xy(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
@@ -1627,9 +1625,8 @@ void match_render(const match_state_t& state) {
                 if (is_placement_out_of_bounds) {
                     is_cell_green = false;
                 }
-                // TODO if map fog at cell is not revealed, cell green is false
-                // TOOD is tile is a ramp then cell green is false
-                if (xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
+                if (state.map_fog[network_get_player_id()][x + (y * state.map_width)] == FOG_HIDDEN || map_is_tile_ramp(state, xy(x, y)) ||
+                        (xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY)) {
                     is_cell_green = false;
                 }
 
