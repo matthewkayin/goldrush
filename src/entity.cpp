@@ -9,7 +9,7 @@
 static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_MINE_TICK_DURATION = 60;
-static const uint32_t UNIT_MAX_GOLD_HELD = 8;
+static const uint32_t UNIT_MAX_GOLD_HELD = 10;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
 static const uint32_t ENTITY_BUNKER_FIRE_OFFSET = 10;
@@ -329,6 +329,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         if (entity.gold_held == 0) {
             ui_deselect_entity_if_selected(state, id);
             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
+            map_recalculate_unreachable_cells(state, entity.cell);
             // Triggers gold removal from entities list. This is done this way so that we can guarantee that the cell is set empty before deletion
             entity.mode = MODE_GOLD_MINED_OUT;
         }

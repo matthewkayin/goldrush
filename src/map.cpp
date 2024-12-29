@@ -682,7 +682,7 @@ void map_calculate_unreachable_cells(match_state_t& state) {
             map_tile_islands[next.x + (next.y * state.map_width)] = island_index;
             island_size[island_index]++;
 
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
                 frontier.push_back(next + DIRECTION_XY[direction]);
             }
         }
@@ -698,6 +698,32 @@ void map_calculate_unreachable_cells(match_state_t& state) {
     for (int index = 0; index < state.map_width * state.map_height; index++) {
         if (state.map_cells[index] == CELL_EMPTY && map_tile_islands[index] != biggest_island) {
             state.map_cells[index] = CELL_UNREACHABLE;
+        }
+    }
+}
+
+void map_recalculate_unreachable_cells(match_state_t& state, xy cell) {
+    std::vector<xy> frontier;
+
+    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+        xy child = cell + DIRECTION_XY[direction];
+        if (map_is_cell_in_bounds(state, child) && map_get_cell(state, child) == CELL_UNREACHABLE) {
+            frontier.push_back(child);
+        }
+    }
+
+    while (!frontier.empty()) {
+        xy next = frontier[0];
+        frontier.erase(frontier.begin());
+
+        if (!map_is_cell_in_bounds(state, next) || map_get_cell(state, next) != CELL_UNREACHABLE) {
+            continue;
+        }
+
+        state.map_cells[next.x + (next.y * state.map_width)] = CELL_EMPTY;
+
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            frontier.push_back(next + DIRECTION_XY[direction]);
         }
     }
 }

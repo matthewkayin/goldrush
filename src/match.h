@@ -484,6 +484,7 @@ int ui_get_building_queue_item_hovered(const match_state_t& state);
 // Map
 std::vector<xy> map_init(match_state_t& state);
 void map_calculate_unreachable_cells(match_state_t& state);
+void map_recalculate_unreachable_cells(match_state_t& state, xy cell);
 bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
 bool map_is_cell_rect_in_bounds(const match_state_t& state, xy cell, int cell_size);
 tile_t map_get_tile(const match_state_t& state, xy cell);
