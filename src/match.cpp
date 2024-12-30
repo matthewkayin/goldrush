@@ -1745,10 +1745,10 @@ void match_render(const match_state_t& state) {
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(button_icon - 1, button_frame), render_pos + xy(1, 0), RENDER_SPRITE_NO_CULL);
         char control_group_number_text[4];
         sprintf(control_group_number_text, "%u", control_group_index == 9 ? 0 : control_group_index + 1);
-        render_text(font, control_group_number_text, render_pos + xy(3, -2));
+        render_text(font, control_group_number_text, render_pos + xy(3, -9));
         char control_group_count_text[4];
         sprintf(control_group_count_text, "%u", entity_count);
-        render_text(font, control_group_count_text, render_pos + xy(32, 30), TEXT_ANCHOR_BOTTOM_RIGHT);
+        render_text(font, control_group_count_text, render_pos + xy(32, 23), TEXT_ANCHOR_BOTTOM_RIGHT);
     }
 
     // UI frames
