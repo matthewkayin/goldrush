@@ -908,6 +908,94 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
     std::vector<node_t> frontier;
     std::vector<node_t> explored;
     std::vector<int> explored_indices = std::vector<int>(state.map_width * state.map_height, -1);
+
+    bool is_target_unreachable = false;
+    for (int y = to.y; y < to.y + cell_size; y++) {
+        for (int x = to.x; x < to.x + cell_size; x++) {
+            entity_id cell_value = map_get_cell(state, xy(x, y));
+            if (cell_value == CELL_BLOCKED || cell_value == CELL_UNREACHABLE) {
+                is_target_unreachable = true;
+                // Cause break on both inner and outer loops
+                x = to.x + cell_size;
+                y = to.y + cell_size;
+            }
+        }
+    }
+    if (is_target_unreachable) {
+        // Reverse pathfind to find the nearest reachable cell
+        frontier.push_back((node_t) {
+            .cost = fixed::from_int(0),
+            .distance = fixed::from_int(0),
+            .parent = -1,
+            .cell = to
+        });
+
+        while (!frontier.empty()) {
+            // Find the smallest path
+            uint32_t smallest_index = 0;
+            for (uint32_t i = 1; i < frontier.size(); i++) {
+                if (frontier[i].score() < frontier[smallest_index].score()) {
+                    smallest_index = i;
+                }
+            }
+
+            // Pop the smallest path
+            node_t smallest = frontier[smallest_index];
+            frontier.erase(frontier.begin() + smallest_index);
+
+            // If it's the solution, return it
+            if (!map_is_cell_rect_occupied(state, smallest.cell, cell_size, from, gold_walk)) {
+                to = smallest.cell;
+                break; // breaks while frontier not empty
+            }
+
+            // Otherwise mark this cell as explored
+            explored_indices[smallest.cell.x + (smallest.cell.y * state.map_width)] = 1;
+
+            // Consider all children
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                node_t child = (node_t) {
+                    .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
+                    .distance = fixed::from_int(xy::manhattan_distance(smallest.cell + DIRECTION_XY[direction], to)),
+                    .parent = -1,
+                    .cell = smallest.cell + DIRECTION_XY[direction]
+                };
+
+                // Don't consider out of bounds children
+                if (!map_is_cell_rect_in_bounds(state, child.cell, cell_size)) {
+                    continue;
+                }
+
+                // Don't consider explored indices
+                if (explored_indices[child.cell.x + (child.cell.y * state.map_width)] != -1) {
+                    continue;
+                }
+
+                // Check if it's in the frontier
+                uint32_t frontier_index;
+                for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                    node_t& frontier_node = frontier[frontier_index];
+                    if (frontier_node.cell == child.cell) {
+                        break;
+                    }
+                }
+                // If it's in the frontier...
+                if (frontier_index < frontier.size()) {
+                    // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
+                    if (child.score() < frontier[frontier_index].score()) {
+                        frontier[frontier_index] = child;
+                    }
+                    continue;
+                }
+                // If it's not in the frontier, then add it
+                frontier.push_back(child);
+            } // End for each child / direction
+        } // End while frontier not empty
+
+        frontier.clear();
+        memset(&explored_indices[0], -1, state.map_width * state.map_height * sizeof(int));
+    } // End if target_is_unreachable
+
     uint32_t closest_explored = 0;
     bool found_path = false;
     node_t path_end;
@@ -946,7 +1034,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
             closest_explored = explored.size() - 1;
         }
 
-        if (explored.size() > 1999) {
+        if (explored.size() > 999) {
             log_trace("Pathfinding too long, going with closest explored...");
             break;
         }
@@ -992,7 +1080,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
                 continue;
             }
 
-                        // Check if it's in the frontier
+            // Check if it's in the frontier
             uint32_t frontier_index;
             for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
                 node_t& frontier_node = frontier[frontier_index];
