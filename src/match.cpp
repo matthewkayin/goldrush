@@ -112,6 +112,7 @@ match_state_t match_init() {
         }
 
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
+        state.map_fog[player_id] = std::vector<int>(state.map_width * state.map_height, FOG_HIDDEN);
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
@@ -121,14 +122,6 @@ match_state_t match_init() {
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
-
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (network_get_player(player_id).status == PLAYER_NONE) {
-            continue;
-        }
-        state.map_fog[player_id] = std::vector<FogValue>(state.map_width * state.map_height, FOG_HIDDEN);
-    }
-    state.map_is_fog_dirty = true;
 
     // Destroy minimap texture if already created
     if (engine.minimap_texture != NULL) {
@@ -698,15 +691,7 @@ void match_update(match_state_t& state) {
 
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-        xy entity_before_frame = entity_get_animation_frame(state.entities[entity_index]);
-        EntityMode entity_before_mode = state.entities[entity_index].mode;
-
         entity_update(state, entity_index);
-
-        if (!entity_is_unit(state.entities[entity_index].type) && 
-                (entity_before_mode != state.entities[entity_index].mode || entity_before_frame != entity_get_animation_frame(state.entities[entity_index]))) {
-            state.map_is_fog_dirty = true;
-        }
     }
 
     // Remove any dead entities
@@ -717,8 +702,8 @@ void match_update(match_state_t& state) {
                     (state.entities[entity_index].garrison_id != ID_NULL && state.entities[entity_index].health == 0) ||
                     (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0) ||
                     (state.entities[entity_index].type == ENTITY_GOLD && state.entities[entity_index].mode == MODE_GOLD_MINED_OUT)) {
+                map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, ENTITY_DATA.at(state.entities[entity_index].type).sight, false);
                 state.entities.remove_at(entity_index);
-                state.map_is_fog_dirty = true;
             } else {
                 entity_index++;
             }
@@ -744,7 +729,15 @@ void match_update(match_state_t& state) {
             if (network_get_player(player_id).status == PLAYER_NONE) {
                 continue;
             }
-            map_fog_update(state, player_id);
+            // Remove any remembered entities (but only if this player can see that they should be removed)
+            auto it = state.remembered_entities[player_id].begin();
+            while (it != state.remembered_entities[player_id].end()) {
+                if (state.entities.get_index_of(it->first) == INDEX_INVALID && map_is_cell_rect_revealed(state, player_id, it->second.cell, it->second.cell_size)) {
+                    it = state.remembered_entities[player_id].erase(it);
+                } else {
+                    it++;
+                }
+            }
         }
         if (state.selection.size() == 1) {
             entity_t& selected_entity = state.entities.get_by_id(state.selection[0]);
@@ -808,7 +801,7 @@ input_t match_create_move_input(const match_state_t& state) {
     input_t input;
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
-    FogValue fog_value = state.map_fog[network_get_player_id()][input.move.target_cell.x + (input.move.target_cell.y * state.map_width)];
+    int fog_value = state.map_fog[network_get_player_id()][input.move.target_cell.x + (input.move.target_cell.y * state.map_width)];
     if (fog_value != FOG_HIDDEN) {
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
             if (!entity_is_selectable(state.entities[entity_index]) || (fog_value == FOG_EXPLORED && state.entities[entity_index].type != ENTITY_GOLD)) {
@@ -1520,8 +1513,8 @@ void match_render(const match_state_t& state) {
         for (int y = 0; y < max_visible_tiles.y; y++) {
             for (int x = 0; x < max_visible_tiles.x; x++) {
                 xy fog_cell = base_coords + xy(x, y);
-                FogValue fog = state.map_fog[network_get_player_id()][fog_cell.x + (fog_cell.y * state.map_width)];
-                if (fog == FOG_REVEALED) {
+                int fog = state.map_fog[network_get_player_id()][fog_cell.x + (fog_cell.y * state.map_width)];
+                if (fog > 0) {
                     continue;
                 }
                 if (fog_pass == 1 && fog == FOG_EXPLORED) {
@@ -1536,7 +1529,7 @@ void match_render(const match_state_t& state) {
                         continue;
                     }
                     if (fog_pass == 0 
-                            ? state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] != FOG_REVEALED 
+                            ? state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] < 1 
                             : state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] == FOG_HIDDEN) {
                         neighbors += DIRECTION_MASK[direction];
                     }
@@ -1555,7 +1548,7 @@ void match_render(const match_state_t& state) {
                         continue;
                     }
                     if (fog_pass == 0 
-                            ? state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] != FOG_REVEALED 
+                            ? state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] < 1 
                             : state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.map_width)] == FOG_HIDDEN) {
                         neighbors += DIRECTION_MASK[direction];
                     }
@@ -2007,7 +2000,7 @@ void match_render(const match_state_t& state) {
     fog_explored_points.reserve(state.map_width * state.map_height);
     for (int y = 0; y < state.map_height; y++) {
         for (int x = 0; x < state.map_width; x++) {
-            FogValue fog = state.map_fog[network_get_player_id()][x + (y * state.map_width)];
+            int fog = state.map_fog[network_get_player_id()][x + (y * state.map_width)];
             if (fog == FOG_HIDDEN) {
                 fog_hidden_points.push_back((SDL_Point) { .x = x, .y = y });
             } else if (fog == FOG_EXPLORED) {

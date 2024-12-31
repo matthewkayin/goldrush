@@ -762,7 +762,6 @@ void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id v
             state.map_cells[x + (y * state.map_width)] = value;
         }
     }
-    state.map_is_fog_dirty = true;
 }
 
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin, bool gold_walk) {
@@ -1122,7 +1121,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            if (state.map_fog[player_id][x + (y * state.map_width)] == FOG_REVEALED) {
+            if (state.map_fog[player_id][x + (y * state.map_width)] > 0) {
                 return true;
             }
         }
@@ -1131,89 +1130,74 @@ bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy
     return false;
 }
 
-void map_fog_update(match_state_t& state, uint8_t player_id) {
-    // Remember revealed entities
-    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-        entity_t& entity = state.entities[entity_index];
-        if (entity_is_unit(entity.type) || !map_is_cell_rect_revealed(state, player_id, entity.cell, entity_cell_size(entity.type))) {
-            continue;
-        }
-
-        state.remembered_entities[player_id][state.entities.get_id_of(entity_index)] = (remembered_entity_t) {
-            .sprite_params = (render_sprite_params_t) {
-                .sprite = entity_get_sprite(entity),
-                .frame = entity_get_animation_frame(entity),
-                .position = entity.position.to_xy(),
-                .options = 0,
-                .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : entity.player_id
-            },
-            .cell = entity.cell,
-            .cell_size = entity_cell_size(entity.type)
-        };
-    }
-
-    // Dim everything that's revealed
-    for (uint32_t map_index = 0; map_index < state.map_width * state.map_height; map_index++) {
-        if (state.map_fog[player_id][map_index] == FOG_REVEALED) {
-            state.map_fog[player_id][map_index] = FOG_EXPLORED;
-        }
-    }
-
-    // Reveal based on vision
-    for (entity_t& entity : state.entities) {
-        if (entity.player_id != player_id || !entity_is_selectable(entity)) {
-            continue;
-        }
-
-        std::queue<xy> frontier;
-        std::unordered_map<int, int> explored;
-        frontier.push(entity.cell);
-        int entity_sight = ENTITY_DATA.at(entity.type).sight;
-
-        while (!frontier.empty()) {
-            xy next = frontier.front();
-            frontier.pop();
-
-            // Check explored
-            auto explored_it = explored.find(next.x + (next.y * state.map_width));
-            if (explored_it != explored.end()) {
-                continue;
-            }
-            explored[next.x + (next.y * state.map_width)] = 1;
-
-            if (!map_is_cell_in_bounds(state, next)) {
-                continue;
+void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int sight, bool increment) { 
+    xy line_start[4] = {
+        cell + xy(-sight, -sight),
+        cell + xy(sight, -sight),
+        cell + xy(sight, sight),
+        cell + xy(-sight, sight)
+    };
+    for (int line_index = 0; line_index < 4; line_index++) {
+        xy line_end = line_start[line_index];
+        xy line_end_dest = line_start[(line_index + 1) % 4];
+        while (line_end != line_end_dest) {
+            fixed step;
+            if (std::abs(line_end.x - cell.x) >= std::abs(line_end.y - cell.y)) {
+                step = fixed::from_int(std::abs(line_end.x - cell.x));
+            } else {
+                step = fixed::from_int(std::abs(line_end.y - cell.y));
             }
 
-            // Check that the cell is in sight range
-            if (std::abs(next.x - entity.cell.x) > entity_sight || std::abs(next.y - entity.cell.y) > entity_sight ||
-                    ((next.x == entity.cell.x - entity_sight || next.x == entity.cell.x + entity_sight) &&
-                     (next.y == entity.cell.y - entity_sight || next.y == entity.cell.y + entity_sight))) {
-                continue;
-            }
+            xy_fixed line_step = xy_fixed(fixed::from_int(line_end.x - cell.x) / step,
+                                fixed::from_int(line_end.y - cell.y) / step);
+            xy_fixed line_position = xy_fixed(cell);
+            fixed i = fixed::from_raw(0);
+            while (i <= step) {
+                xy line_cell = xy(fixed::round(line_position.x).integer_part(), fixed::round(line_position.y).integer_part());
+                if (!map_is_cell_in_bounds(state, line_cell) || std::abs(line_cell.x - cell.x) == sight || std::abs(line_cell.y - cell.y) == sight || xy::euclidean_distance_squared(cell, line_cell) > sight * sight) {
+                    break;
+                }
+                entity_id cell_value = map_get_cell(state, line_cell);
 
-            // Reveal the cell
-            state.map_fog[player_id][next.x + (next.y * state.map_width)] = FOG_REVEALED;
+                if (increment) {
+                    if (state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)] == FOG_HIDDEN) {
+                        state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)] = 1;
+                    } else {
+                        state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]++;
+                    }
+                } else {
+                    state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
 
-            // Decide whether to keep revealing from this cell
-            if (map_get_tile(state, entity.cell).elevation < map_get_tile(state, next).elevation) {
-                continue;
-            }
+                    // Remember revealed entities
+                    if (cell_value < CELL_EMPTY) {
+                        entity_t& entity = state.entities.get_by_id(cell_value);
+                        if (!entity_is_unit(entity.type)) {
+                            state.remembered_entities[player_id][cell_value] = (remembered_entity_t) {
+                                .sprite_params = (render_sprite_params_t) {
+                                    .sprite = entity_get_sprite(entity),
+                                    .frame = entity_get_animation_frame(entity),
+                                    .position = entity.position.to_xy(),
+                                    .options = 0,
+                                    .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : entity.player_id
+                            },
+                            .cell = entity.cell,
+                            .cell_size = entity_cell_size(entity.type)
+                            };
+                        }
+                    } // End if cell value < cell empty
+                } // End if !increment
 
-            // Add children
-            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                frontier.push(next + DIRECTION_XY[direction]);
-            }
-        } // End while !frontier empty
-    } // End for each entity
+                if (map_get_tile(state, line_cell).elevation > map_get_tile(state, cell).elevation) {
+                    break;
+                }
 
-    // Remove any remembered entities (but only if this player can see that they should be removed)
-    auto it = state.remembered_entities[player_id].begin();
-    while (it != state.remembered_entities[player_id].end()) {
-        if (state.entities.get_index_of(it->first) == INDEX_INVALID && map_is_cell_rect_revealed(state, player_id, it->second.cell, it->second.cell_size)) {
-            it = state.remembered_entities[player_id].erase(it);
-        } else {
-            it++;
-        }
-    }
+                line_position += line_step;
+                i += fixed::from_int(1);
+            } // End while i <= step
+
+            line_end += DIRECTION_XY[((line_index * 2) + 2) % DIRECTION_COUNT];
+        } // End for line step index
+    } // For each line index
+
+    state.map_is_fog_dirty = true;
 }

@@ -51,6 +51,10 @@ struct fixed {
         return ((raw_value & fractional_mask) * 1000) / scale_factor;
     }
 
+    static fixed round(const fixed& value) {
+        return fixed::from_int(value.integer_part() + (value.fractional_part() <= 128 ? 0 : 1));
+    }
+
     bool operator==(const fixed& other) const {
         return raw_value == other.raw_value;
     }
