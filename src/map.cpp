@@ -1034,7 +1034,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
             closest_explored = explored.size() - 1;
         }
 
-        if (explored.size() > 999) {
+        if (explored.size() > 1999) {
             log_trace("Pathfinding too long, going with closest explored...");
             break;
         }

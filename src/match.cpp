@@ -9,7 +9,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
-static const uint32_t PLAYER_STARTING_GOLD = 500;
+static const uint32_t PLAYER_STARTING_GOLD = 5000;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
@@ -273,6 +273,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
     // Order movement
     if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state, state.selection) == SELECTION_TYPE_UNITS && 
+            (sdl_rect_has_point(MINIMAP_RECT, engine.mouse_position) || !ui_is_mouse_in_ui()) &&
             ((event.button.button == SDL_BUTTON_LEFT && ui_is_targeting(state)) ||
             (event.button.button == SDL_BUTTON_RIGHT && !ui_is_selecting(state) && !state.ui_is_minimap_dragging))) {
         input_t move_input = match_create_move_input(state);

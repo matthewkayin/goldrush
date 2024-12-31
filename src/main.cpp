@@ -130,6 +130,7 @@ int gold_main(int argc, char** argv) {
         } // End if should handle input
 
         // UPDATE
+        double update_start = platform_get_absolute_time();
         while (update_accumulator >= UPDATE_TIME) {
             update_accumulator -= UPDATE_TIME;
             updates++;
@@ -149,8 +150,10 @@ int gold_main(int argc, char** argv) {
                     break;
             }
         } // End while update
+        double update_time = platform_get_absolute_time() - update_start;
 
         // RENDER
+        double render_start = platform_get_absolute_time();
         SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
         SDL_RenderClear(engine.renderer);
 
@@ -172,6 +175,9 @@ int gold_main(int argc, char** argv) {
         }
 
         SDL_RenderPresent(engine.renderer);
+        double render_time = platform_get_absolute_time() - render_start;
+
+        log_trace("update %f render %f", update_time, render_time);
     }
 
     network_quit();
