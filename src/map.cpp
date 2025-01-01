@@ -771,8 +771,8 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_siz
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy origin, bool gold_walk) {
     entity_id origin_id = origin.x == -1 ? ID_NULL : map_get_cell(state, origin);
 
-    for (int y = cell.y; y < cell.y + size.x; y++) {
-        for (int x = cell.x; x < cell.x + size.y; x++) {
+    for (int y = cell.y; y < cell.y + size.y; y++) {
+        for (int x = cell.x; x < cell.x + size.x; x++) {
             entity_id cell_id = map_get_cell(state, xy(x, y));
             if (cell_id > CELL_EMPTY) {
                 return true;
