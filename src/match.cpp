@@ -116,9 +116,9 @@ match_state_t match_init() {
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
-        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
-        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
-        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
+        // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
+        // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
+        // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
@@ -702,7 +702,10 @@ void match_update(match_state_t& state) {
                     (state.entities[entity_index].garrison_id != ID_NULL && state.entities[entity_index].health == 0) ||
                     (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0) ||
                     (state.entities[entity_index].type == ENTITY_GOLD && state.entities[entity_index].mode == MODE_GOLD_MINED_OUT)) {
-                map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, entity_cell_size(state.entities[entity_index].type), ENTITY_DATA.at(state.entities[entity_index].type).sight, false);
+                // Remove this entity's fog but only if they are not gold and not garrisoned
+                if (state.entities[entity_index].player_id != PLAYER_NONE && state.entities[entity_index].garrison_id == ID_NULL) {
+                    map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, entity_cell_size(state.entities[entity_index].type), ENTITY_DATA.at(state.entities[entity_index].type).sight, false);
+                }
                 state.entities.remove_at(entity_index);
             } else {
                 entity_index++;
@@ -1204,6 +1207,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     };
                     builder.mode = MODE_UNIT_IDLE;
                     map_set_cell_rect(state, builder.cell, entity_cell_size(builder.type), state.entities.get_id_of(entity_index));
+                    map_fog_update(state, builder.player_id, builder.cell, entity_cell_size(builder.type), ENTITY_DATA.at(builder.type).sight, true);
                     break;
                 }
             }

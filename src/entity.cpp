@@ -372,12 +372,13 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
                         if (!map_is_cell_rect_occupied(state, xy(x, y), entity_cell_size(garrisoned_unit.type))) {
                             garrisoned_unit.cell = xy(x, y);
-                            garrisoned_unit.position = entity_get_target_position(entity);
+                            garrisoned_unit.position = entity_get_target_position(garrisoned_unit);
                             garrisoned_unit.garrison_id = ID_NULL;
                             garrisoned_unit.mode = MODE_UNIT_IDLE;
                             garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
                             map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), garrisoned_unit_id);
                             map_fog_update(state, garrisoned_unit.player_id, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), ENTITY_DATA.at(garrisoned_unit.type).sight, true);
+                            log_trace("placed unit %u at cell %xi position %xd", garrisoned_unit_id, &garrisoned_unit.cell, &garrisoned_unit.position);
                             unit_is_placed = true;
                             break;
                         }

@@ -1131,60 +1131,117 @@ bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy
 }
 
 void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment) { 
-    for (int y = cell.y - sight; y < cell.y + cell_size + sight; y++) {
-        for (int x = cell.x - sight; x < cell.x + cell_size + sight; x++) {
-            if (!map_is_cell_in_bounds(state, xy(x, y)) || map_get_tile(state, xy(x, y)).elevation > map_get_tile(state, cell).elevation) {
-                continue;
-            }
-            xy origin;
-            if (x < cell.x) {
-                origin.x = cell.x;
-            } else if (x > cell.x + cell_size - 1) {
-                origin.x = cell.x + cell_size - 1;
-            } else {
-                origin.x = x;
-            }
-            if (y < cell.y) {
-                origin.y = cell.y;
-            } else if (y > cell.y + cell_size - 1) {
-                origin.y = cell.y + cell_size - 1;
-            } else {
-                origin.y = y;
-            }
-            if (xy::euclidean_distance_squared(origin, xy(x, y)) > sight * sight) {
-                continue;
-            }
+    /*
+    * This function does a raytrace from the cell center outwards to determine what this unit can see
+    * Raytracing is done using Bresenham's Line Generation Algorithm (https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/)
+    */
 
-            if (increment) {
-                if (state.map_fog[player_id][x + (y * state.map_width)] == FOG_HIDDEN) {
-                    state.map_fog[player_id][x + (y * state.map_width)] = 1;
-                } else {
-                    state.map_fog[player_id][x + (y * state.map_width)]++;
-                }
-            } else {
-                state.map_fog[player_id][x + (y * state.map_width)]--;
-
-                // Remember revealed entities
-                entity_id cell_value = map_get_cell(state, xy(x, y));
-                if (cell_value < CELL_EMPTY) {
-                    entity_t& entity = state.entities.get_by_id(cell_value);
-                    if (!entity_is_unit(entity.type)) {
-                        state.remembered_entities[player_id][cell_value] = (remembered_entity_t) {
-                            .sprite_params = (render_sprite_params_t) {
-                                .sprite = entity_get_sprite(entity),
-                                .frame = entity_get_animation_frame(entity),
-                                .position = entity.position.to_xy(),
-                                .options = 0,
-                                .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : entity.player_id
-                            },
-                            .cell = entity.cell,
-                            .cell_size = entity_cell_size(entity.type)
-                        };
+    xy search_corners[4] = {
+        cell - xy(sight, sight),
+        cell + xy((cell_size - 1) + sight, -sight),
+        cell + xy((cell_size - 1) + sight, (cell_size - 1) + sight),
+        cell + xy(-sight, (cell_size - 1) + sight)
+    };
+    for (int search_index = 0; search_index < 4; search_index++) {
+        xy search_goal = search_corners[search_index + 1 == 4 ? 0 : search_index + 1];
+        xy search_step = DIRECTION_XY[(search_index * 2) + 2 == DIRECTION_COUNT 
+                                            ? DIRECTION_NORTH 
+                                            : (search_index * 2) + 2];
+        for (xy line_end = search_corners[search_index]; line_end != search_goal; line_end += search_step) {
+            xy line_start;
+            switch (cell_size) {
+                case 1:
+                    line_start = cell;
+                    break;
+                case 3:
+                    line_start = cell + xy(1, 1);
+                    break;
+                case 2:
+                case 4: {
+                    xy center_cell = cell_size == 2 ? cell : cell + xy(1, 1);
+                    if (line_end.x < center_cell.x) {
+                        line_start.x = center_cell.x;
+                    } else if (line_end.x > center_cell.x + 1) {
+                        line_start.x = center_cell.x + 1;
+                    } else {
+                        line_start.x = line_end.x;
                     }
-                } // End if cell value < cell empty
-            } // End if !increment
-        }
-    }
+                    if (line_end.y < center_cell.y) {
+                        line_start.y = center_cell.y;
+                    } else if (line_end.y > center_cell.y + 1) {
+                        line_start.y = center_cell.y + 1;
+                    } else {
+                        line_start.y = line_end.y;
+                    }
+                    break;
+                }
+                default:
+                    log_warn("cell size of %i not handled in map_fog_update", cell_size);
+                    line_start = cell;
+                    break;
+            }
+
+            // we want slope to be between 0 and 1
+            // if "run" is greater than "rise" then m is naturally between 0 and 1, we will step with x in increments of 1 and handle y increments that are less than 1
+            // if "rise" is greater than "run" (use_x_step is false) then we will swap x and y so that we can step with y in increments of 1 and handle x increments that are less than 1
+            bool use_x_step = std::abs(line_end.x - line_start.x) >= std::abs(line_end.y - line_start.y);
+            int slope = std::abs(2 * (use_x_step ? (line_end.y - line_start.y) : (line_end.x - line_start.x)));
+            int slope_error = slope - std::abs((use_x_step ? (line_end.x - line_start.x) : (line_end.y - line_start.y)));
+            xy line_step;
+            xy line_opposite_step;
+            if (use_x_step) {
+                line_step = xy(1, 0) * (line_end.x >= line_start.x ? 1 : -1);
+                line_opposite_step = xy(0, 1) * (line_end.y >= line_start.y ? 1 : -1);
+            } else {
+                line_step = xy(0, 1) * (line_end.y >= line_start.y ? 1 : -1);
+                line_opposite_step = xy(1, 0) * (line_end.x >= line_start.x ? 1 : -1);
+            }
+            for (xy line_cell = line_start; line_cell != line_end; line_cell += line_step) {
+                if (!map_is_cell_in_bounds(state, line_cell) || xy::euclidean_distance_squared(line_start, line_cell) > sight * sight) {
+                    break;
+                }
+
+                if (increment) {
+                    if (state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)] == FOG_HIDDEN) {
+                        state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)] = 1;
+                    } else {
+                        state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]++;
+                    }
+                } else {
+                    state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
+
+                    // Remember revealed entities
+                    entity_id cell_value = map_get_cell(state, line_cell);
+                    if (cell_value < CELL_EMPTY) {
+                        entity_t& entity = state.entities.get_by_id(cell_value);
+                        if (!entity_is_unit(entity.type)) {
+                            state.remembered_entities[player_id][cell_value] = (remembered_entity_t) {
+                                .sprite_params = (render_sprite_params_t) {
+                                    .sprite = entity_get_sprite(entity),
+                                    .frame = entity_get_animation_frame(entity),
+                                    .position = entity.position.to_xy(),
+                                    .options = 0,
+                                    .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : entity.player_id
+                                },
+                                .cell = entity.cell,
+                                .cell_size = entity_cell_size(entity.type)
+                            };
+                        }
+                    } // End if cell value < cell empty
+                } // End if !increment
+
+                if (map_get_tile(state, line_cell).elevation > map_get_tile(state, line_start).elevation) {
+                    break;
+                }
+
+                slope_error += slope;
+                if (slope_error >= 0) {
+                    line_cell += line_opposite_step;
+                    slope_error -= 2 * std::abs((use_x_step ? (line_end.x - line_start.x) : (line_end.y - line_start.y)));
+                }
+            } // End for each line cell in line
+        } // End for each line end from corner to corner
+    } // End for each search index
 
     state.map_is_fog_dirty = true;
 }
