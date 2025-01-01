@@ -183,7 +183,7 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_UI_PARCHMENT_BUTTONS, (sprite_params_t) {
         .path = "sprite/ui_parchment_buttons.png",
-        .hframes = 3,
+        .hframes = 1,
         .vframes = 3,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
@@ -207,7 +207,7 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_UI_MENU_PARCHMENT_BUTTONS, (sprite_params_t) {
         .path = "sprite/ui_menu_parchment_buttons.png",
-        .hframes = 2,
+        .hframes = 1,
         .vframes = 2,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},

@@ -19,12 +19,16 @@ static const SDL_Rect UI_DISCONNECT_FRAME_RECT = (SDL_Rect) {
     .w = 200, .h = 200
 };
 static const SDL_Rect UI_MATCH_OVER_FRAME_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - (250 / 2), .y = 128,
-    .w = 250, .h = 60
+    .x = (SCREEN_WIDTH / 2) - (250 / 2), .y = 96,
+    .w = 250, .h = 90
+};
+static const SDL_Rect UI_MATCH_OVER_CONTINUE_BUTTON_RECT = (SDL_Rect) {
+    .x = (SCREEN_WIDTH / 2) - 45, .y = UI_MATCH_OVER_FRAME_RECT.y + 32,
+    .w = 89, .h = 21
 };
 static const SDL_Rect UI_MATCH_OVER_EXIT_BUTTON_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - 32, .y = UI_MATCH_OVER_FRAME_RECT.y + 32,
-    .w = 63, .h = 21
+    .x = (SCREEN_WIDTH / 2) - 45, .y = UI_MATCH_OVER_CONTINUE_BUTTON_RECT.y + UI_MATCH_OVER_CONTINUE_BUTTON_RECT.h + 4,
+    .w = 89, .h = 21
 };
 static const SDL_Rect UI_MENU_BUTTON_RECT = (SDL_Rect) {
     .x = 1, .y = 1, .w = 19, .h = 18
@@ -33,6 +37,19 @@ static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
     .x = (SCREEN_WIDTH / 2) - (150 / 2), .y = 64,
     .w = 150, .h = 100
 };
+static const int UI_MENU_BUTTON_COUNT = 2;
+static const SDL_Rect UI_MENU_BUTTON_RECTS[UI_MENU_BUTTON_COUNT] = {
+    (SDL_Rect) {
+        .x = (SCREEN_WIDTH / 2) - 45, .y = UI_MENU_RECT.y + 32,
+        .w = 86, .h = 21
+    },
+    (SDL_Rect) {
+        .x = (SCREEN_WIDTH / 2) - 45, .y = UI_MENU_RECT.y + 32 + 21 + 5,
+        .w = 86, .h = 21
+    },
+};
+static const char* UI_MENU_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "EXIT GAME", "BACK" };
+static const char* UI_MENU_SURRENDER_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "YES", "BACK" };
 const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
 const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
 const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
@@ -172,15 +189,68 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
     // Match over button press
     if ((state.ui_mode == UI_MODE_MATCH_OVER_VICTORY || state.ui_mode == UI_MODE_MATCH_OVER_DEFEAT)) {
+        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && sdl_rect_has_point(UI_MATCH_OVER_CONTINUE_BUTTON_RECT, engine.mouse_position)) {
+            state.ui_mode = UI_MODE_NONE;
+            return;
+        }
         if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && sdl_rect_has_point(UI_MATCH_OVER_EXIT_BUTTON_RECT, engine.mouse_position)) {
             network_disconnect();
             state.ui_mode = UI_MODE_LEAVE_MATCH;
+            return;
+        }
+        return;
+    }
+
+    // Open menu button
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && !ui_is_targeting(state) && !ui_is_selecting(state) && !state.ui_is_minimap_dragging && sdl_rect_has_point(UI_MENU_BUTTON_RECT, engine.mouse_position)) {
+        if (state.ui_mode == UI_MODE_MENU || state.ui_mode == UI_MODE_MENU_SURRENDER) {
+            state.ui_mode = UI_MODE_NONE;
+        } else {
+            state.ui_mode = UI_MODE_MENU;
         }
         return;
     }
 
     // Menu button press
-    if (state.ui_mode == UI_MODE_MENU) {
+    if (state.ui_mode == UI_MODE_MENU || state.ui_mode == UI_MODE_MENU_SURRENDER) {
+        if (!(event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)) {
+            return;
+        }
+
+        int button_pressed;
+        for (button_pressed = 0; button_pressed < UI_MENU_BUTTON_COUNT; button_pressed++) {
+            if (sdl_rect_has_point(UI_MENU_BUTTON_RECTS[button_pressed], engine.mouse_position)) {
+                break;
+            }
+        }
+        if (button_pressed == UI_MENU_BUTTON_COUNT) {
+            return;
+        }
+
+        if (state.ui_mode == UI_MODE_MENU && button_pressed == 1) {
+            state.ui_mode = UI_MODE_NONE;
+        } else if (state.ui_mode == UI_MODE_MENU_SURRENDER && button_pressed == 1) {
+            state.ui_mode = UI_MODE_MENU;
+        } else if (state.ui_mode == UI_MODE_MENU && button_pressed == 0) {
+            bool is_another_player_in_match = false;
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (!(network_get_player_id() == player_id || network_get_player(player_id).status == PLAYER_STATUS_NONE)) {
+                    is_another_player_in_match = true;
+                    break;
+                }
+            }
+
+            if (is_another_player_in_match) {
+                state.ui_mode = UI_MODE_MENU_SURRENDER;
+            } else {
+                network_disconnect();
+                state.ui_mode = UI_MODE_LEAVE_MATCH;
+            }
+        } else if (state.ui_mode == UI_MODE_MENU_SURRENDER && button_pressed == 0) {
+            network_disconnect();
+            state.ui_mode = UI_MODE_LEAVE_MATCH;
+        }
+
         return;
     }
 
@@ -1683,20 +1753,30 @@ void match_render(const match_state_t& state) {
     if (state.ui_mode == UI_MODE_MATCH_OVER_VICTORY || state.ui_mode == UI_MODE_MATCH_OVER_DEFEAT) {
         render_ninepatch(SPRITE_UI_FRAME, UI_MATCH_OVER_FRAME_RECT, 16);
         render_text(FONT_WESTERN8_GOLD, state.ui_mode == UI_MODE_MATCH_OVER_VICTORY ? "Victory!" : "Defeat!", xy(RENDER_TEXT_CENTERED, UI_MATCH_OVER_FRAME_RECT.y + 10));
+
+        bool continue_button_hovered = sdl_rect_has_point(UI_MATCH_OVER_CONTINUE_BUTTON_RECT, engine.mouse_position);
+        xy continue_button_position = xy(UI_MATCH_OVER_CONTINUE_BUTTON_RECT.x, UI_MATCH_OVER_CONTINUE_BUTTON_RECT.y + (continue_button_hovered ? -1 : 0));
+        render_sprite(SPRITE_UI_MENU_PARCHMENT_BUTTONS, xy(0, continue_button_hovered ? 1 : 0), continue_button_position, RENDER_SPRITE_NO_CULL);
+        render_text(continue_button_hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, "CONTINUE", continue_button_position + xy(UI_MATCH_OVER_EXIT_BUTTON_RECT.w / 2, 5), TEXT_ANCHOR_TOP_CENTER);
+
+
         bool exit_button_hovered = sdl_rect_has_point(UI_MATCH_OVER_EXIT_BUTTON_RECT, engine.mouse_position);
-        render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(2, exit_button_hovered ? 1 : 0), xy(UI_MATCH_OVER_EXIT_BUTTON_RECT.x, UI_MATCH_OVER_EXIT_BUTTON_RECT.y + (exit_button_hovered ? -1 : 0)), RENDER_SPRITE_NO_CULL);
+        xy exit_button_position = xy(UI_MATCH_OVER_EXIT_BUTTON_RECT.x, UI_MATCH_OVER_EXIT_BUTTON_RECT.y + (exit_button_hovered ? -1 : 0));
+        render_sprite(SPRITE_UI_MENU_PARCHMENT_BUTTONS, xy(0, exit_button_hovered ? 1 : 0), exit_button_position, RENDER_SPRITE_NO_CULL);
+        render_text(exit_button_hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, "EXIT", exit_button_position + xy(UI_MATCH_OVER_EXIT_BUTTON_RECT.w / 2, 5), TEXT_ANCHOR_TOP_CENTER);
     }
 
     // Menu button
     render_sprite(SPRITE_UI_MENU_BUTTON, xy(sdl_rect_has_point(UI_MENU_BUTTON_RECT, engine.mouse_position) || state.ui_mode == UI_MODE_MENU ? 1 : 0, 0), xy(UI_MENU_BUTTON_RECT.x, UI_MENU_BUTTON_RECT.y), RENDER_SPRITE_NO_CULL);
-    if (state.ui_mode == UI_MODE_MENU) {
-        /*
+    if (state.ui_mode == UI_MODE_MENU || state.ui_mode == UI_MODE_MENU_SURRENDER) {
         render_ninepatch(SPRITE_UI_FRAME, UI_MENU_RECT, 16);
-        render_text(FONT_WESTERN8, "Game Menu", COLOR_GOLD, xy(RENDER_TEXT_CENTERED, UI_MENU_RECT.position.y + 10));
-        for (int i = UI_MENU_BUTTON_NONE + 1; i < UI_MENU_BUTTON_COUNT; i++) {
-            render_sprite(SPRITE_UI_MENU_PARCHMENT_BUTTONS, xy(i - (UI_MENU_BUTTON_NONE + 1), ui_menu_get_parchment_button_hovered() == i ? 1 : 0), ui_menu_get_parchment_button_rect((UiMenuButton)i).position, RENDER_SPRITE_NO_CULL);
+        render_text(FONT_WESTERN8_GOLD, state.ui_mode == UI_MODE_MENU ? "Game Menu" : "Surrender?", xy(RENDER_TEXT_CENTERED, UI_MENU_RECT.y + 10));
+        for (int i = 0; i < UI_MENU_BUTTON_COUNT; i++) {
+            bool button_hovered = sdl_rect_has_point(UI_MENU_BUTTON_RECTS[i], engine.mouse_position);
+            xy button_position = xy(UI_MENU_BUTTON_RECTS[i].x, UI_MENU_BUTTON_RECTS[i].y + (button_hovered ? -1 : 0));
+            render_sprite(SPRITE_UI_MENU_PARCHMENT_BUTTONS, xy(0, button_hovered ? 1 : 0), button_position, RENDER_SPRITE_NO_CULL);
+            render_text(button_hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, state.ui_mode == UI_MODE_MENU ? UI_MENU_BUTTON_TEXT[i] : UI_MENU_SURRENDER_BUTTON_TEXT[i], button_position + xy(UI_MENU_BUTTON_RECTS[i].w / 2, 5), TEXT_ANCHOR_TOP_CENTER);
         }
-        */
     }
 
     // UI Control Groups
