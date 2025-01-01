@@ -495,7 +495,7 @@ bool map_is_tile_ramp(const match_state_t& state, xy cell);
 bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size);
-void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int sight, bool increment);
+void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment);
 
 // Entities
 entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id, xy cell);

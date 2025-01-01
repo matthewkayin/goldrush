@@ -702,7 +702,7 @@ void match_update(match_state_t& state) {
                     (state.entities[entity_index].garrison_id != ID_NULL && state.entities[entity_index].health == 0) ||
                     (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0) ||
                     (state.entities[entity_index].type == ENTITY_GOLD && state.entities[entity_index].mode == MODE_GOLD_MINED_OUT)) {
-                map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, ENTITY_DATA.at(state.entities[entity_index].type).sight, false);
+                map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, entity_cell_size(state.entities[entity_index].type), ENTITY_DATA.at(state.entities[entity_index].type).sight, false);
                 state.entities.remove_at(entity_index);
             } else {
                 entity_index++;

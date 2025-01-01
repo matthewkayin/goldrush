@@ -54,6 +54,9 @@ struct fixed {
     static fixed round(const fixed& value) {
         return fixed::from_int(value.integer_part() + (value.fractional_part() <= 128 ? 0 : 1));
     }
+    static fixed abs(const fixed& value) {
+        return value < fixed::from_raw(0) ? value * fixed::from_int(-1) : value;
+    }
 
     bool operator==(const fixed& other) const {
         return raw_value == other.raw_value;

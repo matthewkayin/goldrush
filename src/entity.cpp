@@ -293,7 +293,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
 
     entity_id id = state.entities.push_back(entity);
     map_set_cell_rect(state, entity.cell, entity_cell_size(type), id);
-    map_fog_update(state, entity.player_id, entity.cell, ENTITY_DATA.at(entity.type).sight, true);
+    map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, true);
 
     return id;
 }
@@ -377,7 +377,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             garrisoned_unit.mode = MODE_UNIT_IDLE;
                             garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
                             map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), garrisoned_unit_id);
-                            map_fog_update(state, garrisoned_unit.player_id, garrisoned_unit.cell, ENTITY_DATA.at(garrisoned_unit.type).sight, true);
+                            map_fog_update(state, garrisoned_unit.player_id, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), ENTITY_DATA.at(garrisoned_unit.type).sight, true);
                             unit_is_placed = true;
                             break;
                         }
@@ -487,12 +487,12 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         if (map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id)) {
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
                         }
-                        map_fog_update(state, entity.player_id, entity.cell, ENTITY_DATA.at(entity.type).sight, false);
+                        map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false);
                         entity.cell = entity.path[0];
                         if (!entity_should_gold_walk(state, entity)) {
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
                         } 
-                        map_fog_update(state, entity.player_id, entity.cell, ENTITY_DATA.at(entity.type).sight, true);
+                        map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, true);
                         entity.path.erase(entity.path.begin());
                     }
 
@@ -602,7 +602,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         state.player_gold[entity.player_id] -= ENTITY_DATA.at(entity.target.build.building_type).gold_cost;
                         map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
-                        map_fog_update(state, entity.player_id, entity.cell, ENTITY_DATA.at(entity.type).sight, false);
+                        map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false);
                         entity.target.id = entity_create(state, entity.target.build.building_type, entity.player_id, entity.target.build.building_cell);
                         entity.mode = MODE_UNIT_BUILD;
                         entity.timer = UNIT_BUILD_TICK_DURATION;
@@ -703,7 +703,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             entity.mode = MODE_UNIT_IDLE;
                             entity.target = (target_t) { .type = TARGET_NONE };
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
-                            map_fog_update(state, entity.player_id, entity.cell, ENTITY_DATA.at(entity.type).sight, false);
+                            map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false);
                             ui_deselect_entity_if_selected(state, id);
                             update_finished = true;
                             break;
@@ -1715,7 +1715,7 @@ void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garris
             garrisoned_unit.cell = exit_cell;
             garrisoned_unit.position = entity_get_target_position(garrisoned_unit);
             map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), entity.garrisoned_units[index]);
-            map_fog_update(state, garrisoned_unit.player_id, garrisoned_unit.cell, ENTITY_DATA.at(garrisoned_unit.type).sight, true);
+            map_fog_update(state, garrisoned_unit.player_id, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), ENTITY_DATA.at(garrisoned_unit.type).sight, true);
             garrisoned_unit.mode = MODE_UNIT_IDLE;
             garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
             garrisoned_unit.garrison_id = ID_NULL;
@@ -1758,7 +1758,7 @@ void entity_stop_building(match_state_t& state, entity_id id) {
     };
     entity.mode = MODE_UNIT_IDLE;
     map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
-    map_fog_update(state, entity.player_id, entity.cell, ENTITY_DATA.at(entity.type).sight, true);
+    map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, true);
 }
 
 void entity_building_finish(match_state_t& state, entity_id building_id) {
