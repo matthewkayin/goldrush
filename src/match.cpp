@@ -73,6 +73,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_ATTACK, SDLK_a },
     { UI_BUTTON_DEFEND, SDLK_d },
     { UI_BUTTON_BUILD, SDLK_b },
+    { UI_BUTTON_BUILD2, SDLK_v },
     { UI_BUTTON_REPAIR, SDLK_r },
     { UI_BUTTON_CANCEL, SDLK_ESCAPE },
     { UI_BUTTON_UNLOAD, SDLK_x },
@@ -81,6 +82,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_BUILD_CAMP, SDLK_c },
     { UI_BUTTON_BUILD_SALOON, SDLK_s },
     { UI_BUTTON_BUILD_BUNKER, SDLK_b },
+    { UI_BUTTON_BUILD_COOP, SDLK_c },
     { UI_BUTTON_UNIT_MINER, SDLK_r },
     { UI_BUTTON_UNIT_MINER, SDLK_e },
     { UI_BUTTON_UNIT_COWBOY, SDLK_c },
@@ -431,7 +433,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
     // Begin minimap drag
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && 
-            (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD) && sdl_rect_has_point(MINIMAP_RECT, engine.mouse_position)) {
+            (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD || state.ui_mode == UI_MODE_BUILD2) && sdl_rect_has_point(MINIMAP_RECT, engine.mouse_position)) {
         state.ui_is_minimap_dragging = true;
         return;
     }
@@ -444,7 +446,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
     // Begin selecting
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT &&
-            (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD) && !ui_is_mouse_in_ui()) {
+            (state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD || state.ui_mode == UI_MODE_BUILD2) && !ui_is_mouse_in_ui()) {
         state.select_rect_origin = match_get_mouse_world_pos(state);
         return;
     }

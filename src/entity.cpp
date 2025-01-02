@@ -241,6 +241,29 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .can_rally = false
         }
     }},
+    { ENTITY_COOP, (entity_data_t) {
+        .name = "Chicken Coop",
+        .sprite = SPRITE_BUILDING_COOP,
+        .ui_button = UI_BUTTON_BUILD_COOP,
+        .cell_size = 3,
+
+        .gold_cost = 150,
+        .train_duration = 0,
+        .max_health = 600,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 9, 27, 26 },
+            .builder_positions_y = { 24, 18, 4 },
+            .builder_flip_h = { false, true, true },
+            .can_rally = true
+        }
+    }},
     { ENTITY_GOLD, (entity_data_t) {
         .name = "Gold",
         .sprite = SPRITE_TILE_GOLD,

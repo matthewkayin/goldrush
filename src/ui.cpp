@@ -43,6 +43,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
     { UI_BUTTON_BUILD_BUNKER, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_SALOON
+    }},
+    { UI_BUTTON_BUILD_COOP, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_SALOON
     }}
 };
 
@@ -182,6 +186,11 @@ void ui_update_buttons(match_state_t& state) {
         state.ui_buttons[5] = UI_BUTTON_CANCEL;
         return;
     }
+    if (state.ui_mode == UI_MODE_BUILD2) {
+        state.ui_buttons[0] = UI_BUTTON_BUILD_COOP;
+        state.ui_buttons[5] = UI_BUTTON_CANCEL;
+        return;
+    }
 
     if (state.selection.empty()) {
         return;
@@ -226,6 +235,7 @@ void ui_update_buttons(match_state_t& state) {
         case ENTITY_MINER: {
             state.ui_buttons[3] = UI_BUTTON_REPAIR;
             state.ui_buttons[4] = UI_BUTTON_BUILD;
+            state.ui_buttons[5] = UI_BUTTON_BUILD2;
             break;
         }
         case ENTITY_HALL: {
@@ -358,9 +368,28 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             state.ui_mode = UI_MODE_BUILD;
             break;
         }
+        case UI_BUTTON_BUILD2: {
+            state.ui_mode = UI_MODE_BUILD2;
+            break;
+        }
         case UI_BUTTON_CANCEL: {
             if (state.ui_mode == UI_MODE_BUILDING_PLACE) {
-                state.ui_mode = UI_MODE_BUILD;
+                switch (state.ui_building_type) {
+                    case ENTITY_HALL:
+                    case ENTITY_CAMP:
+                    case ENTITY_HOUSE:
+                    case ENTITY_SALOON:
+                    case ENTITY_BUNKER:
+                        state.ui_mode = UI_MODE_BUILD;
+                        break;
+                    case ENTITY_COOP:
+                        state.ui_mode = UI_MODE_BUILD2;
+                        break;
+                    default:
+                        log_warn("Tried to cancel with unhandled ui_building_type of %u", state.ui_building_type);
+                        state.ui_mode = UI_MODE_NONE;
+                        break;
+                }
             } else if (state.selection.size() == 1 && state.entities.get_by_id(state.selection[0]).mode == MODE_BUILDING_IN_PROGRESS) {
                 state.input_queue.push_back((input_t) {
                     .type = INPUT_BUILD_CANCEL,
@@ -376,7 +405,7 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
                         .index = BUILDING_DEQUEUE_POP_FRONT
                     }
                 });
-            } else if (state.ui_mode == UI_MODE_BUILD) {
+            } else if (state.ui_mode == UI_MODE_BUILD || state.ui_mode == UI_MODE_BUILD2) {
                 state.ui_mode = UI_MODE_NONE;
             } else if (state.ui_mode == UI_MODE_TARGET_REPAIR || state.ui_mode == UI_MODE_TARGET_ATTACK || state.ui_mode == UI_MODE_TARGET_UNLOAD) {
                 state.ui_mode = UI_MODE_NONE;
@@ -532,6 +561,9 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
         case UI_BUTTON_BUILD:
             info_text_ptr += sprintf(info_text_ptr, "Build");
             break;
+        case UI_BUTTON_BUILD2:
+            info_text_ptr += sprintf(info_text_ptr, "Advanced Build");
+            break;
         case UI_BUTTON_REPAIR:
             info_text_ptr += sprintf(info_text_ptr, "Repair");
             break;
@@ -583,7 +615,7 @@ int ui_get_garrisoned_index_hovered(const match_state_t& state) {
     SelectionType selection_type = ui_get_selection_type(state, state.selection);
     if (!(selection_type == SELECTION_TYPE_UNITS || selection_type == SELECTION_TYPE_BUILDINGS) ||
             state.selection.size() != 1 || ui_is_selecting(state) || state.ui_is_minimap_dragging || 
-            !(state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD)) {
+            !(state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD || state.ui_mode == UI_MODE_BUILD2)) {
         return -1;
     } 
 
@@ -603,7 +635,7 @@ xy ui_get_selected_unit_icon_position(uint32_t selection_index) {
 }
 
 int ui_get_selected_unit_hovered(const match_state_t& state) {
-    if (state.selection.size() < 2 || ui_is_selecting(state) || state.ui_is_minimap_dragging || !(state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD)) {
+    if (state.selection.size() < 2 || ui_is_selecting(state) || state.ui_is_minimap_dragging || !(state.ui_mode == UI_MODE_NONE || state.ui_mode == UI_MODE_BUILD || state.ui_mode == UI_MODE_BUILD2)) {
         return -1;
     } 
 
