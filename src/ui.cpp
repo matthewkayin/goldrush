@@ -47,6 +47,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
     { UI_BUTTON_BUILD_COOP, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_SALOON
+    }},
+    { UI_BUTTON_BUILD_SMITH, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_SALOON
     }}
 };
 
@@ -188,6 +192,7 @@ void ui_update_buttons(match_state_t& state) {
     }
     if (state.ui_mode == UI_MODE_BUILD2) {
         state.ui_buttons[0] = UI_BUTTON_BUILD_COOP;
+        state.ui_buttons[1] = UI_BUTTON_BUILD_SMITH;
         state.ui_buttons[5] = UI_BUTTON_CANCEL;
         return;
     }

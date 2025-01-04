@@ -289,6 +289,29 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .can_rally = true
         }
     }},
+    { ENTITY_SMITH, (entity_data_t) {
+        .name = "Blacksmith",
+        .sprite = SPRITE_BUILDING_SMITH,
+        .ui_button = UI_BUTTON_BUILD_SMITH,
+        .cell_size = 3,
+
+        .gold_cost = 150,
+        .train_duration = 0,
+        .max_health = 600,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 10, 28, 28 },
+            .builder_positions_y = { 29, 17, 4 },
+            .builder_flip_h = { false, true, true },
+            .can_rally = true
+        }
+    }},
     { ENTITY_GOLD, (entity_data_t) {
         .name = "Gold",
         .sprite = SPRITE_TILE_GOLD,

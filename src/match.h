@@ -67,6 +67,7 @@ enum EntityType {
     ENTITY_SALOON,
     ENTITY_BUNKER,
     ENTITY_COOP,
+    ENTITY_SMITH,
     ENTITY_GOLD
 };
 
