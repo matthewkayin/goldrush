@@ -247,6 +247,11 @@ void ui_update_buttons(match_state_t& state) {
             state.ui_buttons[1] = UI_BUTTON_UNIT_BANDIT;
             break;
         }
+        case ENTITY_COOP: {
+            state.ui_buttons[0] = UI_BUTTON_UNIT_JOCKEY;
+            state.ui_buttons[1] = UI_BUTTON_UNIT_WAGON;
+            break;
+        }
         default:
             break;
     }

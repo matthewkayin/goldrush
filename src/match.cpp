@@ -87,7 +87,8 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_MINER, SDLK_e },
     { UI_BUTTON_UNIT_COWBOY, SDLK_c },
     { UI_BUTTON_UNIT_WAGON, SDLK_w },
-    { UI_BUTTON_UNIT_BANDIT, SDLK_b }
+    { UI_BUTTON_UNIT_BANDIT, SDLK_b },
+    { UI_BUTTON_UNIT_JOCKEY, SDLK_e }
 };
 
 match_state_t match_init() {
@@ -1376,6 +1377,8 @@ void match_render(const match_state_t& state) {
         max_visible_tiles.y++;
     }
 
+    std::vector<render_sprite_params_t> above_fog_render_params;
+
     // Begin elevation passes
     for (uint16_t elevation = 0; elevation < 3; elevation++) {
         std::vector<render_sprite_params_t> ysorted_render_params;
@@ -1528,9 +1531,20 @@ void match_render(const match_state_t& state) {
 
         // UI move animation
         if (animation_is_playing(state.ui_move_animation) && 
-            map_get_tile(state, state.ui_move_position / TILE_SIZE).elevation == elevation) {
+                map_get_tile(state, state.ui_move_position / TILE_SIZE).elevation == elevation) {
             if (state.ui_move_animation.name == ANIMATION_UI_MOVE_CELL) {
-                render_sprite(SPRITE_UI_MOVE, state.ui_move_animation.frame, state.ui_move_position - state.camera_offset, RENDER_SPRITE_CENTERED);
+                render_sprite_params_t ui_move_params = (render_sprite_params_t) {
+                    .sprite = SPRITE_UI_MOVE,
+                    .frame = state.ui_move_animation.frame,
+                    .position = state.ui_move_position - state.camera_offset,
+                    .options = RENDER_SPRITE_CENTERED
+                };
+                xy ui_move_cell = state.ui_move_position / TILE_SIZE;
+                if (state.map_fog[network_get_player_id()][ui_move_cell.x + (ui_move_cell.y * state.map_width)] > 0) {
+                    render_sprite(ui_move_params.sprite, ui_move_params.frame, ui_move_params.position, ui_move_params.options);
+                } else {
+                    above_fog_render_params.push_back(ui_move_params);
+                }
             } else if (state.ui_move_animation.frame.x % 2 == 0) {
                 uint32_t entity_index = state.entities.get_index_of(state.ui_move_entity_id);
                 if (entity_index != INDEX_INVALID) {
@@ -1555,9 +1569,14 @@ void match_render(const match_state_t& state) {
         if (ui_get_selection_type(state, state.selection) == SELECTION_TYPE_BUILDINGS) {
             for (entity_id id : state.selection) {
                 const entity_t& building = state.entities.get_by_id(id);
+                xy rally_cell = building.rally_point / TILE_SIZE;
                 if (building.mode == MODE_BUILDING_FINISHED && building.rally_point.x != -1 &&
-                    map_get_tile(state, building.rally_point / TILE_SIZE).elevation == elevation) {
-                    ysorted_render_params.push_back((render_sprite_params_t) {
+                        map_get_tile(state, rally_cell).elevation == elevation) {
+                    // Determine whether to render above or below the fog of war
+                    std::vector<render_sprite_params_t>& sprite_params_vector = state.map_fog[building.player_id][rally_cell.x + (rally_cell.y * state.map_width)] > 0
+                                                                                    ? ysorted_render_params
+                                                                                    : above_fog_render_params;
+                    sprite_params_vector.push_back((render_sprite_params_t) {
                         .sprite = SPRITE_RALLY_FLAG,
                         .frame = state.ui_rally_flag_animation.frame,
                         .position = building.rally_point - xy(4, 15) - state.camera_offset,
@@ -1653,6 +1672,11 @@ void match_render(const match_state_t& state) {
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
+
+    // Above fog of war sprites
+    for (render_sprite_params_t params : above_fog_render_params) {
+        render_sprite(params.sprite, params.frame, params.position, params.options);
+    }
 
     // Debug pathing 
     #ifdef GOLD_DEBUG_UNIT_PATHS

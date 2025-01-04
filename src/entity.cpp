@@ -119,11 +119,36 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .unit_data = (unit_data_t) {
             .population_cost = 2,
-            .speed = fixed::from_int_and_raw_decimal(1, 40),
+            .speed = fixed::from_int_and_raw_decimal(1, 20),
 
             .damage = 0,
             .attack_cooldown = 0,
             .range_squared = 1
+        }
+    }},
+    { ENTITY_JOCKEY, (entity_data_t) {
+        .name = "Jockey",
+        .sprite = SPRITE_UNIT_JOCKEY,
+        .ui_button = UI_BUTTON_UNIT_JOCKEY,
+        .cell_size = 1,
+
+        .gold_cost = 125,
+        .train_duration = 35,
+        .max_health = 50,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 2,
+            .speed = fixed::from_int_and_raw_decimal(1, 40),
+
+            .damage = 6,
+            .attack_cooldown = 30,
+            .range_squared = 25
         }
     }},
     { ENTITY_HALL, (entity_data_t) {
@@ -1157,7 +1182,18 @@ uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity
         return entity_get_elevation(state, state.entities.get_by_id(entity.garrison_id));
     }
 
+
     uint16_t elevation = state.map_tiles[entity.cell.x + (entity.cell.y * state.map_width)].elevation;
+
+    if (entity.type == ENTITY_JOCKEY) {
+        for (int y = 0; y < 2; y++) {
+            xy above_cell = entity.cell - xy(0, y + 1);
+            if (map_is_cell_in_bounds(state, above_cell) && map_is_tile_ramp(state, above_cell)) {
+                elevation = std::max(elevation, state.map_tiles[above_cell.x + (above_cell.y * state.map_width)].elevation);
+            }
+        }
+    }
+
     for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size(entity.type); x++) {
         for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
             elevation = std::max(elevation, state.map_tiles[x + (y * state.map_width)].elevation);
@@ -1680,7 +1716,7 @@ xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int buildi
             exit_cell = cell;
             exit_cell_dist = cell_dist;
         }
-        cell = xy(x, building_cell.y + building_size + (unit_size - 1));
+        cell = xy(x, building_cell.y + building_size);
         cell_dist = xy::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(state, cell, unit_size) && 
            !map_is_cell_rect_occupied(state, cell, unit_size) && 
@@ -1698,7 +1734,7 @@ xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int buildi
             exit_cell = cell;
             exit_cell_dist = cell_dist;
         }
-        cell = xy(building_cell.x + building_size + (unit_size - 1), y);
+        cell = xy(building_cell.x + building_size, y);
         cell_dist = xy::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(state, cell, unit_size) && 
            !map_is_cell_rect_occupied(state, cell, unit_size) && 
