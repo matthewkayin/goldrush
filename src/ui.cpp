@@ -254,7 +254,13 @@ void ui_update_buttons(match_state_t& state) {
         }
         case ENTITY_COOP: {
             state.ui_buttons[0] = UI_BUTTON_UNIT_JOCKEY;
-            state.ui_buttons[1] = UI_BUTTON_UNIT_WAGON;
+            state.ui_buttons[1] = match_player_has_upgrade(state, network_get_player_id(), UPGRADE_WAR_WAGON) ? UI_BUTTON_UNIT_WAR_WAGON : UI_BUTTON_UNIT_WAGON;
+            break;
+        }
+        case ENTITY_SMITH: {
+            if (match_player_upgrade_is_available(state, network_get_player_id(), UPGRADE_WAR_WAGON)) {
+                state.ui_buttons[0] = UI_BUTTON_RESEARCH_WAR_WAGON;
+            }
             break;
         }
         default:
@@ -297,9 +303,6 @@ void ui_add_chat_message(match_state_t& state, std::string message) {
 }
 
 int ui_get_ui_button_hovered(const match_state_t& state) {
-    if (state.ui_button_pressed != -1) {
-        return state.ui_button_pressed;
-    }
     if (ui_is_selecting(state) || state.ui_is_minimap_dragging || state.ui_mode >= UI_MODE_CHAT) {
         return -1;
     } 
@@ -423,6 +426,32 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
         }
         default:
             break;
+    }
+
+    for (auto it : UPGRADE_DATA) {
+        if (it.second.ui_button == button) {
+            if (!match_player_upgrade_is_available(state, network_get_player_id(), it.first)) {
+                return;
+            }
+
+            if (state.player_gold[network_get_player_id()] < it.second.gold_cost) {
+                ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
+                return;
+            }
+
+            state.input_queue.push_back((input_t) {
+                .type = INPUT_BUILDING_ENQUEUE,
+                .building_enqueue = (input_building_enqueue_t) {
+                    .building_id = state.selection[0],
+                    .item = (building_queue_item_t) {
+                        .type = BUILDING_QUEUE_ITEM_UPGRADE,
+                        .upgrade = it.first
+                    }
+                }
+            });
+
+            return;
+        }
     }
 
     for (auto it : ENTITY_DATA) {
@@ -587,6 +616,14 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
             info_text_ptr += sprintf(info_text_ptr, "Cancel");
             break;
         default: {
+            for (auto upgrade_data_it : UPGRADE_DATA) {
+                if (upgrade_data_it.second.ui_button == button) {
+                    info_text_ptr += sprintf(info_text_ptr, "Research %s", upgrade_data_it.second.name);
+                    info.gold_cost = upgrade_data_it.second.gold_cost;
+                    break; // breaks for upgrade_data_it
+                }
+            }
+
             for (auto entity_data_it : ENTITY_DATA) {
                 if (entity_data_it.second.ui_button == button) {
                     info_text_ptr += sprintf(info_text_ptr, "%s %s", entity_is_unit(entity_data_it.first) ? "Hire" : "Build", entity_data_it.second.name);
@@ -597,7 +634,8 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
                     break; // breaks for entity_data_it
                 }
             }
-            break;
+
+            break; 
         }
     }
 

@@ -88,8 +88,19 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_MINER, SDLK_e },
     { UI_BUTTON_UNIT_COWBOY, SDLK_c },
     { UI_BUTTON_UNIT_WAGON, SDLK_w },
+    { UI_BUTTON_UNIT_WAR_WAGON, SDLK_w },
     { UI_BUTTON_UNIT_BANDIT, SDLK_b },
-    { UI_BUTTON_UNIT_JOCKEY, SDLK_e }
+    { UI_BUTTON_UNIT_JOCKEY, SDLK_e },
+    { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w }
+};
+
+const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
+    { UPGRADE_WAR_WAGON, (upgrade_data_t) {
+            .name = "Wagon Armor",
+            .ui_button = UI_BUTTON_RESEARCH_WAR_WAGON,
+            .gold_cost = 200,
+            .research_duration = 60
+    }}
 };
 
 match_state_t match_init() {
@@ -97,7 +108,6 @@ match_state_t match_init() {
 
     state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
     state.ui_status_timer = 0;
-    state.ui_button_pressed = -1;
     state.ui_is_minimap_dragging = false;
     state.select_rect_origin = xy(-1, -1);
     state.control_group_selected = -1;
@@ -133,6 +143,8 @@ match_state_t match_init() {
         }
 
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
+        state.player_upgrades[player_id] = 0;
+        state.player_upgrades_in_progress[player_id] = 0;
         state.map_fog[player_id] = std::vector<int>(state.map_width * state.map_height, FOG_HIDDEN);
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
@@ -259,12 +271,12 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     }
 
     // UI button press
-    if (state.ui_button_pressed == -1 && event.type == SDL_MOUSEBUTTONDOWN && ui_get_ui_button_hovered(state) != -1) {
-        state.ui_button_pressed = ui_get_ui_button_hovered(state);
+    if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_ui_button_hovered(state) != -1) {
+        ui_handle_ui_button_press(state, state.ui_buttons[ui_get_ui_button_hovered(state)]);
         return;
     }
     // UI button hotkey press
-    if (state.ui_button_pressed == -1 && event.type == SDL_KEYDOWN) {
+    if (event.type == SDL_KEYDOWN) {
         for (int button_index = 0; button_index < UI_BUTTONSET_SIZE; button_index++) {
             UiButton button = state.ui_buttons[button_index];
             if (button == UI_BUTTON_NONE) {
@@ -307,16 +319,6 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
                 .index = (uint16_t)ui_get_building_queue_item_hovered(state)
             }
         });
-    }
-
-    // UI button release
-    if (state.ui_button_pressed != -1 && 
-        ((event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) || 
-         (event.type == SDL_KEYUP && event.key.keysym.sym == hotkeys.at(state.ui_buttons[state.ui_button_pressed])))) {
-        UiButton button_pressed = state.ui_buttons[state.ui_button_pressed];
-        state.ui_button_pressed = -1;
-        ui_handle_ui_button_press(state, button_pressed);
-        return;
     }
 
     // UI building place
@@ -863,6 +865,18 @@ uint32_t match_get_player_max_population(const match_state_t& state, uint8_t pla
     return max_population;
 }
 
+bool match_player_has_upgrade(const match_state_t& state, uint8_t player_id, uint32_t upgrade) {
+    return (state.player_upgrades[player_id] & upgrade) == upgrade;
+}
+
+bool match_player_upgrade_is_available(const match_state_t& state, uint8_t player_id, uint32_t upgrade) {
+    return ((state.player_upgrades[player_id] | state.player_upgrades_in_progress[player_id]) & upgrade) == 0;
+}
+
+void match_grant_player_upgrade(match_state_t& state, uint8_t player_id, uint32_t upgrade) {
+    state.player_upgrades[player_id] = upgrade;
+}
+
 input_t match_create_move_input(const match_state_t& state) {
     // Determine move target
     xy move_target;
@@ -1292,14 +1306,29 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         }
         case INPUT_BUILDING_ENQUEUE: {
             uint32_t building_index = state.entities.get_index_of(input.building_enqueue.building_id);
+            building_queue_item_t item = input.building_enqueue.item;
             if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
                 return;
             }
-            if (state.player_gold[player_id] < building_queue_item_cost(input.building_enqueue.item)) {
+            if (state.player_gold[player_id] < building_queue_item_cost(item)) {
                 return;
             }
             if (state.entities[building_index].queue.size() == BUILDING_QUEUE_MAX) {
                 return;
+            }
+            // Reject this enqueue if the upgrade is already being researched
+            if (item.type == BUILDING_QUEUE_ITEM_UPGRADE && !match_player_upgrade_is_available(state, player_id, item.upgrade)) {
+                return;
+            }
+
+            // Check if player has the war wagon upgrade
+            if (item.type == BUILDING_QUEUE_ITEM_UNIT && item.unit_type == ENTITY_WAGON && match_player_has_upgrade(state, player_id, UPGRADE_WAR_WAGON)) {
+                item.unit_type = ENTITY_WAR_WAGON;
+            }
+
+            // Mark upgrades as in-progress when we enqueue them
+            if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
+                state.player_upgrades_in_progress[player_id] |= item.upgrade;
             }
 
             state.player_gold[player_id] -= building_queue_item_cost(input.building_enqueue.item);
@@ -1869,7 +1898,7 @@ void match_render(const match_state_t& state) {
         }
 
         bool is_button_hovered = ui_get_ui_button_hovered(state) == i && ui_button_requirements_met(state, ui_button);
-        bool is_button_pressed = state.ui_button_pressed == i;
+        bool is_button_pressed = is_button_hovered && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON_LEFT) != 0;
         xy offset = is_button_pressed ? xy(1, 1) : (is_button_hovered ? xy(0, -1) : xy(0, 0));
         int button_state = 0;
         if (!ui_button_requirements_met(state, ui_button)) {

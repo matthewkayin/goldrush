@@ -301,6 +301,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 3,
         .strategy = SPRITE_IMPORT_RECOLOR
     }},
+    { SPRITE_UNIT_WAR_WAGON, (sprite_params_t) {
+        .path = "sprite/unit_war_wagon.png",
+        .hframes = 15,
+        .vframes = 3,
+        .strategy = SPRITE_IMPORT_RECOLOR
+    }},
     { SPRITE_UNIT_BANDIT, (sprite_params_t) {
         .path = "sprite/unit_bandit.png",
         .hframes = 15,

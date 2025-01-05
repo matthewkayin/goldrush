@@ -60,6 +60,7 @@ enum EntityType {
     ENTITY_COWBOY,
     ENTITY_BANDIT,
     ENTITY_WAGON,
+    ENTITY_WAR_WAGON,
     ENTITY_JOCKEY,
     ENTITY_HALL,
     ENTITY_CAMP,
@@ -125,13 +126,15 @@ struct target_t {
 };
 
 enum BuildingQueueItemType: uint8_t {
-    BUILDING_QUEUE_ITEM_UNIT
+    BUILDING_QUEUE_ITEM_UNIT,
+    BUILDING_QUEUE_ITEM_UPGRADE
 };
 
 struct building_queue_item_t {
     BuildingQueueItemType type;
     union {
         EntityType unit_type;
+        uint32_t upgrade;
     };
 };
 
@@ -305,6 +308,19 @@ struct particle_t {
     xy position;
 };
 
+// Upgrades
+
+const uint32_t UPGRADE_WAR_WAGON = 1;
+
+struct upgrade_data_t {
+    const char* name;
+    UiButton ui_button;
+    uint32_t gold_cost;
+    uint32_t research_duration;
+};
+
+extern const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA;
+
 // Input
 
 enum InputType: uint8_t {
@@ -401,7 +417,6 @@ struct match_state_t {
     UiMode ui_mode;
     UiButton ui_buttons[6];
     bool ui_is_minimap_dragging;
-    int ui_button_pressed;
     xy camera_offset;
     xy select_rect_origin;
     SDL_Rect select_rect;
@@ -436,6 +451,8 @@ struct match_state_t {
     std::vector<particle_t> particles;
 
     uint32_t player_gold[MAX_PLAYERS];
+    uint32_t player_upgrades[MAX_PLAYERS];
+    uint32_t player_upgrades_in_progress[MAX_PLAYERS];
 };
 
 match_state_t match_init();
@@ -443,6 +460,9 @@ void match_handle_input(match_state_t& state, SDL_Event e);
 void match_update(match_state_t& state);
 uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id);
 uint32_t match_get_player_max_population(const match_state_t& state, uint8_t player_id);
+bool match_player_has_upgrade(const match_state_t& state, uint8_t player_id, uint32_t upgrade);
+bool match_player_upgrade_is_available(const match_state_t& state, uint8_t player_id, uint32_t upgrade);
+void match_grant_player_upgrade(match_state_t& state, uint8_t player_id, uint32_t upgrade);
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
 input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input);

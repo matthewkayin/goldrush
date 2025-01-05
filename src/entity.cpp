@@ -126,6 +126,31 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .range_squared = 1
         }
     }},
+    { ENTITY_WAR_WAGON, (entity_data_t) {
+        .name = "War Wagon",
+        .sprite = SPRITE_UNIT_WAR_WAGON,
+        .ui_button = UI_BUTTON_UNIT_WAR_WAGON,
+        .cell_size = 2,
+
+        .gold_cost = 150,
+        .train_duration = 38,
+        .max_health = 100,
+        .sight = 7,
+        .armor = 2,
+        .attack_priority = 1,
+
+        .garrison_capacity = 4,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 2,
+            .speed = fixed::from_int_and_raw_decimal(1, 20),
+
+            .damage = 0,
+            .attack_cooldown = 0,
+            .range_squared = 1
+        }
+    }},
     { ENTITY_JOCKEY, (entity_data_t) {
         .name = "Jockey",
         .sprite = SPRITE_UNIT_JOCKEY,
@@ -1077,6 +1102,39 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         entity_building_dequeue(state, entity);
+                    } else if (entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UPGRADE) {
+                        match_grant_player_upgrade(state, entity.player_id, entity.queue[0].upgrade);
+
+                        // Set all existing wagons to war wagons
+                        for (entity_t& other_entity : state.entities) {
+                            if (other_entity.player_id != entity.player_id) {
+                                continue;
+                            }
+                            if (other_entity.type == ENTITY_WAGON) {
+                                other_entity.type = ENTITY_WAR_WAGON;
+                            } else if (entity_is_building(other_entity.type)) {
+                                for (building_queue_item_t& other_item : other_entity.queue) {
+                                    if (other_item.type == BUILDING_QUEUE_ITEM_UNIT && other_item.unit_type == ENTITY_WAGON) {
+                                        other_item.unit_type = ENTITY_WAR_WAGON;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Create alert
+                        SDL_Rect building_rect = entity_get_rect(entity);
+                        building_rect.x -= state.camera_offset.x;
+                        building_rect.y -= state.camera_offset.y;
+                        if (entity.player_id == network_get_player_id() && SDL_HasIntersection(&SCREEN_RECT, &building_rect) != SDL_TRUE) {
+                            state.alerts.push_back((alert_t) {
+                                .color = ALERT_COLOR_GREEN,
+                                .cell = entity.cell,
+                                .cell_size = entity_cell_size(entity.type),
+                                .timer = MATCH_ALERT_TOTAL_DURATION
+                            });
+                        }
+
+                        entity_building_dequeue(state, entity);
                     }
                 } else if (entity.timer != 0) {
                     entity.timer--;
@@ -1906,6 +1964,12 @@ void entity_building_enqueue(match_state_t& state, entity_t& building, building_
 
 void entity_building_dequeue(match_state_t& state, entity_t& building) {
     GOLD_ASSERT(!building.queue.empty());
+
+    building_queue_item_t& dequeued_item = *building.queue.begin();
+    if (dequeued_item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
+        state.player_upgrades_in_progress[building.player_id] &= ~dequeued_item.upgrade;
+    }
+
     building.queue.erase(building.queue.begin());
     if (building.queue.empty()) {
         building.timer = 0;
@@ -1937,6 +2001,9 @@ UiButton building_queue_item_icon(const building_queue_item_t& item) {
         case BUILDING_QUEUE_ITEM_UNIT: {
             return ENTITY_DATA.at(item.unit_type).ui_button;
         }
+        case BUILDING_QUEUE_ITEM_UPGRADE: {
+            return UPGRADE_DATA.at(item.upgrade).ui_button;
+        }
     }
 }
 
@@ -1945,6 +2012,9 @@ uint32_t building_queue_item_duration(const building_queue_item_t& item) {
         case BUILDING_QUEUE_ITEM_UNIT: {
             return ENTITY_DATA.at(item.unit_type).train_duration * 60;
         }
+        case BUILDING_QUEUE_ITEM_UPGRADE: {
+            return UPGRADE_DATA.at(item.upgrade).research_duration * 60;
+        }
     }
 }
 
@@ -1952,6 +2022,9 @@ uint32_t building_queue_item_cost(const building_queue_item_t& item) {
     switch (item.type) {
         case BUILDING_QUEUE_ITEM_UNIT: {
             return ENTITY_DATA.at(item.unit_type).gold_cost;
+        }
+        case BUILDING_QUEUE_ITEM_UPGRADE: {
+            return UPGRADE_DATA.at(item.upgrade).gold_cost;
         }
     }
 }
