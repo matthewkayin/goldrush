@@ -13,12 +13,10 @@ static const uint32_t UNIT_MAX_GOLD_HELD = 10;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
 static const uint32_t ENTITY_BUNKER_FIRE_OFFSET = 10;
-static const xy ENTITY_BUNKER_PARTICLE_OFFSETS[4] = {
-    xy(3, 23), 
-    xy(11, 26),
-    xy(20, 25),
-    xy(28, 23)
-};
+static const xy ENTITY_BUNKER_PARTICLE_OFFSETS[4] = { xy(3, 23), xy(11, 26), xy(20, 25), xy(28, 23) };
+static const xy ENTITY_WAR_WAGON_DOWN_PARTICLE_OFFSETS[4] = { xy(14, 6), xy(17, 8), xy(21, 6), xy(24, 8) };
+static const xy ENTITY_WAR_WAGON_UP_PARTICLE_OFFSETS[4] = { xy(16, 20), xy(18, 22), xy(21, 20), xy(23, 22) };
+static const xy ENTITY_WAR_WAGON_RIGHT_PARTICLE_OFFSETS[4] = { xy(7, 18), xy(11, 19), xy(12, 20), xy(16, 18) };
 static const uint32_t ENTITY_CANNOT_GARRISON = 0;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 static const uint32_t UNIT_HEALTH_REGEN_DELAY = 10 * 60;
@@ -381,6 +379,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.animation = animation_create(ANIMATION_UNIT_IDLE);
 
     entity.garrison_id = ID_NULL;
+    entity.bunker_cooldown_timer = 0;
     entity.gold_held = 0;
     entity.gold_patch_id = GOLD_PATCH_ID_NULL;
 
@@ -409,7 +408,7 @@ entity_id entity_create_gold(match_state_t& state, xy cell, uint32_t gold_left, 
     entity.gold_held = gold_left;
     entity.gold_patch_id = gold_patch_id;
 
-    entity.animation.frame = xy(lcg_short_rand() % 3, 0);
+    entity.animation.frame = xy(lcg_rand() % 3, 0);
 
     entity_id id = state.entities.push_back(entity);
     map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
@@ -500,7 +499,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 // Unit is garrisoned
                 if (entity.garrison_id != ID_NULL) {
                     const entity_t& carrier = state.entities.get_by_id(entity.garrison_id);
-                    if (carrier.type != ENTITY_BUNKER) {
+                    if (!(carrier.type == ENTITY_BUNKER || carrier.type == ENTITY_WAR_WAGON)) {
                         update_finished = true;
                         break;
                     } 
@@ -530,6 +529,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 }
 
                 if (entity_check_flag(entity, ENTITY_FLAG_HOLD_POSITION) || entity.garrison_id != ID_NULL) {
+                    // Throw away targets if garrisoned. This prevents bunkered units from fixating on a target they can no longer reach
+                    if (entity.garrison_id != ID_NULL) {
+                        entity.target = (target_t) { .type = TARGET_NONE };
+                    }
                     update_finished = true;
                     break;
                 }
@@ -763,14 +766,14 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && entity_data.unit_data.damage != 0) {
                             if (entity.garrison_id != ID_NULL) {
-                                entity_t& bunker = state.entities.get_by_id(entity.garrison_id);
+                                entity_t& carrier = state.entities.get_by_id(entity.garrison_id);
                                 // Don't attack during bunker cooldown or if this is a melee unit
-                                if (bunker.timer != 0 || entity_data.unit_data.range_squared == 1) {
+                                if (carrier.bunker_cooldown_timer != 0 || entity_data.unit_data.range_squared == 1) {
                                     update_finished = true;
                                     break;
                                 }
 
-                                bunker.timer = ENTITY_BUNKER_FIRE_OFFSET;
+                                carrier.bunker_cooldown_timer = ENTITY_BUNKER_FIRE_OFFSET;
                             }
 
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
@@ -1136,9 +1139,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         entity_building_dequeue(state, entity);
                     }
-                } else if (entity.timer != 0) {
-                    entity.timer--;
-                }
+                } 
 
                 update_finished = true;
                 break;
@@ -1155,6 +1156,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 break;
         }
     } // End while !update_finished
+
+    if (entity.bunker_cooldown_timer != 0) {
+        entity.bunker_cooldown_timer--;
+    }
 
     if (entity.taking_damage_timer != 0) {
         entity.taking_damage_timer--;
@@ -1707,11 +1712,14 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
     int attacker_damage = ENTITY_DATA.at(attacker.type).unit_data.damage;
     int defender_armor = ENTITY_DATA.at(defender.type).armor;
     int damage = std::max(1, attacker_damage - defender_armor);
+    int accuracy = 100;
 
     if (entity_get_elevation(state, attacker) < entity_get_elevation(state, defender)) {
-        if (lcg_rand() % 2 == 0) {
-            attack_missed = true;
-        }
+        accuracy /= 2;
+    }
+
+    if (accuracy < lcg_rand() % 100) {
+        attack_missed = true;
     }
     
     if (!attack_missed) {
@@ -1727,7 +1735,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
             state.particles.push_back((particle_t) {
                 .sprite = SPRITE_PARTICLE_SPARKS,
                 .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
-                .vframe = lcg_short_rand() % 3,
+                .vframe = lcg_rand() % 3,
                 .position = particle_position
             });
         }
@@ -1735,13 +1743,30 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
 
     // Add bunker particle for garrisoned unit. Happens even if they miss
     if (attacker.garrison_id != ID_NULL) {
-        entity_t& bunker = state.entities.get_by_id(attacker.garrison_id);
-        int particle_index = lcg_short_rand() % 4;
+        entity_t& carrier = state.entities.get_by_id(attacker.garrison_id);
+        int particle_index = lcg_rand() % 4;
+        xy particle_position;
+        if (carrier.type == ENTITY_BUNKER) {
+            particle_position = (carrier.cell * TILE_SIZE) + ENTITY_BUNKER_PARTICLE_OFFSETS[particle_index];
+        } else if (carrier.type == ENTITY_WAR_WAGON) {
+            particle_position = carrier.position.to_xy() - (engine.sprites[SPRITE_UNIT_WAR_WAGON].frame_size / 2);
+            if (carrier.direction == DIRECTION_SOUTH) {
+                particle_position += ENTITY_WAR_WAGON_DOWN_PARTICLE_OFFSETS[particle_index];
+            } else if (carrier.direction == DIRECTION_NORTH) {
+                particle_position += ENTITY_WAR_WAGON_UP_PARTICLE_OFFSETS[particle_index];
+            } else {
+                xy offset = ENTITY_WAR_WAGON_RIGHT_PARTICLE_OFFSETS[particle_index];
+                if (carrier.direction > DIRECTION_SOUTH) {
+                    offset.x = engine.sprites[SPRITE_UNIT_WAR_WAGON].frame_size.x - offset.x;
+                }
+                particle_position += offset;
+            }
+        }
         state.particles.push_back((particle_t) {
             .sprite = SPRITE_PARTICLE_BUNKER_COWBOY,
             .animation = animation_create(ANIMATION_PARTICLE_BUNKER_COWBOY),
             .vframe = 0,
-            .position = (bunker.cell * TILE_SIZE) + ENTITY_BUNKER_PARTICLE_OFFSETS[particle_index]
+            .position = particle_position
         });
     }
 

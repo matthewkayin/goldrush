@@ -135,7 +135,7 @@ match_state_t match_init() {
         }
 
         // Determine player spawn
-        int spawn_index = lcg_short_rand() % player_spawns.size();
+        int spawn_index = lcg_rand() % player_spawns.size();
         xy player_spawn = player_spawns[spawn_index];
         player_spawns.erase(player_spawns.begin() + spawn_index);
         if (player_id == network_get_player_id()) {
@@ -1567,7 +1567,8 @@ void match_render(const match_state_t& state) {
                     .sprite = SPRITE_UI_MOVE,
                     .frame = state.ui_move_animation.frame,
                     .position = state.ui_move_position - state.camera_offset,
-                    .options = RENDER_SPRITE_CENTERED
+                    .options = RENDER_SPRITE_CENTERED,
+                    .recolor_id = RECOLOR_NONE
                 };
                 xy ui_move_cell = state.ui_move_position / TILE_SIZE;
                 if (state.map_fog[network_get_player_id()][ui_move_cell.x + (ui_move_cell.y * state.map_width)] > 0) {
@@ -1705,7 +1706,7 @@ void match_render(const match_state_t& state) {
 
     // Above fog of war sprites
     for (render_sprite_params_t params : above_fog_render_params) {
-        render_sprite(params.sprite, params.frame, params.position, params.options);
+        render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_id);
     }
 
     // Debug pathing 

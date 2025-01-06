@@ -127,8 +127,8 @@ void animation_init() {
     ANIMATION_DATA[ANIMATION_PARTICLE_BUNKER_COWBOY] = (animation_data_t) {
         .vframe = -1,
         .frames = {
-            (animation_frame_t) { .hframe = 0, .duration = 8 },
-            (animation_frame_t) { .hframe = 1, .duration = 8 },
+            (animation_frame_t) { .hframe = 0, .duration = 4 },
+            (animation_frame_t) { .hframe = 1, .duration = 4 },
         },
         .loops = 1
     };

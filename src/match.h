@@ -163,6 +163,7 @@ struct entity_t {
 
     std::vector<entity_id> garrisoned_units;
     entity_id garrison_id;
+    uint32_t bunker_cooldown_timer;
 
     uint32_t gold_held;
     uint32_t gold_patch_id;

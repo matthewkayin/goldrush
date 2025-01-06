@@ -149,7 +149,7 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
     }
 
     while (!frontier.empty()) {
-        int next_index = lcg_short_rand() % frontier.size();
+        int next_index = lcg_rand() % frontier.size();
         xy next = frontier[next_index];
 
         int child_attempts = 0;
@@ -157,7 +157,7 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
         xy child;
         while (!child_is_valid && child_attempts < 30) {
             child_attempts++;
-            child = next + circle_offset_points[lcg_short_rand() % circle_offset_points.size()];
+            child = next + circle_offset_points[lcg_rand() % circle_offset_points.size()];
             child_is_valid = poisson_is_point_valid(state, params, child);
         }
         if (child_is_valid) {
@@ -282,7 +282,7 @@ std::vector<xy> map_init(match_state_t& state) {
 
                     // Regular sand tile 
                     if (neighbors == 0) {
-                        int new_index = lcg_short_rand() % 7;
+                        int new_index = lcg_rand() % 7;
                         if (new_index < 4 && index % 3 == 0) {
                             state.map_tiles[index].index = new_index == 1 ? engine.tile_index[TILE_SAND3] : engine.tile_index[TILE_SAND2];
                         } else {
@@ -572,11 +572,11 @@ std::vector<xy> map_init(match_state_t& state) {
     for (uint32_t patch_id = 0; patch_id < gold_sample.size(); patch_id++) {
         // Choose an adjacent direction to walk in
         int patch_size = 0;
-        int patch_goal = 3 + (lcg_short_rand() % 10);
+        int patch_goal = 3 + (lcg_rand() % 10);
         std::vector<xy> gold_frontier;
         gold_frontier.push_back(gold_sample[patch_id]);
         while (patch_size < patch_goal && !gold_frontier.empty()) {
-            int next_index = lcg_short_rand() % gold_frontier.size();
+            int next_index = lcg_rand() % gold_frontier.size();
             xy next = gold_frontier[next_index];
             gold_frontier.erase(gold_frontier.begin() + next_index);
 
@@ -612,7 +612,7 @@ std::vector<xy> map_init(match_state_t& state) {
     params.allow_unreachable_cells = true;
     std::vector<xy> decoration_cells = poisson_disk(state, params);
     for (xy cell : decoration_cells) {
-        state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_DECORATION_1 + (lcg_short_rand() % 5);
+        state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_DECORATION_1 + (lcg_rand() % 5);
     }
 
     return player_spawns;
