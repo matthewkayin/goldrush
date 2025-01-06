@@ -132,6 +132,33 @@ void animation_init() {
         },
         .loops = 1
     };
+    ANIMATION_DATA[ANIMATION_SMITH_BEGIN] = (animation_data_t) {
+        .vframe = 0,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 8 },
+            (animation_frame_t) { .hframe = 1, .duration = 8 },
+            (animation_frame_t) { .hframe = 2, .duration = 8 },
+            (animation_frame_t) { .hframe = 3, .duration = 8 },
+        },
+        .loops = 1
+    };
+    ANIMATION_DATA[ANIMATION_SMITH_LOOP] = (animation_data_t) {
+        .vframe = 0,
+        .frames = {
+            (animation_frame_t) { .hframe = 4, .duration = 8 },
+            (animation_frame_t) { .hframe = 5, .duration = 8 },
+            (animation_frame_t) { .hframe = 6, .duration = 8 }
+        },
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
+    ANIMATION_DATA[ANIMATION_SMITH_END] = (animation_data_t) {
+        .vframe = 0,
+        .frames = {
+            (animation_frame_t) { .hframe = 7, .duration = 8 },
+            (animation_frame_t) { .hframe = 8, .duration = 8 }
+        },
+        .loops = 1
+    };
 }
 
 animation_t animation_create(AnimationName name) {

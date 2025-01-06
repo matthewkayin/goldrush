@@ -1625,6 +1625,13 @@ void match_render(const match_state_t& state) {
         }
     } // End for each elevation
 
+    // Smith animation
+    for (const entity_t& entity : state.entities) {
+        if (entity.type == ENTITY_SMITH && entity.animation.name != ANIMATION_UNIT_IDLE && map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
+            render_sprite(SPRITE_BUILDING_SMITH_ANIMATION, entity.animation.frame, entity.position.to_xy() - xy(0, 16) - state.camera_offset);
+        }
+    }
+
     // Particles
     for (const particle_t& particle : state.particles) {
         if (!map_is_cell_rect_revealed(state, network_get_player_id(), particle.position / TILE_SIZE, 1)) {

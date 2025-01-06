@@ -1184,7 +1184,18 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             entity.animation = animation_create(expected_animation);
         }
         animation_update(entity.animation);
-    } 
+    } else if (entity.type == ENTITY_SMITH) {
+        if (entity.queue.empty() && entity.animation.name != ANIMATION_UNIT_IDLE && entity.animation.name != ANIMATION_SMITH_END) {
+            entity.animation = animation_create(ANIMATION_SMITH_END);
+        } else if (entity.animation.name == ANIMATION_SMITH_END && !animation_is_playing(entity.animation)) {
+            entity.animation = animation_create(ANIMATION_UNIT_IDLE);
+        } else if (!entity.queue.empty() && entity.animation.name == ANIMATION_UNIT_IDLE) {
+            entity.animation = animation_create(ANIMATION_SMITH_BEGIN);
+        } else if (entity.animation.name == ANIMATION_SMITH_BEGIN && !animation_is_playing(entity.animation)) {
+            entity.animation = animation_create(ANIMATION_SMITH_LOOP);
+        }
+        animation_update(entity.animation);
+    }
 }
 
 bool entity_is_unit(EntityType type) {
