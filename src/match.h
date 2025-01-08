@@ -62,6 +62,7 @@ enum EntityType {
     ENTITY_WAGON,
     ENTITY_WAR_WAGON,
     ENTITY_JOCKEY,
+    ENTITY_SAPPER,
     ENTITY_HALL,
     ENTITY_CAMP,
     ENTITY_HOUSE,
@@ -245,13 +246,15 @@ enum UiMode {
 };
 
 enum UiButtonRequirementsType {
-    UI_BUTTON_REQUIRES_BUILDING
+    UI_BUTTON_REQUIRES_BUILDING,
+    UI_BUTTON_REQUIRES_UPGRADE
 };
 
 struct ui_button_requirements_t {
     UiButtonRequirementsType type;
     union {
         EntityType building_type;
+        uint32_t upgrade;
     };
 };
 
@@ -312,6 +315,7 @@ struct particle_t {
 // Upgrades
 
 const uint32_t UPGRADE_WAR_WAGON = 1;
+const uint32_t UPGRADE_EXPLOSIVES = 2;
 
 struct upgrade_data_t {
     const char* name;

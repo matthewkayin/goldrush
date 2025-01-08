@@ -51,7 +51,11 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
     { UI_BUTTON_BUILD_SMITH, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_SALOON
-    }}
+    }},
+    { UI_BUTTON_UNIT_SAPPER, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_UPGRADE,
+        .upgrade = UPGRADE_EXPLOSIVES
+    }},
 };
 
 bool ui_is_mouse_in_ui() {
@@ -250,6 +254,7 @@ void ui_update_buttons(match_state_t& state) {
         case ENTITY_SALOON: {
             state.ui_buttons[0] = UI_BUTTON_UNIT_COWBOY;
             state.ui_buttons[1] = UI_BUTTON_UNIT_BANDIT;
+            state.ui_buttons[2] = UI_BUTTON_UNIT_SAPPER;
             break;
         }
         case ENTITY_COOP: {
@@ -260,6 +265,9 @@ void ui_update_buttons(match_state_t& state) {
         case ENTITY_SMITH: {
             if (match_player_upgrade_is_available(state, network_get_player_id(), UPGRADE_WAR_WAGON)) {
                 state.ui_buttons[0] = UI_BUTTON_RESEARCH_WAR_WAGON;
+            }
+            if (match_player_upgrade_is_available(state, network_get_player_id(), UPGRADE_EXPLOSIVES)) {
+                state.ui_buttons[1] = UI_BUTTON_RESEARCH_EXPLOSIVES;
             }
             break;
         }
@@ -336,6 +344,9 @@ bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
                 }
             }
             return false;
+        }
+        case UI_BUTTON_REQUIRES_UPGRADE: {
+            return match_player_has_upgrade(state, network_get_player_id(), UPGRADE_EXPLOSIVES);
         }
     }
 }
@@ -583,6 +594,10 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
         switch (button_requirements_it->second.type) {
             case UI_BUTTON_REQUIRES_BUILDING: {
                 info_text_ptr += sprintf(info_text_ptr, "%s", ENTITY_DATA.at(button_requirements_it->second.building_type).name);
+                break;
+            }
+            case UI_BUTTON_REQUIRES_UPGRADE: {
+                info_text_ptr += sprintf(info_text_ptr, "%s", UPGRADE_DATA.at(button_requirements_it->second.upgrade).name);
                 break;
             }
         }

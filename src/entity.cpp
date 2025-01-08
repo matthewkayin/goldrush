@@ -174,6 +174,31 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .range_squared = 25
         }
     }},
+    { ENTITY_SAPPER, (entity_data_t) {
+        .name = "Sapper",
+        .sprite = SPRITE_UNIT_SAPPER,
+        .ui_button = UI_BUTTON_UNIT_SAPPER,
+        .cell_size = 1,
+
+        .gold_cost = 150,
+        .train_duration = 30,
+        .max_health = 50,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 225),
+
+            .damage = 1,
+            .attack_cooldown = 15,
+            .range_squared = 1
+        }
+    }},
     { ENTITY_HALL, (entity_data_t) {
         .name = "Town Hall",
         .sprite = SPRITE_BUILDING_HALL,
@@ -332,7 +357,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .builder_positions_x = { 10, 28, 28 },
             .builder_positions_y = { 29, 17, 4 },
             .builder_flip_h = { false, true, true },
-            .can_rally = true
+            .can_rally = false
         }
     }},
     { ENTITY_GOLD, (entity_data_t) {
@@ -763,6 +788,30 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         entity_t& target = state.entities.get_by_id(entity.target.id);
 
+                        // Sapper explosion
+                        if (entity.target.type == TARGET_ATTACK_ENTITY && entity.type == ENTITY_SAPPER) {
+                            // TODO damage
+
+                            // Kill the entity
+                            map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
+                            ui_deselect_entity_if_selected(state, id);
+                            entity.health = 0;
+                            entity.mode = MODE_UNIT_DEATH_FADE;
+                            entity.animation = animation_create(ANIMATION_UNIT_DEATH_FADE);
+
+                            // Create particle
+                            state.particles.push_back((particle_t) {
+                                .sprite = SPRITE_PARTICLE_EXPLOSION,
+                                .animation = animation_create(ANIMATION_PARTICLE_EXPLOSION),
+                                .vframe = 0,
+                                .position = entity.position.to_xy()
+                            });
+
+                            update_finished = true;
+                            break;
+                        }
+
+
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && entity_data.unit_data.damage != 0) {
                             if (entity.garrison_id != ID_NULL) {
@@ -1109,19 +1158,28 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         match_grant_player_upgrade(state, entity.player_id, entity.queue[0].upgrade);
 
                         // Set all existing wagons to war wagons
-                        for (entity_t& other_entity : state.entities) {
-                            if (other_entity.player_id != entity.player_id) {
-                                continue;
-                            }
-                            if (other_entity.type == ENTITY_WAGON) {
-                                other_entity.type = ENTITY_WAR_WAGON;
-                            } else if (entity_is_building(other_entity.type)) {
-                                for (building_queue_item_t& other_item : other_entity.queue) {
-                                    if (other_item.type == BUILDING_QUEUE_ITEM_UNIT && other_item.unit_type == ENTITY_WAGON) {
-                                        other_item.unit_type = ENTITY_WAR_WAGON;
+                        if (entity.queue[0].upgrade == UPGRADE_WAR_WAGON) {
+                            for (entity_t& other_entity : state.entities) {
+                                if (other_entity.player_id != entity.player_id) {
+                                    continue;
+                                }
+                                if (other_entity.type == ENTITY_WAGON) {
+                                    other_entity.type = ENTITY_WAR_WAGON;
+                                } else if (entity_is_building(other_entity.type)) {
+                                    for (building_queue_item_t& other_item : other_entity.queue) {
+                                        if (other_item.type == BUILDING_QUEUE_ITEM_UNIT && other_item.unit_type == ENTITY_WAGON) {
+                                            other_item.unit_type = ENTITY_WAR_WAGON;
+                                        }
                                     }
                                 }
                             }
+                        }
+
+                        // Show status
+                        if (entity.player_id == network_get_player_id()) {
+                            char upgrade_status[128];
+                            sprintf(upgrade_status, "%s research complete.", UPGRADE_DATA.at(entity.queue[0].upgrade).name);
+                            ui_show_status(state, upgrade_status);
                         }
 
                         // Create alert
@@ -2000,11 +2058,6 @@ void entity_building_enqueue(match_state_t& state, entity_t& building, building_
 
 void entity_building_dequeue(match_state_t& state, entity_t& building) {
     GOLD_ASSERT(!building.queue.empty());
-
-    building_queue_item_t& dequeued_item = *building.queue.begin();
-    if (dequeued_item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
-        state.player_upgrades_in_progress[building.player_id] &= ~dequeued_item.upgrade;
-    }
 
     building.queue.erase(building.queue.begin());
     if (building.queue.empty()) {

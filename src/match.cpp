@@ -91,13 +91,21 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_WAR_WAGON, SDLK_w },
     { UI_BUTTON_UNIT_BANDIT, SDLK_b },
     { UI_BUTTON_UNIT_JOCKEY, SDLK_e },
-    { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w }
+    { UI_BUTTON_UNIT_SAPPER, SDLK_s },
+    { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w },
+    { UI_BUTTON_RESEARCH_EXPLOSIVES, SDLK_e }
 };
 
 const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
     { UPGRADE_WAR_WAGON, (upgrade_data_t) {
             .name = "Wagon Armor",
             .ui_button = UI_BUTTON_RESEARCH_WAR_WAGON,
+            .gold_cost = 200,
+            .research_duration = 60
+    }},
+    { UPGRADE_EXPLOSIVES, (upgrade_data_t) {
+            .name = "Explosives",
+            .ui_button = UI_BUTTON_RESEARCH_EXPLOSIVES,
             .gold_cost = 200,
             .research_duration = 60
     }}
@@ -874,7 +882,7 @@ bool match_player_upgrade_is_available(const match_state_t& state, uint8_t playe
 }
 
 void match_grant_player_upgrade(match_state_t& state, uint8_t player_id, uint32_t upgrade) {
-    state.player_upgrades[player_id] = upgrade;
+    state.player_upgrades[player_id] |= upgrade;
 }
 
 input_t match_create_move_input(const match_state_t& state) {
@@ -1350,6 +1358,10 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                                     : input.building_dequeue.index;
             
             state.player_gold[player_id] += building_queue_item_cost(building.queue[index]);
+            if (building.queue[index].type == BUILDING_QUEUE_ITEM_UPGRADE) {
+                state.player_upgrades_in_progress[building.player_id] &= ~building.queue[index].upgrade;
+            }
+
             if (index == 0) {
                 entity_building_dequeue(state, building);
             } else {

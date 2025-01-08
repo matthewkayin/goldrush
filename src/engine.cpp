@@ -319,6 +319,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 3,
         .strategy = SPRITE_IMPORT_RECOLOR
     }},
+    { SPRITE_UNIT_SAPPER, (sprite_params_t) {
+        .path = "sprite/unit_sapper.png",
+        .hframes = 15,
+        .vframes = 3,
+        .strategy = SPRITE_IMPORT_RECOLOR
+    }},
     { SPRITE_BUILDING_HALL, (sprite_params_t) {
         .path = "sprite/building_hall.png",
         .hframes = 4,
@@ -424,6 +430,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     { SPRITE_PARTICLE_BUNKER_COWBOY, (sprite_params_t) {
         .path = "sprite/particle_bunker_cowboy.png",
         .hframes = 2,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_PARTICLE_EXPLOSION, (sprite_params_t) {
+        .path = "sprite/particle_explosion.png",
+        .hframes = 6,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }}

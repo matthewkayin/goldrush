@@ -132,13 +132,25 @@ void animation_init() {
         },
         .loops = 1
     };
+    ANIMATION_DATA[ANIMATION_PARTICLE_EXPLOSION] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 0, .duration = 4 },
+            (animation_frame_t) { .hframe = 1, .duration = 4 },
+            (animation_frame_t) { .hframe = 2, .duration = 4 },
+            (animation_frame_t) { .hframe = 3, .duration = 4 },
+            (animation_frame_t) { .hframe = 4, .duration = 4 },
+            (animation_frame_t) { .hframe = 5, .duration = 4 }
+        },
+        .loops = 1
+    };
     ANIMATION_DATA[ANIMATION_SMITH_BEGIN] = (animation_data_t) {
         .vframe = 0,
         .frames = {
             (animation_frame_t) { .hframe = 0, .duration = 8 },
             (animation_frame_t) { .hframe = 1, .duration = 8 },
             (animation_frame_t) { .hframe = 2, .duration = 8 },
-            (animation_frame_t) { .hframe = 3, .duration = 8 },
+            (animation_frame_t) { .hframe = 3, .duration = 8 }
         },
         .loops = 1
     };
