@@ -398,6 +398,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.health = entity_is_unit(type) ? entity_data.max_health : entity_data.max_health / 10;
     entity.target = (target_t) { .type = TARGET_NONE };
     entity.remembered_gold_target = (target_t) { .type = TARGET_NONE };
+    entity.pathfind_attempts = 0;
     entity.timer = 0;
     entity.rally_point = xy(-1, -1);
 
@@ -564,11 +565,16 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                 map_pathfind(state, entity.cell, entity_get_target_cell(state, entity), entity_cell_size(entity.type), &entity.path, entity_should_gold_walk(state, entity));
                 if (!entity.path.empty()) {
+                    entity.pathfind_attempts = 0;
                     entity.mode = MODE_UNIT_MOVE;
                     break;
                 } else {
-                    if (entity.target.type == TARGET_BUILD) {
-                        // show can't build message
+                    entity.pathfind_attempts++;
+                    if (entity.pathfind_attempts == 3) {
+                        if (entity.player_id == network_get_player_id() && entity.target.type == TARGET_BUILD) {
+                            ui_show_status(state, UI_STATUS_CANT_BUILD);
+                        }
+                        entity.target = (target_t) { .type = TARGET_NONE };
                         update_finished = true;
                         break;
                     } else if (entity.target.type == TARGET_GOLD) {

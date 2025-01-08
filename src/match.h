@@ -158,6 +158,7 @@ struct entity_t {
     std::vector<xy> path;
     std::vector<building_queue_item_t> queue;
     xy rally_point;
+    uint32_t pathfind_attempts;
     uint32_t timer;
 
     animation_t animation;
