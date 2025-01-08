@@ -152,6 +152,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                         break;
                     }
 
+                    SDL_StopTextInput();
                     menu_set_mode(state, MENU_MODE_MATCHLIST);
                     break;
                 }

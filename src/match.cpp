@@ -279,6 +279,59 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         return;
     }
 
+    // Begin chat
+    if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN && !SDL_IsTextInputActive()) {
+        state.ui_chat_message = "";
+        SDL_SetTextInputRect(&UI_CHAT_RECT);
+        SDL_StartTextInput();
+        return;
+    }
+
+    // Chat enter message
+    if (SDL_IsTextInputActive() && event.type == SDL_TEXTINPUT) {
+        state.ui_chat_message += std::string(event.text.text);
+        if (state.ui_chat_message.length() > UI_CHAT_MESSAGE_MAX_LENGTH) {
+            state.ui_chat_message = state.ui_chat_message.substr(0, UI_CHAT_MESSAGE_MAX_LENGTH);
+        }
+
+        return;
+    } 
+
+    // Chat non-text input key handle
+    if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN) {
+        switch (event.key.keysym.sym) {
+            // Chat delete character
+            case SDLK_BACKSPACE: {
+                if (state.ui_chat_message.length() > 0) {
+                    state.ui_chat_message.pop_back();
+                }
+                break;
+            }
+            // Chat send message
+            case SDLK_RETURN: {
+                if (state.ui_chat_message.length() != 0) {
+                    input_t input;
+                    input.type = INPUT_CHAT;
+                    input.chat.message_length = (uint8_t)state.ui_chat_message.length() + 1; // The +1 is for the null character
+                    strcpy(input.chat.message, &state.ui_chat_message[0]);
+                    state.input_queue.push_back(input);
+                }
+
+                SDL_StopTextInput();
+                break;
+            }
+            // Cancel chat message
+            case SDLK_ESCAPE: {
+                SDL_StopTextInput();
+                break;
+            }
+            default:
+                break;
+        }
+
+        return;
+    }
+
     // UI button press
     if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_ui_button_hovered(state) != -1) {
         ui_handle_ui_button_press(state, state.ui_buttons[ui_get_ui_button_hovered(state)]);
@@ -1033,6 +1086,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.explode.entity_count * sizeof(entity_id);
             break;
         }
+        case INPUT_CHAT: {
+            memcpy(out_buffer + out_buffer_length, &input.chat.message_length, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.chat.message, input.chat.message_length);
+            out_buffer_length += input.chat.message_length;
+            break;
+        }
         default:
             break;
     }
@@ -1131,6 +1192,14 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             memcpy(&input.explode.entity_ids, in_buffer + in_buffer_head, input.explode.entity_count * sizeof(entity_id));
             in_buffer_head += input.explode.entity_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_CHAT: {
+            memcpy(&input.chat.message_length, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
+            memcpy(&input.chat.message, in_buffer + in_buffer_head, input.chat.message_length);
+            in_buffer_head += input.chat.message_length;
             break;
         }
         default:
@@ -1427,6 +1496,10 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 }
                 entity_explode(state, input.explode.entity_ids[id_index]);
             }
+            break;
+        }
+        case INPUT_CHAT: {
+            ui_add_chat_message(state, std::string(network_get_player(player_id).name) + ": " + std::string(input.chat.message));
             break;
         }
         default:
@@ -1829,7 +1902,13 @@ void match_render(const match_state_t& state) {
 
     // UI Chat
     for (uint32_t chat_index = 0; chat_index < state.ui_chat.size(); chat_index++) {
-        render_text(FONT_HACK_WHITE, state.ui_chat[chat_index].message.c_str(), xy(16, MINIMAP_RECT.y - 40 - (chat_index * 16)));
+        render_text(FONT_HACK_WHITE, state.ui_chat[state.ui_chat.size() - chat_index - 1].message.c_str(), xy(16, MINIMAP_RECT.y - 48 - (chat_index * 16)));
+    }
+    // UI Chat message
+    if (SDL_IsTextInputActive()) {
+        char prompt_str[128];
+        sprintf(prompt_str, "Message: %s", state.ui_chat_message.c_str());
+        render_text(FONT_HACK_WHITE, prompt_str, xy(UI_CHAT_RECT.x, UI_CHAT_RECT.y));
     }
 
     // UI Status message

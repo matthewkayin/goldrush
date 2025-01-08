@@ -26,6 +26,7 @@ const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE] = {
     (SDL_Rect) { .x = UI_BUTTON_LEFT + (2 * (UI_BUTTON_LEFT_PAD + UI_BUTTON_SIZE)), .y = UI_BUTTON_TOP + UI_BUTTON_SIZE + UI_BUTTON_TOP_PAD, 
                  .w = UI_BUTTON_SIZE, .h = UI_BUTTON_SIZE },
 };
+const SDL_Rect UI_CHAT_RECT = (SDL_Rect) { .x = 16, .y = MINIMAP_RECT.y - 32, .w = 128, .h = 16 };
 
 const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS = {
     { UI_BUTTON_BUILD_HOUSE, (ui_button_requirements_t) {

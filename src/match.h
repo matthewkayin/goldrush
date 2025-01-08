@@ -302,6 +302,8 @@ extern const uint32_t MATCH_ALERT_LINGER_DURATION;
 extern const uint32_t MATCH_ALERT_TOTAL_DURATION;
 extern const uint32_t MATCH_ATTACK_ALERT_DISTANCE;
 extern const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX];
+extern const SDL_Rect UI_CHAT_RECT;
+const size_t UI_CHAT_MESSAGE_MAX_LENGTH = 64;
 
 // Particles
 
@@ -403,6 +405,11 @@ struct input_explode_t {
     entity_id entity_ids[SELECTION_LIMIT];
 };
 
+struct input_chat_t {
+    uint8_t message_length;
+    char message[UI_CHAT_MESSAGE_MAX_LENGTH];
+};
+
 struct input_t {
     uint8_t type;
     union {
@@ -417,6 +424,7 @@ struct input_t {
         input_single_unload_t single_unload;
         input_rally_t rally;
         input_explode_t explode;
+        input_chat_t chat;
     };
 };
 
@@ -440,6 +448,7 @@ struct match_state_t {
     std::string ui_status_message;
     uint32_t ui_status_timer;
     std::vector<chat_message_t> ui_chat;
+    std::string ui_chat_message;
     uint32_t ui_disconnect_timer;
     EntityType ui_building_type;
     uint32_t ui_double_click_timer;
