@@ -77,6 +77,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_REPAIR, SDLK_r },
     { UI_BUTTON_CANCEL, SDLK_ESCAPE },
     { UI_BUTTON_UNLOAD, SDLK_x },
+    { UI_BUTTON_EXPLODE, SDLK_e },
     { UI_BUTTON_BUILD_HALL, SDLK_t },
     { UI_BUTTON_BUILD_HOUSE, SDLK_e },
     { UI_BUTTON_BUILD_CAMP, SDLK_c },
@@ -1024,6 +1025,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.rally.building_count * sizeof(entity_id);
             break;
         }
+        case INPUT_EXPLODE: {
+            memcpy(out_buffer + out_buffer_length, &input.explode.entity_count, sizeof(uint16_t));
+            out_buffer_length += sizeof(uint16_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.explode.entity_ids, input.explode.entity_count * sizeof(entity_id));
+            out_buffer_length += input.explode.entity_count * sizeof(entity_id);
+            break;
+        }
         default:
             break;
     }
@@ -1114,6 +1123,14 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
 
             memcpy(&input.rally.building_ids, in_buffer + in_buffer_head, input.rally.building_count * sizeof(entity_id));
             in_buffer_head += input.rally.building_count * sizeof(entity_id);
+            break;
+        }
+        case INPUT_EXPLODE: {
+            memcpy(&input.explode.entity_count, in_buffer + in_buffer_head, sizeof(uint16_t));
+            in_buffer_head += sizeof(uint16_t);
+
+            memcpy(&input.explode.entity_ids, in_buffer + in_buffer_head, input.explode.entity_count * sizeof(entity_id));
+            in_buffer_head += input.explode.entity_count * sizeof(entity_id);
             break;
         }
         default:
@@ -1399,6 +1416,16 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     continue;
                 }
                 state.entities[building_index].rally_point = input.rally.rally_point;
+            }
+            break;
+        }
+        case INPUT_EXPLODE: {
+            for (uint32_t id_index = 0; id_index < input.explode.entity_count; id_index++) {
+                uint32_t entity_index = state.entities.get_index_of(input.explode.entity_ids[id_index]);
+                if (entity_index == INDEX_INVALID || !entity_is_selectable(state.entities[entity_index])) {
+                    continue;
+                }
+                entity_explode(state, input.explode.entity_ids[id_index]);
             }
             break;
         }

@@ -247,6 +247,10 @@ void ui_update_buttons(match_state_t& state) {
             state.ui_buttons[5] = UI_BUTTON_BUILD2;
             break;
         }
+        case ENTITY_SAPPER: {
+            state.ui_buttons[3] = UI_BUTTON_EXPLODE;
+            break;
+        }
         case ENTITY_HALL: {
             state.ui_buttons[0] = UI_BUTTON_UNIT_MINER;
             break;
@@ -434,6 +438,14 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             } else if (state.ui_mode == UI_MODE_TARGET_REPAIR || state.ui_mode == UI_MODE_TARGET_ATTACK || state.ui_mode == UI_MODE_TARGET_UNLOAD) {
                 state.ui_mode = UI_MODE_NONE;
             } 
+        }
+        case UI_BUTTON_EXPLODE: {
+            input_t input;
+            input.type = INPUT_EXPLODE;
+            input.explode.entity_count = state.selection.size();
+            memcpy(&input.explode.entity_ids, &state.selection[0], input.explode.entity_count * sizeof(entity_id));
+            state.input_queue.push_back(input);
+            break;
         }
         default:
             break;
@@ -626,6 +638,9 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
             break;
         case UI_BUTTON_UNLOAD:
             info_text_ptr += sprintf(info_text_ptr, "Unload");
+            break;
+        case UI_BUTTON_EXPLODE:
+            info_text_ptr += sprintf(info_text_ptr, "Explode");
             break;
         case UI_BUTTON_CANCEL:
             info_text_ptr += sprintf(info_text_ptr, "Cancel");

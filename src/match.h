@@ -346,7 +346,8 @@ enum InputType: uint8_t {
     INPUT_RALLY,
     INPUT_UNLOAD,
     INPUT_SINGLE_UNLOAD,
-    INPUT_CHAT
+    INPUT_CHAT,
+    INPUT_EXPLODE
 };
 
 struct input_move_t {
@@ -397,6 +398,11 @@ struct input_rally_t {
     entity_id building_ids[SELECTION_LIMIT];
 };
 
+struct input_explode_t {
+    uint16_t entity_count;
+    entity_id entity_ids[SELECTION_LIMIT];
+};
+
 struct input_t {
     uint8_t type;
     union {
@@ -410,6 +416,7 @@ struct input_t {
         input_unload_t unload;
         input_single_unload_t single_unload;
         input_rally_t rally;
+        input_explode_t explode;
     };
 };
 
@@ -562,6 +569,7 @@ uint32_t entity_get_garrisoned_occupancy(const match_state_t& state, const entit
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);
+void entity_explode(match_state_t& state, entity_id id);
 xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell);
 void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garrisoned_unit_id);
 void entity_stop_building(match_state_t& state, entity_id id);

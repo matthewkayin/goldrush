@@ -790,27 +790,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         // Sapper explosion
                         if (entity.target.type == TARGET_ATTACK_ENTITY && entity.type == ENTITY_SAPPER) {
-                            // TODO damage
-
-                            // Kill the entity
-                            map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
-                            ui_deselect_entity_if_selected(state, id);
-                            entity.health = 0;
-                            entity.mode = MODE_UNIT_DEATH_FADE;
-                            entity.animation = animation_create(ANIMATION_UNIT_DEATH_FADE);
-
-                            // Create particle
-                            state.particles.push_back((particle_t) {
-                                .sprite = SPRITE_PARTICLE_EXPLOSION,
-                                .animation = animation_create(ANIMATION_PARTICLE_EXPLOSION),
-                                .vframe = 0,
-                                .position = entity.position.to_xy()
-                            });
-
+                            entity_explode(state, id);
                             update_finished = true;
                             break;
                         }
-
 
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && entity_data.unit_data.damage != 0) {
@@ -1877,6 +1860,27 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
             .id = attacker_id
         };
     }
+}
+
+void entity_explode(match_state_t& state, entity_id id) {
+    // TODO damage
+
+    // Kill the entity
+    entity_t& entity = state.entities.get_by_id(id);
+    map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
+    ui_deselect_entity_if_selected(state, id);
+    entity.health = 0;
+    entity.target = (target_t) { .type = TARGET_NONE };
+    entity.mode = MODE_UNIT_DEATH_FADE;
+    entity.animation = animation_create(ANIMATION_UNIT_DEATH_FADE);
+
+    // Create particle
+    state.particles.push_back((particle_t) {
+        .sprite = SPRITE_PARTICLE_EXPLOSION,
+        .animation = animation_create(ANIMATION_PARTICLE_EXPLOSION),
+        .vframe = 0,
+        .position = entity.position.to_xy()
+    });
 }
 
 xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell) {
