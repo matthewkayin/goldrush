@@ -194,7 +194,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
 
-            .damage = 1,
+            .damage = 101,
             .attack_cooldown = 15,
             .range_squared = 1
         }
@@ -1513,6 +1513,9 @@ xy entity_get_animation_frame(const entity_t& entity) {
         if (entity.gold_held && (entity.animation.name == ANIMATION_UNIT_MOVE || entity.animation.name == ANIMATION_UNIT_IDLE)) {
             frame.y += 3;
         }
+        if (entity.type == ENTITY_SAPPER && entity.target.type == TARGET_ATTACK_ENTITY) {
+            frame.y += 3;
+        }
 
         return frame;
     } else if (entity_is_building(entity.type)) {
@@ -1822,6 +1825,13 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
         });
     }
 
+    entity_on_attack(state, attacker_id, defender);
+}
+
+void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& defender) {
+    entity_t& attacker = state.entities.get_by_id(attacker_id);
+
+    // Alerts / Taking damage flicker
     if (attacker.player_id != defender.player_id && defender.player_id == network_get_player_id()) {
         SDL_Rect defender_rect = entity_get_rect(defender);
         defender_rect.x -= state.camera_offset.x;
@@ -1847,6 +1857,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
         }
         defender.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
     }
+    // Health regen timer
     if (entity_is_unit(defender.type)) {
         defender.health_regen_timer = UNIT_HEALTH_REGEN_DURATION + UNIT_HEALTH_REGEN_DELAY;
     }
@@ -1863,10 +1874,35 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
 }
 
 void entity_explode(match_state_t& state, entity_id id) {
-    // TODO damage
+    entity_t& entity = state.entities.get_by_id(id);
+
+    // Apply damage
+    SDL_Rect explosion_rect = (SDL_Rect) { 
+        .x = (entity.cell.x - 1) * TILE_SIZE,
+        .y = (entity.cell.y - 1) * TILE_SIZE,
+        .w = TILE_SIZE * 3,
+        .h = TILE_SIZE * 3
+    };
+    int explosion_damage = ENTITY_DATA.at(entity.type).unit_data.damage;
+    for (uint32_t defender_index = 0; defender_index < state.entities.size(); defender_index++) {
+        if (defender_index == state.entities.get_index_of(id)) {
+            continue;
+        }
+        entity_t& defender = state.entities[defender_index];
+        if (defender.type == ENTITY_GOLD || !entity_is_selectable(defender)) {
+            continue;
+        }
+
+        SDL_Rect defender_rect = entity_get_rect(defender);
+        if (SDL_HasIntersection(&defender_rect, &explosion_rect)) {
+            int defender_armor = ENTITY_DATA.at(defender.type).armor;
+            int damage = std::max(1, explosion_damage - defender_armor);
+            defender.health = std::max(defender.health - damage, 0);
+            entity_on_attack(state, id, defender);
+        }
+    }
 
     // Kill the entity
-    entity_t& entity = state.entities.get_by_id(id);
     map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
     ui_deselect_entity_if_selected(state, id);
     entity.health = 0;

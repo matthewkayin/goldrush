@@ -569,6 +569,7 @@ uint32_t entity_get_garrisoned_occupancy(const match_state_t& state, const entit
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);
+void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& defender);
 void entity_explode(match_state_t& state, entity_id id);
 xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell);
 void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garrisoned_unit_id);

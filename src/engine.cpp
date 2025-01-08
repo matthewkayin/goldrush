@@ -322,7 +322,7 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     { SPRITE_UNIT_SAPPER, (sprite_params_t) {
         .path = "sprite/unit_sapper.png",
         .hframes = 15,
-        .vframes = 3,
+        .vframes = 6,
         .strategy = SPRITE_IMPORT_RECOLOR
     }},
     { SPRITE_BUILDING_HALL, (sprite_params_t) {

@@ -438,6 +438,7 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             } else if (state.ui_mode == UI_MODE_TARGET_REPAIR || state.ui_mode == UI_MODE_TARGET_ATTACK || state.ui_mode == UI_MODE_TARGET_UNLOAD) {
                 state.ui_mode = UI_MODE_NONE;
             } 
+            break;
         }
         case UI_BUTTON_EXPLODE: {
             input_t input;
