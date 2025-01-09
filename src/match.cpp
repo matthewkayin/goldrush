@@ -1489,12 +1489,20 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             break;
         }
         case INPUT_EXPLODE: {
+            // Determine all the exploding entities up front
+            // This is because if an entity has died in the four frames since this input was sent, we don't want it to explode
+            // But otherwise we want them all to explode at once and if we handle them sequentially then one might kill the other before it gets the chance to explode
+            entity_id entities_to_explode[SELECTION_LIMIT];
+            uint32_t entity_count = 0;
             for (uint32_t id_index = 0; id_index < input.explode.entity_count; id_index++) {
                 uint32_t entity_index = state.entities.get_index_of(input.explode.entity_ids[id_index]);
-                if (entity_index == INDEX_INVALID || !entity_is_selectable(state.entities[entity_index])) {
-                    continue;
+                if (entity_index != INDEX_INVALID && entity_is_selectable(state.entities[entity_index])) {
+                    entities_to_explode[entity_count] = input.explode.entity_ids[id_index];
+                    entity_count++;
                 }
-                entity_explode(state, input.explode.entity_ids[id_index]);
+            }
+            for (uint32_t explode_index = 0; explode_index < entity_count; explode_index++) {
+                entity_explode(state, entities_to_explode[explode_index]);
             }
             break;
         }
