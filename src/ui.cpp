@@ -57,6 +57,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
         .type = UI_BUTTON_REQUIRES_UPGRADE,
         .upgrade = UPGRADE_EXPLOSIVES
     }},
+    { UI_BUTTON_UNIT_TINKER, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_UPGRADE,
+        .upgrade = UPGRADE_EXPLOSIVES
+    }},
 };
 
 bool ui_is_mouse_in_ui() {
@@ -252,6 +256,10 @@ void ui_update_buttons(match_state_t& state) {
             state.ui_buttons[3] = UI_BUTTON_EXPLODE;
             break;
         }
+        case ENTITY_TINKER: {
+            state.ui_buttons[3] = UI_BUTTON_BUILD_MINE;
+            break;
+        }
         case ENTITY_HALL: {
             state.ui_buttons[0] = UI_BUTTON_UNIT_MINER;
             break;
@@ -260,6 +268,7 @@ void ui_update_buttons(match_state_t& state) {
             state.ui_buttons[0] = UI_BUTTON_UNIT_COWBOY;
             state.ui_buttons[1] = UI_BUTTON_UNIT_BANDIT;
             state.ui_buttons[2] = UI_BUTTON_UNIT_SAPPER;
+            state.ui_buttons[3] = UI_BUTTON_UNIT_TINKER;
             break;
         }
         case ENTITY_COOP: {
@@ -543,7 +552,7 @@ void ui_show_status(match_state_t& state, const char* message) {
 
 xy ui_get_building_cell(const match_state_t& state) {
     int building_cell_size = entity_cell_size(state.ui_building_type);
-    xy offset = xy(building_cell_size, building_cell_size) - xy(2, 2);
+    xy offset = building_cell_size == 1 ? xy(0, 0) : xy(building_cell_size, building_cell_size) - xy(2, 2);
     xy building_cell = ((engine.mouse_position + state.camera_offset) / TILE_SIZE) - offset;
     building_cell.x = std::max(0, building_cell.x);
     building_cell.y = std::max(0, building_cell.y);
@@ -574,13 +583,17 @@ bool ui_building_can_be_placed(const match_state_t& state) {
     }
 
     SDL_Rect building_rect = (SDL_Rect) { .x = building_cell.x, .y = building_cell.y, .w = building_cell_size, .h = building_cell_size };
-    for (const entity_t& gold : state.entities) {
-        if (gold.type != ENTITY_GOLD || gold.gold_held == 0) {
-            continue;
-        }
-        SDL_Rect gold_block_rect = entity_gold_get_block_building_rect(gold.cell);
-        if ((state.ui_building_type == ENTITY_CAMP || state.ui_building_type == ENTITY_HALL) && SDL_HasIntersection(&building_rect, &gold_block_rect) == SDL_TRUE) {
-            return false;
+    for (const entity_t& entity : state.entities) {
+        if (entity.type == ENTITY_GOLD && entity.gold_held != 0) {
+            SDL_Rect gold_block_rect = entity_gold_get_block_building_rect(entity.cell);
+            if ((state.ui_building_type == ENTITY_CAMP || state.ui_building_type == ENTITY_HALL) && SDL_HasIntersection(&building_rect, &gold_block_rect) == SDL_TRUE) {
+                return false;
+            }
+        } else if (entity.type == ENTITY_MINE) {
+            SDL_Rect mine_rect = entity_get_rect(entity);
+            if (SDL_HasIntersection(&building_rect, &mine_rect) == SDL_TRUE) {
+                return false;
+            }
         }
     }
 
@@ -658,7 +671,11 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
 
             for (auto entity_data_it : ENTITY_DATA) {
                 if (entity_data_it.second.ui_button == button) {
-                    info_text_ptr += sprintf(info_text_ptr, "%s %s", entity_is_unit(entity_data_it.first) ? "Hire" : "Build", entity_data_it.second.name);
+                    if (button == UI_BUTTON_BUILD_MINE) {
+                        info_text_ptr += sprintf(info_text_ptr, "Lay %s", entity_data_it.second.name);
+                    } else {
+                        info_text_ptr += sprintf(info_text_ptr, "%s %s", entity_is_unit(entity_data_it.first) ? "Hire" : "Build", entity_data_it.second.name);
+                    }
                     info.gold_cost = entity_data_it.second.gold_cost;
                     if (entity_is_unit(entity_data_it.first)) {
                         info.population_cost = entity_data_it.second.unit_data.population_cost;

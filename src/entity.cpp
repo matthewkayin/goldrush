@@ -20,6 +20,8 @@ static const xy ENTITY_WAR_WAGON_RIGHT_PARTICLE_OFFSETS[4] = { xy(7, 18), xy(11,
 static const uint32_t ENTITY_CANNOT_GARRISON = 0;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 static const uint32_t UNIT_HEALTH_REGEN_DELAY = 10 * 60;
+static const uint32_t MINE_ARM_DURATION = 20;
+static const uint32_t MINE_PRIME_DURATION = 90;
 
 // Building train time = (HP * 0.9) / 10
 
@@ -199,6 +201,31 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .range_squared = 1
         }
     }},
+    { ENTITY_TINKER, (entity_data_t) {
+        .name = "Tinker",
+        .sprite = SPRITE_UNIT_TINKER,
+        .ui_button = UI_BUTTON_UNIT_TINKER,
+        .cell_size = 1,
+
+        .gold_cost = 150,
+        .train_duration = 30,
+        .max_health = 50,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 200),
+
+            .damage = 0,
+            .attack_cooldown = 15,
+            .range_squared = 1
+        }
+    }},
     { ENTITY_HALL, (entity_data_t) {
         .name = "Town Hall",
         .sprite = SPRITE_BUILDING_HALL,
@@ -360,6 +387,29 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .can_rally = false
         }
     }},
+    { ENTITY_MINE, (entity_data_t) {
+        .name = "Mine",
+        .sprite = SPRITE_BUILDING_MINE,
+        .ui_button = UI_BUTTON_BUILD_MINE,
+        .cell_size = 1,
+
+        .gold_cost = 25,
+        .train_duration = 0,
+        .max_health = 5,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 10, 28, 28 },
+            .builder_positions_y = { 29, 17, 4 },
+            .builder_flip_h = { false, true, true },
+            .can_rally = false
+        }
+    }},
     { ENTITY_GOLD, (entity_data_t) {
         .name = "Gold",
         .sprite = SPRITE_TILE_GOLD,
@@ -413,7 +463,15 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.health_regen_timer = 0;
 
     entity_id id = state.entities.push_back(entity);
-    map_set_cell_rect(state, entity.cell, entity_cell_size(type), id);
+
+    if (entity.type == ENTITY_MINE) {
+        entity.timer = MINE_ARM_DURATION;
+        entity.mode = MODE_MINE_ARM;
+    } else {
+        // Mines should not occupy a cell
+        map_set_cell_rect(state, entity.cell, entity_cell_size(type), id);
+    }
+
     map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, true);
 
     return id;
@@ -463,7 +521,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             entity.mode = MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
         } else {
-            log_trace("building mode is destroyed.");
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;
             entity.queue.clear();
@@ -1198,6 +1255,20 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 update_finished = true;
                 break;
             }
+            case MODE_MINE_ARM: {
+                entity.timer--;
+                if (entity.timer == 0) {
+                    entity.mode = MODE_BUILDING_FINISHED;
+                }
+                update_finished = true;
+            }
+            case MODE_MINE_PRIME: {
+                entity.timer--;
+                if (entity.timer == 0) {
+                    entity_explode(state, id);
+                }
+                update_finished = true;
+            }
             default:
                 update_finished = true;
                 break;
@@ -1285,6 +1356,9 @@ Sprite entity_get_sprite(const entity_t entity) {
         if (entity.type == ENTITY_BUNKER) {
             return SPRITE_BUILDING_DESTROYED_BUNKER;
         }
+        if (entity.type == ENTITY_MINE) {
+            return SPRITE_BUILDING_DESTROYED_MINE;
+        }
         switch (entity_cell_size(entity.type)) {
             case 2:
                 return SPRITE_BUILDING_DESTROYED_2;
@@ -1306,6 +1380,9 @@ Sprite entity_get_sprite(const entity_t entity) {
 Sprite entity_get_select_ring(const entity_t entity, bool is_ally) {
     if (entity.type == ENTITY_GOLD) {
         return SPRITE_SELECT_RING_GOLD;
+    }
+    if (entity.type == ENTITY_MINE) {
+        return is_ally ? SPRITE_SELECT_RING_UNIT_1 : SPRITE_SELECT_RING_UNIT_1_ENEMY;
     }
 
     Sprite select_ring; 
@@ -1525,7 +1602,7 @@ xy entity_get_animation_frame(const entity_t& entity) {
 
         return frame;
     } else if (entity_is_building(entity.type)) {
-        if (entity.mode == MODE_BUILDING_DESTROYED) {
+        if (entity.mode == MODE_BUILDING_DESTROYED || entity.mode == MODE_MINE_ARM || entity.mode == MODE_MINE_PRIME) {
             return xy(0, 0);
         }
         if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
@@ -1534,7 +1611,7 @@ xy entity_get_animation_frame(const entity_t& entity) {
         // Building finished frame
         return xy(3, 0);
     } else {
-        // Mines
+        // Gold
         return xy(entity.animation.frame.x, entity.gold_held < GOLD_LOW_THRESHOLD ? 1 : 0);
     }
 }
@@ -1912,9 +1989,15 @@ void entity_explode(match_state_t& state, entity_id id) {
     map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
     ui_deselect_entity_if_selected(state, id);
     entity.health = 0;
-    entity.target = (target_t) { .type = TARGET_NONE };
-    entity.mode = MODE_UNIT_DEATH_FADE;
-    entity.animation = animation_create(ANIMATION_UNIT_DEATH_FADE);
+    if (entity.type == ENTITY_SAPPER) {
+        entity.target = (target_t) { .type = TARGET_NONE };
+        entity.mode = MODE_UNIT_DEATH_FADE;
+        entity.animation = animation_create(ANIMATION_UNIT_DEATH_FADE);
+    } else {
+        // TODO mine is invisible if it died by explosion. possibly same with sapper, but still fade on both
+        entity.mode = MODE_BUILDING_DESTROYED;
+        entity.timer = BUILDING_FADE_DURATION;
+    }
 
     // Create particle
     state.particles.push_back((particle_t) {

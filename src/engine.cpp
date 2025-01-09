@@ -325,6 +325,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 6,
         .strategy = SPRITE_IMPORT_RECOLOR
     }},
+    { SPRITE_UNIT_TINKER, (sprite_params_t) {
+        .path = "sprite/unit_tinker.png",
+        .hframes = 15,
+        .vframes = 3,
+        .strategy = SPRITE_IMPORT_RECOLOR
+    }},
     { SPRITE_BUILDING_HALL, (sprite_params_t) {
         .path = "sprite/building_hall.png",
         .hframes = 4,
@@ -373,6 +379,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
+    { SPRITE_BUILDING_MINE, (sprite_params_t) {
+        .path = "sprite/building_mine.png",
+        .hframes = 4,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_RECOLOR
+    }},
     { SPRITE_BUILDING_DESTROYED_2, (sprite_params_t) {
         .path = "sprite/building_destroyed2x2.png",
         .hframes = 1,
@@ -393,6 +405,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_BUILDING_DESTROYED_BUNKER, (sprite_params_t) {
         .path = "sprite/building_destroyed_bunker.png",
+        .hframes = 1,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_BUILDING_DESTROYED_MINE, (sprite_params_t) {
+        .path = "sprite/building_destroyed_mine.png",
         .hframes = 1,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
