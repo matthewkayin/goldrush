@@ -161,6 +161,7 @@ match_state_t match_init() {
         state.player_upgrades[player_id] = 0;
         state.player_upgrades_in_progress[player_id] = 0;
         state.map_fog[player_id] = std::vector<int>(state.map_width * state.map_height, FOG_HIDDEN);
+        state.map_detection[player_id] = std::vector<int>(state.map_width * state.map_height, 0);
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
@@ -849,7 +850,7 @@ void match_update(match_state_t& state) {
                     (state.entities[entity_index].type == ENTITY_GOLD && state.entities[entity_index].mode == MODE_GOLD_MINED_OUT)) {
                 // Remove this entity's fog but only if they are not gold and not garrisoned
                 if (state.entities[entity_index].player_id != PLAYER_NONE && state.entities[entity_index].garrison_id == ID_NULL) {
-                    map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, entity_cell_size(state.entities[entity_index].type), ENTITY_DATA.at(state.entities[entity_index].type).sight, false);
+                    map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, entity_cell_size(state.entities[entity_index].type), ENTITY_DATA.at(state.entities[entity_index].type).sight, false, ENTITY_DATA.at(state.entities[entity_index].type).has_detection);
                 }
                 state.entities.remove_at(entity_index);
             } else {
@@ -880,7 +881,8 @@ void match_update(match_state_t& state) {
             // Remove any remembered entities (but only if this player can see that they should be removed)
             auto it = state.remembered_entities[player_id].begin();
             while (it != state.remembered_entities[player_id].end()) {
-                if (state.entities.get_index_of(it->first) == INDEX_INVALID && map_is_cell_rect_revealed(state, player_id, it->second.cell, it->second.cell_size)) {
+                if ((state.entities.get_index_of(it->first) == INDEX_INVALID || state.entities.get_by_id(it->first).health == 0) && 
+                        (map_is_cell_rect_revealed(state, player_id, it->second.cell, it->second.cell_size) || it->second.sprite_params.recolor_id == player_id)) {
                     it = state.remembered_entities[player_id].erase(it);
                 } else {
                     it++;
@@ -964,7 +966,12 @@ input_t match_create_move_input(const match_state_t& state) {
     int fog_value = state.map_fog[network_get_player_id()][input.move.target_cell.x + (input.move.target_cell.y * state.map_width)];
     if (fog_value != FOG_HIDDEN) {
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-            if (!entity_is_selectable(state.entities[entity_index]) || (fog_value == FOG_EXPLORED && state.entities[entity_index].type != ENTITY_GOLD)) {
+            const entity_t& entity = state.entities[entity_index];
+            // I think this is saying, don't target unselectable entities, unless it's gold and the player doesn't know that the gold is unselectable
+            // It's also saying, don't target a hidden mine
+            if (!entity_is_selectable(entity) || 
+                    (fog_value == FOG_EXPLORED && entity.type != ENTITY_GOLD) ||
+                    (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && entity.player_id != network_get_player_id() && state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.map_width)] == 0)) {
                 continue;
             }
 
@@ -1398,7 +1405,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     };
                     builder.mode = MODE_UNIT_IDLE;
                     map_set_cell_rect(state, builder.cell, entity_cell_size(builder.type), state.entities.get_id_of(entity_index));
-                    map_fog_update(state, builder.player_id, builder.cell, entity_cell_size(builder.type), ENTITY_DATA.at(builder.type).sight, true);
+                    map_fog_update(state, builder.player_id, builder.cell, entity_cell_size(builder.type), ENTITY_DATA.at(builder.type).sight, true, ENTITY_DATA.at(builder.type).has_detection);
                     break;
                 }
             }
@@ -1629,6 +1636,7 @@ void match_render(const match_state_t& state) {
         for (const entity_t& entity : state.entities) {
             if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_MINE) || 
                     entity_get_elevation(state, entity) != elevation || 
+                    (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && entity.player_id != network_get_player_id() && state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.map_width)] == 0) ||
                     !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
                 continue;
             }
@@ -1639,7 +1647,7 @@ void match_render(const match_state_t& state) {
 
         // Remembered entity corpses
         for (auto it : state.remembered_entities[network_get_player_id()]) {
-            if (it.second.sprite_params.sprite < SPRITE_BUILDING_MINE || it.second.sprite_params.sprite > SPRITE_BUILDING_DESTROYED_MINE ||
+            if (it.second.sprite_params.sprite < SPRITE_BUILDING_DESTROYED_2 || it.second.sprite_params.sprite > SPRITE_BUILDING_DESTROYED_MINE ||
                     map_get_tile(state, it.second.cell).elevation != elevation || map_is_cell_rect_revealed(state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
                 continue;
             }

@@ -118,7 +118,8 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
         if (entity.player_id == network_get_player_id() || 
             !entity_is_unit(entity.type) || 
             !entity_is_selectable(entity) || 
-            !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
+            !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) ||
+            (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.map_width)] == 0)) {
             continue;
         }
 
@@ -135,7 +136,8 @@ std::vector<entity_id> ui_create_selection_from_rect(const match_state_t& state)
         if (entity.player_id == network_get_player_id() || 
             !entity_is_building(entity.type) || 
             !entity_is_selectable(entity) || 
-            !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
+            !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) ||
+            (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.map_width)] == 0)) {
             continue;
         }
 

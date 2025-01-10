@@ -1131,7 +1131,7 @@ bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy
     return false;
 }
 
-void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment) { 
+void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection) { 
     /*
     * This function does a raytrace from the cell center outwards to determine what this unit can see
     * Raytracing is done using Bresenham's Line Generation Algorithm (https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/)
@@ -1208,8 +1208,14 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
                     } else {
                         state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]++;
                     }
+                    if (has_detection) {
+                        state.map_detection[player_id][line_cell.x + (line_cell.y * state.map_width)]++;
+                    }
                 } else {
                     state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
+                    if (has_detection) {
+                        state.map_detection[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
+                    }
 
                     // Remember revealed entities
                     // First check for a mine
@@ -1220,7 +1226,7 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
                     }
                     if (cell_value < CELL_EMPTY) {
                         entity_t& entity = state.entities.get_by_id(cell_value);
-                        if (!entity_is_unit(entity.type)) {
+                        if (!entity_is_unit(entity.type) && entity_is_selectable(entity) && entity.type != ENTITY_MINE) {
                             state.remembered_entities[player_id][cell_value] = (remembered_entity_t) {
                                 .sprite_params = (render_sprite_params_t) {
                                     .sprite = entity_get_sprite(entity),

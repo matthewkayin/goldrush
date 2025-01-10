@@ -171,6 +171,14 @@ void animation_init() {
         },
         .loops = 1
     };
+    ANIMATION_DATA[ANIMATION_MINE_PRIME] = (animation_data_t) {
+        .vframe = 0,
+        .frames = {
+            (animation_frame_t) { .hframe = 1, .duration = 6 },
+            (animation_frame_t) { .hframe = 0, .duration = 6 },
+        },
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
 }
 
 animation_t animation_create(AnimationName name) {

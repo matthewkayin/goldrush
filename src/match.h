@@ -85,6 +85,7 @@ enum EntityMode {
     MODE_UNIT_ATTACK_WINDUP,
     MODE_UNIT_ATTACK_COOLDOWN,
     MODE_UNIT_MINE,
+    MODE_UNIT_LAY_MINE,
     MODE_UNIT_DEATH,
     MODE_UNIT_DEATH_FADE,
     MODE_BUILDING_IN_PROGRESS,
@@ -145,6 +146,7 @@ struct building_queue_item_t {
 
 const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
 const uint32_t ENTITY_FLAG_DAMAGE_FLICKER = 2;
+const uint32_t ENTITY_FLAG_INVISIBLE = 4;
 
 struct entity_t {
     EntityType type;
@@ -209,6 +211,8 @@ struct entity_data_t {
 
     uint32_t garrison_capacity;
     uint32_t garrison_size;
+
+    bool has_detection;
 
     union {
         unit_data_t unit_data;
@@ -470,6 +474,7 @@ struct match_state_t {
     std::vector<entity_id> map_cells;
     std::vector<entity_id> map_mine_cells;
     std::vector<int> map_fog[MAX_PLAYERS];
+    std::vector<int> map_detection[MAX_PLAYERS];
     std::unordered_map<entity_id, remembered_entity_t> remembered_entities[MAX_PLAYERS];
     bool map_is_fog_dirty;
 
@@ -546,7 +551,7 @@ bool map_is_tile_ramp(const match_state_t& state, xy cell);
 bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size);
-void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment);
+void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection);
 
 // Entities
 entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id, xy cell);
