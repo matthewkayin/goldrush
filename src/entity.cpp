@@ -445,7 +445,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
                         : xy_fixed(entity.cell * TILE_SIZE);
     entity.direction = DIRECTION_SOUTH;
 
-    entity.health = entity_is_unit(type) ? entity_data.max_health : entity_data.max_health / 10;
+    entity.health = (entity_is_unit(type) || entity.type == ENTITY_MINE) ? entity_data.max_health : entity_data.max_health / 10;
     entity.target = (target_t) { .type = TARGET_NONE };
     entity.remembered_gold_target = (target_t) { .type = TARGET_NONE };
     entity.pathfind_attempts = 0;
@@ -462,16 +462,17 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.taking_damage_timer = 0;
     entity.health_regen_timer = 0;
 
-    entity_id id = state.entities.push_back(entity);
-
     if (entity.type == ENTITY_MINE) {
         entity.timer = MINE_ARM_DURATION;
         entity.mode = MODE_MINE_ARM;
-    } else {
-        // Mines should not occupy a cell
-        map_set_cell_rect(state, entity.cell, entity_cell_size(type), id);
     }
 
+    entity_id id = state.entities.push_back(entity);
+    if (entity.type == ENTITY_MINE) {
+        state.map_mine_cells[entity.cell.x + (entity.cell.y * state.map_width)] = id;
+    } else {
+        map_set_cell_rect(state, entity.cell, entity_cell_size(type), id);
+    }
     map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, true);
 
     return id;
@@ -525,12 +526,16 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             entity.timer = BUILDING_FADE_DURATION;
             entity.queue.clear();
 
-            // Set building cells to empty, done a special way to avoid overriding the miner cell
-            // in the case of a building cancel where the builder is placed on top of the building's old location
-            for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size(entity.type); x++) {
-                for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
-                    if (map_get_cell(state, xy(x, y)) == id) {
-                        state.map_cells[x + (y * state.map_width)] = CELL_EMPTY;
+            if (entity.type == ENTITY_MINE) {
+                state.map_mine_cells[entity.cell.x + (entity.cell.y * state.map_width)] = ID_NULL;
+            } else {
+                // Set building cells to empty, done a special way to avoid overriding the miner cell
+                // in the case of a building cancel where the builder is placed on top of the building's old location
+                for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size(entity.type); x++) {
+                    for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
+                        if (map_get_cell(state, xy(x, y)) == id) {
+                            state.map_cells[x + (y * state.map_width)] = CELL_EMPTY;
+                        }
                     }
                 }
             }
@@ -789,6 +794,14 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         state.player_gold[entity.player_id] -= ENTITY_DATA.at(entity.target.build.building_type).gold_cost;
+
+                        if (entity.target.build.building_type == ENTITY_MINE) {
+                            entity_create(state, entity.target.build.building_type, entity.player_id, entity.target.build.building_cell);
+                            entity.target = (target_t) { .type = TARGET_NONE };
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
                         map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
                         map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false);
                         entity.target.id = entity_create(state, entity.target.build.building_type, entity.player_id, entity.target.build.building_cell);
@@ -1261,6 +1274,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     entity.mode = MODE_BUILDING_FINISHED;
                 }
                 update_finished = true;
+                break;
             }
             case MODE_MINE_PRIME: {
                 entity.timer--;
@@ -1382,7 +1396,7 @@ Sprite entity_get_select_ring(const entity_t entity, bool is_ally) {
         return SPRITE_SELECT_RING_GOLD;
     }
     if (entity.type == ENTITY_MINE) {
-        return is_ally ? SPRITE_SELECT_RING_UNIT_1 : SPRITE_SELECT_RING_UNIT_1_ENEMY;
+        return is_ally ? SPRITE_SELECT_RING_MINE : SPRITE_SELECT_RING_MINE_ENEMY;
     }
 
     Sprite select_ring; 
@@ -1485,8 +1499,12 @@ bool entity_has_reached_target(const match_state_t& state, const entity_t& entit
         case TARGET_CELL:
         case TARGET_ATTACK_CELL:
             return entity.cell == entity.target.cell;
-        case TARGET_BUILD:
+        case TARGET_BUILD: {
+            if (entity.target.build.building_type == ENTITY_MINE) {
+                return xy::manhattan_distance(entity.cell, entity.target.build.building_cell) == 1;
+            }
             return entity.cell == entity.target.build.unit_cell;
+        }
         case TARGET_BUILD_ASSIST: {
             const entity_t& builder = state.entities.get_by_id(entity.target.id);
             SDL_Rect building_rect = (SDL_Rect) {
@@ -1530,8 +1548,12 @@ xy entity_get_target_cell(const match_state_t& state, const entity_t& entity) {
     switch (entity.target.type) {
         case TARGET_NONE:
             return entity.cell;
-        case TARGET_BUILD:
+        case TARGET_BUILD: {
+            if (entity.target.build.building_type == ENTITY_MINE) {
+                return map_get_nearest_cell_around_rect(state, entity.cell, entity_cell_size(entity.type), entity.target.build.building_cell, entity_cell_size(ENTITY_MINE), false);
+            }
             return entity.target.build.unit_cell;
+        }
         case TARGET_BUILD_ASSIST: {
             const entity_t& builder = state.entities.get_by_id(entity.target.id);
             return map_get_nearest_cell_around_rect(state, entity.cell, entity_cell_size(entity.type), builder.target.build.building_cell, entity_cell_size(builder.target.build.building_type), false);
@@ -1986,17 +2008,18 @@ void entity_explode(match_state_t& state, entity_id id) {
     }
 
     // Kill the entity
-    map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
     ui_deselect_entity_if_selected(state, id);
     entity.health = 0;
     if (entity.type == ENTITY_SAPPER) {
         entity.target = (target_t) { .type = TARGET_NONE };
         entity.mode = MODE_UNIT_DEATH_FADE;
         entity.animation = animation_create(ANIMATION_UNIT_DEATH_FADE);
+        map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
     } else {
         // TODO mine is invisible if it died by explosion. possibly same with sapper, but still fade on both
         entity.mode = MODE_BUILDING_DESTROYED;
         entity.timer = BUILDING_FADE_DURATION;
+        state.map_mine_cells[entity.cell.x + (entity.cell.y * state.map_width)] = ID_NULL;
     }
 
     // Create particle

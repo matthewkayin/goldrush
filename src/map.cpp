@@ -178,6 +178,7 @@ std::vector<xy> map_init(match_state_t& state) {
     log_trace("Generating map. Size: %ux%u", state.map_width, state.map_height);
 
     state.map_cells = std::vector<entity_id>(state.map_width * state.map_height, CELL_EMPTY);
+    state.map_mine_cells = std::vector<entity_id>(state.map_width * state.map_height, ID_NULL);
     state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
         .index = engine.tile_index[TILE_SAND],
         .elevation = 0
@@ -1211,7 +1212,12 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
                     state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
 
                     // Remember revealed entities
-                    entity_id cell_value = map_get_cell(state, line_cell);
+                    // First check for a mine
+                    entity_id cell_value = state.map_mine_cells[line_cell.x + (line_cell.y * state.map_width)];
+                    // If there's no mine, check the regular cell grid
+                    if (cell_value == ID_NULL) {
+                        cell_value = map_get_cell(state, line_cell);
+                    }
                     if (cell_value < CELL_EMPTY) {
                         entity_t& entity = state.entities.get_by_id(cell_value);
                         if (!entity_is_unit(entity.type)) {

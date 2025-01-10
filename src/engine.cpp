@@ -277,6 +277,18 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
+    { SPRITE_SELECT_RING_MINE, (sprite_params_t) {
+        .path = "sprite/select_ring_mine.png",
+        .hframes = 1,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_SELECT_RING_MINE_ENEMY, (sprite_params_t) {
+        .path = "sprite/select_ring_mine_attack.png",
+        .hframes = 1,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
     { SPRITE_MINER_BUILDING, (sprite_params_t) {
         .path = "sprite/unit_miner_building.png",
         .hframes = 2,

@@ -68,6 +68,10 @@ const uint32_t MATCH_ALERT_LINGER_DURATION = 60 * 20;
 const uint32_t MATCH_ALERT_TOTAL_DURATION = MATCH_ALERT_DURATION + MATCH_ALERT_LINGER_DURATION;
 const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
 
+static const int HEALTHBAR_HEIGHT = 4;
+static const int HEALTHBAR_PADDING = 3;
+static const int BUILDING_HEALTHBAR_PADDING = 5;
+
 const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_STOP, SDLK_s },
     { UI_BUTTON_ATTACK, SDLK_a },
@@ -160,6 +164,7 @@ match_state_t match_init() {
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
+        entity_create(state, ENTITY_TINKER, player_id, player_spawn + xy(0, 1));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
@@ -1352,21 +1357,23 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 .type = TARGET_BUILD,
                 .id = ID_NULL,
                 .build = (target_build_t) {
-                    .unit_cell = get_nearest_cell_in_rect(lead_builder.cell, input.build.target_cell, entity_cell_size((EntityType)input.build.building_type)),
+                    .unit_cell = input.build.building_type == ENTITY_MINE ? input.build.target_cell : get_nearest_cell_in_rect(lead_builder.cell, input.build.target_cell, entity_cell_size((EntityType)input.build.building_type)),
                     .building_cell = input.build.target_cell,
                     .building_type = (EntityType)input.build.building_type
                 }
             });
 
             // Assign the helpers' target
-            for (entity_id builder_id : builder_ids) {
-                if (builder_id == lead_builder_id) {
-                    continue;
-                } 
-                entity_set_target(state.entities.get_by_id(builder_id), (target_t) {
-                    .type = TARGET_BUILD_ASSIST,
-                    .id = lead_builder_id
-                });
+            if (input.build.building_type != ENTITY_MINE) {
+                for (entity_id builder_id : builder_ids) {
+                    if (builder_id == lead_builder_id) {
+                        continue;
+                    } 
+                    entity_set_target(state.entities.get_by_id(builder_id), (target_t) {
+                        .type = TARGET_BUILD_ASSIST,
+                        .id = lead_builder_id
+                    });
+                }
             }
             break;
         }
@@ -1582,9 +1589,45 @@ void match_render(const match_state_t& state) {
         } // End for y of visible tiles
         // End render map
 
+        // Mine select rings and healthbars
+        for (entity_id id : state.selection) {
+            const entity_t& entity = state.entities.get_by_id(id);
+            if (entity.type != ENTITY_MINE || entity_get_elevation(state, entity) != elevation) {
+                continue;
+            }
+
+            // Select ring
+            render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || entity.player_id == network_get_player_id()), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+
+            // Determine the healthbar rect
+            SDL_Rect entity_rect = entity_get_rect(entity);
+            entity_rect.x -= state.camera_offset.x;
+            entity_rect.y -= state.camera_offset.y;
+            xy healthbar_position = xy(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING);
+            match_render_healthbar(healthbar_position, xy(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, ENTITY_DATA.at(entity.type).max_health);
+        }
+
+        // Mine UI move animation
+        if (animation_is_playing(state.ui_move_animation) && 
+                map_get_tile(state, state.ui_move_position / TILE_SIZE).elevation == elevation &&
+                state.ui_move_animation.name != ANIMATION_UI_MOVE_CELL && state.ui_move_animation.frame.x % 2 == 0) {
+            uint32_t entity_index = state.entities.get_index_of(state.ui_move_entity_id);
+            if (entity_index != INDEX_INVALID && state.entities[entity_index].type == ENTITY_MINE) {
+                const entity_t& entity = state.entities[entity_index];
+                render_sprite(entity_get_select_ring(entity, state.ui_move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+            } else {
+                auto remembered_entities_it = state.remembered_entities[network_get_player_id()].find(state.ui_move_entity_id);
+                if (remembered_entities_it != state.remembered_entities[network_get_player_id()].end()) {
+                    if (remembered_entities_it->second.sprite_params.sprite == SPRITE_BUILDING_MINE) {
+                        render_sprite(SPRITE_SELECT_RING_MINE, xy(0, 0), (remembered_entities_it->second.cell * TILE_SIZE) + (xy(remembered_entities_it->second.cell_size, remembered_entities_it->second.cell_size) * TILE_SIZE / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                    }
+                }
+            }
+        }
+
         // Render entity corpses
         for (const entity_t& entity : state.entities) {
-            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) || 
+            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_MINE) || 
                     entity_get_elevation(state, entity) != elevation || 
                     !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
                 continue;
@@ -1596,7 +1639,7 @@ void match_render(const match_state_t& state) {
 
         // Remembered entity corpses
         for (auto it : state.remembered_entities[network_get_player_id()]) {
-            if (it.second.sprite_params.sprite < SPRITE_BUILDING_DESTROYED_2 || it.second.sprite_params.sprite > SPRITE_BUILDING_DESTROYED_BUNKER ||
+            if (it.second.sprite_params.sprite < SPRITE_BUILDING_MINE || it.second.sprite_params.sprite > SPRITE_BUILDING_DESTROYED_MINE ||
                     map_get_tile(state, it.second.cell).elevation != elevation || map_is_cell_rect_revealed(state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
                 continue;
             }
@@ -1607,12 +1650,9 @@ void match_render(const match_state_t& state) {
         }
 
         // Select rings and healthbars
-        static const int HEALTHBAR_HEIGHT = 4;
-        static const int HEALTHBAR_PADDING = 3;
-        static const int BUILDING_HEALTHBAR_PADDING = 5;
         for (entity_id id : state.selection) {
             const entity_t& entity = state.entities.get_by_id(id);
-            if (entity_get_elevation(state, entity) != elevation) {
+            if (entity.type == ENTITY_MINE || entity_get_elevation(state, entity) != elevation) {
                 continue;
             }
 
@@ -1635,7 +1675,8 @@ void match_render(const match_state_t& state) {
 
         // Entities
         for (const entity_t& entity : state.entities) {
-            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) || 
+            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_MINE ||
+                    !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) || 
                     entity.garrison_id != ID_NULL || entity_get_elevation(state, entity) != elevation) {
                 continue;
             }
@@ -1658,7 +1699,7 @@ void match_render(const match_state_t& state) {
 
         // Remembered entities
         for (auto it : state.remembered_entities[network_get_player_id()]) {
-            if ((it.second.sprite_params.sprite >= SPRITE_BUILDING_DESTROYED_2 && it.second.sprite_params.sprite <= SPRITE_BUILDING_DESTROYED_BUNKER) ||
+            if ((it.second.sprite_params.sprite >= SPRITE_BUILDING_DESTROYED_2 && it.second.sprite_params.sprite <= SPRITE_BUILDING_DESTROYED_MINE) || it.second.sprite_params.sprite == SPRITE_BUILDING_MINE ||
                     map_get_tile(state, it.second.cell).elevation != elevation || map_is_cell_rect_revealed(state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
                 continue;
             }
@@ -1701,18 +1742,22 @@ void match_render(const match_state_t& state) {
             } else if (state.ui_move_animation.frame.x % 2 == 0) {
                 uint32_t entity_index = state.entities.get_index_of(state.ui_move_entity_id);
                 if (entity_index != INDEX_INVALID) {
-                    const entity_t& entity = state.entities[entity_index];
-                    render_sprite(entity_get_select_ring(entity, state.ui_move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                    if (state.entities[entity_index].type != ENTITY_MINE) {
+                        const entity_t& entity = state.entities[entity_index];
+                        render_sprite(entity_get_select_ring(entity, state.ui_move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+                    }
                 } else {
                     auto remembered_entities_it = state.remembered_entities[network_get_player_id()].find(state.ui_move_entity_id);
                     if (remembered_entities_it != state.remembered_entities[network_get_player_id()].end()) {
                         Sprite select_ring_sprite;
-                        if (remembered_entities_it->second.sprite_params.sprite == SPRITE_TILE_GOLD) {
-                            select_ring_sprite = SPRITE_SELECT_RING_GOLD;
-                        } else {
-                            select_ring_sprite = (Sprite)(SPRITE_SELECT_RING_BUILDING_2 + ((remembered_entities_it->second.cell_size - 2) * 2) + 1);
+                        if (remembered_entities_it->second.sprite_params.sprite != SPRITE_BUILDING_MINE) {
+                            if (remembered_entities_it->second.sprite_params.sprite == SPRITE_TILE_GOLD) {
+                                select_ring_sprite = SPRITE_SELECT_RING_GOLD;
+                            } else {
+                                select_ring_sprite = (Sprite)(SPRITE_SELECT_RING_BUILDING_2 + ((remembered_entities_it->second.cell_size - 2) * 2) + 1);
+                            }
+                            render_sprite(select_ring_sprite, xy(0, 0), (remembered_entities_it->second.cell * TILE_SIZE) + (xy(remembered_entities_it->second.cell_size, remembered_entities_it->second.cell_size) * TILE_SIZE / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                         }
-                        render_sprite(select_ring_sprite, xy(0, 0), (remembered_entities_it->second.cell * TILE_SIZE) + (xy(remembered_entities_it->second.cell_size, remembered_entities_it->second.cell_size) * TILE_SIZE / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
                 }
             }
@@ -1880,7 +1925,8 @@ void match_render(const match_state_t& state) {
                     is_cell_green = false;
                 }
                 if (state.map_fog[network_get_player_id()][x + (y * state.map_width)] == FOG_HIDDEN || map_is_tile_ramp(state, xy(x, y)) ||
-                        (xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY)) {
+                        (xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) ||
+                        state.map_mine_cells[x + (y * state.map_width)] != ID_NULL) {
                     is_cell_green = false;
                 }
 

@@ -468,6 +468,7 @@ struct match_state_t {
     uint32_t map_height;
     std::vector<tile_t> map_tiles;
     std::vector<entity_id> map_cells;
+    std::vector<entity_id> map_mine_cells;
     std::vector<int> map_fog[MAX_PLAYERS];
     std::unordered_map<entity_id, remembered_entity_t> remembered_entities[MAX_PLAYERS];
     bool map_is_fog_dirty;

@@ -423,6 +423,9 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
                     case ENTITY_COOP:
                         state.ui_mode = UI_MODE_BUILD2;
                         break;
+                    case ENTITY_MINE:
+                        state.ui_mode = UI_MODE_NONE;
+                        break;
                     default:
                         log_warn("Tried to cancel with unhandled ui_building_type of %u", state.ui_building_type);
                         state.ui_mode = UI_MODE_NONE;
@@ -589,18 +592,15 @@ bool ui_building_can_be_placed(const match_state_t& state) {
             if ((state.ui_building_type == ENTITY_CAMP || state.ui_building_type == ENTITY_HALL) && SDL_HasIntersection(&building_rect, &gold_block_rect) == SDL_TRUE) {
                 return false;
             }
-        } else if (entity.type == ENTITY_MINE) {
-            SDL_Rect mine_rect = entity_get_rect(entity);
-            if (SDL_HasIntersection(&building_rect, &mine_rect) == SDL_TRUE) {
-                return false;
-            }
-        }
+        } 
     }
 
     for (int x = building_cell.x; x < building_cell.x + building_cell_size; x++) {
         for (int y = building_cell.y; y < building_cell.y + building_cell_size; y++) {
             if ((xy(x, y) != miner_cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) || 
-                    state.map_fog[network_get_player_id()][x + (y * state.map_width)] == FOG_HIDDEN || map_is_tile_ramp(state, xy(x, y))) {
+                    state.map_fog[network_get_player_id()][x + (y * state.map_width)] == FOG_HIDDEN || 
+                    map_is_tile_ramp(state, xy(x, y)) ||
+                    state.map_mine_cells[x + (y * state.map_width)] != ID_NULL) {
                 return false;
             }
         }
