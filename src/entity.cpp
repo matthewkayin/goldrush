@@ -243,6 +243,33 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .range_squared = 1
         }
     }},
+    { ENTITY_SOLDIER, (entity_data_t) {
+        .name = "Soldier",
+        .sprite = SPRITE_UNIT_SOLDIER,
+        .ui_button = UI_BUTTON_UNIT_SOLDIER,
+        .cell_size = 1,
+
+        .gold_cost = 125,
+        .train_duration = 30,
+        .max_health = 50,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+
+        .has_detection = false,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 180),
+
+            .damage = 9,
+            .attack_cooldown = 30,
+            .range_squared = 49
+        }
+    }},
     { ENTITY_HALL, (entity_data_t) {
         .name = "Town Hall",
         .sprite = SPRITE_BUILDING_HALL,
@@ -416,6 +443,31 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .builder_positions_y = { 29, 17, 4 },
             .builder_flip_h = { false, true, true },
             .can_rally = false
+        }
+    }},
+    { ENTITY_BARRACKS, (entity_data_t) {
+        .name = "Barracks",
+        .sprite = SPRITE_BUILDING_BARRACKS,
+        .ui_button = UI_BUTTON_BUILD_BARRACKS,
+        .cell_size = 3,
+
+        .gold_cost = 150,
+        .train_duration = 0,
+        .max_health = 600,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .has_detection = false,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 6, 27, 3 },
+            .builder_positions_y = { 27, 7, 3 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
         }
     }},
     { ENTITY_MINE, (entity_data_t) {

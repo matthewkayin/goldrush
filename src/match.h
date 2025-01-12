@@ -64,6 +64,7 @@ enum EntityType {
     ENTITY_JOCKEY,
     ENTITY_SAPPER,
     ENTITY_TINKER,
+    ENTITY_SOLDIER,
     ENTITY_HALL,
     ENTITY_CAMP,
     ENTITY_HOUSE,
@@ -71,6 +72,7 @@ enum EntityType {
     ENTITY_BUNKER,
     ENTITY_COOP,
     ENTITY_SMITH,
+    ENTITY_BARRACKS,
     ENTITY_MINE,
     ENTITY_GOLD
 };
