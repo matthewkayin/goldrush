@@ -65,6 +65,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
         .type = UI_BUTTON_REQUIRES_UPGRADE,
         .upgrade = UPGRADE_EXPLOSIVES
     }},
+    { UI_BUTTON_RESEARCH_BAYONETS, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_BARRACKS
+    }}
 };
 
 bool ui_is_mouse_in_ui() {
@@ -289,6 +293,9 @@ void ui_update_buttons(match_state_t& state) {
             }
             if (match_player_upgrade_is_available(state, network_get_player_id(), UPGRADE_EXPLOSIVES)) {
                 state.ui_buttons[1] = UI_BUTTON_RESEARCH_EXPLOSIVES;
+            }
+            if (match_player_upgrade_is_available(state, network_get_player_id(), UPGRADE_BAYONETS)) {
+                state.ui_buttons[2] = UI_BUTTON_RESEARCH_BAYONETS;
             }
             break;
         }

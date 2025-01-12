@@ -85,6 +85,7 @@ enum EntityMode {
     MODE_UNIT_BUILD,
     MODE_UNIT_REPAIR,
     MODE_UNIT_ATTACK_WINDUP,
+    MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP,
     MODE_UNIT_ATTACK_COOLDOWN,
     MODE_UNIT_MINE,
     MODE_UNIT_LAY_MINE,
@@ -330,6 +331,7 @@ struct particle_t {
 
 const uint32_t UPGRADE_WAR_WAGON = 1;
 const uint32_t UPGRADE_EXPLOSIVES = 2;
+const uint32_t UPGRADE_BAYONETS = 4;
 
 struct upgrade_data_t {
     const char* name;

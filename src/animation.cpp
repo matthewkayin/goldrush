@@ -67,6 +67,17 @@ void animation_init() {
         },
         .loops = 1
     };
+    ANIMATION_DATA[ANIMATION_SOLDIER_RANGED_ATTACK] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 15, .duration = 8 },
+            (animation_frame_t) { .hframe = 16, .duration = 32 },
+            (animation_frame_t) { .hframe = 17, .duration = 32 },
+            (animation_frame_t) { .hframe = 18, .duration = 8 },
+            (animation_frame_t) { .hframe = 19, .duration = 8 }
+        },
+        .loops = 1
+    };
     ANIMATION_DATA[ANIMATION_UNIT_MINE] = (animation_data_t) {
         .vframe = -1,
         .frames = {

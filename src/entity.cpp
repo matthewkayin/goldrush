@@ -23,6 +23,7 @@ static const uint32_t UNIT_HEALTH_REGEN_DELAY = 10 * 60;
 static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const int MINE_EXPLOSION_DAMAGE = 101;
+static const int SOLDIER_BAYONET_DAMAGE = 4;
 
 // Building train time = (HP * 0.9) / 10
 
@@ -273,8 +274,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 180),
 
-            .damage = 9,
-            .attack_cooldown = 45,
+            .damage = 15,
+            .attack_cooldown = 30,
             .range_squared = 49,
             .min_range_squared = 4
         }
@@ -986,11 +987,16 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             // Check min range
                             SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type), .h = entity_cell_size(entity.type) };
                             SDL_Rect target_rect = (SDL_Rect) { .x = target.cell.x, .y = target.cell.y, .w = entity_cell_size(target.type), .h = entity_cell_size(target.type) };
+                            bool attack_with_bayonets = false;
                             if (euclidean_distance_squared_between(entity_rect, target_rect) < ENTITY_DATA.at(entity.type).unit_data.min_range_squared) {
-                                entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
-                                entity.mode = MODE_UNIT_IDLE;
-                                update_finished = true;
-                                break;
+                                if (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
+                                    attack_with_bayonets = true;
+                                } else {
+                                    entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
+                                    entity.mode = MODE_UNIT_IDLE;
+                                    update_finished = true;
+                                    break;
+                                }
                             }
 
                             // Attack inside bunker
@@ -1007,7 +1013,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                             // Begin attack windup
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
-                            entity.mode = MODE_UNIT_ATTACK_WINDUP;
+                            entity.mode = entity.type == ENTITY_SOLDIER && !attack_with_bayonets ? MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP : MODE_UNIT_ATTACK_WINDUP;
                             update_finished = true;
                             break;
                         }
@@ -1198,7 +1204,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 update_finished = true;
                 break;
             }
-            case MODE_UNIT_ATTACK_WINDUP: {
+            case MODE_UNIT_ATTACK_WINDUP: 
+            case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP: {
                 if (entity_is_target_invalid(state, entity)) {
                     // TOOD target = nearest insight enemy
                     entity.target = (target_t) {
@@ -1234,7 +1241,22 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                 entity.timer--;
                 if (entity.timer == 0) {
-                    entity.mode = MODE_UNIT_ATTACK_WINDUP;
+                    if (entity.type == ENTITY_SOLDIER) {
+                        entity_t& target = state.entities.get_by_id(entity.target.id);
+                        SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type), .h = entity_cell_size(entity.type) };
+                        SDL_Rect target_rect = (SDL_Rect) { .x = target.cell.x, .y = target.cell.y, .w = entity_cell_size(target.type), .h = entity_cell_size(target.type) };
+                        if (euclidean_distance_squared_between(entity_rect, target_rect) < ENTITY_DATA.at(entity.type).unit_data.min_range_squared) {
+                            if (match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
+                                entity.mode = MODE_UNIT_ATTACK_WINDUP;
+                            } else {
+                                entity.mode = MODE_UNIT_IDLE;
+                            }
+                        } else {
+                            entity.mode = MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP;
+                        }
+                    } else {
+                        entity.mode = MODE_UNIT_ATTACK_WINDUP;
+                    }
                 }
 
                 update_finished = true;
@@ -1722,6 +1744,8 @@ AnimationName entity_get_expected_animation(const entity_t& entity) {
         case MODE_UNIT_ATTACK_WINDUP:
         case MODE_UNIT_LAY_MINE:
             return ANIMATION_UNIT_ATTACK;
+        case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
+            return ANIMATION_SOLDIER_RANGED_ATTACK;
         case MODE_UNIT_MINE:
             return ANIMATION_UNIT_MINE;
         case MODE_UNIT_DEATH:
@@ -2009,7 +2033,8 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
     entity_t& attacker = state.entities.get_by_id(attacker_id);
     bool attack_missed = false;
 
-    int attacker_damage = ENTITY_DATA.at(attacker.type).unit_data.damage;
+    bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;
+    int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : ENTITY_DATA.at(attacker.type).unit_data.damage;
     int defender_armor = ENTITY_DATA.at(defender.type).armor;
     int damage = std::max(1, attacker_damage - defender_armor);
     int accuracy = 100;
@@ -2026,7 +2051,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
         defender.health = std::max(0, defender.health - damage);
 
         // Create particle effect
-        if (attacker.type == ENTITY_COWBOY) {
+        if (attacker.type == ENTITY_COWBOY || attacker.type == ENTITY_SOLDIER) {
             SDL_Rect defender_rect = entity_get_rect(defender);
 
             xy particle_position;

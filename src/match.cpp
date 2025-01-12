@@ -102,7 +102,8 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_TINKER, SDLK_t },
     { UI_BUTTON_UNIT_SOLDIER, SDLK_s },
     { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w },
-    { UI_BUTTON_RESEARCH_EXPLOSIVES, SDLK_e }
+    { UI_BUTTON_RESEARCH_EXPLOSIVES, SDLK_e },
+    { UI_BUTTON_RESEARCH_BAYONETS, SDLK_b }
 };
 
 const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
@@ -115,6 +116,12 @@ const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
     { UPGRADE_EXPLOSIVES, (upgrade_data_t) {
             .name = "Explosives",
             .ui_button = UI_BUTTON_RESEARCH_EXPLOSIVES,
+            .gold_cost = 200,
+            .research_duration = 60
+    }},
+    { UPGRADE_BAYONETS, (upgrade_data_t) {
+            .name = "Bayonets",
+            .ui_button = UI_BUTTON_RESEARCH_BAYONETS,
             .gold_cost = 200,
             .research_duration = 60
     }}
