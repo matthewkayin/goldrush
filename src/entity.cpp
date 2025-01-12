@@ -2051,7 +2051,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
         defender.health = std::max(0, defender.health - damage);
 
         // Create particle effect
-        if (attacker.type == ENTITY_COWBOY || attacker.type == ENTITY_SOLDIER) {
+        if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets)) {
             SDL_Rect defender_rect = entity_get_rect(defender);
 
             xy particle_position;
