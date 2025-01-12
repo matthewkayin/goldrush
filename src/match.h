@@ -189,6 +189,7 @@ struct unit_data_t {
     int damage;
     int attack_cooldown;
     int range_squared;
+    int min_range_squared;
 };
 
 struct building_data_t {

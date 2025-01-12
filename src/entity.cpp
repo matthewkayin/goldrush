@@ -51,7 +51,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
             .damage = 3,
             .attack_cooldown = 16,
-            .range_squared = 1
+            .range_squared = 1,
+            .min_range_squared = 1
         }
     }},
     { ENTITY_COWBOY, (entity_data_t) {
@@ -78,7 +79,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
             .damage = 6,
             .attack_cooldown = 30,
-            .range_squared = 25
+            .range_squared = 25,
+            .min_range_squared = 1
         }
     }},
     { ENTITY_BANDIT, (entity_data_t) {
@@ -105,7 +107,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
             .damage = 5,
             .attack_cooldown = 15,
-            .range_squared = 1
+            .range_squared = 1,
+            .min_range_squared = 1
         }
     }},
     { ENTITY_WAGON, (entity_data_t) {
@@ -132,7 +135,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
             .damage = 0,
             .attack_cooldown = 0,
-            .range_squared = 1
+            .range_squared = 1,
+            .min_range_squared = 1
         }
     }},
     { ENTITY_WAR_WAGON, (entity_data_t) {
@@ -160,6 +164,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .damage = 0,
             .attack_cooldown = 0,
             .range_squared = 1,
+            .min_range_squared = 1
         }
     }},
     { ENTITY_JOCKEY, (entity_data_t) {
@@ -186,7 +191,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
             .damage = 6,
             .attack_cooldown = 30,
-            .range_squared = 25
+            .range_squared = 25,
+            .min_range_squared = 1
         }
     }},
     { ENTITY_SAPPER, (entity_data_t) {
@@ -213,7 +219,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
             .damage = 101,
             .attack_cooldown = 15,
-            .range_squared = 1
+            .range_squared = 1,
+            .min_range_squared = 1
         }
     }},
     { ENTITY_TINKER, (entity_data_t) {
@@ -240,7 +247,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
             .damage = 0,
             .attack_cooldown = 15,
-            .range_squared = 1
+            .range_squared = 1,
+            .min_range_squared = 1
         }
     }},
     { ENTITY_SOLDIER, (entity_data_t) {
@@ -266,8 +274,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .speed = fixed::from_int_and_raw_decimal(0, 180),
 
             .damage = 9,
-            .attack_cooldown = 30,
-            .range_squared = 49
+            .attack_cooldown = 45,
+            .range_squared = 49,
+            .min_range_squared = 4
         }
     }},
     { ENTITY_HALL, (entity_data_t) {
@@ -974,6 +983,17 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && entity_data.unit_data.damage != 0) {
+                            // Check min range
+                            SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type), .h = entity_cell_size(entity.type) };
+                            SDL_Rect target_rect = (SDL_Rect) { .x = target.cell.x, .y = target.cell.y, .w = entity_cell_size(target.type), .h = entity_cell_size(target.type) };
+                            if (euclidean_distance_squared_between(entity_rect, target_rect) < ENTITY_DATA.at(entity.type).unit_data.min_range_squared) {
+                                entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
+                                entity.mode = MODE_UNIT_IDLE;
+                                update_finished = true;
+                                break;
+                            }
+
+                            // Attack inside bunker
                             if (entity.garrison_id != ID_NULL) {
                                 entity_t& carrier = state.entities.get_by_id(entity.garrison_id);
                                 // Don't attack during bunker cooldown or if this is a melee unit
@@ -985,6 +1005,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                 carrier.bunker_cooldown_timer = ENTITY_BUNKER_FIRE_OFFSET;
                             }
 
+                            // Begin attack windup
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, entity_cell_size(target.type));
                             entity.mode = MODE_UNIT_ATTACK_WINDUP;
                             update_finished = true;
