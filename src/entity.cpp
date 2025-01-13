@@ -1575,7 +1575,7 @@ uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity
 
     uint16_t elevation = state.map_tiles[entity.cell.x + (entity.cell.y * state.map_width)].elevation;
 
-    if (entity.type == ENTITY_JOCKEY) {
+    if (entity.type == ENTITY_JOCKEY || entity.type == ENTITY_SOLDIER) {
         for (int y = 0; y < 2; y++) {
             xy above_cell = entity.cell - xy(0, y + 1);
             if (map_is_cell_in_bounds(state, above_cell) && map_is_tile_ramp(state, above_cell)) {
