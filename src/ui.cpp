@@ -68,6 +68,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
     { UI_BUTTON_RESEARCH_BAYONETS, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_BARRACKS
+    }},
+    { UI_BUTTON_UNIT_CANNON, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_SMITH
     }}
 };
 
@@ -301,6 +305,7 @@ void ui_update_buttons(match_state_t& state) {
         }
         case ENTITY_BARRACKS: {
             state.ui_buttons[0] = UI_BUTTON_UNIT_SOLDIER;
+            state.ui_buttons[1] = UI_BUTTON_UNIT_CANNON;
             break;
         }
         default:

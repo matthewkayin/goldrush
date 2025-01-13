@@ -280,6 +280,34 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .min_range_squared = 4
         }
     }},
+    { ENTITY_CANNON, (entity_data_t) {
+        .name = "Cannoneer",
+        .sprite = SPRITE_UNIT_CANNON,
+        .ui_button = UI_BUTTON_UNIT_CANNON,
+        .cell_size = 2,
+
+        .gold_cost = 200,
+        .train_duration = 45,
+        .max_health = 75,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .has_detection = false,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 140),
+
+            .damage = 30,
+            .attack_cooldown = 60,
+            .range_squared = 49,
+            .min_range_squared = 9
+        }
+    }},
     { ENTITY_HALL, (entity_data_t) {
         .name = "Town Hall",
         .sprite = SPRITE_BUILDING_HALL,
@@ -1735,6 +1763,21 @@ xy_fixed entity_get_target_position(const entity_t& entity) {
 }
 
 AnimationName entity_get_expected_animation(const entity_t& entity) {
+    if (entity.type == ENTITY_CANNON) {
+        switch (entity.mode) {
+            case MODE_UNIT_MOVE:
+                return ANIMATION_UNIT_MOVE_CANNON;
+            case MODE_UNIT_ATTACK_WINDUP:
+                return ANIMATION_CANNON_ATTACK;
+            case MODE_UNIT_DEATH:
+                return ANIMATION_CANNON_DEATH;
+            case MODE_UNIT_DEATH_FADE:
+                return ANIMATION_CANNON_DEATH_FADE;
+            default:
+                return ANIMATION_UNIT_IDLE;
+        }
+    }
+    
     switch (entity.mode) {
         case MODE_UNIT_MOVE:
             return ANIMATION_UNIT_MOVE;

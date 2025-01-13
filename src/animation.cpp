@@ -58,6 +58,20 @@ void animation_init() {
         },
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
+    ANIMATION_DATA[ANIMATION_UNIT_MOVE_CANNON] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 1, .duration = 4 },
+            (animation_frame_t) { .hframe = 2, .duration = 4 },
+            (animation_frame_t) { .hframe = 3, .duration = 4 },
+            (animation_frame_t) { .hframe = 4, .duration = 4 },
+            (animation_frame_t) { .hframe = 5, .duration = 4 },
+            (animation_frame_t) { .hframe = 6, .duration = 4 },
+            (animation_frame_t) { .hframe = 7, .duration = 4 },
+            (animation_frame_t) { .hframe = 8, .duration = 4 }
+        },
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
     ANIMATION_DATA[ANIMATION_UNIT_ATTACK] = (animation_data_t) {
         .vframe = -1,
         .frames = {
@@ -75,6 +89,17 @@ void animation_init() {
             (animation_frame_t) { .hframe = 17, .duration = 32 },
             (animation_frame_t) { .hframe = 18, .duration = 8 },
             (animation_frame_t) { .hframe = 19, .duration = 8 }
+        },
+        .loops = 1
+    };
+    ANIMATION_DATA[ANIMATION_CANNON_ATTACK] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 9, .duration = 8 },
+            (animation_frame_t) { .hframe = 10, .duration = 8 },
+            (animation_frame_t) { .hframe = 11, .duration = 8 },
+            (animation_frame_t) { .hframe = 12, .duration = 8 },
+            (animation_frame_t) { .hframe = 13, .duration = 8 }
         },
         .loops = 1
     };
@@ -99,6 +124,7 @@ void animation_init() {
         .vframe = -1,
         .frames = {
             (animation_frame_t) { .hframe = 8, .duration = 4 },
+            (animation_frame_t) { .hframe = 9, .duration = 4 },
             (animation_frame_t) { .hframe = 10, .duration = 4 },
             (animation_frame_t) { .hframe = 11, .duration = 4 }
         },
@@ -110,6 +136,25 @@ void animation_init() {
             (animation_frame_t) { .hframe = 12, .duration = 180 },
             (animation_frame_t) { .hframe = 13, .duration = 180 },
             (animation_frame_t) { .hframe = 14, .duration = 180 }
+        },
+        .loops = 1
+    };
+    ANIMATION_DATA[ANIMATION_CANNON_DEATH] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 14, .duration = 4 },
+            (animation_frame_t) { .hframe = 15, .duration = 4 },
+            (animation_frame_t) { .hframe = 16, .duration = 4 },
+            (animation_frame_t) { .hframe = 17, .duration = 4 }
+        },
+        .loops = 1
+    };
+    ANIMATION_DATA[ANIMATION_CANNON_DEATH_FADE] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 18, .duration = 180 },
+            (animation_frame_t) { .hframe = 19, .duration = 180 },
+            (animation_frame_t) { .hframe = 20, .duration = 180 }
         },
         .loops = 1
     };
