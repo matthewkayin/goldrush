@@ -1244,7 +1244,12 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 }
 
                 if (!animation_is_playing(entity.animation)) {
-                    entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
+                    if (entity.type == ENTITY_CANNON) {
+                        entity_t& target = state.entities.get_by_id(entity.target.id);
+                        entity_cannon_explode(state, id, target.cell, entity_cell_size(target.type));
+                    } else {
+                        entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
+                    }
                     entity.timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
                     entity.mode = MODE_UNIT_ATTACK_COOLDOWN;
                 }
@@ -2107,6 +2112,8 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
                 .position = particle_position
             });
         }
+
+        entity_on_attack(state, attacker_id, defender);
     }
 
     // Add bunker particle for garrisoned unit. Happens even if they miss
@@ -2137,8 +2144,6 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
             .position = particle_position
         });
     }
-
-    entity_on_attack(state, attacker_id, defender);
 }
 
 void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& defender) {
@@ -2236,6 +2241,65 @@ void entity_explode(match_state_t& state, entity_id id) {
         .animation = animation_create(ANIMATION_PARTICLE_EXPLOSION),
         .vframe = 0,
         .position = entity.type == ENTITY_SAPPER ? entity.position.to_xy() : cell_center(entity.cell).to_xy()
+    });
+}
+
+void entity_cannon_explode(match_state_t& state, entity_id attacker_id, xy cell, int cell_size) {
+    entity_t& attacker = state.entities.get_by_id(attacker_id);
+
+    // Calculate accuracy
+    bool attack_missed = false;
+    int accuracy = 100;
+    if (entity_get_elevation(state, attacker) < state.map_tiles[cell.x + (cell.y * state.map_width)].elevation) {
+        accuracy /= 2;
+    }
+    if (accuracy < lcg_rand() % 100) {
+        attack_missed = true;
+    }
+
+    if (attack_missed) {
+        return;
+    }
+
+    // Check which enemies we hit. 
+    int attacker_damage = ENTITY_DATA.at(attacker.type).unit_data.damage;
+    xy position = (cell * TILE_SIZE) + ((xy(cell_size, cell_size) * TILE_SIZE) / 2);
+    SDL_Rect full_damage_rect = (SDL_Rect) {
+        .x = position.x - (TILE_SIZE / 2), .y = position.y - (TILE_SIZE / 2),
+        .w = TILE_SIZE, .h = TILE_SIZE
+    };
+    SDL_Rect splash_damage_rect = (SDL_Rect) {
+        .x = full_damage_rect.x - (TILE_SIZE / 2), .y = full_damage_rect.y - (TILE_SIZE / 2),
+        .w = full_damage_rect.w + TILE_SIZE, .h = full_damage_rect.h + TILE_SIZE
+    };
+    for (entity_t& defender : state.entities) {
+        if (defender.type == ENTITY_GOLD || !entity_is_selectable(defender)) {
+            continue;
+        }
+
+        // To check if we've hit this enemy, first check the splash damage rect
+        // We have to check both, but since the splash rect is bigger, we know that 
+        // if they're outside of it, they will be outside of the full damage rect as well
+        SDL_Rect defender_rect = entity_get_rect(defender);
+        if (SDL_HasIntersection(&defender_rect, &splash_damage_rect) == SDL_TRUE) {
+            int damage = attacker_damage; 
+            // Half damage if they are only within splash damage range
+            if (SDL_HasIntersection(&defender_rect, &full_damage_rect) != SDL_TRUE) {
+                damage /= 2;
+            }
+            damage = std::max(1, damage - ENTITY_DATA.at(defender.type).armor);
+
+            defender.health = std::max(0, defender.health - damage);
+            entity_on_attack(state, attacker_id, defender);
+        }
+    }
+
+    // Create particle
+    state.particles.push_back((particle_t) {
+        .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
+        .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
+        .vframe = 0,
+        .position = position
     });
 }
 

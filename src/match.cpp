@@ -175,7 +175,7 @@ match_state_t match_init() {
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
-        entity_create(state, ENTITY_TINKER, player_id, player_spawn + xy(0, 1));
+        entity_create(state, ENTITY_CANNON, player_id, player_spawn + xy(-2, 1));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));

@@ -486,6 +486,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 6,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_PARTICLE_CANNON_EXPLOSION, (sprite_params_t) {
+        .path = "sprite/particle_cannon_explosion.png",
+        .hframes = 4,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
     }}
 };
 
