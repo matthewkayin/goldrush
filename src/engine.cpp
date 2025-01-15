@@ -78,6 +78,7 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
 enum SpriteImportStrategy {
     SPRITE_IMPORT_DEFAULT,
     SPRITE_IMPORT_RECOLOR,
+    SPRITE_IMPORT_RECOLOR_AND_LOW_TRANSPARENCY,
     SPRITE_IMPORT_TILE_SIZE,
     SPRITE_IMPORT_TILESET,
     SPRITE_IMPORT_FOG_OF_WAR
@@ -359,7 +360,7 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .path = "sprite/unit_spy.png",
         .hframes = 15,
         .vframes = 3,
-        .strategy = SPRITE_IMPORT_RECOLOR
+        .strategy = SPRITE_IMPORT_RECOLOR_AND_LOW_TRANSPARENCY
     }},
     { SPRITE_BUILDING_HALL, (sprite_params_t) {
         .path = "sprite/building_hall.png",
@@ -839,7 +840,8 @@ bool engine_init_renderer() {
                 sprite.frame_size = xy(sprite_surface->w / sprite.hframes, sprite_surface->h / sprite.vframes);
                 break;
             }
-            case SPRITE_IMPORT_RECOLOR: {
+            case SPRITE_IMPORT_RECOLOR: 
+            case SPRITE_IMPORT_RECOLOR_AND_LOW_TRANSPARENCY: {
                 // Re-color texture creation
                 uint32_t* sprite_pixels = (uint32_t*)sprite_surface->pixels;
                 uint32_t reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_REF.r, RECOLOR_REF.g, RECOLOR_REF.b, RECOLOR_REF.a);
@@ -854,6 +856,14 @@ bool engine_init_renderer() {
 
                     for (uint32_t pixel_index = 0; pixel_index < recolored_surface->w * recolored_surface->h; pixel_index++) {
                         recolor_pixels[pixel_index] = sprite_pixels[pixel_index] == reference_pixel ? replace_pixel : sprite_pixels[pixel_index];
+                        if (sprite_params_it->second.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_TRANSPARENCY) {
+                            uint8_t r, g, b, a;
+                            SDL_GetRGBA(recolor_pixels[pixel_index], recolored_surface->format, &r, &g, &b, &a);
+                            if (a != 0) {
+                                a = 200;
+                            }
+                            recolor_pixels[pixel_index] = SDL_MapRGBA(recolored_surface->format, r, g, b, a);
+                        }
                     }
 
                     sprite.colored_texture[player_color] = SDL_CreateTextureFromSurface(engine.renderer, recolored_surface);

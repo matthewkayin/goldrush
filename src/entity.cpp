@@ -619,6 +619,9 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
         entity.timer = MINE_ARM_DURATION;
         entity.mode = MODE_MINE_ARM;
     }
+    if (entity.type == ENTITY_SPY) {
+        entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, true);
+    }
 
     entity_id id = state.entities.push_back(entity);
     if (entity.type == ENTITY_MINE) {
@@ -1636,7 +1639,7 @@ uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity
 
     uint16_t elevation = state.map_tiles[entity.cell.x + (entity.cell.y * state.map_width)].elevation;
 
-    if (entity.type == ENTITY_JOCKEY || entity.type == ENTITY_SOLDIER) {
+    if (entity.type == ENTITY_JOCKEY || entity.type == ENTITY_SOLDIER || entity.type == ENTITY_COWBOY || entity.type == ENTITY_SAPPER || entity.type == ENTITY_SPY) {
         for (int y = 0; y < 2; y++) {
             xy above_cell = entity.cell - xy(0, y + 1);
             if (map_is_cell_in_bounds(state, above_cell) && map_is_tile_ramp(state, above_cell)) {
@@ -2127,7 +2130,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
         defender.health = std::max(0, defender.health - damage);
 
         // Create particle effect
-        if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets)) {
+        if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_SPY) {
             SDL_Rect defender_rect = entity_get_rect(defender);
 
             xy particle_position;
@@ -2211,7 +2214,8 @@ void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& def
     // Make the enemy attack back
     if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE && 
             defender.target.type == TARGET_NONE && ENTITY_DATA.at(defender.type).unit_data.damage != 0 && 
-            defender.player_id != attacker.player_id && map_is_cell_rect_revealed(state, defender.player_id, attacker.cell, entity_cell_size(attacker.type))) {
+            defender.player_id != attacker.player_id && map_is_cell_rect_revealed(state, defender.player_id, attacker.cell, entity_cell_size(attacker.type)) &&
+            !(entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE) && state.map_detection[defender.player_id][attacker.cell.x + (attacker.cell.y * state.map_width)] == 0)) {
         defender.target = (target_t) {
             .type = TARGET_ATTACK_ENTITY,
             .id = attacker_id

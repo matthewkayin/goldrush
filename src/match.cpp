@@ -1696,6 +1696,7 @@ void match_render(const match_state_t& state) {
         for (const entity_t& entity : state.entities) {
             if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_MINE ||
                     !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) || 
+                    (entity.player_id != network_get_player_id() && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.map_width)] == 0) ||
                     entity.garrison_id != ID_NULL || entity_get_elevation(state, entity) != elevation) {
                 continue;
             }

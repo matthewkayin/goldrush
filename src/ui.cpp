@@ -256,7 +256,7 @@ void ui_update_buttons(match_state_t& state) {
         state.ui_buttons[3] = UI_BUTTON_UNLOAD;
     }
 
-    if (!entity.queue.empty()) {
+    if (!entity.queue.empty() && state.selection.size() == 1) {
         state.ui_buttons[5] = UI_BUTTON_CANCEL;
     }
 
