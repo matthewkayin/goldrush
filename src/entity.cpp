@@ -308,6 +308,34 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .min_range_squared = 9
         }
     }},
+    { ENTITY_SPY, (entity_data_t) {
+        .name = "Spy",
+        .sprite = SPRITE_UNIT_SPY,
+        .ui_button = UI_BUTTON_UNIT_SPY,
+        .cell_size = 1,
+
+        .gold_cost = 75,
+        .train_duration = 25,
+        .max_health = 50,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+
+        .has_detection = true,
+
+        .unit_data = (unit_data_t) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 170),
+
+            .damage = 6,
+            .attack_cooldown = 30,
+            .range_squared = 25,
+            .min_range_squared = 1
+        }
+    }},
     { ENTITY_HALL, (entity_data_t) {
         .name = "Town Hall",
         .sprite = SPRITE_BUILDING_HALL,

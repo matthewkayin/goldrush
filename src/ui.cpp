@@ -61,7 +61,7 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
         .type = UI_BUTTON_REQUIRES_UPGRADE,
         .upgrade = UPGRADE_EXPLOSIVES
     }},
-    { UI_BUTTON_UNIT_TINKER, (ui_button_requirements_t) {
+    { UI_BUTTON_BUILD_MINE, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_UPGRADE,
         .upgrade = UPGRADE_EXPLOSIVES
     }},
@@ -306,6 +306,7 @@ void ui_update_buttons(match_state_t& state) {
         case ENTITY_BARRACKS: {
             state.ui_buttons[0] = UI_BUTTON_UNIT_SOLDIER;
             state.ui_buttons[1] = UI_BUTTON_UNIT_CANNON;
+            state.ui_buttons[2] = UI_BUTTON_UNIT_SPY;
             break;
         }
         default:
