@@ -106,7 +106,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
 
-            .damage = 5,
+            .damage = 7,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1
@@ -963,7 +963,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         bool can_build = true;
                         for (int x = entity.target.build.building_cell.x; x < entity.target.build.building_cell.x + entity_cell_size(entity.target.build.building_type); x++) {
                             for (int y = entity.target.build.building_cell.y; y < entity.target.build.building_cell.y + entity_cell_size(entity.target.build.building_type); y++) {
-                                if (xy(x, y) != entity.cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) {
+                                if ((xy(x, y) != entity.cell && state.map_cells[x + (y * state.map_width)] != CELL_EMPTY) || 
+                                        state.map_mine_cells[x + (y * state.map_width)] != ID_NULL) {
                                     can_build = false;
                                 }
                             }
