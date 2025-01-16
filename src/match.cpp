@@ -90,6 +90,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_BUILD_COOP, SDLK_c },
     { UI_BUTTON_BUILD_SMITH, SDLK_s },
     { UI_BUTTON_BUILD_BARRACKS, SDLK_b },
+    { UI_BUTTON_BUILD_SHERIFFS, SDLK_e },
     { UI_BUTTON_BUILD_MINE, SDLK_e },
     { UI_BUTTON_UNIT_MINER, SDLK_r },
     { UI_BUTTON_UNIT_MINER, SDLK_e },

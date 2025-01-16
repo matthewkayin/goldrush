@@ -309,7 +309,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         }
     }},
     { ENTITY_SPY, (entity_data_t) {
-        .name = "Spy",
+        .name = "Detective",
         .sprite = SPRITE_UNIT_SPY,
         .ui_button = UI_BUTTON_UNIT_SPY,
         .cell_size = 1,
@@ -532,6 +532,31 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .building_data = (building_data_t) {
             .builder_positions_x = { 6, 27, 3 },
             .builder_positions_y = { 27, 7, 3 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_SHERIFFS, (entity_data_t) {
+        .name = "Sheriff's Office",
+        .sprite = SPRITE_BUILDING_SHERIFFS,
+        .ui_button = UI_BUTTON_BUILD_SHERIFFS,
+        .cell_size = 3,
+
+        .gold_cost = 150,
+        .train_duration = 0,
+        .max_health = 600,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+
+        .has_detection = false,
+
+        .building_data = (building_data_t) {
+            .builder_positions_x = { 6, 27, 14 },
+            .builder_positions_y = { 27, 7, 1 },
             .builder_flip_h = { false, true, false },
             .can_rally = true
         }
@@ -2130,7 +2155,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
         defender.health = std::max(0, defender.health - damage);
 
         // Create particle effect
-        if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_SPY) {
+        if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_SPY || attacker.type == ENTITY_JOCKEY) {
             SDL_Rect defender_rect = entity_get_rect(defender);
 
             xy particle_position;

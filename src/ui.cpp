@@ -45,17 +45,17 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_SALOON
     }},
-    { UI_BUTTON_BUILD_COOP, (ui_button_requirements_t) {
-        .type = UI_BUTTON_REQUIRES_BUILDING,
-        .building_type = ENTITY_SALOON
-    }},
     { UI_BUTTON_BUILD_SMITH, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_SALOON
     }},
+    { UI_BUTTON_BUILD_COOP, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_SMITH
+    }},
     { UI_BUTTON_BUILD_BARRACKS, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
-        .building_type = ENTITY_SALOON
+        .building_type = ENTITY_SMITH
     }},
     { UI_BUTTON_UNIT_SAPPER, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_UPGRADE,
@@ -69,10 +69,10 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_BARRACKS
     }},
-    { UI_BUTTON_UNIT_CANNON, (ui_button_requirements_t) {
+    { UI_BUTTON_BUILD_SHERIFFS, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_BUILDING,
-        .building_type = ENTITY_SMITH
-    }}
+        .building_type = ENTITY_BARRACKS
+    }},
 };
 
 bool ui_is_mouse_in_ui() {
@@ -214,9 +214,10 @@ void ui_update_buttons(match_state_t& state) {
         return;
     }
     if (state.ui_mode == UI_MODE_BUILD2) {
-        state.ui_buttons[0] = UI_BUTTON_BUILD_COOP;
-        state.ui_buttons[1] = UI_BUTTON_BUILD_SMITH;
+        state.ui_buttons[0] = UI_BUTTON_BUILD_SMITH;
+        state.ui_buttons[1] = UI_BUTTON_BUILD_COOP;
         state.ui_buttons[2] = UI_BUTTON_BUILD_BARRACKS;
+        state.ui_buttons[3] = UI_BUTTON_BUILD_SHERIFFS;
         state.ui_buttons[5] = UI_BUTTON_CANCEL;
         return;
     }
@@ -282,8 +283,8 @@ void ui_update_buttons(match_state_t& state) {
         case ENTITY_SALOON: {
             state.ui_buttons[0] = UI_BUTTON_UNIT_COWBOY;
             state.ui_buttons[1] = UI_BUTTON_UNIT_BANDIT;
-            state.ui_buttons[2] = UI_BUTTON_UNIT_SAPPER;
-            state.ui_buttons[3] = UI_BUTTON_UNIT_TINKER;
+            state.ui_buttons[2] = UI_BUTTON_UNIT_TINKER;
+            state.ui_buttons[3] = UI_BUTTON_UNIT_SAPPER;
             break;
         }
         case ENTITY_COOP: {
@@ -306,7 +307,10 @@ void ui_update_buttons(match_state_t& state) {
         case ENTITY_BARRACKS: {
             state.ui_buttons[0] = UI_BUTTON_UNIT_SOLDIER;
             state.ui_buttons[1] = UI_BUTTON_UNIT_CANNON;
-            state.ui_buttons[2] = UI_BUTTON_UNIT_SPY;
+            break;
+        }
+        case ENTITY_SHERIFFS: {
+            state.ui_buttons[0] = UI_BUTTON_UNIT_SPY;
             break;
         }
         default:

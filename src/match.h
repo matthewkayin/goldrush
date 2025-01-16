@@ -75,6 +75,7 @@ enum EntityType {
     ENTITY_COOP,
     ENTITY_SMITH,
     ENTITY_BARRACKS,
+    ENTITY_SHERIFFS,
     ENTITY_MINE,
     ENTITY_GOLD
 };
