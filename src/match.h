@@ -32,6 +32,7 @@
 #define UI_STATUS_MINE_EXIT_BLOCKED "Mine exit is blocked."
 #define UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
 #define UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
+#define UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
 
 // Map
 
@@ -178,7 +179,7 @@ struct entity_t {
 
     std::vector<entity_id> garrisoned_units;
     entity_id garrison_id;
-    uint32_t bunker_cooldown_timer;
+    uint32_t cooldown_timer;
 
     uint32_t gold_held;
     uint32_t gold_patch_id;

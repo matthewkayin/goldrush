@@ -25,6 +25,7 @@ static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const int MINE_EXPLOSION_DAMAGE = 101;
 static const int SOLDIER_BAYONET_DAMAGE = 4;
 static const int SMOKE_BOMB_THROW_RANGE_SQUARED = 36;
+static const int SMOKE_BOMB_COOLDOWN = 60 * 60;
 
 // Building train time = (HP * 0.9) / 10
 
@@ -634,7 +635,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.animation = animation_create(ANIMATION_UNIT_IDLE);
 
     entity.garrison_id = ID_NULL;
-    entity.bunker_cooldown_timer = 0;
+    entity.cooldown_timer = 0;
     entity.gold_held = 0;
     entity.gold_patch_id = GOLD_PATCH_ID_NULL;
 
@@ -1100,12 +1101,12 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             if (entity.garrison_id != ID_NULL) {
                                 entity_t& carrier = state.entities.get_by_id(entity.garrison_id);
                                 // Don't attack during bunker cooldown or if this is a melee unit
-                                if (carrier.bunker_cooldown_timer != 0 || entity_data.unit_data.range_squared == 1) {
+                                if (carrier.cooldown_timer != 0 || entity_data.unit_data.range_squared == 1) {
                                     update_finished = true;
                                     break;
                                 }
 
-                                carrier.bunker_cooldown_timer = ENTITY_BUNKER_FIRE_OFFSET;
+                                carrier.cooldown_timer = ENTITY_BUNKER_FIRE_OFFSET;
                             }
 
                             // Begin attack windup
@@ -1399,6 +1400,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             .position = entity.position + xy_fixed(DIRECTION_XY[entity.direction] * 10),
                             .target = cell_center(entity.target.cell)
                         });
+                        entity.cooldown_timer = SMOKE_BOMB_COOLDOWN;
                     }
                     entity.target = (target_t) { .type = TARGET_NONE };
                     entity.mode = MODE_UNIT_IDLE;
@@ -1552,8 +1554,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         }
     } // End while !update_finished
 
-    if (entity.bunker_cooldown_timer != 0) {
-        entity.bunker_cooldown_timer--;
+    if (entity.cooldown_timer != 0) {
+        entity.cooldown_timer--;
     }
 
     if (entity.taking_damage_timer != 0) {

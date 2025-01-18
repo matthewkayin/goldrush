@@ -1394,9 +1394,14 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         } // End handle INPUT_MOVE
         case INPUT_MOVE_SMOKE: {
             uint32_t smoke_thrower_index = INDEX_INVALID;
+            bool all_units_are_dead = true;
             for (uint32_t id_index = 0; id_index < input.move.entity_count; id_index++) {
                 uint32_t unit_index = state.entities.get_index_of(input.move.entity_ids[id_index]);
                 if (unit_index == INDEX_INVALID || !entity_is_selectable(state.entities[unit_index])) {
+                    continue;
+                }
+                all_units_are_dead = false;
+                if (state.entities[unit_index].cooldown_timer != 0) {
                     continue;
                 }
                 if (smoke_thrower_index == INDEX_INVALID || xy::manhattan_distance(state.entities[unit_index].cell, input.move.target_cell) < 
@@ -1406,6 +1411,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             }
 
             if (smoke_thrower_index == INDEX_INVALID) {
+                if (!all_units_are_dead && player_id == network_get_player_id()) {
+                    ui_show_status(state, UI_STATUS_SMOKE_COOLDOWN);
+                }
                 return;
             }
 
@@ -2238,6 +2246,11 @@ void match_render(const match_state_t& state) {
 
             if (ENTITY_DATA.at(entity.type).has_detection) {
                 render_text(FONT_WESTERN8_GOLD, "Detection", SELECTION_LIST_TOP_LEFT + xy(36, 22));
+            }
+            if (entity.type == ENTITY_TINKER && entity.cooldown_timer != 0) {
+                char cooldown_text[64];
+                sprintf(cooldown_text, "Smoke Bomb cooldown: %us", entity.cooldown_timer / 60);
+                render_text(FONT_WESTERN8_GOLD, cooldown_text, SELECTION_LIST_TOP_LEFT + xy(36, 36));
             }
         } else {
             char gold_left_str[17];

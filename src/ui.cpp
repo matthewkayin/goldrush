@@ -502,6 +502,17 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             break;
         }
         case UI_BUTTON_SMOKE: {
+            bool is_smoke_off_cooldown = false;
+            for (entity_id id : state.selection) {
+                if (state.entities.get_by_id(id).cooldown_timer == 0) {
+                    is_smoke_off_cooldown = true;
+                    break;
+                }
+            }
+            if (!is_smoke_off_cooldown) {
+                ui_show_status(state, UI_STATUS_SMOKE_COOLDOWN);
+                break;
+            }
             state.ui_mode = UI_MODE_TARGET_SMOKE;
             break;
         }
