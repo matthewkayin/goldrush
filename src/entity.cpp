@@ -22,7 +22,7 @@ static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 static const uint32_t UNIT_HEALTH_REGEN_DELAY = 10 * 60;
 static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
-static const int MINE_EXPLOSION_DAMAGE = 101;
+static const int MINE_EXPLOSION_DAMAGE = 200;
 static const int SOLDIER_BAYONET_DAMAGE = 4;
 static const int SMOKE_BOMB_THROW_RANGE_SQUARED = 36;
 static const int SMOKE_BOMB_COOLDOWN = 60 * 60;
@@ -93,7 +93,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .cell_size = 1,
 
         .gold_cost = 50,
-        .train_duration = 25,
+        .train_duration = 20,
         .max_health = 50,
         .sight = 7,
         .armor = 0,
@@ -120,9 +120,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_UNIT_WAGON,
         .cell_size = 2,
 
-        .gold_cost = 150,
+        .gold_cost = 200,
         .train_duration = 38,
-        .max_health = 100,
+        .max_health = 120,
         .sight = 7,
         .armor = 1,
         .attack_priority = 1,
@@ -148,9 +148,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_UNIT_WAR_WAGON,
         .cell_size = 2,
 
-        .gold_cost = 150,
+        .gold_cost = 200,
         .train_duration = 38,
-        .max_health = 100,
+        .max_health = 120,
         .sight = 7,
         .armor = 2,
         .attack_priority = 1,
@@ -178,7 +178,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 125,
         .train_duration = 35,
-        .max_health = 50,
+        .max_health = 100,
         .sight = 7,
         .armor = 0,
         .attack_priority = 2,
@@ -204,9 +204,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_UNIT_SAPPER,
         .cell_size = 1,
 
-        .gold_cost = 150,
-        .train_duration = 30,
-        .max_health = 50,
+        .gold_cost = 100,
+        .train_duration = 27,
+        .max_health = 40,
         .sight = 7,
         .armor = 0,
         .attack_priority = 2,
@@ -220,7 +220,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
 
-            .damage = 101,
+            .damage = 200,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1
@@ -262,9 +262,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 125,
         .train_duration = 30,
-        .max_health = 50,
+        .max_health = 60,
         .sight = 7,
-        .armor = 0,
+        .armor = 1,
         .attack_priority = 2,
 
         .garrison_capacity = 0,
@@ -290,9 +290,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 200,
         .train_duration = 45,
-        .max_health = 75,
+        .max_health = 100,
         .sight = 7,
-        .armor = 0,
+        .armor = 1,
         .attack_priority = 2,
 
         .garrison_capacity = 0,
@@ -301,7 +301,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .has_detection = false,
 
         .unit_data = (unit_data_t) {
-            .population_cost = 1,
+            .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(0, 140),
 
             .damage = 30,
@@ -316,8 +316,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_UNIT_SPY,
         .cell_size = 1,
 
-        .gold_cost = 75,
-        .train_duration = 25,
+        .gold_cost = 175,
+        .train_duration = 30,
         .max_health = 50,
         .sight = 7,
         .armor = 0,
@@ -333,7 +333,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .speed = fixed::from_int_and_raw_decimal(0, 170),
 
             .damage = 6,
-            .attack_cooldown = 30,
+            .attack_cooldown = 45,
             .range_squared = 25,
             .min_range_squared = 1
         }
@@ -346,7 +346,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 400,
         .train_duration = 0,
-        .max_health = 1000,
+        .max_health = 840,
         .sight = 7,
         .armor = 1,
         .attack_priority = 0,
@@ -471,7 +471,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 150,
         .train_duration = 0,
-        .max_health = 600,
+        .max_health = 500,
         .sight = 7,
         .armor = 1,
         .attack_priority = 0,
@@ -494,9 +494,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_BUILD_SMITH,
         .cell_size = 3,
 
-        .gold_cost = 150,
+        .gold_cost = 250,
         .train_duration = 0,
-        .max_health = 600,
+        .max_health = 560,
         .sight = 7,
         .armor = 1,
         .attack_priority = 0,
@@ -519,7 +519,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_BUILD_BARRACKS,
         .cell_size = 3,
 
-        .gold_cost = 150,
+        .gold_cost = 300,
         .train_duration = 0,
         .max_health = 600,
         .sight = 7,
@@ -544,9 +544,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_BUILD_SHERIFFS,
         .cell_size = 3,
 
-        .gold_cost = 150,
+        .gold_cost = 200,
         .train_duration = 0,
-        .max_health = 600,
+        .max_health = 560,
         .sight = 7,
         .armor = 1,
         .attack_priority = 0,
@@ -572,8 +572,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .gold_cost = 25,
         .train_duration = 0,
         .max_health = 5,
-        .sight = 7,
-        .armor = 1,
+        .sight = 3,
+        .armor = 0,
         .attack_priority = 0,
 
         .garrison_capacity = 0,

@@ -9,7 +9,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
-static const uint32_t PLAYER_STARTING_GOLD = 5000;
+static const uint32_t PLAYER_STARTING_GOLD = 500;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
@@ -116,25 +116,25 @@ const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
     { UPGRADE_WAR_WAGON, (upgrade_data_t) {
             .name = "Wagon Armor",
             .ui_button = UI_BUTTON_RESEARCH_WAR_WAGON,
-            .gold_cost = 200,
-            .research_duration = 60
+            .gold_cost = 300,
+            .research_duration = 50
     }},
     { UPGRADE_EXPLOSIVES, (upgrade_data_t) {
             .name = "Explosives",
             .ui_button = UI_BUTTON_RESEARCH_EXPLOSIVES,
-            .gold_cost = 200,
-            .research_duration = 60
+            .gold_cost = 400,
+            .research_duration = 75
     }},
     { UPGRADE_BAYONETS, (upgrade_data_t) {
             .name = "Bayonets",
             .ui_button = UI_BUTTON_RESEARCH_BAYONETS,
             .gold_cost = 200,
-            .research_duration = 60
+            .research_duration = 50
     }},
     { UPGRADE_SMOKE, (upgrade_data_t) {
             .name = "Smoke Bombs",
             .ui_button = UI_BUTTON_RESEARCH_SMOKE,
-            .gold_cost = 200,
+            .gold_cost = 300,
             .research_duration = 60
     }}
 };
@@ -156,9 +156,6 @@ match_state_t match_init() {
     }
 
     std::vector<xy> player_spawns = map_init(state);
-    if (player_spawns.size() > 1) {
-        player_spawns[1] = player_spawns[0] + xy(0, 16);
-    }
     
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
@@ -190,11 +187,9 @@ match_state_t match_init() {
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
-        entity_create(state, ENTITY_TINKER, player_id, player_spawn + xy(-1, 0));
-        match_grant_player_upgrade(state, player_id, UPGRADE_SMOKE);
-        // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
-        // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
-        // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
+        entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
     }
     state.turn_timer = 0;
     state.ui_disconnect_timer = 0;
