@@ -24,6 +24,7 @@ static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const int MINE_EXPLOSION_DAMAGE = 101;
 static const int SOLDIER_BAYONET_DAMAGE = 4;
+static const int SMOKE_BOMB_THROW_RANGE_SQUARED = 36;
 
 // Building train time = (HP * 0.9) / 10
 
@@ -106,7 +107,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
 
-            .damage = 7,
+            .damage = 5,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1
@@ -959,6 +960,17 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.target = (target_t) { .type = TARGET_NONE };
                         break;
                     }
+                    case TARGET_SMOKE: {
+                        if (!entity_has_reached_target(state, entity)) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
+                        entity.direction = enum_direction_to_rect(entity.cell, entity.target.cell, 1);
+                        entity.mode = MODE_UNIT_TINKER_THROW;
+                        entity.animation = animation_create(ANIMATION_UNIT_ATTACK);
+                        break;
+                    }
                     case TARGET_BUILD: {
                         bool can_build = true;
                         for (int x = entity.target.build.building_cell.x; x < entity.target.build.building_cell.x + entity_cell_size(entity.target.build.building_type); x++) {
@@ -990,10 +1002,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         if (entity.target.build.building_type == ENTITY_MINE) {
                             entity_create(state, entity.target.build.building_type, entity.player_id, entity.target.build.building_cell);
-                            entity.direction = enum_direction_to_rect(entity.cell, entity.target.build.building_cell, entity_cell_size(entity.target.build.building_type));
 
+                            entity.direction = enum_direction_to_rect(entity.cell, entity.target.build.building_cell, entity_cell_size(entity.target.build.building_type));
                             entity.target = (target_t) { .type = TARGET_NONE };
-                            entity.mode = MODE_UNIT_LAY_MINE;
+                            entity.mode = MODE_UNIT_TINKER_THROW;
                             entity.animation = animation_create(ANIMATION_UNIT_ATTACK);
                             break;
                         }
@@ -1379,8 +1391,16 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 update_finished = true;
                 break;
             }
-            case MODE_UNIT_LAY_MINE: {
+            case MODE_UNIT_TINKER_THROW: {
                 if (!animation_is_playing(entity.animation)) {
+                    if (entity.target.type == TARGET_SMOKE) {
+                        state.projectiles.push_back((projectile_t) {
+                            .type = PROJECTILE_SMOKE,
+                            .position = entity.position + xy_fixed(DIRECTION_XY[entity.direction] * 10),
+                            .target = cell_center(entity.target.cell)
+                        });
+                    }
+                    entity.target = (target_t) { .type = TARGET_NONE };
                     entity.mode = MODE_UNIT_IDLE;
                 }
 
@@ -1610,7 +1630,7 @@ xy entity_get_center_position(const entity_t& entity) {
     return xy(rect.x + (rect.w / 2), rect.y + (rect.h / 2));
 }
 
-Sprite entity_get_sprite(const entity_t entity) {
+Sprite entity_get_sprite(const entity_t& entity) {
     if (entity.mode == MODE_BUILDING_DESTROYED) {
         if (entity.type == ENTITY_BUNKER) {
             return SPRITE_BUILDING_DESTROYED_BUNKER;
@@ -1636,7 +1656,7 @@ Sprite entity_get_sprite(const entity_t entity) {
     return ENTITY_DATA.at(entity.type).sprite;
 }
 
-Sprite entity_get_select_ring(const entity_t entity, bool is_ally) {
+Sprite entity_get_select_ring(const entity_t& entity, bool is_ally) {
     if (entity.type == ENTITY_GOLD) {
         return SPRITE_SELECT_RING_GOLD;
     }
@@ -1783,6 +1803,9 @@ bool entity_has_reached_target(const match_state_t& state, const entity_t& entit
                         ? sdl_rects_are_adjacent(entity_rect, target_rect)
                         : euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
         }
+        case TARGET_SMOKE: {
+            return xy::euclidean_distance_squared(entity.cell, entity.target.cell) <= SMOKE_BOMB_THROW_RANGE_SQUARED;
+        }
         case TARGET_GOLD: {
             return entity.cell == entity.target.cell;
         }
@@ -1806,6 +1829,7 @@ xy entity_get_target_cell(const match_state_t& state, const entity_t& entity) {
         case TARGET_CELL:
         case TARGET_ATTACK_CELL:
         case TARGET_UNLOAD:
+        case TARGET_SMOKE:
             return entity.target.cell;
         case TARGET_ENTITY:
         case TARGET_ATTACK_ENTITY:
@@ -1847,7 +1871,7 @@ AnimationName entity_get_expected_animation(const entity_t& entity) {
         case MODE_UNIT_REPAIR:
             return ANIMATION_UNIT_BUILD;
         case MODE_UNIT_ATTACK_WINDUP:
-        case MODE_UNIT_LAY_MINE:
+        case MODE_UNIT_TINKER_THROW:
             return ANIMATION_UNIT_ATTACK;
         case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
             return ANIMATION_SOLDIER_RANGED_ATTACK;
@@ -2287,7 +2311,6 @@ void entity_explode(match_state_t& state, entity_id id) {
         entity.animation = animation_create(ANIMATION_UNIT_DEATH_FADE);
         map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
     } else {
-        // TODO mine is invisible if it died by explosion. possibly same with sapper, but still fade on both
         entity.mode = MODE_BUILDING_DESTROYED;
         entity.timer = BUILDING_FADE_DURATION;
         state.map_mine_cells[entity.cell.x + (entity.cell.y * state.map_width)] = ID_NULL;

@@ -57,9 +57,17 @@ const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREME
         .type = UI_BUTTON_REQUIRES_BUILDING,
         .building_type = ENTITY_SMITH
     }},
+    { UI_BUTTON_UNIT_TINKER, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_BUILDING,
+        .building_type = ENTITY_SMITH
+    }},
     { UI_BUTTON_UNIT_SAPPER, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_UPGRADE,
         .upgrade = UPGRADE_EXPLOSIVES
+    }},
+    { UI_BUTTON_SMOKE, (ui_button_requirements_t) {
+        .type = UI_BUTTON_REQUIRES_UPGRADE,
+        .upgrade = UPGRADE_SMOKE
     }},
     { UI_BUTTON_BUILD_MINE, (ui_button_requirements_t) {
         .type = UI_BUTTON_REQUIRES_UPGRADE,
@@ -274,6 +282,7 @@ void ui_update_buttons(match_state_t& state) {
         }
         case ENTITY_TINKER: {
             state.ui_buttons[3] = UI_BUTTON_BUILD_MINE;
+            state.ui_buttons[4] = UI_BUTTON_SMOKE;
             break;
         }
         case ENTITY_HALL: {
@@ -301,6 +310,9 @@ void ui_update_buttons(match_state_t& state) {
             }
             if (match_player_upgrade_is_available(state, network_get_player_id(), UPGRADE_BAYONETS)) {
                 state.ui_buttons[2] = UI_BUTTON_RESEARCH_BAYONETS;
+            }
+            if (match_player_upgrade_is_available(state, network_get_player_id(), UPGRADE_SMOKE)) {
+                state.ui_buttons[3] = UI_BUTTON_RESEARCH_SMOKE;
             }
             break;
         }
@@ -388,7 +400,7 @@ bool ui_button_requirements_met(const match_state_t& state, UiButton button) {
             return false;
         }
         case UI_BUTTON_REQUIRES_UPGRADE: {
-            return match_player_has_upgrade(state, network_get_player_id(), UPGRADE_EXPLOSIVES);
+            return match_player_has_upgrade(state, network_get_player_id(), ui_button_requirements_it->second.upgrade);
         }
     }
 }
@@ -476,7 +488,7 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
                 });
             } else if (state.ui_mode == UI_MODE_BUILD || state.ui_mode == UI_MODE_BUILD2) {
                 state.ui_mode = UI_MODE_NONE;
-            } else if (state.ui_mode == UI_MODE_TARGET_REPAIR || state.ui_mode == UI_MODE_TARGET_ATTACK || state.ui_mode == UI_MODE_TARGET_UNLOAD) {
+            } else if (ui_is_targeting(state)) {
                 state.ui_mode = UI_MODE_NONE;
             } 
             break;
@@ -487,6 +499,10 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
             input.explode.entity_count = state.selection.size();
             memcpy(&input.explode.entity_ids, &state.selection[0], input.explode.entity_count * sizeof(entity_id));
             state.input_queue.push_back(input);
+            break;
+        }
+        case UI_BUTTON_SMOKE: {
+            state.ui_mode = UI_MODE_TARGET_SMOKE;
             break;
         }
         default:
@@ -684,6 +700,9 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
             break;
         case UI_BUTTON_EXPLODE:
             info_text_ptr += sprintf(info_text_ptr, "Explode");
+            break;
+        case UI_BUTTON_SMOKE:
+            info_text_ptr += sprintf(info_text_ptr, "Smoke Bomb");
             break;
         case UI_BUTTON_CANCEL:
             info_text_ptr += sprintf(info_text_ptr, "Cancel");

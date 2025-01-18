@@ -67,10 +67,10 @@ const uint32_t MATCH_ALERT_DURATION = 90;
 const uint32_t MATCH_ALERT_LINGER_DURATION = 60 * 20;
 const uint32_t MATCH_ALERT_TOTAL_DURATION = MATCH_ALERT_DURATION + MATCH_ALERT_LINGER_DURATION;
 const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
-
 static const int HEALTHBAR_HEIGHT = 4;
 static const int HEALTHBAR_PADDING = 3;
 static const int BUILDING_HEALTHBAR_PADDING = 5;
+static const fixed PROJECTILE_SMOKE_SPEED = fixed::from_int(2);
 
 const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_STOP, SDLK_s },
@@ -82,6 +82,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_CANCEL, SDLK_ESCAPE },
     { UI_BUTTON_UNLOAD, SDLK_x },
     { UI_BUTTON_EXPLODE, SDLK_e },
+    { UI_BUTTON_SMOKE, SDLK_b },
     { UI_BUTTON_BUILD_HALL, SDLK_t },
     { UI_BUTTON_BUILD_HOUSE, SDLK_e },
     { UI_BUTTON_BUILD_CAMP, SDLK_c },
@@ -106,7 +107,8 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_SPY, SDLK_s },
     { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w },
     { UI_BUTTON_RESEARCH_EXPLOSIVES, SDLK_e },
-    { UI_BUTTON_RESEARCH_BAYONETS, SDLK_b }
+    { UI_BUTTON_RESEARCH_BAYONETS, SDLK_b },
+    { UI_BUTTON_RESEARCH_SMOKE, SDLK_s }
 };
 
 const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
@@ -127,6 +129,12 @@ const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
             .ui_button = UI_BUTTON_RESEARCH_BAYONETS,
             .gold_cost = 200,
             .research_duration = 60
+    }},
+    { UPGRADE_SMOKE, (upgrade_data_t) {
+            .name = "Smoke Bombs",
+            .ui_button = UI_BUTTON_RESEARCH_SMOKE,
+            .gold_cost = 200,
+            .research_duration = 60
     }}
 };
 
@@ -137,6 +145,7 @@ match_state_t match_init() {
     state.ui_status_timer = 0;
     state.ui_is_minimap_dragging = false;
     state.select_rect_origin = xy(-1, -1);
+    state.select_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 1, .h = 1 };
     state.control_group_selected = -1;
     state.ui_double_click_timer = 0;
     state.control_group_double_tap_timer = 0;
@@ -146,6 +155,9 @@ match_state_t match_init() {
     }
 
     std::vector<xy> player_spawns = map_init(state);
+    if (player_spawns.size() > 1) {
+        player_spawns[1] = player_spawns[0] + xy(0, 16);
+    }
     
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
@@ -177,7 +189,6 @@ match_state_t match_init() {
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
-        entity_create(state, ENTITY_CANNON, player_id, player_spawn + xy(-2, 1));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
@@ -481,7 +492,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
                                                             : ANIMATION_UI_MOVE_ENTITY);
             state.ui_move_position = cell_center(move_input.move.target_cell).to_xy();
             state.ui_move_entity_id = remembered_entity_id;
-        } else if (move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_UNLOAD) {
+        } else if (move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_UNLOAD || move_input.type == INPUT_MOVE_SMOKE) {
             state.ui_move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
             state.ui_move_position = match_get_mouse_world_pos(state);
             state.ui_move_entity_id = ID_NULL;
@@ -839,10 +850,42 @@ void match_update(match_state_t& state) {
         uint32_t particle_index = 0;
         while (particle_index < state.particles.size()) {
             animation_update(state.particles[particle_index].animation);
+
+            // On particle finish
+            if (!animation_is_playing(state.particles[particle_index].animation)) {
+                if (state.particles[particle_index].animation.name == ANIMATION_PARTICLE_SMOKE_START) {
+                    state.particles[particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE);
+                } else if (state.particles[particle_index].animation.name == ANIMATION_PARTICLE_SMOKE) {
+                    state.particles[particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE_END);
+                }
+            }
+
+            // If particle finished and is not playing an animation, then remove it
             if (!animation_is_playing(state.particles[particle_index].animation)) {
                 state.particles.erase(state.particles.begin() + particle_index);
             } else {
                 particle_index++;
+            }
+        }
+    }
+
+    // Update projectiles
+    {
+        uint32_t projectile_index = 0;
+        while (projectile_index < state.projectiles.size()) {
+            projectile_t& projectile = state.projectiles[projectile_index];
+            if (projectile.position.distance_to(projectile.target) <= PROJECTILE_SMOKE_SPEED) {
+                // On projectile finish
+                state.particles.push_back((particle_t) {
+                    .sprite = SPRITE_PARTICLE_SMOKE,
+                    .animation = animation_create(ANIMATION_PARTICLE_SMOKE_START),
+                    .vframe = 0,
+                    .position = projectile.target.to_xy()
+                });
+                state.projectiles.erase(state.projectiles.begin() + projectile_index);
+            } else {
+                projectile.position += ((projectile.target - projectile.position) * PROJECTILE_SMOKE_SPEED) / projectile.position.distance_to(projectile.target);
+                projectile_index++;
             }
         }
     }
@@ -883,6 +926,9 @@ void match_update(match_state_t& state) {
     }
 
     engine_set_cursor(ui_is_targeting(state) ? CURSOR_TARGET : CURSOR_DEFAULT);
+    if ((ui_is_targeting(state) || state.ui_mode == UI_MODE_BUILDING_PLACE || state.ui_mode == UI_MODE_BUILD || state.ui_mode == UI_MODE_BUILD2) && state.selection.empty()) {
+        state.ui_mode = UI_MODE_NONE;
+    }
     ui_update_buttons(state);
 
     if (state.map_is_fog_dirty) {
@@ -999,6 +1045,8 @@ input_t match_create_move_input(const match_state_t& state) {
         input.type = INPUT_MOVE_UNLOAD;
     } else if (state.ui_mode == UI_MODE_TARGET_REPAIR) {
         input.type = INPUT_MOVE_REPAIR;
+    } else if (state.ui_mode == UI_MODE_TARGET_SMOKE) {
+        input.type = INPUT_MOVE_SMOKE;
     } else if (input.move.target_id != ID_NULL && state.entities.get_by_id(input.move.target_id).type != ENTITY_GOLD &&
                (state.ui_mode == UI_MODE_TARGET_ATTACK || 
                 state.entities.get_by_id(input.move.target_id).player_id != network_get_player_id())) {
@@ -1028,7 +1076,8 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
         case INPUT_MOVE_ATTACK_CELL:
         case INPUT_MOVE_ATTACK_ENTITY:
         case INPUT_MOVE_REPAIR:
-        case INPUT_MOVE_UNLOAD: {
+        case INPUT_MOVE_UNLOAD:
+        case INPUT_MOVE_SMOKE: {
             memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
             out_buffer_length += sizeof(xy);
 
@@ -1136,7 +1185,8 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
         case INPUT_MOVE_ATTACK_CELL:
         case INPUT_MOVE_ATTACK_ENTITY:
         case INPUT_MOVE_REPAIR:
-        case INPUT_MOVE_UNLOAD: {
+        case INPUT_MOVE_UNLOAD: 
+        case INPUT_MOVE_SMOKE: {
             memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
 
@@ -1339,6 +1389,29 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             } // End for each unit in move input
             break;
         } // End handle INPUT_MOVE
+        case INPUT_MOVE_SMOKE: {
+            uint32_t smoke_thrower_index = INDEX_INVALID;
+            for (uint32_t id_index = 0; id_index < input.move.entity_count; id_index++) {
+                uint32_t unit_index = state.entities.get_index_of(input.move.entity_ids[id_index]);
+                if (unit_index == INDEX_INVALID || !entity_is_selectable(state.entities[unit_index])) {
+                    continue;
+                }
+                if (smoke_thrower_index == INDEX_INVALID || xy::manhattan_distance(state.entities[unit_index].cell, input.move.target_cell) < 
+                                                            xy::manhattan_distance(state.entities[smoke_thrower_index].cell, input.move.target_cell)) {
+                    smoke_thrower_index = unit_index;                                            
+                }
+            }
+
+            if (smoke_thrower_index == INDEX_INVALID) {
+                return;
+            }
+
+            state.entities[smoke_thrower_index].target = (target_t) {
+                .type = TARGET_SMOKE,
+                .cell = input.move.target_cell
+            };
+            break;
+        }
         case INPUT_STOP:
         case INPUT_DEFEND: {
             for (uint8_t id_index = 0; id_index < input.stop.entity_count; id_index++) {
@@ -1826,6 +1899,14 @@ void match_render(const match_state_t& state) {
             continue;
         }
         render_sprite(particle.sprite, xy(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED);
+    }
+
+    // Projectiles
+    for (const projectile_t& projectile : state.projectiles) {
+        if (!map_is_cell_rect_revealed(state, network_get_player_id(), projectile.position.to_xy() / TILE_SIZE, 1)) {
+            continue;
+        }
+        render_sprite(SPRITE_PROJECTILE_SMOKE, xy(0, 0), projectile.position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
     // Fog of War

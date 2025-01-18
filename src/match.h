@@ -91,7 +91,7 @@ enum EntityMode {
     MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP,
     MODE_UNIT_ATTACK_COOLDOWN,
     MODE_UNIT_MINE,
-    MODE_UNIT_LAY_MINE,
+    MODE_UNIT_TINKER_THROW,
     MODE_UNIT_DEATH,
     MODE_UNIT_DEATH_FADE,
     MODE_BUILDING_IN_PROGRESS,
@@ -112,6 +112,7 @@ enum TargetType {
     TARGET_ATTACK_ENTITY,
     TARGET_REPAIR,
     TARGET_UNLOAD,
+    TARGET_SMOKE,
     TARGET_BUILD,
     TARGET_BUILD_ASSIST,
     TARGET_GOLD
@@ -253,6 +254,7 @@ enum UiMode {
     UI_MODE_TARGET_ATTACK,
     UI_MODE_TARGET_UNLOAD,
     UI_MODE_TARGET_REPAIR,
+    UI_MODE_TARGET_SMOKE,
     UI_MODE_CHAT,
     UI_MODE_MENU,
     UI_MODE_MENU_SURRENDER,
@@ -330,11 +332,22 @@ struct particle_t {
     xy position;
 };
 
+enum ProjectileType {
+    PROJECTILE_SMOKE
+};
+
+struct projectile_t {
+    ProjectileType type;
+    xy_fixed position;
+    xy_fixed target;
+};
+
 // Upgrades
 
 const uint32_t UPGRADE_WAR_WAGON = 1;
 const uint32_t UPGRADE_EXPLOSIVES = 2;
 const uint32_t UPGRADE_BAYONETS = 4;
+const uint32_t UPGRADE_SMOKE = 8;
 
 struct upgrade_data_t {
     const char* name;
@@ -356,6 +369,7 @@ enum InputType: uint8_t {
     INPUT_MOVE_ATTACK_ENTITY,
     INPUT_MOVE_REPAIR,
     INPUT_MOVE_UNLOAD,
+    INPUT_MOVE_SMOKE,
     INPUT_STOP,
     INPUT_DEFEND,
     INPUT_BUILD,
@@ -489,6 +503,7 @@ struct match_state_t {
     // Entities
     id_array<entity_t, 400 * MAX_PLAYERS> entities;
     std::vector<particle_t> particles;
+    std::vector<projectile_t> projectiles;
 
     uint32_t player_gold[MAX_PLAYERS];
     uint32_t player_upgrades[MAX_PLAYERS];
@@ -571,8 +586,8 @@ bool entity_is_building(EntityType type);
 int entity_cell_size(EntityType entity);
 SDL_Rect entity_get_rect(const entity_t& entity);
 xy entity_get_center_position(const entity_t& entity);
-Sprite entity_get_sprite(const entity_t entity);
-Sprite entity_get_select_ring(const entity_t entity, bool is_ally);
+Sprite entity_get_sprite(const entity_t& entity);
+Sprite entity_get_select_ring(const entity_t& entity, bool is_ally);
 uint16_t entity_get_elevation(const match_state_t& state, const entity_t& entity);
 bool entity_is_selectable(const entity_t& entity);
 bool entity_check_flag(const entity_t& entity, uint32_t flag);

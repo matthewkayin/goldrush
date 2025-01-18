@@ -505,6 +505,18 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .hframes = 4,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_PARTICLE_SMOKE, (sprite_params_t) {
+        .path = "sprite/particle_smoke.png",
+        .hframes = 9,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_PROJECTILE_SMOKE, (sprite_params_t) {
+        .path = "sprite/projectile_smoke.png",
+        .hframes = 1,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
     }}
 };
 
