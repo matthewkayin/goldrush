@@ -213,9 +213,9 @@ void animation_init() {
     ANIMATION_DATA[ANIMATION_PARTICLE_SMOKE_START] = (animation_data_t) {
         .vframe = -1,
         .frames = {
-            (animation_frame_t) { .hframe = 0, .duration = 8 },
-            (animation_frame_t) { .hframe = 1, .duration = 8 },
-            (animation_frame_t) { .hframe = 2, .duration = 8 }
+            (animation_frame_t) { .hframe = 0, .duration = 4 },
+            (animation_frame_t) { .hframe = 1, .duration = 4 },
+            (animation_frame_t) { .hframe = 2, .duration = 4 }
         },
         .loops = 1
     };
@@ -223,16 +223,16 @@ void animation_init() {
         .vframe = -1,
         .frames = {
             (animation_frame_t) { .hframe = 3, .duration = 30 },
-            (animation_frame_t) { .hframe = 4, .duration = 30 }
+            (animation_frame_t) { .hframe = 4, .duration = 30 },
         },
-        .loops = 36 // This is the smoke duration in seconds
+        .loops = 36 
     };
     ANIMATION_DATA[ANIMATION_PARTICLE_SMOKE_END] = (animation_data_t) {
         .vframe = -1,
         .frames = {
-            (animation_frame_t) { .hframe = 5, .duration = 8 },
-            (animation_frame_t) { .hframe = 6, .duration = 8 },
-            (animation_frame_t) { .hframe = 7, .duration = 8 },
+            (animation_frame_t) { .hframe = 5, .duration = 4 },
+            (animation_frame_t) { .hframe = 6, .duration = 4 },
+            (animation_frame_t) { .hframe = 7, .duration = 4 },
         },
         .loops = 1
     };

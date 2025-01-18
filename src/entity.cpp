@@ -2172,6 +2172,28 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
         accuracy /= 2;
     }
 
+    // check for smoke clouds
+    bool is_ranged_attack = !(attack_with_bayonets || ENTITY_DATA.at(attacker.type).unit_data.range_squared == 1);
+    if (is_ranged_attack) {
+        SDL_Rect defender_rect = entity_get_rect(defender);
+        for (const particle_t& particle : state.particles) {
+            if (particle.animation.name != ANIMATION_PARTICLE_SMOKE) {
+                continue;
+            }
+
+            SDL_Rect particle_rect = (SDL_Rect) {
+                .x = particle.position.x - (engine.sprites[SPRITE_PARTICLE_SMOKE].frame_size.x / 2),
+                .y = particle.position.y - (engine.sprites[SPRITE_PARTICLE_SMOKE].frame_size.x / 2),
+                .w = engine.sprites[SPRITE_PARTICLE_SMOKE].frame_size.x,
+                .h = engine.sprites[SPRITE_PARTICLE_SMOKE].frame_size.y
+            };
+            if (SDL_HasIntersection(&particle_rect, &defender_rect) == SDL_TRUE) {
+                accuracy = 0;
+                break;
+            }
+        }
+    }
+
     if (accuracy < lcg_rand() % 100) {
         attack_missed = true;
     }

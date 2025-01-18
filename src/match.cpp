@@ -70,7 +70,8 @@ const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
 static const int HEALTHBAR_HEIGHT = 4;
 static const int HEALTHBAR_PADDING = 3;
 static const int BUILDING_HEALTHBAR_PADDING = 5;
-static const fixed PROJECTILE_SMOKE_SPEED = fixed::from_int(2);
+static const fixed PROJECTILE_SMOKE_SPEED = fixed::from_int(4);
+static const int PARTICLE_SMOKE_CELL_SIZE = 7;
 
 const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_STOP, SDLK_s },
@@ -189,6 +190,8 @@ match_state_t match_init() {
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
+        entity_create(state, ENTITY_TINKER, player_id, player_spawn + xy(-1, 0));
+        match_grant_player_upgrade(state, player_id, UPGRADE_SMOKE);
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
         // entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
@@ -1895,8 +1898,27 @@ void match_render(const match_state_t& state) {
 
     // Particles
     for (const particle_t& particle : state.particles) {
-        if (!map_is_cell_rect_revealed(state, network_get_player_id(), particle.position / TILE_SIZE, 1)) {
-            continue;
+        if (particle.animation.name == ANIMATION_PARTICLE_SMOKE) {
+            xy particle_top_left_cell = (particle.position / TILE_SIZE) - xy((PARTICLE_SMOKE_CELL_SIZE - 1) / 2, (PARTICLE_SMOKE_CELL_SIZE - 1) / 2);
+            bool particle_is_revealed = false;
+            for (int y = particle_top_left_cell.y; y < particle_top_left_cell.y + PARTICLE_SMOKE_CELL_SIZE; y++) {
+                for (int x = particle_top_left_cell.x; x < particle_top_left_cell.x + PARTICLE_SMOKE_CELL_SIZE; x++) {
+                    if (map_is_cell_in_bounds(state, xy(x, y)) && state.map_fog[network_get_player_id()][x + (y * state.map_width)] > 0) {
+                        particle_is_revealed = true;
+                        break;
+                    }
+                }
+                if (particle_is_revealed) {
+                    break;
+                }
+            }
+            if (!particle_is_revealed) {
+                continue;
+            }
+        } else {
+            if (!map_is_cell_rect_revealed(state, network_get_player_id(), particle.position / TILE_SIZE, 1)) {
+                continue;
+            }
         }
         render_sprite(particle.sprite, xy(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
