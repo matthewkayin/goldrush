@@ -701,6 +701,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
     }
 
     if (entity_should_die(entity)) {
+        log_trace("entity %u of type %u player id %u is dead. hp %i", entity_index, entity.type, entity.player_id, entity.health);
         if (entity_is_unit(entity.type)) {
             entity.mode = MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
@@ -1314,12 +1315,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 }
 
                 if (!animation_is_playing(entity.animation)) {
-                    if (entity.type == ENTITY_CANNON) {
-                        entity_t& target = state.entities.get_by_id(entity.target.id);
-                        entity_cannon_explode(state, id, target.cell, entity_cell_size(target.type));
-                    } else {
-                        entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
-                    }
+                    entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
                     entity.timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
                     entity.mode = MODE_UNIT_ATTACK_COOLDOWN;
                 }
@@ -2405,26 +2401,6 @@ void entity_explode(match_state_t& state, entity_id id) {
         .vframe = 0,
         .position = entity.type == ENTITY_SAPPER ? entity.position.to_xy() : cell_center(entity.cell).to_xy()
     });
-}
-
-void entity_cannon_explode(match_state_t& state, entity_id attacker_id, xy cell, int cell_size) {
-    entity_t& attacker = state.entities.get_by_id(attacker_id);
-
-    // Calculate accuracy
-    bool attack_missed = false;
-    int accuracy = 100;
-    if (entity_get_elevation(state, attacker) < state.map_tiles[cell.x + (cell.y * state.map_width)].elevation) {
-        accuracy /= 2;
-    }
-    if (accuracy < lcg_rand() % 100) {
-        attack_missed = true;
-    }
-
-    if (attack_missed) {
-        return;
-    }
-
-
 }
 
 xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell) {
