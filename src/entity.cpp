@@ -2201,7 +2201,43 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
     }
     
     if (!attack_missed) {
-        defender.health = std::max(0, defender.health - damage);
+        if (attacker.type == ENTITY_CANNON) {
+            // Check which enemies we hit. 
+            int attacker_damage = ENTITY_DATA.at(attacker.type).unit_data.damage;
+            xy position = defender.position.to_xy();
+            SDL_Rect full_damage_rect = (SDL_Rect) {
+                .x = position.x - (TILE_SIZE / 2), .y = position.y - (TILE_SIZE / 2),
+                .w = TILE_SIZE, .h = TILE_SIZE
+            };
+            SDL_Rect splash_damage_rect = (SDL_Rect) {
+                .x = full_damage_rect.x - (TILE_SIZE / 2), .y = full_damage_rect.y - (TILE_SIZE / 2),
+                .w = full_damage_rect.w + TILE_SIZE, .h = full_damage_rect.h + TILE_SIZE
+            };
+            for (entity_t& defender : state.entities) {
+                if (defender.type == ENTITY_GOLD || !entity_is_selectable(defender)) {
+                    continue;
+                }
+
+                // To check if we've hit this enemy, first check the splash damage rect
+                // We have to check both, but since the splash rect is bigger, we know that 
+                // if they're outside of it, they will be outside of the full damage rect as well
+                SDL_Rect defender_rect = entity_get_rect(defender);
+                if (SDL_HasIntersection(&defender_rect, &splash_damage_rect) == SDL_TRUE) {
+                    int damage = attacker_damage; 
+                    // Half damage if they are only within splash damage range
+                    if (SDL_HasIntersection(&defender_rect, &full_damage_rect) != SDL_TRUE) {
+                        damage /= 2;
+                    }
+                    damage = std::max(1, damage - ENTITY_DATA.at(defender.type).armor);
+
+                    defender.health = std::max(0, defender.health - damage);
+                    entity_on_attack(state, attacker_id, defender);
+                }
+            }
+        } else {
+            defender.health = std::max(0, defender.health - damage);
+        }
+
 
         // Create particle effect
         if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_SPY || attacker.type == ENTITY_JOCKEY) {
@@ -2215,6 +2251,14 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
                 .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
                 .vframe = lcg_rand() % 3,
                 .position = particle_position
+            });
+        } else if (attacker.type == ENTITY_CANNON) {
+            // Create particle
+            state.particles.push_back((particle_t) {
+                .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
+                .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
+                .vframe = 0,
+                .position = defender.position.to_xy()
             });
         }
 
@@ -2248,6 +2292,20 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
             .vframe = 0,
             .position = particle_position
         });
+    }
+
+    // Reveal cell if on highground
+    if (entity_get_elevation(state, attacker) > entity_get_elevation(state, defender) && !entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE)) {
+        log_trace("map reveal");
+        map_reveal_t reveal = (map_reveal_t) {
+            .player_id = defender.player_id,
+            .cell = attacker.cell,
+            .cell_size = entity_cell_size(attacker.type),
+            .sight = 3,
+            .timer = 60
+        };
+        map_fog_update(state, reveal.player_id, reveal.cell, reveal.cell_size, reveal.sight, true, false);
+        state.map_reveals.push_back(reveal);
     }
 }
 
@@ -2366,46 +2424,7 @@ void entity_cannon_explode(match_state_t& state, entity_id attacker_id, xy cell,
         return;
     }
 
-    // Check which enemies we hit. 
-    int attacker_damage = ENTITY_DATA.at(attacker.type).unit_data.damage;
-    xy position = (cell * TILE_SIZE) + ((xy(cell_size, cell_size) * TILE_SIZE) / 2);
-    SDL_Rect full_damage_rect = (SDL_Rect) {
-        .x = position.x - (TILE_SIZE / 2), .y = position.y - (TILE_SIZE / 2),
-        .w = TILE_SIZE, .h = TILE_SIZE
-    };
-    SDL_Rect splash_damage_rect = (SDL_Rect) {
-        .x = full_damage_rect.x - (TILE_SIZE / 2), .y = full_damage_rect.y - (TILE_SIZE / 2),
-        .w = full_damage_rect.w + TILE_SIZE, .h = full_damage_rect.h + TILE_SIZE
-    };
-    for (entity_t& defender : state.entities) {
-        if (defender.type == ENTITY_GOLD || !entity_is_selectable(defender)) {
-            continue;
-        }
 
-        // To check if we've hit this enemy, first check the splash damage rect
-        // We have to check both, but since the splash rect is bigger, we know that 
-        // if they're outside of it, they will be outside of the full damage rect as well
-        SDL_Rect defender_rect = entity_get_rect(defender);
-        if (SDL_HasIntersection(&defender_rect, &splash_damage_rect) == SDL_TRUE) {
-            int damage = attacker_damage; 
-            // Half damage if they are only within splash damage range
-            if (SDL_HasIntersection(&defender_rect, &full_damage_rect) != SDL_TRUE) {
-                damage /= 2;
-            }
-            damage = std::max(1, damage - ENTITY_DATA.at(defender.type).armor);
-
-            defender.health = std::max(0, defender.health - damage);
-            entity_on_attack(state, attacker_id, defender);
-        }
-    }
-
-    // Create particle
-    state.particles.push_back((particle_t) {
-        .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
-        .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
-        .vframe = 0,
-        .position = position
-    });
 }
 
 xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell) {

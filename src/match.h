@@ -53,6 +53,14 @@ const entity_id CELL_DECORATION_5 = ID_MAX + 8;
 const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;
 
+struct map_reveal_t {
+    int player_id;
+    xy cell;
+    int cell_size;
+    int sight;
+    int timer;
+};
+
 // Entities
 
 // If you change this, make sure that entity_is_unit() and entity_is_building() still work
@@ -499,6 +507,7 @@ struct match_state_t {
     std::vector<int> map_fog[MAX_PLAYERS];
     std::vector<int> map_detection[MAX_PLAYERS];
     std::unordered_map<entity_id, remembered_entity_t> remembered_entities[MAX_PLAYERS];
+    std::vector<map_reveal_t> map_reveals;
     bool map_is_fog_dirty;
 
     // Entities

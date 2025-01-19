@@ -9,7 +9,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
-static const uint32_t PLAYER_STARTING_GOLD = 500;
+static const uint32_t PLAYER_STARTING_GOLD = 5000;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
@@ -156,6 +156,11 @@ match_state_t match_init() {
     }
 
     std::vector<xy> player_spawns = map_init(state);
+    #ifdef GOLD_NEAR_SPAWN
+    if (player_spawns.size() > 1) {
+        player_spawns[1] = player_spawns[0] + xy(0, 16);
+    }
+    #endif
     
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
@@ -888,6 +893,21 @@ void match_update(match_state_t& state) {
         }
     }
 
+    // Update map reveals
+    {
+        uint32_t reveal_index = 0;
+        while (reveal_index < state.map_reveals.size()) {
+            map_reveal_t& reveal = state.map_reveals[reveal_index];
+            reveal.timer--;
+            if (reveal.timer == 0) {
+                map_fog_update(state, reveal.player_id, reveal.cell, reveal.cell_size, reveal.sight, false, false);
+                state.map_reveals.erase(state.map_reveals.begin() + reveal_index);
+            } else {
+                reveal_index++;
+            }
+        }
+    }
+
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         entity_update(state, entity_index);
@@ -1467,6 +1487,10 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     if (builder_id == lead_builder_id) {
                         continue;
                     } 
+                    uint32_t builder_index = state.entities.get_index_of(builder_id);
+                    if (builder_index == INDEX_INVALID || !entity_is_selectable(state.entities[builder_index])) {
+                        continue;
+                    }
                     entity_set_target(state.entities.get_by_id(builder_id), (target_t) {
                         .type = TARGET_BUILD_ASSIST,
                         .id = lead_builder_id
