@@ -1083,6 +1083,12 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && entity_data.unit_data.damage != 0) {
+                            if (entity.cooldown_timer != 0) {
+                                entity.mode = MODE_UNIT_IDLE;
+                                update_finished = true;
+                                break;
+                            }
+
                             // Check min range
                             SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type), .h = entity_cell_size(entity.type) };
                             SDL_Rect target_rect = (SDL_Rect) { .x = target.cell.x, .y = target.cell.y, .w = entity_cell_size(target.type), .h = entity_cell_size(target.type) };
@@ -1316,46 +1322,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                 if (!animation_is_playing(entity.animation)) {
                     entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
-                    entity.timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
-                    entity.mode = MODE_UNIT_ATTACK_COOLDOWN;
-                }
-
-                update_finished = true;
-                break;
-            }
-            case MODE_UNIT_ATTACK_COOLDOWN: {
-                if (entity_is_target_invalid(state, entity)) {
-                    entity.timer = 0;
-                    entity.target = entity_target_nearest_enemy(state, entity);
+                    entity.cooldown_timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
                     entity.mode = MODE_UNIT_IDLE;
-                    break;
-                }
-
-                if (!entity_has_reached_target(state, entity)) {
-                    // Repath to target
-                    entity.timer = 0;
-                    entity.mode = MODE_UNIT_IDLE;
-                    break;
-                }
-
-                entity.timer--;
-                if (entity.timer == 0) {
-                    if (entity.type == ENTITY_SOLDIER) {
-                        entity_t& target = state.entities.get_by_id(entity.target.id);
-                        SDL_Rect entity_rect = (SDL_Rect) { .x = entity.cell.x, .y = entity.cell.y, .w = entity_cell_size(entity.type), .h = entity_cell_size(entity.type) };
-                        SDL_Rect target_rect = (SDL_Rect) { .x = target.cell.x, .y = target.cell.y, .w = entity_cell_size(target.type), .h = entity_cell_size(target.type) };
-                        if (euclidean_distance_squared_between(entity_rect, target_rect) < ENTITY_DATA.at(entity.type).unit_data.min_range_squared) {
-                            if (match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
-                                entity.mode = MODE_UNIT_ATTACK_WINDUP;
-                            } else {
-                                entity.mode = MODE_UNIT_IDLE;
-                            }
-                        } else {
-                            entity.mode = MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP;
-                        }
-                    } else {
-                        entity.mode = MODE_UNIT_ATTACK_WINDUP;
-                    }
                 }
 
                 update_finished = true;
