@@ -618,6 +618,7 @@ target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& 
 bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity);
 SDL_Rect entity_gold_get_block_building_rect(xy cell);
 uint32_t entity_get_garrisoned_occupancy(const match_state_t& state, const entity_t& entity);
+void entity_on_death_release_garrisoned_units(match_state_t& state, entity_t& entity);
 
 void entity_set_target(entity_t& entity, target_t target);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);

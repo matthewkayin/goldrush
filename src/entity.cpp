@@ -728,38 +728,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
         ui_deselect_entity_if_selected(state, id);
 
-        // Handle garrisoned units
-        for (entity_id garrisoned_unit_id : entity.garrisoned_units) {
-            entity_t& garrisoned_unit = state.entities.get_by_id(garrisoned_unit_id);
-            if (entity_is_unit(entity.type)) {
-                garrisoned_unit.health = 0;
-            } else {
-                // For buildings, place garrisoned units inside former-self
-                bool unit_is_placed = false;
-                for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size(entity.type); x++) {
-                    for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
-                        if (!map_is_cell_rect_occupied(state, xy(x, y), entity_cell_size(garrisoned_unit.type))) {
-                            garrisoned_unit.cell = xy(x, y);
-                            garrisoned_unit.position = entity_get_target_position(garrisoned_unit);
-                            garrisoned_unit.garrison_id = ID_NULL;
-                            garrisoned_unit.mode = MODE_UNIT_IDLE;
-                            garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
-                            map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), garrisoned_unit_id);
-                            map_fog_update(state, garrisoned_unit.player_id, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), ENTITY_DATA.at(garrisoned_unit.type).sight, true, ENTITY_DATA.at(garrisoned_unit.type).has_detection);
-                            log_trace("placed unit %u at cell %xi position %xd", garrisoned_unit_id, &garrisoned_unit.cell, &garrisoned_unit.position);
-                            unit_is_placed = true;
-                            break;
-                        }
-                    }
-                    if (unit_is_placed) {
-                        break;
-                    }
-                }
-
-                if (!unit_is_placed) {
-                    log_warn("Unable to place garrisoned unit.");
-                }
-            }
+        // Handle garrisoned units for buildings
+        // Units handle them after MODE_UNIT_DEATH is over
+        if (!entity_is_unit(entity.type)) {
+            entity_on_death_release_garrisoned_units(state, entity);
         }
         return;
     } // End if entity_should_die
@@ -1378,6 +1350,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
             case MODE_UNIT_DEATH: {
                 if (!animation_is_playing(entity.animation)) {
                     map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
+                    entity_on_death_release_garrisoned_units(state, entity);
                     entity.mode = MODE_UNIT_DEATH_FADE;
                 }
                 update_finished = true;
@@ -2620,5 +2593,36 @@ uint32_t building_queue_population_cost(const building_queue_item_t& item) {
         }
         default:
             return 0;
+    }
+}
+
+void entity_on_death_release_garrisoned_units(match_state_t& state, entity_t& entity) {
+    for (entity_id garrisoned_unit_id : entity.garrisoned_units) {
+        entity_t& garrisoned_unit = state.entities.get_by_id(garrisoned_unit_id);
+        // place garrisoned units inside former-self
+        bool unit_is_placed = false;
+        for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size(entity.type); x++) {
+            for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size(entity.type); y++) {
+                if (!map_is_cell_rect_occupied(state, xy(x, y), entity_cell_size(garrisoned_unit.type))) {
+                    garrisoned_unit.cell = xy(x, y);
+                    garrisoned_unit.position = entity_get_target_position(garrisoned_unit);
+                    garrisoned_unit.garrison_id = ID_NULL;
+                    garrisoned_unit.mode = MODE_UNIT_IDLE;
+                    garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
+                    map_set_cell_rect(state, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), garrisoned_unit_id);
+                    map_fog_update(state, garrisoned_unit.player_id, garrisoned_unit.cell, entity_cell_size(garrisoned_unit.type), ENTITY_DATA.at(garrisoned_unit.type).sight, true, ENTITY_DATA.at(garrisoned_unit.type).has_detection);
+                    log_trace("placed unit %u at cell %xi position %xd", garrisoned_unit_id, &garrisoned_unit.cell, &garrisoned_unit.position);
+                    unit_is_placed = true;
+                    break;
+                }
+            }
+            if (unit_is_placed) {
+                break;
+            }
+        }
+
+        if (!unit_is_placed) {
+            log_warn("Unable to place garrisoned unit.");
+        }
     }
 }
