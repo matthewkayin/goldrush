@@ -703,7 +703,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
     }
 
     if (entity_should_die(entity)) {
-        log_trace("entity %u of type %u player id %u is dead. hp %i", entity_index, entity.type, entity.player_id, entity.health);
         if (entity_is_unit(entity.type)) {
             entity.mode = MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
@@ -1861,7 +1860,7 @@ xy entity_get_animation_frame(const entity_t& entity) {
 
         if (entity.mode == MODE_UNIT_BUILD) {
             frame.y = 2;
-        } else if (entity.animation.name == ANIMATION_UNIT_DEATH || entity.animation.name == ANIMATION_UNIT_DEATH_FADE) {
+        } else if (entity.animation.name == ANIMATION_UNIT_DEATH || entity.animation.name == ANIMATION_UNIT_DEATH_FADE || entity.animation.name == ANIMATION_CANNON_DEATH || entity.animation.name == ANIMATION_CANNON_DEATH_FADE) {
             frame.y = entity.direction == DIRECTION_NORTH ? 1 : 0;
         } else if (entity.direction == DIRECTION_NORTH) {
             frame.y = 1;

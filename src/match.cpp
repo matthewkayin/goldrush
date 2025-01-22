@@ -2569,6 +2569,7 @@ void match_render(const match_state_t& state) {
                     "Soldier Ranged Attack",
                     "Cannon Attack",
                     "Unit Mine",
+                    "Unit Build",
                     "Unit Death",
                     "Unit Death Fade",
                     "Cannon Death",
