@@ -785,7 +785,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy 
             if (!entity_is_unit(entity.type)) {
                 return true;
             }
-            if (origin_id != ID_NULL && xy::manhattan_distance(origin, xy(x, y)) > 3) {
+            if (origin_id != ID_NULL && xy::manhattan_distance(origin, xy(x, y)) > 5) {
                 continue;
             }
             if (gold_walk) {

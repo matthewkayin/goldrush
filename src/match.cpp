@@ -105,7 +105,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_TINKER, SDLK_t },
     { UI_BUTTON_UNIT_SOLDIER, SDLK_d },
     { UI_BUTTON_UNIT_CANNON, SDLK_c },
-    { UI_BUTTON_UNIT_SPY, SDLK_s },
+    { UI_BUTTON_UNIT_SPY, SDLK_d },
     { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w },
     { UI_BUTTON_RESEARCH_EXPLOSIVES, SDLK_e },
     { UI_BUTTON_RESEARCH_BAYONETS, SDLK_b },
@@ -2513,6 +2513,90 @@ void match_render(const match_state_t& state) {
 
     // Minimap render texture
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, NULL, &MINIMAP_RECT);
+
+    if (!ui_is_mouse_in_ui()) {
+        xy mouse_cell = (engine.mouse_position + state.camera_offset) / TILE_SIZE;
+        entity_id cell_value = map_get_cell(state, mouse_cell);
+        char cell_text[128];
+        switch (cell_value) {
+            case CELL_EMPTY:
+                sprintf(cell_text, "%i,%i: EMPTY", mouse_cell.x, mouse_cell.y);
+                break;
+            case CELL_BLOCKED:
+                sprintf(cell_text, "%i,%i: BLOCKED", mouse_cell.x, mouse_cell.y);
+                break;
+            case CELL_UNREACHABLE:
+                sprintf(cell_text, "%i,%i: UNREACHABLE", mouse_cell.x, mouse_cell.y);
+                break;
+            case CELL_DECORATION_1:
+            case CELL_DECORATION_2:
+            case CELL_DECORATION_3:
+            case CELL_DECORATION_4:
+            case CELL_DECORATION_5:
+                sprintf(cell_text, "%i,%i: DECORATION", mouse_cell.x, mouse_cell.y);
+                break;
+            default:
+                sprintf(cell_text, "%i,%i: %u", mouse_cell.x, mouse_cell.y, cell_value);
+                break;
+        }
+        render_text(FONT_HACK_WHITE, cell_text, xy(0, 0));
+
+        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+            if (state.entities[entity_index].type == ENTITY_GOLD) {
+                continue;
+            }
+
+            SDL_Rect entity_rect = entity_get_rect(state.entities[entity_index]);
+            if (sdl_rect_has_point(entity_rect, engine.mouse_position + state.camera_offset)) {
+                const entity_t& entity = state.entities[entity_index];
+                const char* mode_text[] = {
+                    "Idle", "Move", "Blocked", "Finished", "Build", "Repair", "Attack", "Soldier Attack",
+                    "Mine", "Throw", "Death", "Death Fade", "In Progress", "Finish", "Destroyed", "Arm", "Prime", "Gold", "Mined Out"
+                };
+                const char* target_text[] = {
+                    "None", "Cell", "Entity", "Attack Cell", "Attack Entity", "Repair", "Unload",
+                    "Smoke", "Build", "Build Assist", "Gold"
+                };
+                const char* anim_name[] = {
+                    "Ui Move Cell",
+                    "Ui Move Entity",
+                    "Ui Move Attack Entity",
+                    "Unit Idle",
+                    "Unit Move",
+                    "Unit Move Slow",
+                    "Unit Move Cannon",
+                    "Unit Attack",
+                    "Soldier Ranged Attack",
+                    "Cannon Attack",
+                    "Unit Mine",
+                    "Unit Death",
+                    "Unit Death Fade",
+                    "Cannon Death",
+                    "Cannon Death Fade",
+                    "Rally Flag",
+                    "Particle Sparks",
+                    "Particle Bunker Cowboy",
+                    "Particle Explosion",
+                    "Particle Cannon Explosion",
+                    "Particle Smoke Start",
+                    "Particle Smoke",
+                    "Particle Smoke End",
+                    "Smith Begin",
+                    "Smith Loop",
+                    "Smith End",
+                    "Mine Prime"
+                };
+                char debug_text[128];
+                sprintf(debug_text, "%u: type %s player %u mode %s flags %u", state.entities.get_id_of(entity_index), ENTITY_DATA.at(entity.type).name, entity.player_id, mode_text[entity.mode], entity.flags);
+                render_text(FONT_HACK_WHITE, debug_text, xy(0, 12));
+                sprintf(debug_text, "hp %u target %s cell %i,%i", entity.health, target_text[entity.target.type], entity.cell.x, entity.cell.y);
+                render_text(FONT_HACK_WHITE, debug_text, xy(0, 24));
+                sprintf(debug_text, "anim %s frame %i,%i loops %i", anim_name[entity.animation.name], entity.animation.frame.x, entity.animation.frame.y, entity.animation.loops_remaining);
+                render_text(FONT_HACK_WHITE, debug_text, xy(0, 36));
+                break;
+            }
+        }
+    }
 }
 
 render_sprite_params_t match_create_entity_render_params(const match_state_t& state, const entity_t& entity) {

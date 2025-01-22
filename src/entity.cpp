@@ -658,6 +658,8 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     }
     map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, true, ENTITY_DATA.at(entity.type).has_detection);
 
+    log_trace("created entity id %u type %s", id, ENTITY_DATA.at(entity.type).name);
+
     return id;
 }
 
@@ -816,11 +818,12 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     break;
                 } else {
                     entity.pathfind_attempts++;
-                    if (entity.pathfind_attempts == 3) {
+                    if (entity.pathfind_attempts >= 3) {
                         if (entity.player_id == network_get_player_id() && entity.target.type == TARGET_BUILD) {
                             ui_show_status(state, UI_STATUS_CANT_BUILD);
                         }
                         entity.target = (target_t) { .type = TARGET_NONE };
+                        entity.pathfind_attempts = 0;
                         update_finished = true;
                         break;
                     } else if (entity.target.type == TARGET_GOLD) {
@@ -863,7 +866,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         if (map_is_cell_rect_equal_to(state, entity.cell, entity_cell_size(entity.type), id)) {
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
-                        }
+                        } 
                         map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false, ENTITY_DATA.at(entity.type).has_detection);
                         entity.cell = entity.path[0];
                         if (!entity_should_gold_walk(state, entity)) {
@@ -2120,6 +2123,7 @@ void entity_set_target(entity_t& entity, target_t target) {
     if (entity.mode != MODE_UNIT_MOVE) {
         // Abandon current behavior in favor of new order
         entity.timer = 0;
+        entity.pathfind_attempts = 0;
         entity.mode = MODE_UNIT_IDLE;
     }
 }
