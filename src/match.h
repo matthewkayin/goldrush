@@ -175,6 +175,7 @@ struct entity_t {
 
     int health;
     target_t target;
+    std::vector<target_t> target_queue;
     target_t remembered_gold_target;
     std::vector<xy> path;
     std::vector<building_queue_item_t> queue;
@@ -392,6 +393,7 @@ enum InputType: uint8_t {
 };
 
 struct input_move_t {
+    uint8_t shift_command;
     xy target_cell;
     entity_id target_id;
     uint8_t entity_count;
@@ -404,6 +406,7 @@ struct input_stop_t {
 };
 
 struct input_build_t {
+    uint8_t shift_command;
     uint8_t building_type;
     xy target_cell;
     uint16_t entity_count;
@@ -535,6 +538,7 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
 void match_render_healthbar(xy position, xy size, int health, int max_health);
 void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisoned_size, int garrisoned_capacity);
 void match_render_text_with_text_frame(const char* text, xy position);
+void match_render_target_build(const match_state_t& state, const target_t& target);
 
 // Generic
 void match_camera_clamp(match_state_t& state);

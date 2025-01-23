@@ -426,13 +426,16 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
         input_t input;
         input.type = INPUT_BUILD;
+        input.build.shift_command = engine.keystate[SDL_SCANCODE_LSHIFT];
         input.build.building_type = state.ui_building_type;
         input.build.entity_count = state.selection.size();
         memcpy(&input.build.entity_ids, &state.selection[0], state.selection.size() * sizeof(entity_id));
         input.build.target_cell = ui_get_building_cell(state);
         state.input_queue.push_back(input);
 
-        state.ui_mode = UI_MODE_NONE;
+        if (!input.build.shift_command) {
+            state.ui_mode = UI_MODE_NONE;
+        }
         return;
     }
 
@@ -1037,6 +1040,7 @@ input_t match_create_move_input(const match_state_t& state) {
 
     // Create move input
     input_t input;
+    input.move.shift_command = engine.keystate[SDL_SCANCODE_LSHIFT];
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
     int fog_value = state.map_fog[network_get_player_id()][input.move.target_cell.x + (input.move.target_cell.y * state.map_width)];
@@ -1096,6 +1100,9 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
         case INPUT_MOVE_REPAIR:
         case INPUT_MOVE_UNLOAD:
         case INPUT_MOVE_SMOKE: {
+            memcpy(out_buffer + out_buffer_length, &input.move.shift_command, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
+
             memcpy(out_buffer + out_buffer_length, &input.move.target_cell, sizeof(xy));
             out_buffer_length += sizeof(xy);
 
@@ -1119,6 +1126,9 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             break;
         }
         case INPUT_BUILD: {
+            memcpy(out_buffer + out_buffer_length, &input.build.shift_command, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
+
             memcpy(out_buffer + out_buffer_length, &input.build.building_type, sizeof(uint8_t));
             out_buffer_length += sizeof(uint8_t);
 
@@ -1205,6 +1215,9 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
         case INPUT_MOVE_REPAIR:
         case INPUT_MOVE_UNLOAD: 
         case INPUT_MOVE_SMOKE: {
+            memcpy(&input.move.shift_command, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
             memcpy(&input.move.target_cell, in_buffer + in_buffer_head, sizeof(xy));
             in_buffer_head += sizeof(xy);
 
@@ -1228,6 +1241,9 @@ input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head) {
             break;
         }
         case INPUT_BUILD: {
+            memcpy(&input.build.shift_command, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
             memcpy(&input.build.building_type, in_buffer + in_buffer_head, sizeof(uint8_t));
             in_buffer_head += sizeof(uint8_t);
 
@@ -1394,16 +1410,13 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 } else {
                     target.id = input.move.target_id;
                 }
-                entity_set_target(entity, target);
 
-                if (entity.target.type == TARGET_GOLD) {
-                    entity.gold_patch_id = state.entities.get_by_id(entity.target.id).gold_patch_id;
-                } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY && (state.entities[target_index].type == ENTITY_CAMP || state.entities[target_index].type == ENTITY_HALL) && entity.gold_held) {
-                    target_t nearest_gold_target = entity_target_nearest_gold(state, state.entities[target_index].player_id, state.entities[target_index].cell, GOLD_PATCH_ID_NULL);
-                    entity.gold_patch_id = nearest_gold_target.type == TARGET_NONE
-                                            ? GOLD_PATCH_ID_NULL
-                                            : state.entities.get_by_id(nearest_gold_target.id).gold_patch_id;
-                }
+                if (!input.move.shift_command) {
+                    entity.target = (target_t) { .type = TARGET_NONE };
+                    entity.target_queue.clear();
+                } 
+                entity.target_queue.push_back(target);
+
             } // End for each unit in move input
             break;
         } // End handle INPUT_MOVE
@@ -1432,10 +1445,15 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 return;
             }
 
-            state.entities[smoke_thrower_index].target = (target_t) {
+            target_t smoke_target = (target_t) {
                 .type = TARGET_SMOKE,
                 .cell = input.move.target_cell
             };
+            if (!input.move.shift_command) {
+                state.entities[smoke_thrower_index].target = (target_t) { .type = TARGET_NONE };
+                state.entities[smoke_thrower_index].target_queue.clear();
+            } 
+            state.entities[smoke_thrower_index].target_queue.push_back(smoke_target);
             break;
         }
         case INPUT_STOP:
@@ -1448,6 +1466,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 entity_t& entity = state.entities[entity_index];
 
                 entity.path.clear();
+                entity.target_queue.clear();
                 entity_set_target(entity, (target_t) {
                     .type = TARGET_NONE
                 });
@@ -1471,7 +1490,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             // Assign the lead builder's target
             entity_id lead_builder_id = ui_get_nearest_builder(state, builder_ids, input.build.target_cell);
             entity_t& lead_builder = state.entities.get_by_id(lead_builder_id);
-            entity_set_target(lead_builder, (target_t) {
+            target_t build_target = (target_t) {
                 .type = TARGET_BUILD,
                 .id = ID_NULL,
                 .build = (target_build_t) {
@@ -1479,10 +1498,15 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     .building_cell = input.build.target_cell,
                     .building_type = (EntityType)input.build.building_type
                 }
-            });
+            };
+            if (!input.build.shift_command) {
+                lead_builder.target = (target_t) { .type = TARGET_NONE };
+                lead_builder.target_queue.clear();
+            } 
+            lead_builder.target_queue.push_back(build_target);
 
             // Assign the helpers' target
-            if (input.build.building_type != ENTITY_MINE) {
+            if (input.build.building_type != ENTITY_MINE && !input.build.shift_command) {
                 for (entity_id builder_id : builder_ids) {
                     if (builder_id == lead_builder_id) {
                         continue;
@@ -1519,6 +1543,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                         .type = TARGET_NONE
                     };
                     builder.mode = MODE_UNIT_IDLE;
+                    builder.target_queue.clear();
                     map_set_cell_rect(state, builder.cell, entity_cell_size(builder.type), state.entities.get_id_of(entity_index));
                     map_fog_update(state, builder.player_id, builder.cell, entity_cell_size(builder.type), ENTITY_DATA.at(builder.type).sight, true, ENTITY_DATA.at(builder.type).has_detection);
                     break;
@@ -2059,11 +2084,26 @@ void match_render(const match_state_t& state) {
         SDL_RenderDrawRect(engine.renderer, &select_rect);
     }
 
+    // UI show queued building placements
+    if (state.selection.size() == 1) {
+        const entity_t& entity = state.entities.get_by_id(state.selection[0]);
+        if (entity_is_unit(entity.type) && entity.player_id == network_get_player_id()) {
+            if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
+                match_render_target_build(state, entity.target);
+            }
+            for (const target_t& target : entity.target_queue) {
+                if (target.type == TARGET_BUILD) {
+                    match_render_target_build(state, target);
+                }
+            }
+        }
+    }
+
     // UI Building Placement
     if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
         const entity_data_t& building_data = ENTITY_DATA.at(state.ui_building_type);
         xy ui_building_cell = ui_get_building_cell(state);
-        render_sprite(building_data.sprite, xy(3, 0), (ui_building_cell * TILE_SIZE) + - state.camera_offset, 0, network_get_player_id());
+        render_sprite(building_data.sprite, xy(3, 0), (ui_building_cell * TILE_SIZE) - state.camera_offset, 0, network_get_player_id());
 
         bool is_placement_out_of_bounds = ui_building_cell.x + building_data.cell_size >= state.map_width ||
                                           ui_building_cell.y + building_data.cell_size >= state.map_height;
@@ -2686,4 +2726,18 @@ void match_render_text_with_text_frame(const char* text, xy position) {
     }
 
     render_text(FONT_WESTERN8_OFFBLACK, text, position + xy(((frame_width * 15) / 2) - (text_size.x / 2), 2));
+}
+
+void match_render_target_build(const match_state_t& state, const target_t& target) {
+    SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, 128);
+    xy building_pos = (target.build.building_cell * TILE_SIZE) - state.camera_offset;
+    render_sprite(ENTITY_DATA.at(target.build.building_type).sprite, xy(3, 0), building_pos, 0, network_get_player_id());
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
+    SDL_Rect building_rect = (SDL_Rect) {
+        .x = building_pos.x, .y = building_pos.y,
+        .w = entity_cell_size(target.build.building_type) * TILE_SIZE,
+        .h = entity_cell_size(target.build.building_type) * TILE_SIZE
+    };
+    SDL_RenderFillRect(engine.renderer, &building_rect);
+    SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 }

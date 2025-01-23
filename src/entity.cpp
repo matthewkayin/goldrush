@@ -750,6 +750,25 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     } 
                 }
 
+                // If unit is idle, check target queue
+                if (entity.target.type == TARGET_NONE && !entity.target_queue.empty()) {
+                    entity_set_target(entity, entity.target_queue[0]);
+                    entity.target_queue.erase(entity.target_queue.begin());
+
+                    // Set gold_patch_id
+                    if (entity.target.type == TARGET_GOLD) {
+                        entity.gold_patch_id = state.entities.get_by_id(entity.target.id).gold_patch_id;
+                    } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY) {
+                        uint32_t target_index = state.entities.get_index_of(entity.target.id);
+                        if ((state.entities[target_index].type == ENTITY_CAMP || state.entities[target_index].type == ENTITY_HALL) && entity.gold_held) {
+                            target_t nearest_gold_target = entity_target_nearest_gold(state, state.entities[target_index].player_id, state.entities[target_index].cell, GOLD_PATCH_ID_NULL);
+                            entity.gold_patch_id = nearest_gold_target.type == TARGET_NONE
+                                                    ? GOLD_PATCH_ID_NULL
+                                                    : state.entities.get_by_id(nearest_gold_target.id).gold_patch_id;
+                        }
+                    }
+                }
+
                 // If unit is idle, try to find a nearby target
                 if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && ENTITY_DATA.at(entity.type).unit_data.damage != 0) {
                     entity.target = entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
