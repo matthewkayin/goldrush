@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #define APP_NAME "GOLD RUSH"
-#define APP_VERSION "0.4.0"
+#define APP_VERSION "0.4.1"
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 4
@@ -29,8 +29,8 @@
 #define GOLD_LOG_LEVEL 3
 #define GOLD_ASSERTS_ENABLED
 #define GOLD_RESOURCE_PATH "../res/"
-#define GOLD_DEBUG_FAST_TRAIN
-#define GOLD_DEBUG_FAST_BUILD
-#define GOLD_NEAR_SPAWN
+// #define GOLD_DEBUG_FAST_TRAIN
+// #define GOLD_DEBUG_FAST_BUILD
+// #define GOLD_NEAR_SPAWN
 // #define GOLD_DEBUG_UNIT_PATHS
-#define GOLD_RAND_SEED 1735730464
+// #define GOLD_RAND_SEED 1735730464

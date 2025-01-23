@@ -1411,11 +1411,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     target.id = input.move.target_id;
                 }
 
-                if (!input.move.shift_command) {
-                    entity.target = (target_t) { .type = TARGET_NONE };
+                if (!input.move.shift_command || (entity.target.type == TARGET_NONE && entity.target_queue.empty())) {
                     entity.target_queue.clear();
-                } 
-                entity.target_queue.push_back(target);
+                    entity_set_target(entity, target);
+                } else {
+                    entity.target_queue.push_back(target);
+                }
 
             } // End for each unit in move input
             break;
@@ -1449,11 +1450,13 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 .type = TARGET_SMOKE,
                 .cell = input.move.target_cell
             };
-            if (!input.move.shift_command) {
-                state.entities[smoke_thrower_index].target = (target_t) { .type = TARGET_NONE };
+
+            if (!input.move.shift_command || (state.entities[smoke_thrower_index].target.type == TARGET_NONE && state.entities[smoke_thrower_index].target_queue.empty())) {
                 state.entities[smoke_thrower_index].target_queue.clear();
-            } 
-            state.entities[smoke_thrower_index].target_queue.push_back(smoke_target);
+                entity_set_target(state.entities[smoke_thrower_index], smoke_target);
+            } else {
+                state.entities[smoke_thrower_index].target_queue.push_back(smoke_target);
+            }
             break;
         }
         case INPUT_STOP:
@@ -1499,11 +1502,12 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     .building_type = (EntityType)input.build.building_type
                 }
             };
-            if (!input.build.shift_command) {
-                lead_builder.target = (target_t) { .type = TARGET_NONE };
+            if (!input.move.shift_command || (lead_builder.target.type == TARGET_NONE && lead_builder.target_queue.empty())) {
                 lead_builder.target_queue.clear();
-            } 
-            lead_builder.target_queue.push_back(build_target);
+                entity_set_target(lead_builder, build_target);
+            } else {
+                lead_builder.target_queue.push_back(build_target);
+            }
 
             // Assign the helpers' target
             if (input.build.building_type != ENTITY_MINE && !input.build.shift_command) {
