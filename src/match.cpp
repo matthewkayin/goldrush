@@ -2514,7 +2514,7 @@ void match_render(const match_state_t& state) {
     // Minimap render texture
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, NULL, &MINIMAP_RECT);
 
-    if (!ui_is_mouse_in_ui()) {
+    if (!ui_is_mouse_in_ui() && engine.render_debug_info) {
         xy mouse_cell = (engine.mouse_position + state.camera_offset) / TILE_SIZE;
         entity_id cell_value = map_get_cell(state, mouse_cell);
         char cell_text[128];
@@ -2539,7 +2539,7 @@ void match_render(const match_state_t& state) {
                 sprintf(cell_text, "%i,%i: %u", mouse_cell.x, mouse_cell.y, cell_value);
                 break;
         }
-        render_text(FONT_HACK_WHITE, cell_text, xy(0, 0));
+        render_text(FONT_HACK_WHITE, cell_text, xy(0, 12));
 
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
             if (state.entities[entity_index].type == ENTITY_GOLD) {
@@ -2589,11 +2589,11 @@ void match_render(const match_state_t& state) {
                 };
                 char debug_text[128];
                 sprintf(debug_text, "%u: type %s player %u mode %s flags %u", state.entities.get_id_of(entity_index), ENTITY_DATA.at(entity.type).name, entity.player_id, mode_text[entity.mode], entity.flags);
-                render_text(FONT_HACK_WHITE, debug_text, xy(0, 12));
-                sprintf(debug_text, "hp %u target %s cell %i,%i", entity.health, target_text[entity.target.type], entity.cell.x, entity.cell.y);
                 render_text(FONT_HACK_WHITE, debug_text, xy(0, 24));
-                sprintf(debug_text, "anim %s frame %i,%i loops %i", anim_name[entity.animation.name], entity.animation.frame.x, entity.animation.frame.y, entity.animation.loops_remaining);
+                sprintf(debug_text, "hp %u target %s cell %i,%i", entity.health, target_text[entity.target.type], entity.cell.x, entity.cell.y);
                 render_text(FONT_HACK_WHITE, debug_text, xy(0, 36));
+                sprintf(debug_text, "anim %s frame %i,%i loops %i", anim_name[entity.animation.name], entity.animation.frame.x, entity.animation.frame.y, entity.animation.loops_remaining);
+                render_text(FONT_HACK_WHITE, debug_text, xy(0, 48));
                 break;
             }
         }

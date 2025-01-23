@@ -760,6 +760,7 @@ bool engine_init() {
     }
 
     engine.keystate = SDL_GetKeyboardState(NULL);
+    engine.render_debug_info = false;
 
     log_info("%s initialized.", APP_NAME);
     return true;

@@ -59,7 +59,6 @@ int gold_main(int argc, char** argv) {
     uint32_t fps = 0;
     uint32_t updates = 0;
     uint32_t ups = 0;
-    bool render_fps = false;
 
     bool game_is_running = true;
     GameMode game_mode = GAME_MODE_MENU;
@@ -110,7 +109,7 @@ int gold_main(int argc, char** argv) {
                     continue;
                 }
                 if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3) {
-                    render_fps = !render_fps;
+                    engine.render_debug_info = !engine.render_debug_info;
                     continue;
                 }
                 // If input not handled, pass event to current game mode
@@ -163,12 +162,10 @@ int gold_main(int argc, char** argv) {
                 break;
         }
 
-        if (render_fps) {
-            char text_buffer[16];
-            sprintf(text_buffer, "FPS: %u", fps);
+        if (engine.render_debug_info) {
+            char text_buffer[32];
+            sprintf(text_buffer, "FPS: %u | UPS: %u", fps, ups);
             render_text(FONT_HACK_WHITE, text_buffer, xy(0, 0));
-            sprintf(text_buffer, "UPS: %u", ups);
-            render_text(FONT_HACK_WHITE, text_buffer, xy(0, 12));
         }
 
         SDL_RenderPresent(engine.renderer);

@@ -258,6 +258,7 @@ struct engine_t {
 
     xy mouse_position;
     Cursor current_cursor;
+    bool render_debug_info;
 };
 extern engine_t engine;
 
