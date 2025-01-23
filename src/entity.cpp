@@ -304,7 +304,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(0, 140),
 
-            .damage = 30,
+            .damage = 20,
             .attack_cooldown = 60,
             .range_squared = 49,
             .min_range_squared = 9
