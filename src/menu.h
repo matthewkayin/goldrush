@@ -21,6 +21,7 @@ enum MenuMode {
 enum MenuButton {
     MENU_BUTTON_NONE,
     MENU_BUTTON_PLAY,
+    MENU_BUTTON_REPLAYS,
     MENU_BUTTON_OPTIONS,
     MENU_BUTTON_EXIT,
     MENU_BUTTON_HOST,
@@ -73,3 +74,7 @@ void menu_show_status(menu_state_t& state, const char* text);
 void menu_set_mode(menu_state_t& state, MenuMode mode);
 bool menu_is_button_disabled(const menu_state_t& state, MenuButton button);
 void menu_render(const menu_state_t& state);
+SDL_Rect menu_get_lobby_text_frame_rect(int lobby_index);
+void menu_render_lobby_text(const menu_state_t& state, int lobby_index);
+void menu_render_menu_button(MenuButton button, bool hovered);
+SDL_Rect menu_get_button_rect(MenuButton button);

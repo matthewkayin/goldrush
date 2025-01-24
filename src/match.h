@@ -537,7 +537,6 @@ void match_render(const match_state_t& state);
 render_sprite_params_t match_create_entity_render_params(const match_state_t& state, const entity_t& entity);
 void match_render_healthbar(xy position, xy size, int health, int max_health);
 void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisoned_size, int garrisoned_capacity);
-void match_render_text_with_text_frame(const char* text, xy position);
 void match_render_target_build(const match_state_t& state, const target_t& target);
 
 // Generic

@@ -67,6 +67,7 @@ enum Font {
     FONT_WESTERN8_GOLD,
     FONT_WESTERN16_OFFBLACK,
     FONT_WESTERN16_WHITE,
+    FONT_WESTERN16_GOLD,
     FONT_WESTERN32_OFFBLACK,
     FONT_M3X6_OFFBLACK,
     FONT_M3X6_DARKBLACK,
@@ -144,6 +145,7 @@ enum Sprite {
     SPRITE_UI_BUTTON_ICON,
     SPRITE_UI_TOOLTIP_FRAME,
     SPRITE_UI_TEXT_FRAME,
+    SPRITE_UI_TEXT_FRAME_2,
     SPRITE_UI_TABS,
     SPRITE_UI_GOLD,
     SPRITE_UI_HOUSE,
@@ -198,6 +200,8 @@ enum Sprite {
     SPRITE_RALLY_FLAG,
     SPRITE_MENU_CLOUDS,
     SPRITE_MENU_REFRESH,
+    SPRITE_MENU_BUTTON,
+    SPRITE_MENU_USERNAME,
     SPRITE_PARTICLE_SPARKS,
     SPRITE_PARTICLE_BUNKER_COWBOY,
     SPRITE_PARTICLE_EXPLOSION,
@@ -319,3 +323,6 @@ const uint32_t RENDER_SPRITE_NO_CULL = 4;
 void ysort_render_params(std::vector<render_sprite_params_t>& params, int low, int high);
 void render_sprite(Sprite sprite, const xy& frame, const xy& position, uint32_t options = 0, uint8_t recolor_id = RECOLOR_NONE);
 void render_ninepatch(Sprite sprite, const SDL_Rect& rect, int patch_margin);
+
+void render_text_with_text_frame(Sprite sprite, Font font, const char* text, xy position, xy text_offset, bool center_text = true);
+SDL_Rect get_text_with_text_frame_rect(Sprite sprite, Font font, const char* text, xy position);

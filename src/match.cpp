@@ -2292,7 +2292,7 @@ void match_render(const match_state_t& state) {
         const entity_t& entity = state.entities.get_by_id(state.selection[0]);
         const entity_data_t& entity_data = ENTITY_DATA.at(entity.type);
 
-        match_render_text_with_text_frame(entity_data.name, SELECTION_LIST_TOP_LEFT);
+        render_text_with_text_frame(SPRITE_UI_TEXT_FRAME, FONT_WESTERN8_OFFBLACK, entity_data.name, SELECTION_LIST_TOP_LEFT, xy(0, 2));
         render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(entity_data.ui_button - 1, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
 
@@ -2711,25 +2711,6 @@ void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisone
         int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / garrisoned_capacity);
         SDL_RenderDrawLine(engine.renderer, line_x, healthbar_rect.y, line_x, healthbar_rect.y + healthbar_rect.h - 1);
     }
-}
-
-void match_render_text_with_text_frame(const char* text, xy position) {
-    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
-    int frame_width = (text_size.x / 15) + 1;
-    if (text_size.x % 15 != 0) {
-        frame_width++;
-    }
-    for (int frame_x = 0; frame_x < frame_width; frame_x++) {
-        int x_frame = 1;
-        if (frame_x == 0) {
-            x_frame = 0;
-        } else if (frame_x == frame_width - 1) {
-            x_frame = 2;
-        }
-        render_sprite(SPRITE_UI_TEXT_FRAME, xy(x_frame, 0), position + xy(frame_x * 15, 0), RENDER_SPRITE_NO_CULL);
-    }
-
-    render_text(FONT_WESTERN8_OFFBLACK, text, position + xy(((frame_width * 15) / 2) - (text_size.x / 2), 2));
 }
 
 void match_render_target_build(const match_state_t& state, const target_t& target) {

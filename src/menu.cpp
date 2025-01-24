@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 static const std::unordered_map<MenuMode, std::vector<MenuButton>> MODE_BUTTONS = {
-    { MENU_MODE_MAIN, { MENU_BUTTON_PLAY, MENU_BUTTON_OPTIONS, MENU_BUTTON_EXIT } },
+    { MENU_MODE_MAIN, { MENU_BUTTON_PLAY, MENU_BUTTON_REPLAYS, MENU_BUTTON_OPTIONS, MENU_BUTTON_EXIT } },
     { MENU_MODE_USERNAME, { MENU_BUTTON_USERNAME_BACK, MENU_BUTTON_USERNAME_OK } },
     { MENU_MODE_MATCHLIST, { MENU_BUTTON_HOST, MENU_BUTTON_JOIN, MENU_BUTTON_MATCHLIST_BACK } },
     { MENU_MODE_LOBBY, { MENU_BUTTON_LOBBY_BACK, MENU_BUTTON_LOBBY_READY, MENU_BUTTON_LOBBY_START } },
@@ -15,91 +15,88 @@ static const std::unordered_map<MenuMode, std::vector<MenuButton>> MODE_BUTTONS 
 
 struct menu_button_t {
     const char* text;
-    SDL_Rect rect;
+    int position_x;
+    int position_y;
 };
 
-static SDL_Rect TEXT_INPUT_RECT = (SDL_Rect) {
-    .x = 48, .y = 120, .w = 264, .h = 35 
-};
 static const SDL_Rect PLAYERLIST_RECT = (SDL_Rect) {
-    .x = 24, .y = 32, .w = 256, .h = 128
+    .x = 36, .y = 32, .w = 256, .h = 128
+};
+static SDL_Rect TEXT_INPUT_RECT = (SDL_Rect) {
+    .x = PLAYERLIST_RECT.x + 8 + 9, .y = 136, .w = 150, .h = 18 
 };
 static const int PLAYERLIST_ITEM_HEIGHT = 16;
-static const xy REFRESH_BUTTON_POSITION = xy(PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 8, PLAYERLIST_RECT.y);
+static const xy REFRESH_BUTTON_POSITION = xy(PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 8, PLAYERLIST_RECT.y + 8);
 
+static const int BUTTON_X = PLAYERLIST_RECT.x + 8;
+static const int BUTTON_Y = 128;
+static const int BUTTON_Y_DIST = 21 + 4;
 static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
     { MENU_BUTTON_PLAY, (menu_button_t) {
         .text = "PLAY",
-        .rect = (SDL_Rect) {
-            .x = 48, .y = 128,
-            .w = 84, .h = 30
-    }}},
+        .position_x = BUTTON_X, 
+        .position_y = BUTTON_Y
+    }},
+    { MENU_BUTTON_REPLAYS, (menu_button_t) {
+        .text = "REPLAYS",
+        .position_x = BUTTON_X, 
+        .position_y = BUTTON_Y + BUTTON_Y_DIST
+    }},
     { MENU_BUTTON_OPTIONS, (menu_button_t) {
         .text = "OPTIONS",
-        .rect = (SDL_Rect) {
-            .x = 48, .y = 128 + 42,
-            .w = 120, .h = 30
-    }}},
+        .position_x = BUTTON_X,
+        .position_y = BUTTON_Y + (BUTTON_Y_DIST * 2)
+    }},
     { MENU_BUTTON_EXIT, (menu_button_t) {
         .text = "EXIT",
-        .rect = (SDL_Rect) {
-            .x = 48, .y = 128 + 42 + 42,
-            .w = 72, .h = 30
-    }}},
+        .position_x = BUTTON_X,
+        .position_y = BUTTON_Y + (BUTTON_Y_DIST * 3)
+    }},
     { MENU_BUTTON_HOST, (menu_button_t) {
         .text = "HOST",
-        .rect = (SDL_Rect) {
-            .x = PLAYERLIST_RECT.x, .y = 128 + 42,
-            .w = 76, .h = 30
-    }}},
+        .position_x = PLAYERLIST_RECT.x + 8 + 56 + 4,
+        .position_y = BUTTON_Y + 42
+    }},
     { MENU_BUTTON_JOIN, (menu_button_t) {
         .text = "JOIN",
-        .rect = (SDL_Rect) {
-            .x = PLAYERLIST_RECT.x + 76 + 8, .y = 128 + 42,
-            .w = 72, .h = 30
-    }}},
+        .position_x = PLAYERLIST_RECT.x + 8 + ((56 + 4) * 2),
+        .position_y = BUTTON_Y + 42
+    }},
     { MENU_BUTTON_MATCHLIST_BACK, (menu_button_t) {
         .text = "BACK",
-        .rect = (SDL_Rect) {
-            .x = PLAYERLIST_RECT.x, .y = 128 + 42 + 42,
-            .w = 78, .h = 30
-    }}},
+        .position_x = BUTTON_X,
+        .position_y = BUTTON_Y + 42
+    }},
     { MENU_BUTTON_USERNAME_BACK, (menu_button_t) {
         .text = "BACK",
-        .rect = (SDL_Rect) {
-            .x = 48 + 48 + 8, .y = 128 + 42,
-            .w = 78, .h = 30
-    }}},
+        .position_x = BUTTON_X,
+        .position_y = BUTTON_Y + 42
+    }},
     { MENU_BUTTON_USERNAME_OK, (menu_button_t) {
         .text = "OK",
-        .rect = (SDL_Rect) {
-            .x = 48, .y = 128 + 42,
-            .w = 48, .h = 30
-    }}},
+        .position_x = BUTTON_X + 56 + 4,
+        .position_y = BUTTON_Y + 42
+    }},
     { MENU_BUTTON_LOBBY_BACK, (menu_button_t) {
         .text = "BACK",
-        .rect = (SDL_Rect) {
-            .x = PLAYERLIST_RECT.x, .y = PLAYERLIST_RECT.y + PLAYERLIST_RECT.h + 8,
-            .w = 78, .h = 30
-    }}},
+        .position_x = BUTTON_X,
+        .position_y = BUTTON_Y + 42
+    }},
     { MENU_BUTTON_LOBBY_READY, (menu_button_t) {
         .text = "READY",
-        .rect = (SDL_Rect) {
-            .x = PLAYERLIST_RECT.x + 78 + 8, .y = PLAYERLIST_RECT.y + PLAYERLIST_RECT.h + 8,
-            .w = 100, .h = 30
-    }}},
+        .position_x = PLAYERLIST_RECT.x + 8 + 56 + 4,
+        .position_y = BUTTON_Y + 42
+    }},
     { MENU_BUTTON_LOBBY_START, (menu_button_t) {
         .text = "START",
-        .rect = (SDL_Rect) {
-            .x = PLAYERLIST_RECT.x + 78 + 8, .y = PLAYERLIST_RECT.y + PLAYERLIST_RECT.h + 8,
-            .w = 92, .h = 30
-    }}},
+        .position_x = PLAYERLIST_RECT.x + 8 + 56 + 4,
+        .position_y = BUTTON_Y + 42
+    }},
     { MENU_BUTTON_CONNECTING_BACK, (menu_button_t) {
         .text = "BACK",
-        .rect = (SDL_Rect) {
-            .x = 48, .y = 128 + 42,
-            .w = 78, .h = 30
-    }}},
+        .position_x = BUTTON_X,
+        .position_y = BUTTON_Y + 42
+    }},
 };
 
 static const uint32_t STATUS_TIMER_DURATION = 60;
@@ -298,7 +295,8 @@ void menu_update(menu_state_t& state) {
                     continue;
                 }
 
-                if (sdl_rect_has_point(MENU_BUTTON_DATA.at(button).rect, engine.mouse_position)) {
+                SDL_Rect button_rect = menu_get_button_rect(button);
+                if (sdl_rect_has_point(button_rect, engine.mouse_position)) {
                     state.hover = (menu_hover_t) {
                         .type = MENU_HOVER_BUTTON,
                         .button = button
@@ -310,12 +308,7 @@ void menu_update(menu_state_t& state) {
     }
     if (state.mode == MENU_MODE_MATCHLIST && state.hover.type == MENU_HOVER_NONE && SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
         for (int match_index = 0; match_index < network_get_lobby_count(); match_index++) {
-            SDL_Rect item_rect = (SDL_Rect) { 
-                .x = PLAYERLIST_RECT.x, 
-                .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * match_index), 
-                .w = PLAYERLIST_RECT.w, 
-                .h = PLAYERLIST_ITEM_HEIGHT 
-            };
+            SDL_Rect item_rect = menu_get_lobby_text_frame_rect(match_index);
             if (sdl_rect_has_point(item_rect, engine.mouse_position)) {
                 state.hover = (menu_hover_t) {
                     .type = MENU_HOVER_ITEM,
@@ -488,11 +481,8 @@ void menu_render(const menu_state_t& state) {
     }
 
     if (state.mode == MENU_MODE_USERNAME) {
-        const char* prompt_text = "USERNAME";
-        render_text(FONT_WESTERN8_OFFBLACK, prompt_text, xy(TEXT_INPUT_RECT.x + 1, TEXT_INPUT_RECT.y - 13));
-        SDL_SetRenderDrawColor(engine.renderer, 0, 0, 0, 255);
-        SDL_RenderDrawRect(engine.renderer, &TEXT_INPUT_RECT);
-        render_text(FONT_WESTERN16_OFFBLACK, state.username.c_str(), xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 31), TEXT_ANCHOR_BOTTOM_LEFT);
+        render_sprite(SPRITE_MENU_USERNAME, xy(0, 0), xy(TEXT_INPUT_RECT.x - (engine.sprites[SPRITE_MENU_USERNAME].frame_size.x - TEXT_INPUT_RECT.w), TEXT_INPUT_RECT.y), RENDER_SPRITE_NO_CULL);
+        render_text(FONT_WESTERN8_OFFBLACK, state.username.c_str(), xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 17), TEXT_ANCHOR_BOTTOM_LEFT);
     }
 
     if (state.mode == MENU_MODE_CONNECTING) {
@@ -500,40 +490,10 @@ void menu_render(const menu_state_t& state) {
     }
 
     if (state.mode == MENU_MODE_MATCHLIST) {
-        SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
-        SDL_RenderDrawRect(engine.renderer, &PLAYERLIST_RECT);
+        render_ninepatch(SPRITE_UI_FRAME, PLAYERLIST_RECT, 16);
 
         for (int lobby_index = 0; lobby_index < network_get_lobby_count(); lobby_index++) {
-            const lobby_t& lobby = network_get_lobby(lobby_index);
-
-            char lobby_text[64];
-            sprintf(lobby_text, "%s (%u/%u)", lobby.name, lobby.player_count, MAX_PLAYERS);
-
-            int line_y = 16 * (lobby_index + 1);
-            if (lobby_index == state.item_selected) {
-                SDL_Rect item_rect = (SDL_Rect) {
-                    .x = PLAYERLIST_RECT.x,
-                    .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * lobby_index),
-                    .w = PLAYERLIST_RECT.w,
-                    .h = PLAYERLIST_ITEM_HEIGHT
-                };
-                SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
-                SDL_RenderFillRect(engine.renderer, &item_rect);
-                SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
-            } 
-            render_text(FONT_WESTERN8_OFFBLACK, lobby_text, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
-            SDL_RenderDrawLine(engine.renderer, PLAYERLIST_RECT.x, PLAYERLIST_RECT.y + line_y, PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - 1, PLAYERLIST_RECT.y + line_y);
-        }
-
-        if (state.hover.type == MENU_HOVER_ITEM) {
-            SDL_Rect item_rect = (SDL_Rect) {
-                .x = PLAYERLIST_RECT.x,
-                .y = PLAYERLIST_RECT.y + (PLAYERLIST_ITEM_HEIGHT * state.hover.item),
-                .w = PLAYERLIST_RECT.w,
-                .h = PLAYERLIST_ITEM_HEIGHT
-            };
-            SDL_SetRenderDrawColor(engine.renderer, 255, 255, 255, 255);
-            SDL_RenderDrawRect(engine.renderer, &item_rect);
+            menu_render_lobby_text(state, lobby_index);
         }
 
         // Refresh button
@@ -554,8 +514,7 @@ void menu_render(const menu_state_t& state) {
 
     // Player list
     if (state.mode == MENU_MODE_LOBBY) {
-        SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
-        SDL_RenderDrawRect(engine.renderer, &PLAYERLIST_RECT);
+        render_ninepatch(SPRITE_UI_FRAME, PLAYERLIST_RECT, 16);
 
         uint32_t player_index = 0;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -575,15 +534,10 @@ void menu_render(const menu_state_t& state) {
                 player_name_text_ptr += sprintf(player_name_text_ptr, ": READY");
             }
 
-            int line_y = PLAYERLIST_ITEM_HEIGHT * (player_index + 1);
-            render_text(FONT_WESTERN8_OFFBLACK, player_name_text, xy(PLAYERLIST_RECT.x + 4, PLAYERLIST_RECT.y + line_y - 2), TEXT_ANCHOR_BOTTOM_LEFT);
-            SDL_RenderDrawLine(engine.renderer, PLAYERLIST_RECT.x, PLAYERLIST_RECT.y + line_y, PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - 1, PLAYERLIST_RECT.y + line_y);
+            int line_y = PLAYERLIST_ITEM_HEIGHT * player_index;
+            render_text(FONT_WESTERN8_GOLD, player_name_text, xy(PLAYERLIST_RECT.x + 16, PLAYERLIST_RECT.y + 12 + line_y));
             player_index++;
         } // End for each player id
-
-        if (state.mode == MENU_MODE_LOBBY && network_is_server()) {
-            render_text(FONT_WESTERN8_OFFBLACK, "You are the host.", xy(PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 2, PLAYERLIST_RECT.y));
-        }
     }
 
     auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
@@ -593,13 +547,82 @@ void menu_render(const menu_state_t& state) {
                 continue;
             }
             
-            SDL_Color button_color = state.hover.type == MENU_HOVER_BUTTON && button == state.hover.button ? COLOR_WHITE : COLOR_OFFBLACK;
-            Font button_font = state.hover.type == MENU_HOVER_BUTTON && button == state.hover.button ? FONT_WESTERN16_WHITE : FONT_WESTERN16_OFFBLACK;
-            SDL_SetRenderDrawColor(engine.renderer, button_color.r, button_color.g, button_color.b, button_color.a);
-
-            const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);
-            SDL_RenderDrawRect(engine.renderer, &button_data.rect);
-            render_text(button_font, button_data.text, xy(button_data.rect.x + 4, button_data.rect.y + 4));
+            menu_render_menu_button(button, state.hover.type == MENU_HOVER_BUTTON && button == state.hover.button);
         }
     }
+}
+
+SDL_Rect menu_get_lobby_text_frame_rect(int lobby_index) {
+    char lobby_text[64];
+    sprintf(lobby_text, "* %s (4/4) *", network_get_lobby(lobby_index).name);
+
+    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, lobby_text);
+    int frame_width = (text_size.x / 15) + 1;
+    if (text_size.x % 15 != 0) {
+        frame_width++;
+    }
+
+    return (SDL_Rect) {
+        .x = PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - ((frame_width * 15) / 2), .y = PLAYERLIST_RECT.y + (20 * lobby_index) + 8,
+        .w = frame_width * 15, .h = 15
+    };
+}
+
+void menu_render_lobby_text(const menu_state_t& state, int lobby_index) {
+    SDL_Rect rect = menu_get_lobby_text_frame_rect(lobby_index);
+
+    bool text_hovered = state.hover.type == MENU_HOVER_ITEM && state.hover.item == lobby_index;
+
+    xy position = xy(rect.x, rect.y + (text_hovered ? -1 : 0));
+    int frame_width = rect.w / 15;
+    for (int frame_x = 0; frame_x < frame_width; frame_x++) {
+        int x_frame = 1;
+        if (frame_x == 0) {
+            x_frame = 0;
+        } else if (frame_x == frame_width - 1) {
+            x_frame = 2;
+        }
+        render_sprite(SPRITE_UI_TEXT_FRAME, xy(x_frame, 0), position + xy(frame_x * 15, 0), RENDER_SPRITE_NO_CULL);
+    }
+
+
+    char lobby_text[64];
+    const lobby_t& lobby = network_get_lobby(lobby_index);
+    sprintf(lobby_text, "%s %s (%u/%u) %s", state.item_selected == lobby_index ? "*" : "", lobby.name, lobby.player_count, MAX_PLAYERS, state.item_selected == lobby_index ? "*" : "");
+    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, lobby_text);
+
+    xy text_position_offset = xy(((frame_width * 15) / 2) - (text_size.x / 2), 0); 
+    render_text(text_hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, lobby_text, position + text_position_offset);
+}
+
+void menu_render_menu_button(MenuButton button, bool hovered) {
+    const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);
+    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, button_data.text);
+    if (text_size.x % 8 != 0) {
+        text_size.x = ((text_size.x / 8) + 1) * 8;
+    }
+    text_size.x += 16;
+
+    int frame_count = text_size.x / 8;
+    for (int frame = 0; frame < frame_count; frame++) {
+        int hframe = 1;
+        if (frame == 0) {
+            hframe = 0;
+        } else if (frame == frame_count - 1) {
+            hframe = 2;
+        }
+        render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(hframe, (int)hovered), xy(button_data.position_x + (8 * frame), button_data.position_y + (hovered ? -1 : 0)), RENDER_SPRITE_NO_CULL);
+    }
+
+    render_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, button_data.text, xy(button_data.position_x + 5, button_data.position_y + 5 + (hovered ? -1 : 0)));
+}
+
+SDL_Rect menu_get_button_rect(MenuButton button) {
+    const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);
+    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, button_data.text);
+    if (text_size.x % 8 != 0) {
+        text_size.x = ((text_size.x / 8) + 1) * 8;
+    }
+    text_size.x += 16;
+    return (SDL_Rect) { .x = button_data.position_x, .y = button_data.position_y, .w = text_size.x, .h = engine.sprites[SPRITE_UI_PARCHMENT_BUTTONS].frame_size.y };
 }

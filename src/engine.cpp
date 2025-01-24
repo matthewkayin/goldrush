@@ -55,6 +55,12 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
         .color = COLOR_WHITE,
         .ignore_y_bearing = false
     }},
+    { FONT_WESTERN16_GOLD, (font_params_t) {
+        .path = "font/western.ttf",
+        .size = 16,
+        .color = COLOR_GOLD,
+        .ignore_y_bearing = false
+    }},
     { FONT_WESTERN32_OFFBLACK, (font_params_t) {
         .path = "font/western.ttf",
         .size = 32,
@@ -158,6 +164,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
+    { SPRITE_UI_TEXT_FRAME_2, (sprite_params_t) {
+        .path = "sprite/ui_text_frame2.png",
+        .hframes = 3,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
     { SPRITE_UI_TABS, (sprite_params_t) {
         .path = "sprite/ui_frame_tabs.png",
         .hframes = 2,
@@ -184,8 +196,8 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     }},
     { SPRITE_UI_PARCHMENT_BUTTONS, (sprite_params_t) {
         .path = "sprite/ui_parchment_buttons.png",
-        .hframes = 1,
-        .vframes = 3,
+        .hframes = 3,
+        .vframes = 2,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
     { SPRITE_UI_OPTIONS_DROPDOWN, (sprite_params_t) {
@@ -479,6 +491,18 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     { SPRITE_MENU_REFRESH, (sprite_params_t) {
         .path = "sprite/menu_refresh.png",
         .hframes = 2,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_MENU_BUTTON, (sprite_params_t) {
+        .path = "sprite/menu_button.png",
+        .hframes = 1,
+        .vframes = 2,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_MENU_USERNAME, (sprite_params_t) {
+        .path = "sprite/menu_username.png",
+        .hframes = 1,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
@@ -1470,4 +1494,39 @@ void render_ninepatch(Sprite sprite, const SDL_Rect& rect, int patch_margin) {
     dst_rect.w = rect.w - (patch_margin * 2);
     dst_rect.h = rect.h - (patch_margin * 2);
     SDL_RenderCopy(engine.renderer, engine.sprites[sprite].texture, &src_rect, &dst_rect);
+}
+
+void render_text_with_text_frame(Sprite sprite, Font font, const char* text, xy position, xy text_offset, bool center_text) {
+    int frame_size = engine.sprites[sprite].frame_size.x;
+    xy text_size = render_get_text_size(font, text);
+    int frame_width = (text_size.x / frame_size) + 1;
+    if (text_size.x % frame_size != 0) {
+        frame_width++;
+    }
+    for (int frame_x = 0; frame_x < frame_width; frame_x++) {
+        int x_frame = 1;
+        if (frame_x == 0) {
+            x_frame = 0;
+        } else if (frame_x == frame_width - 1) {
+            x_frame = 2;
+        }
+        render_sprite(sprite, xy(x_frame, 0), position + xy(frame_x * frame_size, 0), RENDER_SPRITE_NO_CULL);
+    }
+
+    xy text_position_offset = center_text ? xy(((frame_width * frame_size) / 2) - (text_size.x / 2), 0) : xy(0, 0); 
+    render_text(font, text, position + text_position_offset + text_offset);
+}
+
+SDL_Rect get_text_with_text_frame_rect(Sprite sprite, Font font, const char* text, xy position) {
+    int frame_size = engine.sprites[sprite].frame_size.x;
+    xy text_size = render_get_text_size(font, text);
+    int frame_width = (text_size.x / frame_size) + 1;
+    if (text_size.x % frame_size != 0) {
+        frame_width++;
+    }
+    return (SDL_Rect) { 
+        .x = position.x, .y = position.y, 
+        .w = frame_width * engine.sprites[sprite].frame_size.x, 
+        .h = engine.sprites[sprite].frame_size.y 
+    };
 }
