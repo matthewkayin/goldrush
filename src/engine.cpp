@@ -863,18 +863,27 @@ bool engine_init_renderer() {
             case SPRITE_IMPORT_RECOLOR_AND_LOW_TRANSPARENCY: {
                 // Re-color texture creation
                 uint32_t* sprite_pixels = (uint32_t*)sprite_surface->pixels;
-                uint32_t reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_REF.r, RECOLOR_REF.g, RECOLOR_REF.b, RECOLOR_REF.a);
+                uint32_t skin_reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_SKIN_REF.r, RECOLOR_SKIN_REF.g, RECOLOR_SKIN_REF.b, RECOLOR_SKIN_REF.a);
+                uint32_t clothes_reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_CLOTHES_REF.r, RECOLOR_CLOTHES_REF.g, RECOLOR_CLOTHES_REF.b, RECOLOR_CLOTHES_REF.a);
 
                 for (uint32_t player_color = 0; player_color < MAX_PLAYERS; player_color++) {
                     SDL_Surface* recolored_surface = SDL_CreateRGBSurfaceWithFormat(0, sprite_surface->w, sprite_surface->h, 32, sprite_surface->format->format);
                     uint32_t* recolor_pixels = (uint32_t*)recolored_surface->pixels;
                     SDL_LockSurface(recolored_surface);
 
-                    const SDL_Color& color_player = PLAYER_COLORS[player_color];
-                    uint32_t replace_pixel = SDL_MapRGBA(recolored_surface->format, color_player.r, color_player.g, color_player.b, color_player.a);
+                    const SDL_Color& color_player_skin = PLAYER_COLORS[player_color].skin_color;
+                    const SDL_Color& color_player_clothes = PLAYER_COLORS[player_color].clothes_color;
+                    uint32_t replace_skin_pixel = SDL_MapRGBA(recolored_surface->format, color_player_skin.r, color_player_skin.g, color_player_skin.b, color_player_skin.a);
+                    uint32_t replace_clothes_pixel = SDL_MapRGBA(recolored_surface->format, color_player_clothes.r, color_player_clothes.g, color_player_clothes.b, color_player_clothes.a);
 
                     for (uint32_t pixel_index = 0; pixel_index < recolored_surface->w * recolored_surface->h; pixel_index++) {
-                        recolor_pixels[pixel_index] = sprite_pixels[pixel_index] == reference_pixel ? replace_pixel : sprite_pixels[pixel_index];
+                        if (sprite_pixels[pixel_index] == skin_reference_pixel) {
+                            recolor_pixels[pixel_index] = replace_skin_pixel;
+                        } else if (sprite_pixels[pixel_index] == clothes_reference_pixel) {
+                            recolor_pixels[pixel_index] = replace_clothes_pixel;
+                        } else {
+                            recolor_pixels[pixel_index] = sprite_pixels[pixel_index];
+                        }
                         if (sprite_params_it->second.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_TRANSPARENCY) {
                             uint8_t r, g, b, a;
                             SDL_GetRGBA(recolor_pixels[pixel_index], recolored_surface->format, &r, &g, &b, &a);

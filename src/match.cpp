@@ -2471,7 +2471,7 @@ void match_render(const match_state_t& state) {
                 color = COLOR_GREEN;
             }
         } else {
-            color = PLAYER_COLORS[entity.player_id];
+            color = PLAYER_COLORS[entity.player_id].skin_color;
         }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &entity_rect);
@@ -2492,7 +2492,7 @@ void match_render(const match_state_t& state) {
         if (it.second.sprite_params.recolor_id == RECOLOR_NONE) {
             color = COLOR_GOLD;
         } else {
-            color = PLAYER_COLORS[it.second.sprite_params.recolor_id];
+            color = PLAYER_COLORS[it.second.sprite_params.recolor_id].skin_color;
         }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &entity_rect);

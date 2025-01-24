@@ -25,13 +25,37 @@ const SDL_Color COLOR_GREEN = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 2
 const SDL_Color COLOR_GOLD = (SDL_Color) { .r = 238, .g = 209, .b = 158, .a = 255 };
 const SDL_Color COLOR_DARK_GRAY = (SDL_Color) { .r = 94, .g = 88, .b = 89, .a = 255 };
 
-const SDL_Color PLAYER_COLORS[MAX_PLAYERS] = {
-    (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 }, // Blue
-    (SDL_Color) { .r = 181, .g = 94, .b = 94, .a = 255 }, // Red
-    (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 }, // Purple
-    (SDL_Color) { .r = 212, .g = 166, .b = 80, .a = 255 } // Yellow
+struct player_color_t {
+    const char* name;
+    SDL_Color skin_color;
+    SDL_Color clothes_color;
 };
-const SDL_Color RECOLOR_REF = (SDL_Color) { .r = 255, .g = 0, .b = 255, .a = 255 };
+
+const player_color_t PLAYER_COLORS[MAX_PLAYERS] = {
+    (player_color_t) {
+        .name = "Green",
+        .skin_color = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 51, .g = 71, .b = 50, .a = 255 },
+    },
+    (player_color_t) {
+        .name = "Red",
+        .skin_color = (SDL_Color) { .r = 219, .g = 151, .b = 114, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }
+    },
+    (player_color_t) {
+        .name = "Purple",
+        .skin_color = (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 69, .g = 56, .b = 73, .a = 255 }
+    },
+    (player_color_t) {
+        .name = "Blue",
+        .skin_color = (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 64, .g = 74, .b = 94, .a = 255 }
+    }
+};
+
+const SDL_Color RECOLOR_SKIN_REF = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
+const SDL_Color RECOLOR_CLOTHES_REF = (SDL_Color) { .r = 255, .g = 0, .b = 255, .a = 255 };
 
 // FONT
 
