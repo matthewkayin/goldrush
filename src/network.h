@@ -23,7 +23,7 @@ enum PlayerStatus {
 
 struct player_t {
     uint8_t status;
-    uint8_t padding;
+    uint8_t recolor_id;
     char name[NAME_BUFFER_SIZE];
 };
 
@@ -89,6 +89,7 @@ const size_t network_get_lobby_count();
 const lobby_t& network_get_lobby(size_t index);
 
 void network_toggle_ready();
+void network_set_player_color(uint8_t recolor_id);
 void network_begin_loading_match();
 void network_send_input(uint8_t* out_buffer, size_t out_buffer_length);
 

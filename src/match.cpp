@@ -961,7 +961,7 @@ void match_update(match_state_t& state) {
             auto it = state.remembered_entities[player_id].begin();
             while (it != state.remembered_entities[player_id].end()) {
                 if ((state.entities.get_index_of(it->first) == INDEX_INVALID || state.entities.get_by_id(it->first).health == 0) && 
-                        (map_is_cell_rect_revealed(state, player_id, it->second.cell, it->second.cell_size) || it->second.sprite_params.recolor_id == player_id)) {
+                        (map_is_cell_rect_revealed(state, player_id, it->second.cell, it->second.cell_size) || it->second.sprite_params.recolor_id == network_get_player(player_id).recolor_id)) {
                     it = state.remembered_entities[player_id].erase(it);
                 } else {
                     it++;
@@ -1932,7 +1932,7 @@ void match_render(const match_state_t& state) {
                         .frame = state.ui_rally_flag_animation.frame,
                         .position = building.rally_point - xy(4, 15) - state.camera_offset,
                         .options = 0,
-                        .recolor_id = building.player_id
+                        .recolor_id = network_get_player(building.player_id).recolor_id
                     });
                 } // End if should render rally point
             } // End for each id
@@ -2107,7 +2107,7 @@ void match_render(const match_state_t& state) {
     if (state.ui_mode == UI_MODE_BUILDING_PLACE && !ui_is_mouse_in_ui()) {
         const entity_data_t& building_data = ENTITY_DATA.at(state.ui_building_type);
         xy ui_building_cell = ui_get_building_cell(state);
-        render_sprite(building_data.sprite, xy(3, 0), (ui_building_cell * TILE_SIZE) - state.camera_offset, 0, network_get_player_id());
+        render_sprite(building_data.sprite, xy(3, 0), (ui_building_cell * TILE_SIZE) - state.camera_offset, 0, network_get_player(network_get_player_id()).recolor_id);
 
         bool is_placement_out_of_bounds = ui_building_cell.x + building_data.cell_size >= state.map_width ||
                                           ui_building_cell.y + building_data.cell_size >= state.map_height;
@@ -2471,7 +2471,7 @@ void match_render(const match_state_t& state) {
                 color = COLOR_GREEN;
             }
         } else {
-            color = PLAYER_COLORS[entity.player_id].skin_color;
+            color = PLAYER_COLORS[network_get_player(entity.player_id).recolor_id].clothes_color;
         }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &entity_rect);
@@ -2492,7 +2492,7 @@ void match_render(const match_state_t& state) {
         if (it.second.sprite_params.recolor_id == RECOLOR_NONE) {
             color = COLOR_GOLD;
         } else {
-            color = PLAYER_COLORS[it.second.sprite_params.recolor_id].skin_color;
+            color = PLAYER_COLORS[it.second.sprite_params.recolor_id].clothes_color;
         }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderFillRect(engine.renderer, &entity_rect);
@@ -2650,7 +2650,7 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
         .frame = entity_get_animation_frame(entity),
         .position = entity.position.to_xy() - state.camera_offset,
         .options = 0,
-        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : entity.player_id
+        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
     };
     // Adjust render position for units because they are centered
     if (entity_is_unit(entity.type)) {
@@ -2716,7 +2716,7 @@ void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisone
 void match_render_target_build(const match_state_t& state, const target_t& target) {
     SDL_SetRenderDrawColor(engine.renderer, COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, 128);
     xy building_pos = (target.build.building_cell * TILE_SIZE) - state.camera_offset;
-    render_sprite(ENTITY_DATA.at(target.build.building_type).sprite, xy(3, 0), building_pos, 0, network_get_player_id());
+    render_sprite(ENTITY_DATA.at(target.build.building_type).sprite, xy(3, 0), building_pos, 0, network_get_player(network_get_player_id()).recolor_id);
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     SDL_Rect building_rect = (SDL_Rect) {
         .x = building_pos.x, .y = building_pos.y,

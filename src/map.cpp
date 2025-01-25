@@ -1233,7 +1233,7 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
                                     .frame = entity_get_animation_frame(entity),
                                     .position = entity.position.to_xy(),
                                     .options = 0,
-                                    .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : entity.player_id
+                                    .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
                                 },
                                 .cell = entity.cell,
                                 .cell_size = entity_cell_size(entity.type)

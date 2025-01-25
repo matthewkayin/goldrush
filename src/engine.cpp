@@ -5,6 +5,29 @@
 #include "animation.h"
 #include <unordered_map>
 
+const player_color_t PLAYER_COLORS[MAX_PLAYERS] = {
+    (player_color_t) {
+        .name = "Blue",
+        .skin_color = (SDL_Color) { .r = 125, .g = 181, .b = 164, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 }
+    },
+    (player_color_t) {
+        .name = "Red",
+        .skin_color = (SDL_Color) { .r = 219, .g = 151, .b = 114, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }
+    },
+    (player_color_t) {
+        .name = "Green",
+        .skin_color = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 77, .g = 135, .b = 115, .a = 255 },
+    },
+    (player_color_t) {
+        .name = "Purple",
+        .skin_color = (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 },
+    }
+};
+
 struct font_params_t {
     const char* path;
     int size;

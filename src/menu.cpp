@@ -19,14 +19,16 @@ struct menu_button_t {
     int position_y;
 };
 
+static const SDL_Rect MATCHLIST_RECT = (SDL_Rect) {
+    .x = 36, .y = 32, .w = 320, .h = 128
+};
 static const SDL_Rect PLAYERLIST_RECT = (SDL_Rect) {
-    .x = 36, .y = 32, .w = 256, .h = 128
+    .x = 36, .y = 32, .w = 512, .h = 128
 };
 static SDL_Rect TEXT_INPUT_RECT = (SDL_Rect) {
     .x = PLAYERLIST_RECT.x + 8 + 9, .y = 136, .w = 150, .h = 18 
 };
-static const int PLAYERLIST_ITEM_HEIGHT = 16;
-static const xy REFRESH_BUTTON_POSITION = xy(PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 8, PLAYERLIST_RECT.y + 8);
+static const xy REFRESH_BUTTON_POSITION = xy(MATCHLIST_RECT.x + MATCHLIST_RECT.w + 8, MATCHLIST_RECT.y + 8);
 
 static const int BUTTON_X = PLAYERLIST_RECT.x + 8;
 static const int BUTTON_Y = 128;
@@ -113,6 +115,8 @@ menu_state_t menu_init() {
     };
     menu_set_mode(state, MENU_MODE_MAIN);
 
+    state.dropdown_open = false;
+
     state.wagon_animation = animation_create(ANIMATION_UNIT_MOVE_SLOW);
     state.parallax_x = 0;
     state.parallax_cloud_x = 0;
@@ -125,6 +129,14 @@ menu_state_t menu_init() {
 void menu_handle_input(menu_state_t& state, SDL_Event event) {
     // Mouse pressed
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        if (state.mode == MENU_MODE_LOBBY && state.dropdown_open) {
+            if (state.hover.type == MENU_HOVER_DROPDOWN_ITEM) {
+                network_set_player_color((uint8_t)state.hover.item);
+            }
+            state.dropdown_open = false;
+            return;
+        }
+
         // Button pressed
         if (state.hover.type == MENU_HOVER_BUTTON) {
             switch (state.hover.button) {
@@ -191,6 +203,25 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     if (!network_are_all_players_ready()) {
                         break;
                     }
+
+                    bool are_all_players_different_colors = true;
+                    int color_occurances[MAX_PLAYERS];
+                    memset(color_occurances, 0, sizeof(color_occurances));
+                    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                        const player_t& player = network_get_player(player_id);
+                        if (player.status == PLAYER_STATUS_NONE) {
+                            continue;
+                        }
+                        color_occurances[player.recolor_id]++;
+                        if (color_occurances[player.recolor_id] > 1) {
+                            are_all_players_different_colors = false;
+                            break;
+                        }
+                    }
+                    if (!are_all_players_different_colors) {
+                        break;
+                    }
+
                     network_scanner_destroy();
                     network_begin_loading_match();
                     menu_set_mode(state, MENU_MODE_LOAD_MATCH);
@@ -204,6 +235,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
         state.item_selected = state.mode == MENU_MODE_MATCHLIST && state.hover.type == MENU_HOVER_ITEM
                                 ?  state.item_selected = state.hover.item
                                 : -1;
+        state.dropdown_open = state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN;
 
         // Text input pressed
         if (state.hover.type == MENU_HOVER_NONE && state.mode == MENU_MODE_USERNAME &&
@@ -287,7 +319,7 @@ void menu_update(menu_state_t& state) {
     state.hover = (menu_hover_t) {
         .type = MENU_HOVER_NONE
     };
-    if (SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
+    if (SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE && !state.dropdown_open) {
         auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
         if (mode_buttons_it != MODE_BUTTONS.end()) {
             for (MenuButton button : mode_buttons_it->second) {
@@ -333,6 +365,42 @@ void menu_update(menu_state_t& state) {
         }
     }
 
+    if (state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_NONE && SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE) {
+        // Get dropdown rect
+        int player_index = 0;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (player_id == network_get_player_id()) {
+                break;
+            }
+            if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
+                continue;
+            }
+            player_index++;
+        }
+        SDL_Rect dropdown_rect = menu_get_dropdown_rect(player_index);
+
+        // Check for dropdown hover
+        if (!state.dropdown_open) {
+            if (sdl_rect_has_point(dropdown_rect, engine.mouse_position)) {
+                state.hover = (menu_hover_t) {
+                    .type = MENU_HOVER_DROPDOWN
+                };
+            }
+        // Check for dropdown item hover
+        } else {
+            for (int index = 0; index < MAX_PLAYERS; index++) {
+                dropdown_rect.y += dropdown_rect.h;
+                if (sdl_rect_has_point(dropdown_rect, engine.mouse_position)) {
+                    state.hover = (menu_hover_t) {
+                        .type = MENU_HOVER_DROPDOWN_ITEM,
+                        .item = index
+                    };
+                    break;
+                }
+            }
+        }
+    }
+
     engine_set_cursor(CURSOR_DEFAULT);
 
     animation_update(state.wagon_animation);
@@ -355,6 +423,7 @@ void menu_show_status(menu_state_t& state, const char* text) {
 void menu_set_mode(menu_state_t& state, MenuMode mode) {
     state.mode = mode;
 
+    state.dropdown_open = false;
     if (state.mode == MENU_MODE_MATCHLIST) {
         state.item_selected = -1;
 
@@ -443,7 +512,15 @@ void menu_render(const menu_state_t& state) {
         .w = src_rect.w * 2,
         .h = src_rect.h * 2
     };
-    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UNIT_WAGON].colored_texture[network_get_status() == NETWORK_STATUS_CONNECTED ? network_get_player_id() : 0], &src_rect, &dst_rect);
+    uint8_t wagon_recolor_id;
+    if (!(network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_SERVER)) {
+        wagon_recolor_id = 0;
+    } else if (state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN_ITEM) {
+        wagon_recolor_id = (uint8_t)state.hover.item;
+    } else {
+        wagon_recolor_id = network_get_player(network_get_player_id()).recolor_id;
+    }
+    SDL_RenderCopy(engine.renderer, engine.sprites[SPRITE_UNIT_WAGON].colored_texture[wagon_recolor_id], &src_rect, &dst_rect);
 
     // Render clouds
     static const int cloud_count = 6;
@@ -490,7 +567,7 @@ void menu_render(const menu_state_t& state) {
     }
 
     if (state.mode == MENU_MODE_MATCHLIST) {
-        render_ninepatch(SPRITE_UI_FRAME, PLAYERLIST_RECT, 16);
+        render_ninepatch(SPRITE_UI_FRAME, MATCHLIST_RECT, 16);
 
         for (int lobby_index = 0; lobby_index < network_get_lobby_count(); lobby_index++) {
             menu_render_lobby_text(state, lobby_index);
@@ -517,6 +594,7 @@ void menu_render(const menu_state_t& state) {
         render_ninepatch(SPRITE_UI_FRAME, PLAYERLIST_RECT, 16);
 
         uint32_t player_index = 0;
+        uint32_t current_player_index = 0;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
             if (player.status == PLAYER_STATUS_NONE) {
@@ -534,11 +612,37 @@ void menu_render(const menu_state_t& state) {
                 player_name_text_ptr += sprintf(player_name_text_ptr, ": READY");
             }
 
-            int line_y = PLAYERLIST_ITEM_HEIGHT * player_index;
-            render_text(FONT_WESTERN8_GOLD, player_name_text, xy(PLAYERLIST_RECT.x + 16, PLAYERLIST_RECT.y + 12 + line_y));
+            SDL_Rect dropdown_rect = menu_get_dropdown_rect(player_index);
+            int dropdown_vframe = 0;
+            if (player_id != network_get_player_id()) {
+                dropdown_vframe = 3;
+            } else if (state.hover.type == MENU_HOVER_DROPDOWN) {
+                dropdown_vframe = 1;
+            } else if (state.dropdown_open) {
+                dropdown_vframe = 2;
+            }
+
+            render_text(FONT_WESTERN8_GOLD, player_name_text, xy(PLAYERLIST_RECT.x + 16, dropdown_rect.y + 5));
+            render_text(FONT_WESTERN8_GOLD, "Color:", xy(dropdown_rect.x - 48, dropdown_rect.y + 5));
+            render_sprite(SPRITE_UI_OPTIONS_DROPDOWN, xy(0, dropdown_vframe), xy(dropdown_rect.x, dropdown_rect.y));
+            render_text(dropdown_vframe == 1 ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, PLAYER_COLORS[player.recolor_id].name, xy(dropdown_rect.x + 5, dropdown_rect.y + 5));
+
+            if (player_id == network_get_player_id()) {
+                current_player_index = player_index;
+            }
             player_index++;
         } // End for each player id
-    }
+
+        if (state.dropdown_open) {
+            SDL_Rect dropdown_rect = menu_get_dropdown_rect(current_player_index);
+            for (uint8_t recolor_id = 0; recolor_id < MAX_PLAYERS; recolor_id++) {
+                dropdown_rect.y += dropdown_rect.h;
+                bool hovered = state.hover.type == MENU_HOVER_DROPDOWN_ITEM && state.hover.item == recolor_id;
+                render_sprite(SPRITE_UI_OPTIONS_DROPDOWN, xy(0, hovered ? 4 : 3), xy(dropdown_rect.x, dropdown_rect.y));
+                render_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, PLAYER_COLORS[recolor_id].name, xy(dropdown_rect.x + 5, dropdown_rect.y + 5));
+            }
+        }
+    } // End if menu mode lobby
 
     auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
     if (mode_buttons_it != MODE_BUTTONS.end()) {
@@ -563,7 +667,7 @@ SDL_Rect menu_get_lobby_text_frame_rect(int lobby_index) {
     }
 
     return (SDL_Rect) {
-        .x = PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - ((frame_width * 15) / 2), .y = PLAYERLIST_RECT.y + (20 * lobby_index) + 8,
+        .x = MATCHLIST_RECT.x + (MATCHLIST_RECT.w / 2) - ((frame_width * 15) / 2), .y = MATCHLIST_RECT.y + (20 * lobby_index) + 8,
         .w = frame_width * 15, .h = 15
     };
 }
@@ -625,4 +729,13 @@ SDL_Rect menu_get_button_rect(MenuButton button) {
     }
     text_size.x += 16;
     return (SDL_Rect) { .x = button_data.position_x, .y = button_data.position_y, .w = text_size.x, .h = engine.sprites[SPRITE_UI_PARCHMENT_BUTTONS].frame_size.y };
+}
+
+SDL_Rect menu_get_dropdown_rect(int index) {
+    return (SDL_Rect) {
+        .x = PLAYERLIST_RECT.x + PLAYERLIST_RECT.w - engine.sprites[SPRITE_UI_OPTIONS_DROPDOWN].frame_size.x - 16,
+        .y = PLAYERLIST_RECT.y + 12 + ((engine.sprites[SPRITE_UI_OPTIONS_DROPDOWN].frame_size.y + 4) * index),
+        .w = engine.sprites[SPRITE_UI_OPTIONS_DROPDOWN].frame_size.x,
+        .h = engine.sprites[SPRITE_UI_OPTIONS_DROPDOWN].frame_size.y
+    };
 }

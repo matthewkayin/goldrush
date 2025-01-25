@@ -31,29 +31,7 @@ struct player_color_t {
     SDL_Color clothes_color;
 };
 
-const player_color_t PLAYER_COLORS[MAX_PLAYERS] = {
-    (player_color_t) {
-        .name = "Green",
-        .skin_color = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 },
-        .clothes_color = (SDL_Color) { .r = 51, .g = 71, .b = 50, .a = 255 },
-    },
-    (player_color_t) {
-        .name = "Red",
-        .skin_color = (SDL_Color) { .r = 219, .g = 151, .b = 114, .a = 255 },
-        .clothes_color = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }
-    },
-    (player_color_t) {
-        .name = "Purple",
-        .skin_color = (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 },
-        .clothes_color = (SDL_Color) { .r = 69, .g = 56, .b = 73, .a = 255 }
-    },
-    (player_color_t) {
-        .name = "Blue",
-        .skin_color = (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 },
-        .clothes_color = (SDL_Color) { .r = 64, .g = 74, .b = 94, .a = 255 }
-    }
-};
-
+extern const player_color_t PLAYER_COLORS[MAX_PLAYERS];
 const SDL_Color RECOLOR_SKIN_REF = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
 const SDL_Color RECOLOR_CLOTHES_REF = (SDL_Color) { .r = 255, .g = 0, .b = 255, .a = 255 };
 

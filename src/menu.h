@@ -39,7 +39,9 @@ enum MenuHoverType {
     MENU_HOVER_NONE,
     MENU_HOVER_BUTTON,
     MENU_HOVER_ITEM,
-    MENU_HOVER_REFRESH
+    MENU_HOVER_REFRESH,
+    MENU_HOVER_DROPDOWN,
+    MENU_HOVER_DROPDOWN_ITEM
 };
 
 struct menu_hover_t {
@@ -60,6 +62,8 @@ struct menu_state_t {
     std::string username;
     int item_selected;
 
+    bool dropdown_open;
+
     animation_t wagon_animation;
     int parallax_x;
     int parallax_cloud_x;
@@ -78,3 +82,4 @@ SDL_Rect menu_get_lobby_text_frame_rect(int lobby_index);
 void menu_render_lobby_text(const menu_state_t& state, int lobby_index);
 void menu_render_menu_button(MenuButton button, bool hovered);
 SDL_Rect menu_get_button_rect(MenuButton button);
+SDL_Rect menu_get_dropdown_rect(int index);
