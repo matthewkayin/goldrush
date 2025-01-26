@@ -1602,6 +1602,9 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             uint32_t index = input.building_dequeue.index == BUILDING_DEQUEUE_POP_FRONT
                                     ? building.queue.size() - 1
                                     : input.building_dequeue.index;
+            if (index >= building.queue.size()) {
+                return;
+            }
             
             state.player_gold[player_id] += building_queue_item_cost(building.queue[index]);
             if (building.queue[index].type == BUILDING_QUEUE_ITEM_UPGRADE) {
