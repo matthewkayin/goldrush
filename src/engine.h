@@ -5,6 +5,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_mixer.h>
 #include <vector>
 #include <unordered_map>
 
@@ -249,6 +250,13 @@ enum Cursor {
     CURSOR_COUNT
 };
 
+// Sound
+
+enum Sound {
+    SOUND_DEATH,
+    SOUND_COUNT
+};
+
 struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -261,6 +269,8 @@ struct engine_t {
     std::vector<SDL_Cursor*> cursors;
     SDL_Texture* minimap_texture = NULL;
     SDL_Texture* minimap_tiles_texture = NULL;
+    std::vector<Mix_Chunk*> sounds;
+    std::vector<uint32_t> sound_index;
 
     xy mouse_position;
     Cursor current_cursor;
@@ -304,3 +314,5 @@ void render_ninepatch(Sprite sprite, const SDL_Rect& rect, int patch_margin);
 
 void render_text_with_text_frame(Sprite sprite, Font font, const char* text, xy position, xy text_offset, bool center_text = true);
 SDL_Rect get_text_with_text_frame_rect(Sprite sprite, Font font, const char* text, xy position);
+
+void sound_play(Sound sound);

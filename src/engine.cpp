@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "asserts.h"
 #include "animation.h"
+#include "lcg.h"
 #include <unordered_map>
 
 const player_color_t PLAYER_COLORS[MAX_PLAYERS] = {
@@ -773,10 +774,22 @@ static const std::unordered_map<Cursor, cursor_params_t> CURSOR_PARAMS = {
     }},
 };
 
+struct sound_params_t {
+    const char* path;
+    int variants;
+};
+
+static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
+    { SOUND_DEATH, (sound_params_t) {
+        .path = "sfx/death",
+        .variants = 10
+    }}
+};
+
 engine_t engine;
 
 bool engine_init() {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
         return false;
     }
@@ -794,6 +807,12 @@ bool engine_init() {
         return false;
     }
 
+    // Init Mixer
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        log_error("Error initializing SDL_mixer: %s", Mix_GetError());
+        return false;
+    }
+
     engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, SDL_WINDOW_SHOWN);
     if (engine.window == NULL) {
         log_error("Error creating window: %s", SDL_GetError());
@@ -804,6 +823,28 @@ bool engine_init() {
 
     if (!engine_init_renderer()) {
         return false;
+    }
+
+    // Load sound effects
+    for (int sound = 0; sound < SOUND_COUNT; sound++) {
+        const sound_params_t& params = SOUND_PARAMS.at((Sound)sound);
+        engine.sound_index.push_back(engine.sounds.size());
+
+        for (int variant = 0; variant < params.variants; variant++) {
+            char sound_path[256];
+            if (params.variants == 1) {
+                sprintf(sound_path, "%s%s.wav", GOLD_RESOURCE_PATH, params.path);
+            } else {
+                sprintf(sound_path, "%s%s%i.wav", GOLD_RESOURCE_PATH, params.path, (variant + 1));
+            }
+            Mix_Chunk* sound_variant = Mix_LoadWAV(sound_path);
+            if (sound_variant == NULL) {
+                log_error("Unable to load sound at path %s", variant + 1, sound_path);
+                return false;
+            }
+
+            engine.sounds.push_back(sound_variant);
+        }
     }
 
     engine.keystate = SDL_GetKeyboardState(NULL);
@@ -1247,6 +1288,13 @@ void engine_destroy_renderer() {
 void engine_quit() {
     engine_destroy_renderer();
     SDL_DestroyWindow(engine.window);
+
+    for (int i = 0; i < engine.sounds.size(); i++) {
+        Mix_FreeChunk(engine.sounds[i]);
+    }
+
+    Mix_Quit();
+
     IMG_Quit();
     TTF_Quit();
     SDL_Quit();
@@ -1552,4 +1600,11 @@ SDL_Rect get_text_with_text_frame_rect(Sprite sprite, Font font, const char* tex
         .w = frame_width * engine.sprites[sprite].frame_size.x, 
         .h = engine.sprites[sprite].frame_size.y 
     };
+}
+
+// SOUND
+
+void sound_play(Sound sound) {
+    int variant = SOUND_PARAMS.at(sound).variants == 1 ? 0 : lcg_rand() % SOUND_PARAMS.at(sound).variants;
+    Mix_PlayChannel(-1, engine.sounds[engine.sound_index[sound] + variant], 0);
 }

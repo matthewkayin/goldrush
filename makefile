@@ -15,7 +15,7 @@ BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
 COMPILER_FLAGS := -std=c++17 -Wall -g -O0
-LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image
+LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 
 # Use -Wno-deprecated-declarations on OSX because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)

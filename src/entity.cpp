@@ -3,6 +3,7 @@
 #include "network.h"
 #include "logger.h"
 #include "lcg.h"
+#include "engine.h"
 #include <unordered_map>
 #include <algorithm>
 
@@ -706,6 +707,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         if (entity_is_unit(entity.type)) {
             entity.mode = MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
+            sound_play(SOUND_DEATH);
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;
