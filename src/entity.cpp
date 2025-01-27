@@ -1010,19 +1010,13 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.target.id = entity_create(state, entity.target.build.building_type, entity.player_id, entity.target.build.building_cell);
                         entity.mode = MODE_UNIT_BUILD;
                         entity.timer = UNIT_BUILD_TICK_DURATION;
-                        ui_deselect_entity_if_selected(state, id);
 
-                        bool is_targeting_only_builders = true;
-                        for (entity_id selected_id : state.selection) {
-                            entity_t& selected_entity = state.entities.get_by_id(selected_id);
-                            if (!(selected_entity.target.type == TARGET_BUILD_ASSIST && selected_entity.target.id == id)) {
-                                is_targeting_only_builders = false;
-                                break;
-                            }
-                        }
-                        if (is_targeting_only_builders) {
+                        if (state.selection.size() == 1 && state.selection[0] == id) {
                             state.selection.clear();
                             state.selection.push_back(entity.target.id);
+                            state.ui_mode = UI_MODE_NONE;
+                        } else {
+                            ui_deselect_entity_if_selected(state, id);
                         }
 
                         break;
