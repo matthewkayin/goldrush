@@ -9,7 +9,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
-static const uint32_t PLAYER_STARTING_GOLD = 500;
+static const uint32_t PLAYER_STARTING_GOLD = 5000;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_DRAG_SPEED = 16;
@@ -2095,16 +2095,19 @@ void match_render(const match_state_t& state) {
     }
 
     // UI show queued building placements
-    if (state.selection.size() == 1) {
-        const entity_t& entity = state.entities.get_by_id(state.selection[0]);
-        if (entity_is_unit(entity.type) && entity.player_id == network_get_player_id()) {
-            if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
-                match_render_target_build(state, entity.target);
-            }
-            for (const target_t& target : entity.target_queue) {
-                if (target.type == TARGET_BUILD) {
-                    match_render_target_build(state, target);
-                }
+    for (entity_id id : state.selection) {
+        const entity_t& entity = state.entities.get_by_id(id);
+        // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
+        if (!entity_is_unit(entity.type) || entity.player_id != network_get_player_id()) {
+            break;
+        }
+
+        if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
+            match_render_target_build(state, entity.target);
+        }
+        for (const target_t& target : entity.target_queue) {
+            if (target.type == TARGET_BUILD) {
+                match_render_target_build(state, target);
             }
         }
     }

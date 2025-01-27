@@ -1111,7 +1111,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         // Return gold
-                        if (entity.type == ENTITY_MINER && (target.type == ENTITY_HALL || target.type == ENTITY_CAMP) && entity.player_id == target.player_id && entity.gold_held != 0 && entity.target.type != TARGET_REPAIR) {
+                        if (entity.type == ENTITY_MINER && (target.type == ENTITY_HALL || target.type == ENTITY_CAMP) && target.mode == MODE_BUILDING_FINISHED && entity.player_id == target.player_id && entity.gold_held != 0 && entity.target.type != TARGET_REPAIR) {
                             state.player_gold[entity.player_id] += entity.gold_held;
                             entity.gold_held = 0;
                             entity.target = entity.remembered_gold_target.type != TARGET_NONE 
@@ -1125,7 +1125,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         // Garrison
-                        if (entity.player_id == target.player_id && entity_data.garrison_size != ENTITY_CANNOT_GARRISON && entity_get_garrisoned_occupancy(state, target) + entity_data.garrison_size <= ENTITY_DATA.at(target.type).garrison_capacity && entity.target.type != TARGET_REPAIR) {
+                        if (entity.player_id == target.player_id && entity_data.garrison_size != ENTITY_CANNOT_GARRISON && entity_get_garrisoned_occupancy(state, target) + entity_data.garrison_size <= ENTITY_DATA.at(target.type).garrison_capacity && entity.target.type != TARGET_REPAIR && (entity_is_unit(target.type) || target.mode == MODE_BUILDING_FINISHED)) {
                             target.garrisoned_units.push_back(id);
                             entity.garrison_id = entity.target.id;
                             entity.mode = MODE_UNIT_IDLE;
@@ -1211,8 +1211,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 break;
             } // End mode move finished
             case MODE_UNIT_BUILD: {
-                // This code handles the case where 1. the building is destroyed while the unit is building it
-                // and 2. the unit was unable to exit the building and is now stuck inside it
+                // This code handles the case where the building is destroyed while the unit is building it
                 uint32_t building_index = state.entities.get_index_of(entity.target.id);
                 if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index]) || state.entities[building_index].mode != MODE_BUILDING_IN_PROGRESS) {
                     entity_stop_building(state, id);
@@ -1311,6 +1310,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
                     entity.cooldown_timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
                     entity.mode = MODE_UNIT_IDLE;
+
+                    // If garrisoned, reasses targets. This is so that units don't get stuck shooting a building when a unit may have become a bigger priority
+                    if (entity.garrison_id != ID_NULL) {
+                        entity.target = entity_target_nearest_enemy(state, entity);
+                    }
                 }
 
                 update_finished = true;
@@ -2447,23 +2451,26 @@ void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garris
 void entity_stop_building(match_state_t& state, entity_id id) {
     entity_t& entity = state.entities.get_by_id(id);
 
-    xy exit_cell = map_get_nearest_cell_around_rect(state, entity.cell, entity_cell_size(entity.type), entity.target.build.building_cell, entity_cell_size(entity.target.build.building_type), false);
-    if (exit_cell == entity.cell) {
-        // Unable to exit the building
-        exit_cell = xy(-1, -1);
-        for (int x = entity.target.build.building_cell.x; x < entity.target.build.building_cell.x + entity_cell_size(entity.target.build.building_type); x++) {
-            for (int y = entity.target.build.building_cell.y; x < entity.target.build.building_cell.y + entity_cell_size(entity.target.build.building_type); y++) {
-                if (!map_is_cell_rect_occupied(state, xy(x, y), entity_cell_size(entity.type))) {
-                    exit_cell = xy(x, y);
-                    break;
-                }
+    xy exit_cell = entity.target.build.building_cell + xy(-1, 0);
+    xy search_corners[4] = {
+        entity.target.build.building_cell + xy(-1, entity_cell_size(entity.target.build.building_type)),
+        entity.target.build.building_cell + xy(entity_cell_size(entity.target.build.building_type), entity_cell_size(entity.target.build.building_type)),
+        entity.target.build.building_cell + xy(entity_cell_size(entity.target.build.building_type), -1),
+        entity.target.build.building_cell + xy(-1, -1)
+    };
+    const Direction search_directions[4] = { DIRECTION_SOUTH, DIRECTION_EAST, DIRECTION_NORTH, DIRECTION_WEST };
+    int search_index = 0;
+    while (!map_is_cell_in_bounds(state, exit_cell) || map_is_cell_rect_occupied(state, exit_cell, entity_cell_size(entity.type))) {
+        exit_cell += DIRECTION_XY[search_directions[search_index]];
+        if (exit_cell == search_corners[search_index]) {
+            search_index++;
+            if (search_index == 4) {
+                search_index = 0;
+                search_corners[0] += xy(-1, 1);
+                search_corners[1] += xy(1, 1);
+                search_corners[2] += xy(1, -1);
+                search_corners[3] += xy(-1, -1);
             }
-            if (exit_cell.x != -1) {
-                break;
-            }
-        }
-        if (exit_cell.x == -1) {
-            return;
         }
     }
 
