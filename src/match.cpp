@@ -440,7 +440,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     }
 
     // Order movement
-    if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state, state.selection) == SELECTION_TYPE_UNITS && 
+    if (event.type == SDL_MOUSEBUTTONDOWN && ui_get_selection_type(state, state.selection) == SELECTION_TYPE_UNITS && state.ui_mode != UI_MODE_BUILDING_PLACE &&
             (sdl_rect_has_point(MINIMAP_RECT, engine.mouse_position) || !ui_is_mouse_in_ui()) &&
             ((event.button.button == SDL_BUTTON_LEFT && ui_is_targeting(state)) ||
             (event.button.button == SDL_BUTTON_RIGHT && !ui_is_selecting(state) && !state.ui_is_minimap_dragging))) {
