@@ -21,7 +21,7 @@ DEFINES := -D_CRT_SECURE_NO_WARNINGS
 # Use -Wno-deprecated-declarations on OSX because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 ifeq ($(PLATFORM),OSX)
 	COMPILER_FLAGS += -Wno-deprecated-declarations
-	LINKER_FLAGS += -lenet
+	LINKER_FLAGS += -L/opt/homebrew/lib -lenet
 endif
 
 ifeq ($(PLATFORM),WIN32)

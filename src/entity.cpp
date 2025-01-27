@@ -569,7 +569,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_BUILD_MINE,
         .cell_size = 1,
 
-        .gold_cost = 25,
+        .gold_cost = 50,
         .train_duration = 0,
         .max_health = 5,
         .sight = 3,

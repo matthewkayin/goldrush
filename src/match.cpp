@@ -1009,6 +1009,9 @@ uint32_t match_get_player_max_population(const match_state_t& state, uint8_t pla
     for (const entity_t& building : state.entities) {
         if (building.player_id == player_id && building.mode == MODE_BUILDING_FINISHED && (building.type == ENTITY_HOUSE || building.type == ENTITY_HALL)) {
             max_population += 10;
+            if (max_population == 200) {
+                return 200;
+            }
         }
     }
 
