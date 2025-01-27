@@ -14,10 +14,11 @@ Hammer Sound (Modified to create building sound)
 Eelke
 https://freesound.org/people/Eelke
 
-Proto-Germanic Voices
-Manuel Senfft (Submitted by Andrettin on OpenGameArt)
-https://opengameart.org/content/proto-germanic-voices
-
-Death Sounds
+Death Sounds, modified from:
 thebardofblasphemy on OpenGameArt
 https://opengameart.org/content/grunts-male-death-and-pain
+
+UI click
+Cyrex Studios (Universal UI Soundpack)
+https://cyrex-studios.itch.io/universal-ui-soundpack
+

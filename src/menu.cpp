@@ -131,6 +131,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         if (state.mode == MENU_MODE_LOBBY && state.dropdown_open) {
             if (state.hover.type == MENU_HOVER_DROPDOWN_ITEM) {
+                sound_play(SOUND_UI_SELECT);
                 network_set_player_color((uint8_t)state.hover.item);
             }
             state.dropdown_open = false;
@@ -230,22 +231,28 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                 default:
                     break;
             }
+            sound_play(SOUND_UI_SELECT);
         }
 
         state.item_selected = state.mode == MENU_MODE_MATCHLIST && state.hover.type == MENU_HOVER_ITEM
                                 ?  state.item_selected = state.hover.item
                                 : -1;
         state.dropdown_open = state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN;
+        if ((state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN) || (state.mode == MENU_MODE_MATCHLIST && state.hover.type == MENU_HOVER_ITEM)) {
+            sound_play(SOUND_UI_SELECT);
+        }
 
         // Text input pressed
         if (state.hover.type == MENU_HOVER_NONE && state.mode == MENU_MODE_USERNAME &&
             sdl_rect_has_point(TEXT_INPUT_RECT, engine.mouse_position)) {
             SDL_SetTextInputRect(&TEXT_INPUT_RECT);
             SDL_StartTextInput();
+            sound_play(SOUND_UI_SELECT);
         }
 
         if (state.hover.type == MENU_HOVER_REFRESH) {
             network_scanner_search();
+            sound_play(SOUND_UI_SELECT);
         }
     } else if (event.type == SDL_TEXTINPUT) {
         if (state.mode == MENU_MODE_USERNAME) {

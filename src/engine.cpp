@@ -782,8 +782,20 @@ struct sound_params_t {
 static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
     { SOUND_DEATH, (sound_params_t) {
         .path = "sfx/death",
-        .variants = 10
-    }}
+        .variants = 9
+    }},
+    { SOUND_UI_SELECT, (sound_params_t) {
+        .path = "sfx/ui_select",
+        .variants = 1
+    }},
+    { SOUND_MUSKET, (sound_params_t) {
+        .path = "sfx/musket",
+        .variants = 4
+    }},
+    { SOUND_BUILDING_IN_PROGRESS, (sound_params_t) {
+        .path = "sfx/building_in_progress",
+        .variants = 1
+    }},
 };
 
 engine_t engine;
@@ -808,7 +820,7 @@ bool engine_init() {
     }
 
     // Init Mixer
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) < 0) {
         log_error("Error initializing SDL_mixer: %s", Mix_GetError());
         return false;
     }

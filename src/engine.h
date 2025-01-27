@@ -254,6 +254,9 @@ enum Cursor {
 
 enum Sound {
     SOUND_DEATH,
+    SOUND_UI_SELECT,
+    SOUND_MUSKET,
+    SOUND_BUILDING_IN_PROGRESS,
     SOUND_COUNT
 };
 

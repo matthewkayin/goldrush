@@ -103,7 +103,7 @@ const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
     { UI_BUTTON_UNIT_JOCKEY, SDLK_e },
     { UI_BUTTON_UNIT_SAPPER, SDLK_s },
     { UI_BUTTON_UNIT_TINKER, SDLK_t },
-    { UI_BUTTON_UNIT_SOLDIER, SDLK_d },
+    { UI_BUTTON_UNIT_SOLDIER, SDLK_s },
     { UI_BUTTON_UNIT_CANNON, SDLK_c },
     { UI_BUTTON_UNIT_SPY, SDLK_d },
     { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w },
@@ -600,6 +600,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         // Regular selection
         ui_set_selection(state, selection);
         state.control_group_selected = -1;
+
         return;
     }
 

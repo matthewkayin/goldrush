@@ -1016,6 +1016,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         if (state.selection.size() == 1 && state.selection[0] == id) {
                             state.selection.clear();
                             state.selection.push_back(entity.target.id);
+                            ui_set_selection(state, state.selection);
                             state.ui_mode = UI_MODE_NONE;
                         } else {
                             ui_deselect_entity_if_selected(state, id);
@@ -1311,6 +1312,9 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 if (!animation_is_playing(entity.animation)) {
                     entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
                     entity.cooldown_timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
+                    if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
+                        sound_play(SOUND_MUSKET);
+                    }
                     entity.mode = MODE_UNIT_IDLE;
 
                     // If garrisoned, reasses targets. This is so that units don't get stuck shooting a building when a unit may have become a bigger priority
