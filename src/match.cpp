@@ -2736,3 +2736,11 @@ void match_render_target_build(const match_state_t& state, const target_t& targe
     SDL_RenderFillRect(engine.renderer, &building_rect);
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 }
+
+void match_play_sound_at(const match_state_t& state, Sound sound, xy position) {
+    if (!sdl_rect_has_point(SCREEN_RECT, position - state.camera_offset)) {
+        return;
+    }
+
+    sound_play(sound);
+}

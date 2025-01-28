@@ -22,3 +22,10 @@ UI click
 Cyrex Studios (Universal UI Soundpack)
 https://cyrex-studios.itch.io/universal-ui-soundpack
 
+Gun shots
+Kurt
+https://opengameart.org/content/gunshots
+
+Explosions
+Q009
+https://opengameart.org/content/q009s-weapon-sounds

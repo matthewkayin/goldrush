@@ -108,7 +108,7 @@ void animation_init() {
         .frames = {
             (animation_frame_t) { .hframe = 5, .duration = 8 },
             (animation_frame_t) { .hframe = 6, .duration = 8 },
-            (animation_frame_t) { .hframe = 7, .duration = 16 }
+            (animation_frame_t) { .hframe = 7, .duration = 64 }
         },
         .loops = 1
     };

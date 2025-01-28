@@ -538,6 +538,7 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
 void match_render_healthbar(xy position, xy size, int health, int max_health);
 void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisoned_size, int garrisoned_capacity);
 void match_render_target_build(const match_state_t& state, const target_t& target);
+void match_play_sound_at(const match_state_t& state, Sound sound, xy position);
 
 // Generic
 void match_camera_clamp(match_state_t& state);
@@ -611,6 +612,7 @@ xy_fixed entity_get_target_position(const entity_t& entity);
 AnimationName entity_get_expected_animation(const entity_t& entity);
 xy entity_get_animation_frame(const entity_t& entity);
 bool entity_should_flip_h(const entity_t& entity);
+Sound entity_get_attack_sound(const entity_t& entity);
 bool entity_should_die(const entity_t& entity);
 SDL_Rect entity_get_sight_rect(const entity_t& entity);
 bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);

@@ -3,7 +3,6 @@
 #include "network.h"
 #include "logger.h"
 #include "lcg.h"
-#include "engine.h"
 #include <unordered_map>
 #include <algorithm>
 
@@ -707,7 +706,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         if (entity_is_unit(entity.type)) {
             entity.mode = MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
-            sound_play(SOUND_DEATH);
+            match_play_sound_at(state, SOUND_DEATH, entity.position.to_xy());
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;
@@ -1312,9 +1311,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 if (!animation_is_playing(entity.animation)) {
                     entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
                     entity.cooldown_timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
-                    if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
-                        sound_play(SOUND_MUSKET);
-                    }
+                    match_play_sound_at(state, entity_get_attack_sound(entity), entity.position.to_xy());
                     entity.mode = MODE_UNIT_IDLE;
 
                     // If garrisoned, reasses targets. This is so that units don't get stuck shooting a building when a unit may have become a bigger priority
@@ -1542,7 +1539,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         if (entity.animation.name != expected_animation || !animation_is_playing(entity.animation)) {
             entity.animation = animation_create(expected_animation);
         }
+        int prev_hframe = entity.animation.frame.x;
         animation_update(entity.animation);
+        if (prev_hframe != entity.animation.frame.x && entity.mode == MODE_UNIT_MINE && prev_hframe == 5) {
+            match_play_sound_at(state, SOUND_PICKAXE, entity.position.to_xy());
+        }
     } else if (entity.type == ENTITY_SMITH) {
         if (entity.queue.empty() && entity.animation.name != ANIMATION_UNIT_IDLE && entity.animation.name != ANIMATION_SMITH_END) {
             entity.animation = animation_create(ANIMATION_SMITH_END);
@@ -1894,6 +1895,14 @@ xy entity_get_animation_frame(const entity_t& entity) {
 
 bool entity_should_flip_h(const entity_t& entity) {
     return entity_is_unit(entity.type) && entity.direction > DIRECTION_SOUTH;
+}
+
+Sound entity_get_attack_sound(const entity_t& entity) {
+    if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
+        return SOUND_MUSKET;
+    } else {
+        return SOUND_GUN;
+    }
 }
 
 bool entity_should_die(const entity_t& entity) {
@@ -2360,6 +2369,8 @@ void entity_explode(match_state_t& state, entity_id id) {
         entity.timer = BUILDING_FADE_DURATION;
         state.map_mine_cells[entity.cell.x + (entity.cell.y * state.map_width)] = ID_NULL;
     }
+
+    match_play_sound_at(state, SOUND_EXPLOSION, entity.position.to_xy());
 
     // Create particle
     state.particles.push_back((particle_t) {
