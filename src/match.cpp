@@ -151,6 +151,7 @@ match_state_t match_init() {
     state.ui_double_click_timer = 0;
     state.control_group_double_tap_timer = 0;
     state.ui_rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
+    state.mining_sound_timer = 0;
     for (int i = 0; i < 6; i++) {
         state.ui_buttons[i] = UI_BUTTON_NONE;
     }
@@ -837,6 +838,9 @@ void match_update(match_state_t& state) {
     }
     if (state.control_group_double_tap_timer != 0) {
         state.control_group_double_tap_timer--;
+    }
+    if (state.mining_sound_timer != 0) {
+        state.mining_sound_timer--;
     }
 
     // Update alerts
@@ -2737,7 +2741,14 @@ void match_render_target_build(const match_state_t& state, const target_t& targe
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
 }
 
-void match_play_sound_at(const match_state_t& state, Sound sound, xy position) {
+void match_play_sound_at(match_state_t& state, Sound sound, xy position) {
+    if (sound == SOUND_PICKAXE) {
+        if (state.mining_sound_timer != 0) {
+            return;
+        }
+        state.mining_sound_timer = 5;
+    }
+
     if (!sdl_rect_has_point(SCREEN_RECT, position - state.camera_offset)) {
         return;
     }

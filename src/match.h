@@ -499,6 +499,7 @@ struct match_state_t {
     SDL_Keycode control_group_double_tap_key;
     int control_group_selected;
     std::vector<alert_t> alerts;
+    uint32_t mining_sound_timer;
 
     // Map
     uint32_t map_width;
@@ -538,7 +539,7 @@ render_sprite_params_t match_create_entity_render_params(const match_state_t& st
 void match_render_healthbar(xy position, xy size, int health, int max_health);
 void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisoned_size, int garrisoned_capacity);
 void match_render_target_build(const match_state_t& state, const target_t& target);
-void match_play_sound_at(const match_state_t& state, Sound sound, xy position);
+void match_play_sound_at(match_state_t& state, Sound sound, xy position);
 
 // Generic
 void match_camera_clamp(match_state_t& state);
