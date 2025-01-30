@@ -2,7 +2,7 @@ Pixel Western Font
 Michelle Lehmann (Mirz123)
 https://web.archive.org/web/20100707095521/http://scriptmonkeys.us/monkeys/2010/05/08/graphics-pixel-font-use-license/
 
-Gold Bar Icons, modified from:
+Gold Bar Icons (modified)
 Bonsaiheldin
 https://opengameart.org/content/gold-treasure-icons-16x16
 
@@ -10,11 +10,7 @@ m3x6 Font
 Daniel Linssen
 https://managore.itch.io/m3x6
 
-Hammer Sound (Modified to create building sound)
-Eelke
-https://freesound.org/people/Eelke
-
-Death Sounds, modified from:
+Death Sounds (modified)
 thebardofblasphemy on OpenGameArt
 https://opengameart.org/content/grunts-male-death-and-pain
 
@@ -29,3 +25,11 @@ https://opengameart.org/content/gunshots
 Explosions
 Q009
 https://opengameart.org/content/q009s-weapon-sounds
+
+Mining Sounds (modified)
+TechspiredMinds
+https://freesound.org/people/TechspiredMinds/
+
+Hammer Sounds
+OldSchool
+https://pixabay.com/sound-effects/hammer-sound4-37076/

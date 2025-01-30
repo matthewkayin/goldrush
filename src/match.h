@@ -499,7 +499,7 @@ struct match_state_t {
     SDL_Keycode control_group_double_tap_key;
     int control_group_selected;
     std::vector<alert_t> alerts;
-    uint32_t mining_sound_timer;
+    uint32_t sound_cooldown_timers[SOUND_COUNT];
 
     // Map
     uint32_t map_width;

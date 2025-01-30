@@ -200,10 +200,6 @@ void ui_set_selection(match_state_t& state, const std::vector<entity_id>& select
         state.selection.pop_back();
     }
 
-    if (state.selection.size() == 1 && state.entities.get_by_id(state.selection[0]).mode == MODE_BUILDING_IN_PROGRESS) {
-        sound_play(SOUND_BUILDING_IN_PROGRESS);
-    }
-
     state.ui_mode = UI_MODE_NONE;
 }
 

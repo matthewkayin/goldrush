@@ -1543,6 +1543,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         animation_update(entity.animation);
         if (prev_hframe != entity.animation.frame.x && entity.mode == MODE_UNIT_MINE && prev_hframe == 5) {
             match_play_sound_at(state, SOUND_PICKAXE, entity.position.to_xy());
+        } else if (prev_hframe != entity.animation.frame.x && (entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD) && prev_hframe == 0) {
+            match_play_sound_at(state, SOUND_HAMMER, entity.position.to_xy());
         }
     } else if (entity.type == ENTITY_SMITH) {
         if (entity.queue.empty() && entity.animation.name != ANIMATION_UNIT_IDLE && entity.animation.name != ANIMATION_SMITH_END) {
