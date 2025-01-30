@@ -790,11 +790,11 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
     }},
     { SOUND_MUSKET, (sound_params_t) {
         .path = "sfx/musket",
-        .variants = 4
+        .variants = 9
     }},
     { SOUND_GUN, (sound_params_t) {
         .path = "sfx/gun",
-        .variants = 3
+        .variants = 5
     }},
     { SOUND_EXPLOSION, (sound_params_t) {
         .path = "sfx/explosion",
@@ -811,6 +811,18 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
     { SOUND_BUILDING_PLACE, (sound_params_t) {
         .path = "sfx/building_place",
         .variants = 1
+    }},
+    { SOUND_SWORD, (sound_params_t) {
+        .path = "sfx/sword",
+        .variants = 3
+    }},
+    { SOUND_PUNCH, (sound_params_t) {
+        .path = "sfx/punch",
+        .variants = 3
+    }},
+    { SOUND_DEATH_CHICKEN, (sound_params_t) {
+        .path = "sfx/death_chicken",
+        .variants = 4
     }},
 };
 

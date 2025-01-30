@@ -614,6 +614,7 @@ AnimationName entity_get_expected_animation(const entity_t& entity);
 xy entity_get_animation_frame(const entity_t& entity);
 bool entity_should_flip_h(const entity_t& entity);
 Sound entity_get_attack_sound(const entity_t& entity);
+Sound entity_get_death_sound(EntityType type);
 bool entity_should_die(const entity_t& entity);
 SDL_Rect entity_get_sight_rect(const entity_t& entity);
 bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);

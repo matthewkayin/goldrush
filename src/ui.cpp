@@ -410,6 +410,8 @@ void ui_handle_ui_button_press(match_state_t& state, UiButton button) {
         return;
     }
 
+    sound_play(SOUND_UI_SELECT);
+
     switch (button) {
         case UI_BUTTON_ATTACK: {
             state.ui_mode = UI_MODE_TARGET_ATTACK;

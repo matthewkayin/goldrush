@@ -18,9 +18,13 @@ UI click
 Cyrex Studios (Universal UI Soundpack)
 https://cyrex-studios.itch.io/universal-ui-soundpack
 
-Gun shots
-Kurt
-https://opengameart.org/content/gunshots
+Revolver gunfire
+cedarstudios
+https://freesound.org/people/cedarstudios
+
+Musket gunfire
+J8054
+https://freesound.org/people/J8054/packs/36068/
 
 Explosions
 Q009
@@ -33,3 +37,15 @@ https://freesound.org/people/TechspiredMinds/
 Hammer Sounds
 OldSchool
 https://pixabay.com/sound-effects/hammer-sound4-37076/
+
+Sword Sounds
+Leohpaz (Minifantasy Dungeon Sfx Pack)
+https://leohpaz.itch.io/minifantasy-dungeon-sfx-pack
+
+Kung fu punches (modified)
+periadactyloptrix
+https://freesound.org/people/peridactyloptrix/
+
+Chicken sounds
+Breviceps
+https://freesound.org/people/Breviceps/sounds/456803/
