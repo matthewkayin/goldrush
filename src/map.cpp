@@ -212,6 +212,30 @@ std::vector<xy> map_init(match_state_t& state) {
         }
     }
 
+    // Widen gaps that are too narrow
+    for (int y = 0; y < noise.height; y++) {
+        for (int x = 0; x < noise.width; x++) {
+            if (noise.map[x + (y * noise.width)] == -1 || noise.map[x + (y * noise.width)] == 2) {
+                continue;
+            }
+
+            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                xy wall = xy(x, y) + DIRECTION_XY[direction];
+                if (!map_is_cell_in_bounds(state, wall)) {
+                    continue;
+                }
+                if (noise.map[wall.x + (wall.y * noise.width)] > noise.map[x + (y * noise.width)]) {
+                    for (int step = 0; step < 3; step++) {
+                        xy opposite = xy(x, y) - (DIRECTION_XY[direction] * (step + 1));
+                        if (map_is_cell_in_bounds(state, opposite) && noise.map[opposite.x + (opposite.y * noise.width)] > noise.map[x + (y * noise.width)]) {
+                            noise.map[opposite.x + (opposite.y * noise.width)] = noise.map[x + (y * noise.width)];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Remove elevation artifacts
     uint32_t elevation_artifact_count;
     const int ELEVATION_NEAR_DIST = 4;

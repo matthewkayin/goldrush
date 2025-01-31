@@ -1,10 +1,3 @@
 todos
- - [ ] - Cannon fire in middle of building 
  - [ ] - Prevent bad gold clustes on map creation
  - [ ] - Prevent spawn in place where chicken cannot escape
- - [ ] - Alerts should have sounds paired to them
-sounds
- - [ ] - Unit create notification
- - [ ] - Research complete notification
- - [ ] - Building finished notification
- - [ ] - Under attack notification

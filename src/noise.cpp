@@ -168,14 +168,14 @@ void noise_generate(uint64_t seed, uint32_t width, uint32_t height) {
     noise.height = height;
     noise.map = std::vector<int8_t>(width * height, 0);
 
-    const double FREQUENCY = 1.0 / 48.0;
+    const double FREQUENCY = 1.0 / 56.0;
     for (int x = 0; x < noise.width; x++) {
         for (int y = 0; y < noise.height; y++) {
             // Generates result from -1 to 1
             double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
             if (perlin_result < 0.15) {
                 noise.map[x + (y * noise.width)] = -1;
-            } else if (perlin_result < 0.45) {
+            } else if (perlin_result < 0.6) {
                 noise.map[x + (y * noise.width)] = 0;
             } else if (perlin_result < 0.8) {
                 noise.map[x + (y * noise.width)] = 1;

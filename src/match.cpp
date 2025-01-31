@@ -2012,6 +2012,7 @@ void match_render(const match_state_t& state) {
     }
 
     // Fog of War
+#ifndef GOLD_FOG_DISABLED
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
         for (int y = 0; y < max_visible_tiles.y; y++) {
@@ -2081,6 +2082,7 @@ void match_render(const match_state_t& state) {
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
+#endif
 
     // Above fog of war sprites
     for (render_sprite_params_t params : above_fog_render_params) {
@@ -2547,7 +2549,7 @@ void match_render(const match_state_t& state) {
     }
 
     // Minimap Fog of War
-    #ifndef GOLD_DEBUG_FOG_DISABLED
+#ifndef GOLD_FOG_DISABLED
     std::vector<SDL_Point> fog_hidden_points;
     fog_hidden_points.reserve(state.map_width * state.map_height);
     std::vector<SDL_Point> fog_explored_points;
@@ -2569,7 +2571,7 @@ void match_render(const match_state_t& state) {
     SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, 128);
     SDL_RenderDrawPoints(engine.renderer, &fog_explored_points[0], fog_explored_points.size());
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
-    #endif
+#endif
 
     // Minimap camera rect
     SDL_Rect camera_rect = (SDL_Rect) {
