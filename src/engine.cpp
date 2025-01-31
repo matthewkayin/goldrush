@@ -872,6 +872,22 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
         .path = "sfx/garrison_out",
         .variants = 1
     }},
+    { SOUND_ALERT_BELL, (sound_params_t) {
+        .path = "sfx/alert_bell",
+        .variants = 1
+    }},
+    { SOUND_ALERT_BUILDING, (sound_params_t) {
+        .path = "sfx/alert_building",
+        .variants = 1
+    }},
+    { SOUND_ALERT_RESEARCH, (sound_params_t) {
+        .path = "sfx/alert_research",
+        .variants = 1
+    }},
+    { SOUND_ALERT_UNIT, (sound_params_t) {
+        .path = "sfx/alert_unit",
+        .variants = 1
+    }},
 };
 
 engine_t engine;

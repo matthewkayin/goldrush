@@ -1440,6 +1440,9 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                 .timer = MATCH_ALERT_TOTAL_DURATION
                             });
                         }
+                        if (unit.player_id == network_get_player_id()) {
+                            sound_play(SOUND_ALERT_UNIT);
+                        }
 
                         entity_building_dequeue(state, entity);
                     } else if (entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UPGRADE) {
@@ -1481,6 +1484,9 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                 .cell_size = entity_cell_size(entity.type),
                                 .timer = MATCH_ALERT_TOTAL_DURATION
                             });
+                        }
+                        if (entity.player_id == network_get_player_id()) {
+                            sound_play(SOUND_ALERT_RESEARCH);
                         }
 
                         entity_building_dequeue(state, entity);
@@ -2350,6 +2356,7 @@ void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& def
                     .timer = MATCH_ALERT_TOTAL_DURATION
                 });
                 ui_show_status(state, UI_STATUS_UNDER_ATTACK);
+                sound_play(SOUND_ALERT_BELL);
             }
         }
         defender.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
@@ -2565,6 +2572,7 @@ void entity_building_finish(match_state_t& state, entity_id building_id) {
                 .timer = MATCH_ALERT_TOTAL_DURATION
             });
         }
+        sound_play(SOUND_ALERT_BUILDING);
     }
 
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
