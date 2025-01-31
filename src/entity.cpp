@@ -706,7 +706,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         if (entity_is_unit(entity.type)) {
             entity.mode = MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
-            match_play_sound_at(state, entity_get_death_sound(entity.type), entity.position.to_xy());
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;
@@ -725,6 +724,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     }
                 }
             }
+        }
+
+        if (entity.type != ENTITY_GOLD) {
+            match_play_sound_at(state, entity_get_death_sound(entity.type), entity.position.to_xy());
         }
 
         ui_deselect_entity_if_selected(state, id);
@@ -1906,19 +1909,32 @@ Sound entity_get_attack_sound(const entity_t& entity) {
         return SOUND_GUN;
     } else if (entity.type == ENTITY_BANDIT || entity.type == ENTITY_SOLDIER) {
         return SOUND_SWORD;
+    } else if (entity.type == ENTITY_CANNON) {
+        return SOUND_CANNON;
     } else {
         return SOUND_PUNCH;
     }
 }
 
 Sound entity_get_death_sound(EntityType type) {
-    switch (type) {
-        case ENTITY_WAGON:
-        case ENTITY_WAR_WAGON:
-        case ENTITY_JOCKEY:
-            return SOUND_DEATH_CHICKEN;
-        default:
-            return SOUND_DEATH;
+    if (entity_is_unit(type)) {
+        switch (type) {
+            case ENTITY_WAGON:
+            case ENTITY_WAR_WAGON:
+            case ENTITY_JOCKEY:
+                return SOUND_DEATH_CHICKEN;
+            default:
+                return SOUND_DEATH;
+        }
+    } else {
+        switch (type) {
+            case ENTITY_BUNKER:
+                return SOUND_BUNKER_DESTROY;
+            case ENTITY_MINE:
+                return SOUND_MINE_DESTROY;
+            default:
+                return SOUND_BUILDING_DESTROY;
+        }
     }
 }
 

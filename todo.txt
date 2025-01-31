@@ -1,6 +1,14 @@
 todos
-- (bug / polish) A-move doesn't always work like you would expect, implement priority system?
-- replace percent to win with a UI ticker (maybe vertical UI? either way, use colored arrows and hide usernames unless hovered)
-- (polish) pressing hotkeys should cause a button-press effect in the UI
-- (polish) moving the wagon feels unintuitive because the wagon moves so that its top-left matches the cell you clicked. is there a way we can make the movement more center-aligned?
-    seems like we would have to rework how the movement message is sent to do this, and we would have to account for groups of different sized units. 
+ - [ ] - Cannon fire in middle of building 
+ - [ ] - Prevent bad gold clustes on map creation
+ - [ ] - Prevent spawn in place where chicken cannot escape
+ - [ ] - Alerts should have sounds paired to them
+sounds
+ - [ ] - Rally staff thump
+ - [ ] - Bunker destroy
+ - [ ] - Unit create notification
+ - [ ] - Research complete notification
+ - [ ] - Building finished notification
+ - [ ] - Under attack notification
+ - [ ] - Enter exit bunker shiff
+ - [ ] - Mine arm / disarm beeps
