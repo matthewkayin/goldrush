@@ -46,16 +46,17 @@ Kung fu punches (modified)
 periadactyloptrix
 https://freesound.org/people/peridactyloptrix/
 
-Chicken sounds
+Chicken sounds (modified)
 Breviceps
 https://freesound.org/people/Breviceps/sounds/456803/
 
-Wood throwing sounds
+Wood throwing sounds (modified)
 eneibol
 https://freesound.org/people/eneibol/
 
 Cannon fire
 Wood cracks / hits / destructions
+Puff of Smoke
 qubodup
 https://freesound.org/people/qubodup/
 
@@ -67,6 +68,23 @@ Small crack
 eben-frostey
 https://freesound.org/people/eben-frostey/
 
-RPG-7 Insert
+RPG-7 Insert (modified)
 PNMCarrieRailfan
 https://freesound.org/people/PNMCarrieRailfan/
+
+MaxTempAlert (modified)
+CompleteMelody
+https://freesound.org/people/CompleteMelody/
+
+Throw
+AlexCoover
+https://freesound.org/people/AlexCoover/
+
+Rabbit Thump on Soil
+kessir
+https://freesound.org/people/kessir/
+
+Woosh - ShortAttack (modified)
+Woosh - Short & Quick (modified)
+jwsounddesign
+https://freesound.org/people/jwsounddesign/

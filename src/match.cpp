@@ -268,6 +268,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         } else {
             state.ui_mode = UI_MODE_MENU;
         }
+        sound_play(SOUND_UI_SELECT);
         return;
     }
 
@@ -287,6 +288,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
             return;
         }
 
+        sound_play(SOUND_UI_SELECT);
         if (state.ui_mode == UI_MODE_MENU && button_pressed == 1) {
             state.ui_mode = UI_MODE_NONE;
         } else if (state.ui_mode == UI_MODE_MENU_SURRENDER && button_pressed == 1) {
@@ -319,6 +321,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         state.ui_chat_message = "";
         SDL_SetTextInputRect(&UI_CHAT_RECT);
         SDL_StartTextInput();
+        sound_play(SOUND_UI_SELECT);
         return;
     }
 
@@ -350,6 +353,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
                     input.chat.message_length = (uint8_t)state.ui_chat_message.length() + 1; // The +1 is for the null character
                     strcpy(input.chat.message, &state.ui_chat_message[0]);
                     state.input_queue.push_back(input);
+                    sound_play(SOUND_UI_SELECT);
                 }
 
                 SDL_StopTextInput();
@@ -388,6 +392,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
     // Garrisoned unit icon press
     if (ui_get_garrisoned_index_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        sound_play(SOUND_UI_SELECT);
         state.input_queue.push_back((input_t) {
             .type = INPUT_SINGLE_UNLOAD,
             .single_unload = (input_single_unload_t) {
@@ -398,6 +403,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
     // Selected unit icon press
     if (ui_get_selected_unit_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        sound_play(SOUND_UI_SELECT);
         if (engine.keystate[SDL_SCANCODE_LSHIFT]) {
             ui_deselect_entity_if_selected(state, state.selection[ui_get_selected_unit_hovered(state)]);
         } else {
@@ -409,6 +415,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
     // Building queue icon press
     if (ui_get_building_queue_item_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        sound_play(SOUND_UI_SELECT);
         state.input_queue.push_back((input_t) {
             .type = INPUT_BUILDING_DEQUEUE,
             .building_dequeue = (input_building_dequeue_t) {
@@ -534,6 +541,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         input.rally.building_count = (uint16_t)state.selection.size();
         memcpy(&input.rally.building_ids, &state.selection[0], state.selection.size() * sizeof(entity_id));
         state.input_queue.push_back(input);
+        sound_play(SOUND_FLAG_THUMP);
         return;
     }
 
@@ -897,6 +905,7 @@ void match_update(match_state_t& state) {
                     .vframe = 0,
                     .position = projectile.target.to_xy()
                 });
+                match_play_sound_at(state, SOUND_SMOKE, projectile.position.to_xy());
                 state.projectiles.erase(state.projectiles.begin() + projectile_index);
             } else {
                 projectile.position += ((projectile.target - projectile.position) * PROJECTILE_SMOKE_SPEED) / projectile.position.distance_to(projectile.target);

@@ -4,11 +4,7 @@ todos
  - [ ] - Prevent spawn in place where chicken cannot escape
  - [ ] - Alerts should have sounds paired to them
 sounds
- - [ ] - Rally staff thump
- - [ ] - Bunker destroy
  - [ ] - Unit create notification
  - [ ] - Research complete notification
  - [ ] - Building finished notification
  - [ ] - Under attack notification
- - [ ] - Enter exit bunker shiff
- - [ ] - Mine arm / disarm beeps

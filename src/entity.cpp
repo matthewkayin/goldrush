@@ -968,6 +968,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.direction = enum_direction_to_rect(entity.cell, entity.target.cell, 1);
                         entity.mode = MODE_UNIT_TINKER_THROW;
                         entity.animation = animation_create(ANIMATION_UNIT_ATTACK);
+                        match_play_sound_at(state, SOUND_THROW, entity.position.to_xy());
                         break;
                     }
                     case TARGET_BUILD: {
@@ -1139,6 +1140,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
                             map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false, ENTITY_DATA.at(entity.type).has_detection);
                             ui_deselect_entity_if_selected(state, id);
+                            match_play_sound_at(state, SOUND_GARRISON_IN, target.position.to_xy());
                             update_finished = true;
                             break;
                         }
@@ -1912,7 +1914,7 @@ bool entity_should_flip_h(const entity_t& entity) {
 Sound entity_get_attack_sound(const entity_t& entity) {
     if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
         return SOUND_MUSKET;
-    } else if (entity.type == ENTITY_COWBOY || entity.type == ENTITY_JOCKEY) {
+    } else if (entity.type == ENTITY_COWBOY || entity.type == ENTITY_JOCKEY || entity.type == ENTITY_SPY) {
         return SOUND_GUN;
     } else if (entity.type == ENTITY_BANDIT || entity.type == ENTITY_SOLDIER) {
         return SOUND_SWORD;
@@ -2213,12 +2215,14 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
     }
     
     if (!attack_missed) {
+        xy defender_center_position = entity_is_unit(defender.type) 
+            ? defender.position.to_xy() 
+            : ((defender.cell * TILE_SIZE) + ((xy(entity_cell_size(defender.type), entity_cell_size(defender.type)) * TILE_SIZE) / 2));
         if (attacker.type == ENTITY_CANNON) {
             // Check which enemies we hit. 
             int attacker_damage = ENTITY_DATA.at(attacker.type).unit_data.damage;
-            xy position = defender.position.to_xy();
             SDL_Rect full_damage_rect = (SDL_Rect) {
-                .x = position.x - (TILE_SIZE / 2), .y = position.y - (TILE_SIZE / 2),
+                .x = defender_center_position.x - (TILE_SIZE / 2), .y = defender_center_position.y - (TILE_SIZE / 2),
                 .w = TILE_SIZE, .h = TILE_SIZE
             };
             SDL_Rect splash_damage_rect = (SDL_Rect) {
@@ -2270,7 +2274,7 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
                 .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
                 .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
                 .vframe = 0,
-                .position = defender.position.to_xy()
+                .position = defender_center_position
             });
         }
 
@@ -2499,6 +2503,8 @@ void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garris
 
             // Remove the unit from the garrisoned units list
             entity.garrisoned_units.erase(entity.garrisoned_units.begin() + index);
+
+            match_play_sound_at(state, SOUND_GARRISON_OUT, entity.position.to_xy());
         } else {
             index++;
         }
