@@ -2466,7 +2466,8 @@ void match_render(const match_state_t& state) {
 
     // Minimap entities
     for (const entity_t& entity : state.entities) {
-        if (!entity_is_selectable(entity) || !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
+        if (!entity_is_selectable(entity) || !map_is_cell_rect_revealed(state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) ||
+                (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.map_width)] == 0)) {
             continue;
         }
         SDL_Rect entity_rect = (SDL_Rect) {

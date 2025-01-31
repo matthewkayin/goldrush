@@ -840,6 +840,18 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
         .path = "sfx/mine_destroy",
         .variants = 1
     }},
+    { SOUND_MINE_INSERT, (sound_params_t) {
+        .path = "sfx/mine_insert",
+        .variants = 1
+    }},
+    { SOUND_MINE_ARM, (sound_params_t) {
+        .path = "sfx/mine_arm",
+        .variants = 1
+    }},
+    { SOUND_MINE_PRIME, (sound_params_t) {
+        .path = "sfx/mine_prime",
+        .variants = 1
+    }},
 };
 
 engine_t engine;

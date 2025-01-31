@@ -1001,6 +1001,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         if (entity.target.build.building_type == ENTITY_MINE) {
                             entity_create(state, entity.target.build.building_type, entity.player_id, entity.target.build.building_cell);
+                            match_play_sound_at(state, SOUND_MINE_INSERT, cell_center(entity.target.build.building_cell).to_xy());
 
                             entity.direction = enum_direction_to_rect(entity.cell, entity.target.build.building_cell, entity_cell_size(entity.target.build.building_type));
                             entity.target = (target_t) { .type = TARGET_NONE };
@@ -1544,10 +1545,12 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         }
         int prev_hframe = entity.animation.frame.x;
         animation_update(entity.animation);
-        if (prev_hframe != entity.animation.frame.x && entity.mode == MODE_UNIT_MINE && prev_hframe == 5) {
-            match_play_sound_at(state, SOUND_PICKAXE, entity.position.to_xy());
-        } else if (prev_hframe != entity.animation.frame.x && (entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD) && prev_hframe == 0) {
-            match_play_sound_at(state, SOUND_HAMMER, entity.position.to_xy());
+        if (prev_hframe != entity.animation.frame.x) {
+            if (entity.mode == MODE_UNIT_MINE && prev_hframe == 5) {
+                match_play_sound_at(state, SOUND_PICKAXE, entity.position.to_xy());
+            } else if ((entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD) && prev_hframe == 0) {
+                match_play_sound_at(state, SOUND_HAMMER, entity.position.to_xy());
+            } 
         }
     } else if (entity.type == ENTITY_SMITH) {
         if (entity.queue.empty() && entity.animation.name != ANIMATION_UNIT_IDLE && entity.animation.name != ANIMATION_SMITH_END) {
@@ -1561,7 +1564,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         }
         animation_update(entity.animation);
     } else if (entity.type == ENTITY_MINE && entity.mode == MODE_MINE_PRIME) {
+        int prev_hframe = entity.animation.frame.x;
         animation_update(entity.animation);
+        if (prev_hframe != entity.animation.frame.x) {
+            match_play_sound_at(state, SOUND_MINE_PRIME, entity.position.to_xy());
+        }
     }
 }
 
