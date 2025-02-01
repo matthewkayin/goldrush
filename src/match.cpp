@@ -40,15 +40,15 @@ static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
 static const int UI_MENU_BUTTON_COUNT = 2;
 static const SDL_Rect UI_MENU_BUTTON_RECTS[UI_MENU_BUTTON_COUNT] = {
     (SDL_Rect) {
-        .x = (SCREEN_WIDTH / 2) - 45, .y = UI_MENU_RECT.y + 32,
-        .w = 86, .h = 21
+        .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MENU_RECT.y + 32,
+        .w = 120, .h = 21
     },
     (SDL_Rect) {
-        .x = (SCREEN_WIDTH / 2) - 45, .y = UI_MENU_RECT.y + 32 + 21 + 5,
-        .w = 86, .h = 21
+        .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MENU_RECT.y + 32 + 21 + 5,
+        .w = 120, .h = 21
     },
 };
-static const char* UI_MENU_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "EXIT GAME", "BACK" };
+static const char* UI_MENU_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "LEAVE MATCH", "BACK" };
 static const char* UI_MENU_SURRENDER_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "YES", "BACK" };
 const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
 const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
@@ -179,6 +179,7 @@ match_state_t match_init() {
 
         // Determine player spawn
         int spawn_index = lcg_rand() % player_spawns.size();
+        log_trace("Determining spawn location. spawn size %u spawn index %i", player_spawns.size(), spawn_index);
         xy player_spawn = player_spawns[spawn_index];
         player_spawns.erase(player_spawns.begin() + spawn_index);
         if (player_id == network_get_player_id()) {
@@ -190,6 +191,26 @@ match_state_t match_init() {
         state.player_upgrades_in_progress[player_id] = 0;
         state.map_fog[player_id] = std::vector<int>(state.map_width * state.map_height, FOG_HIDDEN);
         state.map_detection[player_id] = std::vector<int>(state.map_width * state.map_height, 0);
+
+        #ifdef GOLD_DEBUG_FOG_DISABLED
+            state.map_fog[player_id] = std::vector<int>(state.map_width * state.map_height, FOG_EXPLORED);
+            for (uint32_t index = 0; index < state.entities.size(); index++) {
+                entity_t& entity = state.entities[index];
+                if (entity.type == ENTITY_GOLD) {
+                    state.remembered_entities[player_id][state.entities.get_id_of(index)] = (remembered_entity_t) {
+                        .sprite_params = (render_sprite_params_t) {
+                            .sprite = entity_get_sprite(entity),
+                            .frame = entity_get_animation_frame(entity),
+                            .position = entity.position.to_xy(),
+                            .options = 0,
+                            .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
+                        },
+                        .cell = entity.cell,
+                        .cell_size = entity_cell_size(entity.type)
+                    };
+                }
+            }
+        #endif
 
         entity_create(state, ENTITY_WAGON, player_id, player_spawn + xy(1, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 0));
@@ -2012,7 +2033,6 @@ void match_render(const match_state_t& state) {
     }
 
     // Fog of War
-#ifndef GOLD_FOG_DISABLED
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
         for (int y = 0; y < max_visible_tiles.y; y++) {
@@ -2082,7 +2102,6 @@ void match_render(const match_state_t& state) {
         }
     }
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_NONE);
-#endif
 
     // Above fog of war sprites
     for (render_sprite_params_t params : above_fog_render_params) {
@@ -2138,8 +2157,8 @@ void match_render(const match_state_t& state) {
         xy ui_building_cell = ui_get_building_cell(state);
         render_sprite(building_data.sprite, xy(3, 0), (ui_building_cell * TILE_SIZE) - state.camera_offset, 0, network_get_player(network_get_player_id()).recolor_id);
 
-        bool is_placement_out_of_bounds = ui_building_cell.x + building_data.cell_size >= state.map_width ||
-                                          ui_building_cell.y + building_data.cell_size >= state.map_height;
+        bool is_placement_out_of_bounds = ui_building_cell.x + building_data.cell_size > state.map_width ||
+                                          ui_building_cell.y + building_data.cell_size > state.map_height;
         SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
         xy miner_cell = state.entities.get_by_id(ui_get_nearest_builder(state, state.selection, ui_building_cell)).cell;
         for (int x = ui_building_cell.x; x < ui_building_cell.x + building_data.cell_size; x++) {
@@ -2549,7 +2568,7 @@ void match_render(const match_state_t& state) {
     }
 
     // Minimap Fog of War
-#ifndef GOLD_FOG_DISABLED
+#ifndef GOLD_DEBUG_FOG_DISABLED
     std::vector<SDL_Point> fog_hidden_points;
     fog_hidden_points.reserve(state.map_width * state.map_height);
     std::vector<SDL_Point> fog_explored_points;

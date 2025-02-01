@@ -1,3 +1,16 @@
 todos
- - [ ] - Prevent bad gold clustes on map creation
- - [ ] - Prevent spawn in place where chicken cannot escape
+ - [x] - Prevent spawn in place where chicken cannot escape
+ - [x] - Bug: buildings can't be placed at the edge of the map
+ - [ ] - Replays
+ - [ ] - Customizable map size ? or at least dynamic based on player count
+ - [ ] - Team games
+ - [ ] - Options menu
+    - [ ] - Volume slider for sound
+    - [ ] - Volume slider for music
+    - [ ] - Fullscreen
+    - [ ] - Keybinds?
+    - [ ] - Resolution w/ black boxes for people with different aspect ratios
+    - [ ] - Mouse sensitivity
+    - [ ] - Camera scroll sensitivity
+    - [ ] - Minimap player color as not-green
+    - [ ] - Colorblind modes

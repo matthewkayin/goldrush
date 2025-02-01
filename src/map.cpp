@@ -516,10 +516,6 @@ std::vector<xy> map_init(match_state_t& state) {
     const xy player_spawn_size = xy(4, 2);
     const int player_spawn_margin = 8;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (network_get_player(player_id).status == PLAYER_STATUS_NONE) {
-            continue;
-        }
-
         // Chooses diagonal directions clockwise beginning with NE
         int spawn_direction = 1 + (player_id * 2);
 
