@@ -283,6 +283,19 @@ enum Sound {
     SOUND_COUNT
 };
 
+// Options
+
+enum Display {
+    DISPLAY_WINDOWED,
+    DISPLAY_FULLSCREEN,
+    DISPLAY_BORDERLESS
+};
+
+struct options_t {
+    Display display;
+    bool vsync;
+};
+
 struct engine_t {
     SDL_Window* window;
     SDL_Renderer* renderer;
@@ -301,6 +314,7 @@ struct engine_t {
     xy mouse_position;
     Cursor current_cursor;
     bool render_debug_info;
+    options_t options;
 };
 extern engine_t engine;
 
@@ -310,6 +324,10 @@ void engine_destroy_renderer();
 void engine_quit();
 
 void engine_set_cursor(Cursor cursor);
+void engine_set_display(Display display);
+
+void engine_load_options();
+void engine_save_options();
 
 enum TextAnchor {
     TEXT_ANCHOR_TOP_LEFT,

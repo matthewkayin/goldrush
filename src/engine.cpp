@@ -4,6 +4,7 @@
 #include "asserts.h"
 #include "animation.h"
 #include "lcg.h"
+#include <fstream>
 #include <unordered_map>
 
 const player_color_t PLAYER_COLORS[MAX_PLAYERS] = {
@@ -890,9 +891,17 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
     }},
 };
 
+static const char* OPTIONS_PATH = "./options.ini";
+static const options_t OPTIONS_DEFAULT = (options_t) {
+    .display = DISPLAY_BORDERLESS,
+    .vsync = true
+};
+
 engine_t engine;
 
 bool engine_init() {
+    engine_load_options();
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
         return false;
@@ -954,12 +963,17 @@ bool engine_init() {
     engine.keystate = SDL_GetKeyboardState(NULL);
     engine.render_debug_info = false;
 
+    engine_set_display(engine.options.display);
+
     log_info("%s initialized.", APP_NAME);
     return true;
 }
 
 bool engine_init_renderer() {
-    uint32_t renderer_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
+    uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
+    if (engine.options.vsync) {
+        renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
+    }
     engine.renderer = SDL_CreateRenderer(engine.window, -1, renderer_flags);
     if (engine.renderer == NULL) {
         log_error("Error creating renderer: %s", SDL_GetError());
@@ -1390,6 +1404,8 @@ void engine_destroy_renderer() {
 }
 
 void engine_quit() {
+    engine_save_options();
+
     engine_destroy_renderer();
     SDL_DestroyWindow(engine.window);
 
@@ -1411,6 +1427,52 @@ void engine_set_cursor(Cursor cursor) {
     }
     engine.current_cursor = cursor;
     SDL_SetCursor(engine.cursors[cursor]);
+}
+
+void engine_set_display(Display display) {
+    if (display == DISPLAY_WINDOWED) {
+        SDL_SetWindowFullscreen(engine.window, 0);
+    } else if (display == DISPLAY_BORDERLESS) {
+        SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    } else {
+        SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN);
+    }
+}
+
+void engine_load_options() {
+    engine.options = OPTIONS_DEFAULT;
+
+    std::ifstream options_file(OPTIONS_PATH);
+    if (!options_file.is_open()) {
+        log_error("Could not open options file for reading.");
+        return;
+    }
+
+    std::string line;
+    while (std::getline(options_file, line)) {
+        size_t equals_index = line.find('=');
+        std::string key = line.substr(0, equals_index);
+        std::string value = line.substr(equals_index + 1);
+
+        if (key == "display") {
+            engine.options.display = (Display)std::stoi(value);
+        } else if (key == "vsync") {
+            engine.options.vsync = (bool)std::stoi(value);
+        }
+    }
+}
+
+void engine_save_options() {
+    FILE* options_file = fopen(OPTIONS_PATH, "w");
+    if (options_file == NULL) {
+        log_error("Could not open options file for writing.");
+        return;
+    }
+
+    fprintf(options_file, "display=%i\n", (int)engine.options.display);
+    fprintf(options_file, "vsync=%i", (int)engine.options.vsync);
+
+    fclose(options_file);
 }
 
 // RENDER
