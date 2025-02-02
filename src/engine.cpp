@@ -6,6 +6,7 @@
 #include "lcg.h"
 #include <fstream>
 #include <unordered_map>
+#include <string>
 
 const player_color_t PLAYER_COLORS[MAX_PLAYERS] = {
     (player_color_t) {
@@ -926,12 +927,6 @@ bool engine_init() {
         return false;
     }
 
-    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, SDL_WINDOW_SHOWN);
-    if (engine.window == NULL) {
-        log_error("Error creating window: %s", SDL_GetError());
-        return false;
-    }
-
     animation_init();
 
     if (!engine_init_renderer()) {
@@ -963,13 +958,24 @@ bool engine_init() {
     engine.keystate = SDL_GetKeyboardState(NULL);
     engine.render_debug_info = false;
 
-    engine_set_display(engine.options.display);
-
     log_info("%s initialized.", APP_NAME);
     return true;
 }
 
 bool engine_init_renderer() {
+    uint32_t window_flags = SDL_WINDOW_SHOWN;
+    if (engine.options.display == DISPLAY_FULLSCREEN) {
+        window_flags |= SDL_WINDOW_FULLSCREEN;
+    } else if (engine.options.display == DISPLAY_BORDERLESS) {
+        window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, window_flags);
+    if (engine.window == NULL) {
+        log_error("Error creating window: %s", SDL_GetError());
+        return false;
+    }
+
+
     uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
     if (engine.options.vsync) {
         renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
@@ -1400,6 +1406,7 @@ void engine_destroy_renderer() {
     }
 
     SDL_DestroyRenderer(engine.renderer);
+    SDL_DestroyWindow(engine.window);
     log_info("Destroyed renderer.");
 }
 
@@ -1407,7 +1414,6 @@ void engine_quit() {
     engine_save_options();
 
     engine_destroy_renderer();
-    SDL_DestroyWindow(engine.window);
 
     for (int i = 0; i < engine.sounds.size(); i++) {
         Mix_FreeChunk(engine.sounds[i]);
@@ -1427,16 +1433,6 @@ void engine_set_cursor(Cursor cursor) {
     }
     engine.current_cursor = cursor;
     SDL_SetCursor(engine.cursors[cursor]);
-}
-
-void engine_set_display(Display display) {
-    if (display == DISPLAY_WINDOWED) {
-        SDL_SetWindowFullscreen(engine.window, 0);
-    } else if (display == DISPLAY_BORDERLESS) {
-        SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-    } else {
-        SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN);
-    }
 }
 
 void engine_load_options() {

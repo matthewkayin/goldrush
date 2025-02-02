@@ -324,7 +324,6 @@ void engine_destroy_renderer();
 void engine_quit();
 
 void engine_set_cursor(Cursor cursor);
-void engine_set_display(Display display);
 
 void engine_load_options();
 void engine_save_options();
