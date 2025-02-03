@@ -4,6 +4,7 @@
 #include "engine.h"
 #include "network.h"
 #include "animation.h"
+#include "options.h"
 
 #include <string>
 
@@ -69,6 +70,8 @@ struct menu_state_t {
     int parallax_cloud_x;
     int parallax_timer;
     int parallax_cactus_offset;
+
+    options_menu_state_t options_state;
 };
 
 menu_state_t menu_init();
@@ -80,6 +83,4 @@ bool menu_is_button_disabled(const menu_state_t& state, MenuButton button);
 void menu_render(const menu_state_t& state);
 SDL_Rect menu_get_lobby_text_frame_rect(int lobby_index);
 void menu_render_lobby_text(const menu_state_t& state, int lobby_index);
-void menu_render_menu_button(MenuButton button, bool hovered);
-SDL_Rect menu_get_button_rect(MenuButton button);
 SDL_Rect menu_get_dropdown_rect(int index);

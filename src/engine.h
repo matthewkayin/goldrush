@@ -285,16 +285,31 @@ enum Sound {
 
 // Options
 
-enum Display {
-    DISPLAY_WINDOWED,
-    DISPLAY_FULLSCREEN,
-    DISPLAY_BORDERLESS
+enum Option {
+    OPTION_DISPLAY,
+    OPTION_VSYNC,
+    OPTION_COUNT
 };
 
-struct options_t {
-    Display display;
-    bool vsync;
+enum OptionValueDisplay {
+    DISPLAY_WINDOWED,
+    DISPLAY_FULLSCREEN,
+    DISPLAY_BORDERLESS,
+    DISPLAY_COUNT
 };
+
+enum OptionValueVsync {
+    VSYNC_DISABLED,
+    VSYNC_ENABLED,
+    VSYNC_COUNT
+};
+
+struct option_data_t {
+    uint32_t value_count;
+    uint32_t default_value;
+    bool confirm_required;
+};
+extern std::unordered_map<Option, option_data_t> OPTION_DATA;
 
 struct engine_t {
     SDL_Window* window;
@@ -314,17 +329,20 @@ struct engine_t {
     xy mouse_position;
     Cursor current_cursor;
     bool render_debug_info;
-    options_t options;
+    std::unordered_map<Option, int> options;
 };
 extern engine_t engine;
 
 bool engine_init();
-bool engine_init_renderer();
+bool engine_init_renderer(const std::unordered_map<Option, int>& options);
 void engine_destroy_renderer();
 void engine_quit();
 
 void engine_set_cursor(Cursor cursor);
 
+const char* engine_option_name_str(Option option);
+const char* engine_option_value_str(Option option, int value);
+void engine_set_options_to_default(std::unordered_map<Option, int>& options);
 void engine_load_options();
 void engine_save_options();
 
@@ -357,5 +375,7 @@ void render_ninepatch(Sprite sprite, const SDL_Rect& rect, int patch_margin);
 
 void render_text_with_text_frame(Sprite sprite, Font font, const char* text, xy position, xy text_offset, bool center_text = true);
 SDL_Rect get_text_with_text_frame_rect(Sprite sprite, Font font, const char* text, xy position);
+void render_menu_button(const char* text, xy position, bool hovered);
+SDL_Rect render_get_button_rect(const char* text, xy position);
 
 void sound_play(Sound sound);

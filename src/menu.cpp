@@ -123,10 +123,17 @@ menu_state_t menu_init() {
     state.parallax_timer = PARALLAX_TIMER_DURATION;
     state.parallax_cactus_offset = 0;
 
+    state.options_state.mode = OPTION_MENU_CLOSED;
+
     return state;
 }
 
 void menu_handle_input(menu_state_t& state, SDL_Event event) {
+    if (state.options_state.mode != OPTION_MENU_CLOSED) {
+        options_menu_handle_input(state.options_state, event);
+        return;
+    }
+
     // Mouse pressed
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         if (state.mode == MENU_MODE_LOBBY && state.dropdown_open) {
@@ -146,6 +153,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     break;
                 }
                 case MENU_BUTTON_OPTIONS: {
+                    state.options_state = options_menu_open();
                     break;
                 }
                 case MENU_BUTTON_EXIT: {
@@ -323,9 +331,27 @@ void menu_update(menu_state_t& state) {
         }
     }
 
+    engine_set_cursor(CURSOR_DEFAULT);
+
+    animation_update(state.wagon_animation);
+    state.parallax_timer--;
+    state.parallax_x = (state.parallax_x + 1) % (SCREEN_WIDTH * 2);
+    if (state.parallax_timer == 0) {
+        state.parallax_cloud_x = (state.parallax_cloud_x + 1) % (SCREEN_WIDTH * 2);
+        if (state.parallax_x == 0) {
+            state.parallax_cactus_offset = (state.parallax_cactus_offset + 1) % 5;
+        }
+        state.parallax_timer = PARALLAX_TIMER_DURATION;
+    }
+
     state.hover = (menu_hover_t) {
         .type = MENU_HOVER_NONE
     };
+    if (state.options_state.mode != OPTION_MENU_CLOSED) {
+        options_menu_update(state.options_state);
+        return;
+    }
+
     if (SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE && !state.dropdown_open) {
         auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
         if (mode_buttons_it != MODE_BUTTONS.end()) {
@@ -334,7 +360,8 @@ void menu_update(menu_state_t& state) {
                     continue;
                 }
 
-                SDL_Rect button_rect = menu_get_button_rect(button);
+                const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);
+                SDL_Rect button_rect = render_get_button_rect(button_data.text, xy(button_data.position_x, button_data.position_y));
                 if (sdl_rect_has_point(button_rect, engine.mouse_position)) {
                     state.hover = (menu_hover_t) {
                         .type = MENU_HOVER_BUTTON,
@@ -406,19 +433,6 @@ void menu_update(menu_state_t& state) {
                 }
             }
         }
-    }
-
-    engine_set_cursor(CURSOR_DEFAULT);
-
-    animation_update(state.wagon_animation);
-    state.parallax_timer--;
-    state.parallax_x = (state.parallax_x + 1) % (SCREEN_WIDTH * 2);
-    if (state.parallax_timer == 0) {
-        state.parallax_cloud_x = (state.parallax_cloud_x + 1) % (SCREEN_WIDTH * 2);
-        if (state.parallax_x == 0) {
-            state.parallax_cactus_offset = (state.parallax_cactus_offset + 1) % 5;
-        }
-        state.parallax_timer = PARALLAX_TIMER_DURATION;
     }
 }
 
@@ -658,8 +672,14 @@ void menu_render(const menu_state_t& state) {
                 continue;
             }
             
-            menu_render_menu_button(button, state.hover.type == MENU_HOVER_BUTTON && button == state.hover.button);
+            const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);
+            render_menu_button(button_data.text, xy(button_data.position_x, button_data.position_y), state.hover.type == MENU_HOVER_BUTTON && button == state.hover.button);
         }
+    }
+
+    if (state.options_state.mode != OPTION_MENU_CLOSED) {
+        options_menu_render(state.options_state);
+        return;
     }
 }
 
@@ -704,38 +724,6 @@ void menu_render_lobby_text(const menu_state_t& state, int lobby_index) {
 
     xy text_position_offset = xy(((frame_width * 15) / 2) - (text_size.x / 2), 0); 
     render_text(text_hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, lobby_text, position + text_position_offset);
-}
-
-void menu_render_menu_button(MenuButton button, bool hovered) {
-    const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);
-    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, button_data.text);
-    if (text_size.x % 8 != 0) {
-        text_size.x = ((text_size.x / 8) + 1) * 8;
-    }
-    text_size.x += 16;
-
-    int frame_count = text_size.x / 8;
-    for (int frame = 0; frame < frame_count; frame++) {
-        int hframe = 1;
-        if (frame == 0) {
-            hframe = 0;
-        } else if (frame == frame_count - 1) {
-            hframe = 2;
-        }
-        render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(hframe, (int)hovered), xy(button_data.position_x + (8 * frame), button_data.position_y + (hovered ? -1 : 0)), RENDER_SPRITE_NO_CULL);
-    }
-
-    render_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, button_data.text, xy(button_data.position_x + 5, button_data.position_y + 5 + (hovered ? -1 : 0)));
-}
-
-SDL_Rect menu_get_button_rect(MenuButton button) {
-    const menu_button_t& button_data = MENU_BUTTON_DATA.at(button);
-    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, button_data.text);
-    if (text_size.x % 8 != 0) {
-        text_size.x = ((text_size.x / 8) + 1) * 8;
-    }
-    text_size.x += 16;
-    return (SDL_Rect) { .x = button_data.position_x, .y = button_data.position_y, .w = text_size.x, .h = engine.sprites[SPRITE_UI_PARCHMENT_BUTTONS].frame_size.y };
 }
 
 SDL_Rect menu_get_dropdown_rect(int index) {

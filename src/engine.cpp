@@ -892,12 +892,6 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
     }},
 };
 
-static const char* OPTIONS_PATH = "./options.ini";
-static const options_t OPTIONS_DEFAULT = (options_t) {
-    .display = DISPLAY_BORDERLESS,
-    .vsync = true
-};
-
 engine_t engine;
 
 bool engine_init() {
@@ -929,7 +923,7 @@ bool engine_init() {
 
     animation_init();
 
-    if (!engine_init_renderer()) {
+    if (!engine_init_renderer(engine.options)) {
         return false;
     }
 
@@ -962,11 +956,11 @@ bool engine_init() {
     return true;
 }
 
-bool engine_init_renderer() {
+bool engine_init_renderer(const std::unordered_map<Option, int>& options) {
     uint32_t window_flags = SDL_WINDOW_SHOWN;
-    if (engine.options.display == DISPLAY_FULLSCREEN) {
+    if (options.at(OPTION_DISPLAY) == DISPLAY_FULLSCREEN) {
         window_flags |= SDL_WINDOW_FULLSCREEN;
-    } else if (engine.options.display == DISPLAY_BORDERLESS) {
+    } else if (options.at(OPTION_DISPLAY) == DISPLAY_BORDERLESS) {
         window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
     engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, window_flags);
@@ -977,7 +971,7 @@ bool engine_init_renderer() {
 
 
     uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
-    if (engine.options.vsync) {
+    if (options.at(OPTION_VSYNC) == VSYNC_ENABLED) {
         renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
     }
     engine.renderer = SDL_CreateRenderer(engine.window, -1, renderer_flags);
@@ -1435,8 +1429,70 @@ void engine_set_cursor(Cursor cursor) {
     SDL_SetCursor(engine.cursors[cursor]);
 }
 
+static const char* OPTIONS_PATH = "./options.ini";
+
+std::unordered_map<Option, option_data_t> OPTION_DATA = {
+    { OPTION_DISPLAY, (option_data_t) {
+        .value_count = DISPLAY_COUNT,
+        .default_value = DISPLAY_BORDERLESS,
+        .confirm_required = true
+    }},
+    { OPTION_VSYNC, (option_data_t) {
+        .value_count = VSYNC_COUNT,
+        .default_value = VSYNC_ENABLED,
+        .confirm_required = true
+    }}
+};
+
+
+const char* engine_option_name_str(Option option) {
+    switch (option) {
+        case OPTION_DISPLAY:
+            return "Display";
+        case OPTION_VSYNC:
+            return "Vsync";
+        case OPTION_COUNT:
+            return "";
+    }
+}
+
+const char* engine_option_value_str(Option option, int value) {
+    switch (option) {
+        case OPTION_DISPLAY: {
+            switch ((OptionValueDisplay)value) {
+                case DISPLAY_WINDOWED:
+                    return "Windowed";
+                case DISPLAY_FULLSCREEN:
+                    return "Fullscreen";
+                case DISPLAY_BORDERLESS:
+                    return "Borderless";
+                default:
+                    return "";
+            }
+        }
+        case OPTION_VSYNC: {
+            switch ((OptionValueVsync)value) {
+                case VSYNC_DISABLED:
+                    return "Disabled";
+                case VSYNC_ENABLED:
+                    return "Enabled";
+                default:
+                    return "";
+            }
+        }
+        default:
+            return "";
+    }
+}
+
+void engine_set_options_to_default(std::unordered_map<Option, int>& options) {
+    for (int option = 0; option < OPTION_COUNT; option++) {
+        options[(Option)option] = OPTION_DATA.at((Option)option).default_value;
+    }
+}
+
 void engine_load_options() {
-    engine.options = OPTIONS_DEFAULT;
+    engine_set_options_to_default(engine.options);
 
     std::ifstream options_file(OPTIONS_PATH);
     if (!options_file.is_open()) {
@@ -1450,10 +1506,15 @@ void engine_load_options() {
         std::string key = line.substr(0, equals_index);
         std::string value = line.substr(equals_index + 1);
 
-        if (key == "display") {
-            engine.options.display = (Display)std::stoi(value);
-        } else if (key == "vsync") {
-            engine.options.vsync = (bool)std::stoi(value);
+        int option;
+        for (option = 0; option < OPTION_COUNT; option++) {
+            if (key == std::string(engine_option_name_str((Option)option))) {
+                engine.options[(Option)option] = std::stoi(value);
+                break;
+            }
+        }
+        if (option == OPTION_COUNT) {
+            log_warn("Unrecognized option key %s with value %s", key.c_str(), value.c_str());
         }
     }
 }
@@ -1465,8 +1526,9 @@ void engine_save_options() {
         return;
     }
 
-    fprintf(options_file, "display=%i\n", (int)engine.options.display);
-    fprintf(options_file, "vsync=%i", (int)engine.options.vsync);
+    for (int option = 0; option < OPTION_COUNT; option++) {
+        fprintf(options_file, "%s=%i\n", engine_option_name_str((Option)option), engine.options[(Option)option]);
+    }
 
     fclose(options_file);
 }
@@ -1763,6 +1825,37 @@ SDL_Rect get_text_with_text_frame_rect(Sprite sprite, Font font, const char* tex
         .h = engine.sprites[sprite].frame_size.y 
     };
 }
+
+void render_menu_button(const char* text, xy position, bool hovered) {
+    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
+    if (text_size.x % 8 != 0) {
+        text_size.x = ((text_size.x / 8) + 1) * 8;
+    }
+    text_size.x += 16;
+
+    int frame_count = text_size.x / 8;
+    for (int frame = 0; frame < frame_count; frame++) {
+        int hframe = 1;
+        if (frame == 0) {
+            hframe = 0;
+        } else if (frame == frame_count - 1) {
+            hframe = 2;
+        }
+        render_sprite(SPRITE_UI_PARCHMENT_BUTTONS, xy(hframe, (int)hovered), xy(position.x + (8 * frame), position.y + (hovered ? -1 : 0)), RENDER_SPRITE_NO_CULL);
+    }
+
+    render_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, text, xy(position.x + 5, position.y + 5 + (hovered ? -1 : 0)));
+}
+
+SDL_Rect render_get_button_rect(const char* text, xy position) {
+    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
+    if (text_size.x % 8 != 0) {
+        text_size.x = ((text_size.x / 8) + 1) * 8;
+    }
+    text_size.x += 16;
+    return (SDL_Rect) { .x = position.x, .y = position.y, .w = text_size.x, .h = engine.sprites[SPRITE_UI_PARCHMENT_BUTTONS].frame_size.y };
+}
+
 
 // SOUND
 

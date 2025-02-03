@@ -4,6 +4,7 @@ todos
  - [ ] - Replays
  - [ ] - Customizable map size ? or at least dynamic based on player count
  - [ ] - Team games
+ - [ ] - On release build, always grab mouse
  - [ ] - Options menu
     - [ ] - Volume slider for sound
     - [ ] - Volume slider for music
