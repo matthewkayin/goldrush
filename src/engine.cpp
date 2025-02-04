@@ -957,13 +957,17 @@ bool engine_init() {
 }
 
 bool engine_init_renderer(const std::unordered_map<Option, int>& options) {
+    SDL_DisplayMode display_mode;
+    SDL_GetCurrentDisplayMode(0, &display_mode);
+
     uint32_t window_flags = SDL_WINDOW_SHOWN;
+    xy window_size = options.at(OPTION_DISPLAY) == DISPLAY_WINDOWED ? xy(1280, 720) : xy(display_mode.w, display_mode.h);
     if (options.at(OPTION_DISPLAY) == DISPLAY_FULLSCREEN) {
         window_flags |= SDL_WINDOW_FULLSCREEN;
     } else if (options.at(OPTION_DISPLAY) == DISPLAY_BORDERLESS) {
         window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
-    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, window_flags);
+    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, window_flags);
     if (engine.window == NULL) {
         log_error("Error creating window: %s", SDL_GetError());
         return false;
@@ -1444,7 +1448,6 @@ std::unordered_map<Option, option_data_t> OPTION_DATA = {
     }}
 };
 
-
 const char* engine_option_name_str(Option option) {
     switch (option) {
         case OPTION_DISPLAY:
@@ -1492,13 +1495,10 @@ void engine_apply_option(Option option, int value) {
 
     engine.options[option] = value;
     switch (option) {
-        case OPTION_DISPLAY: {
+        case OPTION_DISPLAY:
+        case OPTION_VSYNC: {
             engine_destroy_renderer();
             engine_init_renderer(engine.options);
-            break;
-        }
-        case OPTION_VSYNC: {
-            SDL_RenderSetVSync(engine.renderer, value == VSYNC_ENABLED);
             break;
         }
         case OPTION_COUNT: {
