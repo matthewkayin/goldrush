@@ -2507,18 +2507,14 @@ void match_render(const match_state_t& state) {
         SDL_Color color;
         if (entity.type == ENTITY_GOLD) {
             color = COLOR_GOLD;
-        } else if (entity.player_id == network_get_player_id()) {
+        } else if (entity.taking_damage_timer != 0 && (entity.taking_damage_timer / MATCH_TAKING_DAMAGE_FLICKER_DURATION) % 2 == 0) {
             /*
              * This code is too smart for it's own good so let me explain:
              * entity_damage_timer will begin at 30 and it should cause us to flicker between red and green in intervals of 10 (MATCH_TAKING_DAMAGE_FLICKER_DURATION)
              * if you take entity_damage_timer / 10 you get an int depending on where in the range you are. 5 / 10 = 0, 15 / 10 = 1, 25 / 10 = 2, so the even numbers
              * in this range is where we want the flicker to occur and the odd numbers is where we want to not flicker
             */
-            if (entity.taking_damage_timer != 0 && (entity.taking_damage_timer / MATCH_TAKING_DAMAGE_FLICKER_DURATION) % 2 == 0) {
-                color = COLOR_RED;
-            } else {
-                color = COLOR_GREEN;
-            }
+           color = COLOR_WHITE;
         } else {
             color = PLAYER_COLORS[network_get_player(entity.player_id).recolor_id].clothes_color;
         }

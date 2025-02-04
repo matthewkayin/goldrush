@@ -307,7 +307,6 @@ enum OptionValueVsync {
 struct option_data_t {
     uint32_t value_count;
     uint32_t default_value;
-    bool confirm_required;
 };
 extern std::unordered_map<Option, option_data_t> OPTION_DATA;
 
