@@ -923,8 +923,51 @@ bool engine_init() {
 
     animation_init();
 
-    if (!engine_init_renderer(engine.options)) {
+    SDL_DisplayMode display_mode;
+    SDL_GetCurrentDisplayMode(0, &display_mode);
+
+    uint32_t window_flags = SDL_WINDOW_SHOWN;
+    xy window_size = engine.options.at(OPTION_DISPLAY) == DISPLAY_WINDOWED ? xy(1280, 720) : xy(display_mode.w, display_mode.h);
+    if (engine.options.at(OPTION_DISPLAY) == DISPLAY_FULLSCREEN) {
+        window_flags |= SDL_WINDOW_FULLSCREEN;
+    } else if (engine.options.at(OPTION_DISPLAY) == DISPLAY_BORDERLESS) {
+        window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, window_flags);
+    if (engine.window == NULL) {
+        log_error("Error creating window: %s", SDL_GetError());
         return false;
+    }
+
+    uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
+    if (engine.options.at(OPTION_VSYNC) == VSYNC_ENABLED) {
+        renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
+    }
+    engine.renderer = SDL_CreateRenderer(engine.window, -1, renderer_flags);
+    if (engine.renderer == NULL) {
+        log_error("Error creating renderer: %s", SDL_GetError());
+        return false;
+    }
+    SDL_RenderSetLogicalSize(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+    SDL_SetRenderTarget(engine.renderer, NULL);
+
+    if (!engine_load_textures()) {
+        return false;
+    }
+
+    SDL_RendererInfo renderer_info;
+    SDL_GetRendererInfo(engine.renderer, &renderer_info);
+
+    log_info("Initialized %s renderer.", renderer_info.name);
+
+    bool renderer_supports_argb8888 = false;
+    for (uint32_t i = 0; i < renderer_info.num_texture_formats; i++) {
+        if (renderer_info.texture_formats[i] == SDL_PIXELFORMAT_ARGB8888) {
+            renderer_supports_argb8888 = true;
+        }
+    }
+    if (!renderer_supports_argb8888) {
+        log_warn("Renderer does not support ARGB8888.");
     }
 
     // Load sound effects
@@ -956,36 +999,7 @@ bool engine_init() {
     return true;
 }
 
-bool engine_init_renderer(const std::unordered_map<Option, int>& options) {
-    SDL_DisplayMode display_mode;
-    SDL_GetCurrentDisplayMode(0, &display_mode);
-
-    uint32_t window_flags = SDL_WINDOW_SHOWN;
-    xy window_size = options.at(OPTION_DISPLAY) == DISPLAY_WINDOWED ? xy(1280, 720) : xy(display_mode.w, display_mode.h);
-    if (options.at(OPTION_DISPLAY) == DISPLAY_FULLSCREEN) {
-        window_flags |= SDL_WINDOW_FULLSCREEN;
-    } else if (options.at(OPTION_DISPLAY) == DISPLAY_BORDERLESS) {
-        window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-    }
-    engine.window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, window_flags);
-    if (engine.window == NULL) {
-        log_error("Error creating window: %s", SDL_GetError());
-        return false;
-    }
-
-
-    uint32_t renderer_flags = SDL_RENDERER_ACCELERATED;
-    if (options.at(OPTION_VSYNC) == VSYNC_ENABLED) {
-        renderer_flags |= SDL_RENDERER_PRESENTVSYNC;
-    }
-    engine.renderer = SDL_CreateRenderer(engine.window, -1, renderer_flags);
-    if (engine.renderer == NULL) {
-        log_error("Error creating renderer: %s", SDL_GetError());
-        return false;
-    }
-    SDL_RenderSetLogicalSize(engine.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
-    SDL_SetRenderTarget(engine.renderer, NULL);
-
+bool engine_load_textures() {
     // Load fonts
     log_trace("Loading fonts...");
     engine.fonts.reserve(FONT_COUNT);
@@ -1350,24 +1364,10 @@ bool engine_init_renderer(const std::unordered_map<Option, int>& options) {
     engine.current_cursor = CURSOR_DEFAULT;
     SDL_SetCursor(engine.cursors[CURSOR_DEFAULT]);
 
-    SDL_RendererInfo renderer_info;
-    SDL_GetRendererInfo(engine.renderer, &renderer_info);
-
-    log_info("Initialized %s renderer.", renderer_info.name);
-
-    bool renderer_supports_argb8888 = false;
-    for (uint32_t i = 0; i < renderer_info.num_texture_formats; i++) {
-        if (renderer_info.texture_formats[i] == SDL_PIXELFORMAT_ARGB8888) {
-            renderer_supports_argb8888 = true;
-        }
-    }
-    if (!renderer_supports_argb8888) {
-        log_warn("Renderer does not support ARGB8888.");
-    }
     return true;
 }
 
-void engine_destroy_renderer() {
+void engine_free_textures() {
     // Free fonts
     for (font_t font : engine.fonts) {
         for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
@@ -1403,15 +1403,14 @@ void engine_destroy_renderer() {
         engine.minimap_tiles_texture = NULL;
     }
 
-    SDL_DestroyRenderer(engine.renderer);
-    SDL_DestroyWindow(engine.window);
-    log_info("Destroyed renderer.");
 }
 
 void engine_quit() {
     engine_save_options();
 
-    engine_destroy_renderer();
+    engine_free_textures();
+    SDL_DestroyRenderer(engine.renderer);
+    SDL_DestroyWindow(engine.window);
 
     for (int i = 0; i < engine.sounds.size(); i++) {
         Mix_FreeChunk(engine.sounds[i]);
@@ -1438,13 +1437,11 @@ static const char* OPTIONS_PATH = "./options.ini";
 std::unordered_map<Option, option_data_t> OPTION_DATA = {
     { OPTION_DISPLAY, (option_data_t) {
         .value_count = DISPLAY_COUNT,
-        .default_value = DISPLAY_BORDERLESS,
-        .confirm_required = true
+        .default_value = DISPLAY_BORDERLESS
     }},
     { OPTION_VSYNC, (option_data_t) {
         .value_count = VSYNC_COUNT,
-        .default_value = VSYNC_ENABLED,
-        .confirm_required = true
+        .default_value = VSYNC_ENABLED
     }}
 };
 
@@ -1495,10 +1492,22 @@ void engine_apply_option(Option option, int value) {
 
     engine.options[option] = value;
     switch (option) {
-        case OPTION_DISPLAY:
+        case OPTION_DISPLAY: {
+            if (engine.options[option] == DISPLAY_WINDOWED) {
+                SDL_SetWindowFullscreen(engine.window, 0);
+            } else if (engine.options[option] == DISPLAY_FULLSCREEN) {
+                SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN);
+            } else if (engine.options[option] == DISPLAY_FULLSCREEN) {
+                SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+            }
+            engine_free_textures();
+            engine_load_textures();
+            break;
+        }
         case OPTION_VSYNC: {
-            engine_destroy_renderer();
-            engine_init_renderer(engine.options);
+            SDL_RenderSetVSync(engine.renderer, engine.options[option] == VSYNC_ENABLED);
+            engine_free_textures();
+            engine_load_textures();
             break;
         }
         case OPTION_COUNT: {

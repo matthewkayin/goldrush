@@ -333,8 +333,8 @@ struct engine_t {
 extern engine_t engine;
 
 bool engine_init();
-bool engine_init_renderer(const std::unordered_map<Option, int>& options);
-void engine_destroy_renderer();
+bool engine_load_textures();
+void engine_free_textures();
 void engine_quit();
 
 void engine_set_cursor(Cursor cursor);
