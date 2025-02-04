@@ -6,18 +6,14 @@
 enum OptionMenuMode {
     OPTION_MENU_CLOSED,
     OPTION_MENU_OPEN,
-    OPTION_MENU_DROPDOWN,
-    OPTION_MENU_CONFIRM_CHANGES
+    OPTION_MENU_DROPDOWN
 };
 
 enum OptionMenuHover {
     OPTION_HOVER_NONE,
     OPTION_HOVER_BACK,
-    OPTION_HOVER_APPLY,
     OPTION_HOVER_DROPDOWN,
-    OPTION_HOVER_DROPDOWN_ITEM,
-    OPTION_HOVER_CONFIRM_NO,
-    OPTION_HOVER_CONFIRM_YES
+    OPTION_HOVER_DROPDOWN_ITEM
 };
 
 struct options_menu_state_t {
@@ -25,8 +21,6 @@ struct options_menu_state_t {
     OptionMenuHover hover;
     int hover_subindex;
     int dropdown_chosen;
-    std::unordered_map<Option, int> pending_changes;
-    uint32_t confirm_changes_timer;
 };
 
 options_menu_state_t options_menu_open();

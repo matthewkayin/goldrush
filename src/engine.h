@@ -342,7 +342,7 @@ void engine_set_cursor(Cursor cursor);
 
 const char* engine_option_name_str(Option option);
 const char* engine_option_value_str(Option option, int value);
-void engine_set_options_to_default(std::unordered_map<Option, int>& options);
+void engine_apply_option(Option option, int value);
 void engine_load_options();
 void engine_save_options();
 

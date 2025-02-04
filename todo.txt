@@ -6,9 +6,11 @@ todos
  - [ ] - Team games
  - [ ] - On release build, always grab mouse
  - [ ] - Options menu
+    - [x] - Fullscreen
+    - [x] - Vsync
+    - [ ] - BUG: sticky mouse?
     - [ ] - Volume slider for sound
     - [ ] - Volume slider for music
-    - [ ] - Fullscreen
     - [ ] - Keybinds?
     - [ ] - Resolution w/ black boxes for people with different aspect ratios
     - [ ] - Mouse sensitivity

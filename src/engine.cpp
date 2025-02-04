@@ -1485,14 +1485,32 @@ const char* engine_option_value_str(Option option, int value) {
     }
 }
 
-void engine_set_options_to_default(std::unordered_map<Option, int>& options) {
-    for (int option = 0; option < OPTION_COUNT; option++) {
-        options[(Option)option] = OPTION_DATA.at((Option)option).default_value;
+void engine_apply_option(Option option, int value) {
+    if (engine.options[option] == value) {
+        return;
+    }
+
+    engine.options[option] = value;
+    switch (option) {
+        case OPTION_DISPLAY: {
+            engine_destroy_renderer();
+            engine_init_renderer(engine.options);
+            break;
+        }
+        case OPTION_VSYNC: {
+            SDL_RenderSetVSync(engine.renderer, value == VSYNC_ENABLED);
+            break;
+        }
+        case OPTION_COUNT: {
+            break;
+        }
     }
 }
 
 void engine_load_options() {
-    engine_set_options_to_default(engine.options);
+    for (int option = 0; option < OPTION_COUNT; option++) {
+        engine.options[(Option)option] = OPTION_DATA.at((Option)option).default_value;
+    }
 
     std::ifstream options_file(OPTIONS_PATH);
     if (!options_file.is_open()) {
