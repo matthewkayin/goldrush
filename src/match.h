@@ -5,6 +5,7 @@
 #include "id_array.h"
 #include "engine.h"
 #include "animation.h"
+#include "options.h"
 #include <SDL2/SDL.h>
 #include <queue>
 #include <vector>
@@ -499,6 +500,7 @@ struct match_state_t {
     int control_group_selected;
     std::vector<alert_t> alerts;
     uint32_t sound_cooldown_timers[SOUND_COUNT];
+    options_menu_state_t options_state;
 
     // Map
     uint32_t map_width;
@@ -523,6 +525,7 @@ struct match_state_t {
 };
 
 match_state_t match_init();
+void match_create_minimap_texture(match_state_t& state);
 void match_handle_input(match_state_t& state, SDL_Event e);
 void match_update(match_state_t& state);
 uint32_t match_get_player_population(const match_state_t& state, uint8_t player_id);

@@ -34,9 +34,10 @@ static const SDL_Rect UI_MENU_BUTTON_RECT = (SDL_Rect) {
 };
 static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
     .x = (SCREEN_WIDTH / 2) - (150 / 2), .y = 64,
-    .w = 150, .h = 100
+    .w = 150, .h = 125
 };
-static const int UI_MENU_BUTTON_COUNT = 2;
+static const int UI_MENU_BUTTON_COUNT = 3;
+static const int UI_MENU_SURRENDER_BUTTON_COUNT = 2;
 static const SDL_Rect UI_MENU_BUTTON_RECTS[UI_MENU_BUTTON_COUNT] = {
     (SDL_Rect) {
         .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MENU_RECT.y + 32,
@@ -46,9 +47,13 @@ static const SDL_Rect UI_MENU_BUTTON_RECTS[UI_MENU_BUTTON_COUNT] = {
         .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MENU_RECT.y + 32 + 21 + 5,
         .w = 120, .h = 21
     },
+    (SDL_Rect) {
+        .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MENU_RECT.y + 32 + 21 + 5 + 21 + 5,
+        .w = 120, .h = 21
+    },
 };
-static const char* UI_MENU_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "LEAVE MATCH", "BACK" };
-static const char* UI_MENU_SURRENDER_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "YES", "BACK" };
+static const char* UI_MENU_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "LEAVE MATCH", "OPTIONS", "BACK" };
+static const char* UI_MENU_SURRENDER_BUTTON_TEXT[UI_MENU_SURRENDER_BUTTON_COUNT] = { "YES", "BACK" };
 const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
 const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
 const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
@@ -101,6 +106,8 @@ const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
 
 match_state_t match_init() {
     match_state_t state;
+
+    state.options_state.mode = OPTION_MENU_CLOSED;
 
     state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
     state.ui_status_timer = 0;
@@ -190,6 +197,18 @@ match_state_t match_init() {
         SDL_DestroyTexture(engine.minimap_tiles_texture);
         engine.minimap_tiles_texture = NULL;
     }
+    match_create_minimap_texture(state);
+
+    network_toggle_ready();
+    if (network_are_all_players_ready()) {
+        log_info("Match started.");
+        state.ui_mode = UI_MODE_NONE;
+    }
+
+    return state;
+}
+
+void match_create_minimap_texture(match_state_t& state) {
     // Create new minimap texture
     engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
     engine.minimap_tiles_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
@@ -213,18 +232,18 @@ match_state_t match_init() {
     }
     SDL_SetRenderTarget(engine.renderer, NULL);
     log_trace("Created minimap texture.");
-
-    network_toggle_ready();
-    if (network_are_all_players_ready()) {
-        log_info("Match started.");
-        state.ui_mode = UI_MODE_NONE;
-    }
-
-    return state;
 }
 
 void match_handle_input(match_state_t& state, SDL_Event event) {
     if (state.ui_mode == UI_MODE_MATCH_NOT_STARTED || state.ui_disconnect_timer > 0) {
+        return;
+    }
+
+    if (state.options_state.mode != OPTION_MENU_CLOSED) {
+        options_menu_handle_input(state.options_state, event);
+        if (engine.minimap_texture == NULL) {
+            match_create_minimap_texture(state);
+        }
         return;
     }
 
@@ -260,18 +279,21 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         }
 
         int button_pressed;
-        for (button_pressed = 0; button_pressed < UI_MENU_BUTTON_COUNT; button_pressed++) {
+        int button_count = state.ui_mode == UI_MODE_MENU ? UI_MENU_BUTTON_COUNT : UI_MENU_SURRENDER_BUTTON_COUNT;
+        for (button_pressed = 0; button_pressed < button_count; button_pressed++) {
             if (sdl_rect_has_point(UI_MENU_BUTTON_RECTS[button_pressed], engine.mouse_position)) {
                 break;
             }
         }
-        if (button_pressed == UI_MENU_BUTTON_COUNT) {
+        if (button_pressed == button_count) {
             return;
         }
 
         sound_play(SOUND_UI_SELECT);
-        if (state.ui_mode == UI_MODE_MENU && button_pressed == 1) {
+        if (state.ui_mode == UI_MODE_MENU && button_pressed == 2) {
             state.ui_mode = UI_MODE_NONE;
+        } else if (state.ui_mode == UI_MODE_MENU && button_pressed == 1) {
+            state.options_state = options_menu_open();
         } else if (state.ui_mode == UI_MODE_MENU_SURRENDER && button_pressed == 1) {
             state.ui_mode = UI_MODE_MENU;
         } else if (state.ui_mode == UI_MODE_MENU && button_pressed == 0) {
@@ -686,6 +708,10 @@ void match_update(match_state_t& state) {
         return;
     }
 
+    if (state.options_state.mode != OPTION_MENU_CLOSED) {
+        options_menu_update(state.options_state);
+    }
+
     // Poll network events
     network_event_t network_event;
     while (network_poll_events(&network_event)) {
@@ -788,7 +814,7 @@ void match_update(match_state_t& state) {
     state.turn_timer--;
 
     // CAMERA DRAG
-    if (!ui_is_selecting(state) && !state.ui_is_minimap_dragging) {
+    if (!ui_is_selecting(state) && !state.ui_is_minimap_dragging && state.options_state.mode == OPTION_MENU_CLOSED) {
         xy camera_drag_direction = xy(0, 0);
         if (engine.mouse_position.x < CAMERA_DRAG_MARGIN) {
             camera_drag_direction.x = -1;
@@ -816,7 +842,7 @@ void match_update(match_state_t& state) {
     }
 
     // SELECT RECT
-    if (ui_is_selecting(state)) {
+    if (ui_is_selecting(state) && state.options_state.mode == OPTION_MENU_CLOSED) {
         // Update select rect
         state.select_rect = (SDL_Rect) {
             .x = std::min(state.select_rect_origin.x, match_get_mouse_world_pos(state).x),
@@ -2219,7 +2245,8 @@ void match_render(const match_state_t& state) {
     if (state.ui_mode == UI_MODE_MENU || state.ui_mode == UI_MODE_MENU_SURRENDER) {
         render_ninepatch(SPRITE_UI_FRAME, UI_MENU_RECT, 16);
         render_text(FONT_WESTERN8_GOLD, state.ui_mode == UI_MODE_MENU ? "Game Menu" : "Surrender?", xy(RENDER_TEXT_CENTERED, UI_MENU_RECT.y + 10));
-        for (int i = 0; i < UI_MENU_BUTTON_COUNT; i++) {
+        int button_count = state.ui_mode == UI_MODE_MENU ? UI_MENU_BUTTON_COUNT : UI_MENU_SURRENDER_BUTTON_COUNT;
+        for (int i = 0; i < button_count; i++) {
             bool button_hovered = sdl_rect_has_point(UI_MENU_BUTTON_RECTS[i], engine.mouse_position);
             xy button_position = xy(UI_MENU_BUTTON_RECTS[i].x, UI_MENU_BUTTON_RECTS[i].y + (button_hovered ? -1 : 0));
             render_sprite(SPRITE_UI_MENU_PARCHMENT_BUTTONS, xy(0, button_hovered ? 1 : 0), button_position, RENDER_SPRITE_NO_CULL);
@@ -2653,6 +2680,10 @@ void match_render(const match_state_t& state) {
                 break;
             }
         }
+    }
+
+    if (state.options_state.mode != OPTION_MENU_CLOSED) {
+        options_menu_render(state.options_state);
     }
 }
 

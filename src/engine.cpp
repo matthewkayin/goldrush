@@ -1068,6 +1068,8 @@ bool engine_init() {
         }
     }
 
+    Mix_Volume(-1, engine.options[OPTION_SFX_VOLUME]);
+
     engine.keystate = SDL_GetKeyboardState(NULL);
     engine.render_debug_info = false;
 
@@ -1563,6 +1565,13 @@ void engine_apply_option(Option option, int value) {
             } else if (engine.options[option] == DISPLAY_FULLSCREEN) {
                 SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
             }
+            SDL_DisplayMode display_mode;
+            SDL_GetCurrentDisplayMode(0, &display_mode);
+            xy window_size = engine.options.at(OPTION_DISPLAY) == DISPLAY_WINDOWED ? xy(1280, 720) : xy(display_mode.w, display_mode.h);
+            SDL_SetWindowSize(engine.window, window_size.x, window_size.y);
+            if (engine.options[option] == DISPLAY_WINDOWED) {
+                SDL_SetWindowPosition(engine.window, (display_mode.w / 2) - (window_size.x / 2), (display_mode.h / 2) - (window_size.y / 2));
+            }
             engine_free_textures();
             engine_load_textures();
             break;
@@ -1578,6 +1587,7 @@ void engine_apply_option(Option option, int value) {
             break;
         }
         case OPTION_MUS_VOLUME: {
+            // TODO set this on init as well
             break;
         }
         case OPTION_CAMERA_SPEED: {

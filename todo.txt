@@ -7,11 +7,11 @@ todos
  - [ ] - On release build, always grab mouse
  - [ ] - UI button for gold is wrong
  - [ ] - Options menu
+    - [ ] - Add options menu to match menu
     - [x] - Fullscreen
     - [x] - Vsync
     - [x] - Volume slider for sound
     - [ ] - Volume slider for music
-    - [ ] - Keybinds?
-    - [ ] - Resolution w/ black boxes for people with different aspect ratios
-    - [ ] - Mouse sensitivity
-    - [ ] - Camera scroll sensitivity
+    - [x] - Keybinds
+    - [ ] - Test with different resolutions to see how it looks
+    - [x] - Camera scroll sensitivity
