@@ -1436,54 +1436,31 @@ static const char* OPTIONS_PATH = "./options.ini";
 
 std::unordered_map<Option, option_data_t> OPTION_DATA = {
     { OPTION_DISPLAY, (option_data_t) {
-        .value_count = DISPLAY_COUNT,
+        .name = "Display",
+        .type = OPTION_TYPE_DROPDOWN,
+        .max_value = DISPLAY_COUNT,
         .default_value = DISPLAY_BORDERLESS
     }},
     { OPTION_VSYNC, (option_data_t) {
-        .value_count = VSYNC_COUNT,
+        .name = "Vsync",
+        .type = OPTION_TYPE_DROPDOWN,
+        .max_value = VSYNC_COUNT,
         .default_value = VSYNC_ENABLED
+    }},
+    { OPTION_SFX_VOLUME, (option_data_t) {
+        .name = "Sound Volume",
+        .type = OPTION_TYPE_SLIDER,
+        .max_value = MIX_MAX_VOLUME,
+        .default_value = 50
+    }},
+    { OPTION_MUS_VOLUME, (option_data_t) {
+        .name = "Music Volume",
+        .type = OPTION_TYPE_SLIDER,
+        .max_value = MIX_MAX_VOLUME,
+        .default_value = 50
     }}
 };
 
-const char* engine_option_name_str(Option option) {
-    switch (option) {
-        case OPTION_DISPLAY:
-            return "Display";
-        case OPTION_VSYNC:
-            return "Vsync";
-        case OPTION_COUNT:
-            return "";
-    }
-}
-
-const char* engine_option_value_str(Option option, int value) {
-    switch (option) {
-        case OPTION_DISPLAY: {
-            switch ((OptionValueDisplay)value) {
-                case DISPLAY_WINDOWED:
-                    return "Windowed";
-                case DISPLAY_FULLSCREEN:
-                    return "Fullscreen";
-                case DISPLAY_BORDERLESS:
-                    return "Borderless";
-                default:
-                    return "";
-            }
-        }
-        case OPTION_VSYNC: {
-            switch ((OptionValueVsync)value) {
-                case VSYNC_DISABLED:
-                    return "Disabled";
-                case VSYNC_ENABLED:
-                    return "Enabled";
-                default:
-                    return "";
-            }
-        }
-        default:
-            return "";
-    }
-}
 
 void engine_apply_option(Option option, int value) {
     if (engine.options[option] == value) {
@@ -1508,6 +1485,13 @@ void engine_apply_option(Option option, int value) {
             SDL_RenderSetVSync(engine.renderer, engine.options[option] == VSYNC_ENABLED);
             engine_free_textures();
             engine_load_textures();
+            break;
+        }
+        case OPTION_SFX_VOLUME: {
+            Mix_Volume(-1, engine.options[option]);
+            break;
+        }
+        case OPTION_MUS_VOLUME: {
             break;
         }
         case OPTION_COUNT: {
@@ -1535,7 +1519,7 @@ void engine_load_options() {
 
         int option;
         for (option = 0; option < OPTION_COUNT; option++) {
-            if (key == std::string(engine_option_name_str((Option)option))) {
+            if (key == std::string(OPTION_DATA.at((Option)option).name)) {
                 engine.options[(Option)option] = std::stoi(value);
                 break;
             }
@@ -1554,7 +1538,7 @@ void engine_save_options() {
     }
 
     for (int option = 0; option < OPTION_COUNT; option++) {
-        fprintf(options_file, "%s=%i\n", engine_option_name_str((Option)option), engine.options[(Option)option]);
+        fprintf(options_file, "%s=%i\n", OPTION_DATA.at((Option)option).name, engine.options[(Option)option]);
     }
 
     fclose(options_file);

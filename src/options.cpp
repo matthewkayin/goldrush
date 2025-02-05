@@ -19,6 +19,7 @@ options_menu_state_t options_menu_open() {
     state.hover = OPTION_HOVER_NONE;
     state.hover_subindex = 0;
     state.dropdown_chosen = -1;
+    state.slider_chosen = -1;
 
     return state;
 }
@@ -29,19 +30,17 @@ void options_menu_handle_input(options_menu_state_t& state, SDL_Event event) {
     }
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        if (state.hover != OPTION_HOVER_NONE) {
+            sound_play(SOUND_UI_SELECT);
+        }
+
         if (state.dropdown_chosen != -1) {
             if (state.hover == OPTION_HOVER_DROPDOWN_ITEM) {
                 engine_apply_option((Option)state.dropdown_chosen, state.hover_subindex);
             }
             state.dropdown_chosen = -1;
-            sound_play(SOUND_UI_SELECT);
             return;
         }
-
-        if (state.hover == OPTION_HOVER_NONE) {
-            return;
-        }
-        sound_play(SOUND_UI_SELECT);
 
         if (state.hover == OPTION_HOVER_BACK) {
             state.mode = OPTION_MENU_CLOSED;
@@ -51,6 +50,21 @@ void options_menu_handle_input(options_menu_state_t& state, SDL_Event event) {
             state.hover = OPTION_HOVER_NONE;
             return;
         } 
+
+        for (int option = 0; option < OPTION_COUNT; option++) {
+            SDL_Rect dropdown_rect = options_get_dropdown_rect(option);
+            if (sdl_rect_has_point(dropdown_rect, engine.mouse_position)) {
+                const option_data_t& option_data = OPTION_DATA.at((Option)option);
+                if (option_data.type == OPTION_TYPE_SLIDER) {
+                    state.slider_chosen = option;
+                    return;
+                }
+            }
+        }
+    }
+
+    if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
+        state.slider_chosen = -1;
     }
 }
 
@@ -61,6 +75,20 @@ void options_menu_update(options_menu_state_t& state) {
 
     state.hover = OPTION_HOVER_NONE;
 
+    if (state.slider_chosen != -1) {
+        SDL_Rect dropdown_rect = options_get_dropdown_rect(state.slider_chosen);
+        int mouse_x = engine.mouse_position.x;
+        if (mouse_x < dropdown_rect.x) {
+            mouse_x = dropdown_rect.x;
+        } else if (mouse_x > dropdown_rect.x + dropdown_rect.w) {
+            mouse_x = dropdown_rect.x + dropdown_rect.w;
+        }
+        mouse_x -= dropdown_rect.x;
+
+        engine_apply_option((Option)state.slider_chosen, (mouse_x * OPTION_DATA.at((Option)state.slider_chosen).max_value) / dropdown_rect.w);
+        return;
+    }
+
     SDL_Rect back_button_rect = render_get_button_rect("BACK", BACK_BUTTON_POSITION);
     if (sdl_rect_has_point(back_button_rect, engine.mouse_position)) {
         state.hover = OPTION_HOVER_BACK;
@@ -70,15 +98,18 @@ void options_menu_update(options_menu_state_t& state) {
         for (int option = 0; option < OPTION_COUNT; option++) {
             SDL_Rect dropdown_rect = options_get_dropdown_rect(option);
             if (sdl_rect_has_point(dropdown_rect, engine.mouse_position)) {
-                state.hover = OPTION_HOVER_DROPDOWN;
-                state.hover_subindex = option;
+                const option_data_t& option_data = OPTION_DATA.at((Option)option);
+                if (option_data.type == OPTION_TYPE_DROPDOWN) {
+                    state.hover = OPTION_HOVER_DROPDOWN;
+                    state.hover_subindex = option;
+                } 
                 break;
             }
         }
     }
 
     if (state.hover == OPTION_HOVER_NONE && state.dropdown_chosen != -1) {
-        for (int value = 0; value < OPTION_DATA.at((Option)state.dropdown_chosen).value_count; value++) {
+        for (int value = 0; value < OPTION_DATA.at((Option)state.dropdown_chosen).max_value; value++) {
             SDL_Rect item_rect = options_get_dropdown_item_rect(state.dropdown_chosen, value);
             if (sdl_rect_has_point(item_rect, engine.mouse_position)) {
                 state.hover = OPTION_HOVER_DROPDOWN_ITEM;
@@ -110,17 +141,48 @@ void options_menu_render(const options_menu_state_t& state) {
         }
 
         SDL_Rect dropdown_rect = options_get_dropdown_rect(option);
-        render_text(FONT_WESTERN8_GOLD, engine_option_name_str((Option)option), xy(OPTIONS_FRAME_RECT.x + 8, dropdown_rect.y + 5));
-        render_sprite(SPRITE_UI_OPTIONS_DROPDOWN, xy(0, dropdown_vframe), xy(dropdown_rect.x, dropdown_rect.y), RENDER_SPRITE_NO_CULL);
-        render_text(dropdown_vframe == 1 ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, engine_option_value_str((Option)option, engine.options.at((Option)option)), xy(dropdown_rect.x + 5, dropdown_rect.y + 5));
+        const option_data_t& option_data = OPTION_DATA.at((Option)option);
+        render_text(FONT_WESTERN8_GOLD, option_data.name, xy(OPTIONS_FRAME_RECT.x + 8, dropdown_rect.y + 5));
+
+        if (option_data.type == OPTION_TYPE_DROPDOWN) {
+            render_sprite(SPRITE_UI_OPTIONS_DROPDOWN, xy(0, dropdown_vframe), xy(dropdown_rect.x, dropdown_rect.y), RENDER_SPRITE_NO_CULL);
+            render_text(dropdown_vframe == 1 ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, option_value_str((Option)option, engine.options.at((Option)option)), xy(dropdown_rect.x + 5, dropdown_rect.y + 5));
+        } else if (option_data.type == OPTION_TYPE_SLIDER) {
+            static const int SLIDER_RECT_HEIGHT = 5;
+            static const int NOTCH_WIDTH = 5;
+            static const int NOTCH_HEIGHT = SLIDER_RECT_HEIGHT + 9;
+            SDL_Rect slider_rect = (SDL_Rect) { .x = dropdown_rect.x, .y = dropdown_rect.y + (dropdown_rect.h / 2) - (SLIDER_RECT_HEIGHT / 2) + 1, .w = dropdown_rect.w, .h = SLIDER_RECT_HEIGHT };
+
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_DARKBLACK.r, COLOR_DARKBLACK.g, COLOR_DARKBLACK.b, COLOR_DARKBLACK.a);
+            SDL_RenderFillRect(engine.renderer, &slider_rect);
+
+            slider_rect.x += 1;
+            slider_rect.w = ((dropdown_rect.w - 2) * engine.options[(Option)option]) / option_data.max_value;
+            SDL_Rect notch_rect = (SDL_Rect) { .x = slider_rect.x + slider_rect.w - (NOTCH_WIDTH / 2), .y = slider_rect.y + (SLIDER_RECT_HEIGHT / 2) - (NOTCH_HEIGHT / 2), .w = NOTCH_WIDTH, .h = NOTCH_HEIGHT };
+
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, COLOR_GOLD.a);
+            SDL_RenderFillRect(engine.renderer, &slider_rect);
+
+            slider_rect.x = dropdown_rect.x;
+            slider_rect.w = dropdown_rect.w;
+
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+            SDL_RenderDrawRect(engine.renderer, &slider_rect);
+
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, COLOR_GOLD.a);
+            SDL_RenderFillRect(engine.renderer, &notch_rect);
+            SDL_SetRenderDrawColor(engine.renderer, COLOR_OFFBLACK.r, COLOR_OFFBLACK.g, COLOR_OFFBLACK.b, COLOR_OFFBLACK.a);
+            SDL_RenderDrawRect(engine.renderer, &notch_rect);
+        }
     }
 
     if (state.dropdown_chosen != -1) {
-        for (int value = 0; value < OPTION_DATA.at((Option)state.dropdown_chosen).value_count; value++) {
+        const option_data_t& option_data = OPTION_DATA.at((Option)state.dropdown_chosen);
+        for (int value = 0; value < option_data.max_value; value++) {
             SDL_Rect item_rect = options_get_dropdown_item_rect(state.dropdown_chosen, value);
             int item_vframe = state.hover == OPTION_HOVER_DROPDOWN_ITEM && state.hover_subindex == value ? 4 : 3;
             render_sprite(SPRITE_UI_OPTIONS_DROPDOWN, xy(0, item_vframe), xy(item_rect.x, item_rect.y));
-            render_text(item_vframe == 3 ? FONT_WESTERN8_OFFBLACK : FONT_WESTERN8_WHITE, engine_option_value_str((Option)state.dropdown_chosen, value), xy(item_rect.x + 5, item_rect.y + 5));
+            render_text(item_vframe == 3 ? FONT_WESTERN8_OFFBLACK : FONT_WESTERN8_WHITE, option_value_str((Option)state.dropdown_chosen, value), xy(item_rect.x + 5, item_rect.y + 5));
         }
     }
 
@@ -140,4 +202,33 @@ SDL_Rect options_get_dropdown_item_rect(int option, int value) {
     SDL_Rect dropdown_rect = options_get_dropdown_rect(option);
     dropdown_rect.y += engine.sprites[SPRITE_UI_OPTIONS_DROPDOWN].frame_size.y * (value + 1);
     return dropdown_rect;
+}
+
+const char* option_value_str(Option option, int value) {
+    switch (option) {
+        case OPTION_DISPLAY: {
+            switch ((OptionValueDisplay)value) {
+                case DISPLAY_WINDOWED:
+                    return "Windowed";
+                case DISPLAY_FULLSCREEN:
+                    return "Fullscreen";
+                case DISPLAY_BORDERLESS:
+                    return "Borderless";
+                default:
+                    return "";
+            }
+        }
+        case OPTION_VSYNC: {
+            switch ((OptionValueVsync)value) {
+                case VSYNC_DISABLED:
+                    return "Disabled";
+                case VSYNC_ENABLED:
+                    return "Enabled";
+                default:
+                    return "";
+            }
+        }
+        default:
+            return "";
+    }
 }

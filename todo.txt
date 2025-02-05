@@ -14,5 +14,3 @@ todos
     - [ ] - Resolution w/ black boxes for people with different aspect ratios
     - [ ] - Mouse sensitivity
     - [ ] - Camera scroll sensitivity
-    - [ ] - Minimap player color as not-green
-    - [ ] - Colorblind modes

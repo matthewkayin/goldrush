@@ -548,7 +548,8 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT &&
             ui_get_selection_type(state, state.selection) == SELECTION_TYPE_BUILDINGS && 
-            !ui_is_targeting(state) && !ui_is_selecting(state) && !state.ui_is_minimap_dragging) {
+            !ui_is_targeting(state) && !ui_is_selecting(state) && !state.ui_is_minimap_dragging &&
+            (!ui_is_mouse_in_ui() || sdl_rect_has_point(MINIMAP_RECT, engine.mouse_position))) {
         // Check to make sure that all buildings can rally
         for (entity_id id : state.selection) {
             if (!ENTITY_DATA.at(state.entities.get_by_id(id).type).building_data.can_rally) {
@@ -558,7 +559,13 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
         input_t input;
         input.type = INPUT_RALLY;
-        input.rally.rally_point = match_get_mouse_world_pos(state);
+        if (ui_is_mouse_in_ui()) {
+            xy minimap_pos = engine.mouse_position - xy(MINIMAP_RECT.x, MINIMAP_RECT.y);
+            input.rally.rally_point = xy((state.map_width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                                (state.map_height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+        } else {
+            input.rally.rally_point = match_get_mouse_world_pos(state);
+        }
         input.rally.building_count = (uint16_t)state.selection.size();
         memcpy(&input.rally.building_ids, &state.selection[0], state.selection.size() * sizeof(entity_id));
         state.input_queue.push_back(input);

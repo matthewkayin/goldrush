@@ -288,6 +288,8 @@ enum Sound {
 enum Option {
     OPTION_DISPLAY,
     OPTION_VSYNC,
+    OPTION_SFX_VOLUME,
+    OPTION_MUS_VOLUME,
     OPTION_COUNT
 };
 
@@ -304,9 +306,16 @@ enum OptionValueVsync {
     VSYNC_COUNT
 };
 
+enum OptionType {
+    OPTION_TYPE_DROPDOWN,
+    OPTION_TYPE_SLIDER
+};
+
 struct option_data_t {
-    uint32_t value_count;
-    uint32_t default_value;
+    const char* name;
+    OptionType type;
+    int max_value;
+    int default_value;
 };
 extern std::unordered_map<Option, option_data_t> OPTION_DATA;
 
@@ -339,8 +348,6 @@ void engine_quit();
 
 void engine_set_cursor(Cursor cursor);
 
-const char* engine_option_name_str(Option option);
-const char* engine_option_value_str(Option option, int value);
 void engine_apply_option(Option option, int value);
 void engine_load_options();
 void engine_save_options();

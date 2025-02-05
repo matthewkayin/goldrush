@@ -21,6 +21,7 @@ struct options_menu_state_t {
     OptionMenuHover hover;
     int hover_subindex;
     int dropdown_chosen;
+    int slider_chosen;
 };
 
 options_menu_state_t options_menu_open();
@@ -29,3 +30,4 @@ void options_menu_update(options_menu_state_t& state);
 void options_menu_render(const options_menu_state_t& state);
 SDL_Rect options_get_dropdown_rect(int index);
 SDL_Rect options_get_dropdown_item_rect(int option, int value);
+const char* option_value_str(Option option, int value);
