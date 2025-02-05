@@ -290,6 +290,7 @@ enum Option {
     OPTION_VSYNC,
     OPTION_SFX_VOLUME,
     OPTION_MUS_VOLUME,
+    OPTION_CAMERA_SPEED,
     OPTION_COUNT
 };
 
@@ -308,12 +309,14 @@ enum OptionValueVsync {
 
 enum OptionType {
     OPTION_TYPE_DROPDOWN,
+    OPTION_TYPE_SLIDER_PERCENT,
     OPTION_TYPE_SLIDER
 };
 
 struct option_data_t {
     const char* name;
     OptionType type;
+    int min_value;
     int max_value;
     int default_value;
 };
@@ -351,6 +354,7 @@ void engine_set_cursor(Cursor cursor);
 void engine_apply_option(Option option, int value);
 void engine_load_options();
 void engine_save_options();
+int engine_get_camera_speed();
 
 enum TextAnchor {
     TEXT_ANCHOR_TOP_LEFT,

@@ -1438,29 +1438,39 @@ std::unordered_map<Option, option_data_t> OPTION_DATA = {
     { OPTION_DISPLAY, (option_data_t) {
         .name = "Display",
         .type = OPTION_TYPE_DROPDOWN,
+        .min_value = 0,
         .max_value = DISPLAY_COUNT,
         .default_value = DISPLAY_BORDERLESS
     }},
     { OPTION_VSYNC, (option_data_t) {
         .name = "Vsync",
         .type = OPTION_TYPE_DROPDOWN,
+        .min_value = 0,
         .max_value = VSYNC_COUNT,
         .default_value = VSYNC_ENABLED
     }},
     { OPTION_SFX_VOLUME, (option_data_t) {
         .name = "Sound Volume",
-        .type = OPTION_TYPE_SLIDER,
+        .type = OPTION_TYPE_SLIDER_PERCENT,
+        .min_value = 0,
         .max_value = MIX_MAX_VOLUME,
-        .default_value = 50
+        .default_value = MIX_MAX_VOLUME
     }},
     { OPTION_MUS_VOLUME, (option_data_t) {
         .name = "Music Volume",
-        .type = OPTION_TYPE_SLIDER,
+        .type = OPTION_TYPE_SLIDER_PERCENT,
+        .min_value = 0,
         .max_value = MIX_MAX_VOLUME,
-        .default_value = 50
+        .default_value = MIX_MAX_VOLUME
+    }},
+    { OPTION_CAMERA_SPEED, (option_data_t) {
+        .name = "Camera Speed",
+        .type = OPTION_TYPE_SLIDER,
+        .min_value = 1,
+        .max_value = 31,
+        .default_value = 16
     }}
 };
-
 
 void engine_apply_option(Option option, int value) {
     if (engine.options[option] == value) {
@@ -1492,6 +1502,9 @@ void engine_apply_option(Option option, int value) {
             break;
         }
         case OPTION_MUS_VOLUME: {
+            break;
+        }
+        case OPTION_CAMERA_SPEED: {
             break;
         }
         case OPTION_COUNT: {
@@ -1542,6 +1555,10 @@ void engine_save_options() {
     }
 
     fclose(options_file);
+}
+
+int engine_get_camera_speed() {
+    return engine.options[OPTION_CAMERA_SPEED] + 1;
 }
 
 // RENDER

@@ -12,7 +12,6 @@ static const uint32_t MATCH_DISCONNECT_GRACE = 10;
 static const uint32_t PLAYER_STARTING_GOLD = 5000;
 
 static const int CAMERA_DRAG_MARGIN = 4;
-static const int CAMERA_DRAG_SPEED = 16;
 
 static const SDL_Rect UI_DISCONNECT_FRAME_RECT = (SDL_Rect) {
     .x = (SCREEN_WIDTH / 2) - 100, .y = 32,
@@ -840,7 +839,7 @@ void match_update(match_state_t& state) {
         } else if (engine.mouse_position.y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
             camera_drag_direction.y = 1;
         }
-        state.camera_offset += camera_drag_direction * CAMERA_DRAG_SPEED;
+        state.camera_offset += camera_drag_direction * engine_get_camera_speed();
         match_camera_clamp(state);
     }
 

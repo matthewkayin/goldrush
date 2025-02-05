@@ -8,7 +8,7 @@ todos
  - [ ] - Options menu
     - [x] - Fullscreen
     - [x] - Vsync
-    - [ ] - Volume slider for sound
+    - [x] - Volume slider for sound
     - [ ] - Volume slider for music
     - [ ] - Keybinds?
     - [ ] - Resolution w/ black boxes for people with different aspect ratios

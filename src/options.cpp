@@ -2,7 +2,7 @@
 
 #include "logger.h"
 
-static const int OPTIONS_MENU_WIDTH = 250;
+static const int OPTIONS_MENU_WIDTH = 350;
 static const int OPTIONS_MENU_HEIGHT = 300;
 static const SDL_Rect OPTIONS_FRAME_RECT = (SDL_Rect) {
     .x = (SCREEN_WIDTH / 2) - (OPTIONS_MENU_WIDTH / 2),
@@ -55,7 +55,7 @@ void options_menu_handle_input(options_menu_state_t& state, SDL_Event event) {
             SDL_Rect dropdown_rect = options_get_dropdown_rect(option);
             if (sdl_rect_has_point(dropdown_rect, engine.mouse_position)) {
                 const option_data_t& option_data = OPTION_DATA.at((Option)option);
-                if (option_data.type == OPTION_TYPE_SLIDER) {
+                if (option_data.type == OPTION_TYPE_SLIDER || option_data.type == OPTION_TYPE_SLIDER_PERCENT) {
                     state.slider_chosen = option;
                     return;
                 }
@@ -85,7 +85,8 @@ void options_menu_update(options_menu_state_t& state) {
         }
         mouse_x -= dropdown_rect.x;
 
-        engine_apply_option((Option)state.slider_chosen, (mouse_x * OPTION_DATA.at((Option)state.slider_chosen).max_value) / dropdown_rect.w);
+        const option_data_t& option_data = OPTION_DATA.at((Option)state.slider_chosen);
+        engine_apply_option((Option)state.slider_chosen, option_data.min_value + ((mouse_x * option_data.max_value) / dropdown_rect.w));
         return;
     }
 
@@ -147,7 +148,16 @@ void options_menu_render(const options_menu_state_t& state) {
         if (option_data.type == OPTION_TYPE_DROPDOWN) {
             render_sprite(SPRITE_UI_OPTIONS_DROPDOWN, xy(0, dropdown_vframe), xy(dropdown_rect.x, dropdown_rect.y), RENDER_SPRITE_NO_CULL);
             render_text(dropdown_vframe == 1 ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, option_value_str((Option)option, engine.options.at((Option)option)), xy(dropdown_rect.x + 5, dropdown_rect.y + 5));
-        } else if (option_data.type == OPTION_TYPE_SLIDER) {
+        } else if (option_data.type == OPTION_TYPE_SLIDER || option_data.type == OPTION_TYPE_SLIDER_PERCENT) {
+            char option_value_str[8];
+            if (option_data.type == OPTION_TYPE_SLIDER_PERCENT) {
+                sprintf(option_value_str, "%i%%", (int)(((float)engine.options[(Option)option] * 100.0f) / (float)option_data.max_value));
+            } else {
+                sprintf(option_value_str, "%i", engine.options[(Option)option]);
+            }
+            xy option_value_str_size = render_get_text_size(FONT_WESTERN8_GOLD, option_value_str);
+            render_text(FONT_WESTERN8_GOLD, option_value_str, xy(dropdown_rect.x - 4 - option_value_str_size.x, dropdown_rect.y + 5));
+
             static const int SLIDER_RECT_HEIGHT = 5;
             static const int NOTCH_WIDTH = 5;
             static const int NOTCH_HEIGHT = SLIDER_RECT_HEIGHT + 9;
@@ -157,7 +167,7 @@ void options_menu_render(const options_menu_state_t& state) {
             SDL_RenderFillRect(engine.renderer, &slider_rect);
 
             slider_rect.x += 1;
-            slider_rect.w = ((dropdown_rect.w - 2) * engine.options[(Option)option]) / option_data.max_value;
+            slider_rect.w = ((dropdown_rect.w - 2) * (engine.options[(Option)option] - option_data.min_value)) / option_data.max_value;
             SDL_Rect notch_rect = (SDL_Rect) { .x = slider_rect.x + slider_rect.w - (NOTCH_WIDTH / 2), .y = slider_rect.y + (SLIDER_RECT_HEIGHT / 2) - (NOTCH_HEIGHT / 2), .w = NOTCH_WIDTH, .h = NOTCH_HEIGHT };
 
             SDL_SetRenderDrawColor(engine.renderer, COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, COLOR_GOLD.a);
