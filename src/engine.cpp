@@ -892,6 +892,82 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
     }},
 };
 
+const std::unordered_map<UiButton, SDL_Keycode> DEFAULT_HOTKEYS = {
+    { UI_BUTTON_STOP, SDLK_s },
+    { UI_BUTTON_ATTACK, SDLK_a },
+    { UI_BUTTON_DEFEND, SDLK_d },
+    { UI_BUTTON_BUILD, SDLK_b },
+    { UI_BUTTON_BUILD2, SDLK_v },
+    { UI_BUTTON_REPAIR, SDLK_r },
+    { UI_BUTTON_CANCEL, SDLK_ESCAPE },
+    { UI_BUTTON_UNLOAD, SDLK_x },
+    { UI_BUTTON_EXPLODE, SDLK_e },
+    { UI_BUTTON_SMOKE, SDLK_b },
+    { UI_BUTTON_BUILD_HALL, SDLK_t },
+    { UI_BUTTON_BUILD_HOUSE, SDLK_e },
+    { UI_BUTTON_BUILD_CAMP, SDLK_c },
+    { UI_BUTTON_BUILD_SALOON, SDLK_s },
+    { UI_BUTTON_BUILD_BUNKER, SDLK_b },
+    { UI_BUTTON_BUILD_COOP, SDLK_c },
+    { UI_BUTTON_BUILD_SMITH, SDLK_s },
+    { UI_BUTTON_BUILD_BARRACKS, SDLK_b },
+    { UI_BUTTON_BUILD_SHERIFFS, SDLK_e },
+    { UI_BUTTON_BUILD_MINE, SDLK_e },
+    { UI_BUTTON_UNIT_MINER, SDLK_r },
+    { UI_BUTTON_UNIT_COWBOY, SDLK_c },
+    { UI_BUTTON_UNIT_WAGON, SDLK_w },
+    { UI_BUTTON_UNIT_WAR_WAGON, SDLK_w },
+    { UI_BUTTON_UNIT_BANDIT, SDLK_b },
+    { UI_BUTTON_UNIT_JOCKEY, SDLK_e },
+    { UI_BUTTON_UNIT_SAPPER, SDLK_s },
+    { UI_BUTTON_UNIT_TINKER, SDLK_t },
+    { UI_BUTTON_UNIT_SOLDIER, SDLK_s },
+    { UI_BUTTON_UNIT_CANNON, SDLK_c },
+    { UI_BUTTON_UNIT_SPY, SDLK_d },
+    { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w },
+    { UI_BUTTON_RESEARCH_EXPLOSIVES, SDLK_e },
+    { UI_BUTTON_RESEARCH_BAYONETS, SDLK_b },
+    { UI_BUTTON_RESEARCH_SMOKE, SDLK_s }
+};
+
+const std::unordered_map<UiButton, SDL_Keycode> GRID_HOTKEYS = {
+    { UI_BUTTON_STOP, SDLK_w },
+    { UI_BUTTON_ATTACK, SDLK_q },
+    { UI_BUTTON_DEFEND, SDLK_e },
+    { UI_BUTTON_BUILD, SDLK_s },
+    { UI_BUTTON_BUILD2, SDLK_d },
+    { UI_BUTTON_REPAIR, SDLK_a },
+    { UI_BUTTON_CANCEL, SDLK_ESCAPE },
+    { UI_BUTTON_UNLOAD, SDLK_a },
+    { UI_BUTTON_EXPLODE, SDLK_a },
+    { UI_BUTTON_SMOKE, SDLK_s },
+    { UI_BUTTON_BUILD_HALL, SDLK_q },
+    { UI_BUTTON_BUILD_HOUSE, SDLK_w },
+    { UI_BUTTON_BUILD_CAMP, SDLK_e },
+    { UI_BUTTON_BUILD_SALOON, SDLK_a },
+    { UI_BUTTON_BUILD_BUNKER, SDLK_s },
+    { UI_BUTTON_BUILD_COOP, SDLK_w },
+    { UI_BUTTON_BUILD_SMITH, SDLK_q },
+    { UI_BUTTON_BUILD_BARRACKS, SDLK_e },
+    { UI_BUTTON_BUILD_SHERIFFS, SDLK_a },
+    { UI_BUTTON_BUILD_MINE, SDLK_a },
+    { UI_BUTTON_UNIT_MINER, SDLK_q },
+    { UI_BUTTON_UNIT_COWBOY, SDLK_q },
+    { UI_BUTTON_UNIT_WAGON, SDLK_w },
+    { UI_BUTTON_UNIT_WAR_WAGON, SDLK_w },
+    { UI_BUTTON_UNIT_BANDIT, SDLK_w },
+    { UI_BUTTON_UNIT_JOCKEY, SDLK_q },
+    { UI_BUTTON_UNIT_SAPPER, SDLK_a },
+    { UI_BUTTON_UNIT_TINKER, SDLK_e },
+    { UI_BUTTON_UNIT_SOLDIER, SDLK_q },
+    { UI_BUTTON_UNIT_CANNON, SDLK_w },
+    { UI_BUTTON_UNIT_SPY, SDLK_q },
+    { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_q },
+    { UI_BUTTON_RESEARCH_EXPLOSIVES, SDLK_w },
+    { UI_BUTTON_RESEARCH_BAYONETS, SDLK_e },
+    { UI_BUTTON_RESEARCH_SMOKE, SDLK_a }
+};
+
 engine_t engine;
 
 bool engine_init() {
@@ -1518,6 +1594,10 @@ void engine_load_options() {
         engine.options[(Option)option] = OPTION_DATA.at((Option)option).default_value;
     }
 
+    for (auto it : DEFAULT_HOTKEYS) {
+        engine.hotkeys[it.first] = it.second;
+    }
+
     std::ifstream options_file(OPTIONS_PATH);
     if (!options_file.is_open()) {
         log_error("Could not open options file for reading.");
@@ -1525,20 +1605,32 @@ void engine_load_options() {
     }
 
     std::string line;
+    bool options_mode = true;
     while (std::getline(options_file, line)) {
+        if (line == "[hotkeys]") {
+            options_mode = false;
+            continue;
+        }
+
         size_t equals_index = line.find('=');
         std::string key = line.substr(0, equals_index);
         std::string value = line.substr(equals_index + 1);
 
-        int option;
-        for (option = 0; option < OPTION_COUNT; option++) {
-            if (key == std::string(OPTION_DATA.at((Option)option).name)) {
-                engine.options[(Option)option] = std::stoi(value);
-                break;
+        if (options_mode) {
+            int option;
+            for (option = 0; option < OPTION_COUNT; option++) {
+                if (key == std::string(OPTION_DATA.at((Option)option).name)) {
+                    engine.options[(Option)option] = std::stoi(value);
+                    break;
+                }
             }
-        }
-        if (option == OPTION_COUNT) {
-            log_warn("Unrecognized option key %s with value %s", key.c_str(), value.c_str());
+            if (option == OPTION_COUNT) {
+                log_warn("Unrecognized option key %s with value %s", key.c_str(), value.c_str());
+            }
+        } else {
+            UiButton button = (UiButton)std::stoi(key);
+            SDL_Keycode keycode = (SDL_Keycode)std::stoi(value);
+            engine.hotkeys[button] = keycode;
         }
     }
 }
@@ -1554,11 +1646,45 @@ void engine_save_options() {
         fprintf(options_file, "%s=%i\n", OPTION_DATA.at((Option)option).name, engine.options[(Option)option]);
     }
 
+    fprintf(options_file, "[hotkeys]\n");
+
+    for (auto it : engine.hotkeys) {
+        fprintf(options_file, "%i=%i\n", it.first, it.second);
+    }
+
     fclose(options_file);
 }
 
-int engine_get_camera_speed() {
-    return engine.options[OPTION_CAMERA_SPEED] + 1;
+int engine_sdl_key_str(char* str_ptr, SDL_Keycode hotkey) {
+    if (hotkey == SDLK_ESCAPE) {
+        return sprintf(str_ptr, "ESC");
+    } else if (hotkey >= SDLK_a && hotkey <= SDLK_z) {
+        return sprintf(str_ptr, "%c", (char)(hotkey - 32));
+    } else if (hotkey == SDLK_LEFTBRACKET) {
+        return sprintf(str_ptr, "[");
+    } else if (hotkey == SDLK_RIGHTBRACKET) {
+        return sprintf(str_ptr, "]");
+    } else if (hotkey == SDLK_BACKSLASH) {
+        return sprintf(str_ptr, "\\");
+    } else if (hotkey == SDLK_BACKQUOTE) {
+        return sprintf(str_ptr, "`");
+    } else if (hotkey == SDLK_MINUS) {
+        return sprintf(str_ptr, "-");
+    } else if (hotkey == SDLK_EQUALS) {
+        return sprintf(str_ptr, "=");
+    } else if (hotkey == SDLK_COMMA) {
+        return sprintf(str_ptr, ",");
+    } else if (hotkey == SDLK_PERIOD) {
+        return sprintf(str_ptr, ".");
+    } else if (hotkey == SDLK_SLASH) {
+        return sprintf(str_ptr, "/");
+    } else if (hotkey == SDLK_SEMICOLON) {
+        return sprintf(str_ptr, ";");
+    } else if (hotkey == SDLK_QUOTE) {
+        return sprintf(str_ptr, "'");
+    } else {
+        return 0;
+    }
 }
 
 // RENDER

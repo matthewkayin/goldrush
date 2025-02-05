@@ -750,14 +750,8 @@ ui_tooltip_info_t ui_get_hovered_tooltip_info(const match_state_t& state) {
 
     if (ui_button_requirements_met(state, button)) {
         info_text_ptr += sprintf(info_text_ptr, " (");
-        SDL_Keycode hotkey = hotkeys.at(button);
-        if (hotkey == SDLK_ESCAPE) {
-            info_text_ptr += sprintf(info_text_ptr, "ESC");
-        } else if (hotkey >= SDLK_a && hotkey <= SDLK_z) {
-            info_text_ptr += sprintf(info_text_ptr, "%c", (char)(hotkey - 32));
-        } else {
-            log_error("Unhandled hotkey %u in ui_get_hovered_tooltip_info()", hotkey);
-        }
+        SDL_Keycode hotkey = engine.hotkeys.at(button);
+        info_text_ptr += engine_sdl_key_str(info_text_ptr, hotkey);
         info_text_ptr += sprintf(info_text_ptr, ")");
     }
 

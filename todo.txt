@@ -5,6 +5,7 @@ todos
  - [ ] - Customizable map size ? or at least dynamic based on player count
  - [ ] - Team games
  - [ ] - On release build, always grab mouse
+ - [ ] - UI button for gold is wrong
  - [ ] - Options menu
     - [x] - Fullscreen
     - [x] - Vsync

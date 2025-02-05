@@ -341,6 +341,7 @@ struct engine_t {
     Cursor current_cursor;
     bool render_debug_info;
     std::unordered_map<Option, int> options;
+    std::unordered_map<UiButton, SDL_Keycode> hotkeys;
 };
 extern engine_t engine;
 
@@ -354,7 +355,10 @@ void engine_set_cursor(Cursor cursor);
 void engine_apply_option(Option option, int value);
 void engine_load_options();
 void engine_save_options();
-int engine_get_camera_speed();
+int engine_sdl_key_str(char* str_ptr, SDL_Keycode hotkey);
+
+extern const std::unordered_map<UiButton, SDL_Keycode> DEFAULT_HOTKEYS;
+extern const std::unordered_map<UiButton, SDL_Keycode> GRID_HOTKEYS;
 
 enum TextAnchor {
     TEXT_ANCHOR_TOP_LEFT,

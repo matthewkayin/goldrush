@@ -72,45 +72,6 @@ static const int BUILDING_HEALTHBAR_PADDING = 5;
 static const fixed PROJECTILE_SMOKE_SPEED = fixed::from_int(4);
 static const int PARTICLE_SMOKE_CELL_SIZE = 7;
 
-const std::unordered_map<UiButton, SDL_Keycode> hotkeys = {
-    { UI_BUTTON_STOP, SDLK_s },
-    { UI_BUTTON_ATTACK, SDLK_a },
-    { UI_BUTTON_DEFEND, SDLK_d },
-    { UI_BUTTON_BUILD, SDLK_b },
-    { UI_BUTTON_BUILD2, SDLK_v },
-    { UI_BUTTON_REPAIR, SDLK_r },
-    { UI_BUTTON_CANCEL, SDLK_ESCAPE },
-    { UI_BUTTON_UNLOAD, SDLK_x },
-    { UI_BUTTON_EXPLODE, SDLK_e },
-    { UI_BUTTON_SMOKE, SDLK_b },
-    { UI_BUTTON_BUILD_HALL, SDLK_t },
-    { UI_BUTTON_BUILD_HOUSE, SDLK_e },
-    { UI_BUTTON_BUILD_CAMP, SDLK_c },
-    { UI_BUTTON_BUILD_SALOON, SDLK_s },
-    { UI_BUTTON_BUILD_BUNKER, SDLK_b },
-    { UI_BUTTON_BUILD_COOP, SDLK_c },
-    { UI_BUTTON_BUILD_SMITH, SDLK_s },
-    { UI_BUTTON_BUILD_BARRACKS, SDLK_b },
-    { UI_BUTTON_BUILD_SHERIFFS, SDLK_e },
-    { UI_BUTTON_BUILD_MINE, SDLK_e },
-    { UI_BUTTON_UNIT_MINER, SDLK_r },
-    { UI_BUTTON_UNIT_MINER, SDLK_e },
-    { UI_BUTTON_UNIT_COWBOY, SDLK_c },
-    { UI_BUTTON_UNIT_WAGON, SDLK_w },
-    { UI_BUTTON_UNIT_WAR_WAGON, SDLK_w },
-    { UI_BUTTON_UNIT_BANDIT, SDLK_b },
-    { UI_BUTTON_UNIT_JOCKEY, SDLK_e },
-    { UI_BUTTON_UNIT_SAPPER, SDLK_s },
-    { UI_BUTTON_UNIT_TINKER, SDLK_t },
-    { UI_BUTTON_UNIT_SOLDIER, SDLK_s },
-    { UI_BUTTON_UNIT_CANNON, SDLK_c },
-    { UI_BUTTON_UNIT_SPY, SDLK_d },
-    { UI_BUTTON_RESEARCH_WAR_WAGON, SDLK_w },
-    { UI_BUTTON_RESEARCH_EXPLOSIVES, SDLK_e },
-    { UI_BUTTON_RESEARCH_BAYONETS, SDLK_b },
-    { UI_BUTTON_RESEARCH_SMOKE, SDLK_s }
-};
-
 const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
     { UPGRADE_WAR_WAGON, (upgrade_data_t) {
             .name = "Wagon Armor",
@@ -403,7 +364,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
             if (button == UI_BUTTON_NONE) {
                 continue;
             }
-            if (hotkeys.at(button) == event.key.keysym.sym) {
+            if (engine.hotkeys.at(button) == event.key.keysym.sym) {
                 ui_handle_ui_button_press(state, button);
                 return;
             }
@@ -839,7 +800,7 @@ void match_update(match_state_t& state) {
         } else if (engine.mouse_position.y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
             camera_drag_direction.y = 1;
         }
-        state.camera_offset += camera_drag_direction * engine_get_camera_speed();
+        state.camera_offset += camera_drag_direction * engine.options[OPTION_CAMERA_SPEED];
         match_camera_clamp(state);
     }
 

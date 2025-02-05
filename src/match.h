@@ -321,7 +321,6 @@ extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
 extern const xy UI_FRAME_BOTTOM_POSITION; 
 extern const xy BUILDING_QUEUE_TOP_LEFT; 
 extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
-extern const std::unordered_map<UiButton, SDL_Keycode> hotkeys;
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
 extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION;
 extern const uint32_t MATCH_ALERT_DURATION;
