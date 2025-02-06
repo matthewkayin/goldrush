@@ -22,12 +22,12 @@ static const SDL_Rect UI_MATCH_OVER_FRAME_RECT = (SDL_Rect) {
     .w = 250, .h = 90
 };
 static const SDL_Rect UI_MATCH_OVER_CONTINUE_BUTTON_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - 45, .y = UI_MATCH_OVER_FRAME_RECT.y + 32,
-    .w = 89, .h = 21
+    .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MATCH_OVER_FRAME_RECT.y + 32,
+    .w = 120, .h = 21
 };
 static const SDL_Rect UI_MATCH_OVER_EXIT_BUTTON_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - 45, .y = UI_MATCH_OVER_CONTINUE_BUTTON_RECT.y + UI_MATCH_OVER_CONTINUE_BUTTON_RECT.h + 4,
-    .w = 89, .h = 21
+    .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MATCH_OVER_CONTINUE_BUTTON_RECT.y + UI_MATCH_OVER_CONTINUE_BUTTON_RECT.h + 4,
+    .w = 120, .h = 21
 };
 static const SDL_Rect UI_MENU_BUTTON_RECT = (SDL_Rect) {
     .x = 1, .y = 1, .w = 19, .h = 18

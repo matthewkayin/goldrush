@@ -5,12 +5,12 @@ todos
  - [ ] - Customizable map size ? or at least dynamic based on player count
  - [ ] - Team games
  - [ ] - On release build, always grab mouse
- - [ ] - UI button for gold is wrong
+ - [x] - UI button for gold is wrong
  - [ ] - Add music
  - [ ] - Options menu
     - [x] - Add options menu to match menu
-    - [ ] - Bug: sometimes switching display / vsync settings makes the fog messed up
-    - [ ] - Bug: victory buttons are messed up
+    - [x] - Bug: sometimes switching display / vsync settings makes the fog messed up
+    - [x] - Bug: victory buttons are messed up
     - [x] - Fullscreen
     - [x] - Vsync
     - [x] - Volume slider for sound
