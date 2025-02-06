@@ -1240,14 +1240,14 @@ bool engine_load_textures() {
                         hframes += 47;
                     }
                 }
-                sprite.texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, hframes * TILE_SIZE, TILE_SIZE);
-                if (sprite.texture == NULL) {
+                SDL_Texture* tileset_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, hframes * TILE_SIZE, TILE_SIZE);
+                if (tileset_texture == NULL) {
                     log_error("Unable to create tileset texture: %s", SDL_GetError());
                     return false;
                 }
                 sprite.frame_size = xy(TILE_SIZE, TILE_SIZE);
                 SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
-                SDL_SetRenderTarget(engine.renderer, sprite.texture);
+                SDL_SetRenderTarget(engine.renderer, tileset_texture);
                 int tileset_index = 0;
                 SDL_Rect src_rect = (SDL_Rect) {
                     .x = 0,
@@ -1312,8 +1312,18 @@ bool engine_load_textures() {
                     } // End if tile type is auto
                 } // End for each tile
 
+
+                sprite.texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, hframes * TILE_SIZE, TILE_SIZE);
+                SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
+                const int pitch = hframes * TILE_SIZE * 4;
+                void* pixels = malloc(TILE_SIZE * pitch);
+                SDL_RenderReadPixels(engine.renderer, NULL, SDL_PIXELFORMAT_RGBA8888, pixels, pitch);
+                SDL_UpdateTexture(sprite.texture, NULL, pixels, pitch);
+
                 SDL_SetRenderTarget(engine.renderer, NULL);
                 SDL_DestroyTexture(base_texture);
+                SDL_DestroyTexture(tileset_texture);
+                free(pixels);
                 break;
             }
             case SPRITE_IMPORT_FOG_OF_WAR: {
@@ -1325,14 +1335,14 @@ bool engine_load_textures() {
                 }
                 // Create tileset texture
                 int hframes = 47 + 47;
-                sprite.texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, hframes * TILE_SIZE, TILE_SIZE);
-                if (sprite.texture == NULL) {
+                SDL_Texture* fog_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, hframes * TILE_SIZE, TILE_SIZE);
+                if (fog_texture == NULL) {
                     log_error("Unable to create tileset texture: %s", SDL_GetError());
                     return false;
                 }
                 sprite.frame_size = xy(TILE_SIZE, TILE_SIZE);
                 SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
-                SDL_SetRenderTarget(engine.renderer, sprite.texture);
+                SDL_SetRenderTarget(engine.renderer, fog_texture);
                 int tileset_index = 0;
 
                 // Blit autotile
@@ -1377,8 +1387,17 @@ bool engine_load_textures() {
                     tileset_index++;
                 } // End for each neighbor combo 
 
+                sprite.texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STATIC, hframes * TILE_SIZE, TILE_SIZE);
+                SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
+                const int pitch = hframes * TILE_SIZE * 4;
+                void* pixels = malloc(TILE_SIZE * pitch);
+                SDL_RenderReadPixels(engine.renderer, NULL, SDL_PIXELFORMAT_RGBA8888, pixels, pitch);
+                SDL_UpdateTexture(sprite.texture, NULL, pixels, pitch);
+
                 SDL_SetRenderTarget(engine.renderer, NULL);
                 SDL_DestroyTexture(base_texture);
+                SDL_DestroyTexture(fog_texture);
+                free(pixels);
                 break;
             }
         }
@@ -1572,14 +1591,10 @@ void engine_apply_option(Option option, int value) {
             if (engine.options[option] == DISPLAY_WINDOWED) {
                 SDL_SetWindowPosition(engine.window, (display_mode.w / 2) - (window_size.x / 2), (display_mode.h / 2) - (window_size.y / 2));
             }
-            engine_free_textures();
-            engine_load_textures();
             break;
         }
         case OPTION_VSYNC: {
             SDL_RenderSetVSync(engine.renderer, engine.options[option] == VSYNC_ENABLED);
-            engine_free_textures();
-            engine_load_textures();
             break;
         }
         case OPTION_SFX_VOLUME: {
