@@ -1246,7 +1246,7 @@ bool engine_load_textures() {
                     return false;
                 }
                 sprite.frame_size = xy(TILE_SIZE, TILE_SIZE);
-                SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
+                SDL_SetTextureBlendMode(tileset_texture, SDL_BLENDMODE_BLEND);
                 SDL_SetRenderTarget(engine.renderer, tileset_texture);
                 int tileset_index = 0;
                 SDL_Rect src_rect = (SDL_Rect) {
@@ -1341,7 +1341,7 @@ bool engine_load_textures() {
                     return false;
                 }
                 sprite.frame_size = xy(TILE_SIZE, TILE_SIZE);
-                SDL_SetTextureBlendMode(sprite.texture, SDL_BLENDMODE_BLEND);
+                SDL_SetTextureBlendMode(fog_texture, SDL_BLENDMODE_BLEND);
                 SDL_SetRenderTarget(engine.renderer, fog_texture);
                 int tileset_index = 0;
 

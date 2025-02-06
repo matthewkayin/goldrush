@@ -262,7 +262,8 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     }
 
     // Open menu button
-    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && !ui_is_targeting(state) && !ui_is_selecting(state) && !state.ui_is_minimap_dragging && sdl_rect_has_point(UI_MENU_BUTTON_RECT, engine.mouse_position)) {
+    if ((event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT && !ui_is_targeting(state) && !ui_is_selecting(state) && !state.ui_is_minimap_dragging && sdl_rect_has_point(UI_MENU_BUTTON_RECT, engine.mouse_position)) || 
+            (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F10)) {
         if (state.ui_mode == UI_MODE_MENU || state.ui_mode == UI_MODE_MENU_SURRENDER) {
             state.ui_mode = UI_MODE_NONE;
         } else {
@@ -407,7 +408,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     // Selected unit icon press
     if (ui_get_selected_unit_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         sound_play(SOUND_UI_SELECT);
-        if (engine.keystate[SDL_SCANCODE_LSHIFT]) {
+        if (engine.keystate[SDL_SCANCODE_LSHIFT] || engine.keystate[SDL_SCANCODE_RSHIFT]) {
             ui_deselect_entity_if_selected(state, state.selection[ui_get_selected_unit_hovered(state)]);
         } else {
             std::vector<entity_id> selection;
@@ -437,7 +438,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
 
         input_t input;
         input.type = INPUT_BUILD;
-        input.build.shift_command = engine.keystate[SDL_SCANCODE_LSHIFT];
+        input.build.shift_command = engine.keystate[SDL_SCANCODE_LSHIFT] || engine.keystate[SDL_SCANCODE_RSHIFT];
         input.build.building_type = state.ui_building_type;
         input.build.entity_count = state.selection.size();
         memcpy(&input.build.entity_ids, &state.selection[0], state.selection.size() * sizeof(entity_id));
@@ -581,7 +582,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         std::vector<entity_id> selection = ui_create_selection_from_rect(state);
 
         // Append selection
-        if (engine.keystate[SDL_SCANCODE_LCTRL]) { 
+        if (engine.keystate[SDL_SCANCODE_LCTRL] || engine.keystate[SDL_SCANCODE_RCTRL]) { 
             // Don't append selection if units are same type
             if (ui_get_selection_type(state, state.selection) != ui_get_selection_type(state, selection)) {
                 return;
@@ -629,7 +630,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
     if (event.type == SDL_KEYDOWN && event.key.keysym.sym >= SDLK_0 && event.key.keysym.sym <= SDLK_9) {
         uint32_t control_group_index = event.key.keysym.sym == SDLK_0 ? 9 : (uint32_t)(event.key.keysym.sym - SDLK_1);
         // Set control group
-        if (engine.keystate[SDL_SCANCODE_LCTRL]) {
+        if (engine.keystate[SDL_SCANCODE_LCTRL] || engine.keystate[SDL_SCANCODE_RCTRL]) {
             if (state.selection.empty() || state.entities.get_by_id(state.selection[0]).player_id != network_get_player_id()) {
                 return;
             }
@@ -639,7 +640,7 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         }
 
         // Append control group
-        if (engine.keystate[SDL_SCANCODE_LSHIFT]) {
+        if (engine.keystate[SDL_SCANCODE_LSHIFT] || engine.keystate[SDL_SCANCODE_RSHIFT]) {
             if (state.selection.empty() || state.entities.get_by_id(state.selection[0]).player_id != network_get_player_id() || 
                     ui_get_selection_type(state, state.selection) != ui_get_selection_type(state, state.control_groups[control_group_index])) {
                 return;
@@ -1075,7 +1076,7 @@ input_t match_create_move_input(const match_state_t& state) {
 
     // Create move input
     input_t input;
-    input.move.shift_command = engine.keystate[SDL_SCANCODE_LSHIFT];
+    input.move.shift_command = engine.keystate[SDL_SCANCODE_LSHIFT] || engine.keystate[SDL_SCANCODE_RSHIFT];
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
     int fog_value = state.map_fog[network_get_player_id()][input.move.target_cell.x + (input.move.target_cell.y * state.map_width)];

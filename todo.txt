@@ -7,6 +7,7 @@ todos
  - [ ] - On release build, always grab mouse
  - [x] - UI button for gold is wrong
  - [ ] - Add music
+ - [ ] - F10 to open match menu
  - [ ] - Options menu
     - [x] - Add options menu to match menu
     - [x] - Bug: sometimes switching display / vsync settings makes the fog messed up
