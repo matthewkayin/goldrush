@@ -211,8 +211,9 @@ match_state_t match_init() {
 void match_create_minimap_texture(match_state_t& state) {
     // Create new minimap texture
     engine.minimap_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
-    engine.minimap_tiles_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
-    SDL_SetRenderTarget(engine.renderer, engine.minimap_tiles_texture);
+
+    SDL_Texture* minimap_tiles_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, state.map_width, state.map_height);
+    SDL_SetRenderTarget(engine.renderer, minimap_tiles_texture);
     for (int y = 0; y < state.map_height; y++) {
         for (int x = 0; x < state.map_width; x++) {
             SDL_Color color;
@@ -230,7 +231,16 @@ void match_create_minimap_texture(match_state_t& state) {
             SDL_RenderDrawPoint(engine.renderer, x, y);
         }
     }
+
+    engine.minimap_tiles_texture = SDL_CreateTexture(engine.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, state.map_width, state.map_height);
+    const int pitch = state.map_width * 4;
+    void* pixels = malloc(state.map_height * pitch);
+    SDL_RenderReadPixels(engine.renderer, NULL, SDL_PIXELFORMAT_ARGB8888, pixels, pitch);
+    SDL_UpdateTexture(engine.minimap_tiles_texture, NULL, pixels, pitch);
+
     SDL_SetRenderTarget(engine.renderer, NULL);
+    SDL_DestroyTexture(minimap_tiles_texture);
+    free(pixels);
     log_trace("Created minimap texture.");
 }
 
