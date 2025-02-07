@@ -8,7 +8,7 @@
 
 static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
-static const uint32_t UNIT_MINE_TICK_DURATION = 45;
+static const uint32_t UNIT_MINE_TICK_DURATION = 50;
 static const uint32_t UNIT_MAX_GOLD_HELD = 10;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t GOLD_LOW_THRESHOLD = 500;
