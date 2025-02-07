@@ -9,7 +9,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
-static const uint32_t PLAYER_STARTING_GOLD = 5000;
+static const uint32_t PLAYER_STARTING_GOLD = 550;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 
