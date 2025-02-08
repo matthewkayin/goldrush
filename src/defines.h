@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #define APP_NAME "GOLD RUSH"
-#define APP_VERSION "0.4.2"
+#define APP_VERSION "0.4.3"
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 4
