@@ -53,7 +53,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .speed = fixed::from_int_and_raw_decimal(0, 200),
 
             .damage = 3,
-            .attack_cooldown = 16,
+            .attack_cooldown = 22,
             .range_squared = 1,
             .min_range_squared = 1
         }
@@ -80,8 +80,8 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 200),
 
-            .damage = 6,
-            .attack_cooldown = 30,
+            .damage = 8,
+            .attack_cooldown = 40,
             .range_squared = 25,
             .min_range_squared = 1
         }
@@ -108,7 +108,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
 
-            .damage = 5,
+            .damage = 6,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1
@@ -123,7 +123,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .gold_cost = 200,
         .train_duration = 38,
         .max_health = 120,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 1,
 
@@ -151,7 +151,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .gold_cost = 200,
         .train_duration = 38,
         .max_health = 120,
-        .sight = 7,
+        .sight = 9,
         .armor = 2,
         .attack_priority = 1,
 
@@ -176,10 +176,10 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_UNIT_JOCKEY,
         .cell_size = 1,
 
-        .gold_cost = 125,
-        .train_duration = 35,
+        .gold_cost = 100,
+        .train_duration = 30,
         .max_health = 100,
-        .sight = 7,
+        .sight = 9,
         .armor = 0,
         .attack_priority = 2,
 
@@ -192,7 +192,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(1, 40),
 
-            .damage = 6,
+            .damage = 8,
             .attack_cooldown = 30,
             .range_squared = 25,
             .min_range_squared = 1
@@ -274,7 +274,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .unit_data = (unit_data_t) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 180),
+            .speed = fixed::from_int_and_raw_decimal(0, 170),
 
             .damage = 15,
             .attack_cooldown = 30,
