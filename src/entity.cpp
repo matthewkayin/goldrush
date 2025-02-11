@@ -639,6 +639,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.gold_held = 0;
     entity.gold_patch_id = GOLD_PATCH_ID_NULL;
 
+    entity.taking_damage_counter = 0;
     entity.taking_damage_timer = 0;
     entity.health_regen_timer = 0;
 
@@ -1529,8 +1530,13 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         entity.cooldown_timer--;
     }
 
-    if (entity.taking_damage_timer != 0) {
+    if (entity.taking_damage_counter != 0) {
         entity.taking_damage_timer--;
+        if (entity.taking_damage_timer == 0) {
+            entity.taking_damage_counter--;
+            entity_set_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER, entity.taking_damage_counter == 0 ? false : !entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER));
+            entity.taking_damage_timer = entity.taking_damage_counter == 0 ? 0 : MATCH_TAKING_DAMAGE_FLICKER_DURATION;
+        } 
     }
     if (entity.health == ENTITY_DATA.at(entity.type).max_health) {
         entity.health_regen_timer = 0;
@@ -2339,7 +2345,7 @@ void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& def
         SDL_Rect defender_rect = entity_get_rect(defender);
         defender_rect.x -= state.camera_offset.x;
         defender_rect.y -= state.camera_offset.y;
-        if (defender.taking_damage_timer != 0 && SDL_HasIntersection(&SCREEN_RECT, &defender_rect) != SDL_TRUE) {
+        if (defender.taking_damage_counter == 0 && SDL_HasIntersection(&SCREEN_RECT, &defender_rect) != SDL_TRUE) {
             bool is_existing_attack_alert_nearby = false;
             for (const alert_t& existing_alert : state.alerts) {
                 if (existing_alert.color == ALERT_COLOR_RED && xy::manhattan_distance(existing_alert.cell, defender.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
@@ -2359,8 +2365,12 @@ void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& def
                 sound_play(SOUND_ALERT_BELL);
             }
         }
-        defender.taking_damage_timer = MATCH_TAKING_DAMAGE_TIMER_DURATION;
     }
+    defender.taking_damage_counter = 3;
+    if (defender.taking_damage_timer == 0) {
+        defender.taking_damage_timer = MATCH_TAKING_DAMAGE_FLICKER_DURATION;
+    }
+
     // Health regen timer
     if (entity_is_unit(defender.type)) {
         defender.health_regen_timer = UNIT_HEALTH_REGEN_DURATION + UNIT_HEALTH_REGEN_DELAY;

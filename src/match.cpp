@@ -9,7 +9,7 @@
 static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 4;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
-static const uint32_t PLAYER_STARTING_GOLD = 5500;
+static const uint32_t PLAYER_STARTING_GOLD = 550;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 
@@ -124,12 +124,6 @@ match_state_t match_init() {
     }
 
     std::vector<xy> player_spawns = map_init(state);
-    #ifdef GOLD_NEAR_SPAWN
-    if (player_spawns.size() > 1) {
-        player_spawns[1] = player_spawns[0] + xy(0, 16);
-    }
-    #endif
-    
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
@@ -145,10 +139,21 @@ match_state_t match_init() {
         }
 
         // Determine player spawn
-        int spawn_index = lcg_rand() % player_spawns.size();
-        log_trace("Determining spawn location. spawn size %u spawn index %i", player_spawns.size(), spawn_index);
-        xy player_spawn = player_spawns[spawn_index];
-        player_spawns.erase(player_spawns.begin() + spawn_index);
+        xy player_spawn;
+        #ifdef GOLD_NEAR_SPAWN
+            if (player_id == 0) {
+                player_spawn = player_spawns[0];
+            }
+            if (player_id == 1) {
+                player_spawn = player_spawns[0] + xy(0, 16);
+            }
+        #else
+            int spawn_index = lcg_rand() % player_spawns.size();
+            log_trace("Determining spawn location. spawn size %u spawn index %i", player_spawns.size(), spawn_index);
+            player_spawn = player_spawns[spawn_index];
+            player_spawns.erase(player_spawns.begin() + spawn_index);
+        #endif
+        
         if (player_id == network_get_player_id()) {
             match_camera_center_on_cell(state, player_spawn);
         }
@@ -539,13 +544,15 @@ void match_handle_input(match_state_t& state, SDL_Event event) {
         return;
     } 
 
+    // Set building rally
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT &&
             ui_get_selection_type(state, state.selection) == SELECTION_TYPE_BUILDINGS && 
             !ui_is_targeting(state) && !ui_is_selecting(state) && !state.ui_is_minimap_dragging &&
             (!ui_is_mouse_in_ui() || sdl_rect_has_point(MINIMAP_RECT, engine.mouse_position))) {
         // Check to make sure that all buildings can rally
         for (entity_id id : state.selection) {
-            if (!ENTITY_DATA.at(state.entities.get_by_id(id).type).building_data.can_rally) {
+            entity_t& entity = state.entities.get_by_id(id);
+            if (entity.mode == MODE_BUILDING_IN_PROGRESS || !ENTITY_DATA.at(entity.type).building_data.can_rally) {
                 return;
             }
         }
@@ -1090,10 +1097,11 @@ input_t match_create_move_input(const match_state_t& state) {
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
     int fog_value = state.map_fog[network_get_player_id()][input.move.target_cell.x + (input.move.target_cell.y * state.map_width)];
-    if (fog_value != FOG_HIDDEN) {
+    // don't target enemies in hidden fog or when minimap clicking
+    if (fog_value != FOG_HIDDEN && !ui_is_mouse_in_ui()) {
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
             const entity_t& entity = state.entities[entity_index];
-            // I think this is saying, don't target unselectable entities, unless it's gold and the player doesn't know that the gold is unselectable
+            // don't target unselectable entities, unless it's gold and the player doesn't know that the gold is unselectable
             // It's also saying, don't target a hidden mine
             if (!entity_is_selectable(entity) || 
                     (fog_value == FOG_EXPLORED && entity.type != ENTITY_GOLD) ||
@@ -2512,13 +2520,7 @@ void match_render(const match_state_t& state) {
         SDL_Color color;
         if (entity.type == ENTITY_GOLD) {
             color = COLOR_GOLD;
-        } else if (entity.taking_damage_timer != 0 && (entity.taking_damage_timer / MATCH_TAKING_DAMAGE_FLICKER_DURATION) % 2 == 0) {
-            /*
-             * This code is too smart for it's own good so let me explain:
-             * entity_damage_timer will begin at 30 and it should cause us to flicker between red and green in intervals of 10 (MATCH_TAKING_DAMAGE_FLICKER_DURATION)
-             * if you take entity_damage_timer / 10 you get an int depending on where in the range you are. 5 / 10 = 0, 15 / 10 = 1, 25 / 10 = 2, so the even numbers
-             * in this range is where we want the flicker to occur and the odd numbers is where we want to not flicker
-            */
+        } else if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
            color = COLOR_WHITE;
         } else {
             color = PLAYER_COLORS[network_get_player(entity.player_id).recolor_id].clothes_color;

@@ -575,7 +575,7 @@ std::vector<xy> map_init(match_state_t& state) {
     log_trace("Generating gold cells...");
     poisson_disk_params_t params = (poisson_disk_params_t) {
         .avoid_values = std::vector<int>(state.map_width * state.map_height, 0),
-        .disk_radius = 32,
+        .disk_radius = 40,
         .allow_unreachable_cells = false
     };
 
@@ -593,7 +593,7 @@ std::vector<xy> map_init(match_state_t& state) {
     for (uint32_t patch_id = 0; patch_id < gold_sample.size(); patch_id++) {
         // Choose an adjacent direction to walk in
         int patch_size = 0;
-        int patch_goal = 3 + (lcg_rand() % 10);
+        int patch_goal = 5 + (lcg_rand() % 5);
         std::vector<xy> gold_frontier;
         gold_frontier.push_back(gold_sample[patch_id]);
         while (patch_size < patch_goal && !gold_frontier.empty()) {

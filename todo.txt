@@ -1,25 +1,29 @@
 todos
- - [x] - Prevent spawn in place where chicken cannot escape
- - [x] - Bug: buildings can't be placed at the edge of the map
+ - [ ] - Bugs
+    - [x] - players can attack their own stuff on accident by a-move into minimap
+    - [ ] - possible desync?
+ - [ ] - Balance
+    - [ ] - mining rate
+    - [ ] - gold patch distribution
+    - [ ] - detectives get revealed when they attack but deal more damage and attack slower?
+    - [ ] - more decisive tech trees? 
+    - [ ] - upgrade for cowboys, faster walking and shooting speed?
  - [ ] - Replays
- - [ ] - Customizable map size ? or at least dynamic based on player count
- - [ ] - Team games
+ - [ ] - UI Rework
+    - [ ] - 32 character usernames
+    - [ ] - Chat in lobby
+    - [ ] - LAN and Online options from the "play" menu
+    - [ ] - Room for credits button (so maybe play -> LAN/Online/Replay, main -> Play/Options/Credits/Exit)
+    - [ ] - Custom map size
+    - [ ] - Team games
  - [ ] - On release build, always grab mouse
- - [x] - UI button for gold is wrong
  - [ ] - Add music
- - [x] - F10 to open match menu
- - [ ] - Hammer sound should be quieter
- - [ ] - Better pickaxe sound, try a compressor?
+ - [ ] - Better sounds
+    - [ ] - pickaxe 
+    - [ ] - unit create
  - [ ] - Options menu
-    - [x] - Add options menu to match menu
-    - [x] - Bug: sometimes switching display / vsync settings makes the fog messed up
-    - [x] - Bug: victory buttons are messed up
-    - [x] - Fullscreen
-    - [x] - Vsync
-    - [x] - Volume slider for sound
-    - [ ] - Double click duration?
-    - [ ] - Hide control group icons?
+    - [ ] - Double click duration, or get double click from OS?
+    - [ ] - Hide control group icons ?
     - [ ] - Volume slider for music
-    - [x] - Keybinds
+    - [ ] - Keybinds for other actions ?
     - [ ] - Test with different resolutions to see how it looks
-    - [x] - Camera scroll sensitivity
