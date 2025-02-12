@@ -45,6 +45,18 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
         .color = COLOR_WHITE,
         .ignore_y_bearing = true
     }},
+    { FONT_HACK_BLACK, (font_params_t) {
+        .path = "font/hack.ttf",
+        .size = 10,
+        .color = COLOR_BLACK,
+        .ignore_y_bearing = true
+    }},
+    { FONT_HACK_GOLD, (font_params_t) {
+        .path = "font/hack.ttf",
+        .size = 10,
+        .color = COLOR_GOLD,
+        .ignore_y_bearing = true
+    }},
     { FONT_WESTERN8_OFFBLACK, (font_params_t) {
         .path = "font/western.ttf",
         .size = 8,
@@ -248,6 +260,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .path = "sprite/ui_menu_parchment_buttons.png",
         .hframes = 1,
         .vframes = 2,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_UI_DROPDOWN_MINI, (sprite_params_t) {
+        .path = "sprite/ui_dropdown_mini.png",
+        .hframes = 1,
+        .vframes = 5,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
     { SPRITE_SELECT_RING_UNIT_1, (sprite_params_t) {

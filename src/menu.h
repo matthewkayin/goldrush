@@ -61,6 +61,7 @@ struct menu_state_t {
     uint32_t status_timer;
 
     std::string username;
+    std::string lobby_name;
     int item_selected;
 
     bool dropdown_open;

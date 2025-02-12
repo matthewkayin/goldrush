@@ -15,6 +15,7 @@ struct network_state_t {
     NetworkStatus status;
 
     char client_username[NAME_BUFFER_SIZE];
+    char lobby_name[LOBBY_NAME_BUFFER_SIZE];
 
     uint8_t player_id;
     player_t players[MAX_PLAYERS];
@@ -54,6 +55,7 @@ struct message_welcome_t {
     uint8_t recolor_id;
     uint8_t server_recolor_id;
     char server_username[NAME_BUFFER_SIZE];
+    char lobby_name[LOBBY_NAME_BUFFER_SIZE];
 };
 
 struct message_new_player_t {
@@ -205,6 +207,7 @@ bool network_server_create(const char* username) {
     state.player_id = 0;
     state.players[0].status = PLAYER_STATUS_HOST;
     strncpy(state.players[0].name, username, MAX_USERNAME_LENGTH + 1);
+    sprintf(state.lobby_name, "%s's Game", username);
 
     log_info("Created server.");
     return true;
@@ -341,6 +344,10 @@ const lobby_t& network_get_lobby(size_t index) {
     return state.lobbies[index];
 }
 
+const char* network_get_lobby_name() {
+    return state.lobby_name;
+}
+
 // POLL EVENTS
 
 void network_service() {
@@ -351,7 +358,7 @@ void network_service() {
         while (enet_socketset_select(state.scanner, &set, NULL, 0) > 0) {
             ENetAddress receive_address;
             ENetBuffer receive_buffer;
-            char buffer[64];
+            char buffer[LOBBY_SEARCH_BUFFER_SIZE];
             receive_buffer.data = &buffer;
             receive_buffer.dataLength = sizeof(buffer);
             if (enet_socket_receive(state.scanner, &receive_address, &receive_buffer, 1) <= 0) {
@@ -361,7 +368,7 @@ void network_service() {
             if (state.status == NETWORK_STATUS_SERVER) {
                 // Tell the client about this game
                 lobby_info_t lobby_info;
-                sprintf(lobby_info.name, "%s's Game", state.players[0].name);
+                strncpy(lobby_info.name, state.lobby_name, LOBBY_NAME_BUFFER_SIZE);
                 lobby_info.player_count = 0;
                 lobby_info.port = state.host->address.port;
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -369,6 +376,7 @@ void network_service() {
                         lobby_info.player_count++;
                     }
                 }
+                log_trace("sending lobby info. name %s player count %u port %u", lobby_info.name, lobby_info.player_count, lobby_info.port);
 
                 ENetBuffer response_buffer;
                 response_buffer.data = &lobby_info;
@@ -377,8 +385,9 @@ void network_service() {
             } else {
                 lobby_info_t lobby_info;
                 memcpy(&lobby_info, buffer, sizeof(lobby_info_t));
+                log_trace("received lobby info. name %s player count %u port %u", lobby_info.name, lobby_info.player_count, lobby_info.port);
                 lobby_t lobby;
-                memcpy(&lobby.name, lobby_info.name, 32);
+                memcpy(&lobby.name, lobby_info.name, LOBBY_NAME_BUFFER_SIZE);
                 lobby.player_count = lobby_info.player_count;
                 lobby.port = lobby_info.port;
                 enet_address_get_host_ip(&receive_address, lobby.ip, NAME_BUFFER_SIZE);
@@ -524,6 +533,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             welcome.recolor_id = incoming_player_recolor_id;
             welcome.server_recolor_id = state.players[0].recolor_id;
             strncpy(welcome.server_username, state.players[0].name, MAX_USERNAME_LENGTH + 1);
+            strncpy(welcome.lobby_name, state.lobby_name, LOBBY_NAME_BUFFER_SIZE);
             ENetPacket* welcome_packet = enet_packet_create(&welcome, sizeof(message_welcome_t), ENET_PACKET_FLAG_RELIABLE);
             enet_peer_send(&state.host->peers[incoming_peer_id], 0, welcome_packet);
             log_trace("Sent welcome packet to player %u", incoming_player_id);
@@ -580,6 +590,9 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             uint8_t* player_id_ptr = (uint8_t*)malloc(sizeof(uint8_t));
             *player_id_ptr = 0;
             state.peers[0]->data = player_id_ptr;
+
+            // Get lobby name
+            strncpy(state.lobby_name, welcome.lobby_name, LOBBY_NAME_BUFFER_SIZE);
 
             state.event_queue.push((network_event_t) {
                 .type = NETWORK_EVENT_JOINED_LOBBY

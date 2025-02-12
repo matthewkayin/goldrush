@@ -3,7 +3,9 @@
 #include "defines.h"
 #include <cstddef>
 
-#define NAME_BUFFER_SIZE 20
+#define NAME_BUFFER_SIZE 36
+#define LOBBY_NAME_BUFFER_SIZE 64
+#define LOBBY_SEARCH_BUFFER_SIZE 128
 
 enum NetworkStatus {
     NETWORK_STATUS_OFFLINE,
@@ -28,14 +30,14 @@ struct player_t {
 };
 
 struct lobby_info_t {
-    char name[32];
+    char name[LOBBY_NAME_BUFFER_SIZE];
     uint16_t port;
     uint8_t player_count;
-    uint8_t padding[2];
+    uint8_t padding;
 };
 
 struct lobby_t {
-    char name[32];
+    char name[LOBBY_NAME_BUFFER_SIZE];
     char ip[32];
     uint16_t port;
     uint8_t player_count;
@@ -87,6 +89,7 @@ uint8_t network_get_player_id();
 bool network_are_all_players_ready();
 const size_t network_get_lobby_count();
 const lobby_t& network_get_lobby(size_t index);
+const char* network_get_lobby_name();
 
 void network_toggle_ready();
 void network_set_player_color(uint8_t recolor_id);
