@@ -120,6 +120,8 @@ static const int COL_TEAM_X = PLAYERLIST_RECT.x + 280;
 static const int COL_COLOR_X = PLAYERLIST_RECT.x + 336;
 static const int MINI_DROPDOWN_TEXT_Y_OFFSET = -10;
 
+static const int TEXT_INPUT_BLINK_DURATION = 30;
+
 struct match_setting_t {
     const char* name;
     uint32_t default_value;
@@ -149,7 +151,9 @@ menu_state_t menu_init() {
     };
     menu_set_mode(state, MENU_MODE_MAIN);
 
+    state.text_input_blink_timer = 0;
     state.dropdown_open = -1;
+    state.editing_lobby_name = false;
 
     state.wagon_animation = animation_create(ANIMATION_UNIT_MOVE_SLOW);
     state.parallax_x = 0;
@@ -408,6 +412,19 @@ void menu_update(menu_state_t& state) {
             state.parallax_cactus_offset = (state.parallax_cactus_offset + 1) % 5;
         }
         state.parallax_timer = PARALLAX_TIMER_DURATION;
+    }
+
+    if (SDL_IsTextInputActive()) {
+        if (state.text_input_blink_timer != 0) {
+            state.text_input_blink_timer--;
+        }
+        if (state.text_input_blink_timer == 0) {
+            state.text_input_blink_timer = TEXT_INPUT_BLINK_DURATION;
+            state.text_input_blink = !state.text_input_blink;
+        }
+    } else {
+        state.text_input_blink_timer = 0;
+        state.text_input_blink = false;
     }
 
     state.hover = (menu_hover_t) {
@@ -677,6 +694,10 @@ void menu_render(const menu_state_t& state) {
 
     if (state.mode == MENU_MODE_USERNAME) {
         render_sprite(SPRITE_MENU_USERNAME, xy(0, 0), xy(TEXT_INPUT_RECT.x - (engine.sprites[SPRITE_MENU_USERNAME].frame_size.x - TEXT_INPUT_RECT.w), TEXT_INPUT_RECT.y), RENDER_SPRITE_NO_CULL);
+        if (state.text_input_blink) {
+            xy cursor_pos = xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 7) + xy(render_get_text_size(FONT_HACK_BLACK, state.username.c_str()).x - 4, 0);
+            render_text(FONT_HACK_BLACK, "|", cursor_pos, TEXT_ANCHOR_BOTTOM_LEFT);
+        }
         render_text(FONT_HACK_BLACK, state.username.c_str(), xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 7), TEXT_ANCHOR_BOTTOM_LEFT);
     }
 
@@ -712,10 +733,14 @@ void menu_render(const menu_state_t& state) {
         render_ninepatch(SPRITE_UI_FRAME, PLAYERLIST_RECT, 16);
         render_ninepatch(SPRITE_UI_FRAME, MATCH_SETTINGS_RECT, 16);
         xy lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_is_server() ? state.lobby_name.c_str() : network_get_lobby_name());
-        render_text(FONT_HACK_GOLD, network_is_server() ? state.lobby_name.c_str() : network_get_lobby_name(), xy(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y - 4));
+        xy lobby_name_text_pos = xy(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y - 4);
+        render_text(FONT_HACK_GOLD, network_is_server() ? state.lobby_name.c_str() : network_get_lobby_name(), lobby_name_text_pos);
         if (!state.editing_lobby_name && network_is_server()) {
             SDL_Rect lobby_edit_button_rect = menu_get_lobby_edit_button_rect(state.lobby_name.c_str());
             render_sprite(SPRITE_MENU_EDIT_BUTTON, xy(0, (int)(state.hover.type == MENU_HOVER_EDIT_BUTTON)), xy(lobby_edit_button_rect.x, lobby_edit_button_rect.y + (state.hover.type == MENU_HOVER_EDIT_BUTTON ? -1 : 0)), RENDER_SPRITE_NO_CULL);
+        } else if (state.editing_lobby_name && state.text_input_blink) {
+            xy cursor_pos = lobby_name_text_pos + xy(lobby_name_text_size.x - 4, 0);
+            render_text(FONT_HACK_GOLD, "|", cursor_pos);
         }
 
         render_text(FONT_HACK_GOLD, "Name", xy(COL_NAME_X, COL_HEADER_Y));

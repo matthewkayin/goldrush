@@ -66,6 +66,8 @@ struct menu_state_t {
 
     std::string status_text;
     uint32_t status_timer;
+    uint32_t text_input_blink_timer;
+    bool text_input_blink;
 
     std::string username;
     std::string lobby_name;
