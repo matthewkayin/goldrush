@@ -5,6 +5,7 @@
 
 #define NAME_BUFFER_SIZE 36
 #define LOBBY_NAME_BUFFER_SIZE 64
+#define LOBBY_NAME_MAX 40
 #define LOBBY_SEARCH_BUFFER_SIZE 128
 
 enum NetworkStatus {
@@ -42,6 +43,26 @@ struct lobby_t {
     uint16_t port;
     uint8_t player_count;
 };
+
+enum MatchSetting {
+    MATCH_SETTING_MAP_SIZE,
+    MATCH_SETTING_TEAMS,
+    MATCH_SETTING_COUNT
+};
+
+enum MapSize {
+    MATCH_SETTING_MAP_SIZE_SMALL,
+    MATCH_SETTING_MAP_SIZE_MEDIUM,
+    MATCH_SETTING_MAP_SIZE_LARGE,
+    MATCH_SETTING_MAP_SIZE_COUNT
+};
+
+enum MatchSettingTeams {
+    MATCH_SETTING_TEAMS_ENABLED,
+    MATCH_SETTING_TEAMS_DISABLED,
+    MATCH_SETTING_TEAMS_COUNT
+};
+
 
 enum NetworkEventType {
     NETWORK_EVENT_CONNECTION_FAILED,
@@ -90,6 +111,9 @@ bool network_are_all_players_ready();
 const size_t network_get_lobby_count();
 const lobby_t& network_get_lobby(size_t index);
 const char* network_get_lobby_name();
+void network_set_lobby_name(const char* value);
+uint32_t network_get_match_setting(MatchSetting setting);
+void network_set_match_setting(MatchSetting setting, uint32_t value);
 
 void network_toggle_ready();
 void network_set_player_color(uint8_t recolor_id);

@@ -39,10 +39,17 @@ enum MenuButton {
 enum MenuHoverType {
     MENU_HOVER_NONE,
     MENU_HOVER_BUTTON,
+    MENU_HOVER_EDIT_BUTTON,
     MENU_HOVER_ITEM,
     MENU_HOVER_REFRESH,
     MENU_HOVER_DROPDOWN,
     MENU_HOVER_DROPDOWN_ITEM
+};
+
+enum MenuHoverDropdown {
+    MENU_DROPDOWN_MAP_SIZE,
+    MENU_DROPDOWN_TEAMS,
+    MENU_DROPDOWN_COLOR
 };
 
 struct menu_hover_t {
@@ -63,8 +70,8 @@ struct menu_state_t {
     std::string username;
     std::string lobby_name;
     int item_selected;
-
-    bool dropdown_open;
+    int dropdown_open;
+    bool editing_lobby_name;
 
     animation_t wagon_animation;
     int parallax_x;
@@ -85,3 +92,7 @@ void menu_render(const menu_state_t& state);
 SDL_Rect menu_get_lobby_text_frame_rect(int lobby_index);
 void menu_render_lobby_text(const menu_state_t& state, int lobby_index);
 SDL_Rect menu_get_dropdown_rect(int index);
+
+SDL_Rect menu_get_match_setting_rect(int index);
+const char* menu_match_setting_value_str(MatchSetting setting, uint32_t value);
+SDL_Rect menu_get_lobby_edit_button_rect(const char* lobby_name);

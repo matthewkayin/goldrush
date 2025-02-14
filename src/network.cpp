@@ -8,6 +8,7 @@
 #include <enet/enet.h>
 #include <queue>
 #include <ctime>
+#include <unordered_map>
 
 struct network_state_t {
     ENetHost* host;
@@ -16,6 +17,7 @@ struct network_state_t {
 
     char client_username[NAME_BUFFER_SIZE];
     char lobby_name[LOBBY_NAME_BUFFER_SIZE];
+    std::unordered_map<MatchSetting, uint32_t> match_settings;
 
     uint8_t player_id;
     player_t players[MAX_PLAYERS];
@@ -39,6 +41,8 @@ enum MessageType {
     MESSAGE_READY,
     MESSAGE_NOT_READY,
     MESSAGE_COLOR,
+    MESSAGE_MATCH_SETTING,
+    MESSAGE_LOBBY_NAME,
     MESSAGE_MATCH_LOAD,
     MESSAGE_INPUT
 };
@@ -56,6 +60,7 @@ struct message_welcome_t {
     uint8_t server_recolor_id;
     char server_username[NAME_BUFFER_SIZE];
     char lobby_name[LOBBY_NAME_BUFFER_SIZE];
+    uint8_t match_settings[MATCH_SETTING_COUNT];
 };
 
 struct message_new_player_t {
@@ -75,6 +80,17 @@ struct message_greet_t {
 struct message_color_t {
     const uint8_t type = MESSAGE_COLOR;
     uint8_t recolor_id;
+};
+
+struct message_match_setting_t {
+    const uint8_t type = MESSAGE_MATCH_SETTING;
+    uint8_t setting;
+    uint8_t value;
+};
+
+struct message_lobby_name_t {
+    const uint8_t type = MESSAGE_LOBBY_NAME;
+    char lobby_name[LOBBY_NAME_BUFFER_SIZE];
 };
 
 bool network_init() {
@@ -348,6 +364,33 @@ const char* network_get_lobby_name() {
     return state.lobby_name;
 }
 
+void network_set_lobby_name(const char* value) {
+    strncpy(state.lobby_name, value, LOBBY_NAME_MAX + 1);
+
+    message_lobby_name_t message;
+    strncpy(message.lobby_name, value, LOBBY_NAME_MAX + 1);
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message_lobby_name_t), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+uint32_t network_get_match_setting(MatchSetting setting) {
+    return state.match_settings[setting];
+}
+
+void network_set_match_setting(MatchSetting setting, uint32_t value) {
+    state.match_settings[setting] = value;
+    
+    message_match_setting_t message;
+    message.setting = (uint8_t)setting;
+    message.value = (uint8_t)value;
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message_match_setting_t), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
 // POLL EVENTS
 
 void network_service() {
@@ -385,7 +428,6 @@ void network_service() {
             } else {
                 lobby_info_t lobby_info;
                 memcpy(&lobby_info, buffer, sizeof(lobby_info_t));
-                log_trace("received lobby info. name %s player count %u port %u", lobby_info.name, lobby_info.player_count, lobby_info.port);
                 lobby_t lobby;
                 memcpy(&lobby.name, lobby_info.name, LOBBY_NAME_BUFFER_SIZE);
                 lobby.player_count = lobby_info.player_count;
@@ -534,6 +576,9 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             welcome.server_recolor_id = state.players[0].recolor_id;
             strncpy(welcome.server_username, state.players[0].name, MAX_USERNAME_LENGTH + 1);
             strncpy(welcome.lobby_name, state.lobby_name, LOBBY_NAME_BUFFER_SIZE);
+            for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
+                welcome.match_settings[setting] = (uint8_t)state.match_settings.at((MatchSetting)setting);
+            }
             ENetPacket* welcome_packet = enet_packet_create(&welcome, sizeof(message_welcome_t), ENET_PACKET_FLAG_RELIABLE);
             enet_peer_send(&state.host->peers[incoming_peer_id], 0, welcome_packet);
             log_trace("Sent welcome packet to player %u", incoming_player_id);
@@ -591,8 +636,11 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             *player_id_ptr = 0;
             state.peers[0]->data = player_id_ptr;
 
-            // Get lobby name
+            // Get lobby name and settings
             strncpy(state.lobby_name, welcome.lobby_name, LOBBY_NAME_BUFFER_SIZE);
+            for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
+                state.match_settings[(MatchSetting)setting] = (uint32_t)welcome.match_settings[setting];
+            }
 
             state.event_queue.push((network_event_t) {
                 .type = NETWORK_EVENT_JOINED_LOBBY
@@ -649,6 +697,14 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
 
             uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
             state.players[*player_id].recolor_id = data[1];
+            break;
+        }
+        case MESSAGE_MATCH_SETTING: {
+            state.match_settings[(MatchSetting)data[1]] = (uint32_t)data[2];
+            break;
+        }
+        case MESSAGE_LOBBY_NAME: {
+            strncpy(state.lobby_name, (char*)(data + 1), LOBBY_NAME_MAX + 1);
             break;
         }
         case MESSAGE_MATCH_LOAD: {

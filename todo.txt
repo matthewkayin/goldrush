@@ -2,12 +2,14 @@ todos
  - [ ] - Bugs
     - [x] - players can attack their own stuff on accident by a-move into minimap
     - [ ] - possible desync?
+    - [ ] - Mac / Retina display fullscreen issues
  - [ ] - Balance
     - [ ] - mining rate
     - [ ] - gold patch distribution
     - [ ] - detectives get revealed when they attack but deal more damage and attack slower?
     - [ ] - more decisive tech trees? 
     - [ ] - upgrade for cowboys, faster walking and shooting speed?
+    - [ ] - bunker range
  - [ ] - Replays
  - [ ] - UI Rework
     - [ ] - 32 character usernames

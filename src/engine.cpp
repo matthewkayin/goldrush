@@ -550,6 +550,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
+    { SPRITE_MENU_EDIT_BUTTON, (sprite_params_t) {
+        .path = "sprite/menu_edit.png",
+        .hframes = 1,
+        .vframes = 2,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
     { SPRITE_PARTICLE_SPARKS, (sprite_params_t) {
         .path = "sprite/particle_sparks.png",
         .hframes = 4,

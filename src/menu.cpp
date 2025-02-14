@@ -20,17 +20,26 @@ struct menu_button_t {
 };
 
 static const SDL_Rect MATCHLIST_RECT = (SDL_Rect) {
-    .x = 36, .y = 32, .w = 320, .h = 128
-};
-static const SDL_Rect PLAYERLIST_RECT = (SDL_Rect) {
     .x = 36, .y = 32, .w = 432, .h = 128
 };
+static const SDL_Rect PLAYERLIST_RECT = (SDL_Rect) {
+    .x = 16, .y = 32, .w = 432, .h = 128
+};
+static const SDL_Rect MATCH_SETTINGS_RECT = (SDL_Rect) {
+    .x = PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 4,
+    .y = PLAYERLIST_RECT.y,
+    .w = 172,
+    .h = PLAYERLIST_RECT.h
+};
 static SDL_Rect TEXT_INPUT_RECT = (SDL_Rect) {
-    .x = PLAYERLIST_RECT.x + 8 + 9, .y = 136, .w = 150, .h = 18 
+    .x = MATCHLIST_RECT.x + 8 + 9, .y = 136, .w = 150, .h = 18 
+};
+static SDL_Rect LOBBY_TEXT_INPUT_RECT = (SDL_Rect) {
+    .x = PLAYERLIST_RECT.x - (PLAYERLIST_RECT.w / 2) - 75, .y = PLAYERLIST_RECT.y - 4, .w = 150, .h = 18
 };
 static const xy REFRESH_BUTTON_POSITION = xy(MATCHLIST_RECT.x + MATCHLIST_RECT.w + 8, MATCHLIST_RECT.y + 8);
 
-static const int BUTTON_X = PLAYERLIST_RECT.x + 8;
+static const int BUTTON_X = MATCHLIST_RECT.x + 8;
 static const int BUTTON_Y = 128;
 static const int BUTTON_Y_DIST = 21 + 4;
 static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
@@ -56,12 +65,12 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
     }},
     { MENU_BUTTON_HOST, (menu_button_t) {
         .text = "HOST",
-        .position_x = PLAYERLIST_RECT.x + 8 + 56 + 4,
+        .position_x = BUTTON_X + 56 + 4,
         .position_y = BUTTON_Y + 42
     }},
     { MENU_BUTTON_JOIN, (menu_button_t) {
         .text = "JOIN",
-        .position_x = PLAYERLIST_RECT.x + 8 + ((56 + 4) * 2),
+        .position_x = BUTTON_X + ((56 + 4) * 2),
         .position_y = BUTTON_Y + 42
     }},
     { MENU_BUTTON_MATCHLIST_BACK, (menu_button_t) {
@@ -86,12 +95,12 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
     }},
     { MENU_BUTTON_LOBBY_READY, (menu_button_t) {
         .text = "READY",
-        .position_x = PLAYERLIST_RECT.x + 8 + 56 + 4,
+        .position_x = BUTTON_X + 56 + 4,
         .position_y = BUTTON_Y + 42
     }},
     { MENU_BUTTON_LOBBY_START, (menu_button_t) {
         .text = "START",
-        .position_x = PLAYERLIST_RECT.x + 8 + 56 + 4,
+        .position_x = BUTTON_X + 56 + 4,
         .position_y = BUTTON_Y + 42
     }},
     { MENU_BUTTON_CONNECTING_BACK, (menu_button_t) {
@@ -104,12 +113,30 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
 static const uint32_t STATUS_TIMER_DURATION = 60;
 static const int PARALLAX_TIMER_DURATION = 2;
 
-static const int COL_HEADER_Y = PLAYERLIST_RECT.y + 10;
+static const int COL_HEADER_Y = PLAYERLIST_RECT.y + 12;
 static const int COL_NAME_X = PLAYERLIST_RECT.x + 16;
 static const int COL_STATUS_X = PLAYERLIST_RECT.x + 216;
 static const int COL_TEAM_X = PLAYERLIST_RECT.x + 280;
 static const int COL_COLOR_X = PLAYERLIST_RECT.x + 336;
 static const int MINI_DROPDOWN_TEXT_Y_OFFSET = -10;
+
+struct match_setting_t {
+    const char* name;
+    uint32_t default_value;
+    uint32_t value_count;
+};
+static const std::unordered_map<MatchSetting, match_setting_t> MATCH_SETTING_DATA = {
+    { MATCH_SETTING_MAP_SIZE, (match_setting_t) {
+        .name = "Map Size:",
+        .default_value = MATCH_SETTING_MAP_SIZE_SMALL,
+        .value_count = MATCH_SETTING_MAP_SIZE_COUNT
+    }},
+    { MATCH_SETTING_TEAMS, (match_setting_t) {
+        .name = "Team Game:",
+        .default_value = MATCH_SETTING_TEAMS_DISABLED,
+        .value_count = MATCH_SETTING_TEAMS_COUNT
+    }}
+};
 
 menu_state_t menu_init() {
     menu_state_t state;
@@ -122,7 +149,7 @@ menu_state_t menu_init() {
     };
     menu_set_mode(state, MENU_MODE_MAIN);
 
-    state.dropdown_open = false;
+    state.dropdown_open = -1;
 
     state.wagon_animation = animation_create(ANIMATION_UNIT_MOVE_SLOW);
     state.parallax_x = 0;
@@ -143,12 +170,16 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
 
     // Mouse pressed
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        if (state.mode == MENU_MODE_LOBBY && state.dropdown_open) {
+        if (state.mode == MENU_MODE_LOBBY && state.dropdown_open != -1) {
             if (state.hover.type == MENU_HOVER_DROPDOWN_ITEM) {
                 sound_play(SOUND_UI_SELECT);
-                network_set_player_color((uint8_t)state.hover.item);
+                if (state.dropdown_open == MENU_DROPDOWN_COLOR) {
+                    network_set_player_color((uint8_t)state.hover.item);
+                } else {
+                    network_set_match_setting((MatchSetting)state.dropdown_open, state.hover.item);
+                }
             }
-            state.dropdown_open = false;
+            state.dropdown_open = -1;
             return;
         }
 
@@ -192,6 +223,9 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     }
 
                     state.lobby_name = std::string(network_get_lobby_name());
+                    for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
+                        network_set_match_setting((MatchSetting)setting, MATCH_SETTING_DATA.at((MatchSetting)setting).default_value);
+                    }
                     menu_set_mode(state, MENU_MODE_LOBBY);
                     break;
                 }
@@ -253,7 +287,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
         state.item_selected = state.mode == MENU_MODE_MATCHLIST && state.hover.type == MENU_HOVER_ITEM
                                 ?  state.item_selected = state.hover.item
                                 : -1;
-        state.dropdown_open = state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN;
+        state.dropdown_open = state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN ? state.hover.item : -1;
         if ((state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN) || (state.mode == MENU_MODE_MATCHLIST && state.hover.type == MENU_HOVER_ITEM)) {
             sound_play(SOUND_UI_SELECT);
         }
@@ -270,16 +304,40 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
             network_scanner_search();
             sound_play(SOUND_UI_SELECT);
         }
+
+        if (state.hover.type == MENU_HOVER_EDIT_BUTTON) {
+            state.editing_lobby_name = true;
+            SDL_SetTextInputRect(&LOBBY_TEXT_INPUT_RECT);
+            SDL_StartTextInput();
+            sound_play(SOUND_UI_SELECT);
+        }
     } else if (event.type == SDL_TEXTINPUT) {
         if (state.mode == MENU_MODE_USERNAME) {
             state.username += std::string(event.text.text);
             if (state.username.length() > MAX_USERNAME_LENGTH) {
                 state.username = state.username.substr(0, MAX_USERNAME_LENGTH);
             }
+        } else if (state.editing_lobby_name) {
+            state.lobby_name += std::string(event.text.text);
+            if (state.lobby_name.length() > LOBBY_NAME_MAX) {
+                state.lobby_name = state.lobby_name.substr(0, LOBBY_NAME_MAX);
+            }
         }
     } else if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {
         if (state.mode == MENU_MODE_USERNAME && state.username.length() > 0) {
             state.username.pop_back();
+        } else if (state.editing_lobby_name && state.lobby_name.length() > 0) {
+            state.lobby_name.pop_back();
+        }
+    } else if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE && state.editing_lobby_name) {
+        state.lobby_name = std::string(network_get_lobby_name());
+        state.editing_lobby_name = false;
+        SDL_StopTextInput();
+    } else if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN) {
+        if (state.editing_lobby_name && state.lobby_name.length() > 0) {
+            network_set_lobby_name(state.lobby_name.c_str());
+            state.editing_lobby_name = false;
+            SDL_StopTextInput();
         }
     }
 }
@@ -318,7 +376,6 @@ void menu_update(menu_state_t& state) {
                 break;
             }
             case NETWORK_EVENT_JOINED_LOBBY: {
-                state.lobby_name = std::string(network_get_lobby_name());
                 menu_set_mode(state, MENU_MODE_LOBBY);
                 break;
             }
@@ -360,8 +417,20 @@ void menu_update(menu_state_t& state) {
         options_menu_update(state.options_state);
         return;
     }
+    if (state.editing_lobby_name) {
+        return;
+    }
 
-    if (SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE && !state.dropdown_open) {
+    if (network_is_server() && state.mode == MENU_MODE_LOBBY) {
+        SDL_Rect edit_button_rect = menu_get_lobby_edit_button_rect(state.lobby_name.c_str());
+        if (sdl_rect_has_point(edit_button_rect, engine.mouse_position)) {
+            state.hover = (menu_hover_t) {
+                .type = MENU_HOVER_EDIT_BUTTON
+            };
+        }
+    }
+
+    if (SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE && state.dropdown_open == -1) {
         auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
         if (mode_buttons_it != MODE_BUTTONS.end()) {
             for (MenuButton button : mode_buttons_it->second) {
@@ -420,18 +489,32 @@ void menu_update(menu_state_t& state) {
             }
             player_index++;
         }
-        SDL_Rect dropdown_rect = menu_get_dropdown_rect(player_index);
+        SDL_Rect color_dropdown_rect = menu_get_dropdown_rect(player_index);
 
         // Check for dropdown hover
-        if (!state.dropdown_open) {
-            if (sdl_rect_has_point(dropdown_rect, engine.mouse_position)) {
+        if (state.dropdown_open == -1) {
+            if (sdl_rect_has_point(color_dropdown_rect, engine.mouse_position)) {
                 state.hover = (menu_hover_t) {
-                    .type = MENU_HOVER_DROPDOWN
+                    .type = MENU_HOVER_DROPDOWN,
+                    .item = MENU_DROPDOWN_COLOR
                 };
+            } else if (network_is_server()) {
+                for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
+                    SDL_Rect setting_dropdown_rect = menu_get_match_setting_rect(setting);
+                    if (sdl_rect_has_point(setting_dropdown_rect, engine.mouse_position)) {
+                        state.hover = (menu_hover_t) {
+                            .type = MENU_HOVER_DROPDOWN,
+                            .item = setting
+                        };
+                        break;
+                    }
+                }
             }
         // Check for dropdown item hover
         } else {
-            for (int index = 0; index < MAX_PLAYERS; index++) {
+            SDL_Rect dropdown_rect = state.dropdown_open == MENU_DROPDOWN_COLOR ? color_dropdown_rect : menu_get_match_setting_rect(state.dropdown_open);
+            int dropdown_value_count = state.dropdown_open == MENU_DROPDOWN_COLOR ? MAX_PLAYERS : MATCH_SETTING_DATA.at((MatchSetting)state.dropdown_open).value_count;
+            for (int index = 0; index < dropdown_value_count; index++) {
                 dropdown_rect.y += dropdown_rect.h;
                 if (sdl_rect_has_point(dropdown_rect, engine.mouse_position)) {
                     state.hover = (menu_hover_t) {
@@ -451,9 +534,14 @@ void menu_show_status(menu_state_t& state, const char* text) {
 }
 
 void menu_set_mode(menu_state_t& state, MenuMode mode) {
+    if (state.mode == MENU_MODE_LOBBY && state.editing_lobby_name) {
+        state.editing_lobby_name = false;
+        SDL_StopTextInput();
+    }
+
     state.mode = mode;
 
-    state.dropdown_open = false;
+    state.dropdown_open = -1;
     if (state.mode == MENU_MODE_MATCHLIST) {
         state.item_selected = -1;
 
@@ -545,7 +633,7 @@ void menu_render(const menu_state_t& state) {
     uint8_t wagon_recolor_id;
     if (!(network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_SERVER)) {
         wagon_recolor_id = 0;
-    } else if (state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN_ITEM) {
+    } else if (state.mode == MENU_MODE_LOBBY && state.hover.type == MENU_HOVER_DROPDOWN_ITEM && state.dropdown_open == MENU_DROPDOWN_COLOR) {
         wagon_recolor_id = (uint8_t)state.hover.item;
     } else {
         wagon_recolor_id = network_get_player(network_get_player_id()).recolor_id;
@@ -622,8 +710,13 @@ void menu_render(const menu_state_t& state) {
     // Player list
     if (state.mode == MENU_MODE_LOBBY) {
         render_ninepatch(SPRITE_UI_FRAME, PLAYERLIST_RECT, 16);
-        xy lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, state.lobby_name.c_str());
-        render_text(FONT_HACK_GOLD, state.lobby_name.c_str(), xy(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y - 6));
+        render_ninepatch(SPRITE_UI_FRAME, MATCH_SETTINGS_RECT, 16);
+        xy lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_is_server() ? state.lobby_name.c_str() : network_get_lobby_name());
+        render_text(FONT_HACK_GOLD, network_is_server() ? state.lobby_name.c_str() : network_get_lobby_name(), xy(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y - 4));
+        if (!state.editing_lobby_name && network_is_server()) {
+            SDL_Rect lobby_edit_button_rect = menu_get_lobby_edit_button_rect(state.lobby_name.c_str());
+            render_sprite(SPRITE_MENU_EDIT_BUTTON, xy(0, (int)(state.hover.type == MENU_HOVER_EDIT_BUTTON)), xy(lobby_edit_button_rect.x, lobby_edit_button_rect.y + (state.hover.type == MENU_HOVER_EDIT_BUTTON ? -1 : 0)), RENDER_SPRITE_NO_CULL);
+        }
 
         render_text(FONT_HACK_GOLD, "Name", xy(COL_NAME_X, COL_HEADER_Y));
         render_text(FONT_HACK_GOLD, "Status", xy(COL_STATUS_X, COL_HEADER_Y));
@@ -651,9 +744,9 @@ void menu_render(const menu_state_t& state) {
             int dropdown_vframe = 0;
             if (player_id != network_get_player_id()) {
                 dropdown_vframe = 3;
-            } else if (state.hover.type == MENU_HOVER_DROPDOWN) {
+            } else if (state.hover.type == MENU_HOVER_DROPDOWN && state.hover.item == MENU_DROPDOWN_COLOR) {
                 dropdown_vframe = 1;
-            } else if (state.dropdown_open) {
+            } else if (state.dropdown_open == MENU_DROPDOWN_COLOR) {
                 dropdown_vframe = 2;
             }
 
@@ -669,15 +762,34 @@ void menu_render(const menu_state_t& state) {
             player_index++;
         } // End for each player id
 
-        if (state.dropdown_open) {
-            SDL_Rect dropdown_rect = menu_get_dropdown_rect(current_player_index);
-            for (uint8_t recolor_id = 0; recolor_id < MAX_PLAYERS; recolor_id++) {
-                dropdown_rect.y += dropdown_rect.h;
-                bool hovered = state.hover.type == MENU_HOVER_DROPDOWN_ITEM && state.hover.item == recolor_id;
-                render_sprite(SPRITE_UI_DROPDOWN_MINI, xy(0, hovered ? 4 : 3), xy(dropdown_rect.x, dropdown_rect.y));
-                render_text(hovered ? FONT_HACK_WHITE : FONT_HACK_BLACK, PLAYER_COLORS[recolor_id].name, xy(dropdown_rect.x + 5, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
+        xy settings_text_size = render_get_text_size(FONT_HACK_GOLD, "Settings");
+        render_text(FONT_HACK_GOLD, "Settings", xy(MATCH_SETTINGS_RECT.x + (MATCH_SETTINGS_RECT.w / 2) - (settings_text_size.x / 2), MATCH_SETTINGS_RECT.y - 6));
+        for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
+            const match_setting_t& setting_data = MATCH_SETTING_DATA.at((MatchSetting)setting);
+            SDL_Rect dropdown_rect = menu_get_match_setting_rect(setting);
+            int dropdown_vframe = 0;
+            if (!network_is_server()) {
+                dropdown_vframe = 3;
+            } else if (state.hover.type == MENU_HOVER_DROPDOWN && state.hover.item == setting) {
+                dropdown_vframe = 1;
+            } else if (state.dropdown_open == setting) {
+                dropdown_vframe = 2;
             }
+            render_text(FONT_HACK_GOLD, setting_data.name, xy(MATCH_SETTINGS_RECT.x + 8, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
+            render_sprite(SPRITE_UI_DROPDOWN_MINI, xy(0, dropdown_vframe), xy(dropdown_rect.x, dropdown_rect.y), RENDER_SPRITE_NO_CULL);
+            render_text(dropdown_vframe == 1 ? FONT_HACK_WHITE : FONT_HACK_BLACK, menu_match_setting_value_str((MatchSetting)setting, network_get_match_setting((MatchSetting)setting)), xy(dropdown_rect.x + 5, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
         }
+
+        if (state.dropdown_open != -1) {
+            SDL_Rect dropdown_rect = state.dropdown_open == MENU_DROPDOWN_COLOR ? menu_get_dropdown_rect(current_player_index) : menu_get_match_setting_rect(state.dropdown_open);
+            int dropdown_value_count = state.dropdown_open == MENU_DROPDOWN_COLOR ? MAX_PLAYERS : MATCH_SETTING_DATA.at((MatchSetting)state.dropdown_open).value_count;
+            for (int item = 0; item < dropdown_value_count; item++) {
+                dropdown_rect.y += dropdown_rect.h;
+                bool hovered = state.hover.type == MENU_HOVER_DROPDOWN_ITEM && state.hover.item == item;
+                render_sprite(SPRITE_UI_DROPDOWN_MINI, xy(0, hovered ? 4 : 3), xy(dropdown_rect.x, dropdown_rect.y));
+                render_text(hovered ? FONT_HACK_WHITE : FONT_HACK_BLACK, state.dropdown_open == MENU_DROPDOWN_COLOR ? PLAYER_COLORS[item].name : menu_match_setting_value_str((MatchSetting)state.dropdown_open, item), xy(dropdown_rect.x + 5, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
+            }
+        } 
     } // End if menu mode lobby
 
     auto mode_buttons_it = MODE_BUTTONS.find(state.mode);
@@ -702,7 +814,7 @@ SDL_Rect menu_get_lobby_text_frame_rect(int lobby_index) {
     char lobby_text[64];
     sprintf(lobby_text, "* %s (4/4) *", network_get_lobby(lobby_index).name);
 
-    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, lobby_text);
+    xy text_size = render_get_text_size(FONT_HACK_BLACK, lobby_text);
     int frame_width = (text_size.x / 15) + 1;
     if (text_size.x % 15 != 0) {
         frame_width++;
@@ -735,10 +847,10 @@ void menu_render_lobby_text(const menu_state_t& state, int lobby_index) {
     char lobby_text[64];
     const lobby_t& lobby = network_get_lobby(lobby_index);
     sprintf(lobby_text, "%s %s (%u/%u) %s", state.item_selected == lobby_index ? "*" : "", lobby.name, lobby.player_count, MAX_PLAYERS, state.item_selected == lobby_index ? "*" : "");
-    xy text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, lobby_text);
+    xy text_size = render_get_text_size(FONT_HACK_BLACK, lobby_text);
 
-    xy text_position_offset = xy(((frame_width * 15) / 2) - (text_size.x / 2), 0); 
-    render_text(text_hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, lobby_text, position + text_position_offset);
+    xy text_position_offset = xy(((frame_width * 15) / 2) - (text_size.x / 2), -10); 
+    render_text(text_hovered ? FONT_HACK_WHITE : FONT_HACK_BLACK, lobby_text, position + text_position_offset);
 }
 
 SDL_Rect menu_get_dropdown_rect(int index) {
@@ -747,5 +859,47 @@ SDL_Rect menu_get_dropdown_rect(int index) {
         .y = COL_HEADER_Y + 32 + ((engine.sprites[SPRITE_UI_DROPDOWN_MINI].frame_size.y + 4) * index),
         .w = engine.sprites[SPRITE_UI_DROPDOWN_MINI].frame_size.x,
         .h = engine.sprites[SPRITE_UI_DROPDOWN_MINI].frame_size.y
+    };
+}
+
+SDL_Rect menu_get_match_setting_rect(int index) {
+    return (SDL_Rect) {
+        .x = MATCH_SETTINGS_RECT.x + MATCH_SETTINGS_RECT.w - engine.sprites[SPRITE_UI_DROPDOWN_MINI].frame_size.x - 8,
+        .y = COL_HEADER_Y + 10 + ((engine.sprites[SPRITE_UI_DROPDOWN_MINI].frame_size.y + 4) * index),
+        .w = engine.sprites[SPRITE_UI_DROPDOWN_MINI].frame_size.x,
+        .h = engine.sprites[SPRITE_UI_DROPDOWN_MINI].frame_size.y
+    };
+}
+
+const char* menu_match_setting_value_str(MatchSetting setting, uint32_t value) {
+    switch (setting) {
+        case MATCH_SETTING_MAP_SIZE: {
+            switch (value) {
+                case MATCH_SETTING_MAP_SIZE_SMALL:
+                    return "Small";
+                case MATCH_SETTING_MAP_SIZE_MEDIUM:
+                    return "Medium";
+                case MATCH_SETTING_MAP_SIZE_LARGE:
+                    return "Large";
+                default:
+                    return "";
+            }
+        }
+        case MATCH_SETTING_TEAMS: {
+            return value == MATCH_SETTING_TEAMS_ENABLED ? "Yes" : "No";
+        }
+        default:
+            return "";
+    }
+}
+
+SDL_Rect menu_get_lobby_edit_button_rect(const char* lobby_name) {
+    xy lobby_name_size = render_get_text_size(FONT_HACK_GOLD, lobby_name);
+    xy lobby_name_pos = xy(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_size.x / 2), PLAYERLIST_RECT.y - 4);
+    return (SDL_Rect) {
+        .x = lobby_name_pos.x + lobby_name_size.x + 8,
+        .y = lobby_name_pos.y + 10,
+        .w = engine.sprites[SPRITE_MENU_EDIT_BUTTON].frame_size.x,
+        .h = engine.sprites[SPRITE_MENU_EDIT_BUTTON].frame_size.y,
     };
 }
