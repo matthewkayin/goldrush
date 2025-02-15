@@ -23,7 +23,16 @@ static const SDL_Rect MATCHLIST_RECT = (SDL_Rect) {
     .x = 36, .y = 32, .w = 432, .h = 200
 };
 static const SDL_Rect PLAYERLIST_RECT = (SDL_Rect) {
-    .x = 16, .y = 32, .w = 432, .h = 128
+    .x = 16, .y = 4, .w = 432, .h = 128
+};
+static const SDL_Rect LOBBY_CHAT_RECT = (SDL_Rect) {
+    .x = 16, .y = 4 + 128 + 4, .w = 432, .h = 158
+};
+static const SDL_Rect LOBBY_CHAT_TEXTBOX_RECT = (SDL_Rect) {
+    .x = 16 + 8, .y = 8 + 128 + 158 + 4, .w = 432 - 16, .h = 24
+};
+static const SDL_Rect LOBBY_CHAT_TEXTBOX_INPUT_RECT = (SDL_Rect) {
+    .x = 16 + 44, .y = 8 + 128 + 158 + 8, .w = 432 - 16 - 38, .h = 16
 };
 static const SDL_Rect MATCH_SETTINGS_RECT = (SDL_Rect) {
     .x = PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 4,
@@ -33,9 +42,6 @@ static const SDL_Rect MATCH_SETTINGS_RECT = (SDL_Rect) {
 };
 static SDL_Rect TEXT_INPUT_RECT = (SDL_Rect) {
     .x = MATCHLIST_RECT.x + 8 + 9, .y = 136, .w = 150, .h = 18 
-};
-static SDL_Rect LOBBY_TEXT_INPUT_RECT = (SDL_Rect) {
-    .x = PLAYERLIST_RECT.x - (PLAYERLIST_RECT.w / 2) - 75, .y = PLAYERLIST_RECT.y - 4, .w = 150, .h = 18
 };
 static SDL_Rect MATCHLIST_SEARCH_RECT = (SDL_Rect) {
     .x = 36 + 8, .y = 4, .w = 300, .h = 24
@@ -98,18 +104,18 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
     }},
     { MENU_BUTTON_LOBBY_BACK, (menu_button_t) {
         .text = "BACK",
-        .position_x = BUTTON_X,
-        .position_y = BUTTON_Y + 42
+        .position_x = LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12,
+        .position_y = PLAYERLIST_RECT.y + PLAYERLIST_RECT.h + 4
     }},
     { MENU_BUTTON_LOBBY_READY, (menu_button_t) {
         .text = "READY",
-        .position_x = BUTTON_X + 56 + 4,
-        .position_y = BUTTON_Y + 42
+        .position_x = LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12 + 56 + 4,
+        .position_y = PLAYERLIST_RECT.y + PLAYERLIST_RECT.h + 4
     }},
     { MENU_BUTTON_LOBBY_START, (menu_button_t) {
         .text = "START",
-        .position_x = BUTTON_X + 56 + 4,
-        .position_y = BUTTON_Y + 42
+        .position_x = LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12 + 56 + 4,
+        .position_y = PLAYERLIST_RECT.y + PLAYERLIST_RECT.h + 4
     }},
     { MENU_BUTTON_CONNECTING_BACK, (menu_button_t) {
         .text = "BACK",
@@ -121,7 +127,7 @@ static const std::unordered_map<MenuButton, menu_button_t> MENU_BUTTON_DATA = {
 static const uint32_t STATUS_TIMER_DURATION = 60;
 static const int PARALLAX_TIMER_DURATION = 2;
 
-static const int COL_HEADER_Y = PLAYERLIST_RECT.y + 12;
+static const int COL_HEADER_Y = PLAYERLIST_RECT.y + 10;
 static const int COL_NAME_X = PLAYERLIST_RECT.x + 16;
 static const int COL_STATUS_X = PLAYERLIST_RECT.x + 216;
 static const int COL_TEAM_X = PLAYERLIST_RECT.x + 280;
@@ -130,6 +136,10 @@ static const int MINI_DROPDOWN_TEXT_Y_OFFSET = -10;
 
 static const int TEXT_INPUT_BLINK_DURATION = 30;
 static const size_t MATCHLIST_PAGE_SIZE = 9;
+static const int WAGON_X_DEFAULT = 380;
+static const int WAGON_X_LOBBY = 480;
+
+static const int CHAT_MAX_MESSAGES = 12;
 
 struct match_setting_t {
     const char* name;
@@ -154,6 +164,7 @@ menu_state_t menu_init() {
 
     state.status_text = "";
     state.username = "";
+    state.text_input = "";
     state.status_timer = 0;
     state.hover = (menu_hover_t) {
         .type = MENU_HOVER_NONE
@@ -162,10 +173,10 @@ menu_state_t menu_init() {
 
     state.text_input_blink_timer = 0;
     state.dropdown_open = -1;
-    state.editing_lobby_name = false;
     state.matchlist_page = 0;
 
     state.wagon_animation = animation_create(ANIMATION_UNIT_MOVE_SLOW);
+    state.wagon_x = WAGON_X_DEFAULT;
     state.parallax_x = 0;
     state.parallax_cloud_x = 0;
     state.parallax_timer = PARALLAX_TIMER_DURATION;
@@ -217,12 +228,13 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     break;
                 }
                 case MENU_BUTTON_USERNAME_OK: {
-                    if (state.username.empty()) {
+                    if (state.text_input.empty()) {
                         menu_show_status(state, "Invalid username.");
                         break;
                     }
 
                     SDL_StopTextInput();
+                    state.username = state.text_input;
                     menu_set_mode(state, MENU_MODE_MATCHLIST);
                     break;
                 }
@@ -236,7 +248,6 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                         break;
                     }
 
-                    state.lobby_name = std::string(network_get_lobby_name());
                     for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
                         network_set_match_setting((MatchSetting)setting, MATCH_SETTING_DATA.at((MatchSetting)setting).default_value);
                     }
@@ -325,7 +336,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
 
         if (state.hover.type == MENU_HOVER_REFRESH) {
             state.matchlist_page = 0;
-            network_scanner_search(state.lobby_name.c_str());
+            network_scanner_search(state.text_input.c_str());
             sound_play(SOUND_UI_SELECT);
             return;
         }
@@ -342,44 +353,23 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
             return;
         }
 
-        if (state.hover.type == MENU_HOVER_EDIT_BUTTON) {
-            state.editing_lobby_name = true;
-            SDL_SetTextInputRect(&LOBBY_TEXT_INPUT_RECT);
-            SDL_StartTextInput();
-            sound_play(SOUND_UI_SELECT);
-            return;
-        }
-
         if (state.hover.type == MENU_HOVER_NONE && SDL_IsTextInputActive()) {
-            menu_stop_text_input(state);
+            SDL_StopTextInput();
         }
     } else if (event.type == SDL_TEXTINPUT) {
-        if (state.mode == MENU_MODE_USERNAME) {
-            state.username += std::string(event.text.text);
-            if (state.username.length() > MAX_USERNAME_LENGTH) {
-                state.username = state.username.substr(0, MAX_USERNAME_LENGTH);
-            }
-        } else if (state.editing_lobby_name || state.mode == MENU_MODE_MATCHLIST) {
-            state.lobby_name += std::string(event.text.text);
-            if (state.lobby_name.length() > LOBBY_NAME_MAX) {
-                state.lobby_name = state.lobby_name.substr(0, LOBBY_NAME_MAX);
-            }
-        } 
-    } else if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {
-        if (state.mode == MENU_MODE_USERNAME && state.username.length() > 0) {
-            state.username.pop_back();
-        } else if ((state.editing_lobby_name || state.mode == MENU_MODE_MATCHLIST) && state.lobby_name.length() > 0) {
-            state.lobby_name.pop_back();
+        state.text_input += std::string(event.text.text);
+        if (state.text_input.length() > menu_get_text_input_max(state)) {
+            state.text_input = state.text_input.substr(0, menu_get_text_input_max(state));
         }
+    } else if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_BACKSPACE) {
+        if (state.text_input.length() > 0) {
+            state.text_input.pop_back();
+        } 
     } else if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-        menu_stop_text_input(state);
+        SDL_StopTextInput();
     } else if (SDL_IsTextInputActive() && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN) {
-        if (state.editing_lobby_name && state.lobby_name.length() > 0) {
-            network_set_lobby_name(state.lobby_name.c_str());
-            state.editing_lobby_name = false;
-            SDL_StopTextInput();
-        } else if (state.mode == MENU_MODE_MATCHLIST) {
-            network_scanner_search(state.lobby_name.c_str());
+        if (state.mode == MENU_MODE_MATCHLIST) {
+            network_scanner_search(state.text_input.c_str());
             state.matchlist_page = 0;
         }
     }
@@ -452,6 +442,12 @@ void menu_update(menu_state_t& state) {
         }
         state.parallax_timer = PARALLAX_TIMER_DURATION;
     }
+    int expected_wagon_x = state.mode == MENU_MODE_LOBBY ? WAGON_X_LOBBY : WAGON_X_DEFAULT;
+    if (state.wagon_x < expected_wagon_x) {
+        state.wagon_x++;
+    } else if (state.wagon_x > expected_wagon_x) {
+        state.wagon_x--;
+    }
 
     if (SDL_IsTextInputActive()) {
         if (state.text_input_blink_timer != 0) {
@@ -472,18 +468,6 @@ void menu_update(menu_state_t& state) {
     if (state.options_state.mode != OPTION_MENU_CLOSED) {
         options_menu_update(state.options_state);
         return;
-    }
-    if (state.editing_lobby_name) {
-        return;
-    }
-
-    if (network_is_server() && state.mode == MENU_MODE_LOBBY) {
-        SDL_Rect edit_button_rect = menu_get_lobby_edit_button_rect(state.lobby_name.c_str());
-        if (sdl_rect_has_point(edit_button_rect, engine.mouse_position)) {
-            state.hover = (menu_hover_t) {
-                .type = MENU_HOVER_EDIT_BUTTON
-            };
-        }
     }
 
     if (SDL_GetWindowMouseGrab(engine.window) == SDL_TRUE && state.dropdown_open == -1) {
@@ -606,34 +590,53 @@ void menu_show_status(menu_state_t& state, const char* text) {
 }
 
 void menu_set_mode(menu_state_t& state, MenuMode mode) {
-    if (state.mode == MENU_MODE_LOBBY && state.editing_lobby_name) {
-        state.editing_lobby_name = false;
+    if (SDL_IsTextInputActive()) {
         SDL_StopTextInput();
     }
 
     state.mode = mode;
 
+    if (state.mode == MENU_MODE_LOBBY) {
+        state.chat.clear();
+        for (int i = 0; i < 12; i++) {
+            std::string message = std::string(32, 'A');
+            message += ": ";
+            message += "has joined the game.";
+            // state.chat.push_back("Howdy partner " + std::to_string(i + 1));
+            state.chat.push_back(message);
+        }
+    }
+
     state.dropdown_open = -1;
     if (state.mode == MENU_MODE_MATCHLIST) {
         state.item_selected = -1;
-        state.lobby_name = "";
         state.matchlist_page = 0;
+        state.text_input = "";
 
         if (!network_scanner_create()) {
             menu_set_mode(state, MENU_MODE_MAIN);
             menu_show_status(state, "Error occurred while scanning for LAN games.");
             return;
         }
-        network_scanner_search(state.lobby_name.c_str());
+        network_scanner_search(state.text_input.c_str());
+    }
+
+    if (state.mode == MENU_MODE_USERNAME) {
+        state.text_input = state.username;
+        SDL_SetTextInputRect(&TEXT_INPUT_RECT);
+        SDL_StartTextInput();
     }
 }
 
-void menu_stop_text_input(menu_state_t& state) {
-    if (state.editing_lobby_name) {
-        state.lobby_name = std::string(network_get_lobby_name());
-        state.editing_lobby_name = false;
+size_t menu_get_text_input_max(const menu_state_t& state) {
+    if (state.mode == MENU_MODE_USERNAME) {
+        return MAX_USERNAME_LENGTH;
+    } else if (state.mode == MENU_MODE_MATCHLIST) {
+        return LOBBY_NAME_MAX;
+    } else {
+        log_warn("Unhandled case in menu_get_text_input_max()");
+        return 0;
     }
-    SDL_StopTextInput();
 }
 
 bool menu_is_button_disabled(const menu_state_t& state, MenuButton button) {
@@ -707,7 +710,7 @@ void menu_render(const menu_state_t& state) {
         .h = engine.sprites[SPRITE_UNIT_WAGON].frame_size.y
     };
     SDL_Rect dst_rect = (SDL_Rect) {
-        .x = 380,
+        .x = state.wagon_x,
         .y = SCREEN_HEIGHT - (6 * TILE_SIZE),
         .w = src_rect.w * 2,
         .h = src_rect.h * 2
@@ -760,10 +763,10 @@ void menu_render(const menu_state_t& state) {
     if (state.mode == MENU_MODE_USERNAME) {
         render_sprite(SPRITE_MENU_USERNAME, xy(0, 0), xy(TEXT_INPUT_RECT.x - (engine.sprites[SPRITE_MENU_USERNAME].frame_size.x - TEXT_INPUT_RECT.w), TEXT_INPUT_RECT.y), RENDER_SPRITE_NO_CULL);
         if (state.text_input_blink) {
-            xy cursor_pos = xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 7) + xy(render_get_text_size(FONT_HACK_BLACK, state.username.c_str()).x - 4, 0);
+            xy cursor_pos = xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 7) + xy(render_get_text_size(FONT_HACK_BLACK, state.text_input.c_str()).x - 4, 0);
             render_text(FONT_HACK_BLACK, "|", cursor_pos, TEXT_ANCHOR_BOTTOM_LEFT);
         }
-        render_text(FONT_HACK_BLACK, state.username.c_str(), xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 7), TEXT_ANCHOR_BOTTOM_LEFT);
+        render_text(FONT_HACK_BLACK, state.text_input.c_str(), xy(TEXT_INPUT_RECT.x + 4, TEXT_INPUT_RECT.y + 7), TEXT_ANCHOR_BOTTOM_LEFT);
     }
 
     if (state.mode == MENU_MODE_CONNECTING) {
@@ -783,7 +786,7 @@ void menu_render(const menu_state_t& state) {
 
         render_ninepatch(SPRITE_UI_FRAME_SMALL, MATCHLIST_SEARCH_RECT, 8);
         char lobby_name_text[256];
-        sprintf(lobby_name_text, "Search: %s", state.lobby_name.c_str());
+        sprintf(lobby_name_text, "Search: %s", state.text_input.c_str());
         render_text(FONT_HACK_GOLD, lobby_name_text, xy(MATCHLIST_SEARCH_RECT.x + 4, MATCHLIST_SEARCH_RECT.y - 6));
         if (state.text_input_blink) {
             xy cursor_pos = xy(MATCHLIST_SEARCH_RECT.x + 4, MATCHLIST_SEARCH_RECT.y - 6) + xy(render_get_text_size(FONT_HACK_GOLD, lobby_name_text).x - 4, 0);
@@ -808,20 +811,14 @@ void menu_render(const menu_state_t& state) {
         render_sprite(SPRITE_MENU_NEXT, xy(next_hframe, 0), NEXT_BUTTON_POSITION, RENDER_SPRITE_NO_CULL);
     }
 
-    // Player list
     if (state.mode == MENU_MODE_LOBBY) {
+        // Player list
         render_ninepatch(SPRITE_UI_FRAME, PLAYERLIST_RECT, 16);
         render_ninepatch(SPRITE_UI_FRAME, MATCH_SETTINGS_RECT, 16);
-        xy lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_is_server() ? state.lobby_name.c_str() : network_get_lobby_name());
-        xy lobby_name_text_pos = xy(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y - 4);
-        render_text(FONT_HACK_GOLD, network_is_server() ? state.lobby_name.c_str() : network_get_lobby_name(), lobby_name_text_pos);
-        if (!state.editing_lobby_name && network_is_server()) {
-            SDL_Rect lobby_edit_button_rect = menu_get_lobby_edit_button_rect(state.lobby_name.c_str());
-            render_sprite(SPRITE_MENU_EDIT_BUTTON, xy(0, (int)(state.hover.type == MENU_HOVER_EDIT_BUTTON)), xy(lobby_edit_button_rect.x, lobby_edit_button_rect.y + (state.hover.type == MENU_HOVER_EDIT_BUTTON ? -1 : 0)), RENDER_SPRITE_NO_CULL);
-        } else if (state.editing_lobby_name && state.text_input_blink) {
-            xy cursor_pos = lobby_name_text_pos + xy(lobby_name_text_size.x - 4, 0);
-            render_text(FONT_HACK_GOLD, "|", cursor_pos);
-        }
+        render_ninepatch(SPRITE_UI_FRAME, LOBBY_CHAT_RECT, 16);
+        xy lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name());
+        xy lobby_name_text_pos = xy(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y - 6);
+        render_text(FONT_HACK_GOLD, network_get_lobby_name(), lobby_name_text_pos);
 
         render_text(FONT_HACK_GOLD, "Name", xy(COL_NAME_X, COL_HEADER_Y));
         render_text(FONT_HACK_GOLD, "Status", xy(COL_STATUS_X, COL_HEADER_Y));
@@ -831,10 +828,18 @@ void menu_render(const menu_state_t& state) {
         uint32_t player_index = 0;
         uint32_t current_player_index = 0;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            /*
             const player_t& player = network_get_player(player_id);
             if (player.status == PLAYER_STATUS_NONE) {
                 continue;
             }
+            */
+           player_t player = network_get_player(player_id);
+           if (player.status == PLAYER_STATUS_NONE) {
+            sprintf(player.name, "friend");
+            player.status = PLAYER_STATUS_NOT_READY;
+            player.recolor_id = 0;
+           }
 
             char player_status_text[16];
             if (player.status == PLAYER_STATUS_HOST) {
@@ -867,6 +872,7 @@ void menu_render(const menu_state_t& state) {
             player_index++;
         } // End for each player id
 
+        // Settings
         xy settings_text_size = render_get_text_size(FONT_HACK_GOLD, "Settings");
         render_text(FONT_HACK_GOLD, "Settings", xy(MATCH_SETTINGS_RECT.x + (MATCH_SETTINGS_RECT.w / 2) - (settings_text_size.x / 2), MATCH_SETTINGS_RECT.y - 6));
         for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
@@ -884,6 +890,15 @@ void menu_render(const menu_state_t& state) {
             render_sprite(SPRITE_UI_DROPDOWN_MINI, xy(0, dropdown_vframe), xy(dropdown_rect.x, dropdown_rect.y), RENDER_SPRITE_NO_CULL);
             render_text(dropdown_vframe == 1 ? FONT_HACK_WHITE : FONT_HACK_BLACK, menu_match_setting_value_str((MatchSetting)setting, network_get_match_setting((MatchSetting)setting)), xy(dropdown_rect.x + 5, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
         }
+
+        // Chat
+        for (int chat_index = 0; chat_index < state.chat.size(); chat_index++) {
+            render_text(FONT_HACK_GOLD, state.chat[chat_index].c_str(), xy(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y - 5 + (12 * chat_index)));
+        }
+        render_ninepatch(SPRITE_UI_FRAME_SMALL, LOBBY_CHAT_TEXTBOX_RECT, 8);
+        char chat_text[256];
+        sprintf(chat_text, "Chat: %s", state.text_input.c_str());
+        render_text(FONT_HACK_GOLD, chat_text, xy(LOBBY_CHAT_TEXTBOX_RECT.x + 4, LOBBY_CHAT_TEXTBOX_RECT.y - 6));
 
         if (state.dropdown_open != -1) {
             SDL_Rect dropdown_rect = state.dropdown_open == MENU_DROPDOWN_COLOR ? menu_get_dropdown_rect(current_player_index) : menu_get_match_setting_rect(state.dropdown_open);
@@ -998,17 +1013,9 @@ const char* menu_match_setting_value_str(MatchSetting setting, uint32_t value) {
     }
 }
 
-SDL_Rect menu_get_lobby_edit_button_rect(const char* lobby_name) {
-    xy lobby_name_size = render_get_text_size(FONT_HACK_GOLD, lobby_name);
-    xy lobby_name_pos = xy(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_size.x / 2), PLAYERLIST_RECT.y - 4);
-    return (SDL_Rect) {
-        .x = lobby_name_pos.x + lobby_name_size.x + 8,
-        .y = lobby_name_pos.y + 10,
-        .w = engine.sprites[SPRITE_MENU_EDIT_BUTTON].frame_size.x,
-        .h = engine.sprites[SPRITE_MENU_EDIT_BUTTON].frame_size.y,
-    };
-}
-
 size_t menu_get_matchlist_page_count() {
+    if (network_get_lobby_count() == 0) {
+        return 1;
+    }
     return (network_get_lobby_count() / MATCHLIST_PAGE_SIZE) + (int)(network_get_lobby_count() % MATCHLIST_PAGE_SIZE != 0);
 }
