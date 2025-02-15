@@ -42,6 +42,8 @@ enum MenuHoverType {
     MENU_HOVER_EDIT_BUTTON,
     MENU_HOVER_ITEM,
     MENU_HOVER_REFRESH,
+    MENU_HOVER_PREVIOUS,
+    MENU_HOVER_NEXT,
     MENU_HOVER_DROPDOWN,
     MENU_HOVER_DROPDOWN_ITEM
 };
@@ -74,6 +76,7 @@ struct menu_state_t {
     int item_selected;
     int dropdown_open;
     bool editing_lobby_name;
+    int matchlist_page;
 
     animation_t wagon_animation;
     int parallax_x;
@@ -89,6 +92,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event);
 void menu_update(menu_state_t& state);
 void menu_show_status(menu_state_t& state, const char* text);
 void menu_set_mode(menu_state_t& state, MenuMode mode);
+void menu_stop_text_input(menu_state_t& state);
 bool menu_is_button_disabled(const menu_state_t& state, MenuButton button);
 void menu_render(const menu_state_t& state);
 SDL_Rect menu_get_lobby_text_frame_rect(int lobby_index);
@@ -98,3 +102,4 @@ SDL_Rect menu_get_dropdown_rect(int index);
 SDL_Rect menu_get_match_setting_rect(int index);
 const char* menu_match_setting_value_str(MatchSetting setting, uint32_t value);
 SDL_Rect menu_get_lobby_edit_button_rect(const char* lobby_name);
+size_t menu_get_matchlist_page_count();

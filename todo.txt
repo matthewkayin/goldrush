@@ -12,12 +12,15 @@ todos
     - [ ] - bunker range
  - [ ] - Replays
  - [ ] - UI Rework
-    - [ ] - 32 character usernames
+    - [x] - 32 character usernames
+    - [ ] - lobby passwords
     - [ ] - Chat in lobby
+    - [ ] - Scrollbar and search for lobbies
     - [ ] - LAN and Online options from the "play" menu
     - [ ] - Room for credits button (so maybe play -> LAN/Online/Replay, main -> Play/Options/Credits/Exit)
     - [ ] - Custom map size
     - [ ] - Team games
+ - [ ] - Idle worker button?
  - [ ] - On release build, always grab mouse
  - [ ] - Add music
  - [ ] - Better sounds

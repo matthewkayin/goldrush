@@ -160,6 +160,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 3,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
+    { SPRITE_UI_FRAME_SMALL, (sprite_params_t) {
+        .path = "sprite/ui_frame_small.png",
+        .hframes = 3,
+        .vframes = 3,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
     { SPRITE_UI_FRAME_BOTTOM, (sprite_params_t) {
         .path = "sprite/ui_frame_bottom.png",
         .hframes = 1,
@@ -535,6 +541,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
     { SPRITE_MENU_REFRESH, (sprite_params_t) {
         .path = "sprite/menu_refresh.png",
         .hframes = 2,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_MENU_NEXT, (sprite_params_t) {
+        .path = "sprite/menu_next.png",
+        .hframes = 3,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},

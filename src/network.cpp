@@ -18,6 +18,7 @@ struct network_state_t {
     char client_username[NAME_BUFFER_SIZE];
     char lobby_name[LOBBY_NAME_BUFFER_SIZE];
     std::unordered_map<MatchSetting, uint32_t> match_settings;
+    char lobby_name_query[LOBBY_NAME_BUFFER_SIZE];
 
     uint8_t player_id;
     player_t players[MAX_PLAYERS];
@@ -148,8 +149,9 @@ bool network_scanner_create() {
     return true;
 }
 
-void network_scanner_search() {
+void network_scanner_search(const char* query) {
     state.lobbies.clear();
+    strcpy(state.lobby_name_query, query);
 
     ENetAddress scan_address;
     scan_address.host = ENET_HOST_BROADCAST;
@@ -433,7 +435,9 @@ void network_service() {
                 lobby.player_count = lobby_info.player_count;
                 lobby.port = lobby_info.port;
                 enet_address_get_host_ip(&receive_address, lobby.ip, NAME_BUFFER_SIZE);
-                state.lobbies.push_back(lobby);
+                if (strlen(state.lobby_name_query) == 0 || strstr(lobby.name, state.lobby_name_query) != NULL) {
+                    state.lobbies.push_back(lobby);
+                }
             }
         }
     }
