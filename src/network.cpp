@@ -43,7 +43,7 @@ enum MessageType {
     MESSAGE_NOT_READY,
     MESSAGE_COLOR,
     MESSAGE_MATCH_SETTING,
-    MESSAGE_LOBBY_NAME,
+    MESSAGE_LOBBY_CHAT,
     MESSAGE_MATCH_LOAD,
     MESSAGE_INPUT
 };
@@ -89,9 +89,9 @@ struct message_match_setting_t {
     uint8_t value;
 };
 
-struct message_lobby_name_t {
-    const uint8_t type = MESSAGE_LOBBY_NAME;
-    char lobby_name[LOBBY_NAME_BUFFER_SIZE];
+struct message_lobby_chat_t {
+    const uint8_t type = MESSAGE_LOBBY_CHAT;
+    char message[LOBBY_CHAT_BUFFER_SIZE];
 };
 
 bool network_init() {
@@ -366,13 +366,11 @@ const char* network_get_lobby_name() {
     return state.lobby_name;
 }
 
-void network_set_lobby_name(const char* value) {
-    strncpy(state.lobby_name, value, LOBBY_NAME_MAX + 1);
+void network_send_lobby_chat_message(const char* message) {
+    message_lobby_chat_t net_message;
+    strncpy(net_message.message, message, LOBBY_CHAT_BUFFER_SIZE);
 
-    message_lobby_name_t message;
-    strncpy(message.lobby_name, value, LOBBY_NAME_MAX + 1);
-
-    ENetPacket* packet = enet_packet_create(&message, sizeof(message_lobby_name_t), ENET_PACKET_FLAG_RELIABLE);
+    ENetPacket* packet = enet_packet_create(&net_message, sizeof(message_lobby_chat_t), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
 }
@@ -707,8 +705,11 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             state.match_settings[(MatchSetting)data[1]] = (uint32_t)data[2];
             break;
         }
-        case MESSAGE_LOBBY_NAME: {
-            strncpy(state.lobby_name, (char*)(data + 1), LOBBY_NAME_MAX + 1);
+        case MESSAGE_LOBBY_CHAT: {
+            network_event_t event;
+            event.type = NETWORK_EVENT_LOBBY_CHAT;
+            strncpy(event.lobby_chat.message, (char*)(data + 1), LOBBY_CHAT_BUFFER_SIZE);
+            state.event_queue.push(event);
             break;
         }
         case MESSAGE_MATCH_LOAD: {

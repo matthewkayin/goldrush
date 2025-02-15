@@ -140,6 +140,8 @@ static const int WAGON_X_DEFAULT = 380;
 static const int WAGON_X_LOBBY = 480;
 
 static const int CHAT_MAX_MESSAGES = 12;
+static const int CHAT_LINE_MAX = 64;
+static const int CHAT_MESSAGE_MAX_LENGTH = 60;
 
 struct match_setting_t {
     const char* name;
@@ -326,6 +328,12 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
             sound_play(SOUND_UI_SELECT);
             return;
         }
+        if (state.hover.type == MENU_HOVER_NONE && state.mode == MENU_MODE_LOBBY && sdl_rect_has_point(LOBBY_CHAT_TEXTBOX_INPUT_RECT, engine.mouse_position)) {
+            SDL_SetTextInputRect(&LOBBY_CHAT_TEXTBOX_INPUT_RECT);
+            SDL_StartTextInput();
+            sound_play(SOUND_UI_SELECT);
+            return;
+        }
 
         if (state.hover.type == MENU_HOVER_NONE && state.mode == MENU_MODE_MATCHLIST && sdl_rect_has_point(MATCHLIST_SEARCH_TEXTINPUT_RECT, engine.mouse_position)) {
             SDL_SetTextInputRect(&MATCHLIST_SEARCH_TEXTINPUT_RECT);
@@ -371,6 +379,11 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
         if (state.mode == MENU_MODE_MATCHLIST) {
             network_scanner_search(state.text_input.c_str());
             state.matchlist_page = 0;
+        } else if (state.mode == MENU_MODE_LOBBY) {
+            std::string message = std::string(state.username) + ": " + state.text_input;
+            menu_add_chat_message(state, message);
+            network_send_lobby_chat_message(message.c_str());
+            state.text_input = "";
         }
     }
 }
@@ -409,6 +422,7 @@ void menu_update(menu_state_t& state) {
                 break;
             }
             case NETWORK_EVENT_JOINED_LOBBY: {
+                network_send_lobby_chat_message((state.username + " joined the game.").c_str());
                 menu_set_mode(state, MENU_MODE_LOBBY);
                 break;
             }
@@ -417,7 +431,13 @@ void menu_update(menu_state_t& state) {
                     network_disconnect();
                     menu_set_mode(state, MENU_MODE_MATCHLIST);
                     state.item_selected = -1;
+                } else {
+                    menu_add_chat_message(state, std::string(network_get_player(network_event.player_disconnected.player_id).name) + " disconnected.");
                 }
+                break;
+            }
+            case NETWORK_EVENT_LOBBY_CHAT: {
+                menu_add_chat_message(state, std::string(network_event.lobby_chat.message));
                 break;
             }
             case NETWORK_EVENT_MATCH_LOAD: {
@@ -598,13 +618,6 @@ void menu_set_mode(menu_state_t& state, MenuMode mode) {
 
     if (state.mode == MENU_MODE_LOBBY) {
         state.chat.clear();
-        for (int i = 0; i < 12; i++) {
-            std::string message = std::string(32, 'A');
-            message += ": ";
-            message += "has joined the game.";
-            // state.chat.push_back("Howdy partner " + std::to_string(i + 1));
-            state.chat.push_back(message);
-        }
     }
 
     state.dropdown_open = -1;
@@ -633,6 +646,8 @@ size_t menu_get_text_input_max(const menu_state_t& state) {
         return MAX_USERNAME_LENGTH;
     } else if (state.mode == MENU_MODE_MATCHLIST) {
         return LOBBY_NAME_MAX;
+    } else if (state.mode == MENU_MODE_LOBBY) {
+        return CHAT_MESSAGE_MAX_LENGTH;
     } else {
         log_warn("Unhandled case in menu_get_text_input_max()");
         return 0;
@@ -828,18 +843,10 @@ void menu_render(const menu_state_t& state) {
         uint32_t player_index = 0;
         uint32_t current_player_index = 0;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            /*
             const player_t& player = network_get_player(player_id);
             if (player.status == PLAYER_STATUS_NONE) {
                 continue;
             }
-            */
-           player_t player = network_get_player(player_id);
-           if (player.status == PLAYER_STATUS_NONE) {
-            sprintf(player.name, "friend");
-            player.status = PLAYER_STATUS_NOT_READY;
-            player.recolor_id = 0;
-           }
 
             char player_status_text[16];
             if (player.status == PLAYER_STATUS_HOST) {
@@ -896,8 +903,12 @@ void menu_render(const menu_state_t& state) {
             render_text(FONT_HACK_GOLD, state.chat[chat_index].c_str(), xy(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y - 5 + (12 * chat_index)));
         }
         render_ninepatch(SPRITE_UI_FRAME_SMALL, LOBBY_CHAT_TEXTBOX_RECT, 8);
-        char chat_text[256];
+        char chat_text[128];
         sprintf(chat_text, "Chat: %s", state.text_input.c_str());
+        if (state.text_input_blink) {
+            xy cursor_pos = xy(LOBBY_CHAT_TEXTBOX_INPUT_RECT.x + 4, LOBBY_CHAT_TEXTBOX_RECT.y - 6) + xy(render_get_text_size(FONT_HACK_BLACK, state.text_input.c_str()).x - 4, 0);
+            render_text(FONT_HACK_GOLD, "|", cursor_pos);
+        }
         render_text(FONT_HACK_GOLD, chat_text, xy(LOBBY_CHAT_TEXTBOX_RECT.x + 4, LOBBY_CHAT_TEXTBOX_RECT.y - 6));
 
         if (state.dropdown_open != -1) {
@@ -1018,4 +1029,53 @@ size_t menu_get_matchlist_page_count() {
         return 1;
     }
     return (network_get_lobby_count() / MATCHLIST_PAGE_SIZE) + (int)(network_get_lobby_count() % MATCHLIST_PAGE_SIZE != 0);
+}
+
+std::vector<std::string> menu_split_chat_message(std::string message) {
+    std::vector<std::string> words;
+    while (message.length() != 0) {
+        size_t space_index = message.find(' ');
+        if (space_index == std::string::npos) {
+            words.push_back(message);
+            message = "";
+        } else {
+            words.push_back(message.substr(0, space_index));
+            message = message.substr(space_index + 1);
+        }
+    }
+
+    std::vector<std::string> lines;
+    std::string line;
+    while (!words.empty()) {
+        if (!line.empty()) {
+            line += " ";
+        }
+
+        std::string next = words[0];
+        words.erase(words.begin());
+
+        if (next.length() + line.length() > CHAT_LINE_MAX) {
+            lines.push_back(line);
+            line = "";
+        } else if (!line.empty()) {
+            line += " ";
+        }
+        line += next;
+    }
+    if (!line.empty()) {
+        lines.push_back(line);
+    }
+
+    return lines;
+}
+
+void menu_add_chat_message(menu_state_t& state, std::string message) {
+    std::vector<std::string> lines = menu_split_chat_message(message);
+    while (!lines.empty()) {
+        if (state.chat.size() == CHAT_MAX_MESSAGES) {
+            state.chat.erase(state.chat.begin());
+        }
+        state.chat.push_back(lines[0]);
+        lines.erase(lines.begin());
+    }
 }

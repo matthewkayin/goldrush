@@ -5,6 +5,7 @@
 
 #define NAME_BUFFER_SIZE 36
 #define LOBBY_NAME_BUFFER_SIZE 64
+#define LOBBY_CHAT_BUFFER_SIZE 128
 #define LOBBY_NAME_MAX 40
 #define LOBBY_SEARCH_BUFFER_SIZE 128
 
@@ -72,6 +73,7 @@ enum NetworkEventType {
     NETWORK_EVENT_INVALID_VERSION,
     NETWORK_EVENT_GAME_ALREADY_STARTED,
     NETWORK_EVENT_MATCH_LOAD,
+    NETWORK_EVENT_LOBBY_CHAT,
     NETWORK_EVENT_INPUT
 };
 
@@ -85,11 +87,16 @@ struct network_event_player_disconnected_t {
     uint8_t player_id;
 };
 
+struct network_event_lobby_chat_t {
+    char message[LOBBY_CHAT_BUFFER_SIZE];
+};
+
 struct network_event_t {
     NetworkEventType type;
     union {
         network_event_player_disconnected_t player_disconnected;
         network_event_input_t input;
+        network_event_lobby_chat_t lobby_chat;
     };
 };
 
@@ -111,7 +118,7 @@ bool network_are_all_players_ready();
 const size_t network_get_lobby_count();
 const lobby_t& network_get_lobby(size_t index);
 const char* network_get_lobby_name();
-void network_set_lobby_name(const char* value);
+void network_send_lobby_chat_message(const char* message);
 uint32_t network_get_match_setting(MatchSetting setting);
 void network_set_match_setting(MatchSetting setting, uint32_t value);
 
