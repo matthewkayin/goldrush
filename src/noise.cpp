@@ -161,12 +161,11 @@ float simplex_noise(uint64_t seed, double x, double y) {
     return value;
 }
 
-noise_t noise;
-
-void noise_generate(uint64_t seed, uint32_t width, uint32_t height) {
+noise_t noise_generate(uint64_t seed, uint32_t width, uint32_t height) {
+    noise_t noise;
     noise.width = width;
     noise.height = height;
-    noise.map = std::vector<int8_t>(width * height, 0);
+    noise.map = (int8_t*)malloc(noise.width * noise.height * sizeof(int8_t));
 
     const double FREQUENCY = 1.0 / 56.0;
     for (int x = 0; x < noise.width; x++) {
@@ -184,4 +183,6 @@ void noise_generate(uint64_t seed, uint32_t width, uint32_t height) {
             }
         }
     }
+
+    return noise;
 }

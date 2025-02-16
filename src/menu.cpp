@@ -300,8 +300,6 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                         break;
                     }
 
-                    network_scanner_destroy();
-                    network_begin_loading_match();
                     menu_set_mode(state, MENU_MODE_LOAD_MATCH);
                     break;
                 }
@@ -438,11 +436,6 @@ void menu_update(menu_state_t& state) {
             }
             case NETWORK_EVENT_LOBBY_CHAT: {
                 menu_add_chat_message(state, std::string(network_event.lobby_chat.message));
-                break;
-            }
-            case NETWORK_EVENT_MATCH_LOAD: {
-                network_scanner_destroy();
-                menu_set_mode(state, MENU_MODE_LOAD_MATCH);
                 break;
             }
             default:

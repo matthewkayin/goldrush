@@ -304,7 +304,7 @@ void network_set_player_color(uint8_t recolor_id) {
     enet_host_flush(state.host);
 }
 
-void network_begin_loading_match() {
+void network_begin_loading_match(int32_t lcg_seed, const noise_t& noise) {
     // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.players[player_id].status != PLAYER_STATUS_NONE) {
@@ -314,30 +314,15 @@ void network_begin_loading_match() {
 
     state.status = NETWORK_STATUS_CONNECTED;
 
-    // Set LCG seed
-    #ifdef GOLD_RAND_SEED
-        int32_t lcg_seed = GOLD_RAND_SEED;
-    #else
-        int32_t lcg_seed = (int32_t)time(NULL);
-    #endif
-    lcg_srand(lcg_seed);
-    log_trace("Host: set random seed to %i", lcg_seed);
-
-    // Generate noise for map generation
-    uint64_t noise_seed = (uint64_t)lcg_seed;
-    uint32_t map_width = 128;
-    uint32_t map_height = 128;
-    noise_generate(noise_seed, map_width, map_height);
-
     // Build message
     // Message size is 1 byte for type, 4 bytes for LCG seed, 8 bytes for map width / height, and the rest of the bytes are the generated noise values
-    size_t message_size = 1 + 4 + 8 + (map_width * map_height * sizeof(int8_t));
+    size_t message_size = 1 + 4 + 8 + (noise.width * noise.height * sizeof(int8_t));
     uint8_t* message = (uint8_t*)malloc(message_size);
     message[0] = MESSAGE_MATCH_LOAD;
     memcpy(message + 1, &lcg_seed, sizeof(int32_t));
-    memcpy(message + 5, &map_width, sizeof(uint32_t));
-    memcpy(message + 9, &map_width, sizeof(uint32_t));
-    memcpy(message + 13, &noise.map[0], map_width * map_height * sizeof(int8_t));
+    memcpy(message + 5, &noise.width, sizeof(uint32_t));
+    memcpy(message + 9, &noise.height, sizeof(uint32_t));
+    memcpy(message + 13, &noise.map[0], noise.width * noise.height * sizeof(int8_t));
 
     // Send the packet
     ENetPacket* packet = enet_packet_create(message, message_size, ENET_PACKET_FLAG_RELIABLE);
@@ -717,15 +702,13 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
                 return;
             }
 
-            int32_t lcg_seed;
-            memcpy(&lcg_seed, data + 1, sizeof(int32_t));
-            lcg_srand(lcg_seed);
-            log_trace("Set random seed to %i", lcg_seed);
-
-            memcpy(&noise.width, data + 5, sizeof(uint32_t));
-            memcpy(&noise.height, data + 9, sizeof(uint32_t));
-            noise.map = std::vector<int8_t>(noise.width * noise.height);
-            memcpy(&noise.map[0], data + 13, noise.width * noise.height * sizeof(int8_t));
+            network_event_t event;
+            event.type = NETWORK_EVENT_MATCH_LOAD;
+            memcpy(&event.match_load.lcg_seed, data + 1, sizeof(int32_t));
+            memcpy(&event.match_load.noise.width, data + 5, sizeof(uint32_t));
+            memcpy(&event.match_load.noise.height, data + 9, sizeof(uint32_t));
+            event.match_load.noise.map = (int8_t*)malloc(event.match_load.noise.width * event.match_load.noise.height);
+            memcpy(&event.match_load.noise.map[0], data + 13, event.match_load.noise.width * event.match_load.noise.height * sizeof(int8_t));
 
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (state.players[player_id].status != PLAYER_STATUS_NONE) {
@@ -733,9 +716,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
                 }
             }
 
-            state.event_queue.push((network_event_t) {
-                .type = NETWORK_EVENT_MATCH_LOAD
-            });
+            state.event_queue.push(event);
             break;
         }
         case MESSAGE_INPUT: {

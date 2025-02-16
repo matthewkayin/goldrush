@@ -71,28 +71,28 @@ struct poisson_disk_params_t {
     bool allow_unreachable_cells;
 };
 
-bool poisson_is_point_valid(const match_state_t& state, const poisson_disk_params_t& params, xy point) {
-    if (!map_is_cell_in_bounds(state, point)) {
+bool poisson_is_point_valid(const map_t& map, const poisson_disk_params_t& params, xy point) {
+    if (!map_is_cell_in_bounds(map, point)) {
         return false;
     }
 
-    entity_id cell = map_get_cell(state, point);
+    entity_id cell = map_get_cell(map, point);
     if (cell == CELL_UNREACHABLE && !params.allow_unreachable_cells) {
         return false;
     } else if (cell != CELL_EMPTY) {
         return false;
     }
-    if (map_is_tile_ramp(state, point)) {
+    if (map_is_tile_ramp(map, point)) {
         return false;
     }
 
     for (int nx = point.x - params.disk_radius; nx < point.x + params.disk_radius + 1; nx++) {
         for (int ny = point.y - params.disk_radius; ny < point.y + params.disk_radius + 1; ny++) {
             xy near_point = xy(nx, ny);
-            if (!map_is_cell_in_bounds(state, near_point)) {
+            if (!map_is_cell_in_bounds(map, near_point)) {
                 continue;
             }
-            int avoid_value = params.avoid_values[near_point.x + (near_point.y * state.map_width)];
+            int avoid_value = params.avoid_values[near_point.x + (near_point.y * map.width)];
             if (avoid_value != 0 && xy::manhattan_distance(point, near_point) <= avoid_value) {
                 return false;
             }
@@ -102,19 +102,19 @@ bool poisson_is_point_valid(const match_state_t& state, const poisson_disk_param
     return true;
 }
 
-std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t params) {
+std::vector<xy> poisson_disk(const map_t& map, poisson_disk_params_t params) {
     std::vector<xy> sample;
     std::vector<xy> frontier;
 
     xy first;
     do {
-        first.x = 1 + (lcg_rand() % (state.map_width - 2));
-        first.y = 1 + (lcg_rand() % (state.map_height - 2));
-    } while (!poisson_is_point_valid(state, params, first));
+        first.x = 1 + (lcg_rand() % (map.width - 2));
+        first.y = 1 + (lcg_rand() % (map.height - 2));
+    } while (!poisson_is_point_valid(map, params, first));
 
     frontier.push_back(first);
     sample.push_back(first);
-    params.avoid_values[first.x + (first.y * state.map_width)] = params.disk_radius;
+    params.avoid_values[first.x + (first.y * map.width)] = params.disk_radius;
 
     std::vector<xy> circle_offset_points;
     {
@@ -158,12 +158,12 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
         while (!child_is_valid && child_attempts < 30) {
             child_attempts++;
             child = next + circle_offset_points[lcg_rand() % circle_offset_points.size()];
-            child_is_valid = poisson_is_point_valid(state, params, child);
+            child_is_valid = poisson_is_point_valid(map, params, child);
         }
         if (child_is_valid) {
             frontier.push_back(child);
             sample.push_back(child);
-            params.avoid_values[child.x + (child.y * state.map_width)] = params.disk_radius;
+            params.avoid_values[child.x + (child.y * map.width)] = params.disk_radius;
         } else {
             frontier.erase(frontier.begin() + next_index);
         }
@@ -172,14 +172,16 @@ std::vector<xy> poisson_disk(const match_state_t& state, poisson_disk_params_t p
     return sample;
 }
 
-std::vector<xy> map_init(match_state_t& state) {
-    state.map_width = noise.width;
-    state.map_height = noise.height;
-    log_trace("Generating map. Size: %ux%u", state.map_width, state.map_height);
+map_t map_init(const noise_t& noise) {
+    map_t map;
 
-    state.map_cells = std::vector<entity_id>(state.map_width * state.map_height, CELL_EMPTY);
-    state.map_mine_cells = std::vector<entity_id>(state.map_width * state.map_height, ID_NULL);
-    state.map_tiles = std::vector<tile_t>(state.map_width * state.map_height, (tile_t) {
+    map.width = noise.width;
+    map.height = noise.height;
+    log_trace("Generating map. Size: %ux%u", map.width, map.height);
+
+    map.cells = std::vector<entity_id>(map.width * map.height, CELL_EMPTY);
+    map.mine_cells = std::vector<entity_id>(map.width * map.height, ID_NULL);
+    map.tiles = std::vector<tile_t>(map.width * map.height, (tile_t) {
         .index = engine.tile_index[TILE_SAND],
         .elevation = 0
     });
@@ -195,7 +197,7 @@ std::vector<xy> map_init(match_state_t& state) {
             bool is_too_close_to_wall = false;
             for (int nx = x - WATER_WALL_DIST; nx < x + WATER_WALL_DIST + 1; nx++) {
                 for (int ny = y - WATER_WALL_DIST; ny < y + WATER_WALL_DIST + 1; ny++) {
-                    if (!map_is_cell_in_bounds(state, xy(nx, ny))) {
+                    if (!map_is_cell_in_bounds(map, xy(nx, ny))) {
                         continue;
                     }
                     if (noise.map[nx + (ny * noise.width)] > 0 && xy::manhattan_distance(xy(x, y), xy(nx, ny)) <= WATER_WALL_DIST) {
@@ -221,7 +223,7 @@ std::vector<xy> map_init(match_state_t& state) {
 
             for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
                 xy wall = xy(x, y) + DIRECTION_XY[direction];
-                if (!map_is_cell_in_bounds(state, wall)) {
+                if (!map_is_cell_in_bounds(map, wall)) {
                     continue;
                 }
                 if (noise.map[wall.x + (wall.y * noise.width)] > noise.map[x + (y * noise.width)]) {
@@ -250,7 +252,7 @@ std::vector<xy> map_init(match_state_t& state) {
                 bool is_highground_too_close = false;
                 for (int nx = x - ELEVATION_NEAR_DIST; nx < x + ELEVATION_NEAR_DIST + 1; nx++) {
                     for (int ny = y - ELEVATION_NEAR_DIST; ny < y + ELEVATION_NEAR_DIST + 1; ny++) {
-                        if (!map_is_cell_in_bounds(state, xy(nx, ny))) {
+                        if (!map_is_cell_in_bounds(map, xy(nx, ny))) {
                             continue;
                         }
                         if (noise.map[nx + (ny * noise.width)] != 1) {
@@ -273,31 +275,31 @@ std::vector<xy> map_init(match_state_t& state) {
     // Bake map tiles
     std::vector<xy> artifacts;
     do {
-        std::fill(state.map_tiles.begin(), state.map_tiles.end(), (tile_t) {
+        std::fill(map.tiles.begin(), map.tiles.end(), (tile_t) {
             .index = 0,
             .elevation = 0
         });
         for (xy artifact : artifacts) {
-            noise.map[artifact.x + (artifact.y * state.map_width)]--;
+            noise.map[artifact.x + (artifact.y * map.width)]--;
         }
         artifacts.clear();
 
         log_trace("Baking map tiles...");
-        for (int y = 0; y < state.map_height; y++) {
-            for (int x = 0; x < state.map_width; x++) {
-                int index = x + (y * state.map_width);
+        for (int y = 0; y < map.height; y++) {
+            for (int x = 0; x < map.width; x++) {
+                int index = x + (y * map.width);
                 if (noise.map[index] >= 0) {
-                    state.map_tiles[index].elevation = noise.map[index];
+                    map.tiles[index].elevation = noise.map[index];
                     // First check if we need to place a regular wall here
                     uint32_t neighbors = 0;
                     if (noise.map[index] > 0) {
                         int8_t tile_elevation = noise.map[index];
                         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                             xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
-                            if (!map_is_cell_in_bounds(state, neighbor_cell)) {
+                            if (!map_is_cell_in_bounds(map, neighbor_cell)) {
                                 continue;
                             }
-                            int neighbor_index = neighbor_cell.x + (neighbor_cell.y * state.map_width);
+                            int neighbor_index = neighbor_cell.x + (neighbor_cell.y * map.width);
                             int8_t neighbor_elevation = noise.map[neighbor_index];
                             if (tile_elevation > neighbor_elevation) {
                                 neighbors += DIRECTION_MASK[direction];
@@ -309,14 +311,14 @@ std::vector<xy> map_init(match_state_t& state) {
                     if (neighbors == 0) {
                         int new_index = lcg_rand() % 7;
                         if (new_index < 4 && index % 3 == 0) {
-                            state.map_tiles[index].index = new_index == 1 ? engine.tile_index[TILE_SAND3] : engine.tile_index[TILE_SAND2];
+                            map.tiles[index].index = new_index == 1 ? engine.tile_index[TILE_SAND3] : engine.tile_index[TILE_SAND2];
                         } else {
-                            state.map_tiles[index].index = engine.tile_index[TILE_SAND];
+                            map.tiles[index].index = engine.tile_index[TILE_SAND];
                         }
                     // Wall tile 
                     } else {
-                        state.map_tiles[index].index = engine.tile_index[wall_autotile_lookup(neighbors)];
-                        if (state.map_tiles[index].index == engine.tile_index[TILE_NULL]) {
+                        map.tiles[index].index = engine.tile_index[wall_autotile_lookup(neighbors)];
+                        if (map.tiles[index].index == engine.tile_index[TILE_NULL]) {
                             artifacts.push_back(xy(x, y));
                         }
                     }
@@ -325,8 +327,8 @@ std::vector<xy> map_init(match_state_t& state) {
                     // Check adjacent neighbors
                     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
                         xy neighbor_cell = xy(x, y) + DIRECTION_XY[direction];
-                        if (!map_is_cell_in_bounds(state, neighbor_cell) || 
-                                noise.map[index] == noise.map[neighbor_cell.x + (neighbor_cell.y * state.map_width)]) {
+                        if (!map_is_cell_in_bounds(map, neighbor_cell) || 
+                                noise.map[index] == noise.map[neighbor_cell.x + (neighbor_cell.y * map.width)]) {
                             neighbors += DIRECTION_MASK[direction];
                         }
                     }
@@ -339,13 +341,13 @@ std::vector<xy> map_init(match_state_t& state) {
                                 (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
                             continue;
                         }
-                        if (!map_is_cell_in_bounds(state, neighbor_cell) || 
-                                noise.map[index] == noise.map[neighbor_cell.x + (neighbor_cell.y * state.map_width)]) {
+                        if (!map_is_cell_in_bounds(map, neighbor_cell) || 
+                                noise.map[index] == noise.map[neighbor_cell.x + (neighbor_cell.y * map.width)]) {
                             neighbors += DIRECTION_MASK[direction];
                         }
                     }
                     // Set the map tile based on the neighbors
-                    state.map_tiles[index] = (tile_t) {
+                    map.tiles[index] = (tile_t) {
                         .index = (uint16_t)(engine.tile_index[TILE_WATER] + engine.neighbors_to_autotile_index[neighbors]),
                         .elevation = 0
                     };
@@ -358,26 +360,26 @@ std::vector<xy> map_init(match_state_t& state) {
     } while (!artifacts.empty());
 
     // Place front walls
-    for (int index = 0; index < state.map_width * state.map_height; index++) {
-        int previous = index - state.map_width;
+    for (int index = 0; index < map.width * map.height; index++) {
+        int previous = index - map.width;
         if (previous < 0) {
             continue;
         }
-        if (state.map_tiles[previous].index == engine.tile_index[TILE_WALL_SOUTH_EDGE]) {
-            state.map_tiles[index].index = engine.tile_index[TILE_WALL_SOUTH_FRONT];
-        } else if (state.map_tiles[previous].index == engine.tile_index[TILE_WALL_SW_CORNER]) {
-            state.map_tiles[index].index = engine.tile_index[TILE_WALL_SW_FRONT];
-        } else if (state.map_tiles[previous].index == engine.tile_index[TILE_WALL_SE_CORNER]) {
-            state.map_tiles[index].index = engine.tile_index[TILE_WALL_SE_FRONT];
+        if (map.tiles[previous].index == engine.tile_index[TILE_WALL_SOUTH_EDGE]) {
+            map.tiles[index].index = engine.tile_index[TILE_WALL_SOUTH_FRONT];
+        } else if (map.tiles[previous].index == engine.tile_index[TILE_WALL_SW_CORNER]) {
+            map.tiles[index].index = engine.tile_index[TILE_WALL_SW_FRONT];
+        } else if (map.tiles[previous].index == engine.tile_index[TILE_WALL_SE_CORNER]) {
+            map.tiles[index].index = engine.tile_index[TILE_WALL_SE_FRONT];
         }
     }
 
     // Generate ramps
     std::vector<xy> stair_cells;
     for (int pass = 0; pass < 2; pass++) {
-        for (int x = 0; x < state.map_width; x++) {
-            for (int y = 0; y < state.map_height; y++) {
-                tile_t tile = state.map_tiles[x + (y * state.map_width)];
+        for (int x = 0; x < map.width; x++) {
+            for (int y = 0; y < map.height; y++) {
+                tile_t tile = map.tiles[x + (y * map.width)];
                 // Only generate ramps on straight edged walls
                 if (!(tile.index == engine.tile_index[TILE_WALL_SOUTH_EDGE] ||
                     tile.index == engine.tile_index[TILE_WALL_NORTH_EDGE] ||
@@ -391,11 +393,11 @@ std::vector<xy> map_init(match_state_t& state) {
                                         ? xy(-1, 0)
                                         : xy(0, -1);
                 xy stair_min = xy(x, y);
-                while (map_is_cell_in_bounds(state, stair_min) && state.map_tiles[stair_min.x + (stair_min.y * state.map_width)].index == tile.index) {
+                while (map_is_cell_in_bounds(map, stair_min) && map.tiles[stair_min.x + (stair_min.y * map.width)].index == tile.index) {
                     stair_min += step_direction;
                     if (tile.index == engine.tile_index[TILE_WALL_EAST_EDGE] || tile.index == engine.tile_index[TILE_WALL_WEST_EDGE]) {
                         xy adjacent_cell = stair_min + xy(tile.index == engine.tile_index[TILE_WALL_EAST_EDGE] ? 1 : -1, 0);
-                        if (!map_is_cell_in_bounds(state, adjacent_cell) || map_get_cell(state, adjacent_cell) != CELL_EMPTY) {
+                        if (!map_is_cell_in_bounds(map, adjacent_cell) || map_get_cell(map, adjacent_cell) != CELL_EMPTY) {
                             break;
                         }
                     }
@@ -403,11 +405,11 @@ std::vector<xy> map_init(match_state_t& state) {
                 xy stair_max = xy(x, y);
                 stair_min -= step_direction;
                 step_direction = xy(step_direction.x * -1, step_direction.y * -1);
-                while (map_is_cell_in_bounds(state, stair_max) && state.map_tiles[stair_max.x + (stair_max.y * state.map_width)].index == tile.index) {
+                while (map_is_cell_in_bounds(map, stair_max) && map.tiles[stair_max.x + (stair_max.y * map.width)].index == tile.index) {
                     stair_max += step_direction;
                     if (tile.index == engine.tile_index[TILE_WALL_EAST_EDGE] || tile.index == engine.tile_index[TILE_WALL_WEST_EDGE]) {
                         xy adjacent_cell = stair_min + xy(tile.index == engine.tile_index[TILE_WALL_EAST_EDGE] ? 1 : -1, 0);
-                        if (!map_is_cell_in_bounds(state, adjacent_cell) || map_get_cell(state, adjacent_cell) != CELL_EMPTY) {
+                        if (!map_is_cell_in_bounds(map, adjacent_cell) || map_get_cell(map, adjacent_cell) != CELL_EMPTY) {
                             break;
                         }
                     }
@@ -481,7 +483,7 @@ std::vector<xy> map_init(match_state_t& state) {
                         }
                     }
 
-                    state.map_tiles[cell.x + (cell.y * state.map_width)].index = engine.tile_index[stair_tile];
+                    map.tiles[cell.x + (cell.y * map.width)].index = engine.tile_index[stair_tile];
                     Tile south_front_tile = TILE_NULL;
                     if (stair_tile == TILE_WALL_SOUTH_STAIR_LEFT) {
                         south_front_tile = TILE_WALL_SOUTH_STAIR_FRONT_LEFT;
@@ -491,7 +493,7 @@ std::vector<xy> map_init(match_state_t& state) {
                         south_front_tile = TILE_WALL_SOUTH_STAIR_FRONT_CENTER;
                     }
                     if (south_front_tile != TILE_NULL) {
-                        state.map_tiles[cell.x + ((cell.y + 1) * state.map_width)].index = engine.tile_index[south_front_tile];
+                        map.tiles[cell.x + ((cell.y + 1) * map.width)].index = engine.tile_index[south_front_tile];
                     }
                 } // End for cell in ramp
             } // End for each y
@@ -500,16 +502,16 @@ std::vector<xy> map_init(match_state_t& state) {
     // End create ramps
 
     // Block all walls and water
-    for (int index = 0; index < state.map_width * state.map_height; index++) {
-        if (!(state.map_tiles[index].index == engine.tile_index[TILE_SAND] ||
-                state.map_tiles[index].index == engine.tile_index[TILE_SAND2] ||
-                state.map_tiles[index].index == engine.tile_index[TILE_SAND3] ||
-                map_is_tile_ramp(state, xy(index % state.map_width, index / state.map_width)))) {
-            state.map_cells[index] = CELL_BLOCKED;
+    for (int index = 0; index < map.width * map.height; index++) {
+        if (!(map.tiles[index].index == engine.tile_index[TILE_SAND] ||
+                map.tiles[index].index == engine.tile_index[TILE_SAND2] ||
+                map.tiles[index].index == engine.tile_index[TILE_SAND3] ||
+                map_is_tile_ramp(map, xy(index % map.width, index / map.width)))) {
+            map.cells[index] = CELL_BLOCKED;
         }
     }
 
-    map_calculate_unreachable_cells(state);
+    map_calculate_unreachable_cells(map);
 
     // Determine player spawns
     std::vector<xy> player_spawns;
@@ -519,9 +521,9 @@ std::vector<xy> map_init(match_state_t& state) {
         // Chooses diagonal directions clockwise beginning with NE
         int spawn_direction = 1 + (player_id * 2);
 
-        xy start = xy(state.map_width / 2, state.map_height / 2) + xy(
-                        DIRECTION_XY[spawn_direction].x * ((state.map_width / 2) - player_spawn_margin),
-                        DIRECTION_XY[spawn_direction].y * ((state.map_height / 2) - player_spawn_margin));
+        xy start = xy(map.width / 2, map.height / 2) + xy(
+                        DIRECTION_XY[spawn_direction].x * ((map.width / 2) - player_spawn_margin),
+                        DIRECTION_XY[spawn_direction].y * ((map.height / 2) - player_spawn_margin));
         std::vector<xy> frontier;
         std::unordered_map<uint32_t, uint32_t> explored;
         frontier.push_back(start);
@@ -537,19 +539,19 @@ std::vector<xy> map_init(match_state_t& state) {
             xy next = frontier[next_index];
             frontier.erase(frontier.begin() + next_index);
 
-            if (map_is_cell_rect_same_elevation(state, next, player_spawn_size) && 
-                    !map_is_cell_rect_occupied(state, next, player_spawn_size)) {
+            if (map_is_cell_rect_same_elevation(map, next, player_spawn_size) && 
+                    !map_is_cell_rect_occupied(map, next, player_spawn_size)) {
                 spawn_point = next;
                 break;
             }
 
-            explored[next.x + (next.y * state.map_width)] = 1;
+            explored[next.x + (next.y * map.width)] = 1;
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                 xy child = next + DIRECTION_XY[direction];
-                if (!map_is_cell_in_bounds(state, child)) {
+                if (!map_is_cell_in_bounds(map, child)) {
                     continue;
                 }
-                if (explored.find(child.x + (child.y * state.map_width)) != explored.end()) {
+                if (explored.find(child.x + (child.y * map.width)) != explored.end()) {
                     continue;
                 }
                 bool is_in_frontier = false;
@@ -574,22 +576,22 @@ std::vector<xy> map_init(match_state_t& state) {
 
     log_trace("Generating gold cells...");
     poisson_disk_params_t params = (poisson_disk_params_t) {
-        .avoid_values = std::vector<int>(state.map_width * state.map_height, 0),
+        .avoid_values = std::vector<int>(map.width * map.height, 0),
         .disk_radius = 40,
         .allow_unreachable_cells = false
     };
 
     // Generate the avoid values
-    for (int index = 0; index < state.map_width * state.map_height; index++) {
-        if (state.map_cells[index] == CELL_BLOCKED || map_is_tile_ramp(state, xy(index % state.map_width, index / state.map_width))) {
+    for (int index = 0; index < map.width * map.height; index++) {
+        if (map.cells[index] == CELL_BLOCKED || map_is_tile_ramp(state, xy(index % map.width, index / map.width))) {
             params.avoid_values[index] = 4;
         }
     }
     for (xy player_spawn : player_spawns) {
-        params.avoid_values[player_spawn.x + (player_spawn.y * state.map_width)] = 32;
+        params.avoid_values[player_spawn.x + (player_spawn.y * map.width)] = 32;
     }
 
-    std::vector<xy> gold_sample = poisson_disk(state, params);
+    std::vector<xy> gold_sample = poisson_disk(map, params);
     for (uint32_t patch_id = 0; patch_id < gold_sample.size(); patch_id++) {
         // Choose an adjacent direction to walk in
         int patch_size = 0;
@@ -601,12 +603,12 @@ std::vector<xy> map_init(match_state_t& state) {
             xy next = gold_frontier[next_index];
             gold_frontier.erase(gold_frontier.begin() + next_index);
 
-            if (!poisson_is_point_valid(state, params, next)) {
+            if (!poisson_is_point_valid(map, params, next)) {
                 continue;
             }
 
             // Place gold
-            entity_create_gold(state, next, 1500, patch_id);
+            entity_create_gold(map, next, 1500, patch_id);
             patch_size++;
 
             // Determine next gold cell
@@ -616,13 +618,13 @@ std::vector<xy> map_init(match_state_t& state) {
         }
     }
     // Recalculate unreachables in case the gold cells blocked anything
-    map_calculate_unreachable_cells(state);
+    map_calculate_unreachable_cells(map);
 
     // Fill in the gold values in the poisson avoid table so that decorations are not placed too close to gold
     for (const entity_t& entity : state.entities) {
         // All entities should be gold at this point anyways but it doesn't hurt to check
         if (entity.type == ENTITY_GOLD) {
-            params.avoid_values[entity.cell.x + (entity.cell.y * state.map_width)] = 4;
+            params.avoid_values[entity.cell.x + (entity.cell.y * map.width)] = 4;
         }
     }
 
@@ -631,34 +633,34 @@ std::vector<xy> map_init(match_state_t& state) {
     log_trace("Generating decorations...");
     params.disk_radius = 16;
     params.allow_unreachable_cells = true;
-    std::vector<xy> decoration_cells = poisson_disk(state, params);
+    std::vector<xy> decoration_cells = poisson_disk(map, params);
     for (xy cell : decoration_cells) {
-        state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_DECORATION_1 + (lcg_rand() % 5);
+        map.cells[cell.x + (cell.y * map.width)] = CELL_DECORATION_1 + (lcg_rand() % 5);
     }
 
-    return player_spawns;
+    return map;
 }
 
-void map_calculate_unreachable_cells(match_state_t& state) {
+void map_calculate_unreachable_cells(map_t& map) {
     // Assume any previously unreachable cells are now empty / reachable
-    for (int index = 0; index < state.map_width * state.map_height; index++) {
-        if (state.map_cells[index] == CELL_UNREACHABLE) {
-            state.map_cells[index] = CELL_EMPTY;
+    for (int index = 0; index < map.width * map.height; index++) {
+        if (map.cells[index] == CELL_UNREACHABLE) {
+            map.cells[index] = CELL_EMPTY;
         }
     }
 
     // Determine map "islands"
-    std::vector<int> map_tile_islands = std::vector<int>(state.map_width * state.map_height, -1);
+    std::vector<int> map_tile_islands = std::vector<int>(map.width * map.height, -1);
     std::vector<int> island_size;
 
     while (true) {
         // Set index equal to the index of the first unassigned tile in the array
         int index;
-        for (index = 0; index < state.map_width * state.map_height; index++) {
-            if (state.map_cells[index] == CELL_BLOCKED) {
+        for (index = 0; index < map.width * map.height; index++) {
+            if (map.cells[index] == CELL_BLOCKED) {
                 continue;
             }
-            if (state.map_cells[index] < CELL_EMPTY && !entity_is_unit(state.entities.get_by_id(state.map_cells[index]).type)) {
+            if (map.cells[index] < CELL_EMPTY && !entity_is_unit(map.entities.get_by_id(map.cells[index]).type)) {
                 continue;
             }
 
@@ -666,7 +668,7 @@ void map_calculate_unreachable_cells(match_state_t& state) {
                 break;
             }
         }
-        if (index == state.map_width * state.map_height) {
+        if (index == map.width * map.height) {
             break; // island mapping is complete
         }
 
@@ -677,7 +679,7 @@ void map_calculate_unreachable_cells(match_state_t& state) {
         // Flood fill this island index so that every tile that is reachable from 
         // the start tile (the tile determined by index) has the same island index
         std::vector<xy> frontier;
-        frontier.push_back(xy(index % state.map_width, index / state.map_width));
+        frontier.push_back(xy(index % map.width, index / map.width));
 
         while (!frontier.empty()) {
             xy next = frontier[0];
@@ -686,7 +688,7 @@ void map_calculate_unreachable_cells(match_state_t& state) {
             if (!map_is_cell_in_bounds(state, next)) {
                 continue;
             }
-            entity_id cell_value = state.map_cells[next.x + (next.y * state.map_width)];
+            entity_id cell_value = map.cells[next.x + (next.y * map.width)];
             if (cell_value == CELL_BLOCKED) {
                 continue;
             }
@@ -696,11 +698,11 @@ void map_calculate_unreachable_cells(match_state_t& state) {
             }
 
             // skip this because we've already explored it
-            if (map_tile_islands[next.x + (next.y * state.map_width)] != -1) {
+            if (map_tile_islands[next.x + (next.y * map.width)] != -1) {
                 continue;
             }
 
-            map_tile_islands[next.x + (next.y * state.map_width)] = island_index;
+            map_tile_islands[next.x + (next.y * map.width)] = island_index;
             island_size[island_index]++;
 
             for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
@@ -716,14 +718,14 @@ void map_calculate_unreachable_cells(match_state_t& state) {
     }
     // Everything that's not on the main "island" is considered blocked
     // This makes it so that we don't place any player spawns or gold at these locations
-    for (int index = 0; index < state.map_width * state.map_height; index++) {
-        if (state.map_cells[index] == CELL_EMPTY && map_tile_islands[index] != biggest_island) {
-            state.map_cells[index] = CELL_UNREACHABLE;
+    for (int index = 0; index < map.width * map.height; index++) {
+        if (map.cells[index] == CELL_EMPTY && map_tile_islands[index] != biggest_island) {
+            map.cells[index] = CELL_UNREACHABLE;
         }
     }
 }
 
-void map_recalculate_unreachable_cells(match_state_t& state, xy cell) {
+void map_recalculate_unreachable_cells(map_t& state, xy cell) {
     std::vector<xy> frontier;
 
     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
@@ -741,7 +743,7 @@ void map_recalculate_unreachable_cells(match_state_t& state, xy cell) {
             continue;
         }
 
-        state.map_cells[next.x + (next.y * state.map_width)] = CELL_EMPTY;
+        map.cells[next.x + (next.y * map.width)] = CELL_EMPTY;
 
         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
             frontier.push_back(next + DIRECTION_XY[direction]);
@@ -749,26 +751,26 @@ void map_recalculate_unreachable_cells(match_state_t& state, xy cell) {
     }
 }
 
-bool map_is_cell_in_bounds(const match_state_t& state, xy cell) {
-    return !(cell.x < 0 || cell.y < 0 || cell.x >= state.map_width || cell.y >= state.map_height);
+bool map_is_cell_in_bounds(const map_t& state, xy cell) {
+    return !(cell.x < 0 || cell.y < 0 || cell.x >= map.width || cell.y >= map.height);
 }
 
-bool map_is_cell_rect_in_bounds(const match_state_t& state, xy cell, int cell_size) {
-    return !(cell.x < 0 || cell.y < 0 || cell.x + cell_size - 1 >= state.map_width || cell.y + cell_size - 1 >= state.map_height);
+bool map_is_cell_rect_in_bounds(const map_t& state, xy cell, int cell_size) {
+    return !(cell.x < 0 || cell.y < 0 || cell.x + cell_size - 1 >= map.width || cell.y + cell_size - 1 >= map.height);
 }
 
-tile_t map_get_tile(const match_state_t& state, xy cell) {
-    return state.map_tiles[cell.x + (cell.y * state.map_width)];
+tile_t map_get_tile(const map_t& state, xy cell) {
+    return map.tiles[cell.x + (cell.y * map.width)];
 }
 
-entity_id map_get_cell(const match_state_t& state, xy cell) {
-    return state.map_cells[cell.x + (cell.y * state.map_width)];
+entity_id map_get_cell(const map_t& state, xy cell) {
+    return map.cells[cell.x + (cell.y * map.width)];
 }
 
-bool map_is_cell_rect_equal_to(const match_state_t& state, xy cell, int cell_size, entity_id value) {
+bool map_is_cell_rect_equal_to(const map_t& state, xy cell, int cell_size, entity_id value) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            if (state.map_cells[x + (y * state.map_width)] != value) {
+            if (map.cells[x + (y * map.width)] != value) {
                 return false;
             }
         }
@@ -777,19 +779,19 @@ bool map_is_cell_rect_equal_to(const match_state_t& state, xy cell, int cell_siz
     return true;
 }
 
-void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value) {
+void map_set_cell_rect(map_t& state, xy cell, int cell_size, entity_id value) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            state.map_cells[x + (y * state.map_width)] = value;
+            map.cells[x + (y * map.width)] = value;
         }
     }
 }
 
-bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin, bool gold_walk) {
+bool map_is_cell_rect_occupied(const map_t& state, xy cell, int cell_size, xy origin, bool gold_walk) {
     return map_is_cell_rect_occupied(state, cell, xy(cell_size, cell_size), origin, gold_walk);
 }
 
-bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy origin, bool gold_walk) {
+bool map_is_cell_rect_occupied(const map_t& state, xy cell, xy size, xy origin, bool gold_walk) {
     entity_id origin_id = origin.x == -1 ? ID_NULL : map_get_cell(state, origin);
 
     for (int y = cell.y; y < cell.y + size.y; y++) {
@@ -821,7 +823,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy 
 
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
-xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells) {
+xy map_get_nearest_cell_around_rect(const map_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells) {
     xy nearest_cell;
     int nearest_cell_dist = -1;
 
@@ -861,15 +863,15 @@ xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int st
     return nearest_cell_dist != -1 ? nearest_cell : start;
 }
 
-bool map_is_tile_ramp(const match_state_t& state, xy cell) {
-    uint16_t tile_index = state.map_tiles[cell.x + (cell.y * state.map_width)].index;
+bool map_is_tile_ramp(const map_t& state, xy cell) {
+    uint16_t tile_index = map.tiles[cell.x + (cell.y * map.width)].index;
     return tile_index >= engine.tile_index[TILE_WALL_SOUTH_STAIR_LEFT] && tile_index <= engine.tile_index[TILE_WALL_WEST_STAIR_BOTTOM];
 }
 
-bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size) {
+bool map_is_cell_rect_same_elevation(const map_t& state, xy cell, xy size) {
     for (int x = cell.x; x < cell.x + size.x; x++) {
         for (int y = cell.y; y < cell.y + size.y; y++) {
-            if (state.map_tiles[x + (y * state.map_width)].elevation != state.map_tiles[cell.x + (cell.y * state.map_width)].elevation || 
+            if (map.tiles[x + (y * map.width)].elevation != map.tiles[cell.x + (cell.y * map.width)].elevation || 
                     map_is_tile_ramp(state, xy(x, y))) {
                 return false;
             }
@@ -879,7 +881,7 @@ bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy siz
     return true;
 }
 
-void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk) {
+void map_pathfind(const map_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk) {
     struct node_t {
         fixed cost;
         fixed distance;
@@ -927,7 +929,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
 
     std::vector<node_t> frontier;
     std::vector<node_t> explored;
-    std::vector<int> explored_indices = std::vector<int>(state.map_width * state.map_height, -1);
+    std::vector<int> explored_indices = std::vector<int>(map.width * map.height, -1);
 
     bool is_target_unreachable = false;
     for (int y = to.y; y < to.y + cell_size; y++) {
@@ -970,7 +972,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
             }
 
             // Otherwise mark this cell as explored
-            explored_indices[smallest.cell.x + (smallest.cell.y * state.map_width)] = 1;
+            explored_indices[smallest.cell.x + (smallest.cell.y * map.width)] = 1;
 
             // Consider all children
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
@@ -987,7 +989,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
                 }
 
                 // Don't consider explored indices
-                if (explored_indices[child.cell.x + (child.cell.y * state.map_width)] != -1) {
+                if (explored_indices[child.cell.x + (child.cell.y * map.width)] != -1) {
                     continue;
                 }
 
@@ -1013,7 +1015,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
         } // End while frontier not empty
 
         frontier.clear();
-        memset(&explored_indices[0], -1, state.map_width * state.map_height * sizeof(int));
+        memset(&explored_indices[0], -1, map.width * map.height * sizeof(int));
     } // End if target_is_unreachable
 
     uint32_t closest_explored = 0;
@@ -1049,7 +1051,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
 
         // Otherwise, add this tile to the explored list
         explored.push_back(smallest);
-        explored_indices[smallest.cell.x + (smallest.cell.y * state.map_width)] = explored.size() - 1;
+        explored_indices[smallest.cell.x + (smallest.cell.y * map.width)] = explored.size() - 1;
         if (explored[explored.size() - 1].distance < explored[closest_explored].distance) {
             closest_explored = explored.size() - 1;
         }
@@ -1096,7 +1098,7 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
             }
 
             // Don't consider already explored children
-            if (explored_indices[child.cell.x + (child.cell.y * state.map_width)] != -1) {
+            if (explored_indices[child.cell.x + (child.cell.y * map.width)] != -1) {
                 continue;
             }
 
@@ -1139,10 +1141,10 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
     }
 }
 
-bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size) {
+bool map_is_cell_rect_revealed(const map_t& state, uint8_t player_id, xy cell, int cell_size) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            if (state.map_fog[player_id][x + (y * state.map_width)] > 0) {
+            if (map.fog[player_id][x + (y * map.width)] > 0) {
                 return true;
             }
         }
@@ -1151,7 +1153,7 @@ bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy
     return false;
 }
 
-void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection) { 
+void map_fog_update(map_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection) { 
     /*
     * This function does a raytrace from the cell center outwards to determine what this unit can see
     * Raytracing is done using Bresenham's Line Generation Algorithm (https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/)
@@ -1223,23 +1225,23 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
                 }
 
                 if (increment) {
-                    if (state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)] == FOG_HIDDEN) {
-                        state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)] = 1;
+                    if (map.fog[player_id][line_cell.x + (line_cell.y * map.width)] == FOG_HIDDEN) {
+                        map.fog[player_id][line_cell.x + (line_cell.y * map.width)] = 1;
                     } else {
-                        state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]++;
+                        map.fog[player_id][line_cell.x + (line_cell.y * map.width)]++;
                     }
                     if (has_detection) {
-                        state.map_detection[player_id][line_cell.x + (line_cell.y * state.map_width)]++;
+                        map.detection[player_id][line_cell.x + (line_cell.y * map.width)]++;
                     }
                 } else {
-                    state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
+                    map.fog[player_id][line_cell.x + (line_cell.y * map.width)]--;
                     if (has_detection) {
-                        state.map_detection[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
+                        map.detection[player_id][line_cell.x + (line_cell.y * map.width)]--;
                     }
 
                     // Remember revealed entities
                     // First check for a mine
-                    entity_id cell_value = state.map_mine_cells[line_cell.x + (line_cell.y * state.map_width)];
+                    entity_id cell_value = map.mine_cells[line_cell.x + (line_cell.y * map.width)];
                     // If there's no mine, check the regular cell grid
                     if (cell_value == ID_NULL) {
                         cell_value = map_get_cell(state, line_cell);
@@ -1275,5 +1277,5 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
         } // End for each line end from corner to corner
     } // End for each search index
 
-    state.map_is_fog_dirty = true;
+    map.is_fog_dirty = true;
 }

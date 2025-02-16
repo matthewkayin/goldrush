@@ -6,40 +6,12 @@
 #include "engine.h"
 #include "animation.h"
 #include "options.h"
-#include "entity_types.h"
-#include <SDL2/SDL.h>
-#include <queue>
+#include "types.h"
+#include "map.h"
 #include <vector>
-#include <string>
 #include <array>
+#include <string>
 #include <unordered_map>
-
-// Map
-
-struct tile_t {
-    uint16_t index;
-    uint16_t elevation;
-};
-
-const entity_id CELL_EMPTY = ID_NULL;
-const entity_id CELL_BLOCKED = ID_MAX + 2;
-const entity_id CELL_UNREACHABLE = ID_MAX + 3;
-const entity_id CELL_DECORATION_1 = ID_MAX + 4;
-const entity_id CELL_DECORATION_2 = ID_MAX + 5;
-const entity_id CELL_DECORATION_3 = ID_MAX + 6;
-const entity_id CELL_DECORATION_4 = ID_MAX + 7;
-const entity_id CELL_DECORATION_5 = ID_MAX + 8;
-
-const int FOG_HIDDEN = -1;
-const int FOG_EXPLORED = 0;
-
-struct map_reveal_t {
-    int player_id;
-    xy cell;
-    int cell_size;
-    int sight;
-    int timer;
-};
 
 // Chat
 
@@ -84,6 +56,121 @@ struct upgrade_data_t {
 };
 
 extern const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA;
+
+// Entity
+
+struct target_build_t {
+    xy unit_cell;
+    xy building_cell;
+    EntityType building_type;
+};
+
+struct target_repair_t {
+    uint32_t health_repaired;
+};
+
+struct target_t {
+    TargetType type;
+    entity_id id;
+    xy cell;
+    union {
+        target_build_t build;
+        target_repair_t repair;
+    };
+};
+
+enum BuildingQueueItemType: uint8_t {
+    BUILDING_QUEUE_ITEM_UNIT,
+    BUILDING_QUEUE_ITEM_UPGRADE
+};
+
+struct building_queue_item_t {
+    BuildingQueueItemType type;
+    union {
+        EntityType unit_type;
+        uint32_t upgrade;
+    };
+};
+
+const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
+const uint32_t ENTITY_FLAG_DAMAGE_FLICKER = 2;
+const uint32_t ENTITY_FLAG_INVISIBLE = 4;
+
+struct entity_t {
+    EntityType type;
+    EntityMode mode;
+    uint8_t player_id;
+    uint32_t flags;
+
+    xy cell;
+    xy_fixed position;
+    Direction direction;
+
+    int health;
+    target_t target;
+    std::vector<target_t> target_queue;
+    target_t remembered_gold_target;
+    std::vector<xy> path;
+    std::vector<building_queue_item_t> queue;
+    xy rally_point;
+    uint32_t pathfind_attempts;
+    uint32_t timer;
+
+    animation_t animation;
+
+    std::vector<entity_id> garrisoned_units;
+    entity_id garrison_id;
+    uint32_t cooldown_timer;
+
+    uint32_t gold_held;
+    uint32_t gold_patch_id;
+
+    uint32_t taking_damage_counter;
+    uint32_t taking_damage_timer;
+    uint32_t health_regen_timer;
+};
+
+struct unit_data_t {
+    uint32_t population_cost;
+    fixed speed;
+
+    int damage;
+    int attack_cooldown;
+    int range_squared;
+    int min_range_squared;
+};
+
+struct building_data_t {
+    int builder_positions_x[3];
+    int builder_positions_y[3];
+    int builder_flip_h[3];
+    bool can_rally; // If you add any more flags, use a uint32
+};
+
+struct entity_data_t {
+    const char* name;
+    Sprite sprite;
+    UiButton ui_button;
+    int cell_size;
+
+    uint32_t gold_cost;
+    uint32_t train_duration;
+    int max_health;
+    int sight;
+    int armor;
+    uint32_t attack_priority;
+
+    uint32_t garrison_capacity;
+    uint32_t garrison_size;
+
+    bool has_detection;
+
+    union {
+        unit_data_t unit_data;
+        building_data_t building_data;
+    };
+};
+extern const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA;
 
 // Input
 
@@ -189,28 +276,20 @@ struct input_t {
 };
 
 struct match_state_t {
-    std::vector<chat_message_t> chat;
-
     // Map
-    uint32_t map_width;
-    uint32_t map_height;
-    std::vector<tile_t> map_tiles;
-    std::vector<entity_id> map_cells;
-    std::vector<entity_id> map_mine_cells;
-    std::vector<int> map_fog[MAX_PLAYERS];
-    std::vector<int> map_detection[MAX_PLAYERS];
-    std::unordered_map<entity_id, remembered_entity_t> remembered_entities[MAX_PLAYERS];
-    std::vector<map_reveal_t> map_reveals;
-    bool map_is_fog_dirty;
+    map_t map;
 
     // Entities
     id_array<entity_t, 400 * MAX_PLAYERS> entities;
     std::vector<particle_t> particles;
     std::vector<projectile_t> projectiles;
 
+    // Player
     uint32_t player_gold[MAX_PLAYERS];
     uint32_t player_upgrades[MAX_PLAYERS];
     uint32_t player_upgrades_in_progress[MAX_PLAYERS];
+
+    std::vector<chat_message_t> chat;
 };
 
 match_state_t match_init(const std::vector<xy>& player_spawns);
@@ -302,23 +381,3 @@ UiButton building_queue_item_icon(const building_queue_item_t& item);
 uint32_t building_queue_item_duration(const building_queue_item_t& item);
 uint32_t building_queue_item_cost(const building_queue_item_t& item);
 uint32_t building_queue_population_cost(const building_queue_item_t& item);
-
-// Map
-
-std::vector<xy> map_init(match_state_t& state);
-void map_calculate_unreachable_cells(match_state_t& state);
-void map_recalculate_unreachable_cells(match_state_t& state, xy cell);
-bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
-bool map_is_cell_rect_in_bounds(const match_state_t& state, xy cell, int cell_size);
-tile_t map_get_tile(const match_state_t& state, xy cell);
-entity_id map_get_cell(const match_state_t& state, xy cell);
-bool map_is_cell_rect_equal_to(const match_state_t& state, xy cell, int cell_size, entity_id value);
-void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value);
-bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
-bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
-xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
-bool map_is_tile_ramp(const match_state_t& state, xy cell);
-bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
-void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
-bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size);
-void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection);

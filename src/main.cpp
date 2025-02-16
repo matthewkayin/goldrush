@@ -3,7 +3,7 @@
 #include "platform.h"
 #include "engine.h"
 #include "menu.h"
-#include "match.h"
+#include "ui.h"
 #include "network.h"
 #include <ctime>
 #include <cstdio>
@@ -63,7 +63,7 @@ int gold_main(int argc, char** argv) {
     bool game_is_running = true;
     GameMode game_mode = GAME_MODE_MENU;
     menu_state_t menu_state = menu_init();
-    match_state_t match_state;
+    ui_state_t ui_state;
 
     while (game_is_running) {
         // TIMEKEEP
@@ -118,7 +118,7 @@ int gold_main(int argc, char** argv) {
                         menu_handle_input(menu_state, event);
                         break;
                     case GAME_MODE_MATCH:
-                        match_handle_input(match_state, event);
+                        ui_handle_input(match_state, event);
                         if (match_state.ui_mode == UI_MODE_LEAVE_MATCH) {
                             menu_state = menu_init();
                             game_mode = GAME_MODE_MENU;
@@ -127,6 +127,28 @@ int gold_main(int argc, char** argv) {
                 }
             } // End while PollEvent
         } // End if should handle input
+
+        network_service();
+        network_event_t network_event;
+        while (network_poll_events(&network_event)) {
+            switch (game_mode) {
+                case GAME_MODE_MENU: {
+                    if (network_event.type == NETWORK_EVENT_MATCH_LOAD) {
+                        network_scanner_destroy();
+                        ui_state = ui_init(network_event.match_load.lcg_seed, network_event.match_load.noise);
+                        free(network_event.match_load.noise.map);
+                        game_mode = GAME_MODE_MATCH;
+                    } else {
+                        menu_handle_network_event(event);
+                    }
+                    break;
+                }
+                case GAME_MODE_MATCH: {
+                    ui_handle_network_event(event);
+                    break;
+                }
+            }
+        }
 
         // UPDATE
         while (update_accumulator >= UPDATE_TIME) {
@@ -139,12 +161,34 @@ int gold_main(int argc, char** argv) {
                     if (menu_state.mode == MENU_MODE_EXIT) {
                         game_is_running = false;
                     } else if (menu_state.mode == MENU_MODE_LOAD_MATCH) {
-                        match_state = match_init();
+                        network_scanner_destroy();
+
+                        // This is when the host is beginning a match load
+                        // Set LCG seed
+                        #ifdef GOLD_RAND_SEED
+                            int32_t lcg_seed = GOLD_RAND_SEED;
+                        #else
+                            int32_t lcg_seed = (int32_t)time(NULL);
+                        #endif
+                        lcg_srand(lcg_seed);
+                        log_trace("Host: set random seed to %i", lcg_seed);
+
+                        // Generate noise for map generation
+                        uint64_t noise_seed = (uint64_t)lcg_seed;
+                        // TODO get size from menu match setting
+                        uint32_t map_width = 128;
+                        uint32_t map_height = 128;
+                        noise_t noise = noise_generate(noise_seed, map_width, map_height);
+
+                        network_begin_loading_match(lcg_seed, noise);
+
+                        ui_state = ui_init(network_event.match_load.lcg_seed, network_event.match_load.noise);
+                        free(network_event.match_load.noise.map);
                         game_mode = GAME_MODE_MATCH;
                     }
                     break;
                 case GAME_MODE_MATCH:
-                    match_update(match_state);
+                    ui_update(ui_state);
                     break;
             }
         } // End while update
@@ -158,7 +202,7 @@ int gold_main(int argc, char** argv) {
                 menu_render(menu_state);
                 break;
             case GAME_MODE_MATCH:
-                match_render(match_state);
+                ui_render(ui_state);
                 break;
         }
 

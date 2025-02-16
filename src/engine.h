@@ -2,7 +2,7 @@
 
 #include "defines.h"
 #include "util.h"
-#include "engine_types.h"
+#include "types.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>

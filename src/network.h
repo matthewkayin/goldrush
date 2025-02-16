@@ -91,12 +91,18 @@ struct network_event_lobby_chat_t {
     char message[LOBBY_CHAT_BUFFER_SIZE];
 };
 
+struct network_event_match_load_t {
+    int32_t lcg_seed;
+    noise_t noise;
+};
+
 struct network_event_t {
     NetworkEventType type;
     union {
         network_event_player_disconnected_t player_disconnected;
         network_event_input_t input;
         network_event_lobby_chat_t lobby_chat;
+        network_event_match_load_t match_load;
     };
 };
 
@@ -124,7 +130,7 @@ void network_set_match_setting(MatchSetting setting, uint32_t value);
 
 void network_toggle_ready();
 void network_set_player_color(uint8_t recolor_id);
-void network_begin_loading_match();
+void network_begin_loading_match(int32_t lcg_seed, const noise_t& noise);
 void network_send_input(uint8_t* out_buffer, size_t out_buffer_length);
 
 void network_service();

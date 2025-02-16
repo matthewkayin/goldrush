@@ -1,8 +1,7 @@
 #pragma once
 
 #include "defines.h"
-#include "engine_types.h"
-#include "entity_types.h"
+#include "noise.h"
 #include "util.h"
 #include "options.h"
 #include "match.h"
@@ -144,8 +143,9 @@ struct ui_state_t {
     options_menu_state_t options_menu_state;
 };
 
-ui_state_t ui_init();
+ui_state_t ui_init(int32_t lcg_seed, const noise_t& noise);
 void ui_handle_input(ui_state_t& state, SDL_Event e);
+void ui_handle_network_event(ui_state_t& state, network_event_t& network_event);
 void ui_update(ui_state_t& state);
 void ui_render(const ui_state_t& state);
 

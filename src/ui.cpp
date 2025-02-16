@@ -71,8 +71,11 @@ static const int HEALTHBAR_HEIGHT = 4;
 static const int HEALTHBAR_PADDING = 3;
 static const int BUILDING_HEALTHBAR_PADDING = 5;
 
-ui_state_t ui_init() {
+ui_state_t ui_init(int32_t lcg_seed, const noise_t& noise) {
     ui_state_t state;
+
+    lcg_srand(lcg_seed);
+    log_trace("Set random seed to %i", lcg_seed);
 
     state.mode = UI_MODE_MATCH_NOT_STARTED;
 
@@ -100,7 +103,7 @@ ui_state_t ui_init() {
     }
 
     // INIT MATCH STATE HERE
-    std::vector<xy> player_spawns = map_init(state.match_state);
+    map_t map = map_init(noise);
     ui_center_camera_on_cell(state, player_spawns[network_get_player_id()]);
     state.match_state = match_init()
     if (player_id == network_get_player_id()) {
