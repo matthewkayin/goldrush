@@ -83,6 +83,8 @@
         "mutex": "cpp",
         "queue": "cpp",
         "string_view": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "ranges": "cpp",
+        "span": "cpp"
     }
 }

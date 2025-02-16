@@ -7,12 +7,18 @@
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 4
+#define PLAYER_NONE UINT8_MAX
 #define MAX_USERNAME_LENGTH 32
 #define BASE_PORT 6530
 #define SCANNER_PORT 6529
 #define TILE_SIZE 16
 #define INPUT_BUFFER_SIZE 1024
 #define SELECTION_LIMIT 20
+
+typedef uint16_t entity_id;
+const entity_id ID_MAX = 4096;
+const entity_id ID_NULL = ID_MAX + 1;
+const uint32_t INDEX_INVALID = 65535;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1

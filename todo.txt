@@ -14,7 +14,7 @@ todos
  - [ ] - UI Rework
     - [x] - 32 character usernames
     - [ ] - lobby passwords
-    - [ ] - Chat in lobby
+    - [x] - Chat in lobby
     - [x] - Scrollbar and search for lobbies
     - [ ] - LAN and Online options from the "play" menu
     - [ ] - Room for credits button (so maybe play -> LAN/Online/Replay, main -> Play/Options/Credits/Exit)

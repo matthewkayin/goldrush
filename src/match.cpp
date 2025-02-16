@@ -6,74 +6,10 @@
 #include "lcg.h"
 #include <algorithm>
 
-static const uint32_t TURN_DURATION = 4;
-static const uint32_t TURN_OFFSET = 4;
-static const uint32_t MATCH_DISCONNECT_GRACE = 10;
 static const uint32_t PLAYER_STARTING_GOLD = 550;
 
-static const int CAMERA_DRAG_MARGIN = 4;
-
-static const SDL_Rect UI_DISCONNECT_FRAME_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - 100, .y = 32,
-    .w = 200, .h = 200
-};
-static const SDL_Rect UI_MATCH_OVER_FRAME_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - (250 / 2), .y = 96,
-    .w = 250, .h = 90
-};
-static const SDL_Rect UI_MATCH_OVER_CONTINUE_BUTTON_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MATCH_OVER_FRAME_RECT.y + 32,
-    .w = 120, .h = 21
-};
-static const SDL_Rect UI_MATCH_OVER_EXIT_BUTTON_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MATCH_OVER_CONTINUE_BUTTON_RECT.y + UI_MATCH_OVER_CONTINUE_BUTTON_RECT.h + 4,
-    .w = 120, .h = 21
-};
-static const SDL_Rect UI_MENU_BUTTON_RECT = (SDL_Rect) {
-    .x = 1, .y = 1, .w = 19, .h = 18
-};
-static const SDL_Rect UI_MENU_RECT = (SDL_Rect) {
-    .x = (SCREEN_WIDTH / 2) - (150 / 2), .y = 64,
-    .w = 150, .h = 125
-};
-static const int UI_MENU_BUTTON_COUNT = 3;
-static const int UI_MENU_SURRENDER_BUTTON_COUNT = 2;
-static const SDL_Rect UI_MENU_BUTTON_RECTS[UI_MENU_BUTTON_COUNT] = {
-    (SDL_Rect) {
-        .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MENU_RECT.y + 32,
-        .w = 120, .h = 21
-    },
-    (SDL_Rect) {
-        .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MENU_RECT.y + 32 + 21 + 5,
-        .w = 120, .h = 21
-    },
-    (SDL_Rect) {
-        .x = (SCREEN_WIDTH / 2) - 60, .y = UI_MENU_RECT.y + 32 + 21 + 5 + 21 + 5,
-        .w = 120, .h = 21
-    },
-};
-static const char* UI_MENU_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "LEAVE MATCH", "OPTIONS", "BACK" };
-static const char* UI_MENU_SURRENDER_BUTTON_TEXT[UI_MENU_SURRENDER_BUTTON_COUNT] = { "YES", "BACK" };
-const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
-const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
-const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
-const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
-    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT,
-    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(0, 35),
-    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36, 35),
-    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 2, 35),
-    UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(36 * 3, 35)
-};
-static const uint32_t UI_DOUBLE_CLICK_DURATION = 16;
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
-const uint32_t MATCH_ALERT_DURATION = 90;
-const uint32_t MATCH_ALERT_LINGER_DURATION = 60 * 20;
-const uint32_t MATCH_ALERT_TOTAL_DURATION = MATCH_ALERT_DURATION + MATCH_ALERT_LINGER_DURATION;
-const uint32_t MATCH_ATTACK_ALERT_DISTANCE = 20;
-static const int HEALTHBAR_HEIGHT = 4;
-static const int HEALTHBAR_PADDING = 3;
-static const int BUILDING_HEALTHBAR_PADDING = 5;
 static const fixed PROJECTILE_SMOKE_SPEED = fixed::from_int(4);
 static const int PARTICLE_SMOKE_CELL_SIZE = 7;
 
@@ -104,38 +40,14 @@ const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
     }}
 };
 
-match_state_t match_init() {
+match_state_t match_init(const std::vector<xy>& player_spawns) {
     match_state_t state;
-
-    state.options_state.mode = OPTION_MENU_CLOSED;
-
-    state.ui_mode = UI_MODE_MATCH_NOT_STARTED;
-    state.ui_status_timer = 0;
-    state.ui_is_minimap_dragging = false;
-    state.select_rect_origin = xy(-1, -1);
-    state.select_rect = (SDL_Rect) { .x = 0, .y = 0, .w = 1, .h = 1 };
-    state.control_group_selected = -1;
-    state.ui_double_click_timer = 0;
-    state.control_group_double_tap_timer = 0;
-    state.ui_rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
-    memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
-    for (int i = 0; i < 6; i++) {
-        state.ui_buttons[i] = UI_BUTTON_NONE;
-    }
 
     std::vector<xy> player_spawns = map_init(state);
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const player_t& player = network_get_player(player_id);
         if (player.status == PLAYER_STATUS_NONE) {
             continue;
-        }
-
-        // Init input queues
-        input_t empty_input;
-        empty_input.type = INPUT_NONE;
-        std::vector<input_t> empty_input_list = { empty_input };
-        for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
-            state.inputs[player_id].push_back(empty_input_list);
         }
 
         // Determine player spawn
@@ -154,10 +66,6 @@ match_state_t match_init() {
             player_spawns.erase(player_spawns.begin() + spawn_index);
         #endif
         
-        if (player_id == network_get_player_id()) {
-            match_camera_center_on_cell(state, player_spawn);
-        }
-
         state.player_gold[player_id] = PLAYER_STARTING_GOLD;
         state.player_upgrades[player_id] = 0;
         state.player_upgrades_in_progress[player_id] = 0;
@@ -189,25 +97,6 @@ match_state_t match_init() {
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(0, 1));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 0));
         entity_create(state, ENTITY_MINER, player_id, player_spawn + xy(3, 1));
-    }
-    state.turn_timer = 0;
-    state.ui_disconnect_timer = 0;
-
-    // Destroy minimap texture if already created
-    if (engine.minimap_texture != NULL) {
-        SDL_DestroyTexture(engine.minimap_texture);
-        engine.minimap_texture = NULL;
-    }
-    if (engine.minimap_tiles_texture != NULL) {
-        SDL_DestroyTexture(engine.minimap_tiles_texture);
-        engine.minimap_tiles_texture = NULL;
-    }
-    match_create_minimap_texture(state);
-
-    network_toggle_ready();
-    if (network_are_all_players_ready()) {
-        log_info("Match started.");
-        state.ui_mode = UI_MODE_NONE;
     }
 
     return state;

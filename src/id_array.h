@@ -7,11 +7,6 @@
 #include <queue>
 #include <unordered_map>
 
-typedef uint16_t entity_id;
-const entity_id ID_MAX = 4096;
-const entity_id ID_NULL = ID_MAX + 1;
-const uint32_t INDEX_INVALID = 65535;
-
 template <typename T, size_t capacity>
 struct id_array {
     using iterator = typename std::vector<T>::iterator;
