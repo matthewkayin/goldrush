@@ -838,9 +838,6 @@ void ui_update(ui_state_t& state) {
                     .w = event.alert.cell_size * TILE_SIZE, 
                     .h = event.alert.cell_size * TILE_SIZE 
                 };
-                if (SDL_HasIntersection(&camera_rect, &alert_rect) == SDL_TRUE) {
-                    break;
-                }
 
                 // Check if an existing attack alert already exists nearby
                 if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
@@ -854,6 +851,25 @@ void ui_update(ui_state_t& state) {
                     if (is_existing_attack_alert_nearby) {
                         break;
                     }
+                }
+
+                // Play the sound even if we don't show the alert
+                switch (event.alert.type) {
+                    case MATCH_ALERT_TYPE_BUILDING:
+                        sound_play(SOUND_ALERT_BUILDING);
+                        break;
+                    case MATCH_ALERT_TYPE_UNIT:
+                        sound_play(SOUND_ALERT_UNIT);
+                        break;
+                    case MATCH_ALERT_TYPE_RESEARCH:
+                        sound_play(SOUND_ALERT_RESEARCH);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (SDL_HasIntersection(&camera_rect, &alert_rect) == SDL_TRUE) {
+                    break;
                 }
 
                 UiAlertColor color;
@@ -870,25 +886,9 @@ void ui_update(ui_state_t& state) {
                     .timer = UI_ALERT_TOTAL_DURATION
                 });
 
-                switch (event.alert.type) {
-                    case MATCH_ALERT_TYPE_BUILDING:
-                        sound_play(SOUND_ALERT_BUILDING);
-                        break;
-                    case MATCH_ALERT_TYPE_UNIT:
-                        sound_play(SOUND_ALERT_UNIT);
-                        break;
-                    case MATCH_ALERT_TYPE_RESEARCH:
-                        sound_play(SOUND_ALERT_RESEARCH);
-                        break;
-                    case MATCH_ALERT_TYPE_ATTACK:
-                        sound_play(SOUND_ALERT_BELL);
-                        break;
-                    default:
-                        break;
-                }
-
                 if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
                     ui_show_status(state, UI_STATUS_UNDER_ATTACK);
+                    sound_play(SOUND_ALERT_BELL);
                 }
                 break;
             }
@@ -2720,12 +2720,12 @@ void ui_render(const ui_state_t& state) {
     // Minimap Fog of War
 #ifndef GOLD_DEBUG_FOG_DISABLED
     std::vector<SDL_Point> fog_hidden_points;
-    fog_hidden_points.reserve(state.map_width * state.map_height);
+    fog_hidden_points.reserve(state.match_state.map_width * state.match_state.map_height);
     std::vector<SDL_Point> fog_explored_points;
-    fog_explored_points.reserve(state.map_width * state.map_height);
-    for (int y = 0; y < state.map_height; y++) {
-        for (int x = 0; x < state.map_width; x++) {
-            int fog = state.map_fog[network_get_player_id()][x + (y * state.map_width)];
+    fog_explored_points.reserve(state.match_state.map_width * state.match_state.map_height);
+    for (int y = 0; y < state.match_state.map_height; y++) {
+        for (int x = 0; x < state.match_state.map_width; x++) {
+            int fog = state.match_state.map_fog[network_get_player_id()][x + (y * state.match_state.map_width)];
             if (fog == FOG_HIDDEN) {
                 fog_hidden_points.push_back((SDL_Point) { .x = x, .y = y });
             } else if (fog == FOG_EXPLORED) {

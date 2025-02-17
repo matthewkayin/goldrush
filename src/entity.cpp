@@ -1011,6 +1011,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.timer = UNIT_BUILD_TICK_DURATION;
 
                         state.events.push_back((match_event_t) {
+                            .type = MATCH_EVENT_SELECTION_HANDOFF,
                             .selection_handoff = (match_event_selection_handoff_t) {
                                 .player_id = entity.player_id,
                                 .to_deselect = id,
