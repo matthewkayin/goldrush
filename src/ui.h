@@ -5,14 +5,10 @@
 #include "util.h"
 #include "options.h"
 #include "match.h"
+#include "network.h"
 #include <SDL2/SDL.h>
 #include <unordered_map>
 #include <string>
-
-#define UI_HEIGHT 88
-#define UI_BUTTONSET_SIZE 6
-#define UI_CONTROL_GROUP_COUNT 10
-#define UI_CONTROL_GROUP_NONE_SELECTED -1
 
 #define UI_STATUS_CANT_BUILD "You can't build there."
 #define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
@@ -25,25 +21,18 @@
 #define UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
 #define UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
 
+#define UI_HEIGHT 88
+#define UI_BUTTONSET_SIZE 6
+#define UI_CONTROL_GROUP_COUNT 10
+#define UI_CONTROL_GROUP_NONE_SELECTED -1
+
 extern const xy UI_SELECTION_LIST_TOP_LEFT; 
 extern const SDL_Rect UI_BUTTON_RECT[UI_BUTTONSET_SIZE];
 extern const xy UI_FRAME_BOTTOM_POSITION; 
 extern const xy UI_BUILDING_QUEUE_TOP_LEFT; 
-extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
-extern const uint32_t UI_TAKING_DAMAGE_TIMER_DURATION;
-extern const uint32_t UI_TAKING_DAMAGE_FLICKER_DURATION;
-extern const uint32_t UI_ALERT_DURATION;
-extern const uint32_t UI_ALERT_LINGER_DURATION;
-extern const uint32_t UI_ALERT_TOTAL_DURATION;
-extern const uint32_t UI_ATTACK_ALERT_DISTANCE;
 extern const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX];
 extern const SDL_Rect UI_CHAT_RECT;
-extern const SDL_Rect UI_MINIMAP_RECT = (SDL_Rect) {
-    .x = 4,
-    .y = SCREEN_HEIGHT - 132,
-    .w = 128,
-    .h = 128
-};
+extern const SDL_Rect UI_MINIMAP_RECT;
 
 enum UiMode {
     UI_MODE_MATCH_NOT_STARTED,
@@ -75,6 +64,7 @@ struct ui_button_requirements_t {
         uint32_t upgrade;
     };
 };
+extern const std::unordered_map<UiButton, ui_button_requirements_t> UI_BUTTON_REQUIREMENTS;
 
 struct ui_tooltip_info_t {
     char text[64];
@@ -136,6 +126,8 @@ struct ui_state_t {
     SDL_Keycode control_group_double_tap_key;
     int control_group_selected;
 
+    std::string chat_message;
+
     std::vector<alert_t> alerts;
 
     uint32_t sound_cooldown_timers[SOUND_COUNT];
@@ -145,12 +137,17 @@ struct ui_state_t {
 
 ui_state_t ui_init(int32_t lcg_seed, const noise_t& noise);
 void ui_handle_input(ui_state_t& state, SDL_Event e);
-void ui_handle_network_event(ui_state_t& state, network_event_t& network_event);
+void ui_handle_network_event(ui_state_t& state, const network_event_t& network_event);
 void ui_update(ui_state_t& state);
-void ui_render(const ui_state_t& state);
 
+void ui_create_minimap_texture(const ui_state_t& state);
+input_t ui_create_move_input(const ui_state_t& state);
 bool ui_is_mouse_in_ui();
 bool ui_is_selecting(const ui_state_t& state);
+xy ui_get_mouse_world_pos(const ui_state_t& state);
+void ui_clamp_camera(ui_state_t& state);
+void ui_center_camera_on_cell(ui_state_t& state, xy cell);
+
 std::vector<entity_id> ui_create_selection_from_rect(const ui_state_t& state);
 void ui_set_selection(ui_state_t& state, const std::vector<entity_id>& selection);
 void ui_update_buttons(ui_state_t& state);
@@ -162,7 +159,6 @@ void ui_handle_ui_button_press(ui_state_t& state, UiButton button);
 void ui_deselect_entity_if_selected(ui_state_t& state, entity_id id);
 void ui_show_status(ui_state_t& state, const char* message);
 xy ui_get_building_cell(const ui_state_t& state);
-entity_id ui_get_nearest_builder(const ui_state_t& state, const std::vector<entity_id>& builders, xy cell);
 bool ui_building_can_be_placed(const ui_state_t& state);
 ui_tooltip_info_t ui_get_hovered_tooltip_info(const ui_state_t& state);
 xy ui_garrisoned_icon_position(int index);
@@ -170,4 +166,11 @@ int ui_get_garrisoned_index_hovered(const ui_state_t& state);
 xy ui_get_selected_unit_icon_position(uint32_t unit_index);
 int ui_get_selected_unit_hovered(const ui_state_t& state);
 int ui_get_building_queue_item_hovered(const ui_state_t& state);
-void ui_create_minimap_texture(const ui_state_t& state);
+
+// Render
+
+void ui_render(const ui_state_t& state);
+render_sprite_params_t ui_create_entity_render_params(const ui_state_t& state, const entity_t& entity);
+void ui_render_healthbar(xy position, xy size, int health, int max_health);
+void ui_render_garrisoned_units_healthbar(xy position, xy size, int garrisoned_size, int garrisoned_capacity);
+void ui_render_target_build(const ui_state_t& state, const target_t& target);

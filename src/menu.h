@@ -89,6 +89,7 @@ struct menu_state_t {
 
 menu_state_t menu_init();
 void menu_handle_input(menu_state_t& state, SDL_Event event);
+void menu_handle_network_event(menu_state_t& state, const network_event_t& network_event);
 void menu_update(menu_state_t& state);
 void menu_show_status(menu_state_t& state, const char* text);
 void menu_set_mode(menu_state_t& state, MenuMode mode);

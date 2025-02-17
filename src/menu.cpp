@@ -386,61 +386,59 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
     }
 }
 
+void menu_handle_network_event(menu_state_t& state, const network_event_t& network_event) {
+    switch (network_event.type) {
+        case NETWORK_EVENT_CONNECTION_FAILED: {
+            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            state.item_selected = -1;
+            menu_show_status(state, "Failed to connect to server.");
+            break;
+        }
+        case NETWORK_EVENT_LOBBY_FULL: {
+            network_disconnect();
+            menu_set_mode(state, MENU_MODE_MAIN);
+            menu_show_status(state, "The lobby is full.");
+            break;
+        }
+        case NETWORK_EVENT_INVALID_VERSION: {
+            network_disconnect();
+            menu_set_mode(state, MENU_MODE_MAIN);
+            menu_show_status(state, "Client version does not match.");
+            break;
+        }
+        case NETWORK_EVENT_GAME_ALREADY_STARTED: {
+            network_disconnect();
+            menu_set_mode(state, MENU_MODE_MAIN);
+            menu_show_status(state, "That game has already started.");
+            break;
+        }
+        case NETWORK_EVENT_JOINED_LOBBY: {
+            network_send_lobby_chat_message((state.username + " joined the game.").c_str());
+            menu_set_mode(state, MENU_MODE_LOBBY);
+            break;
+        }
+        case NETWORK_EVENT_PLAYER_DISCONNECTED: {
+            if (network_event.player_disconnected.player_id == 0) {
+                network_disconnect();
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
+                state.item_selected = -1;
+            } else {
+                menu_add_chat_message(state, std::string(network_get_player(network_event.player_disconnected.player_id).name) + " disconnected.");
+            }
+            break;
+        }
+        case NETWORK_EVENT_LOBBY_CHAT: {
+            menu_add_chat_message(state, std::string(network_event.lobby_chat.message));
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 void menu_update(menu_state_t& state) {
     if (state.status_timer > 0) {
         state.status_timer--;
-    }
-
-    network_service();
-    network_event_t network_event;
-    while (network_poll_events(&network_event)) {
-        switch (network_event.type) {
-            case NETWORK_EVENT_CONNECTION_FAILED: {
-                menu_set_mode(state, MENU_MODE_MATCHLIST);
-                state.item_selected = -1;
-                menu_show_status(state, "Failed to connect to server.");
-                break;
-            }
-            case NETWORK_EVENT_LOBBY_FULL: {
-                network_disconnect();
-                menu_set_mode(state, MENU_MODE_MAIN);
-                menu_show_status(state, "The lobby is full.");
-                break;
-            }
-            case NETWORK_EVENT_INVALID_VERSION: {
-                network_disconnect();
-                menu_set_mode(state, MENU_MODE_MAIN);
-                menu_show_status(state, "Client version does not match.");
-                break;
-            }
-            case NETWORK_EVENT_GAME_ALREADY_STARTED: {
-                network_disconnect();
-                menu_set_mode(state, MENU_MODE_MAIN);
-                menu_show_status(state, "That game has already started.");
-                break;
-            }
-            case NETWORK_EVENT_JOINED_LOBBY: {
-                network_send_lobby_chat_message((state.username + " joined the game.").c_str());
-                menu_set_mode(state, MENU_MODE_LOBBY);
-                break;
-            }
-            case NETWORK_EVENT_PLAYER_DISCONNECTED: {
-                if (network_event.player_disconnected.player_id == 0) {
-                    network_disconnect();
-                    menu_set_mode(state, MENU_MODE_MATCHLIST);
-                    state.item_selected = -1;
-                } else {
-                    menu_add_chat_message(state, std::string(network_get_player(network_event.player_disconnected.player_id).name) + " disconnected.");
-                }
-                break;
-            }
-            case NETWORK_EVENT_LOBBY_CHAT: {
-                menu_add_chat_message(state, std::string(network_event.lobby_chat.message));
-                break;
-            }
-            default:
-                break;
-        }
     }
 
     engine_set_cursor(CURSOR_DEFAULT);

@@ -5,6 +5,7 @@
 #include "menu.h"
 #include "ui.h"
 #include "network.h"
+#include "lcg.h"
 #include <ctime>
 #include <cstdio>
 
@@ -118,8 +119,8 @@ int gold_main(int argc, char** argv) {
                         menu_handle_input(menu_state, event);
                         break;
                     case GAME_MODE_MATCH:
-                        ui_handle_input(match_state, event);
-                        if (match_state.ui_mode == UI_MODE_LEAVE_MATCH) {
+                        ui_handle_input(ui_state, event);
+                        if (ui_state.mode == UI_MODE_LEAVE_MATCH) {
                             menu_state = menu_init();
                             game_mode = GAME_MODE_MENU;
                         }
@@ -139,12 +140,12 @@ int gold_main(int argc, char** argv) {
                         free(network_event.match_load.noise.map);
                         game_mode = GAME_MODE_MATCH;
                     } else {
-                        menu_handle_network_event(event);
+                        menu_handle_network_event(menu_state, network_event);
                     }
                     break;
                 }
                 case GAME_MODE_MATCH: {
-                    ui_handle_network_event(event);
+                    ui_handle_network_event(ui_state, network_event);
                     break;
                 }
             }
@@ -182,8 +183,8 @@ int gold_main(int argc, char** argv) {
 
                         network_begin_loading_match(lcg_seed, noise);
 
-                        ui_state = ui_init(network_event.match_load.lcg_seed, network_event.match_load.noise);
-                        free(network_event.match_load.noise.map);
+                        ui_state = ui_init(lcg_seed, noise);
+                        free(noise.map);
                         game_mode = GAME_MODE_MATCH;
                     }
                     break;

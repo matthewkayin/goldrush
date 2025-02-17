@@ -1,6 +1,5 @@
 #include "match.h"
 
-#include "network.h"
 #include "logger.h"
 #include "lcg.h"
 #include <unordered_map>
@@ -694,7 +693,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
     if (entity.type == ENTITY_GOLD) {
         if (entity.gold_held == 0) {
-            ui_deselect_entity_if_selected(state, id);
             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
             map_recalculate_unreachable_cells(state, entity.cell);
             // Triggers gold removal from entities list. This is done this way so that we can guarantee that the cell is set empty before deletion
@@ -728,10 +726,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         }
 
         if (entity.type != ENTITY_GOLD) {
-            match_play_sound_at(state, entity_get_death_sound(entity.type), entity.position.to_xy());
+            match_event_play_sound(state, entity_get_death_sound(entity.type), entity.position.to_xy());
         }
-
-        ui_deselect_entity_if_selected(state, id);
 
         // Handle garrisoned units for buildings
         // Units handle them after MODE_UNIT_DEATH is over
@@ -814,8 +810,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 } else {
                     entity.pathfind_attempts++;
                     if (entity.pathfind_attempts >= 3) {
-                        if (entity.player_id == network_get_player_id() && entity.target.type == TARGET_BUILD) {
-                            ui_show_status(state, UI_STATUS_CANT_BUILD);
+                        if (entity.target.type == TARGET_BUILD) {
+                            state.events.push_back((match_event_t) { .type = MATCH_EVENT_BUILDING_EXIT_BLOCKED, .player_id = entity.player_id });
                         }
                         entity.target = (target_t) { .type = TARGET_NONE };
                         entity.pathfind_attempts = 0;
@@ -969,7 +965,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.direction = enum_direction_to_rect(entity.cell, entity.target.cell, 1);
                         entity.mode = MODE_UNIT_TINKER_THROW;
                         entity.animation = animation_create(ANIMATION_UNIT_ATTACK);
-                        match_play_sound_at(state, SOUND_THROW, entity.position.to_xy());
+                        match_event_play_sound(state, SOUND_THROW, entity.position.to_xy());
                         break;
                     }
                     case TARGET_BUILD: {
@@ -983,17 +979,13 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             }
                         }
                         if (!can_build) {
-                            if (entity.player_id == network_get_player_id()) {
-                                ui_show_status(state, UI_STATUS_CANT_BUILD);
-                            }
+                            state.events.push_back((match_event_t) { .type = MATCH_EVENT_CANT_BUILD, .player_id = entity.player_id });
                             entity.target = (target_t) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
                         if (state.player_gold[entity.player_id] < ENTITY_DATA.at(entity.target.build.building_type).gold_cost) {
-                            if (entity.player_id == network_get_player_id()) {
-                                ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
-                            }
+                            state.events.push_back((match_event_t) { .type = MATCH_EVENT_NOT_ENOUGH_GOLD, .player_id = entity.player_id });
                             entity.target = (target_t) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                             break;
@@ -1003,7 +995,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                         if (entity.target.build.building_type == ENTITY_MINE) {
                             entity_create(state, entity.target.build.building_type, entity.player_id, entity.target.build.building_cell);
-                            match_play_sound_at(state, SOUND_MINE_INSERT, cell_center(entity.target.build.building_cell).to_xy());
+                            match_event_play_sound(state, SOUND_MINE_INSERT, cell_center(entity.target.build.building_cell).to_xy());
 
                             entity.direction = enum_direction_to_rect(entity.cell, entity.target.build.building_cell, entity_cell_size(entity.target.build.building_type));
                             entity.target = (target_t) { .type = TARGET_NONE };
@@ -1018,14 +1010,13 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity.mode = MODE_UNIT_BUILD;
                         entity.timer = UNIT_BUILD_TICK_DURATION;
 
-                        if (state.selection.size() == 1 && state.selection[0] == id) {
-                            state.selection.clear();
-                            state.selection.push_back(entity.target.id);
-                            ui_set_selection(state, state.selection);
-                            state.ui_mode = UI_MODE_NONE;
-                        } else {
-                            ui_deselect_entity_if_selected(state, id);
-                        }
+                        state.events.push_back((match_event_t) {
+                            .selection_handoff = (match_event_selection_handoff_t) {
+                                .player_id = entity.player_id,
+                                .to_deselect = id,
+                                .to_select = entity.target.id
+                            }
+                        });
 
                         break;
                     }
@@ -1140,8 +1131,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             entity.target = (target_t) { .type = TARGET_NONE };
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
                             map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false, ENTITY_DATA.at(entity.type).has_detection);
-                            ui_deselect_entity_if_selected(state, id);
-                            match_play_sound_at(state, SOUND_GARRISON_IN, target.position.to_xy());
+                            match_event_play_sound(state, SOUND_GARRISON_IN, target.position.to_xy());
                             update_finished = true;
                             break;
                         }
@@ -1318,7 +1308,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 if (!animation_is_playing(entity.animation)) {
                     entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
                     entity.cooldown_timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
-                    match_play_sound_at(state, entity_get_attack_sound(entity), entity.position.to_xy());
+                    match_event_play_sound(state, entity_get_attack_sound(entity), entity.position.to_xy());
                     entity.mode = MODE_UNIT_IDLE;
 
                     // If garrisoned, reasses targets. This is so that units don't get stuck shooting a building when a unit may have become a bigger priority
@@ -1405,8 +1395,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                             : entity.rally_point / TILE_SIZE;
                         xy exit_cell = entity_get_exit_cell(state, entity.cell, entity_cell_size(entity.type), entity_cell_size(entity.queue[0].unit_type), rally_cell);
                         if (exit_cell.x == -1) {
-                            if (entity.timer == 0 && entity.player_id == network_get_player_id()) {
-                                ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                            if (entity.timer == 0) {
+                                state.events.push_back((match_event_t) { .type = MATCH_EVENT_BUILDING_EXIT_BLOCKED, .player_id = entity.player_id });
                             }
                             entity.timer = BUILDING_QUEUE_EXIT_BLOCKED;
                             update_finished = true;
@@ -1430,20 +1420,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         // Create alert
-                        SDL_Rect unit_rect = entity_get_rect(unit);
-                        unit_rect.x -= state.camera_offset.x;
-                        unit_rect.y -= state.camera_offset.y;
-                        if (unit.player_id == network_get_player_id() && SDL_HasIntersection(&SCREEN_RECT, &unit_rect) != SDL_TRUE) {
-                            state.alerts.push_back((alert_t) {
-                                .color = ALERT_COLOR_GREEN,
-                                .cell = unit.cell,
-                                .cell_size = entity_cell_size(unit.type),
-                                .timer = MATCH_ALERT_TOTAL_DURATION
-                            });
-                        }
-                        if (unit.player_id == network_get_player_id()) {
-                            sound_play(SOUND_ALERT_UNIT);
-                        }
+                        match_event_alert(state, MATCH_ALERT_TYPE_UNIT, unit.player_id, unit.cell, entity_cell_size(unit.type));
 
                         entity_building_dequeue(state, entity);
                     } else if (entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UPGRADE) {
@@ -1468,27 +1445,16 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
 
                         // Show status
-                        if (entity.player_id == network_get_player_id()) {
-                            char upgrade_status[128];
-                            sprintf(upgrade_status, "%s research complete.", UPGRADE_DATA.at(entity.queue[0].upgrade).name);
-                            ui_show_status(state, upgrade_status);
-                        }
+                        state.events.push_back((match_event_t) {
+                            .type = MATCH_EVENT_RESEARCH_COMPLETE,
+                            .research_complete = (match_event_research_complete_t) {
+                                .upgrade = entity.queue[0].upgrade,
+                                .player_id = entity.player_id
+                            }
+                        });
 
                         // Create alert
-                        SDL_Rect building_rect = entity_get_rect(entity);
-                        building_rect.x -= state.camera_offset.x;
-                        building_rect.y -= state.camera_offset.y;
-                        if (entity.player_id == network_get_player_id() && SDL_HasIntersection(&SCREEN_RECT, &building_rect) != SDL_TRUE) {
-                            state.alerts.push_back((alert_t) {
-                                .color = ALERT_COLOR_GREEN,
-                                .cell = entity.cell,
-                                .cell_size = entity_cell_size(entity.type),
-                                .timer = MATCH_ALERT_TOTAL_DURATION
-                            });
-                        }
-                        if (entity.player_id == network_get_player_id()) {
-                            sound_play(SOUND_ALERT_RESEARCH);
-                        }
+                        match_event_alert(state, MATCH_ALERT_TYPE_RESEARCH, entity.player_id, entity.cell, entity_cell_size(entity.type));
 
                         entity_building_dequeue(state, entity);
                     }
@@ -1561,9 +1527,9 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         animation_update(entity.animation);
         if (prev_hframe != entity.animation.frame.x) {
             if (entity.mode == MODE_UNIT_MINE && prev_hframe == 5) {
-                match_play_sound_at(state, SOUND_PICKAXE, entity.position.to_xy());
+                match_event_play_sound(state, SOUND_PICKAXE, entity.position.to_xy());
             } else if ((entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD) && prev_hframe == 0) {
-                match_play_sound_at(state, SOUND_HAMMER, entity.position.to_xy());
+                match_event_play_sound(state, SOUND_HAMMER, entity.position.to_xy());
             } 
         }
     } else if (entity.type == ENTITY_SMITH) {
@@ -1581,7 +1547,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
         int prev_hframe = entity.animation.frame.x;
         animation_update(entity.animation);
         if (prev_hframe != entity.animation.frame.x) {
-            match_play_sound_at(state, SOUND_MINE_PRIME, entity.position.to_xy());
+            match_event_play_sound(state, SOUND_MINE_PRIME, entity.position.to_xy());
         }
     }
 }
@@ -2341,29 +2307,9 @@ void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& def
     entity_t& attacker = state.entities.get_by_id(attacker_id);
 
     // Alerts / Taking damage flicker
-    if (attacker.player_id != defender.player_id && defender.player_id == network_get_player_id()) {
-        SDL_Rect defender_rect = entity_get_rect(defender);
-        defender_rect.x -= state.camera_offset.x;
-        defender_rect.y -= state.camera_offset.y;
-        if (defender.taking_damage_counter == 0 && SDL_HasIntersection(&SCREEN_RECT, &defender_rect) != SDL_TRUE) {
-            bool is_existing_attack_alert_nearby = false;
-            for (const alert_t& existing_alert : state.alerts) {
-                if (existing_alert.color == ALERT_COLOR_RED && xy::manhattan_distance(existing_alert.cell, defender.cell) < MATCH_ATTACK_ALERT_DISTANCE) {
-                    is_existing_attack_alert_nearby = true;
-                    break;
-                }
-            }
-
-            if (!is_existing_attack_alert_nearby) {
-                state.alerts.push_back((alert_t) {
-                    .color = ALERT_COLOR_RED,
-                    .cell = defender.cell,
-                    .cell_size = entity_cell_size(defender.type),
-                    .timer = MATCH_ALERT_TOTAL_DURATION
-                });
-                ui_show_status(state, UI_STATUS_UNDER_ATTACK);
-                sound_play(SOUND_ALERT_BELL);
-            }
+    if (attacker.player_id != defender.player_id) {
+        if (defender.taking_damage_counter == 0) {
+            match_event_alert(state, MATCH_ALERT_TYPE_ATTACK, defender.player_id, defender.cell, entity_cell_size(defender.type));
         }
     }
     defender.taking_damage_counter = 3;
@@ -2418,7 +2364,6 @@ void entity_explode(match_state_t& state, entity_id id) {
     }
 
     // Kill the entity
-    ui_deselect_entity_if_selected(state, id);
     entity.health = 0;
     if (entity.type == ENTITY_SAPPER) {
         entity.target = (target_t) { .type = TARGET_NONE };
@@ -2431,7 +2376,7 @@ void entity_explode(match_state_t& state, entity_id id) {
         state.map_mine_cells[entity.cell.x + (entity.cell.y * state.map_width)] = ID_NULL;
     }
 
-    match_play_sound_at(state, SOUND_EXPLOSION, entity.position.to_xy());
+    match_event_play_sound(state, SOUND_EXPLOSION, entity.position.to_xy());
 
     // Create particle
     state.particles.push_back((particle_t) {
@@ -2503,8 +2448,8 @@ void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garris
             // Find the exit cell
             xy exit_cell = entity_get_exit_cell(state, entity.cell, entity_cell_size(entity.type), entity_cell_size(garrisoned_unit.type), entity.cell + xy(0, entity_cell_size(entity.type)));
             if (exit_cell.x == -1) {
-                if (garrisoned_unit.player_id == network_get_player_id() && entity_is_building(entity.type)) {
-                    ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                if (entity_is_building(entity.type)) {
+                    state.events.push_back((match_event_t) { .type = MATCH_EVENT_BUILDING_EXIT_BLOCKED, .player_id = garrisoned_unit.player_id });
                 }
                 return;
             }
@@ -2521,7 +2466,7 @@ void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garris
             // Remove the unit from the garrisoned units list
             entity.garrisoned_units.erase(entity.garrisoned_units.begin() + index);
 
-            match_play_sound_at(state, SOUND_GARRISON_OUT, entity.position.to_xy());
+            match_event_play_sound(state, SOUND_GARRISON_OUT, entity.position.to_xy());
         } else {
             index++;
         }
@@ -2570,20 +2515,7 @@ void entity_building_finish(match_state_t& state, entity_id building_id) {
     building.mode = MODE_BUILDING_FINISHED;
 
     // Show alert
-    if (building.player_id == network_get_player_id()) {
-        SDL_Rect building_rect = entity_get_rect(building);
-        building_rect.x -= state.camera_offset.x;
-        building_rect.y -= state.camera_offset.y;
-        if (SDL_HasIntersection(&SCREEN_RECT, &building_rect) != SDL_TRUE) {
-            state.alerts.push_back((alert_t) {
-                .color = ALERT_COLOR_GREEN,
-                .cell = building.cell,
-                .cell_size = entity_cell_size(building.type),
-                .timer = MATCH_ALERT_TOTAL_DURATION
-            });
-        }
-        sound_play(SOUND_ALERT_BUILDING);
-    }
+    match_event_alert(state, MATCH_ALERT_TYPE_BUILDING, building.player_id, building.cell, entity_cell_size(building.type));
 
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         entity_t& entity = state.entities[entity_index];
@@ -2597,8 +2529,8 @@ void entity_building_finish(match_state_t& state, entity_id building_id) {
         if (entity.target.type == TARGET_BUILD) {
             entity_stop_building(state, state.entities.get_id_of(entity_index));
             // If the unit was unable to stop building, notify the user that the exit is blocked
-            if (entity.mode != MODE_UNIT_IDLE && entity.player_id == network_get_player_id()) {
-                ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+            if (entity.mode != MODE_UNIT_IDLE) {
+                state.events.push_back((match_event_t) { .type = MATCH_EVENT_BUILDING_EXIT_BLOCKED, .player_id = entity.player_id });
             }
         } else if (entity.mode == MODE_UNIT_REPAIR) {
             entity.mode = MODE_UNIT_IDLE;
@@ -2615,8 +2547,8 @@ void entity_building_enqueue(match_state_t& state, entity_t& building, building_
     building.queue.push_back(item);
     if (building.queue.size() == 1) {
         if (entity_building_is_supply_blocked(state, building)) {
-            if (building.player_id == network_get_player_id() && building.timer != BUILDING_QUEUE_BLOCKED) {
-                ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
+            if (building.timer != BUILDING_QUEUE_BLOCKED) {
+                state.events.push_back((match_event_t) { .type = MATCH_EVENT_NOT_ENOUGH_HOUSE, .player_id = building.player_id });
             }
             building.timer = BUILDING_QUEUE_BLOCKED;
         } else {
@@ -2633,8 +2565,8 @@ void entity_building_dequeue(match_state_t& state, entity_t& building) {
         building.timer = 0;
     } else {
         if (entity_building_is_supply_blocked(state, building)) {
-            if (building.player_id == network_get_player_id() && building.timer != BUILDING_QUEUE_BLOCKED) {
-                ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
+            if (building.timer != BUILDING_QUEUE_BLOCKED) {
+                state.events.push_back((match_event_t) { .type = MATCH_EVENT_NOT_ENOUGH_HOUSE, .player_id = building.player_id });
             }
             building.timer = BUILDING_QUEUE_BLOCKED;
         } else {

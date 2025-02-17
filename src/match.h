@@ -7,11 +7,47 @@
 #include "animation.h"
 #include "options.h"
 #include "types.h"
-#include "map.h"
+#include "noise.h"
 #include <vector>
 #include <array>
 #include <string>
 #include <unordered_map>
+
+extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
+extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION;
+
+// Map
+
+const entity_id CELL_EMPTY = ID_NULL;
+const entity_id CELL_BLOCKED = ID_MAX + 2;
+const entity_id CELL_UNREACHABLE = ID_MAX + 3;
+const entity_id CELL_DECORATION_1 = ID_MAX + 4;
+const entity_id CELL_DECORATION_2 = ID_MAX + 5;
+const entity_id CELL_DECORATION_3 = ID_MAX + 6;
+const entity_id CELL_DECORATION_4 = ID_MAX + 7;
+const entity_id CELL_DECORATION_5 = ID_MAX + 8;
+
+const int FOG_HIDDEN = -1;
+const int FOG_EXPLORED = 0;
+
+struct tile_t {
+    uint16_t index;
+    uint16_t elevation;
+};
+
+struct remembered_entity_t {
+    render_sprite_params_t sprite_params;
+    xy cell;
+    int cell_size;
+};
+
+struct map_reveal_t {
+    int player_id;
+    xy cell;
+    int cell_size;
+    int sight;
+    int timer;
+};
 
 // Chat
 
@@ -40,6 +76,8 @@ struct projectile_t {
     xy_fixed position;
     xy_fixed target;
 };
+
+extern const int PARTICLE_SMOKE_CELL_SIZE;
 
 // Upgrades
 
@@ -172,6 +210,67 @@ struct entity_data_t {
 };
 extern const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA;
 
+// Match Event
+
+/**
+ * These are events that bubble up to the UI
+ * They represent things that we would like the UI to do, 
+ * but the UI may or may not do them depending on its own state
+ */
+
+enum MatchEventType {
+    MATCH_EVENT_SOUND,
+    MATCH_EVENT_ALERT,
+    MATCH_EVENT_SELECTION_HANDOFF,
+    MATCH_EVENT_RESEARCH_COMPLETE,
+    MATCH_EVENT_SMOKE_COOLDOWN,
+    MATCH_EVENT_CANT_BUILD,
+    MATCH_EVENT_BUILDING_EXIT_BLOCKED,
+    MATCH_EVENT_NOT_ENOUGH_GOLD,
+    MATCH_EVENT_NOT_ENOUGH_HOUSE
+};
+
+struct match_event_sound_t {
+    xy position;
+    Sound sound;
+};
+
+enum MatchAlertType {
+    MATCH_ALERT_TYPE_BUILDING,
+    MATCH_ALERT_TYPE_UNIT,
+    MATCH_ALERT_TYPE_RESEARCH,
+    MATCH_ALERT_TYPE_ATTACK
+};
+
+struct match_event_alert_t {
+    MatchAlertType type;
+    uint8_t player_id;
+    xy cell;
+    int cell_size;
+};
+
+struct match_event_research_complete_t {
+    uint32_t upgrade;
+    uint8_t player_id;
+};
+
+struct match_event_selection_handoff_t {
+    uint8_t player_id;
+    entity_id to_deselect;
+    entity_id to_select;
+};
+
+struct match_event_t {
+    MatchEventType type;
+    union {
+        match_event_sound_t sound;
+        match_event_alert_t alert;
+        match_event_selection_handoff_t selection_handoff;
+        match_event_research_complete_t research_complete;
+        uint8_t player_id;
+    };
+};
+
 // Input
 
 enum InputType: uint8_t {
@@ -277,7 +376,18 @@ struct input_t {
 
 struct match_state_t {
     // Map
-    map_t map;
+    uint32_t map_width;
+    uint32_t map_height;
+    std::vector<tile_t> map_tiles;
+    std::vector<entity_id> map_cells;
+    std::vector<entity_id> map_mine_cells;
+    std::vector<int> map_fog[MAX_PLAYERS];
+    std::vector<int> map_detection[MAX_PLAYERS];
+    std::unordered_map<entity_id, remembered_entity_t> remembered_entities[MAX_PLAYERS];
+    bool map_is_fog_dirty;
+    std::vector<map_reveal_t> map_reveals;
+
+    xy map_player_spawns[MAX_PLAYERS];
 
     // Entities
     id_array<entity_t, 400 * MAX_PLAYERS> entities;
@@ -290,14 +400,16 @@ struct match_state_t {
     uint32_t player_upgrades_in_progress[MAX_PLAYERS];
 
     std::vector<chat_message_t> chat;
+
+    std::vector<match_event_t> events;
 };
 
-match_state_t match_init(const std::vector<xy>& player_spawns);
+match_state_t match_init(int32_t lcg_seed, const noise_t& noise);
 
 // Input
 
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
-input_t match_input_deserialize(uint8_t* in_buffer, size_t& in_buffer_head);
+input_t match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_head);
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input);
 
 // Update
@@ -309,21 +421,34 @@ uint32_t match_get_player_max_population(const match_state_t& state, uint8_t pla
 bool match_player_has_upgrade(const match_state_t& state, uint8_t player_id, uint32_t upgrade);
 bool match_player_upgrade_is_available(const match_state_t& state, uint8_t player_id, uint32_t upgrade);
 void match_grant_player_upgrade(match_state_t& state, uint8_t player_id, uint32_t upgrade);
-
-void match_camera_clamp(match_state_t& state);
-void match_camera_center_on_cell(match_state_t& state, xy cell);
-xy match_get_mouse_world_pos(const match_state_t& state);
-input_t match_create_move_input(const match_state_t& state);
+entity_id match_get_nearest_builder(const match_state_t& state, const std::vector<entity_id>& builders, xy cell);
 void match_add_chat_message(match_state_t& state, std::string message);
 
-// Render
+// Event
 
-void match_render(const match_state_t& state);
-render_sprite_params_t match_create_entity_render_params(const match_state_t& state, const entity_t& entity);
-void match_render_healthbar(xy position, xy size, int health, int max_health);
-void match_render_garrisoned_units_healthbar(xy position, xy size, int garrisoned_size, int garrisoned_capacity);
-void match_render_target_build(const match_state_t& state, const target_t& target);
-void match_play_sound_at(match_state_t& state, Sound sound, xy position);
+void match_event_play_sound(match_state_t& state, Sound sound, xy position);
+void match_event_alert(match_state_t& state, MatchAlertType type, uint8_t player_id, xy cell, int cell_size);
+
+// Map
+
+void map_init(match_state_t& state, const noise_t& noise);
+
+void map_calculate_unreachable_cells(match_state_t& state);
+void map_recalculate_unreachable_cells(match_state_t& state, xy cell);
+bool map_is_cell_in_bounds(const match_state_t& state, xy cell);
+bool map_is_cell_rect_in_bounds(const match_state_t& state, xy cell, int cell_size);
+tile_t map_get_tile(const match_state_t& state, xy cell);
+entity_id map_get_cell(const match_state_t& state, xy cell);
+bool map_is_cell_rect_equal_to(const match_state_t& state, xy cell, int cell_size, entity_id value);
+void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value);
+bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
+bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
+xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
+bool map_is_tile_ramp(const match_state_t& state, xy cell);
+bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
+void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
+bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size);
+void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection);
 
 // Entity
 
