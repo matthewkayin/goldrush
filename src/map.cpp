@@ -597,29 +597,7 @@ void map_init(match_state_t& state, const noise_t& noise) {
 
     std::vector<xy> gold_sample = poisson_disk(state, params);
     for (uint32_t patch_id = 0; patch_id < gold_sample.size(); patch_id++) {
-        // Choose an adjacent direction to walk in
-        int patch_size = 0;
-        int patch_goal = 5 + (lcg_rand() % 5);
-        std::vector<xy> gold_frontier;
-        gold_frontier.push_back(gold_sample[patch_id]);
-        while (patch_size < patch_goal && !gold_frontier.empty()) {
-            int next_index = lcg_rand() % gold_frontier.size();
-            xy next = gold_frontier[next_index];
-            gold_frontier.erase(gold_frontier.begin() + next_index);
-
-            if (!poisson_is_point_valid(state, params, next)) {
-                continue;
-            }
-
-            // Place gold
-            entity_create_gold(state, next, 1500, patch_id);
-            patch_size++;
-
-            // Determine next gold cell
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                gold_frontier.push_back(next + DIRECTION_XY[direction]);
-            }
-        }
+        entity_create_gold_mine(state, gold_sample[patch_id], 5000);
     }
     // Recalculate unreachables in case the gold cells blocked anything
     map_calculate_unreachable_cells(state);
@@ -627,7 +605,7 @@ void map_init(match_state_t& state, const noise_t& noise) {
     // Fill in the gold values in the poisson avoid table so that decorations are not placed too close to gold
     for (const entity_t& entity : state.entities) {
         // All entities should be gold at this point anyways but it doesn't hurt to check
-        if (entity.type == ENTITY_GOLD) {
+        if (entity.type == ENTITY_GOLD_MINE) {
             params.avoid_values[entity.cell.x + (entity.cell.y * state.map_width)] = 4;
         }
     }
@@ -1250,14 +1228,14 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
                     }
                     if (cell_value < CELL_EMPTY) {
                         entity_t& entity = state.entities.get_by_id(cell_value);
-                        if (!entity_is_unit(entity.type) && entity_is_selectable(entity) && entity.type != ENTITY_MINE) {
+                        if (!entity_is_unit(entity.type) && entity_is_selectable(entity) && entity.type != ENTITY_LAND_MINE) {
                             state.remembered_entities[player_id][cell_value] = (remembered_entity_t) {
                                 .sprite_params = (render_sprite_params_t) {
                                     .sprite = entity_get_sprite(entity),
                                     .frame = entity_get_animation_frame(entity),
                                     .position = entity.position.to_xy(),
                                     .options = 0,
-                                    .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
+                                    .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD_MINE ? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
                                 },
                                 .cell = entity.cell,
                                 .cell_size = entity_cell_size(entity.type)

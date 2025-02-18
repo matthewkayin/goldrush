@@ -32,3 +32,10 @@ todos
     - [ ] - Volume slider for music
     - [ ] - Keybinds for other actions ?
     - [ ] - Test with different resolutions to see how it looks
+    - [ ] - Fix the font on the hotkeys screen
+ - [ ] - Linux build
+ - [ ] - Intel mac build
+ - [ ] - Better art
+    - [ ] - Smoke
+    - [ ] - Tinker
+    - [ ] - War Wagon?

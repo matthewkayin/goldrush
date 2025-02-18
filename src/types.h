@@ -64,7 +64,7 @@ enum UiButton {
 enum Sprite {
     SPRITE_TILESET_ARIZONA,
     SPRITE_TILE_DECORATION,
-    SPRITE_TILE_GOLD,
+    SPRITE_GOLD_MINE,
     SPRITE_UI_FRAME,
     SPRITE_UI_FRAME_SMALL,
     SPRITE_UI_FRAME_BOTTOM,
@@ -234,7 +234,6 @@ struct render_sprite_params_t {
 #define BUILDING_QUEUE_BLOCKED UINT32_MAX
 #define BUILDING_QUEUE_EXIT_BLOCKED UINT32_MAX - 1
 #define BUILDING_FADE_DURATION 300
-#define GOLD_PATCH_ID_NULL UINT32_MAX
 #define ENTITY_UNLOAD_ALL ID_NULL
 
 // If you change this, make sure that entity_is_unit() and entity_is_building() still work
@@ -259,8 +258,8 @@ enum EntityType {
     ENTITY_SMITH,
     ENTITY_BARRACKS,
     ENTITY_SHERIFFS,
-    ENTITY_MINE,
-    ENTITY_GOLD
+    ENTITY_LAND_MINE,
+    ENTITY_GOLD_MINE
 };
 
 enum EntityMode {
@@ -272,7 +271,7 @@ enum EntityMode {
     MODE_UNIT_REPAIR,
     MODE_UNIT_ATTACK_WINDUP,
     MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP,
-    MODE_UNIT_MINE,
+    MODE_UNIT_IN_MINE,
     MODE_UNIT_TINKER_THROW,
     MODE_UNIT_DEATH,
     MODE_UNIT_DEATH_FADE,
@@ -281,8 +280,8 @@ enum EntityMode {
     MODE_BUILDING_DESTROYED,
     MODE_MINE_ARM,
     MODE_MINE_PRIME,
-    MODE_GOLD,
-    MODE_GOLD_MINED_OUT
+    MODE_GOLD_MINE,
+    MODE_GOLD_MINE_COLLAPSED
 };
 
 enum TargetType {
@@ -296,6 +295,5 @@ enum TargetType {
     TARGET_UNLOAD,
     TARGET_SMOKE,
     TARGET_BUILD,
-    TARGET_BUILD_ASSIST,
-    TARGET_GOLD
+    TARGET_BUILD_ASSIST
 };

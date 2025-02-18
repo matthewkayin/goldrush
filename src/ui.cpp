@@ -908,6 +908,7 @@ void ui_update(ui_state_t& state) {
             case MATCH_EVENT_SMOKE_COOLDOWN:
             case MATCH_EVENT_CANT_BUILD:
             case MATCH_EVENT_BUILDING_EXIT_BLOCKED:
+            case MATCH_EVENT_MINE_EXIT_BLOCKED:
             case MATCH_EVENT_NOT_ENOUGH_GOLD:
             case MATCH_EVENT_NOT_ENOUGH_HOUSE: {
                 if (event.player_id != network_get_player_id()) {
@@ -922,6 +923,9 @@ void ui_update(ui_state_t& state) {
                         break;
                     case MATCH_EVENT_BUILDING_EXIT_BLOCKED:
                         ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
+                        break;
+                    case MATCH_EVENT_MINE_EXIT_BLOCKED:
+                        ui_show_status(state, UI_STATUS_MINE_EXIT_BLOCKED);
                         break;
                     case MATCH_EVENT_NOT_ENOUGH_GOLD:
                         ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
@@ -1105,7 +1109,7 @@ input_t ui_create_move_input(const ui_state_t& state) {
             // don't target unselectable entities, unless it's gold and the player doesn't know that the gold is unselectable
             // It's also saying, don't target a hidden mine
             if (!entity_is_selectable(entity) || 
-                    (fog_value == FOG_EXPLORED && entity.type != ENTITY_GOLD) ||
+                    (fog_value == FOG_EXPLORED && entity.type != ENTITY_GOLD_MINE) ||
                     (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && entity.player_id != network_get_player_id() && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0)) {
                 continue;
             }
@@ -1124,7 +1128,7 @@ input_t ui_create_move_input(const ui_state_t& state) {
         input.type = INPUT_MOVE_REPAIR;
     } else if (state.mode == UI_MODE_TARGET_SMOKE) {
         input.type = INPUT_MOVE_SMOKE;
-    } else if (input.move.target_id != ID_NULL && state.match_state.entities.get_by_id(input.move.target_id).type != ENTITY_GOLD &&
+    } else if (input.move.target_id != ID_NULL && state.match_state.entities.get_by_id(input.move.target_id).type != ENTITY_GOLD_MINE &&
                (state.mode == UI_MODE_TARGET_ATTACK || 
                 state.match_state.entities.get_by_id(input.move.target_id).player_id != network_get_player_id())) {
         input.type = INPUT_MOVE_ATTACK_ENTITY;
@@ -1245,7 +1249,7 @@ std::vector<entity_id> ui_create_selection_from_rect(const ui_state_t& state) {
 
     for (uint32_t index = 0; index < state.match_state.entities.size(); index++) {
         const entity_t& entity = state.match_state.entities[index];
-        if (entity.type != ENTITY_GOLD || !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
+        if (entity.type != ENTITY_GOLD_MINE || !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
             continue;
         }
 
@@ -1533,7 +1537,7 @@ void ui_handle_ui_button_press(ui_state_t& state, UiButton button) {
                     case ENTITY_COOP:
                         state.mode = UI_MODE_BUILD2;
                         break;
-                    case ENTITY_MINE:
+                    case ENTITY_LAND_MINE:
                         state.mode = UI_MODE_NONE;
                         break;
                     default:
@@ -1698,7 +1702,7 @@ bool ui_building_can_be_placed(const ui_state_t& state) {
 
     SDL_Rect building_rect = (SDL_Rect) { .x = building_cell.x, .y = building_cell.y, .w = building_cell_size, .h = building_cell_size };
     for (const entity_t& entity : state.match_state.entities) {
-        if (entity.type == ENTITY_GOLD && entity.gold_held != 0) {
+        if (entity.type == ENTITY_GOLD_MINE) {
             SDL_Rect gold_block_rect = entity_gold_get_block_building_rect(entity.cell);
             if ((state.building_type == ENTITY_CAMP || state.building_type == ENTITY_HALL) && SDL_HasIntersection(&building_rect, &gold_block_rect) == SDL_TRUE) {
                 return false;
@@ -1947,7 +1951,7 @@ void ui_render(const ui_state_t& state) {
         // Mine select rings and healthbars
         for (entity_id id : state.selection) {
             const entity_t& entity = state.match_state.entities.get_by_id(id);
-            if (entity.type != ENTITY_MINE || entity_get_elevation(state.match_state, entity) != elevation) {
+            if (entity.type != ENTITY_LAND_MINE || entity_get_elevation(state.match_state, entity) != elevation) {
                 continue;
             }
 
@@ -1967,7 +1971,7 @@ void ui_render(const ui_state_t& state) {
                 map_get_tile(state.match_state, state.move_animation_position / TILE_SIZE).elevation == elevation &&
                 state.move_animation.name != ANIMATION_UI_MOVE_CELL && state.move_animation.frame.x % 2 == 0) {
             uint32_t entity_index = state.match_state.entities.get_index_of(state.move_animation_entity_id);
-            if (entity_index != INDEX_INVALID && state.match_state.entities[entity_index].type == ENTITY_MINE) {
+            if (entity_index != INDEX_INVALID && state.match_state.entities[entity_index].type == ENTITY_LAND_MINE) {
                 const entity_t& entity = state.match_state.entities[entity_index];
                 render_sprite(entity_get_select_ring(entity, state.move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
             } else {
@@ -1982,7 +1986,7 @@ void ui_render(const ui_state_t& state) {
 
         // Render entity corpses
         for (const entity_t& entity : state.match_state.entities) {
-            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_MINE) || 
+            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_LAND_MINE) || 
                     entity_get_elevation(state.match_state, entity) != elevation || 
                     (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && entity.player_id != network_get_player_id() && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0) ||
                     !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
@@ -2008,14 +2012,14 @@ void ui_render(const ui_state_t& state) {
         // Select rings and healthbars
         for (entity_id id : state.selection) {
             const entity_t& entity = state.match_state.entities.get_by_id(id);
-            if (entity.type == ENTITY_MINE || entity_get_elevation(state.match_state, entity) != elevation) {
+            if (entity.type == ENTITY_LAND_MINE || entity_get_elevation(state.match_state, entity) != elevation) {
                 continue;
             }
 
             // Select ring
             render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || entity.player_id == network_get_player_id()), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
-            if (entity.type == ENTITY_GOLD) {
+            if (entity.type == ENTITY_GOLD_MINE) {
                 continue;
             }
             // Determine the healthbar rect
@@ -2031,7 +2035,7 @@ void ui_render(const ui_state_t& state) {
 
         // Entities
         for (const entity_t& entity : state.match_state.entities) {
-            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_MINE ||
+            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_LAND_MINE ||
                     !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) || 
                     (entity.player_id != network_get_player_id() && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0) ||
                     entity.garrison_id != ID_NULL || entity_get_elevation(state.match_state, entity) != elevation) {
@@ -2099,7 +2103,7 @@ void ui_render(const ui_state_t& state) {
             } else if (state.move_animation.frame.x % 2 == 0) {
                 uint32_t entity_index = state.match_state.entities.get_index_of(state.move_animation_entity_id);
                 if (entity_index != INDEX_INVALID) {
-                    if (state.match_state.entities[entity_index].type != ENTITY_MINE) {
+                    if (state.match_state.entities[entity_index].type != ENTITY_LAND_MINE) {
                         const entity_t& entity = state.match_state.entities[entity_index];
                         render_sprite(entity_get_select_ring(entity, state.move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
@@ -2108,7 +2112,7 @@ void ui_render(const ui_state_t& state) {
                     if (remembered_entities_it != state.match_state.remembered_entities[network_get_player_id()].end()) {
                         Sprite select_ring_sprite;
                         if (remembered_entities_it->second.sprite_params.sprite != SPRITE_BUILDING_MINE) {
-                            if (remembered_entities_it->second.sprite_params.sprite == SPRITE_TILE_GOLD) {
+                            if (remembered_entities_it->second.sprite_params.sprite == SPRITE_GOLD_MINE) {
                                 select_ring_sprite = SPRITE_SELECT_RING_GOLD;
                             } else {
                                 select_ring_sprite = (Sprite)(SPRITE_SELECT_RING_BUILDING_2 + ((remembered_entities_it->second.cell_size - 2) * 2) + 1);
@@ -2334,7 +2338,7 @@ void ui_render(const ui_state_t& state) {
 
                 if (state.building_type == ENTITY_CAMP || state.building_type == ENTITY_HALL) {
                     for (const entity_t& gold : state.match_state.entities) {
-                        if (gold.type != ENTITY_GOLD || gold.gold_held == 0) {
+                        if (gold.type != ENTITY_GOLD_MINE) {
                             continue;
                         }
                         if (sdl_rect_has_point(entity_gold_get_block_building_rect(gold.cell), xy(x, y))) {
@@ -2504,7 +2508,7 @@ void ui_render(const ui_state_t& state) {
         render_sprite(SPRITE_UI_BUTTON, xy(0, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
         render_sprite(SPRITE_UI_BUTTON_ICON, xy(entity_data.ui_button - 1, 0), SELECTION_LIST_TOP_LEFT + xy(0, 18), RENDER_SPRITE_NO_CULL);
 
-        if (entity.type != ENTITY_GOLD) {
+        if (entity.type != ENTITY_GOLD_MINE) {
             xy healthbar_position = SELECTION_LIST_TOP_LEFT + xy(0, 18 + 35);
             xy healthbar_size = xy(64, 12);
             ui_render_healthbar(healthbar_position, healthbar_size, entity.health, entity_data.max_health);
@@ -2665,7 +2669,7 @@ void ui_render(const ui_state_t& state) {
             .w = entity_cell_size(entity.type) + 1, .h = entity_cell_size(entity.type) + 1
         };
         SDL_Color color;
-        if (entity.type == ENTITY_GOLD) {
+        if (entity.type == ENTITY_GOLD_MINE) {
             color = COLOR_GOLD;
         } else if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
            color = COLOR_WHITE;
@@ -2785,7 +2789,7 @@ void ui_render(const ui_state_t& state) {
         render_text(FONT_HACK_WHITE, cell_text, xy(0, 12));
 
         for (uint32_t entity_index = 0; entity_index < state.match_state.entities.size(); entity_index++) {
-            if (state.match_state.entities[entity_index].type == ENTITY_GOLD) {
+            if (state.match_state.entities[entity_index].type == ENTITY_GOLD_MINE) {
                 continue;
             }
 
@@ -2853,7 +2857,7 @@ render_sprite_params_t ui_create_entity_render_params(const ui_state_t& state, c
         .frame = entity_get_animation_frame(entity),
         .position = entity.position.to_xy() - state.camera_offset,
         .options = 0,
-        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
+        .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD_MINE? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
     };
     // Adjust render position for units because they are centered
     if (entity_is_unit(entity.type)) {

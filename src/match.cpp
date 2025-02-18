@@ -410,8 +410,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                             target.cell = group_move_cell;
                         }
                     }
-                } else if (entity.type == ENTITY_MINER && state.entities[target_index].type == ENTITY_GOLD) {
-                    target = entity_target_gold(state, entity, input.move.target_id);
                 } else if (target.type == TARGET_REPAIR) {
                     target.id = input.move.target_id;
                     target.repair = (target_repair_t) {
@@ -509,7 +507,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                 .type = TARGET_BUILD,
                 .id = ID_NULL,
                 .build = (target_build_t) {
-                    .unit_cell = input.build.building_type == ENTITY_MINE ? input.build.target_cell : get_nearest_cell_in_rect(lead_builder.cell, input.build.target_cell, entity_cell_size((EntityType)input.build.building_type)),
+                    .unit_cell = input.build.building_type == ENTITY_LAND_MINE ? input.build.target_cell : get_nearest_cell_in_rect(lead_builder.cell, input.build.target_cell, entity_cell_size((EntityType)input.build.building_type)),
                     .building_cell = input.build.target_cell,
                     .building_type = (EntityType)input.build.building_type
                 }
@@ -522,7 +520,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             }
 
             // Assign the helpers' target
-            if (input.build.building_type != ENTITY_MINE && !input.build.shift_command) {
+            if (input.build.building_type != ENTITY_LAND_MINE && !input.build.shift_command) {
                 for (entity_id builder_id : builder_ids) {
                     if (builder_id == lead_builder_id) {
                         continue;
@@ -765,8 +763,7 @@ void match_update(match_state_t& state) {
         while (entity_index < state.entities.size()) {
             if ((state.entities[entity_index].mode == MODE_UNIT_DEATH_FADE && !animation_is_playing(state.entities[entity_index].animation)) || 
                     (state.entities[entity_index].garrison_id != ID_NULL && state.entities[entity_index].health == 0) ||
-                    (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0) ||
-                    (state.entities[entity_index].type == ENTITY_GOLD && state.entities[entity_index].mode == MODE_GOLD_MINED_OUT)) {
+                    (state.entities[entity_index].mode == MODE_BUILDING_DESTROYED && state.entities[entity_index].timer == 0)) {
                 // Remove this entity's fog but only if they are not gold and not garrisoned
                 if (state.entities[entity_index].player_id != PLAYER_NONE && state.entities[entity_index].garrison_id == ID_NULL) {
                     map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, entity_cell_size(state.entities[entity_index].type), ENTITY_DATA.at(state.entities[entity_index].type).sight, false, ENTITY_DATA.at(state.entities[entity_index].type).has_detection);
