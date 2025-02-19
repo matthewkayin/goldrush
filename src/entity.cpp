@@ -1249,7 +1249,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 break;
             }
             case MODE_UNIT_IN_MINE: {
-                log_trace("unit is in mine.");
                 if (entity.timer != 0) {
                     entity.timer--;
                 }
@@ -1258,7 +1257,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     target_t camp_target = entity_target_nearest_camp(state, entity);
                     xy rally_cell = camp_target.type == TARGET_NONE ? (gold_mine.cell + xy(1, entity_cell_size(ENTITY_GOLD_MINE))) : state.entities.get_by_id(camp_target.id).cell;
                     xy exit_cell = entity_get_exit_cell(state, gold_mine.cell, entity_cell_size(ENTITY_GOLD_MINE), entity_cell_size(ENTITY_MINER), rally_cell);
-                    log_trace("exiting mine, exit cell %xi", &exit_cell);
 
                     if (exit_cell.x == -1) {
                         state.events.push_back((match_event_t) { .type = MATCH_EVENT_MINE_EXIT_BLOCKED });
@@ -1553,6 +1551,9 @@ Sprite entity_get_sprite(const entity_t& entity) {
 Sprite entity_get_select_ring(const entity_t& entity, bool is_ally) {
     if (entity.type == ENTITY_LAND_MINE) {
         return is_ally ? SPRITE_SELECT_RING_MINE : SPRITE_SELECT_RING_MINE_ENEMY;
+    }
+    if (entity.type == ENTITY_GOLD_MINE) {
+        return SPRITE_SELECT_RING_GOLD_MINE;
     }
 
     Sprite select_ring; 

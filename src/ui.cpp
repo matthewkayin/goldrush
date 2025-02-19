@@ -2112,11 +2112,7 @@ void ui_render(const ui_state_t& state) {
                     if (remembered_entities_it != state.match_state.remembered_entities[network_get_player_id()].end()) {
                         Sprite select_ring_sprite;
                         if (remembered_entities_it->second.sprite_params.sprite != SPRITE_BUILDING_MINE) {
-                            if (remembered_entities_it->second.sprite_params.sprite == SPRITE_GOLD_MINE) {
-                                select_ring_sprite = SPRITE_SELECT_RING_GOLD;
-                            } else {
-                                select_ring_sprite = (Sprite)(SPRITE_SELECT_RING_BUILDING_2 + ((remembered_entities_it->second.cell_size - 2) * 2) + 1);
-                            }
+                            select_ring_sprite = (Sprite)(SPRITE_SELECT_RING_BUILDING_2 + ((remembered_entities_it->second.cell_size - 2) * 2) + 1);
                             render_sprite(select_ring_sprite, xy(0, 0), (remembered_entities_it->second.cell * TILE_SIZE) + (xy(remembered_entities_it->second.cell_size, remembered_entities_it->second.cell_size) * TILE_SIZE / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                         }
                     }

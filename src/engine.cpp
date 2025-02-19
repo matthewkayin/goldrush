@@ -334,8 +334,8 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
-    { SPRITE_SELECT_RING_GOLD, (sprite_params_t) {
-        .path = "sprite/select_ring_gold.png",
+    { SPRITE_SELECT_RING_GOLD_MINE, (sprite_params_t) {
+        .path = "sprite/select_ring_gold_mine.png",
         .hframes = 1,
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT

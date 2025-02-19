@@ -39,3 +39,12 @@ todos
     - [ ] - Smoke
     - [ ] - Tinker
     - [ ] - War Wagon?
+
+ - [ ] - Gold mines
+    - [ ] - proper gold mine select ring
+    - [ ] - gold mine collapse warning
+    - [ ] - test moving towards collapsed mine
+    - [ ] - test building around collapsed mine
+    - [ ] - test moving towards mine while mine is in fog, both collapsed and not
+    - [ ] - have units walk a square into the mine
+    - [ ] - add unit out delay after exiting mine? overall gold mining feel
