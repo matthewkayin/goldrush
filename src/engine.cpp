@@ -1615,17 +1615,15 @@ void engine_apply_option(Option option, int value) {
         case OPTION_DISPLAY: {
             if (engine.options[option] == DISPLAY_WINDOWED) {
                 SDL_SetWindowFullscreen(engine.window, 0);
+                SDL_DisplayMode display_mode;
+                SDL_GetCurrentDisplayMode(0, &display_mode);
+                xy window_size = engine.options.at(OPTION_DISPLAY) == DISPLAY_WINDOWED ? xy(1280, 720) : xy(display_mode.w, display_mode.h);
+                SDL_SetWindowSize(engine.window, window_size.x, window_size.y);
+                SDL_SetWindowPosition(engine.window, (display_mode.w / 2) - (window_size.x / 2), (display_mode.h / 2) - (window_size.y / 2));
             } else if (engine.options[option] == DISPLAY_FULLSCREEN) {
                 SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN);
-            } else if (engine.options[option] == DISPLAY_FULLSCREEN) {
+            } else if (engine.options[option] == DISPLAY_BORDERLESS) {
                 SDL_SetWindowFullscreen(engine.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-            }
-            SDL_DisplayMode display_mode;
-            SDL_GetCurrentDisplayMode(0, &display_mode);
-            xy window_size = engine.options.at(OPTION_DISPLAY) == DISPLAY_WINDOWED ? xy(1280, 720) : xy(display_mode.w, display_mode.h);
-            SDL_SetWindowSize(engine.window, window_size.x, window_size.y);
-            if (engine.options[option] == DISPLAY_WINDOWED) {
-                SDL_SetWindowPosition(engine.window, (display_mode.w / 2) - (window_size.x / 2), (display_mode.h / 2) - (window_size.y / 2));
             }
             break;
         }
