@@ -773,6 +773,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_siz
 
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy origin, bool gold_walk) {
     entity_id origin_id = origin.x == -1 ? ID_NULL : map_get_cell(state, origin);
+    SDL_Rect origin_rect = (SDL_Rect) { .x = origin.x, .y = origin.y, .w = size.x, .h = size.y };
 
     for (int y = cell.y; y < cell.y + size.y; y++) {
         for (int x = cell.x; x < cell.x + size.x; x++) {
@@ -780,7 +781,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy 
             if (cell_id > CELL_EMPTY) {
                 return true;
             }
-            if (cell_id == origin_id || cell_id == CELL_EMPTY) {
+            if (cell_id == CELL_EMPTY || sdl_rect_has_point(origin_rect, xy(x, y))) {
                 continue;
             }  
             const entity_t& entity = state.entities.get_by_id(cell_id);
@@ -790,7 +791,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy 
             if (origin_id != ID_NULL && xy::manhattan_distance(origin, xy(x, y)) > 5) {
                 continue;
             }
-            if (gold_walk) {
+            if (gold_walk && (entity.mode == MODE_UNIT_OUT_MINE || entity_is_mining(state, entity))) {
                 continue;
             }
 
