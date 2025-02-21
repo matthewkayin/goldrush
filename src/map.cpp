@@ -803,7 +803,7 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy 
 
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
-xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells) {
+xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells, xy ignore_cell) {
     xy nearest_cell;
     int nearest_cell_dist = -1;
 
@@ -823,7 +823,7 @@ xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int st
     uint32_t index = 0;
     xy cell = cell_begin[index];
     while (index < 4) {
-        if (map_is_cell_rect_in_bounds(state, cell, start_size)) {
+        if (map_is_cell_rect_in_bounds(state, cell, start_size) && cell != ignore_cell) {
             if (!map_is_cell_rect_occupied(state, cell, start_size, xy(-1, -1), allow_blocked_cells) && (nearest_cell_dist == -1 || xy::manhattan_distance(start, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = xy::manhattan_distance(start, cell);
@@ -861,7 +861,7 @@ bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy siz
     return true;
 }
 
-void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk) {
+void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk, std::vector<xy>* ignore_cells) {
     struct node_t {
         fixed cost;
         fixed distance;
@@ -910,6 +910,12 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
     std::vector<node_t> frontier;
     std::vector<node_t> explored;
     std::vector<int> explored_indices = std::vector<int>(state.map_width * state.map_height, -1);
+
+    if (ignore_cells != NULL) {
+        for (xy cell : *ignore_cells) {
+            explored_indices[cell.x + (cell.y * state.map_width)] = 1;
+        }
+    }
 
     bool is_target_unreachable = false;
     for (int y = to.y; y < to.y + cell_size; y++) {
@@ -1082,7 +1088,6 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
                 continue;
             }
 
-            // Check if it's in the frontier
             uint32_t frontier_index;
             for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
                 node_t& frontier_node = frontier[frontier_index];

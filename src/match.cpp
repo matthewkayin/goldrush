@@ -55,6 +55,16 @@ match_state_t match_init(int32_t lcg_seed, const noise_t& noise) {
         }
 
         // Determine player spawn
+        #ifdef GOLD_NEAR_SPAWN
+            if (player_id == 0) {
+                for (entity_t& entity : state.entities) {
+                    if (entity.type == ENTITY_GOLD_MINE) {
+                        state.map_player_spawns[player_id] = entity.cell + xy(6, 0);
+                        break;
+                    }
+                }
+            }
+        #endif
         xy player_spawn = state.map_player_spawns[player_id];
         #ifdef GOLD_NEAR_SPAWN
             if (player_id == 1) {

@@ -3,15 +3,22 @@
 #include "defines.h"
 #include "util.h"
 #include "id_array.h"
+#include "engine_types.h"
 #include "engine.h"
 #include "animation.h"
 #include "options.h"
-#include "types.h"
 #include "noise.h"
 #include <vector>
 #include <array>
 #include <string>
 #include <unordered_map>
+
+#define BUILDING_QUEUE_MAX 5
+#define BUILDING_DEQUEUE_POP_FRONT BUILDING_QUEUE_MAX
+#define BUILDING_QUEUE_BLOCKED UINT32_MAX
+#define BUILDING_QUEUE_EXIT_BLOCKED UINT32_MAX - 1
+#define BUILDING_FADE_DURATION 300
+#define ENTITY_UNLOAD_ALL ID_NULL
 
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
 extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION;
@@ -96,6 +103,69 @@ struct upgrade_data_t {
 extern const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA;
 
 // Entity
+
+// If you change this, make sure that entity_is_unit() and entity_is_building() still work
+enum EntityType {
+    ENTITY_MINER,
+    ENTITY_COWBOY,
+    ENTITY_BANDIT,
+    ENTITY_WAGON,
+    ENTITY_WAR_WAGON,
+    ENTITY_JOCKEY,
+    ENTITY_SAPPER,
+    ENTITY_TINKER,
+    ENTITY_SOLDIER,
+    ENTITY_CANNON,
+    ENTITY_SPY,
+    ENTITY_HALL,
+    ENTITY_CAMP,
+    ENTITY_HOUSE,
+    ENTITY_SALOON,
+    ENTITY_BUNKER,
+    ENTITY_COOP,
+    ENTITY_SMITH,
+    ENTITY_BARRACKS,
+    ENTITY_SHERIFFS,
+    ENTITY_LAND_MINE,
+    ENTITY_GOLD_MINE
+};
+
+enum EntityMode {
+    MODE_UNIT_IDLE,
+    MODE_UNIT_MOVE,
+    MODE_UNIT_MOVE_BLOCKED,
+    MODE_UNIT_MOVE_FINISHED,
+    MODE_UNIT_BUILD,
+    MODE_UNIT_REPAIR,
+    MODE_UNIT_ATTACK_WINDUP,
+    MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP,
+    MODE_UNIT_IN_MINE,
+    MODE_UNIT_OUT_MINE,
+    MODE_UNIT_TINKER_THROW,
+    MODE_UNIT_DEATH,
+    MODE_UNIT_DEATH_FADE,
+    MODE_BUILDING_IN_PROGRESS,
+    MODE_BUILDING_FINISHED,
+    MODE_BUILDING_DESTROYED,
+    MODE_MINE_ARM,
+    MODE_MINE_PRIME,
+    MODE_GOLD_MINE,
+    MODE_GOLD_MINE_COLLAPSED
+};
+
+enum TargetType {
+    TARGET_NONE,
+    // Make sure that move targets stay in the same order as their inputs
+    TARGET_CELL, 
+    TARGET_ENTITY,
+    TARGET_ATTACK_CELL,
+    TARGET_ATTACK_ENTITY,
+    TARGET_REPAIR,
+    TARGET_UNLOAD,
+    TARGET_SMOKE,
+    TARGET_BUILD,
+    TARGET_BUILD_ASSIST
+};
 
 struct target_build_t {
     xy unit_cell;
@@ -442,10 +512,10 @@ bool map_is_cell_rect_equal_to(const match_state_t& state, xy cell, int cell_siz
 void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value);
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
-xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells);
+xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells, xy ignore_cell = xy(-1, -1));
 bool map_is_tile_ramp(const match_state_t& state, xy cell);
 bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
-void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk);
+void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk, std::vector<xy>* ignored_cells = NULL);
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size);
 void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection);
 
@@ -479,10 +549,12 @@ Sound entity_get_death_sound(EntityType type);
 bool entity_should_die(const entity_t& entity);
 SDL_Rect entity_get_sight_rect(const entity_t& entity);
 bool entity_can_see_rect(const entity_t& entity, xy rect_position, int rect_size);
+
 target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t& entity);
 target_t entity_target_nearest_gold_mine(const match_state_t& state, const entity_t& entity);
 target_t entity_target_nearest_camp(const match_state_t& state, const entity_t& entity);
-bool entity_should_gold_walk(const match_state_t& state, const entity_t& entity);
+bool entity_is_mining(const match_state_t& state, const entity_t& entity);
+
 SDL_Rect entity_gold_get_block_building_rect(xy cell);
 uint32_t entity_get_garrisoned_occupancy(const match_state_t& state, const entity_t& entity);
 void entity_on_death_release_garrisoned_units(match_state_t& state, entity_t& entity);
@@ -491,7 +563,7 @@ void entity_set_target(entity_t& entity, target_t target);
 void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t& defender);
 void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& defender);
 void entity_explode(match_state_t& state, entity_id id);
-xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell);
+xy entity_get_exit_cell(const match_state_t& state, xy building_cell, int building_size, int unit_size, xy rally_cell, bool allow_blocked_cells = false);
 void entity_remove_garrisoned_unit(entity_t& entity, entity_id garrisoned_unit_id);
 void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garrisoned_unit_id);
 void entity_stop_building(match_state_t& state, entity_id id);

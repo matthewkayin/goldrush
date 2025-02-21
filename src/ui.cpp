@@ -6,7 +6,7 @@
 #include <algorithm>
 
 static const uint32_t TURN_DURATION = 4;
-static const uint32_t TURN_OFFSET = 4;
+static const uint32_t TURN_OFFSET = 3;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
 static const uint32_t UI_STATUS_DURATION = 60;
 
@@ -2269,11 +2269,11 @@ void ui_render(const ui_state_t& state) {
 
     // Debug pathing 
     #ifdef GOLD_DEBUG_UNIT_PATHS
-    for (const entity_t& entity : state.entities) {
+    for (const entity_t& entity : state.match_state.entities) {
         if (!entity_is_unit(entity.type) || entity.path.empty()) {
             continue;
         }
-        SDL_Color line_color = entity_should_gold_walk(state, entity) ? COLOR_GOLD : COLOR_WHITE;
+        SDL_Color line_color = entity_is_mining(state.match_state, entity) ? COLOR_GOLD : COLOR_WHITE;
         SDL_SetRenderDrawColor(engine.renderer, line_color.r, line_color.g, line_color.b, line_color.a);
         for (uint32_t path_index = 0; path_index < entity.path.size(); path_index++) {
             xy start = (path_index == 0 ? entity.position.to_xy() : cell_center(entity.path[path_index - 1]).to_xy()) - state.camera_offset;
