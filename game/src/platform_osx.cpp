@@ -33,4 +33,8 @@ void platform_console_write(const char* message, int log_level) {
     }
 }
 
+void platform_setup_unhandled_exception_filter() {
+
+}
+
 #endif

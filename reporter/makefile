@@ -7,26 +7,26 @@ else
 	endif
 endif
 
-ASSEMBLY := gold
+ASSEMBLY := reporter
 EXTENSION :=
 DIR := $(subst /,\,${CURDIR})
 LIB_DIR := lib
-BUILD_DIR := bin
+BUILD_DIR := ../bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
 COMPILER_FLAGS := -std=c++17 -Wall -g -O0
-LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer -llibcurl
+LINKER_FLAGS := -g -L$(LIB_DIR)
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 
 # Use -Wno-deprecated-declarations on OSX because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 ifeq ($(PLATFORM),OSX)
 	COMPILER_FLAGS += -Wno-deprecated-declarations
-	LINKER_FLAGS += -L/opt/homebrew/lib -lenet
+	LINKER_FLAGS += -L/opt/homebrew/lib -lenet -lcurl
 endif
 
 ifeq ($(PLATFORM),WIN32)
 	EXTENSION := .exe
-	LINKER_FLAGS += -luser32 -lws2_32 -lwinmm -lenet64 -ldbghelp
+	LINKER_FLAGS += -luser32 -lws2_32 -lwinmm -lenet64 -ldbghelp -llibcurl
 
 # Make does not offer a recursive wildcard function, so here's one:
 	rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
@@ -35,8 +35,11 @@ ifeq ($(PLATFORM),WIN32)
 	DIRECTORIES := .\src $(subst $(DIR),,$(shell dir .\src /S /AD /B | findstr /i src)) # Get all directories under src.
 	DIRECTORIES += .\vendor $(subst $(DIR),,$(shell dir .\vendor /S /AD /B | findstr /i vendor)) # Get all directories under src.
 else
+	LINKER_FLAGS += -lobjc -framework AppKit
+
 	SRC_FILES := $(shell find vendor -name *.cpp)
 	SRC_FILES += $(shell find src -name *.cpp)
+	SRC_FILES += $(shell find src -name *.mm)
 	DIRECTORIES := $(shell find vendor -type d)
 	DIRECTORIES += $(shell find src -type d)
 endif
@@ -89,3 +92,10 @@ endif
 $(OBJ_DIR)/%.cpp.o: %.cpp # compile .c to .c.o object
 	@echo   $<...
 	@clang++ $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
+
+# compile .m to .o object only for macos
+ifeq ($(PLATFORM),OSX)
+$(OBJ_DIR)/%.mm.o: %.mm
+	@echo   $<...
+	@clang $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
+endif

@@ -12,6 +12,7 @@
 int gold_main(int argc, char** argv);
 
 #if defined PLATFORM_WIN32 && !defined GOLD_DEBUG
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
@@ -30,9 +31,7 @@ enum GameMode {
 
 int gold_main(int argc, char** argv) {
     char logfile_path[128];
-    time_t _time = time(NULL);
-    tm _tm = *localtime(&_time);
-    sprintf(logfile_path, "./logs/%d-%02d-%02dT%02d%02d%02d.log", _tm.tm_year + 1900, _tm.tm_mon + 1, _tm.tm_mday, _tm.tm_hour, _tm.tm_min, _tm.tm_sec);
+    sprintf(logfile_path, "./logs.log");
 
     // Parse system arguments
     for (int argn = 1; argn < argc; argn++) {
@@ -46,8 +45,13 @@ int gold_main(int argc, char** argv) {
     if (logfile == NULL) {
         return -1;
     }
-    platform_setup_unhandled_exception_filter(logfile, logfile_path);
+    platform_setup_unhandled_exception_filter();
     log_info("Initializing %s %s.", APP_NAME, APP_VERSION);
+    #if defined(PLATFORM_WIN32)
+        log_info("Detected platform WIN32.");
+    #elif defined(PLATFORM_OSX)
+        log_info("Detected platform OSX.");
+    #endif
     platform_clock_init();
     if (!network_init()) {
         logger_quit();

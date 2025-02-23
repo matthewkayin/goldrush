@@ -12,8 +12,6 @@
 
 static double clock_frequency;
 static LARGE_INTEGER clock_start_time;
-static FILE* logfile;
-static char logfile_path[128];
 
 void platform_clock_init() {
     LARGE_INTEGER frequency;
@@ -57,11 +55,7 @@ void platform_console_write(const char* message, int log_level) {
 
 LONG WINAPI platform_on_unhandled_exception(EXCEPTION_POINTERS* exception_pointers) {
     // Create dmp file
-    char dumpfile_path[128];
-    time_t _time = time(NULL);
-    tm _tm = *localtime(&_time);
-    sprintf(dumpfile_path, "./logs/gold-%d-%02d-%02dT%02d%02d%02d.dmp", _tm.tm_year + 1900, _tm.tm_mon + 1, _tm.tm_mday, _tm.tm_hour, _tm.tm_min, _tm.tm_sec);
-    HANDLE dump_file = CreateFile((LPCSTR)dumpfile_path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE dump_file = CreateFile((LPCSTR)"crash.dmp", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (dump_file != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION dump_info;
@@ -73,32 +67,11 @@ LONG WINAPI platform_on_unhandled_exception(EXCEPTION_POINTERS* exception_pointe
         CloseHandle(dump_file);
     }
 
-    // Close logger
-    fclose(logfile);
-
-    // Create prompt window
-    int messagebox_id = MessageBox(
-        NULL, 
-        "Gold Rush has crashed. Sorry about that!\nWould you like to send a crash report to the developer?", 
-        "Crash Reporter", 
-        MB_ICONERROR | MB_YESNO | MB_DEFBUTTON2);
-    switch (messagebox_id) {
-        case IDYES: {
-            report_send(logfile_path, dumpfile_path);
-            break;
-        }
-        default: {
-            break;
-        }
-    }
-
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
 
-void platform_setup_unhandled_exception_filter(FILE* p_logfile, const char* p_logfile_path) {
-    strcpy(logfile_path, p_logfile_path);
-    logfile = p_logfile;
+void platform_setup_unhandled_exception_filter() {
     SetUnhandledExceptionFilter(platform_on_unhandled_exception);
 }
 
