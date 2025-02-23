@@ -15,7 +15,7 @@ BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
 COMPILER_FLAGS := -std=c++17 -Wall -g -O0
-LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer
+LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer -llibcurl
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 
 # Use -Wno-deprecated-declarations on OSX because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
@@ -26,7 +26,7 @@ endif
 
 ifeq ($(PLATFORM),WIN32)
 	EXTENSION := .exe
-	LINKER_FLAGS += -luser32 -lws2_32 -lwinmm -lenet64
+	LINKER_FLAGS += -luser32 -lws2_32 -lwinmm -lenet64 -ldbghelp
 
 # Make does not offer a recursive wildcard function, so here's one:
 	rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
@@ -45,13 +45,18 @@ OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for e
 
 all: scaffold compile link
 
+.PHONY: prep
+prep:
+ifeq ($(PLATFORM),WIN32)
+	-@setlocal enableextensions enabledelayedexpansion && copy $(LIB_DIR) $(BUILD_DIR)
+endif
+
 .PHONY: scaffold
 scaffold:
 	@echo Scaffolding...
 ifeq ($(PLATFORM),WIN32)
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(addprefix $(OBJ_DIR), $(DIRECTORIES)) 2>NUL || cd .
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR) 2>NUL || cd .
-	-@setlocal enableextensions enabledelayedexpansion && copy $(LIB_DIR) $(BUILD_DIR)
 else
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(addprefix $(OBJ_DIR)/,$(DIRECTORIES))

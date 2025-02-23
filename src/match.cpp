@@ -357,6 +357,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     target_index = INDEX_INVALID;
                 }
             }
+            GOLD_ASSERT(false);
 
             // Calculate group center
             xy group_center;

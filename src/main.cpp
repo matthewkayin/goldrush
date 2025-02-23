@@ -13,6 +13,7 @@ int gold_main(int argc, char** argv);
 
 #if defined PLATFORM_WIN32 && !defined GOLD_DEBUG
 #include <windows.h>
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     return gold_main(0, NULL);
 }
@@ -41,7 +42,12 @@ int gold_main(int argc, char** argv) {
         }
     }
 
-    logger_init(logfile_path);
+    FILE* logfile = logger_init(logfile_path);
+    if (logfile == NULL) {
+        return -1;
+    }
+    platform_setup_unhandled_exception_filter(logfile, logfile_path);
+    log_info("Initializing %s %s.", APP_NAME, APP_VERSION);
     platform_clock_init();
     if (!network_init()) {
         logger_quit();

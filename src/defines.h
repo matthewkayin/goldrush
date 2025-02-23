@@ -31,7 +31,7 @@ const uint32_t INDEX_INVALID = 65535;
     #define PLATFORM_OSX 1
 #endif
 
-#define GOLD_DEBUG
+// #define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
 #define GOLD_ASSERTS_ENABLED
 #define GOLD_RESOURCE_PATH "../res/"

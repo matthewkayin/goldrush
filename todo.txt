@@ -39,6 +39,7 @@ todos
     - [ ] - Smoke
     - [ ] - Tinker
     - [ ] - War Wagon?
+ - [ ] - game icon
 
  - [ ] - Gold mines
     - [ ] - proper gold mine select ring
