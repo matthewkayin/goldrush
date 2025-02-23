@@ -3,7 +3,6 @@
 #ifdef PLATFORM_WIN32
 
 #define WIN32_LEAN_AND_MEAN
-#include "report.h"
 #include <windows.h>
 #include <DbgHelp.h>
 #include <cstdint>

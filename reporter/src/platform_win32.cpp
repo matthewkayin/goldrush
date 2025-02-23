@@ -1,8 +1,11 @@
 #include "platform.h"
 
 #ifdef PLATFORM_WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 const char* platform_exe_path() {
-    return "./gold.exe";
+    return "game.exe";
 }
 
 std::vector<std::string> platform_get_report_filenames() {
