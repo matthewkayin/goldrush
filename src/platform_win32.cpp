@@ -75,7 +75,22 @@ LONG WINAPI platform_on_unhandled_exception(EXCEPTION_POINTERS* exception_pointe
 
     // Close logger
     fclose(logfile);
-    report_send(logfile_path, dumpfile_path);
+
+    // Create prompt window
+    int messagebox_id = MessageBox(
+        NULL, 
+        "Gold Rush has crashed. Sorry about that!\nWould you like to send a crash report to the developer?", 
+        "Crash Reporter", 
+        MB_ICONERROR | MB_YESNO | MB_DEFBUTTON2);
+    switch (messagebox_id) {
+        case IDYES: {
+            report_send(logfile_path, dumpfile_path);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
 
     return EXCEPTION_EXECUTE_HANDLER;
 }
