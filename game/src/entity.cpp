@@ -9,7 +9,7 @@ static const uint32_t UNIT_MOVE_BLOCKED_DURATION = 30;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_IN_MINE_DURATION = 60;
 static const uint32_t UNIT_OUT_MINE_DURATION = 10;
-static const uint32_t UNIT_MAX_GOLD_HELD = 10;
+static const uint32_t UNIT_MAX_GOLD_HELD = 5;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t ENTITY_BUNKER_FIRE_OFFSET = 10;
 static const xy ENTITY_BUNKER_PARTICLE_OFFSETS[4] = { xy(3, 23), xy(11, 26), xy(20, 25), xy(28, 23) };
@@ -635,6 +635,7 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     entity.garrison_id = ID_NULL;
     entity.cooldown_timer = 0;
     entity.gold_held = 0;
+    entity.gold_mine_id = ID_NULL;
 
     entity.taking_damage_counter = 0;
     entity.taking_damage_timer = 0;
@@ -754,6 +755,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     entity.target = (target_t) { .type = TARGET_NONE };
                     update_finished = true;
                     break;
+                }
+
+                // Remember which gold mine we're using
+                if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY && state.entities.get_by_id(entity.target.id).type == ENTITY_GOLD_MINE) {
+                    entity.gold_mine_id = entity.target.id;
                 }
 
                 if (entity_has_reached_target(state, entity)) {
@@ -1109,7 +1115,24 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         if (entity.type == ENTITY_MINER && (target.type == ENTITY_HALL || target.type == ENTITY_CAMP) && target.mode == MODE_BUILDING_FINISHED && entity.player_id == target.player_id && entity.gold_held != 0 && entity.target.type != TARGET_REPAIR) {
                             state.player_gold[entity.player_id] += entity.gold_held;
                             entity.gold_held = 0;
-                            entity.target = entity_target_nearest_gold_mine(state, entity);
+
+                            // First clear entity's target
+                            entity.target = (target_t) { .type = TARGET_NONE };
+                            // Then try to set its target based on the gold mine it just visited
+                            if (entity.gold_mine_id != ID_NULL) {
+                                // It's safe to do this because gold mines never get removed from the array
+                                const entity_t& gold_mine = state.entities.get_by_id(entity.gold_mine_id);
+                                if (gold_mine.gold_held != 0) {
+                                    entity.target = (target_t) {
+                                        .type = TARGET_ENTITY,
+                                        .id = entity.gold_mine_id
+                                    };
+                                }
+                            }
+                            // If we still haven't gotten a gold target by now, then choose the nearest gold mine as our target
+                            if (entity.target.type == TARGET_NONE) {
+                                entity.target = entity_target_nearest_gold_mine(state, entity);
+                            }
 
                             entity.mode = MODE_UNIT_IDLE;
                             update_finished = true;
@@ -1343,6 +1366,9 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                     entity.direction = DIRECTION_NORTH;
                                 }
                             }
+                        }
+                        if (entity.target.type == TARGET_NONE) {
+                            entity.gold_mine_id = ID_NULL;
                         }
                         entity.timer = UNIT_OUT_MINE_DURATION;
                         entity.cell = exit_cell;
@@ -2125,6 +2151,7 @@ void entity_set_target(entity_t& entity, target_t target) {
     GOLD_ASSERT(entity.mode != MODE_UNIT_BUILD);
     entity.target = target;
     entity.path.clear();
+    entity.gold_mine_id = ID_NULL;
     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, false);
 
     if (entity.mode != MODE_UNIT_MOVE) {

@@ -230,6 +230,7 @@ struct entity_t {
     uint32_t cooldown_timer;
 
     uint32_t gold_held;
+    entity_id gold_mine_id;
 
     uint32_t taking_damage_counter;
     uint32_t taking_damage_timer;
@@ -491,6 +492,7 @@ bool match_player_has_upgrade(const match_state_t& state, uint8_t player_id, uin
 bool match_player_upgrade_is_available(const match_state_t& state, uint8_t player_id, uint32_t upgrade);
 void match_grant_player_upgrade(match_state_t& state, uint8_t player_id, uint32_t upgrade);
 entity_id match_get_nearest_builder(const match_state_t& state, const std::vector<entity_id>& builders, xy cell);
+uint32_t match_get_miners_on_gold_mine(const match_state_t& state, uint8_t player_id, entity_id gold_mine_id);
 void match_add_chat_message(match_state_t& state, std::string message);
 
 // Event

@@ -4,13 +4,13 @@
             "type": "shell",
             "label": "Build Everything",
             "windows": {
-                "command": "build.bat"
+                "command": "${workspaceFolder}/build.bat"
             },
             "osx": {
-                "command": "build.sh"
+                "command": "${workspaceFolder}/build.sh"
             },
             "options": {
-                "cwd": "${workspaceFolder}/game"
+                "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [
                 "$gcc"
@@ -24,10 +24,10 @@
             "type": "shell",
             "label": "Clean Everything",
             "windows": {
-                "command": "build.bat clean"
+                "command": "${workspaceFolder}/build.bat clean"
             },
             "osx": {
-                "command": "build.sh clean"
+                "command": "${workspaceFolder}/build.sh clean"
             },
             "options": {
                 "cwd": "${workspaceFolder}"

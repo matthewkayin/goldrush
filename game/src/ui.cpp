@@ -2191,6 +2191,35 @@ void ui_render(const ui_state_t& state) {
         render_sprite(SPRITE_PROJECTILE_SMOKE, xy(0, 0), projectile.position.to_xy() - state.camera_offset, RENDER_SPRITE_CENTERED);
     }
 
+    // Miners on gold counter
+    for (uint32_t entity_index = 0; entity_index < state.match_state.entities.size(); entity_index++) {
+        Sprite gold_mine_sprite = ENTITY_DATA.at(ENTITY_GOLD_MINE).sprite;
+        const entity_t& entity = state.match_state.entities[entity_index];
+        if (entity.type != ENTITY_GOLD_MINE || !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
+            continue;
+        }
+        SDL_Rect render_rect = (SDL_Rect) {
+            .x = entity.position.x.integer_part() - state.camera_offset.x,
+            .y = entity.position.y.integer_part() - state.camera_offset.y,
+            .w = engine.sprites[gold_mine_sprite].frame_size.x,
+            .h = engine.sprites[gold_mine_sprite].frame_size.y
+        };
+        if (SDL_HasIntersection(&SCREEN_RECT, &render_rect) != SDL_TRUE) {
+            continue;
+        }
+        uint32_t miner_count = match_get_miners_on_gold_mine(state.match_state, network_get_player_id(), state.match_state.entities.get_id_of(entity_index));
+        if (miner_count == 0) {
+            continue;
+        }
+        char counter_text[4];
+        sprintf(counter_text, "%u", miner_count);
+        xy text_size = render_get_text_size(FONT_HACK_WHITE, counter_text);
+        text_size.x += 16; // To account for the miner icon
+        xy text_pos = xy(render_rect.x + (render_rect.w / 2) - (text_size.x / 2), render_rect.y + -6);
+        render_text(FONT_HACK_WHITE, counter_text, text_pos);
+        render_sprite(SPRITE_UI_MINER, xy(0, 0), text_pos + xy((text_size.x - 16) + 4, 13), RENDER_SPRITE_NO_CULL, network_get_player_id());
+    }
+
     // Fog of War
     SDL_SetRenderDrawBlendMode(engine.renderer, SDL_BLENDMODE_BLEND);
     for (int fog_pass = 0; fog_pass < 2; fog_pass++) {

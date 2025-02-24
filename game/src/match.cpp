@@ -6,7 +6,7 @@
 #include "lcg.h"
 #include <algorithm>
 
-static const uint32_t PLAYER_STARTING_GOLD = 5500;
+static const uint32_t PLAYER_STARTING_GOLD = 450;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
@@ -357,7 +357,6 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     target_index = INDEX_INVALID;
                 }
             }
-            GOLD_ASSERT(false);
 
             // Calculate group center
             xy group_center;
@@ -863,6 +862,16 @@ entity_id match_get_nearest_builder(const match_state_t& state, const std::vecto
     }
 
     return nearest_unit_id;
+}
+
+uint32_t match_get_miners_on_gold_mine(const match_state_t& state, uint8_t player_id, entity_id gold_mine_id) {
+    uint32_t miner_count = 0;
+    for (const entity_t& entity : state.entities) {
+        if (entity.player_id == player_id && entity.type == ENTITY_MINER && entity.gold_mine_id == gold_mine_id) {
+            miner_count++;
+        }
+    }
+    return miner_count;
 }
 
 void match_add_chat_message(match_state_t& state, std::string message) {

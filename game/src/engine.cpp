@@ -226,6 +226,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
+    { SPRITE_UI_MINER, (sprite_params_t) {
+        .path = "sprite/ui_miner.png",
+        .hframes = 1,
+        .vframes = 1,
+        .strategy = SPRITE_IMPORT_RECOLOR
+    }},
     { SPRITE_UI_HOUSE, (sprite_params_t) {
         .path = "sprite/ui_house.png",
         .hframes = 1,
