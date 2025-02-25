@@ -758,8 +758,11 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 }
 
                 // Remember which gold mine we're using
-                if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY && state.entities.get_by_id(entity.target.id).type == ENTITY_GOLD_MINE) {
-                    entity.gold_mine_id = entity.target.id;
+                if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY) {
+                    const entity_t& target = state.entities.get_by_id(entity.target.id);
+                    if (target.type == ENTITY_GOLD_MINE && target.gold_held != 0) {
+                        entity.gold_mine_id = entity.target.id;
+                    }
                 }
 
                 if (entity_has_reached_target(state, entity)) {
@@ -1747,8 +1750,8 @@ bool entity_is_target_invalid(const match_state_t& state, const entity_t& entity
         return true;
     }
 
-    if (state.entities[target_index].type == ENTITY_GOLD_MINE && state.entities[target_index].gold_held == 0) {
-        return true;
+    if (state.entities[target_index].type == ENTITY_GOLD_MINE) {
+        return false;
     }
     
     if (entity.target.type == TARGET_BUILD_ASSIST) {
