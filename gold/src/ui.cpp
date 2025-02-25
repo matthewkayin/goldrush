@@ -843,7 +843,7 @@ void ui_update(ui_state_t& state) {
                 if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
                     bool is_existing_attack_alert_nearby = false;
                     for (const alert_t& existing_alert : state.alerts) {
-                        if (existing_alert.color == ALERT_COLOR_RED && xy::manhattan_distance(existing_alert.cell, event.alert.cell) < UI_ATTACK_ALERT_DISTANCE) {
+                        if (existing_alert.color == ALERT_COLOR_WHITE && xy::manhattan_distance(existing_alert.cell, event.alert.cell) < UI_ATTACK_ALERT_DISTANCE) {
                             is_existing_attack_alert_nearby = true;
                             break;
                         }
@@ -874,9 +874,11 @@ void ui_update(ui_state_t& state) {
 
                 UiAlertColor color;
                 if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
-                    color = ALERT_COLOR_RED;
+                    color = ALERT_COLOR_WHITE;
+                } else if (event.alert.type == MATCH_ALERT_TYPE_MINE_COLLAPSE) {
+                    color = ALERT_COLOR_GOLD;
                 } else {
-                    color = ALERT_COLOR_GREEN;
+                    color = ALERT_COLOR_PLAYER;
                 }
 
                 state.alerts.push_back((alert_t) {
@@ -905,39 +907,10 @@ void ui_update(ui_state_t& state) {
                 }
                 break;
             }
-            case MATCH_EVENT_SMOKE_COOLDOWN:
-            case MATCH_EVENT_CANT_BUILD:
-            case MATCH_EVENT_BUILDING_EXIT_BLOCKED:
-            case MATCH_EVENT_MINE_EXIT_BLOCKED:
-            case MATCH_EVENT_NOT_ENOUGH_GOLD:
-            case MATCH_EVENT_NOT_ENOUGH_HOUSE: {
-                if (event.player_id != network_get_player_id()) {
-                    break;
+            case MATCH_EVENT_STATUS: {
+                if (network_get_player_id() == event.status.player_id) {
+                    ui_show_status(state, event.status.message);
                 }
-                switch (event.type) {
-                    case MATCH_EVENT_SMOKE_COOLDOWN:
-                        ui_show_status(state, UI_STATUS_SMOKE_COOLDOWN);
-                        break;
-                    case MATCH_EVENT_CANT_BUILD:
-                        ui_show_status(state, UI_STATUS_CANT_BUILD);
-                        break;
-                    case MATCH_EVENT_BUILDING_EXIT_BLOCKED:
-                        ui_show_status(state, UI_STATUS_BUILDING_EXIT_BLOCKED);
-                        break;
-                    case MATCH_EVENT_MINE_EXIT_BLOCKED:
-                        ui_show_status(state, UI_STATUS_MINE_EXIT_BLOCKED);
-                        break;
-                    case MATCH_EVENT_NOT_ENOUGH_GOLD:
-                        ui_show_status(state, UI_STATUS_NOT_ENOUGH_GOLD);
-                        break;
-                    case MATCH_EVENT_NOT_ENOUGH_HOUSE:
-                        ui_show_status(state, UI_STATUS_NOT_ENOUGH_HOUSE);
-                        break;
-                    default:
-                        log_warn("Unhandled match event %u", event.type);
-                        break;
-                }
-
                 break;
             }
             case MATCH_EVENT_RESEARCH_COMPLETE: {
@@ -2195,7 +2168,7 @@ void ui_render(const ui_state_t& state) {
     for (uint32_t entity_index = 0; entity_index < state.match_state.entities.size(); entity_index++) {
         Sprite gold_mine_sprite = ENTITY_DATA.at(ENTITY_GOLD_MINE).sprite;
         const entity_t& entity = state.match_state.entities[entity_index];
-        if (entity.type != ENTITY_GOLD_MINE || !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
+        if (entity.type != ENTITY_GOLD_MINE || entity.mode == MODE_GOLD_MINE_COLLAPSED || !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
             continue;
         }
         SDL_Rect render_rect = (SDL_Rect) {
@@ -2217,7 +2190,7 @@ void ui_render(const ui_state_t& state) {
         text_size.x += 16; // To account for the miner icon
         xy text_pos = xy(render_rect.x + (render_rect.w / 2) - (text_size.x / 2), render_rect.y + -6);
         render_text(FONT_HACK_WHITE, counter_text, text_pos);
-        render_sprite(SPRITE_UI_MINER, xy(0, 0), text_pos + xy((text_size.x - 16) + 4, 1), RENDER_SPRITE_NO_CULL, network_get_player_id());
+        render_sprite(SPRITE_UI_MINER, xy(0, 0), text_pos + xy((text_size.x - 16) + 4, 12), RENDER_SPRITE_NO_CULL, network_get_player_id());
     }
 
     // Fog of War
@@ -2741,7 +2714,18 @@ void ui_render(const ui_state_t& state) {
             .h = alert.cell_size + 1 + (alert_rect_margin * 2)
         };
 
-        SDL_Color color = alert.color == ALERT_COLOR_GREEN ? COLOR_GREEN : COLOR_RED;
+        SDL_Color color;
+        switch (alert.color) {
+            case ALERT_COLOR_PLAYER:
+                color = PLAYER_COLORS[network_get_player_id()].clothes_color;
+                break;
+            case ALERT_COLOR_WHITE:
+                color = COLOR_WHITE;
+                break;
+            case ALERT_COLOR_GOLD:
+                color = COLOR_GOLD;
+                break;
+        }
         SDL_SetRenderDrawColor(engine.renderer, color.r, color.g, color.b, color.a);
         SDL_RenderDrawRect(engine.renderer, &alert_rect);
     }

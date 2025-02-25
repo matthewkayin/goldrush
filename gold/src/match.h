@@ -20,6 +20,17 @@
 #define BUILDING_FADE_DURATION 300
 #define ENTITY_UNLOAD_ALL ID_NULL
 
+#define UI_STATUS_CANT_BUILD "You can't build there."
+#define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
+#define UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."
+#define UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
+#define UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
+#define UI_STATUS_UNDER_ATTACK "You're under attack!"
+#define UI_STATUS_MINE_EXIT_BLOCKED "Mine exit is blocked."
+#define UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
+#define UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
+#define UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
+
 extern const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION;
 extern const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION;
 
@@ -292,12 +303,7 @@ enum MatchEventType {
     MATCH_EVENT_ALERT,
     MATCH_EVENT_SELECTION_HANDOFF,
     MATCH_EVENT_RESEARCH_COMPLETE,
-    MATCH_EVENT_SMOKE_COOLDOWN,
-    MATCH_EVENT_CANT_BUILD,
-    MATCH_EVENT_BUILDING_EXIT_BLOCKED,
-    MATCH_EVENT_MINE_EXIT_BLOCKED,
-    MATCH_EVENT_NOT_ENOUGH_GOLD,
-    MATCH_EVENT_NOT_ENOUGH_HOUSE
+    MATCH_EVENT_STATUS
 };
 
 struct match_event_sound_t {
@@ -309,7 +315,8 @@ enum MatchAlertType {
     MATCH_ALERT_TYPE_BUILDING,
     MATCH_ALERT_TYPE_UNIT,
     MATCH_ALERT_TYPE_RESEARCH,
-    MATCH_ALERT_TYPE_ATTACK
+    MATCH_ALERT_TYPE_ATTACK,
+    MATCH_ALERT_TYPE_MINE_COLLAPSE
 };
 
 struct match_event_alert_t {
@@ -330,6 +337,11 @@ struct match_event_selection_handoff_t {
     entity_id to_select;
 };
 
+struct match_event_status_t {
+    uint8_t player_id;
+    const char* message;
+};
+
 struct match_event_t {
     MatchEventType type;
     union {
@@ -337,7 +349,7 @@ struct match_event_t {
         match_event_alert_t alert;
         match_event_selection_handoff_t selection_handoff;
         match_event_research_complete_t research_complete;
-        uint8_t player_id;
+        match_event_status_t status;
     };
 };
 
@@ -499,6 +511,7 @@ void match_add_chat_message(match_state_t& state, std::string message);
 
 void match_event_play_sound(match_state_t& state, Sound sound, xy position);
 void match_event_alert(match_state_t& state, MatchAlertType type, uint8_t player_id, xy cell, int cell_size);
+void match_event_show_status(match_state_t& state, uint8_t player_id, const char* message);
 
 // Map
 

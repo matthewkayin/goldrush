@@ -10,17 +10,6 @@
 #include <unordered_map>
 #include <string>
 
-#define UI_STATUS_CANT_BUILD "You can't build there."
-#define UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
-#define UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."
-#define UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
-#define UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
-#define UI_STATUS_UNDER_ATTACK "You're under attack!"
-#define UI_STATUS_MINE_EXIT_BLOCKED "Mine exit is blocked."
-#define UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
-#define UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
-#define UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
-
 #define UI_HEIGHT 88
 #define UI_BUTTONSET_SIZE 6
 #define UI_CONTROL_GROUP_COUNT 10
@@ -82,8 +71,9 @@ enum UiSelectionType {
 };
 
 enum UiAlertColor {
-    ALERT_COLOR_GREEN,
-    ALERT_COLOR_RED
+    ALERT_COLOR_PLAYER,
+    ALERT_COLOR_WHITE,
+    ALERT_COLOR_GOLD
 };
 
 struct alert_t {

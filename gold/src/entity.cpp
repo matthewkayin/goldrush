@@ -35,7 +35,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_UNIT_MINER,
         .cell_size = 1,
 
-        .gold_cost = 50,
+        .gold_cost = 75,
         .train_duration = 15,
         .max_health = 30,
         .sight = 7,
@@ -63,7 +63,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_UNIT_COWBOY,
         .cell_size = 1,
 
-        .gold_cost = 75,
+        .gold_cost = 100,
         .train_duration = 25,
         .max_health = 50,
         .sight = 7,
@@ -91,7 +91,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_UNIT_BANDIT,
         .cell_size = 1,
 
-        .gold_cost = 50,
+        .gold_cost = 75,
         .train_duration = 20,
         .max_health = 50,
         .sight = 7,
@@ -343,7 +343,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_BUILD_HALL,
         .cell_size = 4,
 
-        .gold_cost = 400,
+        .gold_cost = 500,
         .train_duration = 0,
         .max_health = 840,
         .sight = 7,
@@ -418,7 +418,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .ui_button = UI_BUTTON_BUILD_SALOON,
         .cell_size = 3,
 
-        .gold_cost = 150,
+        .gold_cost = 200,
         .train_duration = 0,
         .max_health = 600,
         .sight = 7,
@@ -811,7 +811,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     entity.pathfind_attempts++;
                     if (entity.pathfind_attempts >= 3) {
                         if (entity.target.type == TARGET_BUILD) {
-                            state.events.push_back((match_event_t) { .type = MATCH_EVENT_CANT_BUILD, .player_id = entity.player_id });
+                            match_event_show_status(state, entity.player_id, UI_STATUS_CANT_BUILD);
                         }
                         entity.target = (target_t) { .type = TARGET_NONE };
                         entity.pathfind_attempts = 0;
@@ -980,13 +980,13 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             }
                         }
                         if (!can_build) {
-                            state.events.push_back((match_event_t) { .type = MATCH_EVENT_CANT_BUILD, .player_id = entity.player_id });
+                            match_event_show_status(state, entity.player_id, UI_STATUS_CANT_BUILD);
                             entity.target = (target_t) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
                         if (state.player_gold[entity.player_id] < ENTITY_DATA.at(entity.target.build.building_type).gold_cost) {
-                            state.events.push_back((match_event_t) { .type = MATCH_EVENT_NOT_ENOUGH_GOLD, .player_id = entity.player_id });
+                            match_event_show_status(state, entity.player_id, UI_STATUS_NOT_ENOUGH_GOLD);
                             entity.target = (target_t) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                             break;
@@ -1128,9 +1128,8 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                         .id = entity.gold_mine_id
                                     };
                                 }
-                            }
-                            // If we still haven't gotten a gold target by now, then choose the nearest gold mine as our target
-                            if (entity.target.type == TARGET_NONE) {
+                            // If it doesn't have a last visited gold mine, then find a mine to visit
+                            } else {
                                 entity.target = entity_target_nearest_gold_mine(state, entity);
                             }
 
@@ -1156,7 +1155,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             entity.gold_held = std::min(UNIT_MAX_GOLD_HELD, target.gold_held);
                             target.gold_held -= entity.gold_held;
                             map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), CELL_EMPTY);
-                            map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false, ENTITY_DATA.at(entity.type).has_detection);
 
                             update_finished = true;
                             break;
@@ -1265,7 +1263,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                 entity.timer--;
                 if (entity.timer == 0) {
-                    int building_hframe = entity_get_animation_frame(target).x;
                     target.health++;
                     if (target.mode == MODE_BUILDING_FINISHED) {
                         entity.target.repair.health_repaired++;
@@ -1283,10 +1280,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         }
                     } else {
                         entity.timer = UNIT_BUILD_TICK_DURATION;
-                    }
-
-                    if (entity_get_animation_frame(target).x != building_hframe) {
-                        // state.is_fog_dirty = true;
                     }
                 }
 
@@ -1333,7 +1326,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     xy exit_cell = entity_get_exit_cell(state, mine.cell, entity_cell_size(mine.type), entity_cell_size(ENTITY_MINER), rally_cell, true);
 
                     if (exit_cell.x == -1) {
-                        state.events.push_back((match_event_t) { .type = entity.mode == MODE_UNIT_IN_MINE ? MATCH_EVENT_MINE_EXIT_BLOCKED : MATCH_EVENT_BUILDING_EXIT_BLOCKED });
+                        match_event_show_status(state, entity.player_id, UI_STATUS_MINE_EXIT_BLOCKED);
                     } else {
                         entity_remove_garrisoned_unit(mine, id);
                         entity.garrison_id = ID_NULL;
@@ -1371,16 +1364,15 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                             entity.gold_mine_id = ID_NULL;
                         }
                         entity.timer = UNIT_OUT_MINE_DURATION;
+                        map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false, ENTITY_DATA.at(entity.type).has_detection);
                         entity.cell = exit_cell;
                         entity.position = cell_center(entity.cell);
-                        // if (map_get_cell(state, entity.cell) == CELL_EMPTY) {
-                            // map_set_cell_rect(state, entity.cell, entity_cell_size(entity.type), id);
-                        // }
                         map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, true, ENTITY_DATA.at(entity.type).has_detection);
 
                         if (mine.type == ENTITY_GOLD_MINE && mine.garrisoned_units.empty() && mine.gold_held == 0) {
-                            entity.mode = MODE_GOLD_MINE_COLLAPSED;
-                            // TODO send alert to player of collapse
+                            mine.mode = MODE_GOLD_MINE_COLLAPSED;
+                            match_event_alert(state, MATCH_ALERT_TYPE_MINE_COLLAPSE, entity.player_id, mine.cell, entity_cell_size(mine.type));
+                            match_event_show_status(state, entity.player_id, UI_STATUS_MINE_COLLAPSED);
                         }
                     }
                 }
@@ -1447,7 +1439,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         xy exit_cell = entity_get_exit_cell(state, entity.cell, entity_cell_size(entity.type), entity_cell_size(entity.queue[0].unit_type), rally_cell);
                         if (exit_cell.x == -1) {
                             if (entity.timer == 0) {
-                                state.events.push_back((match_event_t) { .type = MATCH_EVENT_BUILDING_EXIT_BLOCKED, .player_id = entity.player_id });
+                                match_event_show_status(state, entity.player_id, UI_STATUS_BUILDING_EXIT_BLOCKED);
                             }
                             entity.timer = BUILDING_QUEUE_EXIT_BLOCKED;
                             update_finished = true;
@@ -2459,7 +2451,7 @@ void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garris
             xy exit_cell = entity_get_exit_cell(state, entity.cell, entity_cell_size(entity.type), entity_cell_size(garrisoned_unit.type), entity.cell + xy(0, entity_cell_size(entity.type)));
             if (exit_cell.x == -1) {
                 if (entity_is_building(entity.type)) {
-                    state.events.push_back((match_event_t) { .type = MATCH_EVENT_BUILDING_EXIT_BLOCKED, .player_id = garrisoned_unit.player_id });
+                    match_event_show_status(state, garrisoned_unit.player_id, UI_STATUS_BUILDING_EXIT_BLOCKED);
                 }
                 return;
             }
@@ -2540,7 +2532,7 @@ void entity_building_finish(match_state_t& state, entity_id building_id) {
             entity_stop_building(state, state.entities.get_id_of(entity_index));
             // If the unit was unable to stop building, notify the user that the exit is blocked
             if (entity.mode != MODE_UNIT_IDLE) {
-                state.events.push_back((match_event_t) { .type = MATCH_EVENT_BUILDING_EXIT_BLOCKED, .player_id = entity.player_id });
+                match_event_show_status(state, entity.player_id, UI_STATUS_BUILDING_EXIT_BLOCKED);
             }
         } else if (entity.mode == MODE_UNIT_REPAIR) {
             entity.mode = MODE_UNIT_IDLE;
@@ -2558,7 +2550,7 @@ void entity_building_enqueue(match_state_t& state, entity_t& building, building_
     if (building.queue.size() == 1) {
         if (entity_building_is_supply_blocked(state, building)) {
             if (building.timer != BUILDING_QUEUE_BLOCKED) {
-                state.events.push_back((match_event_t) { .type = MATCH_EVENT_NOT_ENOUGH_HOUSE, .player_id = building.player_id });
+                match_event_show_status(state, building.player_id, UI_STATUS_NOT_ENOUGH_HOUSE);
             }
             building.timer = BUILDING_QUEUE_BLOCKED;
         } else {
@@ -2576,7 +2568,7 @@ void entity_building_dequeue(match_state_t& state, entity_t& building) {
     } else {
         if (entity_building_is_supply_blocked(state, building)) {
             if (building.timer != BUILDING_QUEUE_BLOCKED) {
-                state.events.push_back((match_event_t) { .type = MATCH_EVENT_NOT_ENOUGH_HOUSE, .player_id = building.player_id });
+                match_event_show_status(state, building.player_id, UI_STATUS_NOT_ENOUGH_HOUSE);
             }
             building.timer = BUILDING_QUEUE_BLOCKED;
         } else {

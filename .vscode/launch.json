@@ -5,7 +5,7 @@
             "name": "Run 1 instance",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/game",
+            "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--resolution",
                 "1280x720"
@@ -15,7 +15,7 @@
             "environment": [],
             "windows": {
                 "type": "cppvsdbg",
-                "program": "${workspaceFolder}/bin/game.exe",
+                "program": "${workspaceFolder}/bin/gold.exe",
                 "console": "integratedTerminal"
             },
             "osx": {
@@ -28,7 +28,7 @@
             "name": "player1",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/game",
+            "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--logfile",
                 "player1.log",
@@ -40,7 +40,7 @@
             "environment": [],
             "windows": {
                 "type": "cppvsdbg",
-                "program": "${workspaceFolder}/bin/game.exe",
+                "program": "${workspaceFolder}/bin/gold.exe",
                 "console": "integratedTerminal"
             },
             "osx": {
@@ -53,7 +53,7 @@
             "name": "player2",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/game",
+            "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--logfile",
                 "player2.log",
@@ -65,7 +65,7 @@
             "environment": [],
             "windows": {
                 "type": "cppvsdbg",
-                "program": "${workspaceFolder}/bin/game.exe",
+                "program": "${workspaceFolder}/bin/gold.exe",
                 "console": "integratedTerminal"
             },
             "osx": {
@@ -78,7 +78,7 @@
             "name": "player 3",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/game",
+            "program": "${workspaceFolder}/bin/gold",
             "args": [
                 "--logfile",
                 "player3.log",
@@ -90,7 +90,7 @@
             "environment": [],
             "windows": {
                 "type": "cppvsdbg",
-                "program": "${workspaceFolder}/bin/game.exe",
+                "program": "${workspaceFolder}/bin/gold.exe",
                 "console": "integratedTerminal"
             },
             "osx": {

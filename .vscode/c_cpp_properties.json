@@ -3,8 +3,8 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/game/src/**",
-                "${workspaceFolder}/game/vendor/**",
+                "${workspaceFolder}/gold/src/**",
+                "${workspaceFolder}/gold/vendor/**",
                 "${workspaceFolder}/reporter/src/**",
                 "${workspaceFolder}/reporter/vendor/**"
             ],
@@ -21,8 +21,8 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/game/src/**",
-                "${workspaceFolder}/game/vendor/**",
+                "${workspaceFolder}/gold/src/**",
+                "${workspaceFolder}/gold/vendor/**",
                 "${workspaceFolder}/reporter/src/**",
                 "${workspaceFolder}/reporter/vendor/**"
             ],

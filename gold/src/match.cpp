@@ -6,7 +6,7 @@
 #include "lcg.h"
 #include <algorithm>
 
-static const uint32_t PLAYER_STARTING_GOLD = 450;
+static const uint32_t PLAYER_STARTING_GOLD = 550;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
@@ -461,7 +461,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
 
             if (smoke_thrower_index == INDEX_INVALID) {
                 if (!all_units_are_dead) {
-                    state.events.push_back((match_event_t) { .type = MATCH_EVENT_SMOKE_COOLDOWN, .player_id = player_id });
+                    match_event_show_status(state, player_id, UI_STATUS_SMOKE_COOLDOWN);
                 }
                 return;
             }
@@ -901,6 +901,16 @@ void match_event_alert(match_state_t& state, MatchAlertType type, uint8_t player
             .player_id = player_id,
             .cell = cell,
             .cell_size = cell_size
+        }
+    });
+}
+
+void match_event_show_status(match_state_t& state, uint8_t player_id, const char* message) {
+    state.events.push_back((match_event_t) {
+        .type = MATCH_EVENT_STATUS,
+        .status = (match_event_status_t) {
+            .player_id = player_id,
+            .message = message
         }
     });
 }

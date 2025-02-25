@@ -597,7 +597,7 @@ void map_init(match_state_t& state, const noise_t& noise) {
 
     std::vector<xy> gold_sample = poisson_disk(state, params);
     for (uint32_t patch_id = 0; patch_id < gold_sample.size(); patch_id++) {
-        entity_create_gold_mine(state, gold_sample[patch_id], 5000);
+        entity_create_gold_mine(state, gold_sample[patch_id], 50);
     }
     // Recalculate unreachables in case the gold cells blocked anything
     map_calculate_unreachable_cells(state);
