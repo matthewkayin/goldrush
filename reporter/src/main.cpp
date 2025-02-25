@@ -33,6 +33,7 @@ int report_main() {
 }
 
 bool report_send(std::vector<std::string> file_paths) {
+    // const char* password = "seaq jsal lbfg vdce ";
     curl_global_init(CURL_GLOBAL_ALL);
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -41,30 +42,40 @@ bool report_send(std::vector<std::string> file_paths) {
         return false;
     }
 
+    curl_slist* recipients = curl_slist_append(NULL, "matthewkayin@gmail.com");
+
     curl_slist* headers = NULL;
-    curl_slist_append(headers, "Content-Type: multipart/form-data");
+    headers = curl_slist_append(headers, "From: Gold Rush Crash Reports");
+    headers = curl_slist_append(headers, "To: Matthew Madden");
+    headers = curl_slist_append(headers, "Subject: Crash Report");
 
     curl_mime* mime = curl_mime_init(curl);
     curl_mimepart* content_part = curl_mime_addpart(mime);
-    curl_mime_name(content_part, "content");
-    curl_mime_data(content_part, "Received crash report.", CURL_ZERO_TERMINATED);
+    curl_mime_type(content_part, "text/html");
+    curl_mime_data(content_part, "<html><body><p>Someone has sent a crash report.</p></body></html>", CURL_ZERO_TERMINATED);
 
     for (int file_index = 0; file_index < file_paths.size(); file_index++) {
-        char part_name[16];
-        sprintf(part_name, "file[%i]", file_index);
         curl_mimepart* part = curl_mime_addpart(mime);
-        curl_mime_name(part, part_name);
         curl_mime_filedata(part, file_paths[file_index].c_str());
     }
 
-    curl_easy_setopt(curl, CURLOPT_URL, "https://discord.com/api/webhooks/1342861844083118193/aqnZf9O0VSmhazXBz1-I2XtQg5Vu2RUCZr8b_Oo_aQkceViDAVLHOBumRHXGzyJGzGXZ");
+    curl_easy_setopt(curl, CURLOPT_URL, "smtps://smtp.gmail.com:465");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_MAIL_FROM, "goldrushcrashreports@gmail.com");
+    curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
+    curl_easy_setopt(curl, CURLOPT_USERPWD, "goldrushcrashreports@gmail.com:seaq jsal lbfg vdce ");
     curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
 
     CURLcode res = curl_easy_perform(curl);
 
+    if (res != CURLE_OK) {
+        fprintf(stderr, "error %i %s\n", res, curl_easy_strerror(res));
+    }
+
+    curl_slist_free_all(recipients);
     curl_slist_free_all(headers);
     curl_mime_free(mime);
+
     curl_easy_cleanup(curl);
     curl_global_cleanup();
 

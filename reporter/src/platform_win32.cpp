@@ -5,7 +5,7 @@
 #include <windows.h>
 
 const char* platform_exe_path() {
-    return "game.exe";
+    return "gold.exe";
 }
 
 std::vector<std::string> platform_get_report_filenames() {

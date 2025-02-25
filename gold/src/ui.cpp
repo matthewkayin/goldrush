@@ -2217,7 +2217,7 @@ void ui_render(const ui_state_t& state) {
         text_size.x += 16; // To account for the miner icon
         xy text_pos = xy(render_rect.x + (render_rect.w / 2) - (text_size.x / 2), render_rect.y + -6);
         render_text(FONT_HACK_WHITE, counter_text, text_pos);
-        render_sprite(SPRITE_UI_MINER, xy(0, 0), text_pos + xy((text_size.x - 16) + 4, 13), RENDER_SPRITE_NO_CULL, network_get_player_id());
+        render_sprite(SPRITE_UI_MINER, xy(0, 0), text_pos + xy((text_size.x - 16) + 4, 1), RENDER_SPRITE_NO_CULL, network_get_player_id());
     }
 
     // Fog of War

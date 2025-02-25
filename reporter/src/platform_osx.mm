@@ -5,7 +5,7 @@
 #include <dirent.h>
 
 const char* platform_exe_path() {
-    return "./game";
+    return "./gold";
 }
 
 std::vector<std::string> platform_get_report_filenames() {
