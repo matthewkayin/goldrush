@@ -2798,12 +2798,15 @@ void ui_render(const ui_state_t& state) {
         render_text(FONT_HACK_WHITE, cell_text, xy(0, 12));
 
         for (uint32_t entity_index = 0; entity_index < state.match_state.entities.size(); entity_index++) {
-            if (state.match_state.entities[entity_index].type == ENTITY_GOLD_MINE) {
-                continue;
-            }
-
             SDL_Rect entity_rect = entity_get_rect(state.match_state.entities[entity_index]);
             if (sdl_rect_has_point(entity_rect, engine.mouse_position + state.camera_offset)) {
+                if (state.match_state.entities[entity_index].type == ENTITY_GOLD_MINE) {
+                    char debug_text[128];
+                    sprintf(debug_text, "garrison size %zu", state.match_state.entities[entity_index].garrisoned_units.size());
+                    render_text(FONT_HACK_WHITE, debug_text, xy(0, 24));
+                    continue;
+                }
+
                 const entity_t& entity = state.match_state.entities[entity_index];
                 const char* mode_text[] = {
                     "Idle", "Move", "Blocked", "Finished", "Build", "Repair", "Attack", "Soldier Attack",

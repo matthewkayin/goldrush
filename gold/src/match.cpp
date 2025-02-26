@@ -6,7 +6,7 @@
 #include "lcg.h"
 #include <algorithm>
 
-static const uint32_t PLAYER_STARTING_GOLD = 550;
+static const uint32_t PLAYER_STARTING_GOLD = 450;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
