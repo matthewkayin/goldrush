@@ -55,7 +55,7 @@ static const char* UI_MENU_BUTTON_TEXT[UI_MENU_BUTTON_COUNT] = { "LEAVE MATCH", 
 static const char* UI_MENU_SURRENDER_BUTTON_TEXT[UI_MENU_SURRENDER_BUTTON_COUNT] = { "YES", "BACK" };
 const xy UI_FRAME_BOTTOM_POSITION = xy(136, SCREEN_HEIGHT - UI_HEIGHT);
 const xy SELECTION_LIST_TOP_LEFT = UI_FRAME_BOTTOM_POSITION + xy(12 + 16, 12);
-const xy BUILDING_QUEUE_TOP_LEFT = xy(164, 12);
+const xy BUILDING_QUEUE_TOP_LEFT = xy(184, 12);
 const xy UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT,
     UI_FRAME_BOTTOM_POSITION + BUILDING_QUEUE_TOP_LEFT + xy(0, 35),
@@ -389,14 +389,31 @@ void ui_handle_input(ui_state_t& state, SDL_Event event) {
     }
 
     // Garrisoned unit icon press
-    if (ui_get_garrisoned_index_hovered(state) != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        sound_play(SOUND_UI_SELECT);
-        state.input_queue.push_back((input_t) {
-            .type = INPUT_SINGLE_UNLOAD,
-            .single_unload = (input_single_unload_t) {
-                .unit_id = state.match_state.entities.get_by_id(state.selection[0]).garrisoned_units[ui_get_garrisoned_index_hovered(state)]
+    {
+        int garrisoned_index_hovered = ui_get_garrisoned_index_hovered(state);
+        if (garrisoned_index_hovered != -1 && event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            const entity_t& entity = state.match_state.entities.get_by_id(state.selection[0]);
+            int index = 0;
+            for (entity_id id : entity.garrisoned_units) {
+                const entity_t& garrisoned_unit = state.match_state.entities.get_by_id(id);
+                if (garrisoned_unit.player_id != network_get_player_id()) {
+                    continue;
+                }
+
+                if (index == garrisoned_index_hovered) {
+                    sound_play(SOUND_UI_SELECT);
+                    state.input_queue.push_back((input_t) {
+                        .type = INPUT_SINGLE_UNLOAD,
+                        .single_unload = (input_single_unload_t) {
+                            .unit_id = id
+                        }
+                    });
+                    break;
+                }
+
+                index++;
             }
-        });
+        }
     }
 
     // Selected unit icon press
@@ -1795,18 +1812,24 @@ xy ui_garrisoned_icon_position(int index) {
 
 int ui_get_garrisoned_index_hovered(const ui_state_t& state) {
     UiSelectionType selection_type = ui_get_selection_type(state, state.selection);
-    if (!(selection_type == UI_SELECTION_TYPE_UNITS || selection_type == UI_SELECTION_TYPE_BUILDINGS) ||
+    if (!(selection_type == UI_SELECTION_TYPE_UNITS || selection_type == UI_SELECTION_TYPE_BUILDINGS || selection_type == UI_SELECTION_TYPE_GOLD) ||
             state.selection.size() != 1 || ui_is_selecting(state) || state.is_minimap_dragging || 
             !(state.mode == UI_MODE_NONE || state.mode == UI_MODE_BUILD || state.mode == UI_MODE_BUILD2)) {
         return -1;
     } 
 
     const entity_t& entity = state.match_state.entities.get_by_id(state.selection[0]);
-    for (int index = 0; index < entity.garrisoned_units.size(); index++) {
+    int index = 0;
+    for (entity_id id : entity.garrisoned_units) {
+        const entity_t& garrisoned_unit = state.match_state.entities.get_by_id(id);
+        if (garrisoned_unit.player_id != network_get_player_id()) {
+            continue;
+        }
         SDL_Rect icon_rect = (SDL_Rect) { .x = ui_garrisoned_icon_position(index).x, .y = ui_garrisoned_icon_position(index).y, .w = 32, .h = 32 };
         if (sdl_rect_has_point(icon_rect, engine.mouse_position)) {
             return index;
         }
+        index++;
     }
 
     return -1;
@@ -1992,14 +2015,15 @@ void ui_render(const ui_state_t& state) {
             // Select ring
             render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || entity.player_id == network_get_player_id()), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
-            if (entity.type == ENTITY_GOLD_MINE) {
-                continue;
-            }
             // Determine the healthbar rect
             SDL_Rect entity_rect = entity_get_rect(entity);
             entity_rect.x -= state.camera_offset.x;
             entity_rect.y -= state.camera_offset.y;
             xy healthbar_position = xy(entity_rect.x, entity_rect.y + entity_rect.h + (entity_is_unit(entity.type) ? HEALTHBAR_PADDING : BUILDING_HEALTHBAR_PADDING));
+            if (entity.type == ENTITY_GOLD_MINE) {
+                ui_render_garrisoned_units_healthbar(healthbar_position, xy(entity_rect.w, HEALTHBAR_HEIGHT), entity.garrisoned_units.size(), ENTITY_DATA.at(entity.type).garrison_capacity);
+                continue;
+            }
             ui_render_healthbar(healthbar_position, xy(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, ENTITY_DATA.at(entity.type).max_health);
             if (ENTITY_DATA.at(entity.type).garrison_capacity != 0) {
                 ui_render_garrisoned_units_healthbar(healthbar_position + xy(0, HEALTHBAR_HEIGHT + 1), xy(entity_rect.w, HEALTHBAR_HEIGHT), entity.garrisoned_units.size(), ENTITY_DATA.at(entity.type).garrison_capacity);
@@ -2165,12 +2189,15 @@ void ui_render(const ui_state_t& state) {
     }
 
     // Miners on gold counter
-    for (uint32_t entity_index = 0; entity_index < state.match_state.entities.size(); entity_index++) {
-        Sprite gold_mine_sprite = ENTITY_DATA.at(ENTITY_GOLD_MINE).sprite;
-        const entity_t& entity = state.match_state.entities[entity_index];
-        if (entity.type != ENTITY_GOLD_MINE || entity.mode == MODE_GOLD_MINE_COLLAPSED || !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
+    for (entity_id id : state.selection) {
+        const entity_t& entity = state.match_state.entities.get_by_id(id);
+        if (entity.type != ENTITY_GOLD_MINE) {
+            break;
+        }
+        if (entity.mode == MODE_GOLD_MINE_COLLAPSED || !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
             continue;
         }
+        Sprite gold_mine_sprite = ENTITY_DATA.at(ENTITY_GOLD_MINE).sprite;
         SDL_Rect render_rect = (SDL_Rect) {
             .x = entity.position.x.integer_part() - state.camera_offset.x,
             .y = entity.position.y.integer_part() - state.camera_offset.y,
@@ -2180,7 +2207,7 @@ void ui_render(const ui_state_t& state) {
         if (SDL_HasIntersection(&SCREEN_RECT, &render_rect) != SDL_TRUE) {
             continue;
         }
-        uint32_t miner_count = match_get_miners_on_gold_mine(state.match_state, network_get_player_id(), state.match_state.entities.get_id_of(entity_index));
+        uint32_t miner_count = match_get_miners_on_gold_mine(state.match_state, network_get_player_id(), id);
         if (miner_count == 0) {
             continue;
         }
@@ -2579,16 +2606,23 @@ void ui_render(const ui_state_t& state) {
     }
 
     // UI Garrisoned units
-    if (state.selection.size() == 1 && (ui_selection_type == UI_SELECTION_TYPE_BUILDINGS || ui_selection_type == UI_SELECTION_TYPE_UNITS)) {
+    if (state.selection.size() == 1 && (ui_selection_type == UI_SELECTION_TYPE_BUILDINGS || ui_selection_type == UI_SELECTION_TYPE_UNITS || ui_selection_type == UI_SELECTION_TYPE_GOLD)) {
         const entity_t& entity = state.match_state.entities.get_by_id(state.selection[0]);
-        for (int index = 0; index < entity.garrisoned_units.size(); index++) {
-            const entity_t& garrisoned_unit = state.match_state.entities.get_by_id(entity.garrisoned_units[index]);
+        int index = 0;
+        for (entity_id id : entity.garrisoned_units) {
+            const entity_t& garrisoned_unit = state.match_state.entities.get_by_id(id);
+            if (garrisoned_unit.player_id != network_get_player_id()) {
+                continue;
+            }
+
             bool icon_hovered = ui_get_garrisoned_index_hovered(state) == index;
             xy icon_position = ui_garrisoned_icon_position(index) + (icon_hovered ? xy(0, -1) : xy(0, 0));
 
             render_sprite(SPRITE_UI_BUTTON, xy(icon_hovered ? 1 : 0, 0), icon_position, RENDER_SPRITE_NO_CULL);
             render_sprite(SPRITE_UI_BUTTON_ICON, xy(ENTITY_DATA.at(garrisoned_unit.type).ui_button - 1, icon_hovered ? 1 : 0), icon_position, RENDER_SPRITE_NO_CULL);
             ui_render_healthbar(icon_position + xy(1, 32 - 5), xy(32 - 2, 4), garrisoned_unit.health, ENTITY_DATA.at(garrisoned_unit.type).max_health);
+
+            index++;
         }
     }
 

@@ -2474,6 +2474,7 @@ void entity_unload_unit(match_state_t& state, entity_t& entity, entity_id garris
             garrisoned_unit.mode = MODE_UNIT_IDLE;
             garrisoned_unit.target = (target_t) { .type = TARGET_NONE };
             garrisoned_unit.garrison_id = ID_NULL;
+            garrisoned_unit.gold_mine_id = ID_NULL;
 
             // Remove the unit from the garrisoned units list
             entity.garrisoned_units.erase(entity.garrisoned_units.begin() + index);
