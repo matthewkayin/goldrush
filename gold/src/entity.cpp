@@ -1960,7 +1960,7 @@ Sound entity_get_attack_sound(const entity_t& entity) {
     } else if (entity.type == ENTITY_CANNON) {
         return SOUND_CANNON;
     } else {
-        return SOUND_PUNCH;
+        return SOUND_PICKAXE;
     }
 }
 

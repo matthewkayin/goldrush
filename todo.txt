@@ -41,12 +41,8 @@ todos
     - [ ] - War Wagon?
  - [ ] - game icon
 
- - [ ] - Gold mines
-    - [ ] - gold mine worker counter
-    - [ ] - gold mine collapse sound effect
-    - [x] - proper gold mine select ring
-    - [ ] - gold mine collapse warning
-    - [ ] - test moving towards collapsed mine
-    - [ ] - test building around collapsed mine
-    - [ ] - test moving towards mine while mine is in fog, both collapsed and not
-    - [x] - add unit out delay after exiting mine? overall gold mining feel
+- [ ] - make sure mining rate isn't too fast...
+- [ ] - gold mine collapse sound effect
+- [ ] - map size match setting
+- [ ] - team games
+- [ ] - replays
