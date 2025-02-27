@@ -6,10 +6,10 @@
 
 EXTENSION :=
 DIR := $(subst /,\,${CURDIR})
-LIB_DIR := $(ASSEMBLY)\lib
+LIB_DIR := $(ASSEMBLY)/lib
 BUILD_DIR := bin
 OBJ_DIR := obj
-INCLUDE_FLAGS := -I$(ASSEMBLY)\src -I$(ASSEMBLY)\vendor
+INCLUDE_FLAGS := -I$(ASSEMBLY)/src -I$(ASSEMBLY)/vendor
 COMPILER_FLAGS := -std=c++17 -Wall -g -O0
 LINKER_FLAGS := -g -L$(LIB_DIR) $(ADDITIONAL_LFLAGS)
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
@@ -31,8 +31,7 @@ else
 		COMPILER_FLAGS += -Wno-deprecated-declarations
 	endif
 
-	SRC_FILES := $(shell find ${ASSEMBLY} -type f \(-name *.cpp -o -name *.m))
-	SRC_FILES := huh?
+	SRC_FILES := $(shell find $(ASSEMBLY) -type f \( -name "*.cpp" -o -name "*.mm" \))
 	DIRECTORIES := $(shell find ${ASSEMBLY} -type d)
 endif
 
