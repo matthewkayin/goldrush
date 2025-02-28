@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include "noise.h"
+#include "match_settings.h"
 #include <cstddef>
 
 #define NAME_BUFFER_SIZE 36
@@ -45,26 +46,6 @@ struct lobby_t {
     uint16_t port;
     uint8_t player_count;
 };
-
-enum MatchSetting {
-    MATCH_SETTING_MAP_SIZE,
-    MATCH_SETTING_TEAMS,
-    MATCH_SETTING_COUNT
-};
-
-enum MapSize {
-    MATCH_SETTING_MAP_SIZE_SMALL,
-    MATCH_SETTING_MAP_SIZE_MEDIUM,
-    MATCH_SETTING_MAP_SIZE_LARGE,
-    MATCH_SETTING_MAP_SIZE_COUNT
-};
-
-enum MatchSettingTeams {
-    MATCH_SETTING_TEAMS_ENABLED,
-    MATCH_SETTING_TEAMS_DISABLED,
-    MATCH_SETTING_TEAMS_COUNT
-};
-
 
 enum NetworkEventType {
     NETWORK_EVENT_CONNECTION_FAILED,

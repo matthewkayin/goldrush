@@ -6,6 +6,21 @@
 #include "network.h"
 #include "lcg.h"
 
+const std::unordered_map<MapSize, map_size_t> MAP_SIZE_DATA = {
+    { MAP_SIZE_SMALL, (map_size_t) {
+        .tile_size = 96,
+        .gold_disk_radius = 36
+    }},
+    { MAP_SIZE_MEDIUM, (map_size_t) {
+        .tile_size = 128,
+        .gold_disk_radius = 42
+    }},
+    { MAP_SIZE_LARGE, (map_size_t) {
+        .tile_size = 164,
+        .gold_disk_radius = 48
+    }}
+};
+
 Tile wall_autotile_lookup(uint32_t neighbors) {
     switch (neighbors) {
         case 1:
@@ -69,10 +84,11 @@ struct poisson_disk_params_t {
     std::vector<int> avoid_values;
     int disk_radius;
     bool allow_unreachable_cells;
+    xy margin;
 };
 
 bool poisson_is_point_valid(const match_state_t& state, const poisson_disk_params_t& params, xy point) {
-    if (!map_is_cell_in_bounds(state, point)) {
+    if (point.x < params.margin.x || point.x >= state.map_width - params.margin.x || point.y < params.margin.y || point.y >= state.map_height - params.margin.y) {
         return false;
     }
 
@@ -581,8 +597,9 @@ void map_init(match_state_t& state, const noise_t& noise) {
     log_trace("Generating gold cells...");
     poisson_disk_params_t params = (poisson_disk_params_t) {
         .avoid_values = std::vector<int>(state.map_width * state.map_height, 0),
-        .disk_radius = 40,
-        .allow_unreachable_cells = false
+        .disk_radius = MAP_SIZE_DATA.at((MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE)).gold_disk_radius,
+        .allow_unreachable_cells = false,
+        .margin = xy(5, 5)
     };
 
     // Generate the avoid values
@@ -615,6 +632,7 @@ void map_init(match_state_t& state, const noise_t& noise) {
     log_trace("Generating decorations...");
     params.disk_radius = 16;
     params.allow_unreachable_cells = true;
+    params.margin = xy(0, 0);
     std::vector<xy> decoration_cells = poisson_disk(state, params);
     for (xy cell : decoration_cells) {
         state.map_cells[cell.x + (cell.y * state.map_width)] = CELL_DECORATION_1 + (lcg_rand() % 5);

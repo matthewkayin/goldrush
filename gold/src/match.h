@@ -8,6 +8,7 @@
 #include "animation.h"
 #include "options.h"
 #include "noise.h"
+#include "match_settings.h"
 #include <vector>
 #include <array>
 #include <string>
@@ -66,6 +67,12 @@ struct map_reveal_t {
     int sight;
     int timer;
 };
+
+struct map_size_t {
+    uint32_t tile_size;
+    int gold_disk_radius;
+};
+extern const std::unordered_map<MapSize, map_size_t> MAP_SIZE_DATA;
 
 // Chat
 

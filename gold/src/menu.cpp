@@ -151,13 +151,13 @@ struct match_setting_t {
 static const std::unordered_map<MatchSetting, match_setting_t> MATCH_SETTING_DATA = {
     { MATCH_SETTING_MAP_SIZE, (match_setting_t) {
         .name = "Map Size:",
-        .default_value = MATCH_SETTING_MAP_SIZE_SMALL,
-        .value_count = MATCH_SETTING_MAP_SIZE_COUNT
+        .default_value = MAP_SIZE_SMALL,
+        .value_count = MAP_SIZE_COUNT
     }},
     { MATCH_SETTING_TEAMS, (match_setting_t) {
         .name = "Team Game:",
-        .default_value = MATCH_SETTING_TEAMS_DISABLED,
-        .value_count = MATCH_SETTING_TEAMS_COUNT
+        .default_value = TEAMS_DISABLED,
+        .value_count = TEAMS_COUNT
     }}
 };
 
@@ -997,18 +997,18 @@ const char* menu_match_setting_value_str(MatchSetting setting, uint32_t value) {
     switch (setting) {
         case MATCH_SETTING_MAP_SIZE: {
             switch (value) {
-                case MATCH_SETTING_MAP_SIZE_SMALL:
+                case MAP_SIZE_SMALL:
                     return "Small";
-                case MATCH_SETTING_MAP_SIZE_MEDIUM:
+                case MAP_SIZE_MEDIUM:
                     return "Medium";
-                case MATCH_SETTING_MAP_SIZE_LARGE:
+                case MAP_SIZE_LARGE:
                     return "Large";
                 default:
                     return "";
             }
         }
         case MATCH_SETTING_TEAMS: {
-            return value == MATCH_SETTING_TEAMS_ENABLED ? "Yes" : "No";
+            return value == TEAMS_ENABLED ? "Yes" : "No";
         }
         default:
             return "";

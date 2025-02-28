@@ -82,14 +82,14 @@ match_state_t match_init(int32_t lcg_seed, const noise_t& noise) {
             state.map_fog[player_id] = std::vector<int>(state.map_width * state.map_height, FOG_EXPLORED);
             for (uint32_t index = 0; index < state.entities.size(); index++) {
                 entity_t& entity = state.entities[index];
-                if (entity.type == ENTITY_GOLD) {
+                if (entity.type == ENTITY_GOLD_MINE) {
                     state.remembered_entities[player_id][state.entities.get_id_of(index)] = (remembered_entity_t) {
                         .sprite_params = (render_sprite_params_t) {
                             .sprite = entity_get_sprite(entity),
                             .frame = entity_get_animation_frame(entity),
                             .position = entity.position.to_xy(),
                             .options = 0,
-                            .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD ? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
+                            .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLD_MINE ? (uint8_t)RECOLOR_NONE : network_get_player(entity.player_id).recolor_id
                         },
                         .cell = entity.cell,
                         .cell_size = entity_cell_size(entity.type)

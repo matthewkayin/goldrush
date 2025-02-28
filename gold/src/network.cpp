@@ -117,8 +117,10 @@ void network_disconnect() {
 
     network_scanner_destroy();
 
+    size_t connected_peers = 0;
     for (uint8_t peer_id = 0; peer_id < state.host->peerCount; peer_id++) {
         if (state.host->peers[peer_id].state == ENET_PEER_STATE_CONNECTED) {
+            connected_peers++;
             if (state.status == NETWORK_STATUS_SERVER || state.status == NETWORK_STATUS_CONNECTED) {
                 enet_peer_disconnect(&state.host->peers[peer_id], 0);
             } else {
@@ -127,7 +129,7 @@ void network_disconnect() {
         }
     }
     enet_host_flush(state.host);
-    if (state.status == NETWORK_STATUS_SERVER || state.status == NETWORK_STATUS_CONNECTING || state.status == NETWORK_STATUS_DISCONNECTING) {
+    if (state.status == NETWORK_STATUS_SERVER || state.status == NETWORK_STATUS_CONNECTING || state.status == NETWORK_STATUS_DISCONNECTING || connected_peers == 0) {
         enet_host_destroy(state.host);
         state.host = NULL;
         memset(state.peers, 0, sizeof(state.peers));

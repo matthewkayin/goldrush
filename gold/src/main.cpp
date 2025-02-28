@@ -186,9 +186,8 @@ int gold_main(int argc, char** argv) {
 
                         // Generate noise for map generation
                         uint64_t noise_seed = (uint64_t)lcg_seed;
-                        // TODO get size from menu match setting
-                        uint32_t map_width = 128;
-                        uint32_t map_height = 128;
+                        uint32_t map_width = MAP_SIZE_DATA.at((MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE)).tile_size;
+                        uint32_t map_height = map_width;
                         noise_t noise = noise_generate(noise_seed, map_width, map_height);
 
                         network_begin_loading_match(lcg_seed, noise);
@@ -221,6 +220,25 @@ int gold_main(int argc, char** argv) {
             char text_buffer[32];
             sprintf(text_buffer, "FPS: %u | UPS: %u", fps, ups);
             render_text(FONT_HACK_WHITE, text_buffer, xy(0, 0));
+
+            switch (network_get_status()) {
+                case NETWORK_STATUS_OFFLINE:
+                    sprintf(text_buffer, "Offline");
+                    break;
+                case NETWORK_STATUS_SERVER:
+                    sprintf(text_buffer, "Server");
+                    break;
+                case NETWORK_STATUS_CONNECTING:
+                    sprintf(text_buffer, "Connecting");
+                    break;
+                case NETWORK_STATUS_CONNECTED:
+                    sprintf(text_buffer, "Connected");
+                    break;
+                case NETWORK_STATUS_DISCONNECTING:
+                    sprintf(text_buffer, "Disconnecting");
+                    break;
+            }
+            render_text(FONT_HACK_WHITE, text_buffer, xy(0, 24));
         }
 
         SDL_RenderPresent(engine.renderer);

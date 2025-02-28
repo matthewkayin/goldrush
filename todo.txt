@@ -46,3 +46,6 @@ todos
 - [ ] - map size match setting
 - [ ] - team games
 - [ ] - replays
+
+There's a bug where the game crashes on enet_host_service after exiting and re-entering game over and over
+state status was NETWORK_STATUS_DISCONNECTING, I suppose we're using that status when we leave the game, but maybe we shouldn't leave the match yet / shouldn't delete our host until we're done?
