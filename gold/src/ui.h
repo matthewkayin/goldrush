@@ -83,6 +83,14 @@ struct alert_t {
     uint32_t timer;
 };
 
+// Chat
+
+struct chat_message_t {
+    char message[MATCH_CHAT_MESSAGE_MAX_LENGTH + 1];
+    uint8_t player_id;
+    uint32_t timer;
+};
+
 struct ui_state_t {
     UiMode mode;
     UiButton buttons[UI_BUTTONSET_SIZE];
@@ -117,6 +125,7 @@ struct ui_state_t {
     int control_group_selected;
 
     std::string chat_message;
+    std::vector<chat_message_t> chat;
 
     std::vector<alert_t> alerts;
 

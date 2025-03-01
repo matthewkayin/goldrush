@@ -12,7 +12,6 @@ const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const fixed PROJECTILE_SMOKE_SPEED = fixed::from_int(4);
 const int PARTICLE_SMOKE_CELL_SIZE = 7;
-static const uint32_t CHAT_MESSAGE_DURATION = 180;
 
 const std::unordered_map<uint32_t, upgrade_data_t> UPGRADE_DATA = {
     { UPGRADE_WAR_WAGON, (upgrade_data_t) {
@@ -690,7 +689,11 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             break;
         }
         case INPUT_CHAT: {
-            match_add_chat_message(state, std::string(network_get_player(player_id).name) + ": " + std::string(input.chat.message));
+            match_event_t event;
+            event.type = MATCH_EVENT_CHAT;
+            event.chat.player_id = player_id;
+            memcpy(event.chat.message, input.chat.message, input.chat.message_length);
+            state.events.push_back(event);
             break;
         }
         default:
@@ -785,14 +788,6 @@ void match_update(match_state_t& state) {
         }
     }
 
-    for (uint32_t chat_index = 0; chat_index < state.chat.size(); chat_index++) {
-        state.chat[chat_index].timer--;
-        if (state.chat[chat_index].timer == 0) {
-            state.chat.erase(state.chat.begin() + chat_index);
-            chat_index--;
-        }
-    }
-
     if (state.map_is_fog_dirty) {
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (network_get_player(player_id).status == PLAYER_NONE) {
@@ -872,13 +867,6 @@ uint32_t match_get_miners_on_gold_mine(const match_state_t& state, uint8_t playe
         }
     }
     return miner_count;
-}
-
-void match_add_chat_message(match_state_t& state, std::string message) {
-    state.chat.push_back((chat_message_t) {
-        .message = message,
-        .timer = CHAT_MESSAGE_DURATION
-    });
 }
 
 // EVENTS

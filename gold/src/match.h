@@ -74,15 +74,6 @@ struct map_size_t {
 };
 extern const std::unordered_map<MapSize, map_size_t> MAP_SIZE_DATA;
 
-// Chat
-
-struct chat_message_t {
-    std::string message;
-    uint32_t timer;
-};
-
-const size_t MATCH_CHAT_MESSAGE_MAX_LENGTH = 64;
-
 // Particles
 
 struct particle_t {
@@ -310,7 +301,8 @@ enum MatchEventType {
     MATCH_EVENT_ALERT,
     MATCH_EVENT_SELECTION_HANDOFF,
     MATCH_EVENT_RESEARCH_COMPLETE,
-    MATCH_EVENT_STATUS
+    MATCH_EVENT_STATUS,
+    MATCH_EVENT_CHAT
 };
 
 struct match_event_sound_t {
@@ -343,6 +335,12 @@ struct match_event_selection_handoff_t {
     entity_id to_deselect;
     entity_id to_select;
 };
+const size_t MATCH_CHAT_MESSAGE_MAX_LENGTH = 64;
+
+struct match_event_chat_t {
+    uint8_t player_id;
+    char message[MATCH_CHAT_MESSAGE_MAX_LENGTH + 1];
+};
 
 struct match_event_status_t {
     uint8_t player_id;
@@ -357,6 +355,7 @@ struct match_event_t {
         match_event_selection_handoff_t selection_handoff;
         match_event_research_complete_t research_complete;
         match_event_status_t status;
+        match_event_chat_t chat;
     };
 };
 
@@ -442,7 +441,7 @@ struct input_explode_t {
 
 struct input_chat_t {
     uint8_t message_length;
-    char message[MATCH_CHAT_MESSAGE_MAX_LENGTH];
+    char message[MATCH_CHAT_MESSAGE_MAX_LENGTH + 1];
 };
 
 struct input_t {
@@ -488,8 +487,6 @@ struct match_state_t {
     uint32_t player_upgrades[MAX_PLAYERS];
     uint32_t player_upgrades_in_progress[MAX_PLAYERS];
 
-    std::vector<chat_message_t> chat;
-
     std::vector<match_event_t> events;
 };
 
@@ -512,7 +509,6 @@ bool match_player_upgrade_is_available(const match_state_t& state, uint8_t playe
 void match_grant_player_upgrade(match_state_t& state, uint8_t player_id, uint32_t upgrade);
 entity_id match_get_nearest_builder(const match_state_t& state, const std::vector<entity_id>& builders, xy cell);
 uint32_t match_get_miners_on_gold_mine(const match_state_t& state, uint8_t player_id, entity_id gold_mine_id);
-void match_add_chat_message(match_state_t& state, std::string message);
 
 // Event
 

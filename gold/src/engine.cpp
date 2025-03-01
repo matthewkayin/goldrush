@@ -57,6 +57,30 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
         .color = COLOR_GOLD,
         .ignore_y_bearing = true
     }},
+    { FONT_HACK_RECOLOR0, (font_params_t) {
+        .path = "font/hack.ttf",
+        .size = 10,
+        .color = (SDL_Color) { .r = 64, .g = 74, .b = 94, .a = 255 },
+        .ignore_y_bearing = true
+    }},
+    { FONT_HACK_RECOLOR1, (font_params_t) {
+        .path = "font/hack.ttf",
+        .size = 10,
+        .color = PLAYER_COLORS[1].clothes_color,
+        .ignore_y_bearing = true
+    }},
+    { FONT_HACK_RECOLOR2, (font_params_t) {
+        .path = "font/hack.ttf",
+        .size = 10,
+        .color = PLAYER_COLORS[2].clothes_color,
+        .ignore_y_bearing = true
+    }},
+    { FONT_HACK_RECOLOR3, (font_params_t) {
+        .path = "font/hack.ttf",
+        .size = 10,
+        .color = PLAYER_COLORS[3].clothes_color,
+        .ignore_y_bearing = true
+    }},
     { FONT_WESTERN8_OFFBLACK, (font_params_t) {
         .path = "font/western.ttf",
         .size = 8,

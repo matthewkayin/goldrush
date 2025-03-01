@@ -9,6 +9,7 @@ static const uint32_t TURN_DURATION = 4;
 static const uint32_t TURN_OFFSET = 3;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
 static const uint32_t UI_STATUS_DURATION = 60;
+static const uint32_t CHAT_MESSAGE_DURATION = 180;
 
 static const int CAMERA_DRAG_MARGIN = 4;
 
@@ -729,7 +730,11 @@ void ui_handle_network_event(ui_state_t& state, const network_event_t& network_e
             break;
         }
         case NETWORK_EVENT_PLAYER_DISCONNECTED: {
-            match_add_chat_message(state.match_state, std::string(network_get_player(network_event.player_disconnected.player_id).name) + " disconnected.");
+            chat_message_t message;
+            message.player_id = PLAYER_NONE;
+            message.timer = CHAT_MESSAGE_DURATION;
+            sprintf(message.message, "%s left the game.", network_get_player(network_event.player_disconnected.player_id).name);
+            state.chat.push_back(message);
 
             // Determine if we should exit the match
             uint32_t player_count = 0;
@@ -940,6 +945,15 @@ void ui_update(ui_state_t& state) {
                 ui_show_status(state, message);
                 break;
             }
+            case MATCH_EVENT_CHAT: {
+                chat_message_t message;
+                message.player_id = event.chat.player_id;
+                message.timer = CHAT_MESSAGE_DURATION;
+                strcpy(message.message, event.chat.message);
+                state.chat.push_back(message);
+
+                break;
+            }
         }
     }
 
@@ -1014,6 +1028,16 @@ void ui_update(ui_state_t& state) {
             }
         }
     }
+
+    // Update chat
+    for (uint32_t chat_index = 0; chat_index < state.chat.size(); chat_index++) {
+        state.chat[chat_index].timer--;
+        if (state.chat[chat_index].timer == 0) {
+            state.chat.erase(state.chat.begin() + chat_index);
+            chat_index--;
+        }
+    }
+
 
     // Update cursor
     engine_set_cursor(ui_is_targeting(state) ? CURSOR_TARGET : CURSOR_DEFAULT);
@@ -2388,8 +2412,17 @@ void ui_render(const ui_state_t& state) {
     }
 
     // UI Chat
-    for (uint32_t chat_index = 0; chat_index < state.match_state.chat.size(); chat_index++) {
-        render_text(FONT_HACK_WHITE, state.match_state.chat[state.match_state.chat.size() - chat_index - 1].message.c_str(), xy(16, UI_MINIMAP_RECT.y - 48 - (chat_index * 16)));
+    for (uint32_t chat_index = 0; chat_index < state.chat.size(); chat_index++) {
+        const chat_message_t& message = state.chat[state.chat.size() - chat_index - 1];
+        int x_offset = 0;
+        if (message.player_id != PLAYER_NONE) {
+            const player_t& player = network_get_player(message.player_id);
+            char prefix_text[40];
+            sprintf(prefix_text, "%s: ", player.name);
+            render_text((Font)(FONT_HACK_RECOLOR0 + player.recolor_id), prefix_text, xy(16, UI_MINIMAP_RECT.y - 48 - (chat_index * 16)));
+            x_offset = render_get_text_size(FONT_HACK_WHITE, prefix_text).x;
+        }
+        render_text(FONT_HACK_WHITE, message.message, xy(16 + x_offset, UI_MINIMAP_RECT.y - 48 - (chat_index * 16)));
     }
     // UI Chat message
     if (SDL_IsTextInputActive()) {
