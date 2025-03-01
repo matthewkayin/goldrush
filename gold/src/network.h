@@ -47,6 +47,12 @@ struct lobby_t {
     uint8_t player_count;
 };
 
+enum NetworkError {
+    NETWORK_ERROR_NONE,
+    NETWORK_ERROR_NOT_READY,
+    NETWORK_ERROR_SAME_COLOR
+};
+
 enum NetworkEventType {
     NETWORK_EVENT_CONNECTION_FAILED,
     NETWORK_EVENT_PLAYER_DISCONNECTED,
@@ -103,6 +109,7 @@ NetworkStatus network_get_status();
 const player_t& network_get_player(uint8_t player_id);
 uint8_t network_get_player_id();
 bool network_are_all_players_ready();
+NetworkError network_get_error();
 const size_t network_get_lobby_count();
 const lobby_t& network_get_lobby(size_t index);
 const char* network_get_lobby_name();

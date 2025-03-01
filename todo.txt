@@ -40,10 +40,18 @@ todos
     - [ ] - Tinker
     - [ ] - War Wagon?
  - [ ] - game icon
+ - [ ] - shift click movement UI
 
-- [ ] - make sure mining rate isn't too fast...
-- [ ] - gold mine collapse sound effect
-- [ ] - map size match setting
+- [ ] - gold mines
+    - [ ] - make sure mining rate isn't too fast...
+    - [ ] - gold mine collapse sound effect
+    - [ ] - feedback to just start with players already having a town hall, so in that case just one miner to start and maybe five gold cap?
+- [ ] - chat
+    - [ ] - colored chat
+    - [ ] - team chat
+    - [ ] - move chat into UI
+
+- [x] - map size match setting
 - [ ] - team games
 - [ ] - replays
 

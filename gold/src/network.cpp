@@ -288,6 +288,27 @@ bool network_are_all_players_ready() {
     return true;
 }
 
+NetworkError network_get_error() {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status == PLAYER_STATUS_NONE) {
+            continue;
+        }
+        if (state.players[player_id].status == PLAYER_STATUS_NOT_READY) {
+            return NETWORK_ERROR_NOT_READY;
+        }
+        for (uint8_t other_id = 0; other_id < MAX_PLAYERS; other_id++) {
+            if (player_id == other_id || state.players[other_id].status == PLAYER_STATUS_NONE) {
+                continue;
+            }
+            if (state.players[player_id].recolor_id == state.players[other_id].recolor_id) {
+                return NETWORK_ERROR_SAME_COLOR;
+            }
+        }
+    }
+
+    return NETWORK_ERROR_NONE;
+}
+
 void network_toggle_ready() {
     state.players[state.player_id].status = state.players[state.player_id].status == PLAYER_STATUS_NOT_READY ? PLAYER_STATUS_READY : PLAYER_STATUS_NOT_READY;
     uint8_t message = state.players[state.player_id].status == PLAYER_STATUS_READY ? MESSAGE_READY : MESSAGE_NOT_READY;

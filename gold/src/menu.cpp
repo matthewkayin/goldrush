@@ -278,29 +278,21 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
                     break;
                 }
                 case MENU_BUTTON_LOBBY_START: {
-                    if (!network_are_all_players_ready()) {
-                        break;
-                    }
-
-                    bool are_all_players_different_colors = true;
-                    int color_occurances[MAX_PLAYERS];
-                    memset(color_occurances, 0, sizeof(color_occurances));
-                    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                        const player_t& player = network_get_player(player_id);
-                        if (player.status == PLAYER_STATUS_NONE) {
-                            continue;
+                    NetworkError error = network_get_error();
+                    switch (error) {
+                        case NETWORK_ERROR_NOT_READY: {
+                            menu_add_chat_message(state, "Cannot start match: Some players are not ready!");
+                            break;
                         }
-                        color_occurances[player.recolor_id]++;
-                        if (color_occurances[player.recolor_id] > 1) {
-                            are_all_players_different_colors = false;
+                        case NETWORK_ERROR_SAME_COLOR: {
+                            menu_add_chat_message(state, "Cannot start match: Some players have selected the same color!");
+                            break;
+                        }
+                        case NETWORK_ERROR_NONE: {
+                            menu_set_mode(state, MENU_MODE_LOAD_MATCH);
                             break;
                         }
                     }
-                    if (!are_all_players_different_colors) {
-                        break;
-                    }
-
-                    menu_set_mode(state, MENU_MODE_LOAD_MATCH);
                     break;
                 }
                 default:
