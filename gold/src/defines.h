@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #define APP_NAME "GOLD RUSH"
-#define APP_VERSION "0.4.3"
+#define APP_VERSION "0.5"
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 360
 #define MAX_PLAYERS 4
@@ -37,7 +37,7 @@ const uint32_t INDEX_INVALID = 65535;
 #define GOLD_RESOURCE_PATH "../res/"
 // #define GOLD_DEBUG_FAST_TRAIN
 // #define GOLD_DEBUG_FAST_BUILD
-#define GOLD_DEBUG_FOG_DISABLED
+// #define GOLD_DEBUG_FOG_DISABLED
 // #define GOLD_NEAR_SPAWN
 // #define GOLD_DEBUG_UNIT_PATHS
 // #define GOLD_RAND_SEED 1738931249
