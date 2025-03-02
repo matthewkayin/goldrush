@@ -571,7 +571,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 50,
         .train_duration = 0,
-        .max_health = 5,
+        .max_health = 10,
         .sight = 3,
         .armor = 0,
         .attack_priority = 0,
