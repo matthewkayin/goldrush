@@ -571,7 +571,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 50,
         .train_duration = 0,
-        .max_health = 10,
+        .max_health = 5,
         .sight = 3,
         .armor = 0,
         .attack_priority = 0,
@@ -2142,6 +2142,10 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
     int defender_armor = ENTITY_DATA.at(defender.type).armor;
     int damage = std::max(1, attacker_damage - defender_armor);
     int accuracy = 100;
+    if (defender.type == ENTITY_LAND_MINE && defender.mode == MODE_MINE_PRIME) {
+        accuracy = 0;
+        damage = 0;
+    }
 
     if (entity_get_elevation(state, attacker) < entity_get_elevation(state, defender)) {
         accuracy /= 2;
