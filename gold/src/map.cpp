@@ -528,7 +528,7 @@ void map_init(match_state_t& state, const noise_t& noise) {
     map_calculate_unreachable_cells(state);
 
     // Determine player spawns
-    const xy player_spawn_size = xy(4, 2);
+    const xy player_spawn_size = xy(3, 3);
     const int player_spawn_margin = 8;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         state.map_player_spawns[player_id] = xy(-1, -1);
@@ -594,7 +594,16 @@ void map_init(match_state_t& state, const noise_t& noise) {
         state.map_player_spawns[spawn_index] = spawn_point;
     }
 
-    log_trace("Generating gold cells...");
+    log_trace("Generating gold mines...");
+    // Place a gold mine on each player's spawn
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        xy mine_cell = state.map_player_spawns[player_id];
+        entity_create_gold_mine(state, mine_cell, 5000);
+
+        state.map_player_spawns[player_id] = map_get_nearest_cell_around_rect(state, mine_cell, 4, mine_cell - xy(4, 4), 11, false);
+        GOLD_ASSERT(state.map_player_spawns[player_id].x != -1);
+    }
+
     poisson_disk_params_t params = (poisson_disk_params_t) {
         .avoid_values = std::vector<int>(state.map_width * state.map_height, 0),
         .disk_radius = MAP_SIZE_DATA.at((MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE)).gold_disk_radius,
@@ -607,9 +616,6 @@ void map_init(match_state_t& state, const noise_t& noise) {
         if (state.map_cells[index] == CELL_BLOCKED || map_is_tile_ramp(state, xy(index % state.map_width, index / state.map_width))) {
             params.avoid_values[index] = 4;
         }
-    }
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        params.avoid_values[state.map_player_spawns[player_id].x + (state.map_player_spawns[player_id].y * state.map_width)] = 32;
     }
 
     std::vector<xy> gold_sample = poisson_disk(state, params);
@@ -625,6 +631,10 @@ void map_init(match_state_t& state, const noise_t& noise) {
         if (entity.type == ENTITY_GOLD_MINE) {
             params.avoid_values[entity.cell.x + (entity.cell.y * state.map_width)] = 4;
         }
+    }
+    // Add player spawns to the avoid values
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        params.avoid_values[state.map_player_spawns[player_id].x + (state.map_player_spawns[player_id].y * state.map_width)] = 16;
     }
 
     // Generate decorations
