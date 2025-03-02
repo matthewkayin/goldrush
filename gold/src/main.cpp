@@ -220,25 +220,6 @@ int gold_main(int argc, char** argv) {
             char text_buffer[32];
             sprintf(text_buffer, "FPS: %u | UPS: %u", fps, ups);
             render_text(FONT_HACK_WHITE, text_buffer, xy(0, 0));
-
-            switch (network_get_status()) {
-                case NETWORK_STATUS_OFFLINE:
-                    sprintf(text_buffer, "Offline");
-                    break;
-                case NETWORK_STATUS_SERVER:
-                    sprintf(text_buffer, "Server");
-                    break;
-                case NETWORK_STATUS_CONNECTING:
-                    sprintf(text_buffer, "Connecting");
-                    break;
-                case NETWORK_STATUS_CONNECTED:
-                    sprintf(text_buffer, "Connected");
-                    break;
-                case NETWORK_STATUS_DISCONNECTING:
-                    sprintf(text_buffer, "Disconnecting");
-                    break;
-            }
-            render_text(FONT_HACK_WHITE, text_buffer, xy(0, 24));
         }
 
         SDL_RenderPresent(engine.renderer);

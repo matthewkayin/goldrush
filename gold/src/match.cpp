@@ -101,7 +101,6 @@ match_state_t match_init(int32_t lcg_seed, const noise_t& noise) {
         entity_t& hall = state.entities.get_by_id(hall_id);
         hall.health = ENTITY_DATA.at(hall.type).max_health;
         hall.mode = MODE_BUILDING_FINISHED;
-        /*
         target_t gold_mine_target = entity_target_nearest_gold_mine(state, hall);
         GOLD_ASSERT(gold_mine_target.type != TARGET_NONE);
         entity_t& mine = state.entities.get_by_id(gold_mine_target.id);
@@ -109,7 +108,6 @@ match_state_t match_init(int32_t lcg_seed, const noise_t& noise) {
             xy exit_cell = entity_get_exit_cell(state, hall.cell, entity_cell_size(hall.type), entity_cell_size(ENTITY_MINER), mine.cell);
             entity_create(state, ENTITY_MINER, player_id, exit_cell);
         }
-        */
     }
 
     return state;

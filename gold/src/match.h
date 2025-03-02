@@ -531,6 +531,7 @@ bool map_is_cell_rect_equal_to(const match_state_t& state, xy cell, int cell_siz
 void map_set_cell_rect(match_state_t& state, xy cell, int cell_size, entity_id value);
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, int cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
 bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy cell_size, xy origin = xy(-1, -1), bool ignore_miners = false);
+xy map_get_player_spawn_town_hall_cell(const match_state_t& state, xy mine_cell);
 xy map_get_nearest_cell_around_rect(const match_state_t& state, xy start, int start_size, xy rect_position, int rect_size, bool allow_blocked_cells, xy ignore_cell = xy(-1, -1));
 bool map_is_tile_ramp(const match_state_t& state, xy cell);
 bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);

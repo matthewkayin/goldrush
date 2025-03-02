@@ -529,7 +529,7 @@ void map_init(match_state_t& state, const noise_t& noise) {
 
     // Determine player spawns
     const xy player_spawn_size = xy(3, 3);
-    const int player_spawn_margin = 8;
+    const int player_spawn_margin = 16;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         state.map_player_spawns[player_id] = xy(-1, -1);
     }
@@ -564,7 +564,7 @@ void map_init(match_state_t& state, const noise_t& noise) {
             explored[next.x + (next.y * state.map_width)] = 1;
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                 xy child = next + DIRECTION_XY[direction];
-                if (!map_is_cell_in_bounds(state, child)) {
+                if (!map_is_cell_rect_in_bounds(state, child, player_spawn_size.x)) {
                     continue;
                 }
                 if (explored.find(child.x + (child.y * state.map_width)) != explored.end()) {
@@ -595,14 +595,6 @@ void map_init(match_state_t& state, const noise_t& noise) {
     }
 
     log_trace("Generating gold mines...");
-    // Place a gold mine on each player's spawn
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        xy mine_cell = state.map_player_spawns[player_id];
-        entity_create_gold_mine(state, mine_cell, 5000);
-
-        state.map_player_spawns[player_id] = map_get_nearest_cell_around_rect(state, mine_cell, 4, mine_cell - xy(4, 4), 11, false);
-        GOLD_ASSERT(state.map_player_spawns[player_id].x != -1);
-    }
 
     poisson_disk_params_t params = (poisson_disk_params_t) {
         .avoid_values = std::vector<int>(state.map_width * state.map_height, 0),
@@ -610,6 +602,16 @@ void map_init(match_state_t& state, const noise_t& noise) {
         .allow_unreachable_cells = false,
         .margin = xy(5, 5)
     };
+
+    // Place a gold mine on each player's spawn
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        xy mine_cell = state.map_player_spawns[player_id];
+        entity_create_gold_mine(state, mine_cell, 5000);
+        params.avoid_values[mine_cell.x + (mine_cell.y * state.map_width)] = params.disk_radius;
+
+        state.map_player_spawns[player_id] = map_get_player_spawn_town_hall_cell(state, mine_cell);
+        GOLD_ASSERT(state.map_player_spawns[player_id].x != -1);
+    }
 
     // Generate the avoid values
     for (int index = 0; index < state.map_width * state.map_height; index++) {
@@ -828,6 +830,77 @@ bool map_is_cell_rect_occupied(const match_state_t& state, xy cell, xy size, xy 
     }
 
     return false;
+}
+
+xy map_get_player_spawn_town_hall_cell(const match_state_t& state, xy mine_cell) {
+    xy nearest_cell;
+    int nearest_cell_dist = -1;
+    xy rect_position = mine_cell - xy(4, 4);
+    int rect_size = 11;
+    int start_size = entity_cell_size(ENTITY_HALL);
+    xy start = mine_cell;
+
+    xy cell_begin[4] = { 
+        rect_position + xy(-start_size, -(start_size - 1)),
+        rect_position + xy(-(start_size - 1), rect_size),
+        rect_position + xy(rect_size, rect_size - 1),
+        rect_position + xy(rect_size - 1, -start_size)
+    };
+    xy cell_end[4] = { 
+        xy(cell_begin[0].x, rect_position.y + rect_size - 1),
+        xy(rect_position.x + rect_size - 1, cell_begin[1].y),
+        xy(cell_begin[2].x, cell_begin[0].y),
+        xy(cell_begin[0].x + 1, cell_begin[3].y)
+    };
+
+    xy cell_step[4] = { xy(0, 1), xy(1, 0), xy(0, -1), xy(-1, 0) };
+    uint32_t index = 0;
+    xy cell = cell_begin[index];
+    while (index < 4) {
+        // check if cell is valid
+        bool cell_is_valid = map_is_cell_rect_in_bounds(state, cell, start_size);
+        if (cell_is_valid) {
+            cell_is_valid = !map_is_cell_rect_occupied(state, cell, start_size, xy(-1, -1)) && 
+                    map_is_cell_rect_same_elevation(state, cell, xy(start_size, start_size)) && 
+                    map_get_tile(state, cell).elevation == map_get_tile(state, mine_cell).elevation &&
+                    (nearest_cell_dist == -1 || xy::manhattan_distance(start, cell) < nearest_cell_dist);
+        }
+        // after the initial check, check the surrounding cells
+        if (cell_is_valid) {
+            const int STAIR_RADIUS = 2;
+            for (int x = cell.x - STAIR_RADIUS; x < cell.x + start_size + STAIR_RADIUS + 1; x++) {
+                for (int y = cell.y - STAIR_RADIUS; y < cell.y + start_size + STAIR_RADIUS + 1; y++) {
+                    if (map_is_cell_in_bounds(state, xy(x, y))) {
+                        continue;
+                    }
+                    if (map_is_tile_ramp(state, xy(x, y)) || map_get_cell(state, xy(x, y)) != CELL_EMPTY) {
+                        cell_is_valid = false;
+                        break;
+                    }
+                }
+                if (!cell_is_valid) {
+                    break;
+                }
+            }
+        }
+
+        if (cell_is_valid) {
+            nearest_cell = cell;
+            nearest_cell_dist = xy::manhattan_distance(start, cell);
+        }
+
+        if (cell == cell_end[index]) {
+            index++;
+            if (index < 4) {
+                cell = cell_begin[index];
+            }
+        } else {
+            cell += cell_step[index];
+        }
+    }
+
+    // return the cell if we found one, otherwise default back to the non-stair sensitive version of this function
+    return nearest_cell_dist != -1 ? nearest_cell : map_get_nearest_cell_around_rect(state, start, start_size, rect_position, rect_size, false);
 }
 
 // Returns the nearest cell around the rect relative to start_cell
