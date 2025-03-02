@@ -351,6 +351,11 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
             return;
         }
 
+        if (state.hover.type == MENU_HOVER_TEAM_PICKER) {
+            network_set_team(network_get_player(network_get_player_id()).team == 1 ? 2 : 1);
+            sound_play(SOUND_UI_SELECT);
+        }
+
         if (state.hover.type == MENU_HOVER_NONE && SDL_IsTextInputActive()) {
             SDL_StopTextInput();
         }
@@ -549,6 +554,7 @@ void menu_update(menu_state_t& state) {
             player_index++;
         }
         SDL_Rect color_dropdown_rect = menu_get_dropdown_rect(player_index);
+        SDL_Rect team_dropdown_rect = (SDL_Rect) { .x = COL_TEAM_X, .y = color_dropdown_rect.y, .w = engine.sprites[SPRITE_UI_TEAM_PICKER].frame_size.x, .h = engine.sprites[SPRITE_UI_TEAM_PICKER].frame_size.y };
 
         // Check for dropdown hover
         if (state.dropdown_open == -1) {
@@ -557,6 +563,8 @@ void menu_update(menu_state_t& state) {
                     .type = MENU_HOVER_DROPDOWN,
                     .item = MENU_DROPDOWN_COLOR
                 };
+            } else if (network_get_match_setting(MATCH_SETTING_TEAMS) == TEAMS_ENABLED && sdl_rect_has_point(team_dropdown_rect, engine.mouse_position)) {
+                state.hover = (menu_hover_t) { .type = MENU_HOVER_TEAM_PICKER };
             } else if (network_is_server()) {
                 for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
                     SDL_Rect setting_dropdown_rect = menu_get_match_setting_rect(setting);
@@ -852,7 +860,17 @@ void menu_render(const menu_state_t& state) {
 
             render_text(FONT_HACK_GOLD, player.name, xy(COL_NAME_X, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
             render_text(FONT_HACK_GOLD, player_status_text, xy(COL_STATUS_X, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
-            render_text(FONT_HACK_GOLD, "-", xy(COL_TEAM_X, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
+
+            char player_team_text[4];
+            if (network_get_match_setting(MATCH_SETTING_TEAMS) == TEAMS_ENABLED) {
+                sprintf(player_team_text, "%u", player.team);
+            } else {
+                sprintf(player_team_text, "-");
+            }
+            bool is_hovered = player_id == network_get_player_id() && state.hover.type == MENU_HOVER_TEAM_PICKER;
+            render_sprite(SPRITE_UI_TEAM_PICKER, xy(is_hovered ? 1 : 0, 0), xy(COL_TEAM_X, dropdown_rect.y), RENDER_SPRITE_NO_CULL);
+            render_text(is_hovered ? FONT_HACK_WHITE : FONT_HACK_BLACK, player_team_text, xy(COL_TEAM_X + (player.team == 1 ? 4 : 5), dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
+
             render_sprite(SPRITE_UI_DROPDOWN_MINI, xy(0, dropdown_vframe), xy(dropdown_rect.x, dropdown_rect.y));
             render_text(dropdown_vframe == 1 ? FONT_HACK_WHITE : FONT_HACK_BLACK, PLAYER_COLORS[player.recolor_id].name, xy(dropdown_rect.x + 5, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
 

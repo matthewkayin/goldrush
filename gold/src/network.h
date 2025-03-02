@@ -30,6 +30,7 @@ enum PlayerStatus {
 struct player_t {
     uint8_t status;
     uint8_t recolor_id;
+    uint8_t team;
     char name[NAME_BUFFER_SIZE];
 };
 
@@ -118,6 +119,7 @@ uint32_t network_get_match_setting(MatchSetting setting);
 void network_set_match_setting(MatchSetting setting, uint32_t value);
 
 void network_toggle_ready();
+void network_set_team(uint8_t team);
 void network_set_player_color(uint8_t recolor_id);
 void network_begin_loading_match(int32_t lcg_seed, const noise_t& noise);
 void network_send_input(uint8_t* out_buffer, size_t out_buffer_length);

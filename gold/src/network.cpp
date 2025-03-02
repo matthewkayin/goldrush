@@ -45,6 +45,7 @@ enum MessageType {
     MESSAGE_MATCH_SETTING,
     MESSAGE_LOBBY_CHAT,
     MESSAGE_MATCH_LOAD,
+    MESSAGE_TEAM,
     MESSAGE_INPUT
 };
 
@@ -58,7 +59,9 @@ struct message_welcome_t {
     const uint8_t type = MESSAGE_WELCOME;
     uint8_t player_id;
     uint8_t recolor_id;
+    uint8_t team;
     uint8_t server_recolor_id;
+    uint8_t server_team;
     char server_username[NAME_BUFFER_SIZE];
     char lobby_name[LOBBY_NAME_BUFFER_SIZE];
     uint8_t match_settings[MATCH_SETTING_COUNT];
@@ -92,6 +95,11 @@ struct message_match_setting_t {
 struct message_lobby_chat_t {
     const uint8_t type = MESSAGE_LOBBY_CHAT;
     char message[LOBBY_CHAT_BUFFER_SIZE];
+};
+
+struct message_team_t {
+    const uint8_t type = MESSAGE_TEAM;
+    uint8_t team;
 };
 
 bool network_init() {
@@ -226,6 +234,7 @@ bool network_server_create(const char* username) {
 
     state.player_id = 0;
     state.players[0].status = PLAYER_STATUS_HOST;
+    state.players[0].team = 1;
     strncpy(state.players[0].name, username, MAX_USERNAME_LENGTH + 1);
     sprintf(state.lobby_name, "%s's Game", username);
 
@@ -317,6 +326,15 @@ void network_toggle_ready() {
     enet_host_flush(state.host);
 }
 
+void network_set_team(uint8_t team) {
+    state.players[state.player_id].team = team;
+    message_team_t message;
+    message.team = team;
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message_team_t), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
 void network_set_player_color(uint8_t recolor_id) {
     state.players[state.player_id].recolor_id = recolor_id;
 
@@ -332,6 +350,9 @@ void network_begin_loading_match(int32_t lcg_seed, const noise_t& noise) {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.players[player_id].status != PLAYER_STATUS_NONE) {
             state.players[player_id].status = PLAYER_STATUS_NOT_READY;
+            if (state.match_settings[MATCH_SETTING_TEAMS] == TEAMS_DISABLED) {
+                state.players[player_id].team = player_id;
+            }
         }
     }
 
@@ -546,6 +567,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
                 return;
             } 
 
+            // Determine incoming player id
             uint8_t incoming_player_id;
             for (incoming_player_id = 0; incoming_player_id < MAX_PLAYERS; incoming_player_id++) {
                 if (state.players[incoming_player_id].status == PLAYER_STATUS_NONE) {
@@ -558,6 +580,8 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
                     break;
                 }
             }
+            
+            // Determine incoming recolor id
             uint8_t incoming_player_recolor_id;
             for (incoming_player_recolor_id = 0; incoming_player_recolor_id < MAX_PLAYERS; incoming_player_recolor_id++) {
                 bool is_recolor_id_in_use = false;
@@ -576,6 +600,21 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             }
             state.players[incoming_player_id].recolor_id = incoming_player_recolor_id;
 
+            // Determine incoming team
+            int team1_count = 0;
+            int team2_count = 0;
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (state.players[player_id].status == PLAYER_STATUS_NONE || player_id == incoming_player_id) {
+                    continue;
+                }
+                if (state.players[player_id].team == 1) {
+                    team1_count++;
+                } else {
+                    team2_count++;
+                }
+            }
+            state.players[incoming_player_id].team = team1_count <= team2_count ? 1 : 2;
+
             GOLD_ASSERT(incoming_player_id != MAX_PLAYERS && incoming_player_recolor_id != MAX_PLAYERS);
             log_info("Client has greeted us and is now player %u with recolor %u", incoming_player_id, incoming_player_recolor_id);
 
@@ -583,7 +622,9 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             message_welcome_t welcome;
             welcome.player_id = incoming_player_id;
             welcome.recolor_id = incoming_player_recolor_id;
+            welcome.team = state.players[incoming_player_id].team;
             welcome.server_recolor_id = state.players[0].recolor_id;
+            welcome.server_team = state.players[0].team;
             strncpy(welcome.server_username, state.players[0].name, MAX_USERNAME_LENGTH + 1);
             strncpy(welcome.lobby_name, state.lobby_name, LOBBY_NAME_BUFFER_SIZE);
             for (int setting = 0; setting < MATCH_SETTING_COUNT; setting++) {
@@ -634,6 +675,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             // Setup current player info
             state.player_id = welcome.player_id;
             state.players[state.player_id].recolor_id = welcome.recolor_id;
+            state.players[state.player_id].team = welcome.team;
             strncpy(state.players[state.player_id].name, state.client_username, MAX_USERNAME_LENGTH + 1);
             state.players[state.player_id].status = PLAYER_STATUS_NOT_READY;
 
@@ -641,6 +683,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             state.players[0].status = PLAYER_STATUS_HOST;
             strncpy(state.players[0].name, welcome.server_username, MAX_USERNAME_LENGTH + 1);
             state.players[0].recolor_id = welcome.server_recolor_id;
+            state.players[0].team = welcome.server_team;
             state.peers[0] = &state.host->peers[incoming_peer_id];
             uint8_t* player_id_ptr = (uint8_t*)malloc(sizeof(uint8_t));
             *player_id_ptr = 0;
@@ -709,6 +752,15 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             state.players[*player_id].recolor_id = data[1];
             break;
         }
+        case MESSAGE_TEAM: {
+            if (!(state.status == NETWORK_STATUS_CONNECTED || state.status == NETWORK_STATUS_SERVER)) {
+                return;
+            }
+
+            uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
+            state.players[*player_id].team = data[1];
+            break;
+        }
         case MESSAGE_MATCH_SETTING: {
             state.match_settings[(MatchSetting)data[1]] = (uint32_t)data[2];
             break;
@@ -736,6 +788,9 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (state.players[player_id].status != PLAYER_STATUS_NONE) {
                     state.players[player_id].status = PLAYER_STATUS_NOT_READY;
+                    if (state.match_settings[MATCH_SETTING_TEAMS] == TEAMS_DISABLED) {
+                        state.players[player_id].team = player_id;
+                    }
                 }
             }
 

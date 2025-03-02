@@ -48,7 +48,7 @@ static const std::unordered_map<uint32_t, font_params_t> font_params = {
     { FONT_HACK_BLACK, (font_params_t) {
         .path = "font/hack.ttf",
         .size = 10,
-        .color = COLOR_BLACK,
+        .color = COLOR_OFFBLACK,
         .ignore_y_bearing = true
     }},
     { FONT_HACK_GOLD, (font_params_t) {
@@ -302,6 +302,12 @@ static const std::unordered_map<uint32_t, sprite_params_t> SPRITE_PARAMS = {
         .path = "sprite/ui_dropdown_mini.png",
         .hframes = 1,
         .vframes = 5,
+        .strategy = SPRITE_IMPORT_DEFAULT
+    }},
+    { SPRITE_UI_TEAM_PICKER, (sprite_params_t) {
+        .path = "sprite/ui_team_picker.png",
+        .hframes = 2,
+        .vframes = 1,
         .strategy = SPRITE_IMPORT_DEFAULT
     }},
     { SPRITE_SELECT_RING_UNIT_1, (sprite_params_t) {
