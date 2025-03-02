@@ -6,7 +6,7 @@
 #include "lcg.h"
 #include <algorithm>
 
-static const uint32_t PLAYER_STARTING_GOLD = 450;
+static const uint32_t PLAYER_STARTING_GOLD = 4500;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
@@ -790,15 +790,16 @@ void match_update(match_state_t& state) {
 
     if (state.map_is_fog_dirty) {
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status == PLAYER_NONE) {
+            const player_t& player = network_get_player(player_id);
+            if (player.status == PLAYER_NONE) {
                 continue;
             }
             // Remove any remembered entities (but only if this player can see that they should be removed)
-            auto it = state.remembered_entities[player_id].begin();
-            while (it != state.remembered_entities[player_id].end()) {
+            auto it = state.remembered_entities[player.team].begin();
+            while (it != state.remembered_entities[player.team].end()) {
                 if ((state.entities.get_index_of(it->first) == INDEX_INVALID || state.entities.get_by_id(it->first).health == 0) && 
                         (map_is_cell_rect_revealed(state, player_id, it->second.cell, it->second.cell_size) || it->second.sprite_params.recolor_id == network_get_player(player_id).recolor_id)) {
-                    it = state.remembered_entities[player_id].erase(it);
+                    it = state.remembered_entities[player.team].erase(it);
                 } else {
                     it++;
                 }

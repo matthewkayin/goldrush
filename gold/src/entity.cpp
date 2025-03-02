@@ -2,6 +2,7 @@
 
 #include "logger.h"
 #include "lcg.h"
+#include "network.h"
 #include <unordered_map>
 #include <algorithm>
 
@@ -873,7 +874,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         // On step finished
                         // Check to see if we triggered a mine
                         for (entity_t& mine : state.entities) {
-                            if (mine.type != ENTITY_LAND_MINE || mine.health == 0 || mine.mode != MODE_BUILDING_FINISHED || mine.player_id == entity.player_id ||
+                            if (mine.type != ENTITY_LAND_MINE || mine.health == 0 || mine.mode != MODE_BUILDING_FINISHED || network_get_player(mine.player_id).team == network_get_player(entity.player_id).team ||
                                     std::abs(entity.cell.x - mine.cell.x) > 1 || std::abs(entity.cell.y - mine.cell.y) > 1) {
                                 continue;
                             }
@@ -1335,37 +1336,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity_remove_garrisoned_unit(mine, id);
                         entity.garrison_id = ID_NULL;
                         entity.target = camp_target;
-                        // entity.mode = MODE_UNIT_OUT_MINE;
-                        /*
-                        if (camp_index != INDEX_INVALID) {
-                            const entity_t& camp = state.entities[camp_index];
-                            int ydist = 0;
-                            if (mine.cell.y > camp.cell.y + entity_cell_size(camp.type)) {
-                                ydist = mine.cell.y - (camp.cell.y + entity_cell_size(camp.type));
-                            } else if (camp.cell.y > mine.cell.y + entity_cell_size(mine.type)) {
-                                ydist = camp.cell.y - (mine.cell.y + entity_cell_size(mine.type));
-                            }
-                            int xdist = 0;
-                            if (mine.cell.x > camp.cell.x + entity_cell_size(camp.type)) {
-                                xdist = mine.cell.x - (camp.cell.x + entity_cell_size(camp.type));
-                            } else if (camp.cell.x > mine.cell.x + entity_cell_size(mine.type)) {
-                                xdist = camp.cell.x - (mine.cell.x + entity_cell_size(mine.type));
-                            }
-                            if (ydist >= xdist) {
-                                if (camp.cell.y > mine.cell.y) {
-                                    entity.direction = DIRECTION_SOUTH;
-                                } else {
-                                    entity.direction = DIRECTION_NORTH;
-                                }
-                            } else {
-                                if (camp.cell.x > mine.cell.x) {
-                                    entity.direction = DIRECTION_EAST;
-                                } else {
-                                    entity.direction = DIRECTION_NORTH;
-                                }
-                            }
-                        }
-                        */
                         if (entity.target.type == TARGET_NONE) {
                             entity.gold_mine_id = ID_NULL;
                         }
@@ -2033,9 +2003,9 @@ target_t entity_target_nearest_enemy(const match_state_t& state, const entity_t&
         }
 
         SDL_Rect other_rect = (SDL_Rect) { .x = other.cell.x, .y = other.cell.y, .w = entity_cell_size(other.type),. h = entity_cell_size(other.type) };
-        if (other.player_id == entity.player_id || !entity_is_selectable(other) || 
+        if (network_get_player(other.player_id).team == network_get_player(entity.player_id).team || !entity_is_selectable(other) || 
                 !map_is_cell_rect_revealed(state, entity.player_id, other.cell, entity_cell_size(other.type)) || 
-                (entity_check_flag(other, ENTITY_FLAG_INVISIBLE) && state.map_detection[entity.player_id][other.cell.x + (other.cell.y * state.map_width)] == 0) ||
+                (entity_check_flag(other, ENTITY_FLAG_INVISIBLE) && !map_is_cell_detected(state, entity.player_id, other.cell)) ||
                 SDL_HasIntersection(&entity_sight_rect, &other_rect) != SDL_TRUE) {
             continue;
         }
@@ -2070,8 +2040,7 @@ target_t entity_target_nearest_gold_mine(const match_state_t& state, const entit
     for (uint32_t gold_index = 0; gold_index < state.entities.size(); gold_index++) {
         const entity_t& gold = state.entities[gold_index];
 
-        if (gold.type != ENTITY_GOLD_MINE || gold.gold_held == 0 ||
-                (state.map_fog[entity.player_id][gold.cell.x + (gold.cell.y * state.map_width)] == FOG_HIDDEN)) {
+        if (gold.type != ENTITY_GOLD_MINE || gold.gold_held == 0 || map_get_fog(state, entity.player_id, gold.cell) == FOG_HIDDEN) {
             continue;
         }
 
@@ -2302,7 +2271,6 @@ void entity_attack_target(match_state_t& state, entity_id attacker_id, entity_t&
 
     // Reveal cell if on highground
     if (entity_get_elevation(state, attacker) > entity_get_elevation(state, defender) && !entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE)) {
-        log_trace("map reveal");
         map_reveal_t reveal = (map_reveal_t) {
             .player_id = defender.player_id,
             .cell = attacker.cell,
@@ -2338,7 +2306,7 @@ void entity_on_attack(match_state_t& state, entity_id attacker_id, entity_t& def
     if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE && 
             defender.target.type == TARGET_NONE && ENTITY_DATA.at(defender.type).unit_data.damage != 0 && 
             defender.player_id != attacker.player_id && map_is_cell_rect_revealed(state, defender.player_id, attacker.cell, entity_cell_size(attacker.type)) &&
-            !(entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE) && state.map_detection[defender.player_id][attacker.cell.x + (attacker.cell.y * state.map_width)] == 0)) {
+            !(entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE) && !map_is_cell_detected(state, defender.player_id, attacker.cell))) {
         defender.target = (target_t) {
             .type = TARGET_ATTACK_ENTITY,
             .id = attacker_id

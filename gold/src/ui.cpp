@@ -495,7 +495,7 @@ void ui_handle_input(ui_state_t& state, SDL_Event event) {
         // Check if clicked on remembered building
         entity_id remembered_entity_id = ID_NULL;
         if ((move_input.type == INPUT_MOVE_CELL || move_input.type == INPUT_MOVE_ATTACK_CELL) &&
-                state.match_state.map_fog[network_get_player_id()][move_input.move.target_cell.x + (move_input.move.target_cell.y * state.match_state.map_width)] == FOG_EXPLORED) {
+                map_get_fog(state.match_state, network_get_player_id(), move_input.move.target_cell) == FOG_EXPLORED) {
             xy move_target;
             if (ui_is_mouse_in_ui()) {
                 xy minimap_pos = engine.mouse_position - xy(UI_MINIMAP_RECT.x, UI_MINIMAP_RECT.y);
@@ -505,7 +505,7 @@ void ui_handle_input(ui_state_t& state, SDL_Event event) {
                 move_target = ui_get_mouse_world_pos(state);
             }
 
-            for (auto it : state.match_state.remembered_entities[network_get_player_id()]) {
+            for (auto it : state.match_state.remembered_entities[network_get_player(network_get_player_id()).team]) {
                 SDL_Rect remembered_entity_rect = (SDL_Rect) {
                     .x = it.second.cell.x * TILE_SIZE, .y = it.second.cell.y * TILE_SIZE,
                     .w = it.second.cell_size * TILE_SIZE, .h = it.second.cell_size * TILE_SIZE
@@ -519,7 +519,7 @@ void ui_handle_input(ui_state_t& state, SDL_Event event) {
 
         // Provide instant user feedback
         if (remembered_entity_id != ID_NULL) {
-            state.move_animation = animation_create(state.match_state.remembered_entities[network_get_player_id()][remembered_entity_id].sprite_params.recolor_id != RECOLOR_NONE 
+            state.move_animation = animation_create(state.match_state.remembered_entities[network_get_player(network_get_player_id()).team][remembered_entity_id].sprite_params.recolor_id != RECOLOR_NONE 
                                                             ? ANIMATION_UI_MOVE_ATTACK_ENTITY 
                                                             : ANIMATION_UI_MOVE_ENTITY);
             state.move_animation_position = cell_center(move_input.move.target_cell).to_xy();
@@ -849,7 +849,8 @@ void ui_update(ui_state_t& state) {
                 break;
             }
             case MATCH_EVENT_ALERT: {
-                if (event.alert.player_id != network_get_player_id()) {
+                if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && network_get_player(event.alert.player_id).team != network_get_player(network_get_player_id()).team) ||
+                    (event.alert.type != MATCH_ALERT_TYPE_ATTACK && event.alert.player_id != network_get_player_id())) {
                     break;
                 }
 
@@ -911,7 +912,7 @@ void ui_update(ui_state_t& state) {
                 });
 
                 if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
-                    ui_show_status(state, UI_STATUS_UNDER_ATTACK);
+                    ui_show_status(state, event.alert.player_id == network_get_player_id() ? UI_STATUS_UNDER_ATTACK : UI_STATUS_ALLY_UNDER_ATTACK);
                     sound_play(SOUND_ALERT_BELL);
                 }
                 break;
@@ -1115,7 +1116,7 @@ input_t ui_create_move_input(const ui_state_t& state) {
     input.move.shift_command = engine.keystate[SDL_SCANCODE_LSHIFT] || engine.keystate[SDL_SCANCODE_RSHIFT];
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
-    int fog_value = state.match_state.map_fog[network_get_player_id()][input.move.target_cell.x + (input.move.target_cell.y * state.match_state.map_width)];
+    int fog_value = map_get_fog(state.match_state, network_get_player_id(), input.move.target_cell);
     // don't target enemies in hidden fog or when minimap clicking
     if (fog_value != FOG_HIDDEN && !ui_is_mouse_in_ui()) {
         for (uint32_t entity_index = 0; entity_index < state.match_state.entities.size(); entity_index++) {
@@ -1124,7 +1125,7 @@ input_t ui_create_move_input(const ui_state_t& state) {
             // It's also saying, don't target a hidden mine
             if (!entity_is_selectable(entity) || 
                     (fog_value == FOG_EXPLORED && entity.type != ENTITY_GOLD_MINE) ||
-                    (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && entity.player_id != network_get_player_id() && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0)) {
+                    (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && network_get_player(entity.player_id).team != network_get_player(network_get_player_id()).team && !map_is_cell_detected(state.match_state, network_get_player_id(), entity.cell))) {
                 continue;
             }
 
@@ -1144,7 +1145,7 @@ input_t ui_create_move_input(const ui_state_t& state) {
         input.type = INPUT_MOVE_SMOKE;
     } else if (input.move.target_id != ID_NULL && state.match_state.entities.get_by_id(input.move.target_id).type != ENTITY_GOLD_MINE &&
                (state.mode == UI_MODE_TARGET_ATTACK || 
-                state.match_state.entities.get_by_id(input.move.target_id).player_id != network_get_player_id())) {
+                network_get_player(state.match_state.entities.get_by_id(input.move.target_id).player_id).team != network_get_player(network_get_player_id()).team)) {
         input.type = INPUT_MOVE_ATTACK_ENTITY;
     } else if (input.move.target_id == ID_NULL && state.mode == UI_MODE_TARGET_ATTACK) {
         input.type = INPUT_MOVE_ATTACK_CELL;
@@ -1229,10 +1230,10 @@ std::vector<entity_id> ui_create_selection_from_rect(const ui_state_t& state) {
     for (uint32_t index = 0; index < state.match_state.entities.size(); index++) {
         const entity_t& entity = state.match_state.entities[index];
         if (entity.player_id == network_get_player_id() || 
-            !entity_is_unit(entity.type) || 
-            !entity_is_selectable(entity) || 
-            !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) ||
-            (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0)) {
+                !entity_is_unit(entity.type) || 
+                !entity_is_selectable(entity) || 
+                !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) ||
+                (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && !map_is_cell_detected(state.match_state, network_get_player_id(), entity.cell))) {
             continue;
         }
 
@@ -1247,10 +1248,10 @@ std::vector<entity_id> ui_create_selection_from_rect(const ui_state_t& state) {
     for (uint32_t index = 0; index < state.match_state.entities.size(); index++) {
         const entity_t& entity = state.match_state.entities[index];
         if (entity.player_id == network_get_player_id() || 
-            !entity_is_building(entity.type) || 
-            !entity_is_selectable(entity) || 
-            !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) ||
-            (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0)) {
+                !entity_is_building(entity.type) || 
+                !entity_is_selectable(entity) || 
+                !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) ||
+                (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && !map_is_cell_detected(state.match_state, network_get_player_id(), entity.cell))) {
             continue;
         }
 
@@ -1727,7 +1728,7 @@ bool ui_building_can_be_placed(const ui_state_t& state) {
     for (int x = building_cell.x; x < building_cell.x + building_cell_size; x++) {
         for (int y = building_cell.y; y < building_cell.y + building_cell_size; y++) {
             if ((xy(x, y) != miner_cell && state.match_state.map_cells[x + (y * state.match_state.map_width)] != CELL_EMPTY) || 
-                    state.match_state.map_fog[network_get_player_id()][x + (y * state.match_state.map_width)] == FOG_HIDDEN || 
+                    map_get_fog(state.match_state, network_get_player_id(), xy(x, y)) == FOG_HIDDEN ||
                     map_is_tile_ramp(state.match_state, xy(x, y)) ||
                     state.match_state.map_mine_cells[x + (y * state.match_state.map_width)] != ID_NULL) {
                 return false;
@@ -1976,7 +1977,7 @@ void ui_render(const ui_state_t& state) {
             }
 
             // Select ring
-            render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || entity.player_id == network_get_player_id()), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+            render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || network_get_player(entity.player_id).team == network_get_player(network_get_player_id()).team), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
             // Determine the healthbar rect
             SDL_Rect entity_rect = entity_get_rect(entity);
@@ -1995,8 +1996,8 @@ void ui_render(const ui_state_t& state) {
                 const entity_t& entity = state.match_state.entities[entity_index];
                 render_sprite(entity_get_select_ring(entity, state.move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
             } else {
-                auto remembered_entities_it = state.match_state.remembered_entities[network_get_player_id()].find(state.move_animation_entity_id);
-                if (remembered_entities_it != state.match_state.remembered_entities[network_get_player_id()].end()) {
+                auto remembered_entities_it = state.match_state.remembered_entities[network_get_player(network_get_player_id()).team].find(state.move_animation_entity_id);
+                if (remembered_entities_it != state.match_state.remembered_entities[network_get_player(network_get_player_id()).team].end()) {
                     if (remembered_entities_it->second.sprite_params.sprite == SPRITE_BUILDING_MINE) {
                         render_sprite(SPRITE_SELECT_RING_MINE, xy(0, 0), (remembered_entities_it->second.cell * TILE_SIZE) + (xy(remembered_entities_it->second.cell_size, remembered_entities_it->second.cell_size) * TILE_SIZE / 2) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
@@ -2008,7 +2009,7 @@ void ui_render(const ui_state_t& state) {
         for (const entity_t& entity : state.match_state.entities) {
             if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_LAND_MINE) || 
                     entity_get_elevation(state.match_state, entity) != elevation || 
-                    (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && entity.player_id != network_get_player_id() && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0) ||
+                    (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && network_get_player(entity.player_id).team != network_get_player(network_get_player_id()).team && !map_is_cell_detected(state.match_state, network_get_player_id(), entity.cell)) ||
                     !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type))) {
                 continue;
             }
@@ -2018,7 +2019,7 @@ void ui_render(const ui_state_t& state) {
         }
 
         // Remembered entity corpses
-        for (auto it : state.match_state.remembered_entities[network_get_player_id()]) {
+        for (auto it : state.match_state.remembered_entities[network_get_player(network_get_player_id()).team]) {
             if (it.second.sprite_params.sprite < SPRITE_BUILDING_DESTROYED_2 || it.second.sprite_params.sprite > SPRITE_BUILDING_DESTROYED_MINE ||
                     map_get_tile(state.match_state, it.second.cell).elevation != elevation || map_is_cell_rect_revealed(state.match_state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
                 continue;
@@ -2037,7 +2038,7 @@ void ui_render(const ui_state_t& state) {
             }
 
             // Select ring
-            render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || entity.player_id == network_get_player_id()), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
+            render_sprite(entity_get_select_ring(entity, entity.player_id == PLAYER_NONE || network_get_player(entity.player_id).team == network_get_player(network_get_player_id()).team), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
 
             // Determine the healthbar rect
             SDL_Rect entity_rect = entity_get_rect(entity);
@@ -2058,7 +2059,7 @@ void ui_render(const ui_state_t& state) {
         for (const entity_t& entity : state.match_state.entities) {
             if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_LAND_MINE ||
                     !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) || 
-                    (entity.player_id != network_get_player_id() && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0) ||
+                    (entity.player_id != network_get_player_id() && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && !map_is_cell_detected(state.match_state, network_get_player_id(), entity.cell)) ||
                     entity.garrison_id != ID_NULL || entity_get_elevation(state.match_state, entity) != elevation) {
                 continue;
             }
@@ -2080,7 +2081,7 @@ void ui_render(const ui_state_t& state) {
         }
 
         // Remembered entities
-        for (auto it : state.match_state.remembered_entities[network_get_player_id()]) {
+        for (auto it : state.match_state.remembered_entities[network_get_player(network_get_player_id()).team]) {
             if ((it.second.sprite_params.sprite >= SPRITE_BUILDING_DESTROYED_2 && it.second.sprite_params.sprite <= SPRITE_BUILDING_DESTROYED_MINE) || it.second.sprite_params.sprite == SPRITE_BUILDING_MINE ||
                     map_get_tile(state.match_state, it.second.cell).elevation != elevation || map_is_cell_rect_revealed(state.match_state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
                 continue;
@@ -2116,7 +2117,7 @@ void ui_render(const ui_state_t& state) {
                     .recolor_id = RECOLOR_NONE
                 };
                 xy ui_move_cell = state.move_animation_position / TILE_SIZE;
-                if (state.match_state.map_fog[network_get_player_id()][ui_move_cell.x + (ui_move_cell.y * state.match_state.map_width)] > 0) {
+                if (map_get_fog(state.match_state, network_get_player_id(), ui_move_cell) > 0) {
                     render_sprite(ui_move_params.sprite, ui_move_params.frame, ui_move_params.position, ui_move_params.options);
                 } else {
                     above_fog_render_params.push_back(ui_move_params);
@@ -2129,8 +2130,8 @@ void ui_render(const ui_state_t& state) {
                         render_sprite(entity_get_select_ring(entity, state.move_animation.name == ANIMATION_UI_MOVE_ENTITY), xy(0, 0), entity_get_center_position(entity) - state.camera_offset, RENDER_SPRITE_CENTERED);
                     }
                 } else {
-                    auto remembered_entities_it = state.match_state.remembered_entities[network_get_player_id()].find(state.move_animation_entity_id);
-                    if (remembered_entities_it != state.match_state.remembered_entities[network_get_player_id()].end()) {
+                    auto remembered_entities_it = state.match_state.remembered_entities[network_get_player(network_get_player_id()).team].find(state.move_animation_entity_id);
+                    if (remembered_entities_it != state.match_state.remembered_entities[network_get_player(network_get_player_id()).team].end()) {
                         Sprite select_ring_sprite;
                         if (remembered_entities_it->second.sprite_params.sprite != SPRITE_BUILDING_MINE) {
                             select_ring_sprite = (Sprite)(SPRITE_SELECT_RING_BUILDING_2 + ((remembered_entities_it->second.cell_size - 2) * 2) + 1);
@@ -2149,7 +2150,7 @@ void ui_render(const ui_state_t& state) {
                 if (building.mode == MODE_BUILDING_FINISHED && building.rally_point.x != -1 &&
                         map_get_tile(state.match_state, rally_cell).elevation == elevation) {
                     // Determine whether to render above or below the fog of war
-                    std::vector<render_sprite_params_t>& sprite_params_vector = state.match_state.map_fog[building.player_id][rally_cell.x + (rally_cell.y * state.match_state.map_width)] > 0
+                    std::vector<render_sprite_params_t>& sprite_params_vector = map_get_fog(state.match_state, building.player_id, rally_cell) > 0 
                                                                                     ? ysorted_render_params
                                                                                     : above_fog_render_params;
                     sprite_params_vector.push_back((render_sprite_params_t) {
@@ -2184,7 +2185,7 @@ void ui_render(const ui_state_t& state) {
             bool particle_is_revealed = false;
             for (int y = particle_top_left_cell.y; y < particle_top_left_cell.y + PARTICLE_SMOKE_CELL_SIZE; y++) {
                 for (int x = particle_top_left_cell.x; x < particle_top_left_cell.x + PARTICLE_SMOKE_CELL_SIZE; x++) {
-                    if (map_is_cell_in_bounds(state.match_state, xy(x, y)) && state.match_state.map_fog[network_get_player_id()][x + (y * state.match_state.map_width)] > 0) {
+                    if (map_is_cell_in_bounds(state.match_state, xy(x, y)) && map_get_fog(state.match_state, network_get_player_id(), xy(x, y)) > 0) {
                         particle_is_revealed = true;
                         break;
                     }
@@ -2250,7 +2251,7 @@ void ui_render(const ui_state_t& state) {
         for (int y = 0; y < max_visible_tiles.y; y++) {
             for (int x = 0; x < max_visible_tiles.x; x++) {
                 xy fog_cell = base_coords + xy(x, y);
-                int fog = state.match_state.map_fog[network_get_player_id()][fog_cell.x + (fog_cell.y * state.match_state.map_width)];
+                int fog = map_get_fog(state.match_state, network_get_player_id(), fog_cell);
                 if (fog > 0) {
                     continue;
                 }
@@ -2265,9 +2266,8 @@ void ui_render(const ui_state_t& state) {
                         neighbors += DIRECTION_MASK[direction];
                         continue;
                     }
-                    if (fog_pass == 0 
-                            ? state.match_state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.match_state.map_width)] < 1 
-                            : state.match_state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.match_state.map_width)] == FOG_HIDDEN) {
+                    if ((fog_pass == 0 && map_get_fog(state.match_state, network_get_player_id(), neighbor_cell) < 1) ||
+                        (fog_pass != 0 && map_get_fog(state.match_state, network_get_player_id(), neighbor_cell) == FOG_HIDDEN)) {
                         neighbors += DIRECTION_MASK[direction];
                     }
                 }
@@ -2284,9 +2284,8 @@ void ui_render(const ui_state_t& state) {
                         neighbors += DIRECTION_MASK[direction];
                         continue;
                     }
-                    if (fog_pass == 0 
-                            ? state.match_state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.match_state.map_width)] < 1 
-                            : state.match_state.map_fog[network_get_player_id()][neighbor_cell.x + (neighbor_cell.y * state.match_state.map_width)] == FOG_HIDDEN) {
+                    if ((fog_pass == 0 && map_get_fog(state.match_state, network_get_player_id(), neighbor_cell) < 1) ||
+                        (fog_pass != 0 && map_get_fog(state.match_state, network_get_player_id(), neighbor_cell) == FOG_HIDDEN)) {
                         neighbors += DIRECTION_MASK[direction];
                     }
                 }
@@ -2379,7 +2378,7 @@ void ui_render(const ui_state_t& state) {
                 if (is_placement_out_of_bounds) {
                     is_cell_green = false;
                 }
-                if (state.match_state.map_fog[network_get_player_id()][x + (y * state.match_state.map_width)] == FOG_HIDDEN || map_is_tile_ramp(state.match_state, xy(x, y)) ||
+                if (map_get_fog(state.match_state, network_get_player_id(), xy(x, y)) == FOG_HIDDEN || map_is_tile_ramp(state.match_state, xy(x, y)) ||
                         (xy(x, y) != miner_cell && state.match_state.map_cells[x + (y * state.match_state.map_width)] != CELL_EMPTY) ||
                         state.match_state.map_mine_cells[x + (y * state.match_state.map_width)] != ID_NULL) {
                     is_cell_green = false;
@@ -2726,7 +2725,7 @@ void ui_render(const ui_state_t& state) {
     // Minimap entities
     for (const entity_t& entity : state.match_state.entities) {
         if (!entity_is_selectable(entity) || !map_is_cell_rect_revealed(state.match_state, network_get_player_id(), entity.cell, entity_cell_size(entity.type)) ||
-                (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.match_state.map_detection[network_get_player_id()][entity.cell.x + (entity.cell.y * state.match_state.map_width)] == 0)) {
+                (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && !map_is_cell_detected(state.match_state, network_get_player_id(), entity.cell))) {
             continue;
         }
         SDL_Rect entity_rect = (SDL_Rect) {
@@ -2746,8 +2745,8 @@ void ui_render(const ui_state_t& state) {
     }
 
     // Minimap remembered entities
-    for (auto it : state.match_state.remembered_entities[network_get_player_id()]) {
-        if (map_is_cell_rect_revealed(state.match_state, network_get_player_id(), it.second.cell, it.second.cell_size)) {
+    for (auto it : state.match_state.remembered_entities[network_get_player(network_get_player_id()).team]) {
+        if (map_is_cell_rect_revealed(state.match_state, network_get_player(network_get_player_id()).team, it.second.cell, it.second.cell_size)) {
             continue;
         }
 
@@ -2805,7 +2804,7 @@ void ui_render(const ui_state_t& state) {
     fog_explored_points.reserve(state.match_state.map_width * state.match_state.map_height);
     for (int y = 0; y < state.match_state.map_height; y++) {
         for (int x = 0; x < state.match_state.map_width; x++) {
-            int fog = state.match_state.map_fog[network_get_player_id()][x + (y * state.match_state.map_width)];
+            int fog = map_get_fog(state.match_state, network_get_player_id(), xy(x, y));
             if (fog == FOG_HIDDEN) {
                 fog_hidden_points.push_back((SDL_Point) { .x = x, .y = y });
             } else if (fog == FOG_EXPLORED) {

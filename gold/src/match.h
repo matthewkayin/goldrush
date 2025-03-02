@@ -27,6 +27,7 @@
 #define UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
 #define UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
 #define UI_STATUS_UNDER_ATTACK "You're under attack!"
+#define UI_STATUS_ALLY_UNDER_ATTACK "Your ally is under attack!"
 #define UI_STATUS_MINE_EXIT_BLOCKED "Mine exit is blocked."
 #define UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
 #define UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
@@ -535,6 +536,8 @@ bool map_is_tile_ramp(const match_state_t& state, xy cell);
 bool map_is_cell_rect_same_elevation(const match_state_t& state, xy cell, xy size);
 void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std::vector<xy>* path, bool gold_walk, std::vector<xy>* ignored_cells = NULL);
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size);
+int map_get_fog(const match_state_t& state, uint8_t player_id, xy cell);
+bool map_is_cell_detected(const match_state_t& state, uint8_t player_id, xy cell);
 void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection);
 
 // Entity

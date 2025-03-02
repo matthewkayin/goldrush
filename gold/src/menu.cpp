@@ -352,7 +352,7 @@ void menu_handle_input(menu_state_t& state, SDL_Event event) {
         }
 
         if (state.hover.type == MENU_HOVER_TEAM_PICKER) {
-            network_set_team(network_get_player(network_get_player_id()).team == 1 ? 2 : 1);
+            network_set_team((network_get_player(network_get_player_id()).team + 1) % MAX_PLAYERS);
             sound_play(SOUND_UI_SELECT);
         }
 
@@ -863,13 +863,13 @@ void menu_render(const menu_state_t& state) {
 
             char player_team_text[4];
             if (network_get_match_setting(MATCH_SETTING_TEAMS) == TEAMS_ENABLED) {
-                sprintf(player_team_text, "%u", player.team);
+                sprintf(player_team_text, "%u", player.team + 1);
             } else {
                 sprintf(player_team_text, "-");
             }
             bool is_hovered = player_id == network_get_player_id() && state.hover.type == MENU_HOVER_TEAM_PICKER;
             render_sprite(SPRITE_UI_TEAM_PICKER, xy(is_hovered ? 1 : 0, 0), xy(COL_TEAM_X, dropdown_rect.y), RENDER_SPRITE_NO_CULL);
-            render_text(is_hovered ? FONT_HACK_WHITE : FONT_HACK_BLACK, player_team_text, xy(COL_TEAM_X + (player.team == 1 ? 4 : 5), dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
+            render_text(is_hovered ? FONT_HACK_WHITE : FONT_HACK_BLACK, player_team_text, xy(COL_TEAM_X + (player.team == 0 ? 4 : 5), dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));
 
             render_sprite(SPRITE_UI_DROPDOWN_MINI, xy(0, dropdown_vframe), xy(dropdown_rect.x, dropdown_rect.y));
             render_text(dropdown_vframe == 1 ? FONT_HACK_WHITE : FONT_HACK_BLACK, PLAYER_COLORS[player.recolor_id].name, xy(dropdown_rect.x + 5, dropdown_rect.y + MINI_DROPDOWN_TEXT_Y_OFFSET));

@@ -234,7 +234,7 @@ bool network_server_create(const char* username) {
 
     state.player_id = 0;
     state.players[0].status = PLAYER_STATUS_HOST;
-    state.players[0].team = 1;
+    state.players[0].team = 0;
     strncpy(state.players[0].name, username, MAX_USERNAME_LENGTH + 1);
     sprintf(state.lobby_name, "%s's Game", username);
 
@@ -607,13 +607,13 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
                 if (state.players[player_id].status == PLAYER_STATUS_NONE || player_id == incoming_player_id) {
                     continue;
                 }
-                if (state.players[player_id].team == 1) {
+                if (state.players[player_id].team == 0) {
                     team1_count++;
                 } else {
                     team2_count++;
                 }
             }
-            state.players[incoming_player_id].team = team1_count <= team2_count ? 1 : 2;
+            state.players[incoming_player_id].team = team1_count <= team2_count ? 0 : 1;
 
             GOLD_ASSERT(incoming_player_id != MAX_PLAYERS && incoming_player_recolor_id != MAX_PLAYERS);
             log_info("Client has greeted us and is now player %u with recolor %u", incoming_player_id, incoming_player_recolor_id);

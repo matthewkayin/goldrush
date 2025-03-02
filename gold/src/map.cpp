@@ -1146,9 +1146,10 @@ void map_pathfind(const match_state_t& state, xy from, xy to, int cell_size, std
 }
 
 bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy cell, int cell_size) {
+    uint8_t team = network_get_player(player_id).team;
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            if (state.map_fog[player_id][x + (y * state.map_width)] > 0) {
+            if (state.map_fog[team][x + (y * state.map_width)] > 0) {
                 return true;
             }
         }
@@ -1157,11 +1158,21 @@ bool map_is_cell_rect_revealed(const match_state_t& state, uint8_t player_id, xy
     return false;
 }
 
+int map_get_fog(const match_state_t& state, uint8_t player_id, xy cell) {
+    return state.map_fog[network_get_player(player_id).team][cell.x + (cell.y * state.map_width)];
+}
+
+bool map_is_cell_detected(const match_state_t& state, uint8_t player_id, xy cell) {
+    return state.map_detection[network_get_player(player_id).team][cell.x + (cell.y * state.map_width)] > 0;
+}
+
 void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_size, int sight, bool increment, bool has_detection) { 
     /*
     * This function does a raytrace from the cell center outwards to determine what this unit can see
     * Raytracing is done using Bresenham's Line Generation Algorithm (https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/)
     */
+
+    uint8_t player_team = network_get_player(player_id).team;
 
     xy search_corners[4] = {
         cell - xy(sight, sight),
@@ -1229,18 +1240,18 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
                 }
 
                 if (increment) {
-                    if (state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)] == FOG_HIDDEN) {
-                        state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)] = 1;
+                    if (state.map_fog[player_team][line_cell.x + (line_cell.y * state.map_width)] == FOG_HIDDEN) {
+                        state.map_fog[player_team][line_cell.x + (line_cell.y * state.map_width)] = 1;
                     } else {
-                        state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]++;
+                        state.map_fog[player_team][line_cell.x + (line_cell.y * state.map_width)]++;
                     }
                     if (has_detection) {
-                        state.map_detection[player_id][line_cell.x + (line_cell.y * state.map_width)]++;
+                        state.map_detection[player_team][line_cell.x + (line_cell.y * state.map_width)]++;
                     }
                 } else {
-                    state.map_fog[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
+                    state.map_fog[player_team][line_cell.x + (line_cell.y * state.map_width)]--;
                     if (has_detection) {
-                        state.map_detection[player_id][line_cell.x + (line_cell.y * state.map_width)]--;
+                        state.map_detection[player_team][line_cell.x + (line_cell.y * state.map_width)]--;
                     }
 
                     // Remember revealed entities
@@ -1253,7 +1264,7 @@ void map_fog_update(match_state_t& state, uint8_t player_id, xy cell, int cell_s
                     if (cell_value < CELL_EMPTY) {
                         entity_t& entity = state.entities.get_by_id(cell_value);
                         if (!entity_is_unit(entity.type) && entity_is_selectable(entity) && entity.type != ENTITY_LAND_MINE) {
-                            state.remembered_entities[player_id][cell_value] = (remembered_entity_t) {
+                            state.remembered_entities[player_team][cell_value] = (remembered_entity_t) {
                                 .sprite_params = (render_sprite_params_t) {
                                     .sprite = entity_get_sprite(entity),
                                     .frame = entity_get_animation_frame(entity),
