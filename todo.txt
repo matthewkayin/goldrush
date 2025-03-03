@@ -55,3 +55,4 @@ todos
 - [x] - team games
 - [ ] - replays
 - [x] - cowboys can disarm mines before they go off
+- [ ] - map gen is still fucked

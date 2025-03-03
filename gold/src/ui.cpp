@@ -188,7 +188,27 @@ ui_state_t ui_init(int32_t lcg_seed, const noise_t& noise) {
 
     // INIT MATCH STATE HERE
     state.match_state = match_init(lcg_seed, noise);
-    ui_center_camera_on_cell(state, state.match_state.map_player_spawns[network_get_player_id()]);
+
+    // Determine initial camera placement
+    for (const entity_t& entity : state.match_state.entities) {
+        if (entity.type == ENTITY_HALL && entity.player_id == network_get_player_id()) {
+            target_t mine_target = entity_target_nearest_gold_mine(state.match_state, entity);
+            GOLD_ASSERT(mine_target.type != TARGET_NONE);
+            xy mine_cell = state.match_state.entities.get_by_id(mine_target.id).cell;
+            xy cell;
+            if (entity.cell.y + entity_cell_size(entity.type) < mine_cell.y) {
+                cell = xy(entity.cell.x + 1, entity.cell.y + 8);
+            } else if (mine_cell.y + entity_cell_size(ENTITY_GOLD_MINE) < entity.cell.y) {
+                cell = xy(mine_cell.x + 1, mine_cell.y + 8);
+            } else if (entity.cell.x + entity_cell_size(entity.type) < mine_cell.x) {
+                cell = xy(entity.cell.x + 6, entity.cell.y + 1);
+            } else {
+                cell = xy(mine_cell.x + 6, mine_cell.y + 1);
+            }
+            ui_center_camera_on_cell(state, cell);
+        }
+    }
+
     state.is_minimap_dragging = false;
 
     state.select_rect_origin = xy(-1, -1);
@@ -2836,6 +2856,7 @@ void ui_render(const ui_state_t& state) {
     // Minimap render texture
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, NULL, &UI_MINIMAP_RECT);
 
+    /*
     if (!ui_is_mouse_in_ui() && engine.render_debug_info) {
         xy mouse_cell = (engine.mouse_position + state.camera_offset) / TILE_SIZE;
         entity_id cell_value = map_get_cell(state.match_state, mouse_cell);
@@ -2923,6 +2944,7 @@ void ui_render(const ui_state_t& state) {
             }
         }
     }
+    */
 
     if (state.options_menu_state.mode != OPTION_MENU_CLOSED) {
         options_menu_render(state.options_menu_state);

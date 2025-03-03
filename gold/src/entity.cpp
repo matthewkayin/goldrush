@@ -37,7 +37,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
         .cell_size = 1,
 
         .gold_cost = 50,
-        .train_duration = 25,
+        .train_duration = 20,
         .max_health = 30,
         .sight = 7,
         .armor = 0,

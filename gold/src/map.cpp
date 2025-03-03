@@ -9,7 +9,7 @@
 const std::unordered_map<MapSize, map_size_t> MAP_SIZE_DATA = {
     { MAP_SIZE_SMALL, (map_size_t) {
         .tile_size = 96,
-        .gold_disk_radius = 36
+        .gold_disk_radius = 42
     }},
     { MAP_SIZE_MEDIUM, (map_size_t) {
         .tile_size = 128,
@@ -528,8 +528,8 @@ void map_init(match_state_t& state, const noise_t& noise) {
     map_calculate_unreachable_cells(state);
 
     // Determine player spawns
-    const xy player_spawn_size = xy(3, 3);
-    const int player_spawn_margin = 16;
+    const xy player_spawn_size = xy(11, 11);
+    const int player_spawn_margin = 11;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         state.map_player_spawns[player_id] = xy(-1, -1);
     }
@@ -557,8 +557,35 @@ void map_init(match_state_t& state, const noise_t& noise) {
 
             if (map_is_cell_rect_same_elevation(state, next, player_spawn_size) && 
                     !map_is_cell_rect_occupied(state, next, player_spawn_size)) {
-                spawn_point = next;
-                break;
+                xy candidate = next;
+                if (spawn_direction == DIRECTION_NORTHEAST || spawn_direction == DIRECTION_SOUTHEAST) {
+                    candidate.x += 5;
+                } 
+                if (spawn_direction == DIRECTION_SOUTHEAST || spawn_direction == DIRECTION_SOUTHWEST) {
+                    candidate.y += 5;
+                }
+                
+                // last check, check that candidate is not too close to stairs or walls
+                bool is_candidate_valid = true;
+                const int stair_radius = 2;
+                for (int x = candidate.x - stair_radius; x < candidate.x + 3 + stair_radius; x++) {
+                    for (int y = candidate.y - stair_radius; y < candidate.y + 3 + stair_radius; y++) {
+                        if (!map_is_cell_in_bounds(state, xy(x, y))) {
+                            continue;
+                        }
+                        if (map_is_tile_ramp(state, xy(x, y)) || map_get_cell(state, xy(x, y)) != CELL_EMPTY) {
+                            is_candidate_valid = false;
+                            break;
+                        }
+                    }
+                    if (!is_candidate_valid) {
+                        break;
+                    }
+                }
+                if (is_candidate_valid) {
+                    spawn_point = candidate;
+                    break;
+                }
             }
 
             explored[next.x + (next.y * state.map_width)] = 1;
@@ -870,7 +897,7 @@ xy map_get_player_spawn_town_hall_cell(const match_state_t& state, xy mine_cell)
             const int STAIR_RADIUS = 2;
             for (int x = cell.x - STAIR_RADIUS; x < cell.x + start_size + STAIR_RADIUS + 1; x++) {
                 for (int y = cell.y - STAIR_RADIUS; y < cell.y + start_size + STAIR_RADIUS + 1; y++) {
-                    if (map_is_cell_in_bounds(state, xy(x, y))) {
+                    if (!map_is_cell_in_bounds(state, xy(x, y))) {
                         continue;
                     }
                     if (map_is_tile_ramp(state, xy(x, y)) || map_get_cell(state, xy(x, y)) != CELL_EMPTY) {
