@@ -6,6 +6,10 @@ Gold Bar Icons (modified)
 Bonsaiheldin
 https://opengameart.org/content/gold-treasure-icons-16x16
 
+Desert - Top Down Pixel Art Tileset (paid for and used as a strong reference for the walls and stairs)
+sanctumpixel
+https://sanctumpixel.itch.io/desert-top-down-pixel-art-tileset
+
 m3x6 Font
 Daniel Linssen
 https://managore.itch.io/m3x6
@@ -100,3 +104,11 @@ https://freesound.org/people/sandyrb/
 Blacksmith anvil 1 and 2 (modified)
 CKiiDD
 https://freesound.org/people/CKiiDD/
+
+Wood Crash
+benjaminpotter
+https://freesound.org/people/benjaminpotter/sounds/343164/
+
+custom short explosion impact sound
+Artninja, sangnamsa, 7lrs, and newlocknew
+https://freesound.org/people/Artninja/sounds/750822/

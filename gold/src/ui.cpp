@@ -907,6 +907,9 @@ void ui_update(ui_state_t& state) {
                     case MATCH_ALERT_TYPE_RESEARCH:
                         sound_play(SOUND_ALERT_RESEARCH);
                         break;
+                    case MATCH_ALERT_TYPE_MINE_COLLAPSE:
+                        sound_play(SOUND_GOLD_MINE_COLLAPSE);
+                        break;
                     default:
                         break;
                 }
@@ -934,7 +937,7 @@ void ui_update(ui_state_t& state) {
                 if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
                     ui_show_status(state, event.alert.player_id == network_get_player_id() ? UI_STATUS_UNDER_ATTACK : UI_STATUS_ALLY_UNDER_ATTACK);
                     sound_play(SOUND_ALERT_BELL);
-                }
+                } 
                 break;
             }
             case MATCH_EVENT_SELECTION_HANDOFF: {

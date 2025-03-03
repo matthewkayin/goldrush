@@ -33,8 +33,7 @@ todos
     - [ ] - Keybinds for other actions ?
     - [ ] - Test with different resolutions to see how it looks
     - [ ] - Fix the font on the hotkeys screen
- - [ ] - Linux build
- - [ ] - Intel mac build
+ - [ ] - Intel mac build ?
  - [ ] - Better art
     - [ ] - Smoke
     - [ ] - Tinker
@@ -50,9 +49,17 @@ todos
     - [x] - colored chat
     - [ ] - team chat
     - [x] - move chat into UI
+- [ ] - replays
 
 - [x] - map size match setting
 - [x] - team games
-- [ ] - replays
 - [x] - cowboys can disarm mines before they go off
-- [ ] - map gen is still fucked
+- [x] - map gen is still fucked
+- [ ] - gold mine collapse sound
+- [ ] - better unit create sound
+- [ ] - repair / team build should cost gold now
+- [ ] - remove the mining camp from the build screen
+- [ ] - do a stats pass through. i like cowboys at 100 gold, but where does that leave everyone else?
+- [x] - less workers to start, but a scout
+
+Remember to leave some jank in there, lean into what makes this game unique, not what makes this game starcraft

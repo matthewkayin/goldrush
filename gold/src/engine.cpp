@@ -962,6 +962,10 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
         .path = "sfx/alert_unit",
         .variants = 1
     }},
+    { SOUND_GOLD_MINE_COLLAPSE, (sound_params_t) {
+        .path = "sfx/gold_mine_collapse",
+        .variants = 1
+    }},
 };
 
 const std::unordered_map<UiButton, SDL_Keycode> DEFAULT_HOTKEYS = {

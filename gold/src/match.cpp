@@ -104,10 +104,42 @@ match_state_t match_init(int32_t lcg_seed, const noise_t& noise) {
         target_t gold_mine_target = entity_target_nearest_gold_mine(state, hall);
         GOLD_ASSERT(gold_mine_target.type != TARGET_NONE);
         entity_t& mine = state.entities.get_by_id(gold_mine_target.id);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 3; i++) {
             xy exit_cell = entity_get_exit_cell(state, hall.cell, entity_cell_size(hall.type), entity_cell_size(ENTITY_MINER), mine.cell);
             entity_create(state, ENTITY_MINER, player_id, exit_cell);
         }
+
+        xy scout_cell = xy(-1, -1);
+        if (hall.cell.y + entity_cell_size(hall.type) < mine.cell.y || mine.cell.y + entity_cell_size(mine.type) < hall.cell.y) {
+            // if y-aligned, place 
+            for (int x = hall.cell.x - 3; x < hall.cell.x + 4 + 4; x++) {
+                for (int y = hall.cell.y; y < hall.cell.y + 4; y++) {
+                    if (!map_is_cell_rect_in_bounds(state, xy(x, y), 2) || map_is_cell_rect_occupied(state, xy(x, y), 2)) {
+                        continue;
+                    }
+                    scout_cell = xy(x, y);
+                    break;
+                }
+                if (scout_cell.x != -1) {
+                    break;
+                }
+            }
+        } else {
+            for (int x = hall.cell.x; x < hall.cell.x + 4; x++) {
+                for (int y = hall.cell.y - 3; y < hall.cell.y + 4 + 4; y++) {
+                    if (!map_is_cell_rect_in_bounds(state, xy(x, y), 2) || map_is_cell_rect_occupied(state, xy(x, y), 2)) {
+                        continue;
+                    }
+                    scout_cell = xy(x, y);
+                    break;
+                }
+                if (scout_cell.x != -1) {
+                    break;
+                }
+            }
+        }
+        GOLD_ASSERT(scout_cell.x != -1);
+        entity_create(state, ENTITY_WAGON, player_id, scout_cell);
     }
 
     return state;

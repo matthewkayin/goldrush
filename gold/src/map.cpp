@@ -633,7 +633,7 @@ void map_init(match_state_t& state, const noise_t& noise) {
     // Place a gold mine on each player's spawn
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         xy mine_cell = state.map_player_spawns[player_id];
-        entity_create_gold_mine(state, mine_cell, 5000);
+        entity_create_gold_mine(state, mine_cell, 50);
         params.avoid_values[mine_cell.x + (mine_cell.y * state.map_width)] = params.disk_radius;
 
         state.map_player_spawns[player_id] = map_get_player_spawn_town_hall_cell(state, mine_cell);
