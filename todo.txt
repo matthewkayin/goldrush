@@ -55,10 +55,10 @@ todos
 - [x] - team games
 - [x] - cowboys can disarm mines before they go off
 - [x] - map gen is still fucked
-- [ ] - gold mine collapse sound
+- [x] - gold mine collapse sound
 - [ ] - better unit create sound
-- [ ] - repair / team build should cost gold now
-- [ ] - remove the mining camp from the build screen
+- [x] - repair / team build should cost gold now
+- [x] - remove the mining camp from the build screen
 - [ ] - do a stats pass through. i like cowboys at 100 gold, but where does that leave everyone else?
 - [x] - less workers to start, but a scout
 

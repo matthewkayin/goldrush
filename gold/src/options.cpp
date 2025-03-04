@@ -34,14 +34,14 @@ static const std::unordered_map<OptionHotkeyGroup, hotkey_group_t> HOTKEY_GROUPS
     { HOTKEY_GROUP_MINER_BUILD, (hotkey_group_t) {
         .name = "Build:",
         .icon = UI_BUTTON_BUILD,
-        .hotkeys = { UI_BUTTON_BUILD_HALL, UI_BUTTON_BUILD_HOUSE, UI_BUTTON_BUILD_CAMP,
-                     UI_BUTTON_BUILD_SALOON, UI_BUTTON_BUILD_BUNKER, UI_BUTTON_CANCEL }
+        .hotkeys = { UI_BUTTON_BUILD_HALL, UI_BUTTON_BUILD_SALOON, UI_BUTTON_BUILD_HOUSE,
+                     UI_BUTTON_BUILD_BUNKER, UI_BUTTON_BUILD_SMITH, UI_BUTTON_CANCEL }
     }},
     { HOTKEY_GROUP_MINER_BUILD2, (hotkey_group_t) {
         .name = "Advanced Build:",
         .icon = UI_BUTTON_BUILD2,
-        .hotkeys = { UI_BUTTON_BUILD_SMITH, UI_BUTTON_BUILD_COOP, UI_BUTTON_BUILD_BARRACKS,
-                     UI_BUTTON_BUILD_SHERIFFS, UI_BUTTON_NONE, UI_BUTTON_CANCEL }
+        .hotkeys = { UI_BUTTON_BUILD_COOP, UI_BUTTON_BUILD_BARRACKS, UI_BUTTON_BUILD_SHERIFFS,
+                     UI_BUTTON_NONE, UI_BUTTON_NONE, UI_BUTTON_CANCEL }
     }},
     { HOTKEY_GROUP_WAGON, (hotkey_group_t) {
         .name = "Wagon:",
@@ -632,7 +632,7 @@ void option_get_hotkey_str(char* str_ptr, UiButton button, const std::unordered_
             str_ptr += sprintf(str_ptr, "Build Bunker");
             break;
         case UI_BUTTON_BUILD_COOP:
-            str_ptr += sprintf(str_ptr, "Build Coop");
+            str_ptr += sprintf(str_ptr, "Build Chicken Coop");
             break;
         case UI_BUTTON_BUILD_SMITH:
             str_ptr += sprintf(str_ptr, "Build Blacksmith");

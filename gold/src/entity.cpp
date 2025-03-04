@@ -1257,7 +1257,7 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 }
 
                 entity_t& target = state.entities.get_by_id(entity.target.id);
-                if (target.health == ENTITY_DATA.at(target.type).max_health || (target.mode == MODE_BUILDING_FINISHED && state.player_gold[entity.player_id] == 0)) {
+                if (target.health == ENTITY_DATA.at(target.type).max_health || state.player_gold[entity.player_id] == 0) {
                     entity.target = (target_t) {
                         .type = TARGET_NONE
                     };
@@ -1269,12 +1269,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 entity.timer--;
                 if (entity.timer == 0) {
                     target.health++;
-                    if (target.mode == MODE_BUILDING_FINISHED) {
-                        entity.target.repair.health_repaired++;
-                        if (entity.target.repair.health_repaired == UNIT_REPAIR_RATE) {
-                            state.player_gold[entity.player_id]--;
-                            entity.target.repair.health_repaired = 0;
-                        }
+                    target.health_regen_timer++;
+                    if (target.health_regen_timer == UNIT_REPAIR_RATE) {
+                        state.player_gold[entity.player_id]--;
+                        target.health_regen_timer = 0;
                     }
                     if (target.health == ENTITY_DATA.at(target.type).max_health) {
                         if (target.mode == MODE_BUILDING_IN_PROGRESS) {

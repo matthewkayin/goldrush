@@ -1331,18 +1331,17 @@ void ui_update_buttons(ui_state_t& state) {
     }
     if (state.mode == UI_MODE_BUILD) {
         state.buttons[0] = UI_BUTTON_BUILD_HALL;
-        state.buttons[1] = UI_BUTTON_BUILD_HOUSE;
-        state.buttons[2] = UI_BUTTON_BUILD_CAMP;
-        state.buttons[3] = UI_BUTTON_BUILD_SALOON;
-        state.buttons[4] = UI_BUTTON_BUILD_BUNKER;
+        state.buttons[1] = UI_BUTTON_BUILD_SALOON;
+        state.buttons[2] = UI_BUTTON_BUILD_HOUSE;
+        state.buttons[3] = UI_BUTTON_BUILD_BUNKER;
+        state.buttons[4] = UI_BUTTON_BUILD_SMITH;
         state.buttons[5] = UI_BUTTON_CANCEL;
         return;
     }
     if (state.mode == UI_MODE_BUILD2) {
-        state.buttons[0] = UI_BUTTON_BUILD_SMITH;
-        state.buttons[1] = UI_BUTTON_BUILD_COOP;
-        state.buttons[2] = UI_BUTTON_BUILD_BARRACKS;
-        state.buttons[3] = UI_BUTTON_BUILD_SHERIFFS;
+        state.buttons[0] = UI_BUTTON_BUILD_COOP;
+        state.buttons[1] = UI_BUTTON_BUILD_BARRACKS;
+        state.buttons[2] = UI_BUTTON_BUILD_SHERIFFS;
         state.buttons[5] = UI_BUTTON_CANCEL;
         return;
     }
