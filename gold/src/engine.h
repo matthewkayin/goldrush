@@ -78,6 +78,7 @@ enum Option {
     OPTION_VSYNC,
     OPTION_SFX_VOLUME,
     OPTION_MUS_VOLUME,
+    OPTION_UNIT_VOICES,
     OPTION_CAMERA_SPEED,
     OPTION_COUNT
 };
@@ -93,6 +94,12 @@ enum OptionValueVsync {
     VSYNC_DISABLED,
     VSYNC_ENABLED,
     VSYNC_COUNT
+};
+
+enum OptionValueVoices {
+    VOICES_ON,
+    VOICES_OFF,
+    VOICES_COUNT
 };
 
 enum OptionType {

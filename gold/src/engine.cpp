@@ -1648,6 +1648,13 @@ std::unordered_map<Option, option_data_t> OPTION_DATA = {
         .max_value = MIX_MAX_VOLUME,
         .default_value = MIX_MAX_VOLUME
     }},
+    { OPTION_UNIT_VOICES, (option_data_t) {
+        .name = "Unit Voices",
+        .type = OPTION_TYPE_DROPDOWN,
+        .min_value = 0,
+        .max_value = VOICES_COUNT,
+        .default_value = VOICES_ON
+    }},
     { OPTION_CAMERA_SPEED, (option_data_t) {
         .name = "Camera Speed",
         .type = OPTION_TYPE_SLIDER,
@@ -1689,6 +1696,9 @@ void engine_apply_option(Option option, int value) {
         }
         case OPTION_MUS_VOLUME: {
             // TODO set this on init as well
+            break;
+        }
+        case OPTION_UNIT_VOICES: {
             break;
         }
         case OPTION_CAMERA_SPEED: {

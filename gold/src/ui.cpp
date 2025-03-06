@@ -555,7 +555,9 @@ void ui_handle_input(ui_state_t& state, SDL_Event event) {
         }
 
         // Play awk sound
-        sound_play(move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_ATTACK_ENTITY ? SOUND_UNIT_HAW : SOUND_UNIT_OK);
+        if (engine.options[OPTION_UNIT_VOICES] == VOICES_ON) {
+            sound_play(move_input.type == INPUT_MOVE_ATTACK_CELL || move_input.type == INPUT_MOVE_ATTACK_ENTITY ? SOUND_UNIT_HAW : SOUND_UNIT_OK);
+        }
 
         // Reset UI mode if targeting
         if (ui_is_targeting(state)) {
@@ -1321,7 +1323,7 @@ void ui_set_selection(ui_state_t& state, const std::vector<entity_id>& selection
     }
 
     state.mode = UI_MODE_NONE;
-    if (ui_get_selection_type(state, state.selection) == UI_SELECTION_TYPE_UNITS) {
+    if (engine.options[OPTION_UNIT_VOICES] == VOICES_ON && ui_get_selection_type(state, state.selection) == UI_SELECTION_TYPE_UNITS) {
         sound_play(SOUND_UNIT_HEY);
     }
 }

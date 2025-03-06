@@ -532,6 +532,16 @@ const char* option_value_str(Option option, int value) {
                     return "";
             }
         }
+        case OPTION_UNIT_VOICES: {
+            switch ((OptionValueVoices)value) {
+                case VOICES_ON:
+                    return "On";
+                case VOICES_OFF:
+                    return "Off";
+                default:
+                    return "";
+            }
+        }
         default:
             return "";
     }
