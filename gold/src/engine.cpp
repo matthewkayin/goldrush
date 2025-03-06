@@ -959,13 +959,25 @@ static const std::unordered_map<Sound, sound_params_t> SOUND_PARAMS = {
         .variants = 1
     }},
     { SOUND_ALERT_UNIT, (sound_params_t) {
-        .path = "sfx/alert_unit",
+        .path = "sfx/harmonica",
         .variants = 1
     }},
     { SOUND_GOLD_MINE_COLLAPSE, (sound_params_t) {
         .path = "sfx/gold_mine_collapse",
         .variants = 1
     }},
+    { SOUND_UNIT_HEY, (sound_params_t) {
+        .path = "sfx/voice_hey",
+        .variants = 6
+    }},
+    { SOUND_UNIT_OK, (sound_params_t) {
+        .path = "sfx/voice_awk",
+        .variants = 7
+    }},
+    { SOUND_UNIT_HAW, (sound_params_t) {
+        .path = "sfx/voice_haw",
+        .variants = 5
+    }}
 };
 
 const std::unordered_map<UiButton, SDL_Keycode> DEFAULT_HOTKEYS = {
