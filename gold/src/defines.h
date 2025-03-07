@@ -31,12 +31,12 @@ const uint32_t INDEX_INVALID = 65535;
     #define PLATFORM_OSX 1
 #endif
 
-#define GOLD_DEBUG
+// #define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
 #define GOLD_ASSERTS_ENABLED
 #define GOLD_RESOURCE_PATH "../res/"
-#define GOLD_DEBUG_FAST_TRAIN
-#define GOLD_DEBUG_FAST_BUILD
+// #define GOLD_DEBUG_FAST_TRAIN
+// #define GOLD_DEBUG_FAST_BUILD
 // #define GOLD_DEBUG_FOG_DISABLED
 // #define GOLD_NEAR_SPAWN
 // #define GOLD_DEBUG_UNIT_PATHS

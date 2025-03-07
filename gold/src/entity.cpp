@@ -38,7 +38,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 50,
         .train_duration = 20,
-        .max_health = 30,
+        .max_health = 25,
         .sight = 7,
         .armor = 0,
         .attack_priority = 1,
@@ -66,7 +66,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 100,
         .train_duration = 25,
-        .max_health = 50,
+        .max_health = 30,
         .sight = 7,
         .armor = 0,
         .attack_priority = 2,
@@ -94,7 +94,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 75,
         .train_duration = 20,
-        .max_health = 50,
+        .max_health = 40,
         .sight = 7,
         .armor = 0,
         .attack_priority = 2,
@@ -108,7 +108,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
 
-            .damage = 6,
+            .damage = 8,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1
@@ -178,7 +178,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 100,
         .train_duration = 30,
-        .max_health = 100,
+        .max_health = 80,
         .sight = 9,
         .armor = 0,
         .attack_priority = 2,
@@ -234,7 +234,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 150,
         .train_duration = 30,
-        .max_health = 50,
+        .max_health = 30,
         .sight = 7,
         .armor = 0,
         .attack_priority = 2,
@@ -262,9 +262,9 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
 
         .gold_cost = 125,
         .train_duration = 30,
-        .max_health = 60,
+        .max_health = 40,
         .sight = 7,
-        .armor = 1,
+        .armor = 0,
         .attack_priority = 2,
 
         .garrison_capacity = 0,
@@ -332,7 +332,7 @@ const std::unordered_map<EntityType, entity_data_t> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 170),
 
-            .damage = 6,
+            .damage = 5,
             .attack_cooldown = 45,
             .range_squared = 25,
             .min_range_squared = 1

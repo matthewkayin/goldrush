@@ -101,14 +101,6 @@ void animation_init() {
             (animation_frame_t) { .hframe = 23, .duration = 8 },
             (animation_frame_t) { .hframe = 24, .duration = 8 },
             (animation_frame_t) { .hframe = 25, .duration = 16 },
-            /*
-            (animation_frame_t) { .hframe = 24, .duration = 8 },
-            (animation_frame_t) { .hframe = 25, .duration = 8 },
-            (animation_frame_t) { .hframe = 24, .duration = 8 },
-            (animation_frame_t) { .hframe = 25, .duration = 8 },
-            (animation_frame_t) { .hframe = 24, .duration = 8 },
-            (animation_frame_t) { .hframe = 25, .duration = 16 },
-            */
             (animation_frame_t) { .hframe = 24, .duration = 8 },
             (animation_frame_t) { .hframe = 23, .duration = 8 },
             (animation_frame_t) { .hframe = 22, .duration = 8 },
