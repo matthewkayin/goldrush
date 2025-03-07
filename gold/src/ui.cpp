@@ -2272,7 +2272,7 @@ void ui_render(const ui_state_t& state) {
         text_size.x += 16; // To account for the miner icon
         xy text_pos = xy(render_rect.x + (render_rect.w / 2) - (text_size.x / 2), render_rect.y + -6);
         render_text(FONT_HACK_WHITE, counter_text, text_pos);
-        render_sprite(SPRITE_UI_MINER, xy(0, 0), text_pos + xy((text_size.x - 16) + 4, 12), RENDER_SPRITE_NO_CULL, network_get_player_id());
+        render_sprite(SPRITE_UI_MINER, xy(0, 0), text_pos + xy((text_size.x - 16) + 4, 12), RENDER_SPRITE_NO_CULL, network_get_player(network_get_player_id()).recolor_id);
     }
 
     // Fog of War
@@ -2813,7 +2813,7 @@ void ui_render(const ui_state_t& state) {
         SDL_Color color;
         switch (alert.color) {
             case ALERT_COLOR_PLAYER:
-                color = PLAYER_COLORS[network_get_player_id()].clothes_color;
+                color = PLAYER_COLORS[network_get_player(network_get_player_id()).recolor_id].clothes_color;
                 break;
             case ALERT_COLOR_WHITE:
                 color = COLOR_WHITE;
@@ -2865,96 +2865,6 @@ void ui_render(const ui_state_t& state) {
 
     // Minimap render texture
     SDL_RenderCopy(engine.renderer, engine.minimap_texture, NULL, &UI_MINIMAP_RECT);
-
-    /*
-    if (!ui_is_mouse_in_ui() && engine.render_debug_info) {
-        xy mouse_cell = (engine.mouse_position + state.camera_offset) / TILE_SIZE;
-        entity_id cell_value = map_get_cell(state.match_state, mouse_cell);
-        char cell_text[128];
-        switch (cell_value) {
-            case CELL_EMPTY:
-                sprintf(cell_text, "%i,%i: EMPTY", mouse_cell.x, mouse_cell.y);
-                break;
-            case CELL_BLOCKED:
-                sprintf(cell_text, "%i,%i: BLOCKED", mouse_cell.x, mouse_cell.y);
-                break;
-            case CELL_UNREACHABLE:
-                sprintf(cell_text, "%i,%i: UNREACHABLE", mouse_cell.x, mouse_cell.y);
-                break;
-            case CELL_DECORATION_1:
-            case CELL_DECORATION_2:
-            case CELL_DECORATION_3:
-            case CELL_DECORATION_4:
-            case CELL_DECORATION_5:
-                sprintf(cell_text, "%i,%i: DECORATION", mouse_cell.x, mouse_cell.y);
-                break;
-            default:
-                sprintf(cell_text, "%i,%i: %u", mouse_cell.x, mouse_cell.y, cell_value);
-                break;
-        }
-        render_text(FONT_HACK_WHITE, cell_text, xy(0, 12));
-
-        for (uint32_t entity_index = 0; entity_index < state.match_state.entities.size(); entity_index++) {
-            SDL_Rect entity_rect = entity_get_rect(state.match_state.entities[entity_index]);
-            if (sdl_rect_has_point(entity_rect, engine.mouse_position + state.camera_offset)) {
-                if (state.match_state.entities[entity_index].type == ENTITY_GOLD_MINE) {
-                    char debug_text[128];
-                    sprintf(debug_text, "garrison size %zu", state.match_state.entities[entity_index].garrisoned_units.size());
-                    render_text(FONT_HACK_WHITE, debug_text, xy(0, 24));
-                    continue;
-                }
-
-                const entity_t& entity = state.match_state.entities[entity_index];
-                const char* mode_text[] = {
-                    "Idle", "Move", "Blocked", "Finished", "Build", "Repair", "Attack", "Soldier Attack",
-                    "Mine", "Throw", "Death", "Death Fade", "In Progress", "Finish", "Destroyed", "Arm", "Prime", "Gold", "Mined Out"
-                };
-                const char* target_text[] = {
-                    "None", "Cell", "Entity", "Attack Cell", "Attack Entity", "Repair", "Unload",
-                    "Smoke", "Build", "Build Assist", "Gold"
-                };
-                const char* anim_name[] = {
-                    "Ui Move Cell",
-                    "Ui Move Entity",
-                    "Ui Move Attack Entity",
-                    "Unit Idle",
-                    "Unit Move",
-                    "Unit Move Slow",
-                    "Unit Move Cannon",
-                    "Unit Attack",
-                    "Soldier Ranged Attack",
-                    "Cannon Attack",
-                    "Unit Mine",
-                    "Unit Build",
-                    "Unit Death",
-                    "Unit Death Fade",
-                    "Cannon Death",
-                    "Cannon Death Fade",
-                    "Rally Flag",
-                    "Particle Sparks",
-                    "Particle Bunker Cowboy",
-                    "Particle Explosion",
-                    "Particle Cannon Explosion",
-                    "Particle Smoke Start",
-                    "Particle Smoke",
-                    "Particle Smoke End",
-                    "Smith Begin",
-                    "Smith Loop",
-                    "Smith End",
-                    "Mine Prime"
-                };
-                char debug_text[128];
-                sprintf(debug_text, "%u: type %s player %u mode %s flags %u", state.match_state.entities.get_id_of(entity_index), ENTITY_DATA.at(entity.type).name, entity.player_id, mode_text[entity.mode], entity.flags);
-                render_text(FONT_HACK_WHITE, debug_text, xy(0, 24));
-                sprintf(debug_text, "hp %u target %s cell %i,%i", entity.health, target_text[entity.target.type], entity.cell.x, entity.cell.y);
-                render_text(FONT_HACK_WHITE, debug_text, xy(0, 36));
-                sprintf(debug_text, "anim %s frame %i,%i loops %i", anim_name[entity.animation.name], entity.animation.frame.x, entity.animation.frame.y, entity.animation.loops_remaining);
-                render_text(FONT_HACK_WHITE, debug_text, xy(0, 48));
-                break;
-            }
-        }
-    }
-    */
 
     if (state.options_menu_state.mode != OPTION_MENU_CLOSED) {
         options_menu_render(state.options_menu_state);
