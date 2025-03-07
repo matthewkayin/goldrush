@@ -316,22 +316,26 @@ inline bool sdl_rects_are_adjacent(const SDL_Rect& a, const SDL_Rect& b) {
 
 inline xy cell_within_rect_a_nearest_to_rect_b(const SDL_Rect& a, const SDL_Rect& b) {
     xy cell;
-    if (a.y > b.y) {
+    if (b.y + b.h - 1 < a.y) {
         cell.y = a.y;
-    } else if (a.y + a.h <= b.y) {
+    } else if (b.y > a.y + a.h - 1) {
         cell.y = a.y + a.h - 1;
+    } else if (b.y > a.y) {
+        cell.y = b.y;
     } else {
         cell.y = a.y;
     }
 
-    if (a.x > b.x) {
+    if (b.x + b.w - 1 < a.x) {
         cell.x = a.x;
-    } else if (a.x + a.w <= b.x) {
+    } else if (b.x > a.x + a.w - 1) {
         cell.x = a.x + a.w - 1;
-    } else {
+    } else if (b.x > a.x) {
         cell.x = b.x;
+    } else {
+        cell.x = a.x;
     }
-    
+
     return cell;
 }
 

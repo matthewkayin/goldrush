@@ -149,6 +149,7 @@ enum EntityMode {
     MODE_UNIT_REPAIR,
     MODE_UNIT_ATTACK_WINDUP,
     MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP,
+    MODE_UNIT_SOLDIER_CHARGE,
     MODE_UNIT_IN_MINE,
     MODE_UNIT_OUT_MINE,
     MODE_UNIT_TINKER_THROW,
@@ -213,6 +214,7 @@ struct building_queue_item_t {
 const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
 const uint32_t ENTITY_FLAG_DAMAGE_FLICKER = 2;
 const uint32_t ENTITY_FLAG_INVISIBLE = 4;
+const uint32_t ENTITY_FLAG_CHARGED = 8;
 
 struct entity_t {
     EntityType type;

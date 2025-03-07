@@ -92,6 +92,31 @@ void animation_init() {
         },
         .loops = 1
     };
+    ANIMATION_DATA[ANIMATION_SOLDIER_CHARGE] = (animation_data_t) {
+        .vframe = -1,
+        .frames = {
+            (animation_frame_t) { .hframe = 20, .duration = 8 },
+            (animation_frame_t) { .hframe = 21, .duration = 8 },
+            (animation_frame_t) { .hframe = 22, .duration = 8 },
+            (animation_frame_t) { .hframe = 23, .duration = 8 },
+            (animation_frame_t) { .hframe = 24, .duration = 8 },
+            (animation_frame_t) { .hframe = 25, .duration = 16 },
+            /*
+            (animation_frame_t) { .hframe = 24, .duration = 8 },
+            (animation_frame_t) { .hframe = 25, .duration = 8 },
+            (animation_frame_t) { .hframe = 24, .duration = 8 },
+            (animation_frame_t) { .hframe = 25, .duration = 8 },
+            (animation_frame_t) { .hframe = 24, .duration = 8 },
+            (animation_frame_t) { .hframe = 25, .duration = 16 },
+            */
+            (animation_frame_t) { .hframe = 24, .duration = 8 },
+            (animation_frame_t) { .hframe = 23, .duration = 8 },
+            (animation_frame_t) { .hframe = 22, .duration = 8 },
+            (animation_frame_t) { .hframe = 21, .duration = 8 },
+            (animation_frame_t) { .hframe = 20, .duration = 8 }
+        },
+        .loops = 1
+    };
     ANIMATION_DATA[ANIMATION_CANNON_ATTACK] = (animation_data_t) {
         .vframe = -1,
         .frames = {

@@ -649,6 +649,9 @@ entity_id entity_create(match_state_t& state, EntityType type, uint8_t player_id
     if (entity.type == ENTITY_SPY) {
         entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, true);
     }
+    if (entity.type == ENTITY_SOLDIER) {
+        entity_set_flag(entity, ENTITY_FLAG_CHARGED, true);
+    }
 
     entity_id id = state.entities.push_back(entity);
     if (entity.type == ENTITY_LAND_MINE) {
@@ -748,6 +751,10 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                 }
 
                 if (entity.target.type == TARGET_NONE) {
+                    if (entity.type == ENTITY_SOLDIER && !entity_check_flag(entity, ENTITY_FLAG_CHARGED)) {
+                        log_trace("soldier charge from idle.");
+                        entity.mode = MODE_UNIT_SOLDIER_CHARGE;
+                    }
                     update_finished = true;
                     break;
                 }
@@ -1097,6 +1104,13 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                                 }
                             }
 
+                            if (entity.type == ENTITY_SOLDIER && !attack_with_bayonets && !entity_check_flag(entity, ENTITY_FLAG_CHARGED)) {
+                                log_trace("soldier tried to attack but has no charge, using bayonets.");
+                                entity.mode = MODE_UNIT_SOLDIER_CHARGE;
+                                update_finished = true;
+                                break;
+                            }
+
                             // Attack inside bunker
                             if (entity.garrison_id != ID_NULL) {
                                 entity_t& carrier = state.entities.get_by_id(entity.garrison_id);
@@ -1302,14 +1316,28 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
 
                 if (!animation_is_playing(entity.animation)) {
                     entity_attack_target(state, id, state.entities.get_by_id(entity.target.id));
-                    entity.cooldown_timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
                     match_event_play_sound(state, entity_get_attack_sound(entity), entity.position.to_xy());
-                    entity.mode = MODE_UNIT_IDLE;
+                    if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
+                        entity_set_flag(entity, ENTITY_FLAG_CHARGED, false);
+                        entity.mode = MODE_UNIT_SOLDIER_CHARGE;
+                    } else {
+                        entity.cooldown_timer = ENTITY_DATA.at(entity.type).unit_data.attack_cooldown;
+                        entity.mode = MODE_UNIT_IDLE;
+                    }
 
                     // If garrisoned, reasses targets. This is so that units don't get stuck shooting a building when a unit may have become a bigger priority
                     if (entity.garrison_id != ID_NULL) {
                         entity.target = entity_target_nearest_enemy(state, entity);
                     }
+                }
+
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_SOLDIER_CHARGE: {
+                if (!animation_is_playing(entity.animation)) {
+                    entity_set_flag(entity, ENTITY_FLAG_CHARGED, true);
+                    entity.mode = MODE_UNIT_IDLE;
                 }
 
                 update_finished = true;
@@ -1857,6 +1885,8 @@ AnimationName entity_get_expected_animation(const entity_t& entity) {
             return ANIMATION_UNIT_ATTACK;
         case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
             return ANIMATION_SOLDIER_RANGED_ATTACK;
+        case MODE_UNIT_SOLDIER_CHARGE:
+            return ANIMATION_SOLDIER_CHARGE;
         case MODE_UNIT_DEATH:
             return ANIMATION_UNIT_DEATH;
         case MODE_UNIT_DEATH_FADE:
