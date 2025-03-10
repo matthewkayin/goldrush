@@ -1239,7 +1239,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                     // Building tick
                     entity_t& building = state.entities[building_index];
 
-                    int building_hframe = entity_get_animation_frame(building).x;
                     #ifdef GOLD_DEBUG_FAST_BUILD
                         building.health = std::min(building.health + 20, ENTITY_DATA.at(building.type).max_health);
                     #else
@@ -1249,10 +1248,6 @@ void entity_update(match_state_t& state, uint32_t entity_index) {
                         entity_building_finish(state, entity.target.id);
                     } else {
                         entity.timer = UNIT_BUILD_TICK_DURATION;
-                    }
-
-                    if (entity_get_animation_frame(building).x != building_hframe) {
-                        // state.is_fog_dirty = true;
                     }
                 }
 

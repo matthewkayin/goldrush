@@ -97,6 +97,7 @@ struct ui_state_t {
 
     std::vector<std::vector<input_t>> inputs[MAX_PLAYERS];
     std::vector<input_t> input_queue;
+    uint32_t turn_counter;
     uint32_t turn_timer;
     uint32_t disconnect_timer;
     match_state_t match_state;

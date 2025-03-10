@@ -6,7 +6,7 @@
 #include <algorithm>
 
 static const uint32_t TURN_DURATION = 4;
-static const uint32_t TURN_OFFSET = 3;
+static const uint32_t TURN_OFFSET = 2;
 static const uint32_t MATCH_DISCONNECT_GRACE = 10;
 static const uint32_t UI_STATUS_DURATION = 60;
 static const uint32_t CHAT_MESSAGE_DURATION = 180;
@@ -168,6 +168,7 @@ ui_state_t ui_init(int32_t lcg_seed, const noise_t& noise) {
     }
 
     state.turn_timer = 0;
+    state.turn_counter = 0;
     state.disconnect_timer = 0;
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -816,6 +817,8 @@ void ui_update(ui_state_t& state) {
         state.disconnect_timer = 0;
 
         // All inputs received. Begin next turn
+        log_trace("turn %u", state.turn_counter);
+        state.turn_counter++;
         // HANDLE INPUT
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             const player_t& player = network_get_player(player_id);
@@ -823,7 +826,9 @@ void ui_update(ui_state_t& state) {
                 continue;
             }
 
+            log_trace("inputs for player %u", player_id);
             for (const input_t& input : state.inputs[player_id][0]) {
+                match_input_print(input);
                 match_input_handle(state.match_state, player_id, input);
             }
             state.inputs[player_id].erase(state.inputs[player_id].begin());

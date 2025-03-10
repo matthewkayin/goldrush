@@ -6,7 +6,7 @@
 #include "lcg.h"
 #include <algorithm>
 
-static const uint32_t PLAYER_STARTING_GOLD = 50;
+static const uint32_t PLAYER_STARTING_GOLD = 5000;
 
 const uint32_t MATCH_TAKING_DAMAGE_TIMER_DURATION = 30;
 const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
@@ -576,7 +576,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
                     if (builder_index == INDEX_INVALID || !entity_is_selectable(state.entities[builder_index])) {
                         continue;
                     }
-                    entity_set_target(state.entities.get_by_id(builder_id), (target_t) {
+                    entity_set_target(state.entities[builder_index], (target_t) {
                         .type = TARGET_BUILD_ASSIST,
                         .id = lead_builder_id
                     });
@@ -593,6 +593,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             const entity_data_t& building_data = ENTITY_DATA.at(state.entities[building_index].type);
             uint32_t gold_refund = building_data.gold_cost - (((uint32_t)state.entities[building_index].health * building_data.gold_cost) / (uint32_t)building_data.max_health);
             state.player_gold[state.entities[building_index].player_id] += gold_refund;
+            log_trace("player id %u build cancel. gold refund %u player gold %u", player_id, gold_refund, state.player_gold[state.entities[building_index].player_id]);
 
             // Tell the builder to stop building
             for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -664,6 +665,7 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
             }
             
             state.player_gold[player_id] += building_queue_item_cost(building.queue[index]);
+            log_trace("building dequeue player id %u player gold %u", player_id, state.player_gold[player_id]);
             if (building.queue[index].type == BUILDING_QUEUE_ITEM_UPGRADE) {
                 state.player_upgrades_in_progress[building.player_id] &= ~building.queue[index].upgrade;
             }
@@ -737,6 +739,120 @@ void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& 
         default:
             break;
     }
+}
+
+void match_input_print(const input_t& input) {
+    char print_buffer[2048];
+    char* print_ptr = print_buffer;
+
+    switch (input.type) {
+        case INPUT_NONE: {
+            print_ptr += sprintf(print_ptr, "input: NONE");
+            break;
+        }
+        case INPUT_MOVE_CELL:
+        case INPUT_MOVE_ENTITY:
+        case INPUT_MOVE_ATTACK_CELL:
+        case INPUT_MOVE_ATTACK_ENTITY:
+        case INPUT_MOVE_REPAIR:
+        case INPUT_MOVE_SMOKE: {
+            switch (input.type) {
+                case INPUT_MOVE_CELL:
+                    print_ptr += sprintf(print_ptr, "input: MOVE_CELL");
+                    break;
+                case INPUT_MOVE_ENTITY:
+                    print_ptr += sprintf(print_ptr, "input: MOVE_ENTITY");
+                    break;
+                case INPUT_MOVE_ATTACK_CELL:
+                    print_ptr += sprintf(print_ptr, "input: MOVE_ATTACK_CELL");
+                    break;
+                case INPUT_MOVE_ATTACK_ENTITY:
+                    print_ptr += sprintf(print_ptr, "input: MOVE_ATTACK_ENTITY");
+                    break;
+                case INPUT_MOVE_REPAIR:
+                    print_ptr += sprintf(print_ptr, "input: MOVE_REPAIR");
+                    break;
+                case INPUT_MOVE_SMOKE: 
+                    print_ptr += sprintf(print_ptr, "input: MOVE_SMOKE");
+                    break;
+            }
+
+            print_ptr += sprintf(print_ptr, " shift command: %u target cell: %i,%i target id: %u entity count: %u entity ids: ", input.move.shift_command, input.move.target_cell.x, input.move.target_cell.y, input.move.target_id, input.move.entity_count);
+            for (int i = 0; i < SELECTION_LIMIT; i++) {
+                print_ptr += sprintf(print_ptr, "%u ", input.move.entity_ids[i]);
+            }
+            break;
+        }
+        case INPUT_STOP: {
+            print_ptr += sprintf(print_ptr, "input: STOP entity_count: %u entity ids:", input.stop.entity_count);
+            for (int i = 0; i < SELECTION_LIMIT; i++) {
+                print_ptr += sprintf(print_ptr, "%u ", input.move.entity_ids[i]);
+            }
+            break;
+        }
+        case INPUT_DEFEND: {
+            print_ptr += sprintf(print_ptr, "input: DEFEND entity_count: %u entity ids: ", input.stop.entity_count);
+            for (int i = 0; i < SELECTION_LIMIT; i++) {
+                print_ptr += sprintf(print_ptr, "%u ", input.move.entity_ids[i]);
+            }
+            break;
+        }
+        case INPUT_BUILD: {
+            print_ptr += sprintf(print_ptr, "input: BUILD shift command: %u building type: %u target cell: %i,%i entity count: %u entity ids: ", input.build.shift_command, input.build.building_type, input.build.target_cell.x, input.build.target_cell.y, input.build.entity_count);
+            for (int i = 0; i < SELECTION_LIMIT; i++) {
+                print_ptr += sprintf(print_ptr, "%u ", input.build.entity_ids[i]);
+            }
+            break;
+        }
+        case INPUT_BUILD_CANCEL: {
+            print_ptr += sprintf(print_ptr, "input: BUILD_CANCEL building id: %u", input.build_cancel.building_id);
+            break;
+        }
+        case INPUT_BUILDING_ENQUEUE: {
+            print_ptr += sprintf(print_ptr, "input: BUILDING_ENQUEUE building id %u index %u ", input.building_enqueue.building_id, input.building_enqueue.item.type);
+            if (input.building_enqueue.item.type == BUILDING_QUEUE_ITEM_UNIT) {
+                print_ptr += sprintf(print_ptr, "unit_type: %u", input.building_enqueue.item.unit_type);
+            } else {
+                print_ptr += sprintf(print_ptr, "upgrade: %u", input.building_enqueue.item.upgrade);
+            }
+            break;
+        }
+        case INPUT_BUILDING_DEQUEUE: {
+            print_ptr += sprintf(print_ptr, "input: BUILDING_DEQUEUE building_id: %u index: %u", input.building_dequeue.building_id, input.building_dequeue.index);
+            break;
+        }
+        case INPUT_RALLY: {
+            print_ptr += sprintf(print_ptr, "input: RALLY rally_point: %i,%i building_count: %u building_ids: ", input.rally.rally_point.x, input.rally.rally_point.y, input.rally.building_count);
+            for (int i = 0; i < SELECTION_LIMIT; i++) {
+                print_ptr += sprintf(print_ptr, "%u ", input.rally.building_ids[i]);
+            }
+            break;
+        }
+        case INPUT_UNLOAD: {
+            print_ptr += sprintf(print_ptr, "input: UNLOAD entity count: %u entity ids: ", input.unload.entity_count);
+            for (int i = 0; i < SELECTION_LIMIT; i++) {
+                print_ptr += sprintf(print_ptr, "%u ", input.unload.entity_ids[i]);
+            }
+            break;
+        }
+        case INPUT_SINGLE_UNLOAD: {
+            print_ptr += sprintf(print_ptr, "input: SINGLE_UNLOAD unit_id: %u", input.single_unload.unit_id);
+            break;
+        }
+        case INPUT_CHAT: {
+            print_ptr += sprintf(print_ptr, "input: CHAT message length: %u message: %s", input.chat.message_length, input.chat.message);
+            break;
+        }
+        case INPUT_EXPLODE: {
+            print_ptr += sprintf(print_ptr, "input: EXPLODE entity count: %u entity ids: ", input.explode.entity_count);
+            for (int i = 0; i < SELECTION_LIMIT; i++) {
+                print_ptr += sprintf(print_ptr, "%u ", input.explode.entity_ids[i]);
+            }
+            break;
+        }
+    }
+
+    log_trace("%s", print_buffer);
 }
 
 // UPDATE
@@ -819,6 +935,7 @@ void match_update(match_state_t& state) {
                 if (state.entities[entity_index].player_id != PLAYER_NONE && state.entities[entity_index].garrison_id == ID_NULL) {
                     map_fog_update(state, state.entities[entity_index].player_id, state.entities[entity_index].cell, entity_cell_size(state.entities[entity_index].type), ENTITY_DATA.at(state.entities[entity_index].type).sight, false, ENTITY_DATA.at(state.entities[entity_index].type).has_detection);
                 }
+                log_trace("removing entity index %u id %u type %s", entity_index, state.entities.get_id_of(entity_index), ENTITY_DATA.at(state.entities[entity_index].type).name);
                 state.entities.remove_at(entity_index);
             } else {
                 entity_index++;

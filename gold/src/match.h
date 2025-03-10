@@ -500,6 +500,7 @@ match_state_t match_init(int32_t lcg_seed, const noise_t& noise);
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const input_t& input);
 input_t match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_head);
 void match_input_handle(match_state_t& state, uint8_t player_id, const input_t& input);
+void match_input_print(const input_t& input);
 
 // Update
 
