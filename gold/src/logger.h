@@ -1,7 +1,6 @@
 #pragma once
 
 #include "defines.h"
-#include <cstdio>
 
 enum LogLevel {
     LOG_LEVEL_ERROR = 0,
@@ -10,7 +9,7 @@ enum LogLevel {
     LOG_LEVEL_TRACE = 3
 };
 
-FILE* logger_init(const char* logfile_path);
+bool logger_init(const char* logfile_path);
 void logger_quit();
 void logger_output(LogLevel log_level, const char* message, ...);
 

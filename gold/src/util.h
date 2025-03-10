@@ -2,7 +2,6 @@
 
 #include "defines.h"
 #include <cmath>
-#include <SDL2/SDL.h>
 
 // from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
 // sqrt_i64 computes the squrare root of a 64bit integer and returns
@@ -108,91 +107,91 @@ struct fixed {
     }
 };
 
-struct xy {
+struct ivec2 {
     int x;
     int y;
 
-    xy() = default;
-    xy(int x, int y) : x(x), y(y) {}
-    bool operator==(const xy& other) const {
+    ivec2() = default;
+    ivec2(int x, int y) : x(x), y(y) {}
+    bool operator==(const ivec2& other) const {
         return this->x == other.x && this->y == other.y;
     }
-    bool operator!=(const xy& other) const {
+    bool operator!=(const ivec2& other) const {
         return this->x != other.x || this->y != other.y;
     }
-    xy operator-() const {
-        return xy(-x, -y);
+    ivec2 operator-() const {
+        return ivec2(-x, -y);
     }
-    xy operator+(const xy& other) const {
-        return xy(x + other.x, y + other.y);
+    ivec2 operator+(const ivec2& other) const {
+        return ivec2(x + other.x, y + other.y);
     }
-    xy& operator+=(const xy& other) {
+    ivec2& operator+=(const ivec2& other) {
         x += other.x;
         y += other.y;
         return *this;
     }
-    xy operator-(const xy& other) const {
-        return xy(x - other.x, y - other.y);
+    ivec2 operator-(const ivec2& other) const {
+        return ivec2(x - other.x, y - other.y);
     }
-    xy& operator-=(const xy& other) {
+    ivec2& operator-=(const ivec2& other) {
         x -= other.x;
         y -= other.y;
         return *this;
     }
-    xy operator*(int scaler) const {
-        return xy(x * scaler, y * scaler);
+    ivec2 operator*(int scaler) const {
+        return ivec2(x * scaler, y * scaler);
     }
-    xy operator/(int scaler) const {
-        return xy(x / scaler, y / scaler);
+    ivec2 operator/(int scaler) const {
+        return ivec2(x / scaler, y / scaler);
     }
-    static int manhattan_distance(const xy& a, const xy& b) {
+    static int manhattan_distance(const ivec2& a, const ivec2& b) {
         return abs(a.x - b.x) + abs(a.y - b.y);
     }
-    static int euclidean_distance_squared(const xy& a, const xy& b) {
+    static int euclidean_distance_squared(const ivec2& a, const ivec2& b) {
         return (abs(a.x - b.x) * abs(a.x - b.x)) + (abs(a.y - b.y) * abs(a.y - b.y));
     }
 };
 
-struct xy_fixed {
+struct fvec2 {
     fixed x;
     fixed y;
 
-    xy_fixed() = default;
-    xy_fixed(fixed x, fixed y) : x(x), y(y) {}
-    xy_fixed(const xy& other) : x(fixed::from_int(other.x)), y(fixed::from_int(other.y)) {}
-    xy to_xy() const {
-        return xy(x.integer_part(), y.integer_part());
+    fvec2() = default;
+    fvec2(fixed x, fixed y) : x(x), y(y) {}
+    fvec2(const ivec2& other) : x(fixed::from_int(other.x)), y(fixed::from_int(other.y)) {}
+    ivec2 to_ivec2() const {
+        return ivec2(x.integer_part(), y.integer_part());
     }
-    bool operator==(const xy_fixed& other) const {
+    bool operator==(const fvec2& other) const {
         return this->x == other.x && this->y == other.y;
     }
-    bool operator!=(const xy_fixed& other) const {
+    bool operator!=(const fvec2& other) const {
         return this->x != other.x || this->y != other.y;
     }
-    xy_fixed operator-() const {
-        return xy_fixed(-x, -y);
+    fvec2 operator-() const {
+        return fvec2(-x, -y);
     }
-    xy_fixed operator+(const xy_fixed& other) const {
-        return xy_fixed(x + other.x, y + other.y);
+    fvec2 operator+(const fvec2& other) const {
+        return fvec2(x + other.x, y + other.y);
     }
-    xy_fixed& operator+=(const xy_fixed& other) {
+    fvec2& operator+=(const fvec2& other) {
         x += other.x;
         y += other.y;
         return *this;
     }
-    xy_fixed operator-(const xy_fixed& other) const {
-        return xy_fixed(x - other.x, y - other.y);
+    fvec2 operator-(const fvec2& other) const {
+        return fvec2(x - other.x, y - other.y);
     }
-    xy_fixed& operator-=(const xy_fixed& other) {
+    fvec2& operator-=(const fvec2& other) {
         x -= other.x;
         y -= other.y;
         return *this;
     }
-    xy_fixed operator*(const fixed& scaler) const {
-        return xy_fixed(x * scaler, y * scaler);
+    fvec2 operator*(const fixed& scaler) const {
+        return fvec2(x * scaler, y * scaler);
     }
-    xy_fixed operator/(const fixed& scaler) const {
-        return xy_fixed(x / scaler, y / scaler);
+    fvec2 operator/(const fixed& scaler) const {
+        return fvec2(x / scaler, y / scaler);
     }
     fixed length() const {
         int64_t x64 = x.raw_value;
@@ -200,14 +199,10 @@ struct xy_fixed {
         uint64_t length_squared = (x64 * x64) + (y64 * y64);
         return fixed::from_raw((int32_t)sqrt_i64(length_squared));
     }
-    fixed distance_to(const xy_fixed& other) const {
+    fixed distance_to(const fvec2& other) const {
         return (other - *this).length();
     }
 };
-
-inline bool sdl_rect_has_point(SDL_Rect rect, xy point) {
-    return !(point.x < rect.x || point.x >= rect.x + rect.w || point.y < rect.y || point.y >= rect.y + rect.h);
-}
 
 enum Direction {
     DIRECTION_NORTH,
@@ -221,26 +216,26 @@ enum Direction {
     DIRECTION_COUNT
 };
 
-const xy DIRECTION_XY[8] = {
-    xy(0, -1), // North
-    xy(1, -1), // Northeast
-    xy(1, 0), // East
-    xy(1, 1), // Southeast
-    xy(0, 1), // South
-    xy(-1, 1), // Southwest
-    xy(-1, 0), // West
-    xy(-1, -1), // Northwest
+const ivec2 DIRECTION_IVEC2[8] = {
+    ivec2(0, -1), // North
+    ivec2(1, -1), // Northeast
+    ivec2(1, 0), // East
+    ivec2(1, 1), // Southeast
+    ivec2(0, 1), // South
+    ivec2(-1, 1), // Southwest
+    ivec2(-1, 0), // West
+    ivec2(-1, -1), // Northwest
 };
 
-const xy_fixed DIRECTION_XY_FIXED[8] = {
-    xy_fixed(fixed::from_int(0), fixed::from_int(-1)), // North
-    xy_fixed(fixed::from_raw(181), fixed::from_raw(-181)), // Northeast
-    xy_fixed(fixed::from_int(1), fixed::from_int(0)), // East
-    xy_fixed(fixed::from_raw(181), fixed::from_raw(181)), // Southeast
-    xy_fixed(fixed::from_int(0), fixed::from_int(1)), // South
-    xy_fixed(fixed::from_raw(-181), fixed::from_raw(181)), // Southwest
-    xy_fixed(fixed::from_int(-1), fixed::from_int(0)), // West
-    xy_fixed(fixed::from_raw(-181), fixed::from_raw(-181)) // Northwest
+const fvec2 DIRECTION_FVEC2[8] = {
+    fvec2(fixed::from_int(0), fixed::from_int(-1)), // North
+    fvec2(fixed::from_raw(181), fixed::from_raw(-181)), // Northeast
+    fvec2(fixed::from_int(1), fixed::from_int(0)), // East
+    fvec2(fixed::from_raw(181), fixed::from_raw(181)), // Southeast
+    fvec2(fixed::from_int(0), fixed::from_int(1)), // South
+    fvec2(fixed::from_raw(-181), fixed::from_raw(181)), // Southwest
+    fvec2(fixed::from_int(-1), fixed::from_int(0)), // West
+    fvec2(fixed::from_raw(-181), fixed::from_raw(-181)) // Northwest
 };
 
 const uint8_t DIRECTION_MASK[DIRECTION_COUNT] = {
@@ -254,7 +249,7 @@ const uint8_t DIRECTION_MASK[DIRECTION_COUNT] = {
     128
 };
 
-const xy AUTOTILE_EDGE_OFFSETS[4] = { xy(0, 0), xy(1, 0), xy(0, 1), xy(1, 1) };
+const ivec2 AUTOTILE_EDGE_OFFSETS[4] = { ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1) };
 const uint8_t AUTOTILE_EDGE_MASK[4] = { 
     (uint8_t)(DIRECTION_MASK[DIRECTION_NORTH] + DIRECTION_MASK[DIRECTION_NORTHWEST] + DIRECTION_MASK[DIRECTION_WEST]),
     (uint8_t)(DIRECTION_MASK[DIRECTION_NORTH] + DIRECTION_MASK[DIRECTION_NORTHEAST] + DIRECTION_MASK[DIRECTION_EAST]),
@@ -262,28 +257,37 @@ const uint8_t AUTOTILE_EDGE_MASK[4] = {
     (uint8_t)(DIRECTION_MASK[DIRECTION_EAST] + DIRECTION_MASK[DIRECTION_SOUTHEAST] + DIRECTION_MASK[DIRECTION_SOUTH])
 };
 
-inline Direction enum_from_xy_direction(xy xy_direction) {
+inline Direction enum_from_ivec2_direction(ivec2 ivec2_direction) {
     for (int enum_direction = 0; enum_direction < DIRECTION_COUNT; enum_direction++) {
-        if (DIRECTION_XY[enum_direction] == xy_direction) {
+        if (DIRECTION_IVEC2[enum_direction] == ivec2_direction) {
             return (Direction)enum_direction;
         }
     }
     return DIRECTION_COUNT;
 }
 
-inline Direction enum_direction_to_rect(xy from, xy rect, int rect_size) {
+// Rect
+
+struct rect_t {
+    int x;
+    int y;
+    int w;
+    int h;
+};
+
+inline Direction enum_direction_to_rect(ivec2 from, rect_t rect) {
     if (from.y < rect.y) {
         if (from.x < rect.x) {
             return DIRECTION_SOUTHEAST;
-        } else if (from.x >= rect.x + rect_size) {
+        } else if (from.x >= rect.x + rect.w) {
             return DIRECTION_SOUTHWEST;
         } else {
             return DIRECTION_SOUTH;
         }
-    } else if (from.y >= rect.y + rect_size) {
+    } else if (from.y >= rect.y + rect.h) {
         if (from.x < rect.x) {
             return DIRECTION_NORTHEAST;
-        } else if (from.x >= rect.x + rect_size) {
+        } else if (from.x >= rect.x + rect.w) {
             return DIRECTION_NORTHWEST;
         } else {
             return DIRECTION_NORTH;
@@ -295,14 +299,18 @@ inline Direction enum_direction_to_rect(xy from, xy rect, int rect_size) {
     }
 }
 
-inline xy_fixed cell_center(xy cell) {
-    return xy_fixed(
+inline fvec2 cell_center(ivec2 cell) {
+    return fvec2(
         fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)),
         fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2))
     );
 }
 
-inline bool sdl_rects_are_adjacent(const SDL_Rect& a, const SDL_Rect& b) {
+inline bool sdl_rect_has_point(rect_t rect, ivec2 point) {
+    return !(point.x < rect.x || point.x >= rect.x + rect.w || point.y < rect.y || point.y >= rect.y + rect.h);
+}
+
+inline bool sdl_rects_are_adjacent(const rect_t a, const rect_t b) {
     if (a.x + a.w == b.x || b.x + b.w == a.x) {
         return (a.y >= b.y && a.y + a.h <= b.y + b.h) ||
                (b.y >= a.y && b.y + b.h <= a.y + a.h);
@@ -314,8 +322,8 @@ inline bool sdl_rects_are_adjacent(const SDL_Rect& a, const SDL_Rect& b) {
     }
 }
 
-inline xy cell_within_rect_a_nearest_to_rect_b(const SDL_Rect& a, const SDL_Rect& b) {
-    xy cell;
+inline ivec2 cell_within_rect_a_nearest_to_rect_b(const rect_t a, const rect_t b) {
+    ivec2 cell;
     if (b.y + b.h - 1 < a.y) {
         cell.y = a.y;
     } else if (b.y > a.y + a.h - 1) {
@@ -339,21 +347,21 @@ inline xy cell_within_rect_a_nearest_to_rect_b(const SDL_Rect& a, const SDL_Rect
     return cell;
 }
 
-inline int euclidean_distance_squared_between(const SDL_Rect& a, const SDL_Rect& b) {
-    xy cell_in_a_nearest_to_b = cell_within_rect_a_nearest_to_rect_b(a, b);
-    xy cell_in_b_nearest_to_a = cell_within_rect_a_nearest_to_rect_b(b, a);
-    return xy::euclidean_distance_squared(cell_in_a_nearest_to_b, cell_in_b_nearest_to_a);
+inline int euclidean_distance_squared_between(const rect_t a, const rect_t b) {
+    ivec2 cell_in_a_nearest_to_b = cell_within_rect_a_nearest_to_rect_b(a, b);
+    ivec2 cell_in_b_nearest_to_a = cell_within_rect_a_nearest_to_rect_b(b, a);
+    return ivec2::euclidean_distance_squared(cell_in_a_nearest_to_b, cell_in_b_nearest_to_a);
 }
 
-inline xy get_nearest_cell_in_rect(xy start_cell, xy rect_position, int rect_size) {
-    xy nearest_cell = rect_position;
-    uint32_t nearest_cell_dist = xy::manhattan_distance(start_cell, nearest_cell);
+inline ivec2 get_nearest_cell_in_rect(ivec2 start_cell, rect_t rect) {
+    ivec2 nearest_cell = ivec2(rect.x, rect.y);
+    uint32_t nearest_cell_dist = ivec2::manhattan_distance(start_cell, nearest_cell);
 
-    for (int y = rect_position.y; y < rect_position.y + rect_size; y++) {
-        for (int x = rect_position.x; x < rect_position.x + rect_size; x++) {
-            uint32_t cell_dist = xy::manhattan_distance(start_cell, xy(x, y));
+    for (int y = rect.y; y < rect.y + rect.h; y++) {
+        for (int x = rect.x; x < rect.x + rect.w; x++) {
+            uint32_t cell_dist = ivec2::manhattan_distance(start_cell, ivec2(x, y));
             if (cell_dist < nearest_cell_dist) {
-                nearest_cell = xy(x, y);
+                nearest_cell = ivec2(x, y);
                 nearest_cell_dist = cell_dist;
             }
         }

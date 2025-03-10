@@ -9,13 +9,14 @@
 
 static FILE* logfile;
 
-FILE* logger_init(const char* logfile_path) {
+bool logger_init(const char* logfile_path) {
     logfile = fopen(logfile_path, "w");
     if (logfile == NULL) {
         log_error("Unable to open log file for writing.");
+        return false;
     }
 
-    return logfile;
+    return true;
 }
 
 void logger_quit() {
@@ -82,21 +83,21 @@ void logger_output(LogLevel log_level, const char* message, ...) {
                 }
                 break;
             }
-            case 'd': {
+            case 'x': {
                 fixed fp = va_arg(arg_ptr, fixed);
                 out_ptr += sprintf(out_ptr, "%i.%i", fp.integer_part(), fp.fractional_value());
                 break;
             }
-            case 'x': {
+            case 'v': {
                 message++;
                 switch (*message) {
                     case 'i': {
-                        xy* v = va_arg(arg_ptr, xy*);
+                        ivec2* v = va_arg(arg_ptr, ivec2*);
                         out_ptr += sprintf(out_ptr, "<%i, %i>", v->x, v->y);
                         break;
                     }
-                    case 'd': {
-                        xy_fixed* v = va_arg(arg_ptr, xy_fixed*);
+                    case 'f': {
+                        fvec2* v = va_arg(arg_ptr, fvec2*);
                         out_ptr += sprintf(out_ptr, "<%i.%i, %i.%i>", v->x.integer_part(), v->x.fractional_value(), v->y.integer_part(), v->y.fractional_value());
                         break;
                     }
