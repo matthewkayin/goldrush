@@ -11,7 +11,10 @@
     #define PLATFORM_OSX 1
 #endif
 
-#define TILE_SIZE 16
-
 #define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
+
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 360
+#define RESOURCE_PATH "../res/"
+#define TILE_SIZE 16

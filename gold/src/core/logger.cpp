@@ -2,7 +2,7 @@
 
 #include "asserts.h"
 #include "platform.h"
-#include "util.h"
+#include "math/gmath.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdarg>

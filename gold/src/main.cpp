@@ -1,7 +1,8 @@
 #include "defines.h"
-#include "platform.h"
-#include "logger.h"
-#include "util.h"
+#include "core/platform.h"
+#include "core/logger.h"
+#include "math/gmath.h"
+#include "render/render.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <cstring>
@@ -60,9 +61,14 @@ int gold_main(int argc, char** argv) {
         return -1;
     }
 
-    uint32_t window_flags = SDL_WINDOW_SHOWN;
+    uint32_t window_flags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
     ivec2 window_size = ivec2(1280, 720);
     SDL_Window* window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, window_flags);
+
+    if (!render_init(window)) {
+        logger_quit();
+        return -1;
+    }
 
     bool is_running = true;
     bool render_debug_info = true;
@@ -127,7 +133,13 @@ int gold_main(int argc, char** argv) {
             update_accumulator -= UPDATE_TIME;
             updates++;
         }
+
+        // RENDER
+        render_prepare_frame();
+        render_present_frame();
     }
+
+    render_quit();
 
     SDL_DestroyWindow(window);
 
