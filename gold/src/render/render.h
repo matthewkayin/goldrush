@@ -25,3 +25,5 @@ void render_prepare_frame();
 void render_present_frame();
 void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, uint32_t options = 0, uint8_t recolor = RECOLOR_NONE);
 void render_text(font_name name, const char* text, ivec2 position, int z_index, color_t color);
+void render_line(ivec2 start, ivec2 end, int z_index, color_t color);
+void render_rect(ivec2 start, ivec2 end, int z_index, color_t color);

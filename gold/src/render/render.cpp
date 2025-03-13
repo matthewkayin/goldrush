@@ -2,6 +2,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #define MAX_BATCH_VERTICES 32768
+#define MAX_TEXT_CHARS 128
 #define FONT_GLYPH_COUNT 96
 #define FONT_FIRST_CHAR 32 // space
 
@@ -68,15 +69,22 @@ struct render_state_t {
     sprite_t sprites[SPRITE_COUNT];
 
     GLuint font_shader;
+    GLint font_shader_font_color_location;
     GLuint font_vao;
     GLuint font_vbo;
     font_t fonts[FONT_COUNT];
+
+    GLuint line_shader;
+    GLint line_shader_color_location;
+    GLuint line_vao;
+    GLuint line_vbo;
 };
 static render_state_t state;
 
 void render_init_quad_vao();
 void render_init_sprite_vao();
 void render_init_font_vao();
+void render_init_line_vao();
 bool render_init_screen_framebuffer();
 
 bool render_load_sprite(sprite_t* sprite, const sprite_params_t params);
@@ -111,6 +119,7 @@ bool render_init(SDL_Window* window) {
     render_init_quad_vao();
     render_init_sprite_vao();
     render_init_font_vao();
+    render_init_line_vao();
     if (!render_init_screen_framebuffer()) {
         return false;
     }
@@ -145,6 +154,15 @@ bool render_init(SDL_Window* window) {
     glUseProgram(state.font_shader);
     glUniform1ui(glGetUniformLocation(state.font_shader, "font_texture"), 0);
     glUniformMatrix4fv(glGetUniformLocation(state.font_shader, "projection"), 1, GL_FALSE, projection.data);
+    state.font_shader_font_color_location = glGetUniformLocation(state.font_shader, "font_color");
+
+    // Load line shader
+    if (!shader_load(&state.line_shader, "line.vert.glsl", "line.frag.glsl")) {
+        return false;
+    }
+    glUseProgram(state.line_shader);
+    glUniformMatrix4fv(glGetUniformLocation(state.line_shader, "projection"), 1, GL_FALSE, projection.data);
+    state.line_shader_color_location = glGetUniformLocation(state.line_shader, "color");
 
     // Load sprites
     for (int name = 0; name < SPRITE_COUNT; name++) {
@@ -215,7 +233,7 @@ void render_init_font_vao() {
     glGenBuffers(1, &state.font_vbo);
     glBindVertexArray(state.font_vao);
     glBindBuffer(GL_ARRAY_BUFFER, state.font_vbo);
-    glBufferData(GL_ARRAY_BUFFER, MAX_BATCH_VERTICES * sizeof(font_vertex_t), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, MAX_TEXT_CHARS * 6 * sizeof(font_vertex_t), NULL, GL_DYNAMIC_DRAW);
 
     // position
     glEnableVertexAttribArray(0);
@@ -223,6 +241,21 @@ void render_init_font_vao() {
     // tex coord
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void render_init_line_vao() {
+    glGenVertexArrays(1, &state.line_vao);
+    glGenBuffers(1, &state.line_vbo);
+    glBindVertexArray(state.line_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
+    glBufferData(GL_ARRAY_BUFFER, 24 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+
+    // position
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -299,7 +332,7 @@ bool render_load_sprite(sprite_t* sprite, const sprite_params_t params) {
     return true;
 }
 
-bool render_load_font(font_t* font,  const font_params_t params) {
+bool render_load_font(font_t* font, const font_params_t params) {
     static const SDL_Color COLOR_WHITE = { 255, 255, 255, 255 };
 
     char path[128];
@@ -382,6 +415,7 @@ void render_prepare_frame() {
 
 void render_present_frame() {
     render_text(FONT_HACK, "hey friends", ivec2(0, 0), 2, (color_t) { .r = 1.0f, .g = 1.0f, .b = 1.0f });
+    render_rect(ivec2(10, 10), ivec2(100, 30), 2, (color_t) { .r = 1.0f, .g = 1.0f, .b = 1.0f });
 
     // Buffer sprite batch data
     glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
@@ -544,7 +578,7 @@ void render_text(font_name name, const char* text, ivec2 position, int z_index, 
     glBufferSubData(GL_ARRAY_BUFFER, 0, font_vertices.size() * sizeof(font_vertex_t), &font_vertices[0]);
 
     glUseProgram(state.font_shader);
-    glUniform3fv(glGetUniformLocation(state.font_shader, "font_color"), 1, &color.r);
+    glUniform3fv(state.font_shader_font_color_location, 1, &color.r);
 
     glBindVertexArray(state.font_vao);
     glActiveTexture(GL_TEXTURE0);
@@ -554,4 +588,38 @@ void render_text(font_name name, const char* text, ivec2 position, int z_index, 
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void render_line(ivec2 start, ivec2 end, int z_index, color_t color) {
+    glUseProgram(state.line_shader);
+    glLineWidth(1);
+    glUniform3fv(state.line_shader_color_location, 1, &color.r);
+
+    float line_vertices[6] = { (float)start.x, (float)(SCREEN_HEIGHT - start.y), (float)-z_index, (float)end.x, (float)(SCREEN_HEIGHT - end.y), (float)-z_index };
+    glBindVertexArray(state.line_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(line_vertices), line_vertices);
+    glDrawArrays(GL_LINES, 0, 2);
+
+    glBindVertexArray(0);
+}
+
+void render_rect(ivec2 start, ivec2 end, int z_index, color_t color) {
+    glUseProgram(state.line_shader);
+    glLineWidth(1);
+    glUniform3fv(state.line_shader_color_location, 1, &color.r);
+
+    float line_vertices[24] = { 
+        (float)start.x, (float)(SCREEN_HEIGHT - start.y), (float)-z_index, (float)end.x, (float)(SCREEN_HEIGHT - start.y), (float)-z_index,
+        (float)end.x, (float)(SCREEN_HEIGHT - start.y), (float)-z_index, (float)end.x, (float)(SCREEN_HEIGHT - end.y), (float)-z_index,
+        (float)start.x, (float)(SCREEN_HEIGHT - end.y), (float)-z_index, (float)end.x, (float)(SCREEN_HEIGHT - end.y), (float)-z_index,
+        (float)start.x, (float)(SCREEN_HEIGHT - start.y), (float)-z_index, (float)start.x, (float)(SCREEN_HEIGHT - end.y), (float)-z_index
+    };
+
+    glBindVertexArray(state.line_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(line_vertices), line_vertices);
+    glDrawArrays(GL_LINES, 0, 8);
+
+    glBindVertexArray(0);
 }
