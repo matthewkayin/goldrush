@@ -6,10 +6,10 @@
 #include <cstdio>
 #include <cstdlib>
 
-bool shader_compile(uint32_t* id, GLenum type, const char* name) {
+bool shader_compile(uint32_t* id, GLenum type, const char* path_suffix) {
     // Read the shader file
     char path[128];
-    sprintf(path, "%sshader/%s.%s.glsl", RESOURCE_PATH, name, type == GL_VERTEX_SHADER ? "vert" : "frag");
+    sprintf(path, "%sshader/%s", RESOURCE_PATH, path_suffix);
 
     FILE* shader_file = fopen(path, "rb");
     if (!shader_file) {
@@ -47,14 +47,14 @@ bool shader_compile(uint32_t* id, GLenum type, const char* name) {
     return true;
 }
 
-bool shader_load(uint32_t* id, const char* name) {
+bool shader_load(uint32_t* id, const char* vertex_path, const char* fragment_path) {
     // Compile shaders
     GLuint vertex_shader;
-    if (!shader_compile(&vertex_shader, GL_VERTEX_SHADER, name)) {
+    if (!shader_compile(&vertex_shader, GL_VERTEX_SHADER, vertex_path)) {
         return false;
     }
     GLuint fragment_shader;
-    if (!shader_compile(&fragment_shader, GL_FRAGMENT_SHADER, name)) {
+    if (!shader_compile(&fragment_shader, GL_FRAGMENT_SHADER, fragment_path)) {
         return false;
     }
 
@@ -68,14 +68,14 @@ bool shader_load(uint32_t* id, const char* name) {
     if (!success) {
         char info_log[512];
         glGetProgramInfoLog(*id, 512, NULL, info_log);
-        log_error("Failed linking program with name %s: %s", name, info_log);
+        log_error("Failed linking program. vertex path: %s. fragment path: %s. error: %s", vertex_path, fragment_path, info_log);
         return false;
     }
 
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
-    log_info("Shader %s linked successfully.", name);
+    log_info("Shader linked successfully.");
 
     return true;
 }

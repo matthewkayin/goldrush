@@ -2,7 +2,14 @@
 
 #include "math/gmath.h"
 #include "resource/sprite.h"
+#include "resource/font.h"
 #include <SDL2/SDL.h>
+
+struct color_t {
+    float r;
+    float g;
+    float b;
+};
 
 enum recolor_t: uint8_t {
     RECOLOR_NONE
@@ -17,3 +24,4 @@ void render_quit();
 void render_prepare_frame();
 void render_present_frame();
 void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, uint32_t options = 0, uint8_t recolor = RECOLOR_NONE);
+void render_text(font_name name, const char* text, ivec2 position, int z_index, color_t color);

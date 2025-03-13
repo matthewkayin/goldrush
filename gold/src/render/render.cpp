@@ -2,20 +2,30 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #define MAX_BATCH_VERTICES 32768
+#define FONT_GLYPH_COUNT 96
+#define FONT_FIRST_CHAR 32 // space
 
 #include "core/logger.h"
 #include "core/asserts.h"
 #include "math/gmath.h"
 #include "math/mat4.h"
 #include "resource/sprite.h"
+#include "resource/font.h"
 #include "shader.h"
+#include <SDL2/SDL_ttf.h>
 #include <glad/glad.h>
+#include <stb/stb_image.h>
 #include <cstdio>
 #include <cstring>
-#include <stb/stb_image.h>
 #include <vector>
+#include <algorithm>
 
 struct sprite_vertex_t {
+    float position[3];
+    float tex_coord[2];
+};
+
+struct font_vertex_t {
     float position[3];
     float tex_coord[2];
 };
@@ -25,6 +35,21 @@ struct sprite_t {
     ivec2 size;
     ivec2 frame_size;
     ivec2 frame_count;
+};
+
+struct font_glyph_t {
+    int bearing_x;
+    int bearing_y;
+    int advance;
+};
+
+struct font_t {
+    uint32_t texture;
+    int atlas_width;
+    int atlas_height;
+    int glyph_max_width;
+    int glyph_max_height;
+    font_glyph_t glyphs[FONT_GLYPH_COUNT];
 };
 
 struct render_state_t {
@@ -41,14 +66,21 @@ struct render_state_t {
     GLuint sprite_vbo;
     std::vector<sprite_vertex_t> sprite_vertices[SPRITE_COUNT];
     sprite_t sprites[SPRITE_COUNT];
+
+    GLuint font_shader;
+    GLuint font_vao;
+    GLuint font_vbo;
+    font_t fonts[FONT_COUNT];
 };
 static render_state_t state;
 
 void render_init_quad_vao();
 void render_init_sprite_vao();
+void render_init_font_vao();
 bool render_init_screen_framebuffer();
 
 bool render_load_sprite(sprite_t* sprite, const sprite_params_t params);
+bool render_load_font(font_t* font,  const font_params_t params);
 
 bool render_init(SDL_Window* window) {
     state.window = window;
@@ -78,12 +110,13 @@ bool render_init(SDL_Window* window) {
 
     render_init_quad_vao();
     render_init_sprite_vao();
+    render_init_font_vao();
     if (!render_init_screen_framebuffer()) {
         return false;
     }
 
     // Load screen shader
-    if (!shader_load(&state.screen_shader, "screen")) {
+    if (!shader_load(&state.screen_shader, "screen.vert.glsl", "screen.frag.glsl")) {
         return false;
     }
     glUseProgram(state.screen_shader);
@@ -97,18 +130,32 @@ bool render_init(SDL_Window* window) {
     glUniform2iv(glGetUniformLocation(state.screen_shader, "window_size"), 1, &window_size.x);
 
     // Load sprite shader
-    if (!shader_load(&state.sprite_shader, "sprite")) {
+    if (!shader_load(&state.sprite_shader, "sprite.vert.glsl", "sprite.frag.glsl")) {
         return false;
     }
     glUseProgram(state.sprite_shader);
     glUniform1ui(glGetUniformLocation(state.sprite_shader, "sprite_texture"), 0);
-
     mat4 projection = mat4_ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT, 0.0f, 100.0f);
     glUniformMatrix4fv(glGetUniformLocation(state.sprite_shader, "projection"), 1, GL_FALSE, projection.data);
+
+    // Load text shader
+    if (!shader_load(&state.font_shader, "text.vert.glsl", "text.frag.glsl")) {
+        return false;
+    }
+    glUseProgram(state.font_shader);
+    glUniform1ui(glGetUniformLocation(state.font_shader, "font_texture"), 0);
+    glUniformMatrix4fv(glGetUniformLocation(state.font_shader, "projection"), 1, GL_FALSE, projection.data);
 
     // Load sprites
     for (int name = 0; name < SPRITE_COUNT; name++) {
         if (!render_load_sprite(&state.sprites[name], resource_get_sprite_params((sprite_name)name))) {
+            return false;
+        }
+    }
+
+    // Load fonts
+    for (int name = 0; name < FONT_COUNT; name++) {
+        if (!render_load_font(&state.fonts[name], resource_get_font_params((font_name)name))) {
             return false;
         }
     }
@@ -163,6 +210,24 @@ void render_init_sprite_vao() {
     glBindVertexArray(0);
 }
 
+void render_init_font_vao() {
+    glGenVertexArrays(1, &state.font_vao);
+    glGenBuffers(1, &state.font_vbo);
+    glBindVertexArray(state.font_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.font_vbo);
+    glBufferData(GL_ARRAY_BUFFER, MAX_BATCH_VERTICES * sizeof(font_vertex_t), NULL, GL_DYNAMIC_DRAW);
+
+    // position
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    // tex coord
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
 bool render_init_screen_framebuffer() {
     glGenFramebuffers(1, &state.screen_framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, state.screen_framebuffer);
@@ -192,7 +257,7 @@ bool render_init_screen_framebuffer() {
 
 bool render_load_sprite(sprite_t* sprite, const sprite_params_t params) {
     char path[128];
-    sprintf(path, "%s%s", RESOURCE_PATH, params.path);
+    sprintf(path, "%ssprite/%s", RESOURCE_PATH, params.path);
 
     log_info("Loading sprite %s", path);
 
@@ -222,8 +287,6 @@ bool render_load_sprite(sprite_t* sprite, const sprite_params_t params) {
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -232,6 +295,72 @@ bool render_load_sprite(sprite_t* sprite, const sprite_params_t params) {
     sprite->frame_count = ivec2(params.hframes, params.vframes);
     sprite->frame_size = ivec2(sprite->size.x / sprite->frame_count.x, sprite->size.y / sprite->frame_count.y);
     GOLD_ASSERT(sprite->size.x % sprite->frame_size.x == 0 && sprite->size.y % sprite->frame_size.y == 0);
+
+    return true;
+}
+
+bool render_load_font(font_t* font,  const font_params_t params) {
+    static const SDL_Color COLOR_WHITE = { 255, 255, 255, 255 };
+
+    char path[128];
+    sprintf(path, "%sfont/%s", RESOURCE_PATH, params.path);
+
+    log_info("Loading font %s", path);
+
+    // Open the font
+    TTF_Font* ttf_font = TTF_OpenFont(path, params.size);
+    if (ttf_font == NULL) {
+        log_error("Unable to open font %s: %s", path, TTF_GetError());
+        return false;
+    }
+
+    // Render each glyph to a surface
+    SDL_Surface* glyphs[FONT_GLYPH_COUNT];
+    int glyph_max_width = 0;
+    int glyph_max_height = 0;
+    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+        char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
+        glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, COLOR_WHITE);
+        if (glyphs[glyph_index] == NULL) {
+            log_error("Error rendering glyph %s for font %s: %s", text, path, TTF_GetError());
+            return false;
+        }
+
+        glyph_max_width = std::max(glyph_max_width, glyphs[glyph_index]->w);
+        glyph_max_height = std::max(glyph_max_height, glyphs[glyph_index]->h);
+    }
+
+    // Render each surface glyph onto a single atlas surface
+    int atlas_width = next_largest_power_of_two(glyph_max_width * FONT_GLYPH_COUNT);
+    int atlas_height = next_largest_power_of_two(glyph_max_height);
+    SDL_Surface* atlas_surface = SDL_CreateRGBSurface(0, atlas_width, atlas_height, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
+    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+        SDL_Rect dest_rect = (SDL_Rect) { .x = glyph_max_width * glyph_index, .y = 0, .w = glyphs[glyph_index]->w, .h = glyphs[glyph_index]->h };
+        SDL_BlitSurface(glyphs[glyph_index], NULL, atlas_surface, &dest_rect);
+    }
+
+    // Render the atlas surface onto a texture
+    glGenTextures(1, &font->texture);
+    glBindTexture(GL_TEXTURE_2D, font->texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlas_width, atlas_height, 0, GL_BGRA, GL_UNSIGNED_BYTE, atlas_surface->pixels);
+
+    // Finish filling out the font struct
+    font->atlas_width = atlas_width;
+    font->atlas_height = atlas_height;
+    font->glyph_max_width = glyph_max_width;
+    font->glyph_max_height = glyph_max_height;
+    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+        TTF_GlyphMetrics(ttf_font, FONT_FIRST_CHAR + glyph_index, &font->glyphs[glyph_index].bearing_x, NULL, NULL, &font->glyphs[glyph_index].bearing_y, &font->glyphs[glyph_index].advance);
+    }
+
+    // Free all the resources
+    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+        SDL_FreeSurface(glyphs[glyph_index]);
+    }
+    SDL_FreeSurface(atlas_surface);
+    TTF_CloseFont(ttf_font);
 
     return true;
 }
@@ -252,8 +381,7 @@ void render_prepare_frame() {
 }
 
 void render_present_frame() {
-    render_sprite(SPRITE_DECORATION, ivec2(0, 0), ivec2(0, 0), 1);
-    render_sprite(SPRITE_DECORATION, ivec2(0, 0), ivec2(16, 0), 1, RENDER_SPRITE_FLIP_H);
+    render_text(FONT_HACK, "hey friends", ivec2(0, 0), 2, (color_t) { .r = 1.0f, .g = 1.0f, .b = 1.0f });
 
     // Buffer sprite batch data
     glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
@@ -315,8 +443,8 @@ void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, u
         }
     }
 
-    float frame_size_x = 16.0f / 80.0f;
-    float frame_size_y = 16.0f / 16.0f;
+    float frame_size_x = (float)state.sprites[name].frame_size.x / (float)state.sprites[name].size.x;
+    float frame_size_y = (float)state.sprites[name].frame_size.y / (float)state.sprites[name].size.y;
     float tex_coord_left = frame_size_x * frame.x;
     float tex_coord_right = tex_coord_left + frame_size_x;
     float tex_coord_bottom = frame_size_y * frame.y;
@@ -352,4 +480,78 @@ void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, u
         .position = { position_right, position_bottom, (float)-z_index },
         .tex_coord = { tex_coord_right, tex_coord_bottom }
     });
+}
+
+void render_text(font_name name, const char* text, ivec2 position, int z_index, color_t color) {
+    ivec2 glyph_position = position;
+    const char* text_ptr = text;
+
+    // Don't render empty string
+    if (text_ptr == '\0') {
+        return;
+    }
+
+    float frame_size_x = (float)state.fonts[name].glyph_max_width / (float)state.fonts[name].atlas_width;
+    float tex_coord_bottom = 1.0f;
+    float tex_coord_top = 0.0f;
+    float position_top = (float)(SCREEN_HEIGHT - glyph_position.y);
+    float position_bottom = (float)(SCREEN_HEIGHT - (glyph_position.y + state.fonts[name].atlas_height));
+
+    std::vector<font_vertex_t> font_vertices;
+
+    while (*text_ptr != '\0') {
+        int glyph_index = (int)*text_ptr - FONT_FIRST_CHAR;
+        if (glyph_index < 0 || glyph_index >= FONT_GLYPH_COUNT) {
+            glyph_index = (int)('|' - FONT_FIRST_CHAR);
+        }
+
+        float position_left = (float)(glyph_position.x + state.fonts[name].glyphs[glyph_index].bearing_x);
+        float position_right = (float)(glyph_position.x + state.fonts[name].glyphs[glyph_index].bearing_x + state.fonts[name].glyph_max_width);
+
+        float tex_coord_left = frame_size_x * glyph_index;
+        float tex_coord_right = tex_coord_left + frame_size_x;
+
+        font_vertices.push_back((font_vertex_t) {
+            .position = { position_left, position_top, (float)-z_index },
+            .tex_coord = { tex_coord_left, tex_coord_top }
+        });
+        font_vertices.push_back((font_vertex_t) {
+            .position = { position_right, position_bottom, (float)-z_index },
+            .tex_coord = { tex_coord_right, tex_coord_bottom }
+        });
+        font_vertices.push_back((font_vertex_t) {
+            .position = { position_left, position_bottom, (float)-z_index },
+            .tex_coord = { tex_coord_left, tex_coord_bottom }
+        });
+        font_vertices.push_back((font_vertex_t) {
+            .position = { position_left, position_top, (float)-z_index },
+            .tex_coord = { tex_coord_left, tex_coord_top }
+        });
+        font_vertices.push_back((font_vertex_t) {
+            .position = { position_right, position_top, (float)-z_index },
+            .tex_coord = { tex_coord_right, tex_coord_top }
+        });
+        font_vertices.push_back((font_vertex_t) {
+            .position = { position_right, position_bottom, (float)-z_index },
+            .tex_coord = { tex_coord_right, tex_coord_bottom }
+        });
+
+        glyph_position.x += state.fonts[name].glyphs[glyph_index].advance;
+        text_ptr++;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, state.font_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, font_vertices.size() * sizeof(font_vertex_t), &font_vertices[0]);
+
+    glUseProgram(state.font_shader);
+    glUniform3fv(glGetUniformLocation(state.font_shader, "font_color"), 1, &color.r);
+
+    glBindVertexArray(state.font_vao);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, state.fonts[name].texture);
+
+    glDrawArrays(GL_TRIANGLES, 0, font_vertices.size());
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }

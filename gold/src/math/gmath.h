@@ -370,3 +370,12 @@ inline ivec2 get_nearest_cell_in_rect(ivec2 start_cell, rect_t rect) {
 
     return nearest_cell;
 }
+
+inline int next_largest_power_of_two(int number) {
+    int power_of_two = 1;
+    while (power_of_two < number) {
+        power_of_two *= 2;
+    }
+    
+    return power_of_two;
+}

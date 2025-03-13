@@ -4,7 +4,7 @@
 
 static const std::unordered_map<sprite_name, sprite_params_t> SPRITE_PARAMS = {
     { SPRITE_DECORATION, (sprite_params_t) {
-        .path = "sprite/tile_decorations.png",
+        .path = "tile_decorations.png",
         .hframes = 5,
         .vframes = 1
     }}
