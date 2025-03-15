@@ -18,3 +18,4 @@
 #define SCREEN_HEIGHT 360
 #define RESOURCE_PATH "../res/"
 #define TILE_SIZE 16
+#define MAX_PLAYERS 4

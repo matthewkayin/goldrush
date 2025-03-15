@@ -13,9 +13,9 @@
 #include "resource/sprite.h"
 #include "resource/font.h"
 #include "shader.h"
+#include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <glad/glad.h>
-#include <stb/stb_image.h>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -33,7 +33,8 @@ struct font_vertex_t {
 
 struct sprite_t {
     uint32_t texture;
-    ivec2 size;
+    ivec2 image_size; // This is the size of the sprite as it was in the png
+    ivec2 texture_size; // This is the size of the sprite in the actual texture (usually bigger than image_size)
     ivec2 frame_size;
     ivec2 frame_count;
 };
@@ -51,6 +52,37 @@ struct font_t {
     int glyph_max_width;
     int glyph_max_height;
     font_glyph_t glyphs[FONT_GLYPH_COUNT];
+};
+
+struct player_color_t {
+    const char* name;
+    SDL_Color skin_color;
+    SDL_Color clothes_color;
+};
+
+static const SDL_Color RECOLOR_CLOTHES_REF = { .r = 255, .g = 0, .b = 255, .a = 255 };
+static const SDL_Color RECOLOR_SKIN_REF = { .r = 123, .g = 174, .b = 121, .a = 255 };
+static const player_color_t PLAYER_COLORS[MAX_PLAYERS] = {
+    (player_color_t) {
+        .name = "Blue",
+        .skin_color = (SDL_Color) { .r = 125, .g = 181, .b = 164, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 }
+    },
+    (player_color_t) {
+        .name = "Red",
+        .skin_color = (SDL_Color) { .r = 219, .g = 151, .b = 114, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }
+    },
+    (player_color_t) {
+        .name = "Green",
+        .skin_color = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 77, .g = 135, .b = 115, .a = 255 },
+    },
+    (player_color_t) {
+        .name = "Purple",
+        .skin_color = (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 },
+        .clothes_color = (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 },
+    }
 };
 
 struct render_state_t {
@@ -112,9 +144,6 @@ bool render_init(SDL_Window* window) {
         log_error("Error loading OpenGL.");
         return false;
     }
-
-    // Configure STBI
-    stbi_set_flip_vertically_on_load(true);
 
     render_init_quad_vao();
     render_init_sprite_vao();
@@ -294,40 +323,110 @@ bool render_load_sprite(sprite_t* sprite, const sprite_params_t params) {
 
     log_info("Loading sprite %s", path);
 
-    int number_of_components;
-    stbi_uc* data = stbi_load(path, &sprite->size.x, &sprite->size.y, &number_of_components, 0);
-    if (!data) {
-        log_error("Could not load sprite %s", path);
+    SDL_Surface* sprite_surface = IMG_Load(path);
+    if (sprite_surface == NULL) {
+        log_error("Error loading surface for sprite %s: %s", path, IMG_GetError());
         return false;
     }
+    GOLD_ASSERT(sprite_surface->format->BytesPerPixel == 4);
 
-    GLenum texture_format;
-    if (number_of_components == 1) {
-        texture_format = GL_RED;
-    } else if (number_of_components == 3) {
-        texture_format = GL_RGB;
-    } else if (number_of_components == 4) {
-        texture_format = GL_RGBA;
-    } else {
-        log_error("Texture format for sprite %s recognized. Number of components: %i", path, number_of_components);
-        return false;
+    // Fill in the the sprite struct
+    sprite->image_size.x = sprite_surface->w;
+    sprite->image_size.y = sprite_surface->h;
+    sprite->frame_count = ivec2(params.hframes, params.vframes);
+    sprite->frame_size = ivec2(sprite->image_size.x / sprite->frame_count.x, sprite->image_size.y / sprite->frame_count.y);
+    GOLD_ASSERT(sprite->size.x % sprite->frame_size.x == 0 && sprite->size.y % sprite->frame_size.y == 0);
+
+    if (params.strategy == SPRITE_IMPORT_RECOLOR || params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA) {
+        // Create a surface big enough to hold the recolor atlas
+        int sprite_width = next_largest_power_of_two(sprite->image_size.x);
+        int sprite_height = next_largest_power_of_two(sprite->image_size.y * MAX_PLAYERS);
+        SDL_Surface* recolor_surface = SDL_CreateRGBSurfaceWithFormat(0, sprite_width, sprite_height, 32, sprite_surface->format->format);
+        if (recolor_surface == NULL) {
+            log_error("Error creating recolor surface for sprite %s: %s", path, SDL_GetError());
+            return false;
+        }
+
+        // Get the reference pixels into a packed byte
+        uint32_t clothes_reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_CLOTHES_REF.r, RECOLOR_CLOTHES_REF.g, RECOLOR_CLOTHES_REF.b, RECOLOR_CLOTHES_REF.a);
+        uint32_t skin_reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_SKIN_REF.r, RECOLOR_SKIN_REF.g, RECOLOR_SKIN_REF.b, RECOLOR_SKIN_REF.a);
+
+        // Lock the surface so that we can edit pixel values
+        SDL_LockSurface(recolor_surface);
+        uint32_t* recolor_surface_pixels = (uint32_t*)recolor_surface->pixels;
+        uint32_t* sprite_surface_pixels = (uint32_t*)sprite_surface->pixels;
+
+        // Copy the original sprite onto our recolor atlas 4 times, once for each player color
+        for (int recolor_id = 0; recolor_id < MAX_PLAYERS; recolor_id++) {
+            // Get the replacement pixel bytes from the player color
+            uint32_t clothes_replacement_pixel = SDL_MapRGBA(recolor_surface->format, PLAYER_COLORS[recolor_id].clothes_color.r, PLAYER_COLORS[recolor_id].clothes_color.g, PLAYER_COLORS[recolor_id].clothes_color.b, PLAYER_COLORS[recolor_id].clothes_color.a);
+            uint32_t skin_replacement_pixel = SDL_MapRGBA(recolor_surface->format, PLAYER_COLORS[recolor_id].skin_color.r, PLAYER_COLORS[recolor_id].skin_color.g, PLAYER_COLORS[recolor_id].skin_color.b, PLAYER_COLORS[recolor_id].skin_color.a);
+
+            // Loop through each pixel of the original sprite
+            for (int y = 0; y < sprite_surface->h; y++) {
+                for (int x = 0; x < sprite_surface->w; x++) {
+                    // Determine which source pixel to use
+                    uint32_t source_pixel = sprite_surface_pixels[(y * sprite_surface->w) + x];
+                    if (source_pixel == clothes_reference_pixel) {
+                        source_pixel = clothes_replacement_pixel;
+                    } else if (source_pixel == skin_reference_pixel) {
+                        source_pixel = skin_replacement_pixel;
+                    }
+                    if (params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA) {
+                        uint8_t r, g, b, a;
+                        SDL_GetRGBA(source_pixel, recolor_surface->format, &r, &g, &b, &a);
+                        if (a != 0) {
+                            a = 200;
+                        }
+                        source_pixel = SDL_MapRGBA(recolor_surface->format, r, g, b, a);
+                    }
+
+                    // Put the source pixel onto the recolor surface
+                    recolor_surface_pixels[((y + (sprite_surface->h * recolor_id)) * recolor_surface->w) + x] = source_pixel;
+                }
+            }
+        }
+
+        SDL_UnlockSurface(recolor_surface);
+
+        // Handoff the recolor surface into the sprite surface variable
+        // Allows the rest of the sprite loading to work the same as with normal sprites
+        SDL_FreeSurface(sprite_surface);
+        sprite_surface = recolor_surface;
     }
 
+    // Flip the surface vertically
+    SDL_LockSurface(sprite_surface);
+    int sprite_surface_pitch = sprite_surface->pitch;
+    uint8_t temp[sprite_surface_pitch];
+    uint8_t* sprite_surface_pixels = (uint8_t*)sprite_surface->pixels;
+
+    for (int row = 0; row < sprite_surface->h / 2; ++row) {
+        uint8_t* row1 = sprite_surface_pixels + (row * sprite_surface_pitch);
+        uint8_t* row2 = sprite_surface_pixels + ((sprite_surface->h - row - 1) * sprite_surface_pitch);
+
+        memcpy(temp, row1, sprite_surface_pitch);
+        memcpy(row1, row2, sprite_surface_pitch);
+        memcpy(row2, temp, sprite_surface_pitch);
+    }
+    SDL_UnlockSurface(sprite_surface);
+
+    sprite->texture_size.x = sprite_surface->w;
+    sprite->texture_size.y = sprite_surface->h;
+
+    // Create the GL texture
+    GLenum texture_format = GL_RGBA;
     glGenTextures(1, &sprite->texture);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, sprite->texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, texture_format, sprite->size.x, sprite->size.y, GL_FALSE, texture_format, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, texture_format, sprite_surface->w, sprite_surface->h, GL_FALSE, texture_format, GL_UNSIGNED_BYTE, sprite_surface->pixels);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    stbi_image_free(data);
-
-    sprite->frame_count = ivec2(params.hframes, params.vframes);
-    sprite->frame_size = ivec2(sprite->size.x / sprite->frame_count.x, sprite->size.y / sprite->frame_count.y);
-    GOLD_ASSERT(sprite->size.x % sprite->frame_size.x == 0 && sprite->size.y % sprite->frame_size.y == 0);
+    SDL_FreeSurface(sprite_surface);
 
     return true;
 }
@@ -416,12 +515,14 @@ void render_prepare_frame() {
 void render_present_frame() {
     render_text(FONT_HACK, "hey friends", ivec2(0, 0), 2, (color_t) { .r = 1.0f, .g = 1.0f, .b = 1.0f });
     render_rect(ivec2(10, 10), ivec2(100, 30), 2, (color_t) { .r = 1.0f, .g = 1.0f, .b = 1.0f });
+    render_sprite_frame(SPRITE_DECORATION, ivec2(0, 0), ivec2(100, 100), 1, RENDER_SPRITE_FLIP_H, RECOLOR_NONE);
+    render_sprite_frame(SPRITE_UNIT_MINER, ivec2(0, 0), ivec2(116, 100), 1, 0, 0);
 
     // Buffer sprite batch data
-    glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
     glUseProgram(state.sprite_shader);
-    glBindVertexArray(state.sprite_vao);
     glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(state.sprite_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
     for (int name = 0; name < SPRITE_COUNT; name++) {
         if (state.sprite_vertices[name].empty()) {
             continue;
@@ -432,9 +533,10 @@ void render_present_frame() {
         // Render sprite batch
         glBindTexture(GL_TEXTURE_2D, state.sprites[name].texture);
         glDrawArrays(GL_TRIANGLES, 0, state.sprite_vertices[name].size());
-        glBindVertexArray(0);
         state.sprite_vertices[name].clear();
     }
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     // Switch to default framebuffer
     ivec2 window_size;
@@ -457,19 +559,36 @@ void render_present_frame() {
     SDL_GL_SwapWindow(state.window);
 }
 
-void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, uint32_t options, uint8_t recolor) {
+void render_sprite_frame(sprite_name name, ivec2 frame, ivec2 position, int z_index, uint32_t options, int recolor_id) {
+    rect_t src_rect = (rect_t) { 
+        .x = frame.x * state.sprites[name].frame_size.x, 
+        .y = ((recolor_id == RECOLOR_NONE ? 0 : recolor_id) * state.sprites[name].image_size.y) + (frame.y * state.sprites[name].frame_size.y), 
+        .w = state.sprites[name].frame_size.x, 
+        .h = state.sprites[name].frame_size.y 
+    };
+    rect_t dst_rect = (rect_t) { 
+        .x = position.x, 
+        .y = position.y, 
+        .w = state.sprites[name].frame_size.x, 
+        .h = state.sprites[name].frame_size.y 
+    };
+    render_sprite(name, src_rect, dst_rect, z_index, options);
+}
+
+void render_sprite(sprite_name name, rect_t src_rect, rect_t dst_rect, int z_index, uint32_t options) {
     bool flip_h = (options & RENDER_SPRITE_FLIP_H) == RENDER_SPRITE_FLIP_H;
     bool centered = (options & RENDER_SPRITE_CENTERED) == RENDER_SPRITE_CENTERED;
     bool cull = !((options & RENDER_SPRITE_NO_CULL) == RENDER_SPRITE_NO_CULL);
 
     if (centered) {
-        position -= state.sprites[name].frame_size / 2;
+        dst_rect.x -= dst_rect.w / 2;
+        dst_rect.y -= dst_rect.h / 2;
     }
 
-    float position_left = (float)position.x;
-    float position_right = (float)(position.x + state.sprites[name].frame_size.x);
-    float position_top = (float)(SCREEN_HEIGHT - position.y);
-    float position_bottom = (float)(SCREEN_HEIGHT - (position.y + state.sprites[name].frame_size.y));
+    float position_left = (float)dst_rect.x;
+    float position_right = (float)(dst_rect.x + dst_rect.w);
+    float position_top = (float)(SCREEN_HEIGHT - dst_rect.y);
+    float position_bottom = (float)(SCREEN_HEIGHT - (dst_rect.y + dst_rect.h));
 
     if (cull) {
         if (position_right <= 0.0f || position_left >= (float)SCREEN_WIDTH || position_top <= 0.0f || position_bottom >= (float)SCREEN_HEIGHT) {
@@ -477,12 +596,10 @@ void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, u
         }
     }
 
-    float frame_size_x = (float)state.sprites[name].frame_size.x / (float)state.sprites[name].size.x;
-    float frame_size_y = (float)state.sprites[name].frame_size.y / (float)state.sprites[name].size.y;
-    float tex_coord_left = frame_size_x * frame.x;
-    float tex_coord_right = tex_coord_left + frame_size_x;
-    float tex_coord_bottom = frame_size_y * frame.y;
-    float tex_coord_top = tex_coord_bottom + frame_size_y;
+    float tex_coord_left = (float)src_rect.x / (float)state.sprites[name].texture_size.x;
+    float tex_coord_right = tex_coord_left + ((float)src_rect.w / (float)state.sprites[name].texture_size.x);
+    float tex_coord_top = 1.0f - ((float)src_rect.y / (float)state.sprites[name].texture_size.y);
+    float tex_coord_bottom = tex_coord_top - ((float)src_rect.h / (float)state.sprites[name].texture_size.y);
 
     if (flip_h) {
         float temp = tex_coord_left;
@@ -620,6 +737,29 @@ void render_rect(ivec2 start, ivec2 end, int z_index, color_t color) {
     glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(line_vertices), line_vertices);
     glDrawArrays(GL_LINES, 0, 8);
+
+    glBindVertexArray(0);
+}
+
+void render_fill_rect(ivec2 start, ivec2 end, int z_index, color_t color) {
+    // you should batch this
+    glUseProgram(state.line_shader);
+    glUniform3fv(state.line_shader_color_location, 1, &color.r);
+
+    float rect_vertices[18] = {
+        (float)start.x, (float)(SCREEN_HEIGHT - start.y), (float)-z_index,
+        (float)end.x, (float)(SCREEN_HEIGHT - end.y), (float)-z_index,
+        (float)start.x, (float)(SCREEN_HEIGHT - end.y), (float)-z_index,
+
+        (float)start.x, (float)(SCREEN_HEIGHT - start.y), (float)-z_index,
+        (float)end.x, (float)(SCREEN_HEIGHT - start.y), (float)-z_index,
+        (float)end.x, (float)(SCREEN_HEIGHT - end.y), (float)-z_index
+    };
+
+    glBindVertexArray(state.line_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(rect_vertices), rect_vertices);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glBindVertexArray(0);
 }

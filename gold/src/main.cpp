@@ -4,6 +4,7 @@
 #include "math/gmath.h"
 #include "render/render.h"
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <cstring>
 
@@ -52,6 +53,13 @@ int gold_main(int argc, char** argv) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
         logger_quit();
         return -1;
+    }
+
+    // Init SDL image
+    int img_flags = IMG_INIT_PNG;
+    if (!(IMG_Init(img_flags) & img_flags)) {
+        log_error("SDL_image failed to initialize: %s", IMG_GetError());
+        return false;
     }
 
     // Init TTF
