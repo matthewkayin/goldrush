@@ -1,25 +1,38 @@
 #pragma once
 
-#include "math/gmath.h"
 #include <cstdint>
 
+enum atlas_name {
+    ATLAS_UI,
+    ATLAS_COUNT
+};
+
+enum atlas_import_strategy {
+    ATLAS_IMPORT_DEFAULT,
+    ATLAS_IMPORT_RECOLOR,
+    ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA
+};
+
+struct atlas_params_t {
+    const char* path;
+    atlas_import_strategy strategy;
+};
+
 enum sprite_name {
-    SPRITE_DECORATION,
-    SPRITE_UNIT_MINER,
+    SPRITE_UI_MINIMAP,
+    SPRITE_UI_BUTTON_PANEL,
+    SPRITE_UI_BOTTOM_PANEL,
+    SPRITE_UI_FRAME,
     SPRITE_COUNT
 };
 
-enum sprite_import_strategy {
-    SPRITE_IMPORT_DEFAULT,
-    SPRITE_IMPORT_RECOLOR,
-    SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA
+struct sprite_info_t {
+    atlas_name atlas;
+    int atlas_x;
+    int atlas_y;
+    int frame_width;
+    int frame_height;
 };
 
-struct sprite_params_t {
-    const char* path;
-    sprite_import_strategy strategy;
-    int hframes;
-    int vframes;
-};
-
-sprite_params_t resource_get_sprite_params(sprite_name name);
+atlas_params_t resource_get_atlas_params(atlas_name atlas);
+sprite_info_t resource_get_sprite_info(sprite_name name);
