@@ -2,12 +2,14 @@
 
 enum font_name {
     FONT_HACK,
+    FONT_WESTERN8,
     FONT_COUNT
 };
 
 struct font_params_t {
     const char* path;
     int size;
+    bool ignore_bearing;
 };
 
 const font_params_t& resource_get_font_params(font_name name);

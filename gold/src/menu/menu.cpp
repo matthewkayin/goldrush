@@ -134,7 +134,7 @@ void menu_render(const menu_state_t& state) {
         wagon_recolor_id = network_get_player(network_get_player_id()).recolor_id;
     }
     */
-    render_atlas(sprite_wagon_info.atlas, wagon_src_rect, wagon_dst_rect, 2, RENDER_SPRITE_NO_CULL);
+    render_atlas(sprite_wagon_info.atlas, wagon_src_rect, wagon_dst_rect, 3, RENDER_SPRITE_NO_CULL);
 
     // Render clouds
     const sprite_info_t& cloud_sprite_info = resource_get_sprite_info(SPRITE_UI_CLOUDS);

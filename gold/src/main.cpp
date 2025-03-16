@@ -159,7 +159,6 @@ int gold_main(int argc, char** argv) {
 
         menu_render(menu_state);
         if (render_debug_info) {
-            log_trace("hey render");
             char debug_text[32];
             sprintf(debug_text, "FPS: %u | UPS: %u", fps, ups);
             render_text(FONT_HACK, debug_text, ivec2(0, 0), 5, (color_t) { .r = 0.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f });

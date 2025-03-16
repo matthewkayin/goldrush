@@ -1,6 +1,5 @@
 #include "render.h"
 
-#define STB_IMAGE_IMPLEMENTATION
 #define MAX_BATCH_VERTICES 32768
 #define MAX_TEXT_CHARS 128
 #define FONT_GLYPH_COUNT 96
@@ -9,6 +8,8 @@
 #define MINIMAP_TEXTURE_HEIGHT 256
 #define ATLAS_WIDTH 1024
 #define ATLAS_HEIGHT 1024
+#define FONT_ATLAS_WIDTH 512
+#define FONT_ATLAS_HEIGHT 512
 
 #include "core/logger.h"
 #include "core/asserts.h"
@@ -33,20 +34,20 @@ struct sprite_vertex_t {
 struct font_vertex_t {
     float position[3];
     float tex_coord[2];
+    float color[3];
 };
 
 struct font_glyph_t {
+    int atlas_x;
+    int atlas_y;
     int bearing_x;
     int bearing_y;
     int advance;
 };
 
 struct font_t {
-    uint32_t texture;
-    int atlas_width;
-    int atlas_height;
-    int glyph_max_width;
-    int glyph_max_height;
+    int glyph_width;
+    int glyph_height;
     font_glyph_t glyphs[FONT_GLYPH_COUNT];
 };
 
@@ -93,19 +94,20 @@ struct render_state_t {
     GLuint sprite_shader;
     GLuint sprite_vao;
     GLuint sprite_vbo;
-    std::vector<sprite_vertex_t> sprite_vertices;
     uint32_t sprite_texture_array;
     ivec2 sprite_image_size[ATLAS_COUNT];
+    std::vector<sprite_vertex_t> sprite_vertices;
 
     GLuint minimap_texture;
     uint32_t minimap_texture_pixels[MINIMAP_TEXTURE_WIDTH * MINIMAP_TEXTURE_HEIGHT];
     uint32_t minimap_pixel_values[MINIMAP_PIXEL_COUNT];
 
     GLuint font_shader;
-    GLint font_shader_font_color_location;
     GLuint font_vao;
     GLuint font_vbo;
+    GLuint font_texture;
     font_t fonts[FONT_COUNT];
+    std::vector<font_vertex_t> font_vertices;
 
     GLuint line_shader;
     GLint line_shader_color_location;
@@ -122,7 +124,7 @@ void render_init_minimap_texture();
 bool render_init_screen_framebuffer();
 
 bool render_load_atlases();
-bool render_load_font(font_t* font,  const font_params_t& params);
+bool render_load_fonts();
 
 bool render_init(SDL_Window* window) {
     state.window = window;
@@ -176,7 +178,7 @@ bool render_init(SDL_Window* window) {
     }
     glUseProgram(state.sprite_shader);
     glUniform1ui(glGetUniformLocation(state.sprite_shader, "sprite_texture_array"), 0);
-    mat4 projection = mat4_ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT, 0.0f, 100.0f);
+    mat4 projection = mat4_ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT, 0.0f, (float)RENDER_MAX_Z_INDEX + 1.0f);
     glUniformMatrix4fv(glGetUniformLocation(state.sprite_shader, "projection"), 1, GL_FALSE, projection.data);
 
     // Load text shader
@@ -186,7 +188,6 @@ bool render_init(SDL_Window* window) {
     glUseProgram(state.font_shader);
     glUniform1ui(glGetUniformLocation(state.font_shader, "font_texture"), 0);
     glUniformMatrix4fv(glGetUniformLocation(state.font_shader, "projection"), 1, GL_FALSE, projection.data);
-    state.font_shader_font_color_location = glGetUniformLocation(state.font_shader, "font_color");
 
     // Load line shader
     if (!shader_load(&state.line_shader, "line.vert.glsl", "line.frag.glsl")) {
@@ -196,16 +197,11 @@ bool render_init(SDL_Window* window) {
     glUniformMatrix4fv(glGetUniformLocation(state.line_shader, "projection"), 1, GL_FALSE, projection.data);
     state.line_shader_color_location = glGetUniformLocation(state.line_shader, "color");
 
-    // Load sprites
     if (!render_load_atlases()) {
         return false;
     }
-
-    // Load fonts
-    for (int name = 0; name < FONT_COUNT; name++) {
-        if (!render_load_font(&state.fonts[name], resource_get_font_params((font_name)name))) {
-            return false;
-        }
+    if (!render_load_fonts()) {
+        return false;
     }
 
     log_info("Initialized renderer. Vendor: %s. Renderer: %s. Version: %s.", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
@@ -267,10 +263,13 @@ void render_init_font_vao() {
 
     // position
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     // tex coord
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    // color 
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -325,7 +324,7 @@ bool render_init_screen_framebuffer() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     GLuint screen_depthbuffer;
-    glGenTextures(1, &screen_depthbuffer);
+    glGenRenderbuffers(1, &screen_depthbuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, screen_depthbuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCREEN_WIDTH, SCREEN_HEIGHT);
 
@@ -339,6 +338,23 @@ bool render_init_screen_framebuffer() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     return true;
+}
+
+void render_flip_sdl_surface_vertically(SDL_Surface* surface) {
+    SDL_LockSurface(surface);
+    int sprite_surface_pitch = surface->pitch;
+    uint8_t temp[sprite_surface_pitch];
+    uint8_t* sprite_surface_pixels = (uint8_t*)surface->pixels;
+
+    for (int row = 0; row < surface->h / 2; ++row) {
+        uint8_t* row1 = sprite_surface_pixels + (row * sprite_surface_pitch);
+        uint8_t* row2 = sprite_surface_pixels + ((surface->h - row - 1) * sprite_surface_pitch);
+
+        memcpy(temp, row1, sprite_surface_pitch);
+        memcpy(row1, row2, sprite_surface_pitch);
+        memcpy(row2, temp, sprite_surface_pitch);
+    }
+    SDL_UnlockSurface(surface);
 }
 
 SDL_Surface* render_load_atlas_recolor(SDL_Surface* sprite_surface, const atlas_params_t params) {
@@ -523,21 +539,7 @@ bool render_load_atlases() {
             return false;
         }
 
-        // Flip the surface vertically
-        SDL_LockSurface(sprite_surface);
-        int sprite_surface_pitch = sprite_surface->pitch;
-        uint8_t temp[sprite_surface_pitch];
-        uint8_t* sprite_surface_pixels = (uint8_t*)sprite_surface->pixels;
-
-        for (int row = 0; row < sprite_surface->h / 2; ++row) {
-            uint8_t* row1 = sprite_surface_pixels + (row * sprite_surface_pitch);
-            uint8_t* row2 = sprite_surface_pixels + ((sprite_surface->h - row - 1) * sprite_surface_pitch);
-
-            memcpy(temp, row1, sprite_surface_pitch);
-            memcpy(row1, row2, sprite_surface_pitch);
-            memcpy(row2, temp, sprite_surface_pitch);
-        }
-        SDL_UnlockSurface(sprite_surface);
+        render_flip_sdl_surface_vertically(sprite_surface);
 
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, atlas, sprite_surface->w, sprite_surface->h, 1, GL_RGBA, GL_UNSIGNED_BYTE, sprite_surface->pixels);
 
@@ -549,68 +551,102 @@ bool render_load_atlases() {
     return true;
 }
 
-bool render_load_font(font_t* font, const font_params_t& params) {
+bool render_load_fonts() {
     static const SDL_Color COLOR_WHITE = { 255, 255, 255, 255 };
 
-    char path[128];
-    sprintf(path, "%sfont/%s", RESOURCE_PATH, params.path);
-
-    log_info("Loading font %s", path);
-
-    // Open the font
-    TTF_Font* ttf_font = TTF_OpenFont(path, params.size);
-    if (ttf_font == NULL) {
-        log_error("Unable to open font %s: %s", path, TTF_GetError());
+    ivec2 font_atlas_position = ivec2(0, 0);
+    SDL_Surface* atlas_surface = SDL_CreateRGBSurface(0, FONT_ATLAS_WIDTH, FONT_ATLAS_HEIGHT, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
+    if (atlas_surface == NULL) {
+        log_error("Unable to create font atlas: %s", SDL_GetError());
         return false;
     }
 
-    // Render each glyph to a surface
-    SDL_Surface* glyphs[FONT_GLYPH_COUNT];
-    int glyph_max_width = 0;
-    int glyph_max_height = 0;
-    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
-        char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
-        glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, COLOR_WHITE);
-        if (glyphs[glyph_index] == NULL) {
-            log_error("Error rendering glyph %s for font %s: %s", text, path, TTF_GetError());
+    for (int name = 0; name < FONT_COUNT; name++) {
+        const font_params_t& params = resource_get_font_params((font_name)name);
+        font_t& font = state.fonts[name];
+
+        char path[128];
+        sprintf(path, "%sfont/%s", RESOURCE_PATH, params.path);
+
+        log_info("Loading font %s", path);
+
+        // Open the font
+        TTF_Font* ttf_font = TTF_OpenFont(path, params.size);
+        if (ttf_font == NULL) {
+            log_error("Unable to open font %s: %s", path, TTF_GetError());
             return false;
         }
 
-        glyph_max_width = std::max(glyph_max_width, glyphs[glyph_index]->w);
-        glyph_max_height = std::max(glyph_max_height, glyphs[glyph_index]->h);
+        // Render each glyph to a surface
+        SDL_Surface* glyphs[FONT_GLYPH_COUNT];
+        int glyph_max_width = 0;
+        int glyph_max_height = 0;
+        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+            char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
+            glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, COLOR_WHITE);
+            if (glyphs[glyph_index] == NULL) {
+                log_error("Error rendering glyph %s for font %s: %s", text, path, TTF_GetError());
+                return false;
+            }
+
+            glyph_max_width = std::max(glyph_max_width, glyphs[glyph_index]->w);
+            glyph_max_height = std::max(glyph_max_height, glyphs[glyph_index]->h);
+        }
+
+        // Render each surface glyph onto a single atlas surface
+        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+            if (font_atlas_position.x + glyphs[glyph_index]->w >= FONT_ATLAS_WIDTH) {
+                font_atlas_position.x = 0;
+                font_atlas_position.y += glyph_max_height;
+            }
+
+            SDL_Rect dest_rect = (SDL_Rect) { 
+                .x = font_atlas_position.x, 
+                .y = font_atlas_position.y, 
+                .w = glyphs[glyph_index]->w, 
+                .h = glyphs[glyph_index]->h 
+            };
+            SDL_BlitSurface(glyphs[glyph_index], NULL, atlas_surface, &dest_rect);
+
+            font.glyphs[glyph_index].atlas_x = font_atlas_position.x;
+            font.glyphs[glyph_index].atlas_y = font_atlas_position.y;
+            font_atlas_position.x += glyph_max_width;
+        }
+
+        // Finish filling out the font struct
+        font.glyph_width = glyph_max_width;
+        font.glyph_height = glyph_max_height;
+        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+            int bearing_y;
+            TTF_GlyphMetrics(ttf_font, FONT_FIRST_CHAR + glyph_index, &font.glyphs[glyph_index].bearing_x, NULL, NULL, &bearing_y, &font.glyphs[glyph_index].advance);
+            font.glyphs[glyph_index].bearing_y = glyph_max_height - bearing_y;
+            if (params.ignore_bearing) {
+                font.glyphs[glyph_index].bearing_x = 0;
+                font.glyphs[glyph_index].bearing_y = 0;
+            }
+        }
+
+        // Free all the resources
+        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+            SDL_FreeSurface(glyphs[glyph_index]);
+        }
+        TTF_CloseFont(ttf_font);
+
+        font_atlas_position.x = 0;
+        font_atlas_position.y += glyph_max_height;
     }
 
-    // Render each surface glyph onto a single atlas surface
-    int atlas_width = next_largest_power_of_two(glyph_max_width * FONT_GLYPH_COUNT);
-    int atlas_height = next_largest_power_of_two(glyph_max_height);
-    SDL_Surface* atlas_surface = SDL_CreateRGBSurface(0, atlas_width, atlas_height, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
-    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
-        SDL_Rect dest_rect = (SDL_Rect) { .x = glyph_max_width * glyph_index, .y = 0, .w = glyphs[glyph_index]->w, .h = glyphs[glyph_index]->h };
-        SDL_BlitSurface(glyphs[glyph_index], NULL, atlas_surface, &dest_rect);
-    }
+    render_flip_sdl_surface_vertically(atlas_surface);
 
     // Render the atlas surface onto a texture
-    glGenTextures(1, &font->texture);
-    glBindTexture(GL_TEXTURE_2D, font->texture);
+    glGenTextures(1, &state.font_texture);
+    glBindTexture(GL_TEXTURE_2D, state.font_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlas_width, atlas_height, 0, GL_BGRA, GL_UNSIGNED_BYTE, atlas_surface->pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlas_surface->w, atlas_surface->h, 0, GL_BGRA, GL_UNSIGNED_BYTE, atlas_surface->pixels);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
-    // Finish filling out the font struct
-    font->atlas_width = atlas_width;
-    font->atlas_height = atlas_height;
-    font->glyph_max_width = glyph_max_width;
-    font->glyph_max_height = glyph_max_height;
-    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
-        TTF_GlyphMetrics(ttf_font, FONT_FIRST_CHAR + glyph_index, &font->glyphs[glyph_index].bearing_x, NULL, NULL, &font->glyphs[glyph_index].bearing_y, &font->glyphs[glyph_index].advance);
-    }
-
-    // Free all the resources
-    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
-        SDL_FreeSurface(glyphs[glyph_index]);
-    }
     SDL_FreeSurface(atlas_surface);
-    TTF_CloseFont(ttf_font);
 
     return true;
 }
@@ -624,6 +660,7 @@ void render_prepare_frame() {
     glBindFramebuffer(GL_FRAMEBUFFER, state.screen_framebuffer);
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -637,24 +674,52 @@ void render_sprite_vertices() {
     GOLD_ASSERT(state.sprite_vertices.size() <= MAX_BATCH_VERTICES);
 
     // Buffer sprite batch data
+    glBindVertexArray(state.sprite_vao);
     glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, state.sprite_vertices.size() * sizeof(sprite_vertex_t), &state.sprite_vertices[0]);
 
     // Render sprite batch
-    glBindVertexArray(state.sprite_vao);
     glUseProgram(state.sprite_shader);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
 
     glDrawArrays(GL_TRIANGLES, 0, state.sprite_vertices.size());
+
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
     state.sprite_vertices.clear();
 }
 
+void render_font_vertices() {
+    if (state.font_vertices.empty()) {
+        return;
+    }
+    GOLD_ASSERT(state.font_vertices.size() <= MAX_BATCH_VERTICES);
+
+    // Buffer font batch data
+    glBindVertexArray(state.font_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.font_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, state.font_vertices.size() * sizeof(font_vertex_t), &state.font_vertices[0]);
+
+    // Render font batch
+    glUseProgram(state.font_shader);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, state.font_texture);
+
+    glDrawArrays(GL_TRIANGLES, 0, state.font_vertices.size());
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    state.font_vertices.clear();
+}
+
 void render_present_frame() {
     render_sprite_vertices();
+    render_font_vertices();
 
     // Switch to default framebuffer
     ivec2 window_size;
@@ -682,7 +747,7 @@ void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, u
 
     rect_t src_rect = (rect_t) { 
         .x = sprite_info.atlas_x + (frame.x * sprite_info.frame_width), 
-        .y = sprite_info.atlas_y + ((recolor_id == RECOLOR_NONE ? 0 : recolor_id) * state.sprite_image_size[sprite_info.atlas].y) + (frame.y * sprite_info.frame_height), 
+        .y = sprite_info.atlas_y + (recolor_id * state.sprite_image_size[sprite_info.atlas].y) + (frame.y * sprite_info.frame_height), 
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
@@ -801,28 +866,29 @@ void render_atlas(atlas_name atlas, rect_t src_rect, rect_t dst_rect, int z_inde
         tex_coord_right = temp;
     }
 
+    float z = (float)(-RENDER_MAX_Z_INDEX + z_index);
     state.sprite_vertices.push_back((sprite_vertex_t) {
-        .position = { position_left, position_top, (float)-z_index },
+        .position = { position_left, position_top, z },
         .tex_coord = { tex_coord_left, tex_coord_top, (float)atlas }
     });
     state.sprite_vertices.push_back((sprite_vertex_t) {
-        .position = { position_right, position_bottom, (float)-z_index },
+        .position = { position_right, position_bottom, z },
         .tex_coord = { tex_coord_right, tex_coord_bottom, (float)atlas }
     });
     state.sprite_vertices.push_back((sprite_vertex_t) {
-        .position = { position_left, position_bottom, (float)-z_index },
+        .position = { position_left, position_bottom, z },
         .tex_coord = { tex_coord_left, tex_coord_bottom, (float)atlas }
     });
     state.sprite_vertices.push_back((sprite_vertex_t) {
-        .position = { position_left, position_top, (float)-z_index },
+        .position = { position_left, position_top, z },
         .tex_coord = { tex_coord_left, tex_coord_top, (float)atlas }
     });
     state.sprite_vertices.push_back((sprite_vertex_t) {
-        .position = { position_right, position_top, (float)-z_index },
+        .position = { position_right, position_top, z },
         .tex_coord = { tex_coord_right, tex_coord_top, (float)atlas }
     });
     state.sprite_vertices.push_back((sprite_vertex_t) {
-        .position = { position_right, position_bottom, (float)-z_index },
+        .position = { position_right, position_bottom, z },
         .tex_coord = { tex_coord_right, tex_coord_bottom, (float)atlas }
     });
 }
@@ -831,18 +897,8 @@ void render_text(font_name name, const char* text, ivec2 position, int z_index, 
     ivec2 glyph_position = position;
     size_t text_index = 0;
 
-    // Don't render empty string
-    if (text[text_index] == '\0') {
-        return;
-    }
-
-    float frame_size_x = (float)state.fonts[name].glyph_max_width / (float)state.fonts[name].atlas_width;
-    float tex_coord_bottom = 1.0f;
-    float tex_coord_top = 0.0f;
-    float position_top = (float)(SCREEN_HEIGHT - glyph_position.y);
-    float position_bottom = (float)(SCREEN_HEIGHT - (glyph_position.y + state.fonts[name].atlas_height));
-
-    std::vector<font_vertex_t> font_vertices;
+    float frame_size_x = (float)(state.fonts[name].glyph_width) / (float)FONT_ATLAS_WIDTH;
+    float frame_size_y = (float)(state.fonts[name].glyph_height) / (float)FONT_ATLAS_HEIGHT;
 
     while (text[text_index] != '\0') {
         int glyph_index = (int)text[text_index] - FONT_FIRST_CHAR;
@@ -850,55 +906,66 @@ void render_text(font_name name, const char* text, ivec2 position, int z_index, 
             glyph_index = (int)('|' - FONT_FIRST_CHAR);
         }
 
+        float position_top = (float)(SCREEN_HEIGHT - (glyph_position.y + state.fonts[name].glyphs[glyph_index].bearing_y));
+        float position_bottom = position_top - (float)state.fonts[name].glyph_height;
         float position_left = (float)(glyph_position.x + state.fonts[name].glyphs[glyph_index].bearing_x);
-        float position_right = (float)(glyph_position.x + state.fonts[name].glyphs[glyph_index].bearing_x + state.fonts[name].glyph_max_width);
+        float position_right = position_left + (float)state.fonts[name].glyph_width;
 
-        float tex_coord_left = frame_size_x * glyph_index;
+        float tex_coord_left = (float)state.fonts[name].glyphs[glyph_index].atlas_x / (float)FONT_ATLAS_WIDTH;
         float tex_coord_right = tex_coord_left + frame_size_x;
+        float tex_coord_top = 1.0f - ((float)state.fonts[name].glyphs[glyph_index].atlas_y / (float)FONT_ATLAS_HEIGHT);
+        float tex_coord_bottom = tex_coord_top - frame_size_y;
 
-        font_vertices.push_back((font_vertex_t) {
+        state.font_vertices.push_back((font_vertex_t) {
             .position = { position_left, position_top, (float)-z_index },
-            .tex_coord = { tex_coord_left, tex_coord_top }
+            .tex_coord = { tex_coord_left, tex_coord_top },
+            .color = { color.r, color.g, color.b }
         });
-        font_vertices.push_back((font_vertex_t) {
+        state.font_vertices.push_back((font_vertex_t) {
             .position = { position_right, position_bottom, (float)-z_index },
-            .tex_coord = { tex_coord_right, tex_coord_bottom }
+            .tex_coord = { tex_coord_right, tex_coord_bottom },
+            .color = { color.r, color.g, color.b }
         });
-        font_vertices.push_back((font_vertex_t) {
+        state.font_vertices.push_back((font_vertex_t) {
             .position = { position_left, position_bottom, (float)-z_index },
-            .tex_coord = { tex_coord_left, tex_coord_bottom }
+            .tex_coord = { tex_coord_left, tex_coord_bottom },
+            .color = { color.r, color.g, color.b }
         });
-        font_vertices.push_back((font_vertex_t) {
+        state.font_vertices.push_back((font_vertex_t) {
             .position = { position_left, position_top, (float)-z_index },
-            .tex_coord = { tex_coord_left, tex_coord_top }
+            .tex_coord = { tex_coord_left, tex_coord_top },
+            .color = { color.r, color.g, color.b }
         });
-        font_vertices.push_back((font_vertex_t) {
+        state.font_vertices.push_back((font_vertex_t) {
             .position = { position_right, position_top, (float)-z_index },
-            .tex_coord = { tex_coord_right, tex_coord_top }
+            .tex_coord = { tex_coord_right, tex_coord_top },
+            .color = { color.r, color.g, color.b }
         });
-        font_vertices.push_back((font_vertex_t) {
+        state.font_vertices.push_back((font_vertex_t) {
             .position = { position_right, position_bottom, (float)-z_index },
-            .tex_coord = { tex_coord_right, tex_coord_bottom }
+            .tex_coord = { tex_coord_right, tex_coord_bottom },
+            .color = { color.r, color.g, color.b }
         });
 
         glyph_position.x += state.fonts[name].glyphs[glyph_index].advance;
         text_index++;
     }
+}
 
-    glBindBuffer(GL_ARRAY_BUFFER, state.font_vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, font_vertices.size() * sizeof(font_vertex_t), &font_vertices[0]);
+ivec2 render_get_text_size(font_name name, const char* text) {
+    ivec2 size = ivec2(0, state.fonts[name].glyph_height);
+    size_t text_index = 0;
 
-    glUseProgram(state.font_shader);
-    glUniform3fv(state.font_shader_font_color_location, 1, &color.r);
+    while (text[text_index] != '\0') {
+        int glyph_index = (int)text[text_index] - FONT_FIRST_CHAR;
+        if (glyph_index < 0 || glyph_index >= FONT_GLYPH_COUNT) {
+            glyph_index = (int)('|' - FONT_FIRST_CHAR);
+        }
 
-    glBindVertexArray(state.font_vao);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, state.fonts[name].texture);
+        size.x += state.fonts[name].glyphs[glyph_index].advance;
+    }
 
-    glDrawArrays(GL_TRIANGLES, 0, font_vertices.size());
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    return size;
 }
 
 void render_line(ivec2 start, ivec2 end, int z_index, color_t color) {
