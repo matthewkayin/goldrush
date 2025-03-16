@@ -829,10 +829,10 @@ void render_atlas(atlas_name atlas, rect_t src_rect, rect_t dst_rect, int z_inde
 
 void render_text(font_name name, const char* text, ivec2 position, int z_index, color_t color) {
     ivec2 glyph_position = position;
-    const char* text_ptr = text;
+    size_t text_index = 0;
 
     // Don't render empty string
-    if (text_ptr == '\0') {
+    if (text[text_index] == '\0') {
         return;
     }
 
@@ -844,8 +844,8 @@ void render_text(font_name name, const char* text, ivec2 position, int z_index, 
 
     std::vector<font_vertex_t> font_vertices;
 
-    while (*text_ptr != '\0') {
-        int glyph_index = (int)*text_ptr - FONT_FIRST_CHAR;
+    while (text[text_index] != '\0') {
+        int glyph_index = (int)text[text_index] - FONT_FIRST_CHAR;
         if (glyph_index < 0 || glyph_index >= FONT_GLYPH_COUNT) {
             glyph_index = (int)('|' - FONT_FIRST_CHAR);
         }
@@ -882,7 +882,7 @@ void render_text(font_name name, const char* text, ivec2 position, int z_index, 
         });
 
         glyph_position.x += state.fonts[name].glyphs[glyph_index].advance;
-        text_ptr++;
+        text_index++;
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, state.font_vbo);
