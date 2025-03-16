@@ -6,6 +6,7 @@ enum atlas_name {
     ATLAS_UI,
     ATLAS_TILESET,
     ATLAS_UNIT_WAGON,
+    ATLAS_FONT,
     ATLAS_COUNT
 };
 
@@ -13,7 +14,8 @@ enum atlas_import_strategy {
     ATLAS_IMPORT_DEFAULT,
     ATLAS_IMPORT_RECOLOR,
     ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA,
-    ATLAS_IMPORT_TILESET
+    ATLAS_IMPORT_TILESET,
+    ATLAS_IMPORT_FONTS
 };
 
 struct atlas_params_tileset_t {

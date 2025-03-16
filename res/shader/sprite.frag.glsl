@@ -1,7 +1,5 @@
 #version 330 core
 
-#define MAX_ATLASES 16
-
 in vec3 frag_tex_coord;
 
 out vec4 frag_color;

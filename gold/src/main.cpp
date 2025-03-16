@@ -11,9 +11,6 @@
 #include <SDL2/SDL_ttf.h>
 #include <cstring>
 
-#define APP_NAME "GOLD RUSH"
-#define APP_VERSION "0.5"
-
 int gold_main(int argc, char** argv);
 
 #if defined PLATFORM_WIN32 && !defined GOLD_DEBUG
@@ -159,9 +156,9 @@ int gold_main(int argc, char** argv) {
 
         menu_render(menu_state);
         if (render_debug_info) {
-            char debug_text[32];
-            sprintf(debug_text, "FPS: %u | UPS: %u", fps, ups);
-            render_text(FONT_HACK, debug_text, ivec2(0, 0), 5, (color_t) { .r = 0.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f });
+            char fps_text[32];
+            sprintf(fps_text, "FPS: %u | UPS: %u", fps, ups);
+            render_text(FONT_HACK_BLACK, fps_text, ivec2(0, 0), RENDER_COLOR_BLACK);
         }
 
         render_present_frame();

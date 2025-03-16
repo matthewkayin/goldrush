@@ -15,6 +15,10 @@ static const std::unordered_map<atlas_name, atlas_params_t> ATLAS_PARAMS = {
             .end = SPRITE_TILE_DECORATION4
         }
     }},
+    { ATLAS_FONT, (atlas_params_t) {
+        .path = "",
+        .strategy = ATLAS_IMPORT_FONTS,
+    }},
     { ATLAS_UNIT_WAGON, (atlas_params_t) {
         .path = "unit_wagon.png",
         .strategy = ATLAS_IMPORT_RECOLOR,

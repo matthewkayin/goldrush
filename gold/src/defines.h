@@ -11,6 +11,9 @@
     #define PLATFORM_OSX 1
 #endif
 
+#define APP_NAME "GOLD RUSH"
+#define APP_VERSION "0.5"
+
 #define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
 
