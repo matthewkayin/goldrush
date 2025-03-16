@@ -122,7 +122,7 @@ void render_init_minimap_texture();
 bool render_init_screen_framebuffer();
 
 bool render_load_atlases();
-bool render_load_font(font_t* font,  const font_params_t params);
+bool render_load_font(font_t* font,  const font_params_t& params);
 
 bool render_init(SDL_Window* window) {
     state.window = window;
@@ -408,7 +408,7 @@ SDL_Surface* render_load_atlas_tileset(SDL_Surface* sprite_surface, const atlas_
     SDL_Rect dst_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
 
     for (int tile = params.tileset.begin; tile < params.tileset.end + 1; tile++) {
-        tile_data_t tile_data = resource_get_tile_data((sprite_name)tile);
+        const tile_data_t& tile_data = resource_get_tile_data((sprite_name)tile);
 
         // We can go ahead and set this now since the code is the same for both tile types
         // and the dst_rect is already pointing in the place where the tile will go on the atlas
@@ -496,7 +496,7 @@ bool render_load_atlases() {
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     for (int atlas = 0; atlas < ATLAS_COUNT; atlas++) {
-        const atlas_params_t params = resource_get_atlas_params((atlas_name)atlas);
+        const atlas_params_t& params = resource_get_atlas_params((atlas_name)atlas);
 
         char path[128];
         sprintf(path, "%ssprite/%s", RESOURCE_PATH, params.path);
@@ -549,7 +549,7 @@ bool render_load_atlases() {
     return true;
 }
 
-bool render_load_font(font_t* font, const font_params_t params) {
+bool render_load_font(font_t* font, const font_params_t& params) {
     static const SDL_Color COLOR_WHITE = { 255, 255, 255, 255 };
 
     char path[128];
@@ -678,7 +678,7 @@ void render_present_frame() {
 }
 
 void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, uint32_t options, int recolor_id) {
-    sprite_info_t sprite_info = resource_get_sprite_info(name);
+    const sprite_info_t& sprite_info = resource_get_sprite_info(name);
 
     rect_t src_rect = (rect_t) { 
         .x = sprite_info.atlas_x + (frame.x * sprite_info.frame_width), 
@@ -696,7 +696,7 @@ void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, u
 }
 
 void render_ninepatch(sprite_name sprite, rect_t rect, int z_index) {
-    sprite_info_t sprite_info = resource_get_sprite_info(sprite);
+    const sprite_info_t& sprite_info = resource_get_sprite_info(sprite);
     GOLD_ASSERT(rect.w > sprite_info.frame_width * 2 && rect.h > sprite_info.frame_height * 2);
 
     rect_t src_rect = (rect_t) {

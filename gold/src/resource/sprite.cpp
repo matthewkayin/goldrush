@@ -14,6 +14,10 @@ static const std::unordered_map<atlas_name, atlas_params_t> ATLAS_PARAMS = {
             .begin = SPRITE_TILE_NULL,
             .end = SPRITE_TILE_DECORATION4
         }
+    }},
+    { ATLAS_UNIT_WAGON, (atlas_params_t) {
+        .path = "unit_wagon.png",
+        .strategy = ATLAS_IMPORT_RECOLOR,
     }}
 };
 
@@ -107,6 +111,16 @@ static std::unordered_map<sprite_name, sprite_info_t> SPRITE_INFO = {
         .atlas = ATLAS_UI, 
         .atlas_x = 0, .atlas_y = 330,
         .frame_width = 70, .frame_height = 16
+    }},
+    { SPRITE_UI_SKY, (sprite_info_t) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 0, .atlas_y = 352,
+        .frame_width = 16, .frame_height = 16
+    }},
+    { SPRITE_UNIT_WAGON, (sprite_info_t) { 
+        .atlas = ATLAS_UNIT_WAGON, 
+        .atlas_x = 0, .atlas_y = 0,
+        .frame_width = 40, .frame_height = 34
     }}
 };
 
@@ -313,11 +327,11 @@ static const std::unordered_map<sprite_name, tile_data_t> TILE_DATA = {
     }}
 };
 
-atlas_params_t resource_get_atlas_params(atlas_name atlas) {
+const atlas_params_t& resource_get_atlas_params(atlas_name atlas) {
     return ATLAS_PARAMS.at(atlas);
 }
 
-sprite_info_t resource_get_sprite_info(sprite_name name) {
+const sprite_info_t& resource_get_sprite_info(sprite_name name) {
     return SPRITE_INFO.at(name);
 }
 
@@ -325,6 +339,6 @@ void resource_set_sprite_info(sprite_name name, sprite_info_t sprite_info) {
     SPRITE_INFO[name] = sprite_info;
 }
 
-tile_data_t resource_get_tile_data(sprite_name tile) {
+const tile_data_t& resource_get_tile_data(sprite_name tile) {
     return TILE_DATA.at(tile);
 }

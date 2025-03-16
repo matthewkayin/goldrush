@@ -1,0 +1,53 @@
+#pragma once
+
+#define ANIMATION_LOOPS_INDEFINITELY -1
+
+#include "math/gmath.h"
+#include <cstdint>
+
+enum animation_name {
+    ANIMATION_UI_MOVE_CELL,
+    ANIMATION_UI_MOVE_ENTITY,
+    ANIMATION_UI_MOVE_ATTACK_ENTITY,
+    ANIMATION_UNIT_IDLE,
+    ANIMATION_UNIT_MOVE,
+    ANIMATION_UNIT_MOVE_SLOW,
+    ANIMATION_UNIT_MOVE_CANNON,
+    ANIMATION_UNIT_ATTACK,
+    ANIMATION_SOLDIER_RANGED_ATTACK,
+    ANIMATION_SOLDIER_CHARGE,
+    ANIMATION_CANNON_ATTACK,
+    ANIMATION_UNIT_MINE,
+    ANIMATION_UNIT_BUILD,
+    ANIMATION_UNIT_DEATH,
+    ANIMATION_UNIT_DEATH_FADE,
+    ANIMATION_CANNON_DEATH,
+    ANIMATION_CANNON_DEATH_FADE,
+    ANIMATION_RALLY_FLAG,
+    ANIMATION_PARTICLE_SPARKS,
+    ANIMATION_PARTICLE_BUNKER_COWBOY,
+    ANIMATION_PARTICLE_EXPLOSION,
+    ANIMATION_PARTICLE_CANNON_EXPLOSION,
+    ANIMATION_PARTICLE_SMOKE_START,
+    ANIMATION_PARTICLE_SMOKE,
+    ANIMATION_PARTICLE_SMOKE_END,
+    ANIMATION_SMITH_BEGIN,
+    ANIMATION_SMITH_LOOP,
+    ANIMATION_SMITH_END,
+    ANIMATION_MINE_PRIME
+};
+
+struct animation_t {
+    animation_name name;
+    uint32_t timer;
+    uint32_t frame_index;
+    ivec2 frame;
+    int loops_remaining = 0;
+};
+
+// Initializes the animation data
+void animation_init();
+animation_t animation_create(animation_name name);
+bool animation_is_playing(const animation_t& animation);
+void animation_update(animation_t& animation);
+void animation_stop(animation_t& animation);

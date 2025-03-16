@@ -5,6 +5,7 @@
 enum atlas_name {
     ATLAS_UI,
     ATLAS_TILESET,
+    ATLAS_UNIT_WAGON,
     ATLAS_COUNT
 };
 
@@ -47,6 +48,8 @@ enum sprite_name {
     SPRITE_UI_MENU_BUTTON,
     SPRITE_UI_TEXT_FRAME,
     SPRITE_UI_CLOUDS,
+    SPRITE_UI_SKY,
+    SPRITE_UNIT_WAGON,
     SPRITE_TILE_NULL,
     SPRITE_TILE_SAND,
     SPRITE_TILE_SAND2,
@@ -109,7 +112,7 @@ struct tile_data_t {
     int source_y;
 };
 
-atlas_params_t resource_get_atlas_params(atlas_name atlas);
-sprite_info_t resource_get_sprite_info(sprite_name name);
+const atlas_params_t& resource_get_atlas_params(atlas_name atlas);
+const sprite_info_t& resource_get_sprite_info(sprite_name name);
 void resource_set_sprite_info(sprite_name name, sprite_info_t sprite_info);
-tile_data_t resource_get_tile_data(sprite_name tile);
+const tile_data_t& resource_get_tile_data(sprite_name tile);

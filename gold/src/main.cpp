@@ -2,8 +2,10 @@
 #include "core/platform.h"
 #include "core/logger.h"
 #include "core/cursor.h"
+#include "core/animation.h"
 #include "math/gmath.h"
 #include "render/render.h"
+#include "menu/menu.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -82,6 +84,7 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return -1;
     }
+    animation_init();
 
     bool is_running = true;
     bool render_debug_info = true;
@@ -93,6 +96,8 @@ int gold_main(int argc, char** argv) {
     uint32_t fps = 0;
     uint32_t updates = 0;
     uint32_t ups = 0;
+
+    menu_state_t menu_state = menu_init();
 
     while (is_running) {
         // TIMEKEEP
@@ -145,10 +150,13 @@ int gold_main(int argc, char** argv) {
         while (update_accumulator >= UPDATE_TIME) {
             update_accumulator -= UPDATE_TIME;
             updates++;
+
+            menu_update(menu_state);
         }
 
         // RENDER
         render_prepare_frame();
+        menu_render(menu_state);
         render_present_frame();
     }
 

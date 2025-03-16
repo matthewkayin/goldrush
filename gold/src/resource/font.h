@@ -10,4 +10,4 @@ struct font_params_t {
     int size;
 };
 
-font_params_t resource_get_font_params(font_name name);
+const font_params_t& resource_get_font_params(font_name name);
