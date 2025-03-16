@@ -1,6 +1,7 @@
 #include "defines.h"
 #include "core/platform.h"
 #include "core/logger.h"
+#include "core/cursor.h"
 #include "math/gmath.h"
 #include "render/render.h"
 #include <SDL2/SDL.h>
@@ -74,6 +75,10 @@ int gold_main(int argc, char** argv) {
     SDL_Window* window = SDL_CreateWindow(APP_NAME, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, window_flags);
 
     if (!render_init(window)) {
+        logger_quit();
+        return -1;
+    }
+    if (!cursor_init()) {
         logger_quit();
         return -1;
     }
