@@ -7,6 +7,8 @@
 #define FONT_FIRST_CHAR 32 // space
 #define MINIMAP_TEXTURE_WIDTH 512
 #define MINIMAP_TEXTURE_HEIGHT 256
+#define ATLAS_WIDTH 1024
+#define ATLAS_HEIGHT 1024
 
 #include "core/logger.h"
 #include "core/asserts.h"
@@ -31,12 +33,6 @@ struct sprite_vertex_t {
 struct font_vertex_t {
     float position[3];
     float tex_coord[2];
-};
-
-struct atlas_t {
-    uint32_t texture;
-    ivec2 texture_size; 
-    ivec2 image_size;
 };
 
 struct font_glyph_t {
@@ -98,7 +94,8 @@ struct render_state_t {
     GLuint sprite_vao;
     GLuint sprite_vbo;
     std::vector<sprite_vertex_t> sprite_vertices;
-    atlas_t atlases[ATLAS_COUNT];
+    uint32_t sprite_texture_array;
+    ivec2 sprite_image_size[ATLAS_COUNT];
 
     GLuint minimap_texture;
     uint32_t minimap_texture_pixels[MINIMAP_TEXTURE_WIDTH * MINIMAP_TEXTURE_HEIGHT];
@@ -124,7 +121,7 @@ void render_init_line_vao();
 void render_init_minimap_texture();
 bool render_init_screen_framebuffer();
 
-bool render_load_atlas(atlas_t* atlas, const atlas_params_t params);
+bool render_load_atlases();
 bool render_load_font(font_t* font,  const font_params_t params);
 
 bool render_init(SDL_Window* window) {
@@ -178,11 +175,7 @@ bool render_init(SDL_Window* window) {
         return false;
     }
     glUseProgram(state.sprite_shader);
-    for (uint32_t index = 0; index < 16; index++) {
-        char uniform_name[32];
-        sprintf(uniform_name, "sprite_textures[%u]", index);
-        glUniform1ui(glGetUniformLocation(state.sprite_shader, uniform_name), index);
-    }
+    glUniform1ui(glGetUniformLocation(state.sprite_shader, "sprite_texture_array"), 0);
     mat4 projection = mat4_ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT, 0.0f, 100.0f);
     glUniformMatrix4fv(glGetUniformLocation(state.sprite_shader, "projection"), 1, GL_FALSE, projection.data);
 
@@ -204,10 +197,8 @@ bool render_init(SDL_Window* window) {
     state.line_shader_color_location = glGetUniformLocation(state.line_shader, "color");
 
     // Load sprites
-    for (int name = 0; name < ATLAS_COUNT; name++) {
-        if (!render_load_atlas(&state.atlases[name], resource_get_atlas_params((atlas_name)name))) {
-            return false;
-        }
+    if (!render_load_atlases()) {
+        return false;
     }
 
     // Load fonts
@@ -350,110 +341,210 @@ bool render_init_screen_framebuffer() {
     return true;
 }
 
-bool render_load_atlas(atlas_t* atlas, const atlas_params_t params) {
-    char path[128];
-    sprintf(path, "%ssprite/%s", RESOURCE_PATH, params.path);
-
-    log_info("Loading sprite %s", path);
-
-    SDL_Surface* sprite_surface = IMG_Load(path);
-    if (sprite_surface == NULL) {
-        log_error("Error loading surface for sprite %s: %s", path, IMG_GetError());
-        return false;
+SDL_Surface* render_load_atlas_recolor(SDL_Surface* sprite_surface, const atlas_params_t params) {
+    // Create a surface big enough to hold the recolor atlas
+    SDL_Surface* recolor_surface = SDL_CreateRGBSurfaceWithFormat(0, ATLAS_WIDTH, ATLAS_HEIGHT, 32, sprite_surface->format->format);
+    if (recolor_surface == NULL) {
+        log_error("Error creating recolor surface for sprite: %s", SDL_GetError());
+        return NULL;
     }
-    GOLD_ASSERT(sprite_surface->format->BytesPerPixel == 4);
 
-    atlas->image_size = ivec2(sprite_surface->w, sprite_surface->h);
+    // Get the reference pixels into a packed byte
+    uint32_t clothes_reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_CLOTHES_REF.r, RECOLOR_CLOTHES_REF.g, RECOLOR_CLOTHES_REF.b, RECOLOR_CLOTHES_REF.a);
+    uint32_t skin_reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_SKIN_REF.r, RECOLOR_SKIN_REF.g, RECOLOR_SKIN_REF.b, RECOLOR_SKIN_REF.a);
 
-    if (params.strategy == ATLAS_IMPORT_RECOLOR || params.strategy == ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA) {
-        // Create a surface big enough to hold the recolor atlas
-        int sprite_width = next_largest_power_of_two(sprite_surface->w);
-        int sprite_height = next_largest_power_of_two(sprite_surface->h * MAX_PLAYERS);
-        SDL_Surface* recolor_surface = SDL_CreateRGBSurfaceWithFormat(0, sprite_width, sprite_height, 32, sprite_surface->format->format);
-        if (recolor_surface == NULL) {
-            log_error("Error creating recolor surface for sprite %s: %s", path, SDL_GetError());
+    // Lock the surface so that we can edit pixel values
+    SDL_LockSurface(recolor_surface);
+    uint32_t* recolor_surface_pixels = (uint32_t*)recolor_surface->pixels;
+    uint32_t* sprite_surface_pixels = (uint32_t*)sprite_surface->pixels;
+
+    // Copy the original sprite onto our recolor atlas 4 times, once for each player color
+    for (int recolor_id = 0; recolor_id < MAX_PLAYERS; recolor_id++) {
+        // Get the replacement pixel bytes from the player color
+        uint32_t clothes_replacement_pixel = SDL_MapRGBA(recolor_surface->format, PLAYER_COLORS[recolor_id].clothes_color.r, PLAYER_COLORS[recolor_id].clothes_color.g, PLAYER_COLORS[recolor_id].clothes_color.b, PLAYER_COLORS[recolor_id].clothes_color.a);
+        uint32_t skin_replacement_pixel = SDL_MapRGBA(recolor_surface->format, PLAYER_COLORS[recolor_id].skin_color.r, PLAYER_COLORS[recolor_id].skin_color.g, PLAYER_COLORS[recolor_id].skin_color.b, PLAYER_COLORS[recolor_id].skin_color.a);
+
+        // Loop through each pixel of the original sprite
+        for (int y = 0; y < sprite_surface->h; y++) {
+            for (int x = 0; x < sprite_surface->w; x++) {
+                // Determine which source pixel to use
+                uint32_t source_pixel = sprite_surface_pixels[(y * sprite_surface->w) + x];
+                if (source_pixel == clothes_reference_pixel) {
+                    source_pixel = clothes_replacement_pixel;
+                } else if (source_pixel == skin_reference_pixel) {
+                    source_pixel = skin_replacement_pixel;
+                }
+                if (params.strategy == ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA) {
+                    uint8_t r, g, b, a;
+                    SDL_GetRGBA(source_pixel, recolor_surface->format, &r, &g, &b, &a);
+                    if (a != 0) {
+                        a = 200;
+                    }
+                    source_pixel = SDL_MapRGBA(recolor_surface->format, r, g, b, a);
+                }
+
+                // Put the source pixel onto the recolor surface
+                recolor_surface_pixels[((y + (sprite_surface->h * recolor_id)) * recolor_surface->w) + x] = source_pixel;
+            }
+        }
+    }
+
+    SDL_UnlockSurface(recolor_surface);
+
+    // Handoff the recolor surface into the sprite surface variable
+    // Allows the rest of the sprite loading to work the same as with normal sprites
+    SDL_FreeSurface(sprite_surface);
+    return recolor_surface;
+}
+
+SDL_Surface* render_load_atlas_tileset(SDL_Surface* sprite_surface, const atlas_params_t params) {
+    SDL_Surface* tileset_surface = SDL_CreateRGBSurfaceWithFormat(0, ATLAS_WIDTH, ATLAS_HEIGHT, 32, sprite_surface->format->format);
+    if (tileset_surface == NULL) {
+        log_error("Unable to create tileset surface: %s", SDL_GetError());
+        return NULL;
+    }
+
+    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
+    SDL_Rect dst_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
+
+    for (int tile = params.tileset.begin; tile < params.tileset.end + 1; tile++) {
+        tile_data_t tile_data = resource_get_tile_data((sprite_name)tile);
+
+        // We can go ahead and set this now since the code is the same for both tile types
+        // and the dst_rect is already pointing in the place where the tile will go on the atlas
+        sprite_info_t tile_info = (sprite_info_t) {
+            .atlas = ATLAS_TILESET,
+            .atlas_x = dst_rect.x,
+            .atlas_y = dst_rect.y,
+            .frame_width = TILE_SIZE,
+            .frame_height = TILE_SIZE
+        };
+        resource_set_sprite_info((sprite_name)tile, tile_info);
+
+        if (tile_data.type == TILE_TYPE_SINGLE) {
+            src_rect.x = tile_data.source_x;
+            src_rect.y = tile_data.source_y;
+            SDL_BlitSurface(sprite_surface, &src_rect, tileset_surface, &dst_rect);
+
+            dst_rect.x += TILE_SIZE;
+            if (dst_rect.x == ATLAS_WIDTH) {
+                dst_rect.x = 0;
+                dst_rect.y += TILE_SIZE;
+            }
+        } else if (tile_data.type == TILE_TYPE_AUTO) {
+            // To generate an autotile, we iterate through each combination of neighbors
+            for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
+                // There are 256 neighbor combinations, but only 47 of them are unique because
+                // a diagonal neighbor does not affect what tile we render when autotiling 
+                // unless there is an adjacent tile in both directions. 
+                // for example: neighbor in NE by itself does not affect which tile we render
+                // but neighbor in NE and neighbor in N and neighbor in E does (both adjacent directions are required)
+                bool is_unique = true;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                    if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
+                        int prev_direction = direction - 1;
+                        int next_direction = (direction + 1) % DIRECTION_COUNT;
+                        if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                            (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                            is_unique = false;
+                            break;
+                        }
+                    }
+                }
+                if (!is_unique) {
+                    continue;
+                }
+
+                // Each unique autotile is formed by sampling corners off of the source tile
+                // https://gamedev.stackexchange.com/questions/46594/elegant-autotiling
+                for (uint32_t edge = 0; edge < 4; edge++) {
+                    ivec2 edge_source_pos = ivec2(tile_data.source_x, tile_data.source_y) + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
+                    SDL_Rect subtile_src_rect = (SDL_Rect) {
+                        .x = edge_source_pos.x,
+                        .y = edge_source_pos.y,
+                        .w = TILE_SIZE / 2,
+                        .h = TILE_SIZE / 2
+                    };
+                    SDL_Rect subtile_dst_rect = (SDL_Rect) {
+                        .x = dst_rect.x + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
+                        .y = AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2),
+                        .w = TILE_SIZE / 2,
+                        .h = TILE_SIZE / 2
+                    };
+
+                    SDL_BlitSurface(sprite_surface, &subtile_src_rect, tileset_surface, &subtile_dst_rect);
+                } 
+
+                dst_rect.x += TILE_SIZE;
+                if (dst_rect.x == ATLAS_WIDTH) {
+                    dst_rect.x = 0;
+                    dst_rect.y += TILE_SIZE;
+                }
+            } // End for each neighbor combo
+        } // End if tile type is auto
+    } // End for each tile
+
+    SDL_FreeSurface(sprite_surface);
+    return tileset_surface;
+}
+
+bool render_load_atlases() {
+    glGenTextures(1, &state.sprite_texture_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, ATLAS_WIDTH, ATLAS_HEIGHT, ATLAS_COUNT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    for (int atlas = 0; atlas < ATLAS_COUNT; atlas++) {
+        const atlas_params_t params = resource_get_atlas_params((atlas_name)atlas);
+
+        char path[128];
+        sprintf(path, "%ssprite/%s", RESOURCE_PATH, params.path);
+
+        log_info("Loading atlas %s", path);
+
+        SDL_Surface* sprite_surface = IMG_Load(path);
+        if (sprite_surface == NULL) {
+            log_error("Error loading surface for sprite %s: %s", path, IMG_GetError());
+            return false;
+        }
+        GOLD_ASSERT(sprite_surface->format->BytesPerPixel == 4);
+
+        state.sprite_image_size[atlas] = ivec2(sprite_surface->w, sprite_surface->h);
+
+        if (params.strategy == ATLAS_IMPORT_DEFAULT) {
+            GOLD_ASSERT(sprite_surface->w == ATLAS_WIDTH && sprite_surface->h == ATLAS_HEIGHT);
+        } else if (params.strategy == ATLAS_IMPORT_RECOLOR || params.strategy == ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA) {
+            sprite_surface = render_load_atlas_recolor(sprite_surface, params);
+        } else if (params.strategy == ATLAS_IMPORT_TILESET) {
+            sprite_surface = render_load_atlas_tileset(sprite_surface, params);
+        }
+        if (sprite_surface == NULL) {
             return false;
         }
 
-        // Get the reference pixels into a packed byte
-        uint32_t clothes_reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_CLOTHES_REF.r, RECOLOR_CLOTHES_REF.g, RECOLOR_CLOTHES_REF.b, RECOLOR_CLOTHES_REF.a);
-        uint32_t skin_reference_pixel = SDL_MapRGBA(sprite_surface->format, RECOLOR_SKIN_REF.r, RECOLOR_SKIN_REF.g, RECOLOR_SKIN_REF.b, RECOLOR_SKIN_REF.a);
+        // Flip the surface vertically
+        SDL_LockSurface(sprite_surface);
+        int sprite_surface_pitch = sprite_surface->pitch;
+        uint8_t temp[sprite_surface_pitch];
+        uint8_t* sprite_surface_pixels = (uint8_t*)sprite_surface->pixels;
 
-        // Lock the surface so that we can edit pixel values
-        SDL_LockSurface(recolor_surface);
-        uint32_t* recolor_surface_pixels = (uint32_t*)recolor_surface->pixels;
-        uint32_t* sprite_surface_pixels = (uint32_t*)sprite_surface->pixels;
+        for (int row = 0; row < sprite_surface->h / 2; ++row) {
+            uint8_t* row1 = sprite_surface_pixels + (row * sprite_surface_pitch);
+            uint8_t* row2 = sprite_surface_pixels + ((sprite_surface->h - row - 1) * sprite_surface_pitch);
 
-        // Copy the original sprite onto our recolor atlas 4 times, once for each player color
-        for (int recolor_id = 0; recolor_id < MAX_PLAYERS; recolor_id++) {
-            // Get the replacement pixel bytes from the player color
-            uint32_t clothes_replacement_pixel = SDL_MapRGBA(recolor_surface->format, PLAYER_COLORS[recolor_id].clothes_color.r, PLAYER_COLORS[recolor_id].clothes_color.g, PLAYER_COLORS[recolor_id].clothes_color.b, PLAYER_COLORS[recolor_id].clothes_color.a);
-            uint32_t skin_replacement_pixel = SDL_MapRGBA(recolor_surface->format, PLAYER_COLORS[recolor_id].skin_color.r, PLAYER_COLORS[recolor_id].skin_color.g, PLAYER_COLORS[recolor_id].skin_color.b, PLAYER_COLORS[recolor_id].skin_color.a);
-
-            // Loop through each pixel of the original sprite
-            for (int y = 0; y < sprite_surface->h; y++) {
-                for (int x = 0; x < sprite_surface->w; x++) {
-                    // Determine which source pixel to use
-                    uint32_t source_pixel = sprite_surface_pixels[(y * sprite_surface->w) + x];
-                    if (source_pixel == clothes_reference_pixel) {
-                        source_pixel = clothes_replacement_pixel;
-                    } else if (source_pixel == skin_reference_pixel) {
-                        source_pixel = skin_replacement_pixel;
-                    }
-                    if (params.strategy == ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA) {
-                        uint8_t r, g, b, a;
-                        SDL_GetRGBA(source_pixel, recolor_surface->format, &r, &g, &b, &a);
-                        if (a != 0) {
-                            a = 200;
-                        }
-                        source_pixel = SDL_MapRGBA(recolor_surface->format, r, g, b, a);
-                    }
-
-                    // Put the source pixel onto the recolor surface
-                    recolor_surface_pixels[((y + (sprite_surface->h * recolor_id)) * recolor_surface->w) + x] = source_pixel;
-                }
-            }
+            memcpy(temp, row1, sprite_surface_pitch);
+            memcpy(row1, row2, sprite_surface_pitch);
+            memcpy(row2, temp, sprite_surface_pitch);
         }
+        SDL_UnlockSurface(sprite_surface);
 
-        SDL_UnlockSurface(recolor_surface);
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, atlas, sprite_surface->w, sprite_surface->h, 1, GL_RGBA, GL_UNSIGNED_BYTE, sprite_surface->pixels);
 
-        // Handoff the recolor surface into the sprite surface variable
-        // Allows the rest of the sprite loading to work the same as with normal sprites
         SDL_FreeSurface(sprite_surface);
-        sprite_surface = recolor_surface;
     }
 
-    // Flip the surface vertically
-    SDL_LockSurface(sprite_surface);
-    int sprite_surface_pitch = sprite_surface->pitch;
-    uint8_t temp[sprite_surface_pitch];
-    uint8_t* sprite_surface_pixels = (uint8_t*)sprite_surface->pixels;
-
-    for (int row = 0; row < sprite_surface->h / 2; ++row) {
-        uint8_t* row1 = sprite_surface_pixels + (row * sprite_surface_pitch);
-        uint8_t* row2 = sprite_surface_pixels + ((sprite_surface->h - row - 1) * sprite_surface_pitch);
-
-        memcpy(temp, row1, sprite_surface_pitch);
-        memcpy(row1, row2, sprite_surface_pitch);
-        memcpy(row2, temp, sprite_surface_pitch);
-    }
-    SDL_UnlockSurface(sprite_surface);
-
-    atlas->texture_size = ivec2(sprite_surface->w, sprite_surface->h);
-
-    // Create the GL texture
-    GLenum texture_format = GL_RGBA;
-    glGenTextures(1, &atlas->texture);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, atlas->texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, texture_format, sprite_surface->w, sprite_surface->h, GL_FALSE, texture_format, GL_UNSIGNED_BYTE, sprite_surface->pixels);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    SDL_FreeSurface(sprite_surface);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
     return true;
 }
@@ -552,18 +643,17 @@ void render_sprite_vertices() {
     // Render sprite batch
     glBindVertexArray(state.sprite_vao);
     glUseProgram(state.sprite_shader);
-    for (int atlas = 0; atlas < ATLAS_COUNT; atlas++) {
-        glActiveTexture(GL_TEXTURE0 + atlas);
-        glBindTexture(GL_TEXTURE_2D, state.atlases[atlas].texture);
-    }
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
 
     glDrawArrays(GL_TRIANGLES, 0, state.sprite_vertices.size());
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    state.sprite_vertices.clear();
 }
 
 void render_present_frame() {
-    render_ninepatch(SPRITE_UI_FRAME, (rect_t) { .x = 16, .y = 16, .w = 128, .h = 64 }, 0);
     render_sprite_vertices();
 
     // Switch to default framebuffer
@@ -592,7 +682,7 @@ void render_sprite(sprite_name name, ivec2 frame, ivec2 position, int z_index, u
 
     rect_t src_rect = (rect_t) { 
         .x = sprite_info.atlas_x + (frame.x * sprite_info.frame_width), 
-        .y = sprite_info.atlas_y + ((recolor_id == RECOLOR_NONE ? 0 : recolor_id) * state.atlases[sprite_info.atlas].image_size.y) + (frame.y * sprite_info.frame_height), 
+        .y = sprite_info.atlas_y + ((recolor_id == RECOLOR_NONE ? 0 : recolor_id) * state.sprite_image_size[sprite_info.atlas].y) + (frame.y * sprite_info.frame_height), 
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
@@ -700,10 +790,10 @@ void render_atlas(atlas_name atlas, rect_t src_rect, rect_t dst_rect, int z_inde
         }
     }
 
-    float tex_coord_left = (float)src_rect.x / (float)state.atlases[atlas].texture_size.x;
-    float tex_coord_right = tex_coord_left + ((float)src_rect.w / (float)state.atlases[atlas].texture_size.x);
-    float tex_coord_top = 1.0f - ((float)src_rect.y / (float)state.atlases[atlas].texture_size.y);
-    float tex_coord_bottom = tex_coord_top - ((float)src_rect.h / (float)state.atlases[atlas].texture_size.y);
+    float tex_coord_left = (float)src_rect.x / (float)ATLAS_WIDTH;
+    float tex_coord_right = tex_coord_left + ((float)src_rect.w / (float)ATLAS_WIDTH);
+    float tex_coord_top = 1.0f - ((float)src_rect.y / (float)ATLAS_HEIGHT);
+    float tex_coord_bottom = tex_coord_top - ((float)src_rect.h / (float)ATLAS_HEIGHT);
 
     if (flip_h) {
         float temp = tex_coord_left;

@@ -6,8 +6,8 @@ in vec3 frag_tex_coord;
 
 out vec4 frag_color;
 
-uniform sampler2D sprite_textures[MAX_ATLASES];
+uniform sampler2DArray sprite_texture_array;
 
 void main() {
-    frag_color = texture(sprite_textures[int(frag_tex_coord.z)], frag_tex_coord.xy);
+    frag_color = texture(sprite_texture_array, frag_tex_coord);
 }

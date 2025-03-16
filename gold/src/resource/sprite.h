@@ -4,18 +4,28 @@
 
 enum atlas_name {
     ATLAS_UI,
+    ATLAS_TILESET,
     ATLAS_COUNT
 };
 
 enum atlas_import_strategy {
     ATLAS_IMPORT_DEFAULT,
     ATLAS_IMPORT_RECOLOR,
-    ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA
+    ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA,
+    ATLAS_IMPORT_TILESET
+};
+
+struct atlas_params_tileset_t {
+    int begin;
+    int end;
 };
 
 struct atlas_params_t {
     const char* path;
     atlas_import_strategy strategy;
+    union {
+        atlas_params_tileset_t tileset;
+    };
 };
 
 enum sprite_name {
@@ -37,6 +47,46 @@ enum sprite_name {
     SPRITE_UI_MENU_BUTTON,
     SPRITE_UI_TEXT_FRAME,
     SPRITE_UI_CLOUDS,
+    SPRITE_TILE_NULL,
+    SPRITE_TILE_SAND,
+    SPRITE_TILE_SAND2,
+    SPRITE_TILE_SAND3,
+    SPRITE_TILE_WATER,
+    SPRITE_TILE_WALL_NW_CORNER,
+    SPRITE_TILE_WALL_NE_CORNER,
+    SPRITE_TILE_WALL_SW_CORNER,
+    SPRITE_TILE_WALL_SE_CORNER,
+    SPRITE_TILE_WALL_NORTH_EDGE,
+    SPRITE_TILE_WALL_WEST_EDGE,
+    SPRITE_TILE_WALL_EAST_EDGE,
+    SPRITE_TILE_WALL_SOUTH_EDGE,
+    SPRITE_TILE_WALL_SE_FRONT,
+    SPRITE_TILE_WALL_SOUTH_FRONT,
+    SPRITE_TILE_WALL_SW_FRONT,
+    SPRITE_TILE_WALL_NW_INNER_CORNER,
+    SPRITE_TILE_WALL_NE_INNER_CORNER,
+    SPRITE_TILE_WALL_SW_INNER_CORNER,
+    SPRITE_TILE_WALL_SE_INNER_CORNER,
+    SPRITE_TILE_WALL_SOUTH_STAIR_LEFT,
+    SPRITE_TILE_WALL_SOUTH_STAIR_CENTER,
+    SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT,
+    SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_LEFT,
+    SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_CENTER,
+    SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_RIGHT,
+    SPRITE_TILE_WALL_NORTH_STAIR_LEFT,
+    SPRITE_TILE_WALL_NORTH_STAIR_CENTER,
+    SPRITE_TILE_WALL_NORTH_STAIR_RIGHT,
+    SPRITE_TILE_WALL_EAST_STAIR_TOP,
+    SPRITE_TILE_WALL_EAST_STAIR_CENTER,
+    SPRITE_TILE_WALL_EAST_STAIR_BOTTOM,
+    SPRITE_TILE_WALL_WEST_STAIR_TOP,
+    SPRITE_TILE_WALL_WEST_STAIR_CENTER,
+    SPRITE_TILE_WALL_WEST_STAIR_BOTTOM,
+    SPRITE_TILE_DECORATION0,
+    SPRITE_TILE_DECORATION1,
+    SPRITE_TILE_DECORATION2,
+    SPRITE_TILE_DECORATION3,
+    SPRITE_TILE_DECORATION4,
     SPRITE_COUNT
 };
 
@@ -48,5 +98,18 @@ struct sprite_info_t {
     int frame_height;
 };
 
+enum tile_type {
+    TILE_TYPE_SINGLE,
+    TILE_TYPE_AUTO
+};
+
+struct tile_data_t {
+    tile_type type;
+    int source_x;
+    int source_y;
+};
+
 atlas_params_t resource_get_atlas_params(atlas_name atlas);
 sprite_info_t resource_get_sprite_info(sprite_name name);
+void resource_set_sprite_info(sprite_name name, sprite_info_t sprite_info);
+tile_data_t resource_get_tile_data(sprite_name tile);

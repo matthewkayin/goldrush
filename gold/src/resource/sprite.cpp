@@ -6,10 +6,18 @@ static const std::unordered_map<atlas_name, atlas_params_t> ATLAS_PARAMS = {
     { ATLAS_UI, (atlas_params_t) {
         .path = "ui.png",
         .strategy = ATLAS_IMPORT_DEFAULT
+    }},
+    { ATLAS_TILESET, (atlas_params_t) {
+        .path = "tileset.png",
+        .strategy = ATLAS_IMPORT_TILESET,
+        .tileset = (atlas_params_tileset_t) {
+            .begin = SPRITE_TILE_NULL,
+            .end = SPRITE_TILE_DECORATION4
+        }
     }}
 };
 
-static const std::unordered_map<sprite_name, sprite_info_t> SPRITE_INFO = {
+static std::unordered_map<sprite_name, sprite_info_t> SPRITE_INFO = {
     { SPRITE_UI_MINIMAP, (sprite_info_t) { 
         .atlas = ATLAS_UI, 
         .atlas_x = 0, .atlas_y = 0,
@@ -102,10 +110,221 @@ static const std::unordered_map<sprite_name, sprite_info_t> SPRITE_INFO = {
     }}
 };
 
+static const std::unordered_map<sprite_name, tile_data_t> TILE_DATA = {
+    { SPRITE_TILE_NULL, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 32,
+        .source_y = 16
+    }},
+    { SPRITE_TILE_SAND, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 0,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_SAND2, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 16,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_SAND3, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 32,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_WATER, (tile_data_t) {
+        .type = TILE_TYPE_AUTO,
+        .source_x = 0,
+        .source_y = 16
+    }},
+    { SPRITE_TILE_WALL_NW_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_WALL_NE_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 80,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_WALL_SW_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 32
+    }},
+    { SPRITE_TILE_WALL_SE_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 80,
+        .source_y = 32
+    }},
+    { SPRITE_TILE_WALL_NORTH_EDGE, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 64,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_WALL_WEST_EDGE, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 16
+    }},
+    { SPRITE_TILE_WALL_EAST_EDGE, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 80,
+        .source_y = 16
+    }},
+    { SPRITE_TILE_WALL_SOUTH_EDGE, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 64,
+        .source_y = 32
+    }},
+    { SPRITE_TILE_WALL_SW_FRONT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_SOUTH_FRONT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 64,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_SE_FRONT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 80,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_NW_INNER_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 96,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_WALL_NE_INNER_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 112,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_WALL_SW_INNER_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 96,
+        .source_y = 16
+    }},
+    { SPRITE_TILE_WALL_SE_INNER_CORNER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 112,
+        .source_y = 16
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_LEFT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 96,
+        .source_y = 32
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 112,
+        .source_y = 32
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 128,
+        .source_y = 32
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_LEFT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 96,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 112,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_RIGHT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 128,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_NORTH_STAIR_LEFT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 144,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_NORTH_STAIR_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 160,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_NORTH_STAIR_RIGHT, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 176,
+        .source_y = 48
+    }},
+    { SPRITE_TILE_WALL_WEST_STAIR_TOP, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 144,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_WALL_WEST_STAIR_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 144,
+        .source_y = 16
+    }},
+    { SPRITE_TILE_WALL_WEST_STAIR_BOTTOM, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 144,
+        .source_y = 32
+    }},
+    { SPRITE_TILE_WALL_EAST_STAIR_TOP, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 160,
+        .source_y = 0
+    }},
+    { SPRITE_TILE_WALL_EAST_STAIR_CENTER, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 160,
+        .source_y = 16
+    }},
+    { SPRITE_TILE_WALL_EAST_STAIR_BOTTOM, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 160,
+        .source_y = 32
+    }},
+    { SPRITE_TILE_DECORATION0, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 0,
+        .source_y = 64
+    }},
+    { SPRITE_TILE_DECORATION1, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 16,
+        .source_y = 64
+    }},
+    { SPRITE_TILE_DECORATION2, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 32,
+        .source_y = 64
+    }},
+    { SPRITE_TILE_DECORATION3, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 48,
+        .source_y = 64
+    }},
+    { SPRITE_TILE_DECORATION4, (tile_data_t) {
+        .type = TILE_TYPE_SINGLE,
+        .source_x = 64,
+        .source_y = 64
+    }}
+};
+
 atlas_params_t resource_get_atlas_params(atlas_name atlas) {
     return ATLAS_PARAMS.at(atlas);
 }
 
 sprite_info_t resource_get_sprite_info(sprite_name name) {
     return SPRITE_INFO.at(name);
+}
+
+void resource_set_sprite_info(sprite_name name, sprite_info_t sprite_info) {
+    SPRITE_INFO[name] = sprite_info;
+}
+
+tile_data_t resource_get_tile_data(sprite_name tile) {
+    return TILE_DATA.at(tile);
 }

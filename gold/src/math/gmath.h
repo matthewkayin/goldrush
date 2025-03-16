@@ -258,6 +258,60 @@ const uint8_t AUTOTILE_EDGE_MASK[4] = {
     (uint8_t)(DIRECTION_MASK[DIRECTION_EAST] + DIRECTION_MASK[DIRECTION_SOUTHEAST] + DIRECTION_MASK[DIRECTION_SOUTH])
 };
 
+inline ivec2 autotile_edge_lookup(uint32_t edge, uint8_t neighbors) {
+    switch (edge) {
+        case 0:
+            switch (neighbors) {
+                case 0: return ivec2(0, 0);
+                case 128: return ivec2(0, 0);
+                case 1: return ivec2(0, 3);
+                case 129: return ivec2(0, 3);
+                case 64: return ivec2(1, 2);
+                case 192: return ivec2(1, 2);
+                case 65: return ivec2(2, 0);
+                case 193: return ivec2(1, 3);
+                default: return ivec2(-1, -1);
+            }
+        case 1:
+            switch (neighbors) {
+                case 0: return ivec2(1, 0);
+                case 2: return ivec2(1, 0);
+                case 1: return ivec2(3, 3);
+                case 3: return ivec2(3, 3);
+                case 4: return ivec2(1, 2);
+                case 6: return ivec2(1, 2);
+                case 5: return ivec2(3, 0);
+                case 7: return ivec2(1, 3);
+                default: return ivec2(-1, -1);
+            }
+        case 2:
+            switch (neighbors) {
+                case 0: return ivec2(0, 1);
+                case 32: return ivec2(0, 1);
+                case 16: return ivec2(0, 3);
+                case 48: return ivec2(0, 3);
+                case 64: return ivec2(1, 5);
+                case 96: return ivec2(1, 5);
+                case 80: return ivec2(2, 1);
+                case 112: return ivec2(1, 3);
+                default: return ivec2(-1, -1);
+            }
+        case 3:
+            switch (neighbors) {
+                case 0: return ivec2(1, 1);
+                case 8: return ivec2(1, 1);
+                case 4: return ivec2(1, 5);
+                case 12: return ivec2(1, 5);
+                case 16: return ivec2(3, 3);
+                case 24: return ivec2(3, 3);
+                case 20: return ivec2(3, 1);
+                case 28: return ivec2(1, 3);
+                default: return ivec2(-1, -1);
+            }
+        default: return ivec2(-1, -1);
+    }
+}
+
 inline Direction enum_from_ivec2_direction(ivec2 ivec2_direction) {
     for (int enum_direction = 0; enum_direction < DIRECTION_COUNT; enum_direction++) {
         if (DIRECTION_IVEC2[enum_direction] == ivec2_direction) {
