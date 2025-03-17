@@ -15,7 +15,7 @@ enum input_action {
 };
 
 void input_init();
-void input_poll_events(SDL_Window* window);
+void input_poll_events(SDL_Window* window, ivec2 window_size);
 ivec2 input_get_mouse_position();
 bool input_user_requests_exit();
 bool input_is_action_pressed(input_action action);

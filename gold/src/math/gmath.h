@@ -361,7 +361,7 @@ inline fvec2 cell_center(ivec2 cell) {
     );
 }
 
-inline bool sdl_rect_has_point(rect_t rect, ivec2 point) {
+inline bool rect_has_point(rect_t rect, ivec2 point) {
     return !(point.x < rect.x || point.x >= rect.x + rect.w || point.y < rect.y || point.y >= rect.y + rect.h);
 }
 

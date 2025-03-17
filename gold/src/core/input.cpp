@@ -1,5 +1,6 @@
 #include "input.h"
 
+#include "defines.h"
 #include <cstring>
 
 struct input_state_t {
@@ -14,7 +15,7 @@ void input_init() {
     memset(&state, 0, sizeof(state));
 }
 
-void input_poll_events(SDL_Window* window) {
+void input_poll_events(SDL_Window* window, ivec2 window_size) {
     memcpy(&state.current, &state.previous, sizeof(state.current));
 
     SDL_Event event;
@@ -45,7 +46,7 @@ void input_poll_events(SDL_Window* window) {
 
         switch (event.type) {
             case SDL_MOUSEMOTION: {
-                state.mouse_position = ivec2(event.motion.x, event.motion.y);
+                state.mouse_position = ivec2((event.motion.x * SCREEN_WIDTH) / window_size.x, (event.motion.y * SCREEN_HEIGHT) / window_size.y);
                 break;
             }
             case SDL_MOUSEBUTTONDOWN: 

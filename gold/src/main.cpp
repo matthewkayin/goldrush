@@ -121,7 +121,7 @@ int gold_main(int argc, char** argv) {
 
         // INPUT
         if (update_accumulator >= UPDATE_TIME) {
-            input_poll_events(window);
+            input_poll_events(window, window_size);
             if (input_user_requests_exit()) {
                 is_running = false;
                 break;
@@ -138,6 +138,10 @@ int gold_main(int argc, char** argv) {
             updates++;
 
             menu_update(menu_state);
+            if (menu_state.mode == MENU_MODE_EXIT) {
+                is_running = false;
+                break;
+            }
         }
 
         // RENDER

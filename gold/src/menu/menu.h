@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/animation.h"
+#include <vector>
 
 enum menu_mode {
     MENU_MODE_MAIN,
@@ -10,7 +11,19 @@ enum menu_mode {
     MENU_MODE_LOBBY,
     MENU_MODE_EXIT,
     MENU_MODE_OPTIONS,
-    MENU_MODE_LOAD_MATCH
+    MENU_MODE_LOAD_MATCH,
+    MENU_MODE_COUNT
+};
+
+enum menu_button_name {
+    MENU_BUTTON_PLAY,
+    MENU_BUTTON_EXIT
+};
+
+struct menu_button_t {
+    menu_button_name name;
+    const char* text;
+    rect_t rect;
 };
 
 struct menu_state_t {
@@ -22,6 +35,8 @@ struct menu_state_t {
     int parallax_cloud_x;
     int parallax_timer;
     int parallax_cactus_offset;
+
+    std::vector<menu_button_t> menu_buttons[MENU_MODE_COUNT];
 };
 
 menu_state_t menu_init();
