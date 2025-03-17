@@ -108,6 +108,12 @@ int gold_main(int argc, char** argv) {
             ups = updates;
             updates = 0;
             last_second += 1.0;
+
+            #ifdef GOLD_DEBUG
+                if (ups != 60) {
+                    log_warn("Update count is off! ups: %u", ups);
+                }
+            #endif
         }
         frames++;
 
@@ -157,8 +163,8 @@ int gold_main(int argc, char** argv) {
         menu_render(menu_state);
         if (render_debug_info) {
             char fps_text[32];
-            sprintf(fps_text, "FPS: %u | UPS: %u", fps, ups);
-            render_text(FONT_HACK_BLACK, fps_text, ivec2(0, 0), RENDER_COLOR_BLACK);
+            sprintf(fps_text, "FPS: %u", fps);
+            render_text(FONT_HACK_PLAYER0, fps_text, ivec2(0, 0));
         }
 
         render_present_frame();

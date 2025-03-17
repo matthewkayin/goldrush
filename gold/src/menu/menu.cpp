@@ -135,10 +135,15 @@ void menu_render(const menu_state_t& state) {
         render_atlas(cloud_sprite_info.atlas, src_rect, dst_rect, 0);
     }
 
+    if (state.mode != MENU_MODE_LOBBY && state.mode != MENU_MODE_MATCHLIST) {
+        render_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH", ivec2(24, 24));
+    }
+
+    // Render version
     char version_text[32];
     sprintf(version_text, "Version %s", APP_VERSION);
-    ivec2 text_size = render_get_text_size(FONT_WESTERN8_BLACK, version_text);
-    render_text(FONT_WESTERN8_BLACK, version_text, ivec2(4, SCREEN_HEIGHT - text_size.y - 4), RENDER_COLOR_BLACK);
+    ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, version_text);
+    render_text(FONT_WESTERN8_OFFBLACK, version_text, ivec2(4, SCREEN_HEIGHT - text_size.y - 4));
 }
 
 void menu_render_decoration(const menu_state_t& state, int index) {

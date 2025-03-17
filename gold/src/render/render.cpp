@@ -1,7 +1,6 @@
 #include "render.h"
 
 #define MAX_BATCH_VERTICES 32768
-#define MAX_TEXT_CHARS 2048
 #define FONT_GLYPH_COUNT 96
 #define FONT_FIRST_CHAR 32 // space
 #define MINIMAP_TEXTURE_WIDTH 512
@@ -27,6 +26,10 @@
 struct sprite_vertex_t {
     float position[2];
     float tex_coord[3];
+};
+
+struct line_vertex_t {
+    float position[2];
 };
 
 struct font_glyph_t {
@@ -102,6 +105,7 @@ struct render_state_t {
     GLint line_shader_color_location;
     GLuint line_vao;
     GLuint line_vbo;
+    std::vector<line_vertex_t> line_vertices;
 };
 static render_state_t state;
 
@@ -173,7 +177,6 @@ bool render_init(SDL_Window* window) {
     }
     glUseProgram(state.line_shader);
     glUniformMatrix4fv(glGetUniformLocation(state.line_shader, "projection"), 1, GL_FALSE, projection.data);
-    state.line_shader_color_location = glGetUniformLocation(state.line_shader, "color");
 
     if (!render_load_atlases()) {
         return false;
@@ -234,7 +237,7 @@ void render_init_line_vao() {
     glGenBuffers(1, &state.line_vbo);
     glBindVertexArray(state.line_vao);
     glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
-    glBufferData(GL_ARRAY_BUFFER, 24 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 256 * sizeof(line_vertex_t), NULL, GL_DYNAMIC_DRAW);
 
     // position
     glEnableVertexAttribArray(0);
@@ -486,7 +489,11 @@ SDL_Surface* render_load_atlas_fonts() {
         SDL_Surface* glyphs[FONT_GLYPH_COUNT];
         int glyph_max_width = 0;
         int glyph_max_height = 0;
-        SDL_Color font_color = (SDL_Color) { .r = params.r, .g = params.g, .b = params.b, .a = 255 };
+
+        // Hack alert!
+        // Since TTF creates surfaces as BGRA but the rest of the atlas rendering
+        // code expects RGBA, I'm just flipping the R and the B values here
+        SDL_Color font_color = (SDL_Color) { .r = params.b, .g = params.g, .b = params.r, .a = 255 };
         for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
             char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
             glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, font_color);
@@ -639,8 +646,24 @@ void render_sprite_vertices() {
     state.sprite_vertices.clear();
 }
 
+void render_line_vertices() {
+    glUseProgram(state.line_shader);
+    glLineWidth(1);
+
+    glBindVertexArray(state.line_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(line_vertex_t) * state.line_vertices.size(), &state.line_vertices[0]);
+    glDrawArrays(GL_LINES, 0, 2);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    state.line_vertices.clear();
+}
+
 void render_present_frame() {
     render_sprite_vertices();
+    render_line_vertices();
 
     // Switch to default framebuffer
     ivec2 window_size;
@@ -813,7 +836,7 @@ void render_atlas(atlas_name atlas, rect_t src_rect, rect_t dst_rect, uint32_t o
     });
 }
 
-void render_text(font_name name, const char* text, ivec2 position, color_t color) {
+void render_text(font_name name, const char* text, ivec2 position) {
     ivec2 glyph_position = position;
     size_t text_index = 0;
 
@@ -883,38 +906,20 @@ ivec2 render_get_text_size(font_name name, const char* text) {
     return size;
 }
 
-void render_line(ivec2 start, ivec2 end, color_t color) {
-    glUseProgram(state.line_shader);
-    glLineWidth(1);
-    glUniform3fv(state.line_shader_color_location, 1, &color.r);
-
-    float line_vertices[6] = { (float)start.x, (float)(SCREEN_HEIGHT - start.y), (float)end.x, (float)(SCREEN_HEIGHT - end.y) };
-    glBindVertexArray(state.line_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(line_vertices), line_vertices);
-    glDrawArrays(GL_LINES, 0, 2);
-
-    glBindVertexArray(0);
+void render_line(ivec2 start, ivec2 end) {
+    state.line_vertices.push_back((line_vertex_t) {
+        .position = { (float)start.x, (float)(SCREEN_HEIGHT - start.y) }
+    });
+    state.line_vertices.push_back((line_vertex_t) {
+        .position = { (float)end.x, (float)(SCREEN_HEIGHT - end.y) }
+    });
 }
 
-void render_rect(ivec2 start, ivec2 end, color_t color) {
-    glUseProgram(state.line_shader);
-    glLineWidth(1);
-    glUniform3fv(state.line_shader_color_location, 1, &color.r);
-
-    float line_vertices[24] = { 
-        (float)start.x, (float)(SCREEN_HEIGHT - start.y), (float)end.x, (float)(SCREEN_HEIGHT - start.y),
-        (float)end.x, (float)(SCREEN_HEIGHT - start.y), (float)end.x, (float)(SCREEN_HEIGHT - end.y),
-        (float)start.x, (float)(SCREEN_HEIGHT - end.y), (float)end.x, (float)(SCREEN_HEIGHT - end.y),
-        (float)start.x, (float)(SCREEN_HEIGHT - start.y), (float)start.x, (float)(SCREEN_HEIGHT - end.y)
-    };
-
-    glBindVertexArray(state.line_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(line_vertices), line_vertices);
-    glDrawArrays(GL_LINES, 0, 8);
-
-    glBindVertexArray(0);
+void render_rect(ivec2 start, ivec2 end) {
+    render_line(start, ivec2(end.x, start.y));
+    render_line(ivec2(end.x, start.y), end);
+    render_line(end, ivec2(start.x, end.y));
+    render_line(ivec2(start.x, end.y), start);
 }
 
 void render_minimap_putpixel(minimap_layer layer, ivec2 position, minimap_pixel pixel) {

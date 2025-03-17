@@ -5,15 +5,6 @@
 #include "resource/font.h"
 #include <SDL2/SDL.h>
 
-struct color_t {
-    float r;
-    float g;
-    float b;
-    float a;
-};
-
-const color_t RENDER_COLOR_BLACK = (color_t) { .r = 0.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f };
-
 enum minimap_layer {
     MINIMAP_LAYER_TILE,
     MINIMAP_LAYER_FOG
@@ -42,9 +33,9 @@ void render_present_frame();
 void render_sprite(sprite_name name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id);
 void render_ninepatch(sprite_name sprite, rect_t rect);
 void render_atlas(atlas_name atlas, rect_t src_rect, rect_t dst_rect, uint32_t options);
-void render_text(font_name name, const char* text, ivec2 position, color_t color);
+void render_text(font_name name, const char* text, ivec2 position);
 ivec2 render_get_text_size(font_name name, const char* text);
-void render_line(ivec2 start, ivec2 end, color_t color);
-void render_rect(ivec2 start, ivec2 end, color_t color);
+void render_line(ivec2 start, ivec2 end);
+void render_rect(ivec2 start, ivec2 end);
 void render_minimap_putpixel(minimap_layer layer, ivec2 position, minimap_pixel pixel);
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size);
