@@ -476,7 +476,7 @@ SDL_Surface* render_load_atlas_fonts() {
         char path[128];
         sprintf(path, "%sfont/%s", RESOURCE_PATH, params.path);
 
-        log_info("Loading font %s", path);
+        log_info("Loading font %s size %u color %u,%u,%u", path, params.size, params.r, params.g, params.b);
 
         // Open the font
         TTF_Font* ttf_font = TTF_OpenFont(path, params.size);

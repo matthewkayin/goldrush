@@ -3,6 +3,7 @@
 #include "core/logger.h"
 #include "core/cursor.h"
 #include "core/animation.h"
+#include "core/input.h"
 #include "math/gmath.h"
 #include "render/render.h"
 #include "menu/menu.h"
@@ -82,9 +83,10 @@ int gold_main(int argc, char** argv) {
         return -1;
     }
     animation_init();
+    input_init();
 
     bool is_running = true;
-    bool render_debug_info = true;
+    bool render_debug_info = false;
     const double UPDATE_TIME = 1.0 / 60;
     double last_time = platform_get_absolute_time();
     double last_second = last_time;
@@ -119,33 +121,14 @@ int gold_main(int argc, char** argv) {
 
         // INPUT
         if (update_accumulator >= UPDATE_TIME) {
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                // Handle quit
-                if (event.type == SDL_QUIT) {
-                    is_running = false;
-                    break;
-                }
+            input_poll_events(window);
+            if (input_user_requests_exit()) {
+                is_running = false;
+                break;
+            }
 
-                // Capture mouse
-                if (SDL_GetWindowGrab(window) == SDL_FALSE) {
-                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-                        SDL_SetWindowGrab(window, SDL_TRUE);
-                        continue;
-                    }
-                    // If the mouse is not captured, don't handle any other input
-                    break;
-                }
-                // Release mouse
-                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_TAB) {
-                    SDL_SetWindowGrab(window, SDL_FALSE);
-                    break;
-                }
-
-                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3) {
-                    render_debug_info = !render_debug_info;
-                    continue;
-                }
+            if (input_is_action_just_pressed(INPUT_F3)) {
+                render_debug_info = !render_debug_info;
             }
         }
 
@@ -164,7 +147,7 @@ int gold_main(int argc, char** argv) {
         if (render_debug_info) {
             char fps_text[32];
             sprintf(fps_text, "FPS: %u", fps);
-            render_text(FONT_HACK_PLAYER0, fps_text, ivec2(0, 0));
+            render_text(FONT_HACK_OFFBLACK, fps_text, ivec2(0, 0));
         }
 
         render_present_frame();
