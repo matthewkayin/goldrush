@@ -80,6 +80,7 @@ static const player_color_t PLAYER_COLORS[MAX_PLAYERS] = {
 struct render_state_t {
     SDL_Window* window;
     SDL_GLContext context;
+    ivec2 window_size;
 
     GLuint screen_shader;
     GLuint screen_framebuffer;
@@ -155,12 +156,13 @@ bool render_init(SDL_Window* window) {
     glUseProgram(state.screen_shader);
     glUniform1ui(glGetUniformLocation(state.screen_shader, "screen_texture"), 0);
 
-    ivec2 screen_size = ivec2(SCREEN_WIDTH, SCREEN_HEIGHT);
-    glUniform2iv(glGetUniformLocation(state.screen_shader, "screen_size"), 1, &screen_size.x);
+    float screen_size[2] = { (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
+    glUniform2fv(glGetUniformLocation(state.screen_shader, "screen_size"), 1, screen_size);
 
     ivec2 window_size;
     SDL_GetWindowSize(state.window, &window_size.x, &window_size.y);
-    glUniform2iv(glGetUniformLocation(state.screen_shader, "window_size"), 1, &window_size.x);
+    float window_size_float[2] = { (float)window_size.x, (float)window_size.y };
+    glUniform2fv(glGetUniformLocation(state.screen_shader, "window_size"), 1, window_size_float);
 
     // Load sprite shader
     if (!shader_load(&state.sprite_shader, "sprite.vert.glsl", "sprite.frag.glsl")) {
@@ -185,6 +187,13 @@ bool render_init(SDL_Window* window) {
     log_info("Initialized renderer. Vendor: %s. Renderer: %s. Version: %s.", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
 
     return true;
+}
+
+void render_set_window_size(ivec2 window_size) {
+    SDL_SetWindowSize(state.window, window_size.x, window_size.y);
+    glUseProgram(state.screen_shader);
+    glUniform2iv(glGetUniformLocation(state.screen_shader, "window_size"), 1, &window_size.x);
+    state.window_size = window_size;
 }
 
 void render_init_quad_vao() {

@@ -28,6 +28,7 @@ const uint32_t RENDER_SPRITE_CENTERED = 4;
 
 bool render_init(SDL_Window* window);
 void render_quit();
+void render_set_window_size(ivec2 window_size);
 void render_prepare_frame();
 void render_present_frame();
 void render_sprite(sprite_name name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id);

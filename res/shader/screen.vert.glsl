@@ -5,15 +5,13 @@ layout (location = 1) in vec2 in_tex_coord;
 
 out vec2 frag_tex_coord;
 
-uniform ivec2 screen_size;
-uniform ivec2 window_size;
+uniform vec2 screen_size;
+uniform vec2 window_size;
 
 void main() {
-    float aspect = window_size.x / screen_size.x;
-    float scaled_y = screen_size.y * aspect;
-    float border_size = (window_size.y - scaled_y) / 2.0;
-    float device_screen_height = 1.0 - (border_size / window_size.y);
+    float ratio = window_size.x / screen_size.x;
+    float scaled_y = screen_size.y * ratio;
 
-    gl_Position = vec4(in_position.x, in_position.y * device_screen_height, 0.0, 1.0);
+    gl_Position = vec4(in_position.x, in_position.y * (scaled_y / window_size.y), 0.0, 1.0);
     frag_tex_coord = in_tex_coord;
 }

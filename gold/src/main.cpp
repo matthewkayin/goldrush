@@ -83,7 +83,7 @@ int gold_main(int argc, char** argv) {
         return -1;
     }
     animation_init();
-    input_init();
+    input_init(window);
 
     bool is_running = true;
     bool render_debug_info = false;
@@ -121,7 +121,7 @@ int gold_main(int argc, char** argv) {
 
         // INPUT
         if (update_accumulator >= UPDATE_TIME) {
-            input_poll_events(window, window_size);
+            input_poll_events();
             if (input_user_requests_exit()) {
                 is_running = false;
                 break;

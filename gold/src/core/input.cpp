@@ -4,6 +4,11 @@
 #include <cstring>
 
 struct input_state_t {
+    SDL_Window* window;
+    ivec2 window_size;
+    ivec2 screen_position;
+    int scaled_screen_y;
+
     ivec2 mouse_position;
     bool current[INPUT_COUNT];
     bool previous[INPUT_COUNT];
@@ -11,11 +16,25 @@ struct input_state_t {
 };
 static input_state_t state;
 
-void input_init() {
+void input_update_window_size();
+
+void input_init(SDL_Window* window) {
     memset(&state, 0, sizeof(state));
+    state.window = window;
+    input_update_window_size();
 }
 
-void input_poll_events(SDL_Window* window, ivec2 window_size) {
+#include "core/logger.h"
+void input_update_window_size() {
+    SDL_GetWindowSize(state.window, &state.window_size.x, &state.window_size.y);
+    float aspect = (float)state.window_size.x / (float)SCREEN_WIDTH;
+    float scaled_y = (float)SCREEN_HEIGHT * aspect;
+    float border_size = ((float)state.window_size.y - scaled_y) / 2.0;
+    state.scaled_screen_y = (int)scaled_y;
+    state.screen_position = ivec2(0, (int)border_size);
+}
+
+void input_poll_events() {
     memcpy(&state.current, &state.previous, sizeof(state.current));
 
     SDL_Event event;
@@ -27,9 +46,9 @@ void input_poll_events(SDL_Window* window, ivec2 window_size) {
         }
 
         // Capture mouse
-        if (SDL_GetWindowGrab(window) == SDL_FALSE) {
+        if (SDL_GetWindowGrab(state.window) == SDL_FALSE) {
             if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-                SDL_SetWindowGrab(window, SDL_TRUE);
+                SDL_SetWindowGrab(state.window, SDL_TRUE);
                 continue;
             }
             // If the mouse is not captured, don't handle any other input
@@ -39,14 +58,19 @@ void input_poll_events(SDL_Window* window, ivec2 window_size) {
 
         #ifdef GOLD_DEBUG
             if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_TAB) {
-                SDL_SetWindowGrab(window, SDL_FALSE);
+                SDL_SetWindowGrab(state.window, SDL_FALSE);
                 break;
             }
         #endif
 
         switch (event.type) {
+            case SDL_WINDOWEVENT_RESIZED: {
+                input_update_window_size();
+                break;
+            }
             case SDL_MOUSEMOTION: {
-                state.mouse_position = ivec2((event.motion.x * SCREEN_WIDTH) / window_size.x, (event.motion.y * SCREEN_HEIGHT) / window_size.y);
+                state.mouse_position = ivec2(event.motion.x - state.screen_position.x, event.motion.y - state.screen_position.y);
+                state.mouse_position = ivec2((state.mouse_position.x * SCREEN_WIDTH) / state.window_size.x, (state.mouse_position.y * SCREEN_HEIGHT) / state.scaled_screen_y);
                 break;
             }
             case SDL_MOUSEBUTTONDOWN: 
