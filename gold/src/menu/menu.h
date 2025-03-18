@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/animation.h"
-#include <vector>
 
 enum menu_mode {
     MENU_MODE_MAIN,
@@ -20,35 +19,9 @@ enum menu_item_name {
     MENU_ITEM_MAIN_BUTTON_EXIT,
     MENU_ITEM_USERNAME_TEXTBOX,
     MENU_ITEM_USERNAME_BUTTON_BACK,
-    MENU_ITEM_USERNAME_BUTTON_OK
+    MENU_ITEM_USERNAME_BUTTON_OK,
+    MENU_ITEM_COUNT
 };
-
-enum menu_item_type {
-    MENU_ITEM_BUTTON,
-    MENU_ITEM_TEXTBOX
-};
-
-struct menu_button_t {
-    const char* text;
-};
-
-struct menu_textbox_t {
-    const char* prompt;
-    char value[128];
-    size_t value_length;
-    size_t value_max_length;
-};
-
-struct menu_item_t {
-    menu_item_type type;
-    menu_item_name name;
-    rect_t rect;
-    union {
-        menu_button_t button;
-        menu_textbox_t textbox;
-    };
-};
-
 
 struct menu_state_t {
     menu_mode mode;
@@ -60,10 +33,11 @@ struct menu_state_t {
     int parallax_timer;
     int parallax_cactus_offset;
 
+    char username[MAX_USERNAME_LENGTH + 4];
+    size_t username_length;
+
     bool text_input_show_cursor;
     uint32_t text_input_cursor_blink_timer;
-
-    std::vector<menu_item_t> menu_items[MENU_MODE_COUNT];
 };
 
 menu_state_t menu_init();
