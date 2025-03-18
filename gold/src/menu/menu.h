@@ -16,8 +16,9 @@ enum menu_mode {
 };
 
 enum menu_item_type {
-    MENU_ITEM_BUTTON,
-    MENU_ITEM_TEXTBOX
+    MENU_ITEM_TYPE_BUTTON,
+    MENU_ITEM_TYPE_TEXTBOX,
+    MENU_ITEM_TYPE_MATCHLIST_LOBBY
 };
 
 enum menu_item_name {
@@ -26,6 +27,10 @@ enum menu_item_name {
     MENU_ITEM_USERNAME_TEXTBOX,
     MENU_ITEM_USERNAME_BUTTON_BACK,
     MENU_ITEM_USERNAME_BUTTON_OK,
+    MENU_ITEM_MATCHLIST_LOBBY,
+    MENU_ITEM_MATCHLIST_BUTTON_BACK,
+    MENU_ITEM_MATCHLIST_BUTTON_HOST,
+    MENU_ITEM_MATCHLIST_BUTTON_JOIN,
     MENU_ITEM_COUNT
 };
 
@@ -37,6 +42,11 @@ struct menu_textbox_t {
     const char* prompt;
 };
 
+struct matchlist_lobby_t {
+    char name[64];
+    uint32_t player_count;
+};
+
 struct menu_item_t {
     menu_item_type type;
     menu_item_name name;
@@ -44,6 +54,7 @@ struct menu_item_t {
     union {
         menu_button_t button;
         menu_textbox_t textbox;
+        matchlist_lobby_t lobby;
     };
 };
 

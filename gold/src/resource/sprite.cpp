@@ -109,7 +109,7 @@ static std::unordered_map<sprite_name, sprite_info_t> SPRITE_INFO = {
     { SPRITE_UI_TEXT_FRAME, (sprite_info_t) { 
         .atlas = ATLAS_UI, 
         .atlas_x = 252, .atlas_y = 224,
-        .frame_width = 45, .frame_height = 15
+        .frame_width = 15, .frame_height = 15
     }},
     { SPRITE_UI_CLOUDS, (sprite_info_t) { 
         .atlas = ATLAS_UI, 
