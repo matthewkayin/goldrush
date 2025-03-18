@@ -33,10 +33,17 @@ static const int BUTTON_X = 44;
 static const int BUTTON_Y = 128;
 static const int BUTTON_Y_DIST = 25;
 
+static const rect_t MATCHLIST_RECT = (rect_t) {
+    .x = 36, .y = 32, .w = 432, .h = 200
+};
+
+static const uint32_t STATUS_DURATION = 60 * 3;
+
 void menu_set_mode(menu_state_t& state, menu_mode mode);
 menu_item_t menu_textbox_create(menu_item_name name, const char* prompt, rect_t rect);
 menu_item_t menu_button_create(menu_item_name name, const char* text, ivec2 position);
 void menu_handle_item_press(menu_state_t& state, menu_item_t& item);
+void menu_show_status(menu_state_t& state, const char* status);
 void menu_render_decoration(const menu_state_t& state, int index);
 void menu_render_button(const menu_item_t& button, bool hovered);
 void menu_render_textbox(const menu_item_t& textbox, const char* value, bool show_cursor);
@@ -56,6 +63,8 @@ menu_state_t menu_init() {
     memset(state.username, 0, sizeof(state.username));
     state.username_length = 0;
 
+    state.status_timer = 0;
+
     state.mode = MENU_MODE_MAIN;
     menu_set_mode(state, state.mode);
 
@@ -63,6 +72,8 @@ menu_state_t menu_init() {
 }
 
 void menu_set_mode(menu_state_t& state, menu_mode mode) {
+    state.status_timer = 0;
+
     // Stop text input if leaving mode with a textbox
     if (state.mode == MENU_MODE_USERNAME) {
         input_stop_text_input();
@@ -146,6 +157,10 @@ void menu_update(menu_state_t& state) {
         state.text_input_show_cursor = !state.text_input_show_cursor;
     }
 
+    if (state.status_timer > 0) {
+        state.status_timer--;
+    }
+
     if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
         if (input_is_text_input_active()) {
             input_stop_text_input();
@@ -178,7 +193,10 @@ void menu_handle_item_press(menu_state_t& state, menu_item_t& item) {
             return;
         }
         case MENU_ITEM_USERNAME_BUTTON_OK: {
-            // TODO validate username
+            if (state.username_length == 0) {
+                menu_show_status(state, "Please enter a username.");
+                return;
+            }
             menu_set_mode(state, MENU_MODE_MATCHLIST);
             return;
         }
@@ -265,6 +283,16 @@ void menu_render(const menu_state_t& state) {
         render_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH", ivec2(24, 24));
     }
 
+    // Matchlist
+    if (state.mode == MENU_MODE_MATCHLIST) {
+        render_ninepatch(SPRITE_UI_FRAME, MATCHLIST_RECT);
+    }
+
+    // Status text
+    if (state.status_timer != 0) {
+        render_text(FONT_HACK_OFFBLACK, state.status_text, ivec2(BUTTON_X, BUTTON_Y - 16));
+    }
+
     // Render menu items
     for (const menu_item_t& item : state.menu_items) {
         switch (item.type) {
@@ -284,6 +312,11 @@ void menu_render(const menu_state_t& state) {
     sprintf(version_text, "Version %s", APP_VERSION);
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, version_text);
     render_text(FONT_WESTERN8_OFFBLACK, version_text, ivec2(4, SCREEN_HEIGHT - text_size.y - 4));
+}
+
+void menu_show_status(menu_state_t& state, const char* status) {
+    strcpy(state.status_text, status);
+    state.status_timer = STATUS_DURATION;
 }
 
 void menu_render_decoration(const menu_state_t& state, int index) {

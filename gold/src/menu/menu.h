@@ -63,6 +63,9 @@ struct menu_state_t {
     bool text_input_show_cursor;
     uint32_t text_input_cursor_blink_timer;
 
+    uint32_t status_timer;
+    char status_text[128];
+
     std::vector<menu_item_t> menu_items;
 };
 
