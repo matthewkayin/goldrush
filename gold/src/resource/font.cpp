@@ -15,6 +15,12 @@ static const std::unordered_map<font_name, font_params_t> FONT_PARAMS = {
         .r = 255, .g = 255, .b = 255,
         .ignore_bearing = true
     }},
+    { FONT_HACK_GOLD, (font_params_t) { 
+        .path = "hack.ttf", 
+        .size = 10,
+        .r = 238, .g = 209, .b = 158,
+        .ignore_bearing = true
+    }},
     { FONT_HACK_PLAYER0, (font_params_t) { 
         .path = "hack.ttf", 
         .size = 10,

@@ -662,7 +662,7 @@ void render_line_vertices() {
     glBindVertexArray(state.line_vao);
     glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(line_vertex_t) * state.line_vertices.size(), &state.line_vertices[0]);
-    glDrawArrays(GL_LINES, 0, 2);
+    glDrawArrays(GL_LINES, 0, state.line_vertices.size());
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);

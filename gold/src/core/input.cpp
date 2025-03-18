@@ -1,6 +1,7 @@
 #include "input.h"
 
 #include "defines.h"
+#include "core/logger.h"
 #include <cstring>
 
 struct input_state_t {
@@ -13,6 +14,10 @@ struct input_state_t {
     bool current[INPUT_COUNT];
     bool previous[INPUT_COUNT];
     bool user_requests_exit;
+
+    char* text_input_str;
+    size_t* text_input_length;
+    size_t text_input_max_length;
 };
 static input_state_t state;
 
@@ -22,9 +27,9 @@ void input_init(SDL_Window* window) {
     memset(&state, 0, sizeof(state));
     state.window = window;
     input_update_window_size();
+    input_stop_text_input();
 }
 
-#include "core/logger.h"
 void input_update_window_size() {
     SDL_GetWindowSize(state.window, &state.window_size.x, &state.window_size.y);
     float aspect = (float)state.window_size.x / (float)SCREEN_WIDTH;
@@ -107,8 +112,29 @@ void input_poll_events() {
                     case SDLK_F3:
                         state.current[INPUT_F3] = event.type == SDL_KEYDOWN;
                         break;
+                    case SDLK_BACKSPACE: {
+                        if (event.type == SDL_KEYDOWN && SDL_IsTextInputActive() && *state.text_input_length > 0) {
+                            (*state.text_input_length)--;
+                            state.text_input_str[*state.text_input_length] = '\0';
+                        }
+                        break;
+                    }
+                    case SDLK_RETURN: {
+                        if (event.type == SDL_KEYDOWN && SDL_IsTextInputActive()) {
+                            input_stop_text_input();
+                        }
+                        break;
+                    }
                     default:
                         break;
+                }
+                break;
+            }
+            case SDL_TEXTINPUT: {
+                size_t space_remaining = state.text_input_max_length - *state.text_input_length;
+                if (space_remaining > 0) {
+                    strncat(state.text_input_str + *state.text_input_length, event.text.text, space_remaining);
+                    (*state.text_input_length) += strlen(event.text.text);
                 }
                 break;
             }
@@ -116,6 +142,22 @@ void input_poll_events() {
                 break;
         }
     }
+}
+
+void input_start_text_input(char* str, size_t* length, size_t max_length) {
+    SDL_StartTextInput();
+    state.text_input_str = str;
+    state.text_input_length = length;
+    state.text_input_max_length = max_length;
+}
+
+void input_stop_text_input() {
+    SDL_StopTextInput();
+    state.text_input_str = NULL;
+}
+
+bool input_is_text_input_active() {
+    return SDL_IsTextInputActive();
 }
 
 ivec2 input_get_mouse_position() {

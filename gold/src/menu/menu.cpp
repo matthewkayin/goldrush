@@ -27,10 +27,14 @@ static const ivec2 CLOUD_COORDS[CLOUD_COUNT] = {
 };
 static const int CLOUD_FRAME_X[CLOUD_COUNT] = { 0, 1, 2, 2, 1, 1};
 
+static const int TEXT_INPUT_BLINK_DURATION = 30;
+
 void menu_init_buttons(menu_state_t& state);
-void menu_handle_button_press(menu_state_t& state, menu_button_name button);
+void menu_handle_item_press(menu_state_t& state, menu_item_t& item);
+void menu_set_mode(menu_state_t& state, menu_mode mode);
 void menu_render_decoration(const menu_state_t& state, int index);
-void menu_render_button(menu_button_t& button, bool hovered);
+void menu_render_button(const menu_item_t& button, bool hovered);
+void menu_render_textbox(const menu_item_t& textbox, bool show_cursor);
 
 menu_state_t menu_init() {
     menu_state_t state;
@@ -43,27 +47,45 @@ menu_state_t menu_init() {
     state.parallax_cloud_x = 0;
     state.parallax_timer = PARALLAX_TIMER_DURATION;
     state.parallax_cactus_offset = 0;
+    state.text_input_cursor_blink_timer = TEXT_INPUT_BLINK_DURATION;
+    state.text_input_show_cursor = false;
 
     menu_init_buttons(state);
 
     return state;
 }
 
-menu_button_t menu_button_create(menu_button_name name, const char* text, ivec2 position) {
+menu_item_t menu_button_create(menu_item_name name, const char* text, ivec2 position) {
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
     if (text_size.x % 8 != 0) {
         text_size.x = ((text_size.x / 8) + 1) * 8;
     }
     text_size.x += 16;
 
-    return (menu_button_t) {
+    return (menu_item_t) {
+        .type = MENU_ITEM_BUTTON,
         .name = name,
-        .text = text,
         .rect = (rect_t) { 
             .x = position.x, .y = position.y,
             .w = text_size.x, .h = 21
+        },
+        .button = (menu_button_t) {
+            .text = text,
         }
     };
+}
+
+menu_item_t menu_textbox_create(menu_item_name name, const char* prompt, rect_t rect, size_t value_length_max) {
+    menu_item_t item;
+    item.type = MENU_ITEM_TEXTBOX;
+    item.name = name;
+    item.rect = rect;
+    item.textbox.prompt = prompt;
+    item.textbox.value_length = 0;
+    item.textbox.value[item.textbox.value_length] = '\0';
+    item.textbox.value_max_length = value_length_max;
+
+    return item;
 }
 
 void menu_init_buttons(menu_state_t& state) {
@@ -71,10 +93,16 @@ void menu_init_buttons(menu_state_t& state) {
     const int BUTTON_Y = 128;
     const int BUTTON_Y_DIST = 25;
 
-    state.menu_buttons[MENU_MODE_MAIN] = {
-        menu_button_create(MENU_BUTTON_PLAY, "Play", ivec2(BUTTON_X, BUTTON_Y)),
-        menu_button_create(MENU_BUTTON_EXIT, "Exit", ivec2(BUTTON_X, BUTTON_Y + BUTTON_Y_DIST))
+    state.menu_items[MENU_MODE_MAIN] = {
+        menu_button_create(MENU_ITEM_MAIN_BUTTON_PLAY, "Play", ivec2(BUTTON_X, BUTTON_Y)),
+        menu_button_create(MENU_ITEM_MAIN_BUTTON_EXIT, "Exit", ivec2(BUTTON_X, BUTTON_Y + BUTTON_Y_DIST))
     };
+    state.menu_items[MENU_MODE_USERNAME].push_back( 
+        menu_textbox_create(MENU_ITEM_USERNAME_TEXTBOX, "Username: ", (rect_t) { .x = BUTTON_X - 4, .y = BUTTON_Y, .w = 256, .h = 24 }, MAX_USERNAME_LENGTH));
+    state.menu_items[MENU_MODE_USERNAME].push_back( 
+        menu_button_create(MENU_ITEM_USERNAME_BUTTON_BACK, "Back", ivec2(BUTTON_X, BUTTON_Y + BUTTON_Y_DIST + 4)));
+    state.menu_items[MENU_MODE_USERNAME].push_back( 
+        menu_button_create(MENU_ITEM_USERNAME_BUTTON_OK, "OK", ivec2(BUTTON_X + state.menu_items[MENU_MODE_USERNAME][1].rect.w + 4, BUTTON_Y + BUTTON_Y_DIST + 4)));
 }
 
 void menu_update(menu_state_t& state) {
@@ -97,21 +125,60 @@ void menu_update(menu_state_t& state) {
         state.wagon_x--;
     }
 
+    state.text_input_cursor_blink_timer--;
+    if (state.text_input_cursor_blink_timer == 0) {
+        state.text_input_cursor_blink_timer = TEXT_INPUT_BLINK_DURATION;
+        state.text_input_show_cursor = !state.text_input_show_cursor;
+    }
+
     if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
-        for (menu_button_t button : state.menu_buttons[state.mode]) {
-            if (rect_has_point(button.rect, input_get_mouse_position())) {
-                menu_handle_button_press(state, button.name);
+        if (input_is_text_input_active()) {
+            input_stop_text_input();
+        }
+        for (menu_item_t& item : state.menu_items[state.mode]) {
+            if (rect_has_point(item.rect, input_get_mouse_position())) {
+                menu_handle_item_press(state, item);
                 break;
-            }
+            } 
         }
     }
 }
 
-void menu_handle_button_press(menu_state_t& state, menu_button_name button) {
-    switch (button) {
-        case MENU_BUTTON_EXIT: {
-            state.mode = MENU_MODE_EXIT;
+void menu_handle_item_press(menu_state_t& state, menu_item_t& item) {
+    switch (item.name) {
+        case MENU_ITEM_MAIN_BUTTON_PLAY: {
+            menu_set_mode(state, MENU_MODE_USERNAME);
             return;
+        }
+        case MENU_ITEM_MAIN_BUTTON_EXIT: {
+            menu_set_mode(state, MENU_MODE_EXIT);
+            return;
+        }
+        case MENU_ITEM_USERNAME_BUTTON_BACK: {
+            menu_set_mode(state, MENU_MODE_MAIN);
+            return;
+        }
+        case MENU_ITEM_USERNAME_TEXTBOX: {
+            input_start_text_input(item.textbox.value, &item.textbox.value_length, item.textbox.value_max_length);
+            return;
+        }
+    }
+}
+
+void menu_set_mode(menu_state_t& state, menu_mode mode) {
+    // Stop text input if leaving mode with a textbox
+    if (state.mode == MENU_MODE_USERNAME) {
+        input_stop_text_input();
+    }
+
+    // If entering a mode with a textbox, find the textbox and start input on it
+    state.mode = mode;
+    if (mode == MENU_MODE_USERNAME) {
+        for (menu_item_t& item : state.menu_items[mode]) {
+            if (item.type == MENU_ITEM_TEXTBOX) {
+                input_start_text_input(item.textbox.value, &item.textbox.value_length, item.textbox.value_max_length);
+                break;
+            }
         }
     }
 }
@@ -192,9 +259,16 @@ void menu_render(const menu_state_t& state) {
         render_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH", ivec2(24, 24));
     }
 
-    // Render menu buttons
-    for (menu_button_t button : state.menu_buttons[state.mode]) {
-        menu_render_button(button, rect_has_point(button.rect, input_get_mouse_position()));
+    // Render menu items
+    for (const menu_item_t& item : state.menu_items[state.mode]) {
+        switch (item.type) {
+            case MENU_ITEM_BUTTON:
+                menu_render_button(item, rect_has_point(item.rect, input_get_mouse_position()));
+                break;
+            case MENU_ITEM_TEXTBOX:
+                menu_render_textbox(item, state.text_input_show_cursor);
+                break;
+        }
     }
 
     // Render version
@@ -226,7 +300,7 @@ void menu_render_decoration(const menu_state_t& state, int index) {
     render_atlas(sprite_info.atlas, src_rect, dst_rect, 0);
 }
 
-void menu_render_button(menu_button_t& button, bool hovered) {
+void menu_render_button(const menu_item_t& button, bool hovered) {
     // Draw button parchment
     int frame_count = button.rect.w / 8;
     for (int frame = 0; frame < frame_count; frame++) {
@@ -240,5 +314,17 @@ void menu_render_button(menu_button_t& button, bool hovered) {
         render_sprite(SPRITE_UI_MENU_BUTTON, ivec2(hframe, (int)hovered), ivec2(button.rect.x + (frame * 8), button.rect.y), RENDER_SPRITE_NO_CULL, 0);
     }
 
-    render_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, button.text, ivec2(button.rect.x + 5, button.rect.y + 3 - (int)hovered));
+    render_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, button.button.text, ivec2(button.rect.x + 5, button.rect.y + 3 - (int)hovered));
+}
+
+void menu_render_textbox(const menu_item_t& textbox, bool show_cursor) {
+    render_ninepatch(SPRITE_UI_FRAME_SMALL, textbox.rect);
+    render_text(FONT_HACK_GOLD, textbox.textbox.prompt, ivec2(textbox.rect.x + 5, textbox.rect.y + 6));
+    ivec2 prompt_size = render_get_text_size(FONT_HACK_GOLD, textbox.textbox.prompt);
+    render_text(FONT_HACK_GOLD, textbox.textbox.value, ivec2(textbox.rect.x + prompt_size.x, textbox.rect.y + 6));
+    if (show_cursor && input_is_text_input_active()) {
+        int value_text_width = render_get_text_size(FONT_HACK_GOLD, textbox.textbox.value).x;
+        ivec2 cursor_pos = ivec2(textbox.rect.x + prompt_size.x + value_text_width - 4, textbox.rect.y + 6);
+        render_text(FONT_HACK_GOLD, "|", cursor_pos);
+    }
 }

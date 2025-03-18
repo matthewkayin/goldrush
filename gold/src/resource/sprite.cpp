@@ -49,7 +49,7 @@ static std::unordered_map<sprite_name, sprite_info_t> SPRITE_INFO = {
     { SPRITE_UI_FRAME_SMALL, (sprite_info_t) { 
         .atlas = ATLAS_UI, 
         .atlas_x = 316, .atlas_y = 0,
-        .frame_width = 24, .frame_height = 24
+        .frame_width = 8, .frame_height = 8
     }},
     { SPRITE_UI_BUTTON_REFRESH, (sprite_info_t) { 
         .atlas = ATLAS_UI, 

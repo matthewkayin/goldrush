@@ -16,6 +16,11 @@ enum input_action {
 
 void input_init(SDL_Window* window);
 void input_poll_events();
+
+void input_start_text_input(char* str, size_t* length, size_t max_length);
+void input_stop_text_input();
+bool input_is_text_input_active();
+
 ivec2 input_get_mouse_position();
 bool input_user_requests_exit();
 bool input_is_action_pressed(input_action action);

@@ -22,3 +22,4 @@
 #define RESOURCE_PATH "../res/"
 #define TILE_SIZE 16
 #define MAX_PLAYERS 4
+#define MAX_USERNAME_LENGTH 32
