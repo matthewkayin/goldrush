@@ -112,16 +112,13 @@ void input_poll_events() {
                     case SDLK_F3:
                         state.current[INPUT_F3] = event.type == SDL_KEYDOWN;
                         break;
+                    case SDLK_RETURN: 
+                        state.current[INPUT_ENTER] = event.type == SDL_KEYDOWN;
+                        break;
                     case SDLK_BACKSPACE: {
                         if (event.type == SDL_KEYDOWN && SDL_IsTextInputActive() && *state.text_input_length > 0) {
                             (*state.text_input_length)--;
                             state.text_input_str[*state.text_input_length] = '\0';
-                        }
-                        break;
-                    }
-                    case SDLK_RETURN: {
-                        if (event.type == SDL_KEYDOWN && SDL_IsTextInputActive()) {
-                            input_stop_text_input();
                         }
                         break;
                     }

@@ -32,6 +32,10 @@ enum menu_item_name {
     MENU_ITEM_MATCHLIST_BUTTON_BACK,
     MENU_ITEM_MATCHLIST_BUTTON_HOST,
     MENU_ITEM_MATCHLIST_BUTTON_JOIN,
+    MENU_ITEM_MATCHLIST_SEARCH,
+    MENU_ITEM_MATCHLIST_REFRESH,
+    MENU_ITEM_MATCHLIST_PAGE_LEFT,
+    MENU_ITEM_MATCHLIST_PAGE_RIGHT,
     MENU_ITEM_COUNT
 };
 
@@ -66,13 +70,15 @@ struct menu_state_t {
 
     char username[MAX_USERNAME_LENGTH + 4];
     size_t username_length;
-
+    char lobby_search_query[NETWORK_LOBBY_SEARCH_BUFFER_SIZE];
+    size_t lobby_search_query_length;
     bool text_input_show_cursor;
     uint32_t text_input_cursor_blink_timer;
 
     uint32_t status_timer;
     char status_text[128];
 
+    std::vector<lobby_t> lobbies;
     std::vector<menu_item_t> menu_items;
     int item_selected;
 };

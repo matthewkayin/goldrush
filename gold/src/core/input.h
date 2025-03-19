@@ -11,6 +11,7 @@ enum input_action {
     INPUT_SPACE,
     INPUT_ESC,
     INPUT_F3,
+    INPUT_ENTER,
     INPUT_COUNT
 };
 

@@ -4,9 +4,13 @@
 #include "core/cursor.h"
 #include "core/logger.h"
 #include "core/input.h"
+#include "core/asserts.h"
 #include "render/render.h"
 #include <cstdio>
 #include <vector>
+#include <algorithm>
+
+#define MENU_ITEM_NOT_FOUND -1
 
 static const int WAGON_X_DEFAULT = 380;
 static const int WAGON_X_LOBBY = 480;
@@ -38,14 +42,19 @@ static const rect_t MATCHLIST_RECT = (rect_t) {
 };
 
 static const uint32_t STATUS_DURATION = 60 * 2;
+static const uint32_t MATCHLIST_PAGE_SIZE = 9;
 
 void menu_set_mode(menu_state_t& state, menu_mode mode);
 void menu_refresh_items(menu_state_t& state);
 menu_item_t menu_create_textbox(menu_item_name name, const char* prompt, rect_t rect);
 menu_item_t menu_create_button(menu_item_name name, const char* text, ivec2 position);
 menu_item_t menu_create_matchlist_lobby(lobby_t& lobby, int index);
+
+int menu_get_item_index_by_name(const menu_state_t& state, menu_item_name name);
 void menu_handle_item_press(menu_state_t& state, int index);
 void menu_show_status(menu_state_t& state, const char* status);
+void menu_refresh_lobby_search(menu_state_t& state);
+
 void menu_render_decoration(const menu_state_t& state, int index);
 void menu_render_button(const menu_item_t& button, bool hovered);
 void menu_render_textbox(const menu_item_t& textbox, const char* value, bool show_cursor);
@@ -65,6 +74,8 @@ menu_state_t menu_init() {
 
     memset(state.username, 0, sizeof(state.username));
     state.username_length = 0;
+    memset(state.lobby_search_query, 0, sizeof(state.lobby_search_query));
+    state.lobby_search_query_length = 0;
 
     state.mode = MENU_MODE_MAIN;
     menu_set_mode(state, state.mode);
@@ -76,8 +87,7 @@ void menu_set_mode(menu_state_t& state, menu_mode mode) {
     state.status_timer = 0;
     state.item_selected = -1;
 
-    // Stop text input if leaving mode with a textbox
-    if (state.mode == MENU_MODE_USERNAME) {
+    if (input_is_text_input_active()) {
         input_stop_text_input();
     }
 
@@ -90,7 +100,7 @@ void menu_set_mode(menu_state_t& state, menu_mode mode) {
             menu_show_status(state, "Error occurred while searching for LAN games.");
             return;
         }
-        network_scanner_search("");
+        menu_refresh_lobby_search(state);
     }
 
     menu_refresh_items(state);
@@ -114,6 +124,11 @@ void menu_refresh_items(menu_state_t& state) {
             state.menu_items.push_back(menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_BACK, "BACK", ivec2(BUTTON_X, MATCHLIST_RECT.y + MATCHLIST_RECT.h + 4)));
             state.menu_items.push_back(menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_HOST, "HOST", ivec2(state.menu_items[0].rect.x + state.menu_items[0].rect.w + 4, state.menu_items[0].rect.y)));
             state.menu_items.push_back(menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_JOIN, "JOIN", ivec2(state.menu_items[1].rect.x + state.menu_items[1].rect.w + 4, state.menu_items[1].rect.y)));
+            state.menu_items.push_back(menu_create_textbox(MENU_ITEM_MATCHLIST_SEARCH, "Search: ", (rect_t) { .x = 44, .y = 4, .w = 300, .h = 24 }));
+
+            for (int lobby_index = 0; lobby_index < std::min(MATCHLIST_PAGE_SIZE, (uint32_t)state.lobbies.size()); lobby_index++) {
+                state.menu_items.push_back(menu_create_matchlist_lobby(state.lobbies[lobby_index], lobby_index));
+            }
             break;
         }
         default:
@@ -178,13 +193,8 @@ void menu_handle_network_event(menu_state_t& state, network_event_t event) {
     switch (event.type) {
         case NETWORK_EVENT_LOBBY_INFO: {
             if (state.mode == MENU_MODE_MATCHLIST) {
-                int index = 0;
-                for (const menu_item_t& item : state.menu_items) {
-                    if (item.type == MENU_ITEM_TYPE_MATCHLIST_LOBBY) {
-                        index++;
-                    }
-                }
-                state.menu_items.push_back(menu_create_matchlist_lobby(event.lobby.lobby, index));
+                state.lobbies.push_back(event.lobby.lobby);
+                menu_refresh_items(state);
             }
             return;
         }
@@ -234,6 +244,42 @@ void menu_update(menu_state_t& state) {
             } 
         }
     }
+
+    if (input_is_text_input_active() && input_is_action_just_pressed(INPUT_ENTER)) {
+        if (state.mode == MENU_MODE_USERNAME) {
+            int ok_button_index = menu_get_item_index_by_name(state, MENU_ITEM_USERNAME_BUTTON_OK);
+            GOLD_ASSERT(ok_button_index != MENU_ITEM_NOT_FOUND);
+            menu_handle_item_press(state, ok_button_index);
+        } else if (state.mode == MENU_MODE_MATCHLIST) {
+            menu_refresh_lobby_search(state);
+        }
+    }
+}
+
+void menu_refresh_lobby_search(menu_state_t& state) {
+    state.lobbies.clear();
+    memset(state.lobby_search_query, 0, sizeof(state.lobby_search_query));
+    state.lobby_search_query_length = 0;
+    network_scanner_search(state.lobby_search_query);
+
+    for (int i = 0; i < 4; i++) {
+        lobby_t lobby;
+        sprintf(lobby.name, "test game %i", i);
+        lobby.player_count = i;
+        state.lobbies.push_back(lobby);
+    }
+
+    menu_refresh_items(state);
+}
+
+int menu_get_item_index_by_name(const menu_state_t& state, menu_item_name name) {
+    for (int index = 0; index < state.menu_items.size(); index++) {
+        if (state.menu_items[index].name == name) {
+            return index;
+        }
+    }
+    
+    return -1;
 }
 
 void menu_handle_item_press(menu_state_t& state, int index) {
@@ -277,6 +323,10 @@ void menu_handle_item_press(menu_state_t& state, int index) {
         }
         case MENU_ITEM_MATCHLIST_LOBBY: {
             state.item_selected = index;
+            return;
+        }
+        case MENU_ITEM_MATCHLIST_SEARCH: {
+            input_start_text_input(state.lobby_search_query, &state.lobby_search_query_length, NETWORK_LOBBY_NAME_MAX);
             return;
         }
         default:
@@ -366,6 +416,7 @@ void menu_render(const menu_state_t& state) {
     }
 
     // Render menu items
+    uint32_t lobbies_rendered = 0;
     for (int index = 0; index < state.menu_items.size(); index++) {
         const menu_item_t& item = state.menu_items[index];
         switch (item.type) {
@@ -375,12 +426,21 @@ void menu_render(const menu_state_t& state) {
             case MENU_ITEM_TYPE_TEXTBOX:
                 if (state.mode == MENU_MODE_USERNAME) {
                     menu_render_textbox(item, state.username, state.text_input_show_cursor);
+                } else if (state.mode == MENU_MODE_MATCHLIST) {
+                    menu_render_textbox(item, state.lobby_search_query, state.text_input_show_cursor);
+                } else {
+                    log_warn("Unhandled menu mode while rendering MENU_ITEM_TYPE_TEXTBOX");
                 }
                 break;
             case MENU_ITEM_TYPE_MATCHLIST_LOBBY:
                 menu_render_matchlist_lobby(item, rect_has_point(item.rect, input_get_mouse_position()), index == state.item_selected);
+                lobbies_rendered++;
                 break;
         }
+    }
+    if (state.mode == MENU_MODE_MATCHLIST && lobbies_rendered == 0) {
+        int text_width = render_get_text_size(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...").x;
+        render_text(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...", ivec2(MATCHLIST_RECT.x + (MATCHLIST_RECT.w / 2) - (text_width / 2), MATCHLIST_RECT.y + 8));
     }
 
     // Render version
@@ -395,6 +455,12 @@ void menu_render(const menu_state_t& state) {
         int rect_width = text_size.x + 32;
         render_ninepatch(SPRITE_UI_FRAME, (rect_t) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 80, .w = rect_width, .h = 32 });
         render_text(FONT_HACK_GOLD, state.status_text, ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 80 + 16 - (text_size.y / 2)));
+    }
+    if (state.mode == MENU_MODE_CONNECTING) {
+        ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, "Connecting...");
+        int rect_width = text_size.x + 32;
+        render_ninepatch(SPRITE_UI_FRAME, (rect_t) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 80, .w = rect_width, .h = 32 });
+        render_text(FONT_HACK_GOLD, "Connecting...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 80 + 16 - (text_size.y / 2)));
     }
 }
 

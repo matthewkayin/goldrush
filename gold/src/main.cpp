@@ -168,7 +168,6 @@ int gold_main(int argc, char** argv) {
         render_present_frame();
     }
 
-    network_disconnect();
     network_quit();
     render_quit();
 
