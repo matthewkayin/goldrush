@@ -2,6 +2,7 @@
 
 #include "core/animation.h"
 #include "core/network.h"
+#include "resource/sprite.h"
 #include <vector>
 
 enum menu_mode {
@@ -19,7 +20,8 @@ enum menu_mode {
 enum menu_item_type {
     MENU_ITEM_TYPE_BUTTON,
     MENU_ITEM_TYPE_TEXTBOX,
-    MENU_ITEM_TYPE_MATCHLIST_LOBBY
+    MENU_ITEM_TYPE_MATCHLIST_LOBBY,
+    MENU_ITEM_TYPE_SPRITE_BUTTON
 };
 
 enum menu_item_name {
@@ -47,6 +49,12 @@ struct menu_textbox_t {
     const char* prompt;
 };
 
+struct menu_sprite_button_t {
+    sprite_name sprite;
+    bool disabled;
+    bool flip_h;
+};
+
 struct menu_item_t {
     menu_item_type type;
     menu_item_name name;
@@ -55,6 +63,7 @@ struct menu_item_t {
         menu_button_t button;
         menu_textbox_t textbox;
         lobby_t lobby;
+        menu_sprite_button_t sprite;
     };
 };
 
@@ -81,6 +90,7 @@ struct menu_state_t {
     std::vector<lobby_t> lobbies;
     std::vector<menu_item_t> menu_items;
     int item_selected;
+    uint32_t matchlist_page;
 };
 
 menu_state_t menu_init();

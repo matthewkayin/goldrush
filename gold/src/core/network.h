@@ -105,7 +105,7 @@ void network_quit();
 void network_disconnect();
 
 bool network_scanner_create();
-void network_scanner_search(const char* query);
+void network_scanner_search();
 void network_scanner_destroy();
 bool network_server_create(const char* username);
 bool network_client_create(const char* username, const char* server_ip, uint16_t port);

@@ -18,7 +18,6 @@ struct network_state_t {
 
     char client_username[NETWORK_PLAYER_NAME_BUFFER_SIZE];
     char lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
-    char lobby_name_query[NETWORK_LOBBY_NAME_BUFFER_SIZE];
 
     uint8_t player_id;
     player_t players[MAX_PLAYERS];
@@ -156,9 +155,7 @@ bool network_scanner_create() {
     return true;
 }
 
-void network_scanner_search(const char* query) {
-    strcpy(state.lobby_name_query, query);
-
+void network_scanner_search() {
     ENetAddress scan_address;
     scan_address.host = ENET_HOST_BROADCAST;
     scan_address.port = SCANNER_PORT;
@@ -354,14 +351,12 @@ void network_service() {
                 lobby.player_count = lobby_info.player_count;
                 lobby.port = lobby_info.port;
                 enet_address_get_host_ip(&receive_address, lobby.ip, NETWORK_PLAYER_NAME_BUFFER_SIZE);
-                if (strlen(state.lobby_name_query) == 0 || strstr(lobby.name, state.lobby_name_query) != NULL) {
-                    state.event_queue.push((network_event_t) {
-                        .type = NETWORK_EVENT_LOBBY_INFO,
-                        .lobby = (network_event_lobby_t) {
-                            .lobby = lobby
-                        }
-                    });
-                }
+                state.event_queue.push((network_event_t) {
+                    .type = NETWORK_EVENT_LOBBY_INFO,
+                    .lobby = (network_event_lobby_t) {
+                        .lobby = lobby
+                    }
+                });
             }
         }
     }
