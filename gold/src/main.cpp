@@ -4,6 +4,7 @@
 #include "core/cursor.h"
 #include "core/animation.h"
 #include "core/input.h"
+#include "core/network.h"
 #include "math/gmath.h"
 #include "render/render.h"
 #include "menu/menu.h"
@@ -82,6 +83,10 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return -1;
     }
+    if (!network_init()) {
+        logger_quit();
+        return -1;
+    }
     animation_init();
     input_init(window);
 
@@ -130,6 +135,12 @@ int gold_main(int argc, char** argv) {
             if (input_is_action_just_pressed(INPUT_F3)) {
                 render_debug_info = !render_debug_info;
             }
+
+            network_service();
+            network_event_t event;
+            while (network_poll_events(&event)) {
+                menu_handle_network_event(menu_state, event);
+            }
         }
 
         // UPDATE
@@ -157,6 +168,8 @@ int gold_main(int argc, char** argv) {
         render_present_frame();
     }
 
+    network_disconnect();
+    network_quit();
     render_quit();
 
     SDL_DestroyWindow(window);

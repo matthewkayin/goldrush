@@ -205,7 +205,7 @@ struct fvec2 {
     }
 };
 
-enum Direction {
+enum direction {
     DIRECTION_NORTH,
     DIRECTION_NORTHEAST,
     DIRECTION_EAST,
@@ -312,10 +312,10 @@ inline ivec2 autotile_edge_lookup(uint32_t edge, uint8_t neighbors) {
     }
 }
 
-inline Direction enum_from_ivec2_direction(ivec2 ivec2_direction) {
+inline direction enum_from_ivec2_direction(ivec2 ivec2_direction) {
     for (int enum_direction = 0; enum_direction < DIRECTION_COUNT; enum_direction++) {
         if (DIRECTION_IVEC2[enum_direction] == ivec2_direction) {
-            return (Direction)enum_direction;
+            return (direction)enum_direction;
         }
     }
     return DIRECTION_COUNT;
@@ -330,7 +330,7 @@ struct rect_t {
     int h;
 };
 
-inline Direction enum_direction_to_rect(ivec2 from, rect_t rect) {
+inline direction enum_direction_to_rect(ivec2 from, rect_t rect) {
     if (from.y < rect.y) {
         if (from.x < rect.x) {
             return DIRECTION_SOUTHEAST;

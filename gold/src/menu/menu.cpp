@@ -37,14 +37,14 @@ static const rect_t MATCHLIST_RECT = (rect_t) {
     .x = 36, .y = 32, .w = 432, .h = 200
 };
 
-static const uint32_t STATUS_DURATION = 60 * 3;
+static const uint32_t STATUS_DURATION = 60 * 2;
 
 void menu_set_mode(menu_state_t& state, menu_mode mode);
 void menu_refresh_items(menu_state_t& state);
 menu_item_t menu_create_textbox(menu_item_name name, const char* prompt, rect_t rect);
 menu_item_t menu_create_button(menu_item_name name, const char* text, ivec2 position);
-menu_item_t menu_create_matchlist_lobby(const char* lobby_name, uint32_t lobby_count, int index);
-void menu_handle_item_press(menu_state_t& state, menu_item_t& item);
+menu_item_t menu_create_matchlist_lobby(lobby_t& lobby, int index);
+void menu_handle_item_press(menu_state_t& state, int index);
 void menu_show_status(menu_state_t& state, const char* status);
 void menu_render_decoration(const menu_state_t& state, int index);
 void menu_render_button(const menu_item_t& button, bool hovered);
@@ -66,8 +66,6 @@ menu_state_t menu_init() {
     memset(state.username, 0, sizeof(state.username));
     state.username_length = 0;
 
-    state.status_timer = 0;
-
     state.mode = MENU_MODE_MAIN;
     menu_set_mode(state, state.mode);
 
@@ -76,16 +74,23 @@ menu_state_t menu_init() {
 
 void menu_set_mode(menu_state_t& state, menu_mode mode) {
     state.status_timer = 0;
+    state.item_selected = -1;
 
     // Stop text input if leaving mode with a textbox
     if (state.mode == MENU_MODE_USERNAME) {
         input_stop_text_input();
     }
 
-    // If entering a mode with a textbox, find the textbox and start input on it
     state.mode = mode;
     if (mode == MENU_MODE_USERNAME) {
         input_start_text_input(state.username, &state.username_length, MAX_USERNAME_LENGTH);
+    } else if (mode == MENU_MODE_MATCHLIST) {
+        if (!network_scanner_create()) {
+            menu_set_mode(state, MENU_MODE_MAIN);
+            menu_show_status(state, "Error occurred while searching for LAN games.");
+            return;
+        }
+        network_scanner_search("");
     }
 
     menu_refresh_items(state);
@@ -108,9 +113,7 @@ void menu_refresh_items(menu_state_t& state) {
         case MENU_MODE_MATCHLIST: {
             state.menu_items.push_back(menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_BACK, "BACK", ivec2(BUTTON_X, MATCHLIST_RECT.y + MATCHLIST_RECT.h + 4)));
             state.menu_items.push_back(menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_HOST, "HOST", ivec2(state.menu_items[0].rect.x + state.menu_items[0].rect.w + 4, state.menu_items[0].rect.y)));
-            state.menu_items.push_back(menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_HOST, "JOIN", ivec2(state.menu_items[1].rect.x + state.menu_items[1].rect.w + 4, state.menu_items[1].rect.y)));
-            state.menu_items.push_back(menu_create_matchlist_lobby("hello's game", 1, 0));
-            state.menu_items.push_back(menu_create_matchlist_lobby("howdy pardner", 4, 1));
+            state.menu_items.push_back(menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_JOIN, "JOIN", ivec2(state.menu_items[1].rect.x + state.menu_items[1].rect.w + 4, state.menu_items[1].rect.y)));
             break;
         }
         default:
@@ -148,9 +151,9 @@ menu_item_t menu_create_button(menu_item_name name, const char* text, ivec2 posi
     };
 }
 
-menu_item_t menu_create_matchlist_lobby(const char* lobby_name, uint32_t player_count, int index) {
+menu_item_t menu_create_matchlist_lobby(lobby_t& lobby, int index) {
     char lobby_text[64];
-    sprintf(lobby_text, "* %s (4/4) *", lobby_name);
+    sprintf(lobby_text, "* %s (4/4) *", lobby.name);
     ivec2 lobby_text_size = render_get_text_size(FONT_HACK_OFFBLACK, lobby_text);
     int frame_width = (lobby_text_size.x / 15) + 1;
     if (lobby_text_size.x % 15 != 0) {
@@ -166,10 +169,28 @@ menu_item_t menu_create_matchlist_lobby(const char* lobby_name, uint32_t player_
         .w = frame_width * 15,
         .h = 15
     };
-    strcpy(item.lobby.name, lobby_name);
-    item.lobby.player_count = player_count;
+    memcpy(&item.lobby, &lobby, sizeof(lobby));
 
     return item;
+}
+
+void menu_handle_network_event(menu_state_t& state, network_event_t event) {
+    switch (event.type) {
+        case NETWORK_EVENT_LOBBY_INFO: {
+            if (state.mode == MENU_MODE_MATCHLIST) {
+                int index = 0;
+                for (const menu_item_t& item : state.menu_items) {
+                    if (item.type == MENU_ITEM_TYPE_MATCHLIST_LOBBY) {
+                        index++;
+                    }
+                }
+                state.menu_items.push_back(menu_create_matchlist_lobby(event.lobby.lobby, index));
+            }
+            return;
+        }
+        default:
+            return;
+    }
 }
 
 void menu_update(menu_state_t& state) {
@@ -206,16 +227,17 @@ void menu_update(menu_state_t& state) {
         if (input_is_text_input_active()) {
             input_stop_text_input();
         }
-        for (menu_item_t& item : state.menu_items) {
-            if (rect_has_point(item.rect, input_get_mouse_position())) {
-                menu_handle_item_press(state, item);
+        for (int index = 0; index < state.menu_items.size(); index++) {
+            if (rect_has_point(state.menu_items[index].rect, input_get_mouse_position())) {
+                menu_handle_item_press(state, index);
                 break;
             } 
         }
     }
 }
 
-void menu_handle_item_press(menu_state_t& state, menu_item_t& item) {
+void menu_handle_item_press(menu_state_t& state, int index) {
+    menu_item_t& item = state.menu_items[index];
     switch (item.name) {
         case MENU_ITEM_MAIN_BUTTON_PLAY: {
             menu_set_mode(state, MENU_MODE_USERNAME);
@@ -243,6 +265,18 @@ void menu_handle_item_press(menu_state_t& state, menu_item_t& item) {
         }
         case MENU_ITEM_MATCHLIST_BUTTON_BACK: {
             menu_set_mode(state, MENU_MODE_USERNAME);
+            return;
+        }
+        case MENU_ITEM_MATCHLIST_BUTTON_HOST: {
+            if (!network_server_create(state.username)) {
+                menu_show_status(state, "Could not create server.");
+                return;
+            }
+            menu_set_mode(state, MENU_MODE_LOBBY);
+            return;
+        }
+        case MENU_ITEM_MATCHLIST_LOBBY: {
+            state.item_selected = index;
             return;
         }
         default:
@@ -331,13 +365,9 @@ void menu_render(const menu_state_t& state) {
         render_ninepatch(SPRITE_UI_FRAME, MATCHLIST_RECT);
     }
 
-    // Status text
-    if (state.status_timer != 0) {
-        render_text(FONT_HACK_OFFBLACK, state.status_text, ivec2(BUTTON_X, BUTTON_Y - 16));
-    }
-
     // Render menu items
-    for (const menu_item_t& item : state.menu_items) {
+    for (int index = 0; index < state.menu_items.size(); index++) {
+        const menu_item_t& item = state.menu_items[index];
         switch (item.type) {
             case MENU_ITEM_TYPE_BUTTON:
                 menu_render_button(item, rect_has_point(item.rect, input_get_mouse_position()));
@@ -348,7 +378,7 @@ void menu_render(const menu_state_t& state) {
                 }
                 break;
             case MENU_ITEM_TYPE_MATCHLIST_LOBBY:
-                menu_render_matchlist_lobby(item, rect_has_point(item.rect, input_get_mouse_position()), false);
+                menu_render_matchlist_lobby(item, rect_has_point(item.rect, input_get_mouse_position()), index == state.item_selected);
                 break;
         }
     }
@@ -358,6 +388,14 @@ void menu_render(const menu_state_t& state) {
     sprintf(version_text, "Version %s", APP_VERSION);
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, version_text);
     render_text(FONT_WESTERN8_OFFBLACK, version_text, ivec2(4, SCREEN_HEIGHT - text_size.y - 4));
+
+    // Status text
+    if (state.status_timer != 0) {
+        ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, state.status_text);
+        int rect_width = text_size.x + 32;
+        render_ninepatch(SPRITE_UI_FRAME, (rect_t) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 80, .w = rect_width, .h = 32 });
+        render_text(FONT_HACK_GOLD, state.status_text, ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 80 + 16 - (text_size.y / 2)));
+    }
 }
 
 void menu_show_status(menu_state_t& state, const char* status) {

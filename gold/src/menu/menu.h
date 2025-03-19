@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/animation.h"
+#include "core/network.h"
 #include <vector>
 
 enum menu_mode {
@@ -42,11 +43,6 @@ struct menu_textbox_t {
     const char* prompt;
 };
 
-struct matchlist_lobby_t {
-    char name[64];
-    uint32_t player_count;
-};
-
 struct menu_item_t {
     menu_item_type type;
     menu_item_name name;
@@ -54,7 +50,7 @@ struct menu_item_t {
     union {
         menu_button_t button;
         menu_textbox_t textbox;
-        matchlist_lobby_t lobby;
+        lobby_t lobby;
     };
 };
 
@@ -78,8 +74,10 @@ struct menu_state_t {
     char status_text[128];
 
     std::vector<menu_item_t> menu_items;
+    int item_selected;
 };
 
 menu_state_t menu_init();
+void menu_handle_network_event(menu_state_t& state, network_event_t event);
 void menu_update(menu_state_t& state);
 void menu_render(const menu_state_t& state);
