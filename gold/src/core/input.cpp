@@ -4,7 +4,7 @@
 #include "core/logger.h"
 #include <cstring>
 
-struct input_state_t {
+struct InputState {
     SDL_Window* window;
     ivec2 window_size;
     ivec2 screen_position;
@@ -18,7 +18,7 @@ struct input_state_t {
     std::string* text_input_str;
     size_t text_input_max_length;
 };
-static input_state_t state;
+static InputState state;
 
 void input_update_window_size();
 
@@ -161,14 +161,14 @@ bool input_user_requests_exit() {
     return state.user_requests_exit;
 }
 
-bool input_is_action_pressed(input_action action) {
+bool input_is_action_pressed(InputAction action) {
     return state.current[action];
 }
 
-bool input_is_action_just_pressed(input_action action) {
+bool input_is_action_just_pressed(InputAction action) {
     return state.current[action] && !state.previous[action];
 }
 
-bool input_is_action_just_released(input_action action) {
+bool input_is_action_just_released(InputAction action) {
     return state.previous[action] && !state.current[action];
 }

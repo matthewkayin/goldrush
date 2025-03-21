@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-enum atlas_name {
+enum AtlasName {
     ATLAS_UI,
     ATLAS_TILESET,
     ATLAS_UNIT_WAGON,
@@ -10,7 +10,7 @@ enum atlas_name {
     ATLAS_COUNT
 };
 
-enum atlas_import_strategy {
+enum AtlasImportStrategy {
     ATLAS_IMPORT_DEFAULT,
     ATLAS_IMPORT_RECOLOR,
     ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA,
@@ -18,20 +18,20 @@ enum atlas_import_strategy {
     ATLAS_IMPORT_FONTS
 };
 
-struct atlas_params_tileset_t {
+struct AtlasParamsTileset {
     int begin;
     int end;
 };
 
-struct atlas_params_t {
+struct AtlasParams {
     const char* path;
-    atlas_import_strategy strategy;
+    AtlasImportStrategy strategy;
     union {
-        atlas_params_tileset_t tileset;
+        AtlasParamsTileset tileset;
     };
 };
 
-enum sprite_name {
+enum SpriteName {
     SPRITE_UI_MINIMAP,
     SPRITE_UI_BUTTON_PANEL,
     SPRITE_UI_BOTTOM_PANEL,
@@ -95,26 +95,26 @@ enum sprite_name {
     SPRITE_COUNT
 };
 
-struct sprite_info_t {
-    atlas_name atlas;
+struct SpriteInfo {
+    AtlasName atlas;
     int atlas_x;
     int atlas_y;
     int frame_width;
     int frame_height;
 };
 
-enum tile_type {
+enum TileType {
     TILE_TYPE_SINGLE,
     TILE_TYPE_AUTO
 };
 
-struct tile_data_t {
-    tile_type type;
+struct TileData {
+    TileType type;
     int source_x;
     int source_y;
 };
 
-const atlas_params_t& resource_get_atlas_params(atlas_name atlas);
-const sprite_info_t& resource_get_sprite_info(sprite_name name);
-void resource_set_sprite_info(sprite_name name, sprite_info_t sprite_info);
-const tile_data_t& resource_get_tile_data(sprite_name tile);
+const AtlasParams& resource_get_atlas_params(AtlasName atlas);
+const SpriteInfo& resource_get_sprite_info(SpriteName name);
+void resource_set_sprite_info(SpriteName name, SpriteInfo sprite_info);
+const TileData& resource_get_tile_data(SpriteName tile);

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-enum font_name {
+enum FontName {
     FONT_HACK_OFFBLACK,
     FONT_HACK_WHITE,
     FONT_HACK_GOLD,
@@ -18,7 +18,7 @@ enum font_name {
     FONT_COUNT
 };
 
-struct font_params_t {
+struct FontParams {
     const char* path;
     int size;
     uint8_t r;
@@ -27,4 +27,4 @@ struct font_params_t {
     bool ignore_bearing;
 };
 
-const font_params_t& resource_get_font_params(font_name name);
+const FontParams& resource_get_font_params(FontName name);

@@ -5,12 +5,12 @@
 #include "resource/font.h"
 #include <SDL2/SDL.h>
 
-enum minimap_layer {
+enum MinimapLayer {
     MINIMAP_LAYER_TILE,
     MINIMAP_LAYER_FOG
 };
 
-enum minimap_pixel {
+enum MinimapPixel {
     MINIMAP_PIXEL_TRANSPARENT,
     MINIMAP_PIXEL_OFFBLACK,
     MINIMAP_PIXEL_OFFBLACK_TRANSPARENT,
@@ -31,12 +31,12 @@ void render_quit();
 void render_set_window_size(ivec2 window_size);
 void render_prepare_frame();
 void render_present_frame();
-void render_sprite(sprite_name name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id);
-void render_ninepatch(sprite_name sprite, Rect rect);
-void render_atlas(atlas_name atlas, Rect src_rect, Rect dst_rect, uint32_t options);
-void render_text(font_name name, const char* text, ivec2 position);
-ivec2 render_get_text_size(font_name name, const char* text);
+void render_sprite(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id);
+void render_ninepatch(SpriteName sprite, Rect rect);
+void render_atlas(AtlasName atlas, Rect src_rect, Rect dst_rect, uint32_t options);
+void render_text(FontName name, const char* text, ivec2 position);
+ivec2 render_get_text_size(FontName name, const char* text);
 void render_line(ivec2 start, ivec2 end);
 void render_rect(ivec2 start, ivec2 end);
-void render_minimap_putpixel(minimap_layer layer, ivec2 position, minimap_pixel pixel);
+void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel);
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size);

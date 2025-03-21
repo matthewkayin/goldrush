@@ -59,7 +59,7 @@ struct MenuItemTextbox {
 };
 
 struct MenuItemSprite {
-    sprite_name sprite;
+    SpriteName sprite;
     bool disabled;
     bool flip_h;
 };

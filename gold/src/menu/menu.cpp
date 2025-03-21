@@ -61,7 +61,7 @@ void menu_refresh_items(MenuState& state);
 MenuItem menu_create_textbox(MenuItemName name, const char* prompt, std::string* value, size_t max_length, Rect rect);
 MenuItem menu_create_button(MenuItemName name, const char* text, ivec2 position);
 MenuItem menu_create_matchlist_lobby(const NetworkLobby& lobby, int index);
-MenuItem menu_create_sprite_button(MenuItemName name, sprite_name sprite, ivec2 position, bool disabled, bool flip_h);
+MenuItem menu_create_sprite_button(MenuItemName name, SpriteName sprite, ivec2 position, bool disabled, bool flip_h);
 
 int menu_get_item_index_by_name(const MenuState& state, MenuItemName name);
 size_t menu_get_matchlist_page_count(const MenuState& state);
@@ -221,8 +221,8 @@ MenuItem menu_create_matchlist_lobby(const NetworkLobby& lobby, int index) {
     return item;
 }
 
-MenuItem menu_create_sprite_button(MenuItemName name, sprite_name sprite, ivec2 position, bool disabled, bool flip_h) {
-    const sprite_info_t& sprite_info = resource_get_sprite_info(sprite);
+MenuItem menu_create_sprite_button(MenuItemName name, SpriteName sprite, ivec2 position, bool disabled, bool flip_h) {
+    const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
 
     return (MenuItem) {
         .type = MENU_ITEM_TYPE_SPRITE_BUTTON,
@@ -309,7 +309,6 @@ void menu_update(MenuState& state) {
 }
 
 void menu_refresh_lobby_search(MenuState& state) {
-    log_trace("performing scanner search.");
     network_scanner_search(state.lobby_search_query.c_str());
 
     state.matchlist_page = 0;
@@ -454,7 +453,7 @@ void menu_handle_item_press(MenuState& state, int index) {
 
 void menu_render(const MenuState& state) {
     // Sky background
-    const sprite_info_t& sky_sprite_info = resource_get_sprite_info(SPRITE_UI_SKY);
+    const SpriteInfo& sky_sprite_info = resource_get_sprite_info(SPRITE_UI_SKY);
     Rect sky_src_rect = (Rect) { 
         .x = sky_sprite_info.atlas_x, 
         .y = sky_sprite_info.atlas_y, 
@@ -466,8 +465,8 @@ void menu_render(const MenuState& state) {
     // Tiles
     for (int y = 0; y < MENU_TILE_HEIGHT; y++) {
         for (int x = 0; x < MENU_TILE_WIDTH; x++) {
-            sprite_name sprite = (x + y) % 10 == 0 ? SPRITE_TILE_SAND2 : SPRITE_TILE_SAND;
-            const sprite_info_t& sprite_info = resource_get_sprite_info(sprite);
+            SpriteName sprite = (x + y) % 10 == 0 ? SPRITE_TILE_SAND2 : SPRITE_TILE_SAND;
+            const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
             Rect src_rect = (Rect) {
                 .x = sprite_info.atlas_x,
                 .y = sprite_info.atlas_y,
@@ -488,7 +487,7 @@ void menu_render(const MenuState& state) {
     menu_render_decoration(state, 2);
 
     // Wagon animation
-    const sprite_info_t& sprite_wagon_info = resource_get_sprite_info(SPRITE_UNIT_WAGON);
+    const SpriteInfo& sprite_wagon_info = resource_get_sprite_info(SPRITE_UNIT_WAGON);
     Rect wagon_src_rect = (Rect) {
         .x = sprite_wagon_info.atlas_x + (sprite_wagon_info.frame_width * state.wagon_animation.frame.x),
         .y = sprite_wagon_info.atlas_y + (sprite_wagon_info.frame_height * 2),
@@ -506,7 +505,7 @@ void menu_render(const MenuState& state) {
     menu_render_decoration(state, 1);
 
     // Render clouds
-    const sprite_info_t& cloud_sprite_info = resource_get_sprite_info(SPRITE_UI_CLOUDS);
+    const SpriteInfo& cloud_sprite_info = resource_get_sprite_info(SPRITE_UI_CLOUDS);
     for (int index = 0; index < CLOUD_COUNT; index++) {
         Rect src_rect = (Rect) {
             .x = cloud_sprite_info.atlas_x + (CLOUD_FRAME_X[index] * cloud_sprite_info.frame_width),
@@ -604,8 +603,8 @@ void menu_render_decoration(const MenuState& state, int index) {
     if (cactus_index == 2) {
         cactus_index = 0;
     }
-    sprite_name sprite = (sprite_name)(SPRITE_TILE_DECORATION0 + cactus_index);
-    const sprite_info_t& sprite_info = resource_get_sprite_info(sprite);
+    SpriteName sprite = (SpriteName)(SPRITE_TILE_DECORATION0 + cactus_index);
+    const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
     Rect src_rect = (Rect) {
         .x = sprite_info.atlas_x,
         .y = sprite_info.atlas_y,

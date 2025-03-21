@@ -8,19 +8,19 @@
 #include <cstdio>
 #include <unordered_map>
 
-struct cursor_params_t {
+struct CursorParams {
     const char* path;
     int hot_x;
     int hot_y;
 };
 
-static const std::unordered_map<cursor_name, cursor_params_t> CURSOR_PARAMS = {
-    { CURSOR_DEFAULT, (cursor_params_t) {
+static const std::unordered_map<CursorName, CursorParams> CURSOR_PARAMS = {
+    { CURSOR_DEFAULT, (CursorParams) {
         .path = "sprite/ui_cursor.png",
         .hot_x = 0,
         .hot_y = 0
     }},
-    { CURSOR_TARGET, (cursor_params_t) {
+    { CURSOR_TARGET, (CursorParams) {
         .path = "sprite/ui_cursor_target.png",
         .hot_x = 9,
         .hot_y = 9
@@ -28,11 +28,11 @@ static const std::unordered_map<cursor_name, cursor_params_t> CURSOR_PARAMS = {
 };
 
 static SDL_Cursor* cursors[CURSOR_COUNT];
-static cursor_name current_cursor;
+static CursorName current_cursor;
 
 bool cursor_init() {
     for (int cursor = 0; cursor < CURSOR_COUNT; cursor++) {
-        const cursor_params_t params = CURSOR_PARAMS.at((cursor_name)cursor);
+        const CursorParams params = CURSOR_PARAMS.at((CursorName)cursor);
 
         char path[128];
         sprintf(path, "%s%s", RESOURCE_PATH, params.path);
@@ -64,7 +64,7 @@ void cursor_quit() {
     }
 }
 
-void cursor_set(cursor_name cursor) {
+void cursor_set(CursorName cursor) {
     if (current_cursor == cursor) {
         return;
     }

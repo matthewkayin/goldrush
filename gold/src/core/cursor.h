@@ -1,6 +1,6 @@
 #pragma once
 
-enum cursor_name {
+enum CursorName {
     CURSOR_DEFAULT,
     CURSOR_TARGET,
     CURSOR_COUNT
@@ -9,4 +9,4 @@ enum cursor_name {
 bool cursor_init();
 void cursor_quit();
 
-void cursor_set(cursor_name cursor);
+void cursor_set(CursorName cursor);
