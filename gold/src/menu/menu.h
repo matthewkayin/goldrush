@@ -3,6 +3,7 @@
 #include "core/animation.h"
 #include "core/network.h"
 #include "resource/sprite.h"
+#include "resource/font.h"
 #include <vector>
 #include <string>
 
@@ -24,31 +25,29 @@ enum MenuMode {
 };
 
 enum MenuItemType {
-    MENU_ITEM_TYPE_BUTTON,
-    MENU_ITEM_TYPE_TEXTBOX,
-    MENU_ITEM_TYPE_MATCHLIST_LOBBY,
-    MENU_ITEM_TYPE_SPRITE_BUTTON
+    MENU_ITEM_BUTTON,
+    MENU_ITEM_TEXTBOX,
+    MENU_ITEM_LOBBY,
+    MENU_ITEM_SPRITE_BUTTON,
+    MENU_ITEM_TEXT,
+    MENU_ITEM_FRAME
 };
 
-enum MenuItemName {
-    MENU_ITEM_MAIN_BUTTON_PLAY,
-    MENU_ITEM_MAIN_BUTTON_EXIT,
-    MENU_ITEM_USERNAME_TEXTBOX,
-    MENU_ITEM_USERNAME_BUTTON_BACK,
-    MENU_ITEM_USERNAME_BUTTON_OK,
-    MENU_ITEM_MATCHLIST_LOBBY,
-    MENU_ITEM_MATCHLIST_BUTTON_BACK,
-    MENU_ITEM_MATCHLIST_BUTTON_HOST,
-    MENU_ITEM_MATCHLIST_BUTTON_JOIN,
-    MENU_ITEM_MATCHLIST_SEARCH,
-    MENU_ITEM_MATCHLIST_REFRESH,
-    MENU_ITEM_MATCHLIST_PAGE_LEFT,
-    MENU_ITEM_MATCHLIST_PAGE_RIGHT,
-    MENU_ITEM_LOBBY_CHAT_TEXTBOX,
-    MENU_ITEM_COUNT
+enum MenuButtonName {
+    MENU_BUTTON_MAIN_PLAY,
+    MENU_BUTTON_MAIN_EXIT,
+    MENU_BUTTON_USERNAME_BACK,
+    MENU_BUTTON_USERNAME_OK,
+    MENU_BUTTON_MATCHLIST_BACK,
+    MENU_BUTTON_MATCHLIST_HOST,
+    MENU_BUTTON_MATCHLIST_JOIN,
+    MENU_BUTTON_MATCHLIST_REFRESH,
+    MENU_BUTTON_MATCHLIST_PAGE_LEFT,
+    MENU_BUTTON_MATCHLIST_PAGE_RIGHT
 };
 
 struct MenuItemButton {
+    MenuButtonName name;
     const char* text;
 };
 
@@ -59,20 +58,30 @@ struct MenuItemTextbox {
 };
 
 struct MenuItemSprite {
+    MenuButtonName name;
     SpriteName sprite;
     bool disabled;
     bool flip_h;
 };
 
+struct MenuItemLobby {
+    size_t index;
+};
+
+struct MenuItemText {
+    FontName font;
+    const char* text;
+};
+
 struct MenuItem {
     MenuItemType type;
-    MenuItemName name;
     Rect rect;
     union {
         MenuItemButton button;
         MenuItemTextbox textbox;
-        NetworkLobby lobby;
+        MenuItemLobby lobby;
         MenuItemSprite sprite;
+        MenuItemText text;
     };
 };
 

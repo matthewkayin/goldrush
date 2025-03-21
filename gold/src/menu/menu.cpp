@@ -56,17 +56,23 @@ static const Rect MATCH_SETTINGS_RECT = (Rect) {
 static const uint32_t STATUS_DURATION = 60 * 2;
 static const uint32_t MATCHLIST_PAGE_SIZE = 9;
 
+static const int PLAYERLIST_COL_HEADER_Y = PLAYERLIST_RECT.y + 10;
+static const int PLAYERLIST_COL_NAME_X = PLAYERLIST_RECT.x + 16;
+static const int PLAYERLIST_COL_STATUS_X = PLAYERLIST_RECT.x + 216;
+static const int PLAYERLIST_COL_TEAM_X = PLAYERLIST_RECT.x + 280;
+static const int PLAYERLIST_COL_COLOR_X = PLAYERLIST_RECT.x + 336;
+
+static const ivec2 TITLE_TEXT_POSITION = ivec2(24, 24);
+
 void menu_set_mode(MenuState& state, MenuMode mode);
 void menu_refresh_items(MenuState& state);
-MenuItem menu_create_textbox(MenuItemName name, const char* prompt, std::string* value, size_t max_length, Rect rect);
-MenuItem menu_create_button(MenuItemName name, const char* text, ivec2 position);
-MenuItem menu_create_matchlist_lobby(const NetworkLobby& lobby, int index);
-MenuItem menu_create_sprite_button(MenuItemName name, SpriteName sprite, ivec2 position, bool disabled, bool flip_h);
+MenuItem menu_create_text(FontName font, const char* text, ivec2 position);
+MenuItem menu_create_button(MenuButtonName name, const char* text, ivec2 position);
+MenuItem menu_create_matchlist_lobby(size_t lobby_index, int index);
+MenuItem menu_create_sprite_button(MenuButtonName name, SpriteName sprite, ivec2 position, bool disabled, bool flip_h);
 
-int menu_get_item_index_by_name(const MenuState& state, MenuItemName name);
 size_t menu_get_matchlist_page_count(const MenuState& state);
-
-void menu_handle_item_press(MenuState& state, int index);
+void menu_handle_button_press(MenuState& state, MenuButtonName button);
 void menu_show_status(MenuState& state, const char* status);
 void menu_refresh_lobby_search(MenuState& state);
 void menu_add_chat_message(MenuState& state, const char* message);
@@ -122,28 +128,64 @@ void menu_refresh_items(MenuState& state) {
     state.menu_items.clear();
     switch (state.mode) {
         case MENU_MODE_MAIN: {
-            state.menu_items.push_back(menu_create_button(MENU_ITEM_MAIN_BUTTON_PLAY, "PLAY", ivec2(BUTTON_X, BUTTON_Y)));
-            state.menu_items.push_back(menu_create_button(MENU_ITEM_MAIN_BUTTON_EXIT, "EXIT", ivec2(BUTTON_X, BUTTON_Y + BUTTON_Y_DIST)));
+            state.menu_items.push_back(menu_create_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH", TITLE_TEXT_POSITION));
+            state.menu_items.push_back(menu_create_button(MENU_BUTTON_MAIN_PLAY, "PLAY", ivec2(BUTTON_X, BUTTON_Y)));
+            state.menu_items.push_back(menu_create_button(MENU_BUTTON_MAIN_EXIT, "EXIT", ivec2(BUTTON_X, BUTTON_Y + BUTTON_Y_DIST)));
             break;
         }
         case MENU_MODE_USERNAME: {
-            state.menu_items.push_back(menu_create_textbox(MENU_ITEM_USERNAME_TEXTBOX, "Username: ", &state.username, MAX_USERNAME_LENGTH, (Rect) { .x = BUTTON_X - 4, .y = BUTTON_Y, .w = 256, .h = 24 }));
-            state.menu_items.push_back(menu_create_button(MENU_ITEM_USERNAME_BUTTON_BACK, "BACK", ivec2(BUTTON_X, BUTTON_Y + BUTTON_Y_DIST + 4)));
-            state.menu_items.push_back(menu_create_button(MENU_ITEM_USERNAME_BUTTON_OK, "OK", ivec2(BUTTON_X + state.menu_items[1].rect.w + 4, BUTTON_Y + BUTTON_Y_DIST + 4)));
+            state.menu_items.push_back(menu_create_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH", TITLE_TEXT_POSITION));
+            state.menu_items.push_back((MenuItem) {
+                .type = MENU_ITEM_TEXTBOX,
+                .rect = (Rect) { 
+                    .x = BUTTON_X - 4, 
+                    .y = BUTTON_Y, 
+                    .w = 256, 
+                    .h = 24 
+                },
+                .textbox = (MenuItemTextbox) {
+                    .prompt = "Username: ",
+                    .value = &state.username,
+                    .max_length = MAX_USERNAME_LENGTH
+                }
+            });
+            MenuItem back_button = menu_create_button(MENU_BUTTON_USERNAME_BACK, "BACK", ivec2(BUTTON_X, BUTTON_Y + BUTTON_Y_DIST + 4));
+            state.menu_items.push_back(back_button);
+            state.menu_items.push_back(menu_create_button(MENU_BUTTON_USERNAME_OK, "OK", ivec2(BUTTON_X + back_button.rect.w + 4, BUTTON_Y + BUTTON_Y_DIST + 4)));
             break;
         }
         case MENU_MODE_MATCHLIST: {
-            int base_index = (state.matchlist_page * MATCHLIST_PAGE_SIZE);
-            for (int lobby_index = base_index; lobby_index < std::min(base_index + MATCHLIST_PAGE_SIZE, (uint32_t)network_get_lobby_count()); lobby_index++) {
-                state.menu_items.push_back(menu_create_matchlist_lobby(network_get_lobby(lobby_index), lobby_index - base_index));
+            state.menu_items.push_back((MenuItem) {
+                .type = MENU_ITEM_FRAME,
+                .rect = MATCHLIST_RECT
+            });
+
+            if (network_get_lobby_count() == 0) {
+                int text_width = render_get_text_size(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...").x;
+                state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...", ivec2(MATCHLIST_RECT.x + (MATCHLIST_RECT.w / 2) - (text_width / 2), MATCHLIST_RECT.y + 8)));
             }
 
-            MenuItem back_button = menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_BACK, "BACK", ivec2(BUTTON_X, MATCHLIST_RECT.y + MATCHLIST_RECT.h + 4));
-            MenuItem host_button = menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_HOST, "HOST", ivec2(back_button.rect.x + back_button.rect.w + 4, back_button.rect.y));
-            MenuItem search_item = menu_create_textbox(MENU_ITEM_MATCHLIST_SEARCH, "Search: ", &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1, (Rect) { .x = 44, .y = 4, .w = 300, .h = 24 });
-            MenuItem refresh_item = menu_create_sprite_button(MENU_ITEM_MATCHLIST_REFRESH, SPRITE_UI_BUTTON_REFRESH, ivec2(search_item.rect.x + search_item.rect.w + 4, search_item.rect.y), false, false);
-            MenuItem page_left_item = menu_create_sprite_button(MENU_ITEM_MATCHLIST_PAGE_LEFT, SPRITE_UI_BUTTON_ARROW, ivec2(refresh_item.rect.x + refresh_item.rect.w + 4, refresh_item.rect.y), state.matchlist_page == 0, true);
-            MenuItem page_right_item = menu_create_sprite_button(MENU_ITEM_MATCHLIST_PAGE_RIGHT, SPRITE_UI_BUTTON_ARROW, ivec2(page_left_item.rect.x + page_left_item.rect.w + 4, refresh_item.rect.y), state.matchlist_page == menu_get_matchlist_page_count(state) - 1, false);
+            int base_index = (state.matchlist_page * MATCHLIST_PAGE_SIZE);
+            for (int lobby_index = base_index; lobby_index < std::min(base_index + MATCHLIST_PAGE_SIZE, (uint32_t)network_get_lobby_count()); lobby_index++) {
+                state.menu_items.push_back(menu_create_matchlist_lobby(lobby_index, lobby_index - base_index));
+            }
+
+            MenuItem back_button = menu_create_button(MENU_BUTTON_MATCHLIST_BACK, "BACK", ivec2(BUTTON_X, MATCHLIST_RECT.y + MATCHLIST_RECT.h + 4));
+            MenuItem host_button = menu_create_button(MENU_BUTTON_MATCHLIST_HOST, "HOST", ivec2(back_button.rect.x + back_button.rect.w + 4, back_button.rect.y));
+            MenuItem search_item = (MenuItem) {
+                .type = MENU_ITEM_TEXTBOX,
+                .rect = (Rect) { 
+                    .x = 44, .y = 4, .w = 300, .h = 24 
+                },
+                .textbox = (MenuItemTextbox) {
+                    .prompt = "Search: ",
+                    .value = &state.lobby_search_query,
+                    .max_length = NETWORK_LOBBY_NAME_BUFFER_SIZE - 1
+                }
+            };
+            MenuItem refresh_item = menu_create_sprite_button(MENU_BUTTON_MATCHLIST_REFRESH, SPRITE_UI_BUTTON_REFRESH, ivec2(search_item.rect.x + search_item.rect.w + 4, search_item.rect.y), false, false);
+            MenuItem page_left_item = menu_create_sprite_button(MENU_BUTTON_MATCHLIST_PAGE_LEFT, SPRITE_UI_BUTTON_ARROW, ivec2(refresh_item.rect.x + refresh_item.rect.w + 4, refresh_item.rect.y), state.matchlist_page == 0, true);
+            MenuItem page_right_item = menu_create_sprite_button(MENU_BUTTON_MATCHLIST_PAGE_RIGHT, SPRITE_UI_BUTTON_ARROW, ivec2(page_left_item.rect.x + page_left_item.rect.w + 4, refresh_item.rect.y), state.matchlist_page == menu_get_matchlist_page_count(state) - 1, false);
 
             state.menu_items.push_back(back_button);
             state.menu_items.push_back(host_button);
@@ -152,13 +194,42 @@ void menu_refresh_items(MenuState& state) {
             state.menu_items.push_back(page_left_item);
             state.menu_items.push_back(page_right_item);
             if (state.item_selected != -1) {
-                state.menu_items.push_back(menu_create_button(MENU_ITEM_MATCHLIST_BUTTON_JOIN, "JOIN", ivec2(host_button.rect.x + host_button.rect.w + 4, host_button.rect.y)));
+                state.menu_items.push_back(menu_create_button(MENU_BUTTON_MATCHLIST_JOIN, "JOIN", ivec2(host_button.rect.x + host_button.rect.w + 4, host_button.rect.y)));
             }
 
             break;
         }
         case MENU_MODE_LOBBY: {
-            state.menu_items.push_back(menu_create_textbox(MENU_ITEM_LOBBY_CHAT_TEXTBOX, "Chat: ", &state.chat_message, MENU_CHAT_MAX_MESSAGE_LENGTH, (Rect) { .x = 16 + 8, .y = 128 + 158 + 8 + 4, .w = 432 - 16, .h = 24 }));
+            state.menu_items.push_back((MenuItem) {
+                .type = MENU_ITEM_FRAME,
+                .rect = PLAYERLIST_RECT
+            });
+            state.menu_items.push_back((MenuItem) {
+                .type = MENU_ITEM_FRAME,
+                .rect = LOBBY_CHAT_RECT
+            });
+            state.menu_items.push_back((MenuItem) {
+                .type = MENU_ITEM_FRAME,
+                .rect = MATCH_SETTINGS_RECT
+            });
+
+            state.menu_items.push_back((MenuItem) {
+                .type = MENU_ITEM_TEXTBOX,
+                .rect = (Rect) { 
+                    .x = 16 + 8, 
+                    .y = 128 + 158 + 8 + 4, 
+                    .w = 432 - 16, 
+                    .h = 24 
+                },
+                .textbox = (MenuItemTextbox) {
+                    .prompt = "Chat: ",
+                    .value = &state.chat_message,
+                    .max_length = MENU_CHAT_MAX_MESSAGE_LENGTH
+                }
+            });
+
+            int lobby_name_text_width = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name()).x;
+            state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, network_get_lobby_name(), ivec2(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_width / 2), PLAYERLIST_RECT.y + 4)));
             break;
         }
         default:
@@ -166,19 +237,7 @@ void menu_refresh_items(MenuState& state) {
     }
 }
 
-MenuItem menu_create_textbox(MenuItemName name, const char* prompt, std::string* value, size_t max_length, Rect rect) {
-    MenuItem item;
-    item.type = MENU_ITEM_TYPE_TEXTBOX;
-    item.name = name;
-    item.rect = rect;
-    item.textbox.prompt = prompt;
-    item.textbox.value = value;
-    item.textbox.max_length = max_length;
-
-    return item;
-}
-
-MenuItem menu_create_button(MenuItemName name, const char* text, ivec2 position) {
+MenuItem menu_create_button(MenuButtonName name, const char* text, ivec2 position) {
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
     if (text_size.x % 8 != 0) {
         text_size.x = ((text_size.x / 8) + 1) * 8;
@@ -186,19 +245,20 @@ MenuItem menu_create_button(MenuItemName name, const char* text, ivec2 position)
     text_size.x += 16;
 
     return (MenuItem) {
-        .type = MENU_ITEM_TYPE_BUTTON,
-        .name = name,
+        .type = MENU_ITEM_BUTTON,
         .rect = (Rect) { 
             .x = position.x, .y = position.y,
             .w = text_size.x, .h = 21
         },
         .button = (MenuItemButton) {
+            .name = name,
             .text = text,
         }
     };
 }
 
-MenuItem menu_create_matchlist_lobby(const NetworkLobby& lobby, int index) {
+MenuItem menu_create_matchlist_lobby(size_t lobby_index, int index) {
+    const NetworkLobby& lobby = network_get_lobby(lobby_index);
     char network_lobby_text[64];
     sprintf(network_lobby_text, "* %s (4/4) *", lobby.name);
     ivec2 network_lobby_text_size = render_get_text_size(FONT_HACK_OFFBLACK, network_lobby_text);
@@ -207,34 +267,48 @@ MenuItem menu_create_matchlist_lobby(const NetworkLobby& lobby, int index) {
         frame_width++;
     }
 
-    MenuItem item;
-    item.type = MENU_ITEM_TYPE_MATCHLIST_LOBBY;
-    item.name = MENU_ITEM_MATCHLIST_LOBBY;
-    item.rect = (Rect) {
-        .x = MATCHLIST_RECT.x + (MATCHLIST_RECT.w / 2) - ((frame_width * 15) / 2),
-        .y = MATCHLIST_RECT.y + (20 * index) + 12,
-        .w = frame_width * 15,
-        .h = 15
+    return (MenuItem) {
+        .type = MENU_ITEM_LOBBY,
+        .rect = (Rect) { 
+            .x = MATCHLIST_RECT.x + (MATCHLIST_RECT.w / 2) - ((frame_width * 15) / 2),
+            .y = MATCHLIST_RECT.y + (20 * index) + 12,
+            .w = frame_width * 15,
+            .h = 15
+        },
+        .lobby = (MenuItemLobby) {
+            .index = lobby_index
+        }
     };
-    memcpy(&item.lobby, &lobby, sizeof(lobby));
-
-    return item;
 }
 
-MenuItem menu_create_sprite_button(MenuItemName name, SpriteName sprite, ivec2 position, bool disabled, bool flip_h) {
+MenuItem menu_create_sprite_button(MenuButtonName name, SpriteName sprite, ivec2 position, bool disabled, bool flip_h) {
     const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
 
     return (MenuItem) {
-        .type = MENU_ITEM_TYPE_SPRITE_BUTTON,
-        .name = name,
+        .type = MENU_ITEM_SPRITE_BUTTON,
         .rect = (Rect) {
             .x = position.x, .y = position.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
         },
         .sprite = (MenuItemSprite) {
+            .name = name,
             .sprite = sprite,
             .disabled = disabled,
             .flip_h = flip_h
+        }
+    };
+}
+
+MenuItem menu_create_text(FontName font, const char* text, ivec2 position) {
+    return (MenuItem) {
+        .type = MENU_ITEM_TEXT,
+        .rect = (Rect) {
+            .x = position.x, .y = position.y,
+            .w = 0, .h = 0
+        },
+        .text = (MenuItemText) {
+            .font = font,
+            .text = text
         }
     };
 }
@@ -244,6 +318,20 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
         case NETWORK_EVENT_RECEIVED_LOBBY_INFO: {
             log_trace("received lobby info event");
             menu_refresh_items(state);
+            break;
+        }
+        case NETWORK_EVENT_CONNECTION_FAILED: {
+            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            menu_show_status(state, "Connection failed.");
+            break;
+        }
+        case NETWORK_EVENT_INVALID_VERSION: {
+            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            menu_show_status(state, "Game version does not match server.");
+            break;
+        }
+        case NETWORK_EVENT_JOINED_LOBBY: {
+            menu_set_mode(state, MENU_MODE_LOBBY);
             break;
         }
         case NETWORK_EVENT_LOBBY_CHAT: {
@@ -290,22 +378,102 @@ void menu_update(MenuState& state) {
             input_stop_text_input();
         }
         for (int index = 0; index < state.menu_items.size(); index++) {
-            if (state.menu_items[index].rect.has_point(input_get_mouse_position())) {
-                menu_handle_item_press(state, index);
-                break;
-            } 
+            if (!state.menu_items[index].rect.has_point(input_get_mouse_position())) {
+                continue;
+            }
+            switch (state.menu_items[index].type) {
+                case MENU_ITEM_BUTTON: {
+                    menu_handle_button_press(state, state.menu_items[index].button.name);
+                    return;
+                }
+                case MENU_ITEM_SPRITE_BUTTON: {
+                    menu_handle_button_press(state, state.menu_items[index].sprite.name);
+                    return;
+                }
+                case MENU_ITEM_TEXTBOX: {
+                    input_start_text_input(state.menu_items[index].textbox.value, state.menu_items[index].textbox.max_length);
+                    return;
+                }
+                case MENU_ITEM_LOBBY: {
+                    state.item_selected = index;
+                    menu_refresh_items(state);
+                    return;
+                }
+                default:
+                    break;
+            }
         }
     }
 
     if (input_is_text_input_active() && input_is_action_just_pressed(INPUT_ENTER)) {
         if (state.mode == MENU_MODE_USERNAME) {
-            int ok_button_index = menu_get_item_index_by_name(state, MENU_ITEM_USERNAME_BUTTON_OK);
-            GOLD_ASSERT(ok_button_index != MENU_ITEM_NOT_FOUND);
-            menu_handle_item_press(state, ok_button_index);
+            menu_handle_button_press(state, MENU_BUTTON_USERNAME_OK);
         } else if (state.mode == MENU_MODE_MATCHLIST) {
             menu_refresh_lobby_search(state);
         }
     }
+}
+
+void menu_handle_button_press(MenuState& state, MenuButtonName button) {
+    switch (button) {
+        case MENU_BUTTON_MAIN_PLAY: {
+            menu_set_mode(state, MENU_MODE_USERNAME);
+            return;
+        }
+        case MENU_BUTTON_MAIN_EXIT: {
+            menu_set_mode(state, MENU_MODE_EXIT);
+            return;
+        }
+        case MENU_BUTTON_USERNAME_BACK: {
+            menu_set_mode(state, MENU_MODE_MAIN);
+            return;
+        }
+        case MENU_BUTTON_USERNAME_OK: {
+            if (state.username.length() == 0) {
+                menu_show_status(state, "Please enter a username.");
+                return;
+            }
+            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            return;
+        }
+        case MENU_BUTTON_MATCHLIST_BACK: {
+            menu_set_mode(state, MENU_MODE_USERNAME);
+            return;
+        }
+        case MENU_BUTTON_MATCHLIST_HOST: {
+            if (!network_server_create(state.username.c_str())) {
+                menu_show_status(state, "Could not create server.");
+                return;
+            }
+            menu_set_mode(state, MENU_MODE_LOBBY);
+            return;
+        }
+        case MENU_BUTTON_MATCHLIST_JOIN: {
+            const NetworkLobby& lobby = network_get_lobby(state.menu_items[state.item_selected].lobby.index);
+            if (!network_client_create(state.username.c_str(), lobby.ip, lobby.port)) {
+                menu_show_status(state, "Could not create client.");
+                return;
+            }
+            menu_set_mode(state, MENU_MODE_CONNECTING);
+            return;
+        }
+        case MENU_BUTTON_MATCHLIST_REFRESH: {
+            menu_refresh_lobby_search(state);
+            return;
+        }
+        case MENU_BUTTON_MATCHLIST_PAGE_LEFT: {
+            state.matchlist_page--;
+            state.item_selected = -1;
+            menu_refresh_items(state);
+            return;
+        }
+        case MENU_BUTTON_MATCHLIST_PAGE_RIGHT: {
+            state.matchlist_page++;
+            state.item_selected = -1;
+            menu_refresh_items(state);
+            return;
+        }
+    } // End switch button
 }
 
 void menu_refresh_lobby_search(MenuState& state) {
@@ -365,90 +533,11 @@ void menu_add_chat_message(MenuState& state, const char* message) {
     }
 }
 
-int menu_get_item_index_by_name(const MenuState& state, MenuItemName name) {
-    for (int index = 0; index < state.menu_items.size(); index++) {
-        if (state.menu_items[index].name == name) {
-            return index;
-        }
-    }
-    
-    return -1;
-}
-
 size_t menu_get_matchlist_page_count(const MenuState& state) {
     if (network_get_lobby_count() == 0) {
         return 1;
     }
     return (network_get_lobby_count() / MATCHLIST_PAGE_SIZE) + (int)(network_get_lobby_count() % MATCHLIST_PAGE_SIZE != 0);
-}
-
-void menu_handle_item_press(MenuState& state, int index) {
-    MenuItem& item = state.menu_items[index];
-    if (item.type == MENU_ITEM_TYPE_TEXTBOX) {
-        input_start_text_input(item.textbox.value, item.textbox.max_length);
-        return;
-    }
-    switch (item.name) {
-        case MENU_ITEM_MAIN_BUTTON_PLAY: {
-            menu_set_mode(state, MENU_MODE_USERNAME);
-            return;
-        }
-        case MENU_ITEM_MAIN_BUTTON_EXIT: {
-            menu_set_mode(state, MENU_MODE_EXIT);
-            return;
-        }
-        case MENU_ITEM_USERNAME_BUTTON_BACK: {
-            menu_set_mode(state, MENU_MODE_MAIN);
-            return;
-        }
-        case MENU_ITEM_USERNAME_BUTTON_OK: {
-            if (state.username.length() == 0) {
-                menu_show_status(state, "Please enter a username.");
-                return;
-            }
-            menu_set_mode(state, MENU_MODE_MATCHLIST);
-            return;
-        }
-        case MENU_ITEM_MATCHLIST_BUTTON_BACK: {
-            menu_set_mode(state, MENU_MODE_USERNAME);
-            return;
-        }
-        case MENU_ITEM_MATCHLIST_BUTTON_HOST: {
-            if (!network_server_create(state.username.c_str())) {
-                menu_show_status(state, "Could not create server.");
-                return;
-            }
-            menu_set_mode(state, MENU_MODE_LOBBY);
-            return;
-        }
-        case MENU_ITEM_MATCHLIST_LOBBY: {
-            state.item_selected = (state.matchlist_page * MATCHLIST_PAGE_SIZE) + index;
-            menu_refresh_items(state);
-            return;
-        }
-        case MENU_ITEM_MATCHLIST_REFRESH: {
-            menu_refresh_lobby_search(state);
-            return;
-        }
-        case MENU_ITEM_MATCHLIST_PAGE_LEFT: {
-            if (item.sprite.disabled) {
-                return;
-            }
-            state.matchlist_page--;
-            menu_refresh_items(state);
-            return;
-        }
-        case MENU_ITEM_MATCHLIST_PAGE_RIGHT: {
-            if (item.sprite.disabled) {
-                return;
-            }
-            state.matchlist_page++;
-            menu_refresh_items(state);
-            return;
-        }
-        default:
-            return;
-    }
 }
 
 void menu_render(const MenuState& state) {
@@ -522,54 +611,43 @@ void menu_render(const MenuState& state) {
         render_atlas(cloud_sprite_info.atlas, src_rect, dst_rect, 0);
     }
 
-    // Title text
-    if (state.mode != MENU_MODE_LOBBY && state.mode != MENU_MODE_MATCHLIST) {
-        render_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH", ivec2(24, 24));
-    }
+    /*
+        render_text(FONT_HACK_GOLD, "Name", ivec2(PLAYERLIST_COL_NAME_X, PLAYERLIST_COL_HEADER_Y));
+        render_text(FONT_HACK_GOLD, "Status", ivec2(PLAYERLIST_COL_STATUS_X, PLAYERLIST_COL_HEADER_Y));
+        render_text(FONT_HACK_GOLD, "Team", ivec2(PLAYERLIST_COL_TEAM_X, PLAYERLIST_COL_HEADER_Y));
+        render_text(FONT_HACK_GOLD, "Color", ivec2(PLAYERLIST_COL_COLOR_X, PLAYERLIST_COL_HEADER_Y));
 
-    // Matchlist
-    if (state.mode == MENU_MODE_MATCHLIST) {
-        render_ninepatch(SPRITE_UI_FRAME, MATCHLIST_RECT);
-    }
 
-    // Lobby
-    if (state.mode == MENU_MODE_LOBBY) {
-        render_ninepatch(SPRITE_UI_FRAME, PLAYERLIST_RECT);
-        ivec2 lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name());
-        ivec2 lobby_name_text_pos = ivec2(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y + 4);
-        render_text(FONT_HACK_GOLD, network_get_lobby_name(), lobby_name_text_pos);
-
-        render_ninepatch(SPRITE_UI_FRAME, LOBBY_CHAT_RECT);
         for (int chat_index = 0; chat_index < state.chat.size(); chat_index++) {
             render_text(FONT_HACK_GOLD, state.chat[chat_index].c_str(), ivec2(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y - 5 + (12 * chat_index)));
         }
-
-        render_ninepatch(SPRITE_UI_FRAME, MATCH_SETTINGS_RECT);
-    }
+        */
 
     // Render menu items
     uint32_t lobbies_rendered = 0;
     for (int index = 0; index < state.menu_items.size(); index++) {
         const MenuItem& item = state.menu_items[index];
         switch (item.type) {
-            case MENU_ITEM_TYPE_BUTTON:
+            case MENU_ITEM_BUTTON:
                 menu_render_button(item, item.rect.has_point(input_get_mouse_position()));
                 break;
-            case MENU_ITEM_TYPE_TEXTBOX:
+            case MENU_ITEM_TEXTBOX:
                 menu_render_textbox(item, state.text_input_show_cursor);
                 break;
-            case MENU_ITEM_TYPE_MATCHLIST_LOBBY:
-                menu_render_matchlist_lobby(item, item.rect.has_point(input_get_mouse_position()), (state.matchlist_page * MATCHLIST_PAGE_SIZE) + index == state.item_selected);
+            case MENU_ITEM_LOBBY:
+                menu_render_matchlist_lobby(item, item.rect.has_point(input_get_mouse_position()), index == state.item_selected);
                 lobbies_rendered++;
                 break;
-            case MENU_ITEM_TYPE_SPRITE_BUTTON:
+            case MENU_ITEM_SPRITE_BUTTON:
                 menu_render_sprite_button(item, item.rect.has_point(input_get_mouse_position()));
                 break;
+            case MENU_ITEM_TEXT:
+                render_text(item.text.font, item.text.text, ivec2(item.rect.x, item.rect.y));
+                break;
+            case MENU_ITEM_FRAME:
+                render_ninepatch(SPRITE_UI_FRAME, item.rect);
+                break;
         }
-    }
-    if (state.mode == MENU_MODE_MATCHLIST && lobbies_rendered == 0) {
-        int text_width = render_get_text_size(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...").x;
-        render_text(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...", ivec2(MATCHLIST_RECT.x + (MATCHLIST_RECT.w / 2) - (text_width / 2), MATCHLIST_RECT.y + 8));
     }
 
     // Render version
@@ -650,8 +728,9 @@ void menu_render_textbox(const MenuItem& textbox, bool show_cursor) {
 }
 
 void menu_render_matchlist_lobby(const MenuItem& item, bool hovered, bool selected) {
-    char NetworkLobbyext[64];
-    sprintf(NetworkLobbyext, "%s %s (%u/%u) %s", selected ? "*" : "", item.lobby.name, item.lobby.player_count, MAX_PLAYERS, selected ? "*" : "");
+    const NetworkLobby& lobby = network_get_lobby(item.lobby.index);
+    char network_lobby_text[64];
+    sprintf(network_lobby_text, "%s %s (%u/%u) %s", selected ? "*" : "", lobby.name, lobby.player_count, MAX_PLAYERS, selected ? "*" : "");
 
     const int frame_count = item.rect.w / 15;
     for (int frame = 0; frame < frame_count; frame++) {
@@ -664,8 +743,8 @@ void menu_render_matchlist_lobby(const MenuItem& item, bool hovered, bool select
         render_sprite(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), ivec2(item.rect.x + (frame * 15), item.rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
     }
 
-    ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, NetworkLobbyext);
-    render_text(hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, NetworkLobbyext, ivec2(item.rect.x + (item.rect.w / 2) - (text_size.x / 2), item.rect.y + 1 -(int)hovered));
+    ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, network_lobby_text);
+    render_text(hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, network_lobby_text, ivec2(item.rect.x + (item.rect.w / 2) - (text_size.x / 2), item.rect.y + 1 -(int)hovered));
 }
 
 void menu_render_sprite_button(const MenuItem& item, bool hovered) {
