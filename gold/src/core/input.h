@@ -2,6 +2,7 @@
 
 #include "math/gmath.h"
 #include <SDL2/SDL.h>
+#include <string>
 
 enum input_action {
     INPUT_LEFT_CLICK,
@@ -18,7 +19,7 @@ enum input_action {
 void input_init(SDL_Window* window);
 void input_poll_events();
 
-void input_start_text_input(char* str, size_t* length, size_t max_length);
+void input_start_text_input(std::string* str, size_t max_length);
 void input_stop_text_input();
 bool input_is_text_input_active();
 

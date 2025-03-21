@@ -309,6 +309,19 @@ network_error network_get_error() {
     return NETWORK_ERROR_NONE;
 }
 
+const char* network_get_lobby_name() {
+    return state.lobby_name;
+}
+
+void network_send_lobby_chat_message(const char* message) {
+    message_lobby_chat_t net_message;
+    strncpy(net_message.message, message, NETWORK_LOBBY_CHAT_BUFFER_SIZE);
+
+    ENetPacket* packet = enet_packet_create(&net_message, sizeof(message_lobby_chat_t), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
 // POLL EVENTS
 
 void network_service() {

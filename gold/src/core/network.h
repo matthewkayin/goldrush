@@ -54,6 +54,7 @@ struct lobby_t {
 };
 
 enum network_event_type {
+    NETWORK_EVENT_LOBBY_INFO_REQUESTED,
     NETWORK_EVENT_LOBBY_INFO,
     NETWORK_EVENT_CONNECTION_FAILED,
     NETWORK_EVENT_PLAYER_DISCONNECTED,
@@ -103,6 +104,15 @@ struct network_event_t {
 bool network_init();
 void network_quit();
 void network_disconnect();
+
+bool network_is_server();
+network_status network_get_status();
+const player_t& network_get_player(uint8_t player_id);
+uint8_t network_get_player_id();
+bool network_are_all_players_ready();
+network_error network_get_error();
+const char* network_get_lobby_name();
+void network_send_lobby_chat_message(const char* message);
 
 bool network_scanner_create();
 void network_scanner_search();

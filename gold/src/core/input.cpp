@@ -15,8 +15,7 @@ struct input_state_t {
     bool previous[INPUT_COUNT];
     bool user_requests_exit;
 
-    char* text_input_str;
-    size_t* text_input_length;
+    std::string* text_input_str;
     size_t text_input_max_length;
 };
 static input_state_t state;
@@ -116,9 +115,8 @@ void input_poll_events() {
                         state.current[INPUT_ENTER] = event.type == SDL_KEYDOWN;
                         break;
                     case SDLK_BACKSPACE: {
-                        if (event.type == SDL_KEYDOWN && SDL_IsTextInputActive() && *state.text_input_length > 0) {
-                            (*state.text_input_length)--;
-                            state.text_input_str[*state.text_input_length] = '\0';
+                        if (event.type == SDL_KEYDOWN && SDL_IsTextInputActive() && state.text_input_str->length() > 0) {
+                            state.text_input_str->pop_back();
                         }
                         break;
                     }
@@ -128,10 +126,9 @@ void input_poll_events() {
                 break;
             }
             case SDL_TEXTINPUT: {
-                size_t space_remaining = state.text_input_max_length - *state.text_input_length;
-                if (space_remaining > 0) {
-                    strncat(state.text_input_str + *state.text_input_length, event.text.text, space_remaining);
-                    (*state.text_input_length) += strlen(event.text.text);
+                (*state.text_input_str) += std::string(event.text.text);
+                if (state.text_input_str->length() > state.text_input_max_length) {
+                    (*state.text_input_str) = state.text_input_str->substr(0, state.text_input_max_length);
                 }
                 break;
             }
@@ -141,10 +138,9 @@ void input_poll_events() {
     }
 }
 
-void input_start_text_input(char* str, size_t* length, size_t max_length) {
+void input_start_text_input(std::string* str, size_t max_length) {
     SDL_StartTextInput();
     state.text_input_str = str;
-    state.text_input_length = length;
     state.text_input_max_length = max_length;
 }
 
