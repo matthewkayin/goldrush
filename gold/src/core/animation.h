@@ -5,7 +5,7 @@
 #include "math/gmath.h"
 #include <cstdint>
 
-enum animation_name {
+enum AnimationName {
     ANIMATION_UI_MOVE_CELL,
     ANIMATION_UI_MOVE_ENTITY,
     ANIMATION_UI_MOVE_ATTACK_ENTITY,
@@ -37,8 +37,8 @@ enum animation_name {
     ANIMATION_MINE_PRIME
 };
 
-struct animation_t {
-    animation_name name;
+struct Animation {
+    AnimationName name;
     uint32_t timer;
     uint32_t frame_index;
     ivec2 frame;
@@ -47,7 +47,7 @@ struct animation_t {
 
 // Initializes the animation data
 void animation_init();
-animation_t animation_create(animation_name name);
-bool animation_is_playing(const animation_t& animation);
-void animation_update(animation_t& animation);
-void animation_stop(animation_t& animation);
+Animation animation_create(AnimationName name);
+bool animation_is_playing(const Animation& animation);
+void animation_update(Animation& animation);
+void animation_stop(Animation& animation);

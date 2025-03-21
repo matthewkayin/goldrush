@@ -101,7 +101,7 @@ int gold_main(int argc, char** argv) {
     uint32_t updates = 0;
     uint32_t ups = 0;
 
-    menu_state_t menu_state = menu_init();
+    MenuState menu_state = menu_init();
 
     while (is_running) {
         // TIMEKEEP
@@ -137,7 +137,7 @@ int gold_main(int argc, char** argv) {
             }
 
             network_service();
-            network_event_t event;
+            NetworkEvent event;
             while (network_poll_events(&event)) {
                 menu_handle_network_event(menu_state, event);
             }

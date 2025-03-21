@@ -11,7 +11,7 @@
 #define MENU_CHAT_MESSAGE_BUFFER_SIZE 60
 #define MENU_CHAT_MAX_MESSAGE_LENGTH (MENU_CHAT_MESSAGE_BUFFER_SIZE - 1)
 
-enum menu_mode {
+enum MenuMode {
     MENU_MODE_MAIN,
     MENU_MODE_USERNAME,
     MENU_MODE_MATCHLIST,
@@ -23,14 +23,14 @@ enum menu_mode {
     MENU_MODE_COUNT
 };
 
-enum menu_item_type {
+enum MenuItemType {
     MENU_ITEM_TYPE_BUTTON,
     MENU_ITEM_TYPE_TEXTBOX,
     MENU_ITEM_TYPE_MATCHLIST_LOBBY,
     MENU_ITEM_TYPE_SPRITE_BUTTON
 };
 
-enum menu_item_name {
+enum MenuItemName {
     MENU_ITEM_MAIN_BUTTON_PLAY,
     MENU_ITEM_MAIN_BUTTON_EXIT,
     MENU_ITEM_USERNAME_TEXTBOX,
@@ -48,38 +48,38 @@ enum menu_item_name {
     MENU_ITEM_COUNT
 };
 
-struct menu_button_t {
+struct MenuItemButton {
     const char* text;
 };
 
-struct menu_textbox_t {
+struct MenuItemTextbox {
     const char* prompt;
     std::string* value;
     size_t max_length;
 };
 
-struct menu_sprite_button_t {
+struct MenuItemSprite {
     sprite_name sprite;
     bool disabled;
     bool flip_h;
 };
 
-struct menu_item_t {
-    menu_item_type type;
-    menu_item_name name;
-    rect_t rect;
+struct MenuItem {
+    MenuItemType type;
+    MenuItemName name;
+    Rect rect;
     union {
-        menu_button_t button;
-        menu_textbox_t textbox;
-        lobby_t lobby;
-        menu_sprite_button_t sprite;
+        MenuItemButton button;
+        MenuItemTextbox textbox;
+        NetworkLobby lobby;
+        MenuItemSprite sprite;
     };
 };
 
-struct menu_state_t {
-    menu_mode mode;
+struct MenuState {
+    MenuMode mode;
 
-    animation_t wagon_animation;
+    Animation wagon_animation;
     int wagon_x;
     int parallax_x;
     int parallax_cloud_x;
@@ -95,14 +95,13 @@ struct menu_state_t {
     uint32_t status_timer;
     char status_text[128];
 
-    std::vector<lobby_t> lobbies;
-    std::vector<menu_item_t> menu_items;
+    std::vector<MenuItem> menu_items;
     std::vector<std::string> chat;
     int item_selected;
     uint32_t matchlist_page;
 };
 
-menu_state_t menu_init();
-void menu_handle_network_event(menu_state_t& state, network_event_t event);
-void menu_update(menu_state_t& state);
-void menu_render(const menu_state_t& state);
+MenuState menu_init();
+void menu_handle_network_event(MenuState& state, NetworkEvent event);
+void menu_update(MenuState& state);
+void menu_render(const MenuState& state);

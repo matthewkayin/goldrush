@@ -698,13 +698,13 @@ void render_present_frame() {
 void render_sprite(sprite_name name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id) {
     const sprite_info_t& sprite_info = resource_get_sprite_info(name);
 
-    rect_t src_rect = (rect_t) { 
+    Rect src_rect = (Rect) { 
         .x = sprite_info.atlas_x + (frame.x * sprite_info.frame_width), 
         .y = sprite_info.atlas_y + (recolor_id * state.sprite_image_size[sprite_info.atlas].y) + (frame.y * sprite_info.frame_height), 
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
-    rect_t dst_rect = (rect_t) { 
+    Rect dst_rect = (Rect) { 
         .x = position.x, 
         .y = position.y, 
         .w = sprite_info.frame_width,
@@ -713,17 +713,17 @@ void render_sprite(sprite_name name, ivec2 frame, ivec2 position, uint32_t optio
     render_atlas(sprite_info.atlas, src_rect, dst_rect, options);
 }
 
-void render_ninepatch(sprite_name sprite, rect_t rect) {
+void render_ninepatch(sprite_name sprite, Rect rect) {
     const sprite_info_t& sprite_info = resource_get_sprite_info(sprite);
     GOLD_ASSERT(rect.w > sprite_info.frame_width * 2 && rect.h > sprite_info.frame_height * 2);
 
-    rect_t src_rect = (rect_t) {
+    Rect src_rect = (Rect) {
         .x = sprite_info.atlas_x, 
         .y = sprite_info.atlas_y,
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
-    rect_t dst_rect = (rect_t) {
+    Rect dst_rect = (Rect) {
         .x = rect.x,
         .y = rect.y,
         .w = sprite_info.frame_width,
@@ -787,7 +787,7 @@ void render_ninepatch(sprite_name sprite, rect_t rect) {
     render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 
-void render_atlas(atlas_name atlas, rect_t src_rect, rect_t dst_rect, uint32_t options) {
+void render_atlas(atlas_name atlas, Rect src_rect, Rect dst_rect, uint32_t options) {
     bool flip_h = (options & RENDER_SPRITE_FLIP_H) == RENDER_SPRITE_FLIP_H;
     bool centered = (options & RENDER_SPRITE_CENTERED) == RENDER_SPRITE_CENTERED;
     bool cull = !((options & RENDER_SPRITE_NO_CULL) == RENDER_SPRITE_NO_CULL);

@@ -205,7 +205,7 @@ struct fvec2 {
     }
 };
 
-enum direction {
+enum Direction {
     DIRECTION_NORTH,
     DIRECTION_NORTHEAST,
     DIRECTION_EAST,
@@ -312,10 +312,10 @@ inline ivec2 autotile_edge_lookup(uint32_t edge, uint8_t neighbors) {
     }
 }
 
-inline direction enum_from_ivec2_direction(ivec2 ivec2_direction) {
+inline Direction enum_from_ivec2_direction(ivec2 ivec2_direction) {
     for (int enum_direction = 0; enum_direction < DIRECTION_COUNT; enum_direction++) {
         if (DIRECTION_IVEC2[enum_direction] == ivec2_direction) {
-            return (direction)enum_direction;
+            return (Direction)enum_direction;
         }
     }
     return DIRECTION_COUNT;
@@ -323,14 +323,78 @@ inline direction enum_from_ivec2_direction(ivec2 ivec2_direction) {
 
 // Rect
 
-struct rect_t {
+struct Rect {
     int x;
     int y;
     int w;
     int h;
+
+    bool is_adjacent_to(const Rect b) const {
+        if (x + w == b.x || b.x + b.w == x) {
+            return (y >= b.y && y + h <= b.y + b.h) ||
+                (b.y >= y && b.y + b.h <= y + h);
+        } else if (y + h == b.y || b.y + b.h == y) {
+            return (x >= b.x && x + w <= b.x + b.w) ||
+                (b.x >= x && b.x + b.h <= x + w);
+        } else {
+            return false;
+        }
+    }
+
+    bool has_point(ivec2 point) const {
+        return !(point.x < x || point.x >= x + w || point.y < y || point.y >= y + h);
+    }
+
+    ivec2 get_cell_nearest_to(ivec2 start_cell) const {
+        ivec2 nearest_cell = ivec2(x, y);
+        uint32_t nearest_cell_dist = ivec2::manhattan_distance(start_cell, nearest_cell);
+
+        for (int cell_y = y; cell_y < y + h; cell_y++) {
+            for (int cell_x = x; cell_x < x + w; cell_x++) {
+                uint32_t cell_dist = ivec2::manhattan_distance(start_cell, ivec2(cell_x, cell_y));
+                if (cell_dist < nearest_cell_dist) {
+                    nearest_cell = ivec2(cell_x, cell_y);
+                    nearest_cell_dist = cell_dist;
+                }
+            }
+        }
+
+        return nearest_cell;
+    }
+
+    static ivec2 cell_in_a_nearest_to_b(const Rect a, const Rect b) {
+        ivec2 cell;
+        if (b.y + b.h - 1 < a.y) {
+            cell.y = a.y;
+        } else if (b.y > a.y + a.h - 1) {
+            cell.y = a.y + a.h - 1;
+        } else if (b.y > a.y) {
+            cell.y = b.y;
+        } else {
+            cell.y = a.y;
+        }
+
+        if (b.x + b.w - 1 < a.x) {
+            cell.x = a.x;
+        } else if (b.x > a.x + a.w - 1) {
+            cell.x = a.x + a.w - 1;
+        } else if (b.x > a.x) {
+            cell.x = b.x;
+        } else {
+            cell.x = a.x;
+        }
+
+        return cell;
+    }
+
+    static int euclidean_distance_squared_between(const Rect a, const Rect b) {
+        ivec2 cell_in_a_nearest_to_b = Rect::cell_in_a_nearest_to_b(a, b);
+        ivec2 cell_in_b_nearest_to_a = Rect::cell_in_a_nearest_to_b(b, a);
+        return ivec2::euclidean_distance_squared(cell_in_a_nearest_to_b, cell_in_b_nearest_to_a);
+    }
 };
 
-inline direction enum_direction_to_rect(ivec2 from, rect_t rect) {
+inline Direction enum_direction_to_rect(ivec2 from, Rect rect) {
     if (from.y < rect.y) {
         if (from.x < rect.x) {
             return DIRECTION_SOUTHEAST;
@@ -359,70 +423,6 @@ inline fvec2 cell_center(ivec2 cell) {
         fixed::from_int((cell.x * TILE_SIZE) + (TILE_SIZE / 2)),
         fixed::from_int((cell.y * TILE_SIZE) + (TILE_SIZE / 2))
     );
-}
-
-inline bool rect_has_point(rect_t rect, ivec2 point) {
-    return !(point.x < rect.x || point.x >= rect.x + rect.w || point.y < rect.y || point.y >= rect.y + rect.h);
-}
-
-inline bool sdl_rects_are_adjacent(const rect_t a, const rect_t b) {
-    if (a.x + a.w == b.x || b.x + b.w == a.x) {
-        return (a.y >= b.y && a.y + a.h <= b.y + b.h) ||
-               (b.y >= a.y && b.y + b.h <= a.y + a.h);
-    } else if (a.y + a.h == b.y || b.y + b.h == a.y) {
-        return (a.x >= b.x && a.x + a.w <= b.x + b.w) ||
-               (b.x >= a.x && b.x + b.h <= a.x + a.w);
-    } else {
-        return false;
-    }
-}
-
-inline ivec2 cell_within_rect_a_nearest_to_rect_b(const rect_t a, const rect_t b) {
-    ivec2 cell;
-    if (b.y + b.h - 1 < a.y) {
-        cell.y = a.y;
-    } else if (b.y > a.y + a.h - 1) {
-        cell.y = a.y + a.h - 1;
-    } else if (b.y > a.y) {
-        cell.y = b.y;
-    } else {
-        cell.y = a.y;
-    }
-
-    if (b.x + b.w - 1 < a.x) {
-        cell.x = a.x;
-    } else if (b.x > a.x + a.w - 1) {
-        cell.x = a.x + a.w - 1;
-    } else if (b.x > a.x) {
-        cell.x = b.x;
-    } else {
-        cell.x = a.x;
-    }
-
-    return cell;
-}
-
-inline int euclidean_distance_squared_between(const rect_t a, const rect_t b) {
-    ivec2 cell_in_a_nearest_to_b = cell_within_rect_a_nearest_to_rect_b(a, b);
-    ivec2 cell_in_b_nearest_to_a = cell_within_rect_a_nearest_to_rect_b(b, a);
-    return ivec2::euclidean_distance_squared(cell_in_a_nearest_to_b, cell_in_b_nearest_to_a);
-}
-
-inline ivec2 get_nearest_cell_in_rect(ivec2 start_cell, rect_t rect) {
-    ivec2 nearest_cell = ivec2(rect.x, rect.y);
-    uint32_t nearest_cell_dist = ivec2::manhattan_distance(start_cell, nearest_cell);
-
-    for (int y = rect.y; y < rect.y + rect.h; y++) {
-        for (int x = rect.x; x < rect.x + rect.w; x++) {
-            uint32_t cell_dist = ivec2::manhattan_distance(start_cell, ivec2(x, y));
-            if (cell_dist < nearest_cell_dist) {
-                nearest_cell = ivec2(x, y);
-                nearest_cell_dist = cell_dist;
-            }
-        }
-    }
-
-    return nearest_cell;
 }
 
 inline int next_largest_power_of_two(int number) {
