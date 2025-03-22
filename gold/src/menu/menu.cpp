@@ -702,6 +702,7 @@ void menu_handle_button_press(MenuState& state, MenuButtonName button) {
                     }
                     if (player.recolor_id == other_player.recolor_id) {
                         menu_add_chat_message(state, "Cannot start match: Some players have selected the same color.");
+                        return;
                     }
                 }
             }
