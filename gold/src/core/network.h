@@ -55,6 +55,7 @@ enum NetworkEventType {
     NETWORK_EVENT_JOINED_LOBBY,
     NETWORK_EVENT_LOBBY_CHAT,
     NETWORK_EVENT_RECEIVED_LOBBY_INFO,
+    NETWORK_EVENT_PLAYER_SET_VALUE
 };
 
 struct NetworkEventPlayerDisconnected {
@@ -96,3 +97,5 @@ const size_t network_get_lobby_count();
 const NetworkLobby& network_get_lobby(size_t index);
 const char* network_get_lobby_name();
 void network_send_lobby_chat(const char* message);
+void network_set_player_ready(bool ready);
+void network_set_player_color(uint8_t color);

@@ -95,6 +95,7 @@ MenuItem menu_create_dropdown_item(MenuDropdownName name, int value, ivec2 dropd
 
 size_t menu_get_matchlist_page_count(const MenuState& state);
 void menu_handle_button_press(MenuState& state, MenuButtonName button);
+void menu_handle_dropdown_item_selected(MenuState& state, MenuDropdownName name, int value);
 void menu_show_status(MenuState& state, const char* status);
 void menu_refresh_lobby_search(MenuState& state);
 void menu_add_chat_message(MenuState& state, const char* message);
@@ -490,6 +491,12 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             }
             break;
         }
+        case NETWORK_EVENT_PLAYER_SET_VALUE: {
+            if (state.mode == MENU_MODE_LOBBY) {
+                menu_refresh_items(state);
+            }
+            break;
+        }
         default:
             return;
     }
@@ -572,6 +579,7 @@ void menu_update(MenuState& state) {
                     break;
                 }
                 case MENU_ITEM_DROPDOWN_ITEM: {
+                    menu_handle_dropdown_item_selected(state, state.menu_items[index].dropdown_item.name, state.menu_items[index].dropdown_item.value);
                     state.item_selected = -1;
                     menu_refresh_items(state);
                     return;
@@ -668,12 +676,49 @@ void menu_handle_button_press(MenuState& state, MenuButtonName button) {
             return;
         }
         case MENU_BUTTON_LOBBY_READY: {
+            network_set_player_ready(network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY);
+            menu_refresh_items(state);
             return;
         }
         case MENU_BUTTON_LOBBY_START: {
+            // Make sure all players are ready
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NOT_READY) {
+                    menu_add_chat_message(state, "Cannot start match: Some players are not ready.");
+                    return;
+                }
+            }
+
+            // Make sure all players have distinct colors
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                const NetworkPlayer& player = network_get_player(player_id);
+                if (player.status == NETWORK_PLAYER_STATUS_NONE) {
+                    continue;
+                }
+                for (uint8_t other_id = 0; other_id < MAX_PLAYERS; other_id++) {
+                    const NetworkPlayer& other_player = network_get_player(other_id);
+                    if (other_player.status == NETWORK_PLAYER_STATUS_NONE || player_id == other_id) {
+                        continue;
+                    }
+                    if (player.recolor_id == other_player.recolor_id) {
+                        menu_add_chat_message(state, "Cannot start match: Some players have selected the same color.");
+                    }
+                }
+            }
+
+            menu_set_mode(state, MENU_MODE_LOAD_MATCH);
             return;
         }
     } // End switch button
+}
+
+void menu_handle_dropdown_item_selected(MenuState& state, MenuDropdownName name, int value) {
+    switch (name) {
+        case MENU_DROPDOWN_PLAYER_COLOR: {
+            network_set_player_color((uint8_t)value);
+            break;
+        }
+    }
 }
 
 void menu_refresh_lobby_search(MenuState& state) {

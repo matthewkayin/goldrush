@@ -597,6 +597,10 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
 
             uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
             state.players[*player_id].status = message_type == NETWORK_MESSAGE_SET_READY ? NETWORK_PLAYER_STATUS_READY : NETWORK_PLAYER_STATUS_NOT_READY;
+
+            state.event_queue.push((NetworkEvent) {
+                .type = NETWORK_EVENT_PLAYER_SET_VALUE
+            });
             break;
         }
         case NETWORK_MESSAGE_SET_COLOR: {
@@ -605,7 +609,11 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             }
 
             uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
-            state.players[*player_id].status = data[1];
+            state.players[*player_id].recolor_id = data[1];
+
+            state.event_queue.push((NetworkEvent) {
+                .type = NETWORK_EVENT_PLAYER_SET_VALUE
+            });
             break;
         }
         case NETWORK_MESSAGE_LOBBY_CHAT: {
@@ -669,6 +677,26 @@ void network_send_lobby_chat(const char* message) {
     strcpy(out_message.message, message);
 
     ENetPacket* packet = enet_packet_create(&out_message, sizeof(out_message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_set_player_ready(bool ready) {
+    state.players[state.player_id].status = ready ? NETWORK_PLAYER_STATUS_READY : NETWORK_PLAYER_STATUS_NOT_READY;
+
+    uint8_t message = ready ? NETWORK_MESSAGE_SET_READY : NETWORK_MESSAGE_SET_NOT_READY;
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_set_player_color(uint8_t color) {
+    NetworkMessageSetColor message;
+    message.recolor_id = color;
+
+    state.players[state.player_id].recolor_id = color;
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
 }
