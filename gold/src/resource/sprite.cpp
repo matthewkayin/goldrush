@@ -93,7 +93,7 @@ static std::unordered_map<SpriteName, SpriteInfo> SPRITE_INFO = {
     }},
     { SPRITE_UI_TEAM_PICKER, (SpriteInfo) { 
         .atlas = ATLAS_UI, 
-        .atlas_x = 192, .atlas_y = 224,
+        .atlas_x = 194, .atlas_y = 224,
         .frame_width = 16, .frame_height = 16
     }},
     { SPRITE_UI_PANEL_BUTTON, (SpriteInfo) { 

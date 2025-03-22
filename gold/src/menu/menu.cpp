@@ -8,6 +8,7 @@
 #include "render/render.h"
 #include <cstdio>
 #include <vector>
+#include <unordered_map>
 #include <algorithm>
 
 #define MENU_ITEM_NOT_FOUND -1
@@ -56,13 +57,30 @@ static const Rect MATCH_SETTINGS_RECT = (Rect) {
 static const uint32_t STATUS_DURATION = 60 * 2;
 static const uint32_t MATCHLIST_PAGE_SIZE = 9;
 
-static const int PLAYERLIST_COL_HEADER_Y = PLAYERLIST_RECT.y + 10;
+static const int PLAYERLIST_COL_HEADER_Y = PLAYERLIST_RECT.y + 22;
 static const int PLAYERLIST_COL_NAME_X = PLAYERLIST_RECT.x + 16;
 static const int PLAYERLIST_COL_STATUS_X = PLAYERLIST_RECT.x + 216;
 static const int PLAYERLIST_COL_TEAM_X = PLAYERLIST_RECT.x + 280;
 static const int PLAYERLIST_COL_COLOR_X = PLAYERLIST_RECT.x + 336;
+static const int PLAYERLIST_ROW_HEIGHT = 20;
+static const int PLAYERLIST_TEXT_Y_OFFSET = 2;
 
 static const ivec2 TITLE_TEXT_POSITION = ivec2(24, 24);
+
+static const uint32_t CONNECTION_TIMEOUT = 60 * 15;
+
+enum MenuDropdownState {
+    MENU_DROPDOWN_CLOSED,
+    MENU_DROPDOWN_HOVERED,
+    MENU_DROPDOWN_OPEN,
+    MENU_DROPDOWN_DISABLED
+};
+
+static const std::unordered_map<MenuDropdownName, std::vector<const char*>> MENU_DROPDOWN_VALUE_STRINGS = {
+    { MENU_DROPDOWN_PLAYER_COLOR, {
+        "Blue", "Red", "Green", "Purple"
+    }}
+};
 
 void menu_set_mode(MenuState& state, MenuMode mode);
 void menu_refresh_items(MenuState& state);
@@ -70,6 +88,10 @@ MenuItem menu_create_text(FontName font, const char* text, ivec2 position);
 MenuItem menu_create_button(MenuButtonName name, const char* text, ivec2 position);
 MenuItem menu_create_matchlist_lobby(size_t lobby_index, int index);
 MenuItem menu_create_sprite_button(MenuButtonName name, SpriteName sprite, ivec2 position, bool disabled, bool flip_h);
+MenuItem menu_create_team_picker(char value, bool disabled, ivec2 position);
+const char* menu_get_player_status_string(NetworkPlayerStatus status);
+MenuItem menu_create_dropdown(MenuDropdownName name, int value, bool disabled, ivec2 position);
+MenuItem menu_create_dropdown_item(MenuDropdownName name, int value, ivec2 dropdown_position);
 
 size_t menu_get_matchlist_page_count(const MenuState& state);
 void menu_handle_button_press(MenuState& state, MenuButtonName button);
@@ -82,6 +104,9 @@ void menu_render_button(const MenuItem& button, bool hovered);
 void menu_render_textbox(const MenuItem& textbox, bool show_cursor);
 void menu_render_matchlist_lobby(const MenuItem& item, bool hovered, bool selected);
 void menu_render_sprite_button(const MenuItem& item, bool hovered);
+void menu_render_team_picker(const MenuItem& item, bool hovered);
+void menu_render_dropdown(const MenuItem& item, MenuDropdownState state);
+void menu_render_dropdown_item(const MenuItem& item, bool hovered);
 
 MenuState menu_init() {
     MenuState state;
@@ -94,6 +119,7 @@ MenuState menu_init() {
     state.parallax_cactus_offset = 0;
     state.text_input_cursor_blink_timer = TEXT_INPUT_BLINK_DURATION;
     state.text_input_show_cursor = false;
+    state.connection_timeout = 0;
 
     state.mode = MENU_MODE_MAIN;
     menu_set_mode(state, state.mode);
@@ -119,6 +145,8 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
             return;
         }
         menu_refresh_lobby_search(state);
+    } else if (mode == MENU_MODE_CONNECTING) {
+        state.connection_timeout = CONNECTION_TIMEOUT;
     }
 
     menu_refresh_items(state);
@@ -200,19 +228,42 @@ void menu_refresh_items(MenuState& state) {
             break;
         }
         case MENU_MODE_LOBBY: {
+            // Playerlist
             state.menu_items.push_back((MenuItem) {
                 .type = MENU_ITEM_FRAME,
                 .rect = PLAYERLIST_RECT
             });
-            state.menu_items.push_back((MenuItem) {
-                .type = MENU_ITEM_FRAME,
-                .rect = LOBBY_CHAT_RECT
-            });
+            int lobby_name_text_width = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name()).x;
+            state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, network_get_lobby_name(), ivec2(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_width / 2), PLAYERLIST_RECT.y + 6)));
+            state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, "Name", ivec2(PLAYERLIST_COL_NAME_X, PLAYERLIST_COL_HEADER_Y)));
+            state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, "Status", ivec2(PLAYERLIST_COL_STATUS_X, PLAYERLIST_COL_HEADER_Y)));
+            state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, "Team", ivec2(PLAYERLIST_COL_TEAM_X, PLAYERLIST_COL_HEADER_Y)));
+            state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, "Color", ivec2(PLAYERLIST_COL_COLOR_X, PLAYERLIST_COL_HEADER_Y)));
+            uint32_t playerlist_item_index = 0; // used to determine height of a playerlist item
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                const NetworkPlayer& player = network_get_player(player_id);
+                if (player.status == NETWORK_PLAYER_STATUS_NONE) {
+                    continue;
+                }
+
+                int row_y = PLAYERLIST_COL_HEADER_Y + 20 + (PLAYERLIST_ROW_HEIGHT * playerlist_item_index);
+                state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, player.name, ivec2(PLAYERLIST_COL_NAME_X, row_y + PLAYERLIST_TEXT_Y_OFFSET)));
+                state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, menu_get_player_status_string((NetworkPlayerStatus)player.status), ivec2(PLAYERLIST_COL_STATUS_X, row_y + PLAYERLIST_TEXT_Y_OFFSET)));
+                state.menu_items.push_back(menu_create_team_picker('-', true, ivec2(PLAYERLIST_COL_TEAM_X, row_y)));
+                state.menu_items.push_back(menu_create_dropdown(MENU_DROPDOWN_PLAYER_COLOR, player.recolor_id, player_id != network_get_player_id(), ivec2(PLAYERLIST_COL_COLOR_X, row_y)));
+                playerlist_item_index++;
+            }
+
             state.menu_items.push_back((MenuItem) {
                 .type = MENU_ITEM_FRAME,
                 .rect = MATCH_SETTINGS_RECT
             });
 
+            // Chat
+            state.menu_items.push_back((MenuItem) {
+                .type = MENU_ITEM_FRAME,
+                .rect = LOBBY_CHAT_RECT
+            });
             state.menu_items.push_back((MenuItem) {
                 .type = MENU_ITEM_TEXTBOX,
                 .rect = (Rect) { 
@@ -228,8 +279,22 @@ void menu_refresh_items(MenuState& state) {
                 }
             });
 
-            int lobby_name_text_width = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name()).x;
-            state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, network_get_lobby_name(), ivec2(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_width / 2), PLAYERLIST_RECT.y + 4)));
+            MenuItem back_button = menu_create_button(MENU_BUTTON_LOBBY_BACK, "BACK", ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12, PLAYERLIST_RECT.y + PLAYERLIST_RECT.h + 4));
+            state.menu_items.push_back(back_button);
+            if (network_is_server()) {
+                state.menu_items.push_back(menu_create_button(MENU_BUTTON_LOBBY_START, "START", ivec2(back_button.rect.x + back_button.rect.w + 4, back_button.rect.y)));
+            } else {
+                state.menu_items.push_back(menu_create_button(MENU_BUTTON_LOBBY_READY, "READY", ivec2(back_button.rect.x + back_button.rect.w + 4, back_button.rect.y)));
+            }
+
+            // Dropdown items, always added last so that they render on top
+            if (state.item_selected != -1 && state.menu_items[state.item_selected].type == MENU_ITEM_DROPDOWN) {
+                const MenuItem& item = state.menu_items[state.item_selected];
+                for (int item_index = 0; item_index < MENU_DROPDOWN_VALUE_STRINGS.at(item.dropdown.name).size(); item_index++) {
+                    state.menu_items.push_back(menu_create_dropdown_item(item.dropdown.name, item_index, ivec2(item.rect.x, item.rect.y)));
+                }
+            }
+
             break;
         }
         default:
@@ -299,6 +364,21 @@ MenuItem menu_create_sprite_button(MenuButtonName name, SpriteName sprite, ivec2
     };
 }
 
+MenuItem menu_create_team_picker(char value, bool disabled, ivec2 position) {
+    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_TEAM_PICKER);
+    return (MenuItem) {
+        .type = MENU_ITEM_TEAM_PICKER,
+        .rect = (Rect) {
+            .x = position.x, .y = position.y,
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+        },
+        .team = (MenuItemTeamPicker) {
+            .value = value,
+            .disabled = disabled
+        }
+    };
+}
+
 MenuItem menu_create_text(FontName font, const char* text, ivec2 position) {
     return (MenuItem) {
         .type = MENU_ITEM_TEXT,
@@ -309,6 +389,51 @@ MenuItem menu_create_text(FontName font, const char* text, ivec2 position) {
         .text = (MenuItemText) {
             .font = font,
             .text = text
+        }
+    };
+}
+
+const char* menu_get_player_status_string(NetworkPlayerStatus status) {
+    switch (status) {
+        case NETWORK_PLAYER_STATUS_READY:
+            return "READY";
+        case NETWORK_PLAYER_STATUS_NOT_READY:
+            return "NOT READY";
+        case NETWORK_PLAYER_STATUS_HOST:
+            return "HOST";
+        default:
+            return "";
+    }
+}
+
+MenuItem menu_create_dropdown(MenuDropdownName name, int value, bool disabled, ivec2 position) {
+    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+    return (MenuItem) {
+        .type = MENU_ITEM_DROPDOWN,
+        .rect = (Rect) {
+            .x = position.x, .y = position.y,
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+        },
+        .dropdown = (MenuItemDropdown) {
+            .name = name,
+            .value = value,
+            .disabled = disabled
+        }
+    };
+}
+
+MenuItem menu_create_dropdown_item(MenuDropdownName name, int value, ivec2 dropdown_position) {
+    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+    return (MenuItem) {
+        .type = MENU_ITEM_DROPDOWN_ITEM,
+        .rect = (Rect) {
+            .x = dropdown_position.x,
+            .y = dropdown_position.y + (sprite_info.frame_height * (value + 1)),
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+        },
+        .dropdown_item = (MenuItemDropdownItem) {
+            .name = name,
+            .value = value
         }
     };
 }
@@ -337,6 +462,18 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
         case NETWORK_EVENT_LOBBY_CHAT: {
             menu_add_chat_message(state, event.lobby_chat.message);
             return;
+        }
+        case NETWORK_EVENT_PLAYER_DISCONNECTED: {
+            if (state.mode == MENU_MODE_LOBBY) {
+                menu_refresh_items(state);
+            }
+            break;
+        }
+        case NETWORK_EVENT_NEW_PLAYER_CONNECTED: {
+            if (state.mode == MENU_MODE_LOBBY) {
+                menu_refresh_items(state);
+            }
+            break;
         }
         default:
             return;
@@ -372,12 +509,24 @@ void menu_update(MenuState& state) {
     if (state.status_timer > 0) {
         state.status_timer--;
     }
+    if (state.mode == MENU_MODE_CONNECTING && state.connection_timeout > 0) {
+        state.connection_timeout--;
+        if (state.connection_timeout == 0) {
+            network_disconnect();
+            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            menu_show_status(state, "Connection timed out.");
+        }
+    }
 
     if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
         if (input_is_text_input_active()) {
             input_stop_text_input();
         }
         for (int index = 0; index < state.menu_items.size(); index++) {
+            // Only select dropdown items when a dropdown is open
+            if (state.item_selected != -1 && state.menu_items[state.item_selected].type == MENU_ITEM_DROPDOWN && state.menu_items[index].type != MENU_ITEM_DROPDOWN_ITEM) {
+                continue;
+            }
             if (!state.menu_items[index].rect.has_point(input_get_mouse_position())) {
                 continue;
             }
@@ -399,9 +548,28 @@ void menu_update(MenuState& state) {
                     menu_refresh_items(state);
                     return;
                 }
+                case MENU_ITEM_DROPDOWN: {
+                    if (!state.menu_items[index].dropdown.disabled) {
+                        state.item_selected = index;
+                        menu_refresh_items(state);
+                        return;
+                    }
+                    break;
+                }
+                case MENU_ITEM_DROPDOWN_ITEM: {
+                    state.item_selected = -1;
+                    menu_refresh_items(state);
+                    return;
+                }
                 default:
                     break;
             }
+        }
+        // If a dropdown menu is open and we clicked a non-item, just close the dropdown 
+        if (state.item_selected != -1 && state.menu_items[state.item_selected].type == MENU_ITEM_DROPDOWN) {
+            state.item_selected = -1;
+            menu_refresh_items(state);
+            return;
         }
     }
 
@@ -471,6 +639,17 @@ void menu_handle_button_press(MenuState& state, MenuButtonName button) {
             state.matchlist_page++;
             state.item_selected = -1;
             menu_refresh_items(state);
+            return;
+        }
+        case MENU_BUTTON_LOBBY_BACK: {
+            network_disconnect();
+            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            return;
+        }
+        case MENU_BUTTON_LOBBY_READY: {
+            return;
+        }
+        case MENU_BUTTON_LOBBY_START: {
             return;
         }
     } // End switch button
@@ -577,9 +756,22 @@ void menu_render(const MenuState& state) {
 
     // Wagon animation
     const SpriteInfo& sprite_wagon_info = resource_get_sprite_info(SPRITE_UNIT_WAGON);
+    // Wagon color defaults to blue
+    int wagon_recolor_id = 0;
+    if (state.mode == MENU_MODE_LOBBY) { 
+        // If we are in lobby, wagon color is player color
+        wagon_recolor_id = network_get_player(network_get_player_id()).recolor_id;
+        // If player is opening wagon dropdown and hovering a dropdown item, use the hovered color
+        // This code works because the dropdown items will only exist if they have the dropdown open in the first place
+        for (const MenuItem& item : state.menu_items) {
+            if (item.type == MENU_ITEM_DROPDOWN_ITEM && item.dropdown_item.name == MENU_DROPDOWN_PLAYER_COLOR && item.rect.has_point(input_get_mouse_position())) {
+                wagon_recolor_id = item.dropdown_item.value;
+            }
+        }
+    }
     Rect wagon_src_rect = (Rect) {
         .x = sprite_wagon_info.atlas_x + (sprite_wagon_info.frame_width * state.wagon_animation.frame.x),
-        .y = sprite_wagon_info.atlas_y + (sprite_wagon_info.frame_height * 2),
+        .y = sprite_wagon_info.atlas_y + (render_get_sprite_image_size(ATLAS_UNIT_WAGON).y * wagon_recolor_id) + (sprite_wagon_info.frame_height * 2),
         .w = sprite_wagon_info.frame_width,
         .h = sprite_wagon_info.frame_height
     };
@@ -612,31 +804,24 @@ void menu_render(const MenuState& state) {
     }
 
     /*
-        render_text(FONT_HACK_GOLD, "Name", ivec2(PLAYERLIST_COL_NAME_X, PLAYERLIST_COL_HEADER_Y));
-        render_text(FONT_HACK_GOLD, "Status", ivec2(PLAYERLIST_COL_STATUS_X, PLAYERLIST_COL_HEADER_Y));
-        render_text(FONT_HACK_GOLD, "Team", ivec2(PLAYERLIST_COL_TEAM_X, PLAYERLIST_COL_HEADER_Y));
-        render_text(FONT_HACK_GOLD, "Color", ivec2(PLAYERLIST_COL_COLOR_X, PLAYERLIST_COL_HEADER_Y));
-
-
         for (int chat_index = 0; chat_index < state.chat.size(); chat_index++) {
             render_text(FONT_HACK_GOLD, state.chat[chat_index].c_str(), ivec2(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y - 5 + (12 * chat_index)));
         }
         */
 
     // Render menu items
-    uint32_t lobbies_rendered = 0;
+    bool is_dropdown_open = state.item_selected != -1 && state.menu_items[state.item_selected].type == MENU_ITEM_DROPDOWN;
     for (int index = 0; index < state.menu_items.size(); index++) {
         const MenuItem& item = state.menu_items[index];
         switch (item.type) {
             case MENU_ITEM_BUTTON:
-                menu_render_button(item, item.rect.has_point(input_get_mouse_position()));
+                menu_render_button(item, !is_dropdown_open && item.rect.has_point(input_get_mouse_position()));
                 break;
             case MENU_ITEM_TEXTBOX:
                 menu_render_textbox(item, state.text_input_show_cursor);
                 break;
             case MENU_ITEM_LOBBY:
                 menu_render_matchlist_lobby(item, item.rect.has_point(input_get_mouse_position()), index == state.item_selected);
-                lobbies_rendered++;
                 break;
             case MENU_ITEM_SPRITE_BUTTON:
                 menu_render_sprite_button(item, item.rect.has_point(input_get_mouse_position()));
@@ -647,6 +832,25 @@ void menu_render(const MenuState& state) {
             case MENU_ITEM_FRAME:
                 render_ninepatch(SPRITE_UI_FRAME, item.rect);
                 break;
+            case MENU_ITEM_TEAM_PICKER:
+                menu_render_team_picker(item, !is_dropdown_open && !item.team.disabled && item.rect.has_point(input_get_mouse_position()));
+                break;
+            case MENU_ITEM_DROPDOWN: {
+                MenuDropdownState dropdown_state = MENU_DROPDOWN_CLOSED;
+                if (item.dropdown.disabled) {
+                    dropdown_state = MENU_DROPDOWN_DISABLED;
+                } else if (state.item_selected == index) {
+                    dropdown_state = MENU_DROPDOWN_OPEN;
+                } else if (!is_dropdown_open && item.rect.has_point(input_get_mouse_position())) {
+                    dropdown_state = MENU_DROPDOWN_HOVERED;
+                }
+                menu_render_dropdown(item, dropdown_state);
+                break;
+            }
+            case MENU_ITEM_DROPDOWN_ITEM: {
+                menu_render_dropdown_item(item, item.rect.has_point(input_get_mouse_position()));
+                break;
+            }
         }
     }
 
@@ -759,4 +963,20 @@ void menu_render_sprite_button(const MenuItem& item, bool hovered) {
         options |= RENDER_SPRITE_FLIP_H;
     }
     render_sprite(item.sprite.sprite, ivec2(hframe, 0), ivec2(item.rect.x, item.rect.y), options, 0);
+}
+
+void menu_render_team_picker(const MenuItem& item, bool hovered) {
+    render_sprite(SPRITE_UI_TEAM_PICKER, ivec2(hovered ? 1 : 0, 0), ivec2(item.rect.x, item.rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
+    char text[2] = { item.team.value, '\0' };
+    render_text(hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(item.rect.x + 5, item.rect.y + PLAYERLIST_TEXT_Y_OFFSET - (int)hovered));
+}
+
+void menu_render_dropdown(const MenuItem& item, MenuDropdownState state) {
+    render_sprite(SPRITE_UI_DROPDOWN_MINI, ivec2(0, state), ivec2(item.rect.x, item.rect.y), RENDER_SPRITE_NO_CULL, 0);
+    render_text(state == MENU_DROPDOWN_HOVERED ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, MENU_DROPDOWN_VALUE_STRINGS.at(item.dropdown.name)[item.dropdown.value], ivec2(item.rect.x + 5, item.rect.y + PLAYERLIST_TEXT_Y_OFFSET));
+}
+
+void menu_render_dropdown_item(const MenuItem& item, bool hovered) {
+    render_sprite(SPRITE_UI_DROPDOWN_MINI, ivec2(0, 3 + (int)hovered), ivec2(item.rect.x, item.rect.y), RENDER_SPRITE_NO_CULL, 0);
+    render_text(hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, MENU_DROPDOWN_VALUE_STRINGS.at(item.dropdown_item.name)[item.dropdown_item.value], ivec2(item.rect.x + 5, item.rect.y + PLAYERLIST_TEXT_Y_OFFSET));
 }

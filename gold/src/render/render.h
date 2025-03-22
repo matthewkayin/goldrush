@@ -32,6 +32,7 @@ void render_set_window_size(ivec2 window_size);
 void render_prepare_frame();
 void render_present_frame();
 void render_sprite(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id);
+ivec2 render_get_sprite_image_size(AtlasName atlas);
 void render_ninepatch(SpriteName sprite, Rect rect);
 void render_atlas(AtlasName atlas, Rect src_rect, Rect dst_rect, uint32_t options);
 void render_text(FontName name, const char* text, ivec2 position);

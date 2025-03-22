@@ -713,6 +713,10 @@ void render_sprite(SpriteName name, ivec2 frame, ivec2 position, uint32_t option
     render_atlas(sprite_info.atlas, src_rect, dst_rect, options);
 }
 
+ivec2 render_get_sprite_image_size(AtlasName atlas) {
+    return state.sprite_image_size[atlas];
+}
+
 void render_ninepatch(SpriteName sprite, Rect rect) {
     const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
     GOLD_ASSERT(rect.w > sprite_info.frame_width * 2 && rect.h > sprite_info.frame_height * 2);

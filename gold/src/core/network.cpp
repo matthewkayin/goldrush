@@ -504,6 +504,10 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             }
 
             enet_host_flush(state.host);
+
+            state.event_queue.push((NetworkEvent) {
+                .type = NETWORK_EVENT_NEW_PLAYER_CONNECTED
+            });
             break;
         }
         case NETWORK_MESSAGE_INVALID_VERSION: {
@@ -564,6 +568,9 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
                 return;
             }
 
+            state.event_queue.push((NetworkEvent) {
+                .type = NETWORK_EVENT_NEW_PLAYER_CONNECTED
+            });
             break;
         }
         case NETWORK_MESSAGE_GREET_CLIENT: {
@@ -580,6 +587,9 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             *new_player_id_ptr = incoming_message.player_id;
             state.host->peers[incoming_peer_id].data = new_player_id_ptr;
 
+            state.event_queue.push((NetworkEvent) {
+                .type = NETWORK_EVENT_NEW_PLAYER_CONNECTED
+            });
             break;
         }
         case NETWORK_MESSAGE_SET_READY:

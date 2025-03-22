@@ -30,7 +30,10 @@ enum MenuItemType {
     MENU_ITEM_LOBBY,
     MENU_ITEM_SPRITE_BUTTON,
     MENU_ITEM_TEXT,
-    MENU_ITEM_FRAME
+    MENU_ITEM_FRAME,
+    MENU_ITEM_DROPDOWN,
+    MENU_ITEM_DROPDOWN_ITEM,
+    MENU_ITEM_TEAM_PICKER
 };
 
 enum MenuButtonName {
@@ -43,7 +46,10 @@ enum MenuButtonName {
     MENU_BUTTON_MATCHLIST_JOIN,
     MENU_BUTTON_MATCHLIST_REFRESH,
     MENU_BUTTON_MATCHLIST_PAGE_LEFT,
-    MENU_BUTTON_MATCHLIST_PAGE_RIGHT
+    MENU_BUTTON_MATCHLIST_PAGE_RIGHT,
+    MENU_BUTTON_LOBBY_BACK,
+    MENU_BUTTON_LOBBY_START,
+    MENU_BUTTON_LOBBY_READY
 };
 
 struct MenuItemButton {
@@ -73,6 +79,26 @@ struct MenuItemText {
     const char* text;
 };
 
+struct MenuItemTeamPicker {
+    char value;
+    bool disabled;
+};
+
+enum MenuDropdownName {
+    MENU_DROPDOWN_PLAYER_COLOR
+};
+
+struct MenuItemDropdown {
+    MenuDropdownName name;
+    int value;
+    bool disabled;
+};
+
+struct MenuItemDropdownItem {
+    MenuDropdownName name;
+    int value;
+};
+
 struct MenuItem {
     MenuItemType type;
     Rect rect;
@@ -82,6 +108,9 @@ struct MenuItem {
         MenuItemLobby lobby;
         MenuItemSprite sprite;
         MenuItemText text;
+        MenuItemTeamPicker team;
+        MenuItemDropdown dropdown;
+        MenuItemDropdownItem dropdown_item;
     };
 };
 
@@ -100,9 +129,9 @@ struct MenuState {
     std::string chat_message;
     bool text_input_show_cursor;
     uint32_t text_input_cursor_blink_timer;
-
     uint32_t status_timer;
     char status_text[128];
+    uint32_t connection_timeout;
 
     std::vector<MenuItem> menu_items;
     std::vector<std::string> chat;
