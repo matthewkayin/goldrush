@@ -6,7 +6,7 @@
 #define NETWORK_IP_BUFFER_SIZE 32
 #define NETWORK_PLAYER_NAME_BUFFER_SIZE 36
 #define NETWORK_APP_VERSION_BUFFER_SIZE 16
-#define NETWORK_LOBBY_CHAT_BUFFER_SIZE 64
+#define NETWORK_LOBBY_CHAT_BUFFER_SIZE 128
 #define NETWORK_SCANNER_PORT 6529
 #define NETWORK_BASE_PORT 6530
 
@@ -50,16 +50,17 @@ struct NetworkPlayer {
 enum NetworkEventType {
     NETWORK_EVENT_CONNECTION_FAILED,
     NETWORK_EVENT_PLAYER_DISCONNECTED,
+    NETWORK_EVENT_PLAYER_CONNECTED,
     NETWORK_EVENT_INVALID_VERSION,
     NETWORK_EVENT_JOINED_LOBBY,
     NETWORK_EVENT_LOBBY_CHAT,
     NETWORK_EVENT_RECEIVED_LOBBY_INFO,
-    NETWORK_EVENT_NEW_PLAYER_CONNECTED
 };
 
 struct NetworkEventPlayerDisconnected {
     uint8_t player_id;
 };
+
 
 struct NetworkEventLobbyChat {
     char message[NETWORK_LOBBY_CHAT_BUFFER_SIZE];
@@ -94,3 +95,4 @@ uint8_t network_get_player_id();
 const size_t network_get_lobby_count();
 const NetworkLobby& network_get_lobby(size_t index);
 const char* network_get_lobby_name();
+void network_send_lobby_chat(const char* message);

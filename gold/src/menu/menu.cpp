@@ -264,6 +264,10 @@ void menu_refresh_items(MenuState& state) {
                 .type = MENU_ITEM_FRAME,
                 .rect = LOBBY_CHAT_RECT
             });
+            // We always add the max chat line count so that the chat size does not interfere with item_selected (yes, this is bad)
+            for (int chat_index = 0; chat_index < MENU_CHAT_MAX_LINE_COUNT; chat_index++) {
+                state.menu_items.push_back(menu_create_text(FONT_HACK_GOLD, chat_index < state.chat.size() ? state.chat[chat_index].c_str() : "", ivec2(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y + 8 + (12 * chat_index))));
+            }
             state.menu_items.push_back((MenuItem) {
                 .type = MENU_ITEM_TEXTBOX,
                 .rect = (Rect) { 
@@ -460,16 +464,27 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             break;
         }
         case NETWORK_EVENT_LOBBY_CHAT: {
-            menu_add_chat_message(state, event.lobby_chat.message);
+            if (state.mode == MENU_MODE_LOBBY) {
+                menu_add_chat_message(state, event.lobby_chat.message);
+            }
             return;
         }
         case NETWORK_EVENT_PLAYER_DISCONNECTED: {
             if (state.mode == MENU_MODE_LOBBY) {
-                menu_refresh_items(state);
+                if (event.player_disconnected.player_id == 0) {
+                    network_disconnect();
+                    menu_set_mode(state, MENU_MODE_MATCHLIST);
+                    menu_show_status(state, "The host closed the lobby.");
+                } else {
+                    char message[128];
+                    sprintf(message, "%s left the game.", network_get_player(event.player_disconnected.player_id).name);
+                    menu_add_chat_message(state, message);
+                    log_trace("chat is at %s", state.chat[0].c_str());
+                }
             }
             break;
         }
-        case NETWORK_EVENT_NEW_PLAYER_CONNECTED: {
+        case NETWORK_EVENT_PLAYER_CONNECTED: {
             if (state.mode == MENU_MODE_LOBBY) {
                 menu_refresh_items(state);
             }
@@ -578,6 +593,12 @@ void menu_update(MenuState& state) {
             menu_handle_button_press(state, MENU_BUTTON_USERNAME_OK);
         } else if (state.mode == MENU_MODE_MATCHLIST) {
             menu_refresh_lobby_search(state);
+        } else if (state.mode == MENU_MODE_LOBBY) {
+            char message[NETWORK_LOBBY_CHAT_BUFFER_SIZE];
+            sprintf(message, "%s: %s", network_get_player(network_get_player_id()).name, state.chat_message.c_str());
+            menu_add_chat_message(state, message);
+            network_send_lobby_chat(message);
+            state.chat_message = "";
         }
     }
 }
@@ -679,10 +700,6 @@ std::vector<std::string> menu_split_chat_message(std::string message) {
     std::vector<std::string> lines;
     std::string line;
     while (!words.empty()) {
-        if (!line.empty()) {
-            line += " ";
-        }
-
         std::string next = words[0];
         words.erase(words.begin());
 
@@ -710,6 +727,7 @@ void menu_add_chat_message(MenuState& state, const char* message) {
         state.chat.push_back(lines[0]);
         lines.erase(lines.begin());
     }
+    menu_refresh_items(state);
 }
 
 size_t menu_get_matchlist_page_count(const MenuState& state) {
@@ -751,6 +769,7 @@ void menu_render(const MenuState& state) {
         }
     }
 
+    // Render decorations behind wagon
     menu_render_decoration(state, 0);
     menu_render_decoration(state, 2);
 
@@ -783,6 +802,7 @@ void menu_render(const MenuState& state) {
     };
     render_atlas(sprite_wagon_info.atlas, wagon_src_rect, wagon_dst_rect, RENDER_SPRITE_NO_CULL);
 
+    // Render decorations in front of wagon
     menu_render_decoration(state, 1);
 
     // Render clouds
@@ -802,12 +822,6 @@ void menu_render(const MenuState& state) {
         };
         render_atlas(cloud_sprite_info.atlas, src_rect, dst_rect, 0);
     }
-
-    /*
-        for (int chat_index = 0; chat_index < state.chat.size(); chat_index++) {
-            render_text(FONT_HACK_GOLD, state.chat[chat_index].c_str(), ivec2(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y - 5 + (12 * chat_index)));
-        }
-        */
 
     // Render menu items
     bool is_dropdown_open = state.item_selected != -1 && state.menu_items[state.item_selected].type == MENU_ITEM_DROPDOWN;

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "math/gmath.h"
-#include "resource/sprite.h"
-#include "resource/font.h"
+#include "render/sprite.h"
+#include "render/font.h"
 #include <SDL2/SDL.h>
 
 enum MinimapLayer {

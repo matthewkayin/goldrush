@@ -506,7 +506,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             enet_host_flush(state.host);
 
             state.event_queue.push((NetworkEvent) {
-                .type = NETWORK_EVENT_NEW_PLAYER_CONNECTED
+                .type = NETWORK_EVENT_PLAYER_CONNECTED
             });
             break;
         }
@@ -568,9 +568,6 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
                 return;
             }
 
-            state.event_queue.push((NetworkEvent) {
-                .type = NETWORK_EVENT_NEW_PLAYER_CONNECTED
-            });
             break;
         }
         case NETWORK_MESSAGE_GREET_CLIENT: {
@@ -588,7 +585,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             state.host->peers[incoming_peer_id].data = new_player_id_ptr;
 
             state.event_queue.push((NetworkEvent) {
-                .type = NETWORK_EVENT_NEW_PLAYER_CONNECTED
+                .type = NETWORK_EVENT_PLAYER_CONNECTED
             });
             break;
         }
@@ -665,4 +662,13 @@ const NetworkLobby& network_get_lobby(size_t index) {
 
 const char* network_get_lobby_name() {
     return state.lobby_name;
+}
+
+void network_send_lobby_chat(const char* message) {
+    NetworkMessageLobbyChat out_message;
+    strcpy(out_message.message, message);
+
+    ENetPacket* packet = enet_packet_create(&out_message, sizeof(out_message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
 }

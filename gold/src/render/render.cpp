@@ -12,8 +12,8 @@
 #include "core/asserts.h"
 #include "math/gmath.h"
 #include "math/mat4.h"
-#include "resource/sprite.h"
-#include "resource/font.h"
+#include "render/sprite.h"
+#include "render/font.h"
 #include "shader.h"
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>

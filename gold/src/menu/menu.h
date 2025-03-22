@@ -2,8 +2,8 @@
 
 #include "core/animation.h"
 #include "core/network.h"
-#include "resource/sprite.h"
-#include "resource/font.h"
+#include "render/sprite.h"
+#include "render/font.h"
 #include <vector>
 #include <string>
 
