@@ -110,9 +110,15 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             return;
         }
         case NETWORK_EVENT_PLAYER_DISCONNECTED: {
-            char message[128];
-            sprintf(message, "%s left the lobby.", network_get_player(event.player_disconnected.player_id).name);
-            menu_add_chat_message(state, message);
+            if (event.player_disconnected.player_id == 0) {
+                network_disconnect();
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
+                menu_show_status(state, "The host closed the lobby.");
+            } else {
+                char message[128];
+                sprintf(message, "%s left the lobby.", network_get_player(event.player_disconnected.player_id).name);
+                menu_add_chat_message(state, message);
+            }
             return;
         }
         case NETWORK_EVENT_PLAYER_CONNECTED: {
@@ -328,7 +334,53 @@ void menu_update(MenuState& state) {
             network_send_lobby_chat(chat_message);
             state.chat_message = "";
         }
-    }
+
+        // Lobby buttons
+        ui_begin_row(ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12, MATCH_SETTINGS_RECT.y + MATCH_SETTINGS_RECT.h + 4), 4);
+            if (ui_button("BACK")) {
+                network_disconnect();
+                menu_set_mode(state, MENU_MODE_MATCHLIST);
+            }
+            if (network_is_server()) {
+                if (ui_button("START")) {
+                    // Make sure all players are ready
+                    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                        if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NOT_READY) {
+                            menu_add_chat_message(state, "Cannot start match: Some players are not ready.");
+                            return;
+                        }
+                    }
+
+                    // Make sure all players have distinct colors
+                    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                        const NetworkPlayer& player = network_get_player(player_id);
+                        if (player.status == NETWORK_PLAYER_STATUS_NONE) {
+                            continue;
+                        }
+                        for (uint8_t other_id = 0; other_id < MAX_PLAYERS; other_id++) {
+                            const NetworkPlayer& other_player = network_get_player(other_id);
+                            if (other_player.status == NETWORK_PLAYER_STATUS_NONE || player_id == other_id) {
+                                continue;
+                            }
+                            if (player.recolor_id == other_player.recolor_id) {
+                                menu_add_chat_message(state, "Cannot start match: Some players have selected the same color.");
+                                return;
+                            }
+                        }
+                    }
+
+                    menu_set_mode(state, MENU_MODE_LOAD_MATCH);
+                }
+            } else {
+                if (ui_button("READY")) {
+                    // Toggle player ready status
+                    bool is_ready = network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_READY;
+                    network_set_player_ready(!is_ready);
+                }
+            }
+        ui_end_container();
+        // End lobby buttons
+    } // End lobby
 }
 
 void menu_set_mode(MenuState& state, MenuMode mode) {
