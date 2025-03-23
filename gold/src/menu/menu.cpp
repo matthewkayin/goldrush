@@ -109,6 +109,19 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             }
             return;
         }
+        case NETWORK_EVENT_PLAYER_DISCONNECTED: {
+            char message[128];
+            sprintf(message, "%s left the lobby.", network_get_player(event.player_disconnected.player_id).name);
+            menu_add_chat_message(state, message);
+            return;
+        }
+        case NETWORK_EVENT_PLAYER_CONNECTED: {
+            char message[128];
+            sprintf(message, "%s joined the lobby.", network_get_player(event.player_connected.player_id).name);
+            menu_add_chat_message(state, message);
+            network_send_lobby_chat(message);
+            return;
+        }
         default:
             return;
     }
@@ -295,7 +308,26 @@ void menu_update(MenuState& state) {
         // End playerlist
 
         ui_frame_rect(MATCH_SETTINGS_RECT);
+
+        // Chat
         ui_frame_rect(LOBBY_CHAT_RECT);
+        // Chat messages
+        ui_begin_column(ivec2(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y + 8), 0);
+            for (const std::string& message : state.chat) {
+                ui_text(FONT_HACK_GOLD, message.c_str());
+            }
+        ui_end_container();
+
+        // Chat input
+        ui_element_position(ivec2(24, 128 + 158 + 8 + 4));
+        ui_text_input("Chat: ", ivec2(432 - 16, 24), &state.chat_message, MENU_CHAT_MAX_MESSAGE_LENGTH);
+        if (input_is_action_just_pressed(INPUT_ENTER) && input_is_text_input_active()) {
+            char chat_message[128];
+            sprintf(chat_message, "%s: %s", network_get_player(network_get_player_id()).name, state.chat_message.c_str());
+            menu_add_chat_message(state, chat_message);
+            network_send_lobby_chat(chat_message);
+            state.chat_message = "";
+        }
     }
 }
 
@@ -434,19 +466,10 @@ void menu_render(const MenuState& state) {
     const SpriteInfo& sprite_wagon_info = resource_get_sprite_info(SPRITE_UNIT_WAGON);
     // Wagon color defaults to blue
     int wagon_recolor_id = 0;
-    /*
     if (state.mode == MENU_MODE_LOBBY) { 
         // If we are in lobby, wagon color is player color
         wagon_recolor_id = network_get_player(network_get_player_id()).recolor_id;
-        // If player is opening wagon dropdown and hovering a dropdown item, use the hovered color
-        // This code works because the dropdown items will only exist if they have the dropdown open in the first place
-        for (const MenuItem& item : state.menu_items) {
-            if (item.type == MENU_ITEM_DROPDOWN_ITEM && item.dropdown_item.name == MENU_DROPDOWN_PLAYER_COLOR && item.rect.has_point(input_get_mouse_position())) {
-                wagon_recolor_id = item.dropdown_item.value;
-            }
-        }
     }
-    */
     Rect wagon_src_rect = (Rect) {
         .x = sprite_wagon_info.atlas_x + (sprite_wagon_info.frame_width * state.wagon_animation.frame.x),
         .y = sprite_wagon_info.atlas_y + (render_get_sprite_image_size(ATLAS_UNIT_WAGON).y * wagon_recolor_id) + (sprite_wagon_info.frame_height * 2),

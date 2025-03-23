@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 
 #define NETWORK_LOBBY_NAME_BUFFER_SIZE 40
 #define NETWORK_IP_BUFFER_SIZE 32
@@ -62,6 +63,9 @@ struct NetworkEventPlayerDisconnected {
     uint8_t player_id;
 };
 
+struct NetworkEventPlayerConnected {
+    uint8_t player_id;
+};
 
 struct NetworkEventLobbyChat {
     char message[NETWORK_LOBBY_CHAT_BUFFER_SIZE];
@@ -71,6 +75,7 @@ struct NetworkEvent {
     NetworkEventType type;
     union {
         NetworkEventPlayerDisconnected player_disconnected;
+        NetworkEventPlayerConnected player_connected;
         NetworkEventLobbyChat lobby_chat;
     };
 };
