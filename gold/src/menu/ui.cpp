@@ -61,6 +61,7 @@ struct UiState {
     std::vector<UiContainer> container_stack;
     std::vector<UiRender> render_queue[UI_Z_INDEX_COUNT]; 
     int dropdown_open;
+    int dropdown_open_future;
 };
 static UiState state;
 static bool initialized = false;
@@ -76,6 +77,7 @@ void ui_begin() {
         state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
         state.text_input_show_cursor = false;
         state.dropdown_open = UI_DROPDOWN_NONE;
+        state.dropdown_open_future = UI_DROPDOWN_NONE;
         initialized = true;
     }
 
@@ -89,6 +91,8 @@ void ui_begin() {
     if (state.text_input_cursor_blink_timer == 0) {
         state.text_input_show_cursor = !state.text_input_show_cursor;
     }
+
+    state.dropdown_open = state.dropdown_open_future;
 }
 
 void ui_element_position(ivec2 position) {
@@ -342,7 +346,7 @@ bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, s
 
         // If the user left clicked, close the dropdown
         if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
-            state.dropdown_open = UI_DROPDOWN_NONE;
+            state.dropdown_open_future = UI_DROPDOWN_NONE;
             // If they happened to be selecting an item, update the value
             if (item_hovered != -1) {
                 *selected_item = item_hovered;
@@ -351,7 +355,7 @@ bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, s
             return item_hovered != -1;
         }
     } else if (state.dropdown_open == UI_DROPDOWN_NONE && !disabled && hovered && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
-        state.dropdown_open = dropdown_id;
+        state.dropdown_open_future = dropdown_id;
     } 
 
     return false;

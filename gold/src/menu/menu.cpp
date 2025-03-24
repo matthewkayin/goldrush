@@ -300,8 +300,17 @@ void menu_update(MenuState& state) {
                     ui_element_position(ivec2(0, 2));
                     ui_text(FONT_HACK_GOLD, menu_get_player_status_string((NetworkPlayerStatus)player.status));
 
+                    bool teams_enabled = network_get_match_setting(MATCH_SETTING_TEAMS) == MATCH_SETTING_TEAMS_ENABLED;
+                    char team_picker_char;
+                    if (teams_enabled) {
+                        team_picker_char = (char)('1' + (int)player.team);
+                    } else {
+                        team_picker_char = '-';
+                    }
                     ui_element_size(ivec2(PLAYERLIST_COLUMN_TEAM_WIDTH, 0));
-                    ui_team_picker('-', true);
+                    if (ui_team_picker(team_picker_char, !teams_enabled || player_id != network_get_player_id())) {
+                        network_set_player_team(player.team == 0 ? 1 : 0);
+                    }
 
                     uint32_t player_color = player.recolor_id;
                     const char* items[] = { "Blue", "Red", "Green", "Purple" };
@@ -313,7 +322,29 @@ void menu_update(MenuState& state) {
         ui_end_container();
         // End playerlist
 
+        // Match settings
         ui_frame_rect(MATCH_SETTINGS_RECT);
+        ivec2 match_settings_text_size = render_get_text_size(FONT_HACK_GOLD, "Settings");
+        ui_element_position(ivec2(MATCH_SETTINGS_RECT.x + (MATCH_SETTINGS_RECT.w / 2) - (match_settings_text_size.x / 2), MATCH_SETTINGS_RECT.y + 6));
+        ui_text(FONT_HACK_GOLD, "Settings");
+
+        ui_begin_column(ivec2(MATCH_SETTINGS_RECT.x + 8, MATCH_SETTINGS_RECT.y + 22), 4);
+            int dropdown_width = resource_get_sprite_info(SPRITE_UI_DROPDOWN_MINI).frame_width;
+            const int setting_name_element_size = MATCH_SETTINGS_RECT.w - 16 - dropdown_width;
+            for (int index = 0; index < MATCH_SETTING_COUNT; index++) {
+                MatchSettingData setting_data = match_setting_data((MatchSetting)index);
+                ui_begin_row(ivec2(0, 0), 0);
+                    ui_element_size(ivec2(setting_name_element_size, 0));
+                    ui_element_position(ivec2(0, 2));
+                    ui_text(FONT_HACK_GOLD, setting_data.name);
+
+                    uint32_t match_setting_value = network_get_match_setting(index);
+                    if (ui_dropdown(MAX_PLAYERS + index, &match_setting_value, setting_data.values, setting_data.value_count, !network_is_server())) {
+                        network_set_match_setting((uint8_t)index, (uint8_t)match_setting_value);
+                    }
+                ui_end_container();
+            }
+        ui_end_container();
 
         // Chat
         ui_frame_rect(LOBBY_CHAT_RECT);

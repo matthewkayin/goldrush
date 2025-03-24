@@ -2,6 +2,7 @@
 
 #include "core/animation.h"
 #include "core/network.h"
+#include "match_setting.h"
 #include <vector>
 #include <string>
 

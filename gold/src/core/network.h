@@ -54,9 +54,7 @@ enum NetworkEventType {
     NETWORK_EVENT_PLAYER_CONNECTED,
     NETWORK_EVENT_INVALID_VERSION,
     NETWORK_EVENT_JOINED_LOBBY,
-    NETWORK_EVENT_LOBBY_CHAT,
-    NETWORK_EVENT_RECEIVED_LOBBY_INFO,
-    NETWORK_EVENT_PLAYER_SET_VALUE
+    NETWORK_EVENT_LOBBY_CHAT
 };
 
 struct NetworkEventPlayerDisconnected {
@@ -104,3 +102,6 @@ const char* network_get_lobby_name();
 void network_send_lobby_chat(const char* message);
 void network_set_player_ready(bool ready);
 void network_set_player_color(uint8_t color);
+void network_set_match_setting(uint8_t setting, uint8_t value);
+uint8_t network_get_match_setting(uint8_t setting);
+void network_set_player_team(uint8_t team);

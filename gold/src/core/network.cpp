@@ -2,6 +2,7 @@
 
 #include "core/logger.h"
 #include "core/asserts.h"
+#include "menu/match_setting.h"
 #include <enet/enet.h>
 #include <queue>
 #include <vector>
@@ -21,6 +22,7 @@ struct NetworkState {
 
     std::queue<NetworkEvent> event_queue;
     std::vector<NetworkLobby> lobbies;
+    uint8_t match_settings[MATCH_SETTING_COUNT];
 };
 static NetworkState state;
 
@@ -56,7 +58,7 @@ struct NetworkMessageWelcome {
     uint8_t server_team;
     char server_username[NETWORK_PLAYER_NAME_BUFFER_SIZE];
     char lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
-    // uint8_t match_settings[MATCH_SETTING_COUNT];
+    uint8_t match_settings[MATCH_SETTING_COUNT];
 };
 
 struct NetworkMessageNewPlayer {
@@ -86,6 +88,12 @@ struct NetworkMessageSetTeam {
 struct NetworkMessageLobbyChat {
     const uint8_t type = NETWORK_MESSAGE_LOBBY_CHAT;
     char message[NETWORK_LOBBY_CHAT_BUFFER_SIZE];
+};
+
+struct NetworkMessageSetMatchSetting {
+    const uint8_t type = NETWORK_MESSAGE_SET_MATCH_SETTING;
+    uint8_t setting;
+    uint8_t value;
 };
 
 void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer_id);
@@ -230,6 +238,8 @@ bool network_server_create(const char* username) {
     strncpy(state.players[0].name, username, MAX_USERNAME_LENGTH + 1);
     sprintf(state.lobby_name, "%s's Game", username);
 
+    memset(state.match_settings, 0, sizeof(state.match_settings));
+
     log_info("Created server.");
     return true;
 }
@@ -305,9 +315,6 @@ void network_service() {
                 enet_address_get_host_ip(&receive_address, lobby.ip, NETWORK_IP_BUFFER_SIZE);
                 if (strlen(state.lobby_name_query) == 0 || strstr(lobby.name, state.lobby_name_query) != NULL) {
                     state.lobbies.push_back(lobby);
-                    state.event_queue.push((NetworkEvent) {
-                        .type = NETWORK_EVENT_RECEIVED_LOBBY_INFO
-                    });
                 }
             }
         }
@@ -483,7 +490,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             response.server_team = state.players[0].team;
             strncpy(response.server_username, state.players[0].name, MAX_USERNAME_LENGTH + 1);
             strncpy(response.lobby_name, state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
-            // TODO: match settings
+            memcpy(response.match_settings, state.match_settings, sizeof(state.match_settings));
 
             ENetPacket* welcome_packet = enet_packet_create(&response, sizeof(response), ENET_PACKET_FLAG_RELIABLE);
             enet_peer_send(&state.host->peers[incoming_peer_id], 0, welcome_packet);
@@ -546,7 +553,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
 
             // Get lobby name and settings
             strncpy(state.lobby_name, incoming_message.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
-            // TODO lobby settings
+            memcpy(state.match_settings, incoming_message.match_settings, sizeof(state.match_settings));
 
             state.event_queue.push((NetworkEvent) {
                 .type = NETWORK_EVENT_JOINED_LOBBY
@@ -596,10 +603,6 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
 
             uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
             state.players[*player_id].status = message_type == NETWORK_MESSAGE_SET_READY ? NETWORK_PLAYER_STATUS_READY : NETWORK_PLAYER_STATUS_NOT_READY;
-
-            state.event_queue.push((NetworkEvent) {
-                .type = NETWORK_EVENT_PLAYER_SET_VALUE
-            });
             break;
         }
         case NETWORK_MESSAGE_SET_COLOR: {
@@ -609,10 +612,16 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
 
             uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
             state.players[*player_id].recolor_id = data[1];
+            break;
+        }
+        case NETWORK_MESSAGE_SET_TEAM: {
+            if (!(state.status == NETWORK_STATUS_CONNECTED || state.status == NETWORK_STATUS_SERVER)) {
+                return;
+            }
 
-            state.event_queue.push((NetworkEvent) {
-                .type = NETWORK_EVENT_PLAYER_SET_VALUE
-            });
+            uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
+            state.players[*player_id].team = data[1];
+
             break;
         }
         case NETWORK_MESSAGE_LOBBY_CHAT: {
@@ -625,6 +634,14 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             strncpy(event.lobby_chat.message, (char*)(data + 1), NETWORK_LOBBY_CHAT_BUFFER_SIZE);
             state.event_queue.push(event);
 
+            break;
+        }
+        case NETWORK_MESSAGE_SET_MATCH_SETTING: {
+            if (!(state.status == NETWORK_STATUS_CONNECTED || state.status == NETWORK_STATUS_SERVER)) {
+                return;
+            }
+
+            state.match_settings[data[1]] = data[2];
             break;
         }
     }
@@ -694,6 +711,31 @@ void network_set_player_color(uint8_t color) {
     message.recolor_id = color;
 
     state.players[state.player_id].recolor_id = color;
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_set_match_setting(uint8_t setting, uint8_t value) {
+    NetworkMessageSetMatchSetting message;
+    message.setting = setting;
+    message.value = value;
+    state.match_settings[setting] = value;
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+uint8_t network_get_match_setting(uint8_t setting) {
+    return state.match_settings[setting];
+}
+
+void network_set_player_team(uint8_t team) {
+    state.players[state.player_id].team = team;
+    NetworkMessageSetTeam message;
+    message.team = team;
 
     ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
