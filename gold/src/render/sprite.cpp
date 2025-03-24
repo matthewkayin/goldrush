@@ -15,6 +15,10 @@ static const std::unordered_map<AtlasName, AtlasParams> ATLAS_PARAMS = {
             .end = SPRITE_TILE_DECORATION4
         }
     }},
+    { ATLAS_MISC, (AtlasParams) {
+        .path = "misc.png",
+        .strategy = ATLAS_IMPORT_DEFAULT,
+    }},
     { ATLAS_FONT, (AtlasParams) {
         .path = "",
         .strategy = ATLAS_IMPORT_FONTS,
@@ -121,11 +125,16 @@ static std::unordered_map<SpriteName, SpriteInfo> SPRITE_INFO = {
         .atlas_x = 0, .atlas_y = 352,
         .frame_width = 16, .frame_height = 16
     }},
+    { SPRITE_GOLDMINE, (SpriteInfo) { 
+        .atlas = ATLAS_MISC, 
+        .atlas_x = 0, .atlas_y = 0,
+        .frame_width = 48, .frame_height = 48
+    }},
     { SPRITE_UNIT_WAGON, (SpriteInfo) { 
         .atlas = ATLAS_UNIT_WAGON, 
         .atlas_x = 0, .atlas_y = 0,
         .frame_width = 40, .frame_height = 34
-    }}
+    }},
 };
 
 static const std::unordered_map<SpriteName, TileData> TILE_DATA = {

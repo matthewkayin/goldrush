@@ -108,6 +108,15 @@ void match_ui_render(const MatchUiState& state) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.match.map.width);
             Tile tile = state.match.map.tiles[map_index];
+            if (!(tile.sprite >= SPRITE_TILE_SAND && tile.sprite <= SPRITE_TILE_SAND3)) {
+                render_sprite_params[match_get_render_layer(tile.elevation == 0 ? 0 : tile.elevation - 1, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
+                    .sprite = (SpriteName)SPRITE_TILE_SAND,
+                    .frame = ivec2(0, 0),
+                    .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
+                    .options = RENDER_SPRITE_NO_CULL,
+                    .recolor_id = 0
+                });
+            }
             render_sprite_params[match_get_render_layer(tile.elevation, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
                 .sprite = (SpriteName)tile.sprite,
                 .frame = ivec2(tile.autotile_index, 0),

@@ -16,7 +16,6 @@ enum MatchUiMode {
 struct MatchUiState {
     MatchUiMode mode;
     ivec2 camera_offset;
-
     MatchState match;
 };
 
