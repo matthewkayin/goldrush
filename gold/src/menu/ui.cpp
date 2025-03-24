@@ -2,6 +2,7 @@
 
 #include "render/render.h"
 #include "core/input.h"
+#include "core/sound.h"
 #include <vector>
 #include <algorithm>
 
@@ -167,7 +168,11 @@ bool ui_button(const char* text) {
 
     ui_queue_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, text, ivec2(button_rect.x + 5, button_rect.y + 3 - (int)hovered), 0);
 
-    return state.dropdown_open == UI_DROPDOWN_NONE && hovered && input_is_action_just_pressed(INPUT_LEFT_CLICK);
+    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && hovered && input_is_action_just_pressed(INPUT_LEFT_CLICK);
+    if (clicked) {
+        sound_play(SOUND_UI_CLICK);
+    }
+    return clicked;
 }
 
 bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
@@ -188,7 +193,11 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
 
     ui_queue_sprite(sprite, ivec2(hframe, 0), origin, 0, flip_h);
 
-    return state.dropdown_open == UI_DROPDOWN_NONE && !disabled && input_is_action_just_pressed(INPUT_LEFT_CLICK) && sprite_rect.has_point(input_get_mouse_position());
+    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && !disabled && input_is_action_just_pressed(INPUT_LEFT_CLICK) && sprite_rect.has_point(input_get_mouse_position());
+    if (clicked) {
+        sound_play(SOUND_UI_CLICK);
+    }
+    return clicked;
 }
 
 void ui_text(FontName font, const char* text) {
@@ -237,7 +246,11 @@ bool ui_text_frame(const char* text, bool disabled) {
 
     ui_queue_text(hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + (rect.w / 2) - (text_size.x / 2), rect.y + 1 -(int)hovered), 0);
 
-    return state.dropdown_open == UI_DROPDOWN_NONE && hovered && input_is_action_just_pressed(INPUT_LEFT_CLICK);
+    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && hovered && input_is_action_just_pressed(INPUT_LEFT_CLICK);
+    if (clicked) {
+        sound_play(SOUND_UI_CLICK);
+    }
+    return clicked;
 }
 
 void ui_frame(ivec2 size) {
@@ -276,8 +289,9 @@ void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t ma
 
     if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
         if (text_input_rect.has_point(input_get_mouse_position())) {
+            sound_play(SOUND_UI_CLICK);
             input_start_text_input(value, max_length);
-        } else {
+        } else if (input_is_text_input_active()) {
             input_stop_text_input();
         }
     } 
@@ -300,7 +314,11 @@ bool ui_team_picker(char value, bool disabled) {
     char text[2] = { value, '\0' };
     ui_queue_text(is_hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + 5, rect.y + 2), 0);
 
-    return state.dropdown_open == UI_DROPDOWN_NONE && is_hovered && input_is_action_just_pressed(INPUT_LEFT_CLICK);
+    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && is_hovered && input_is_action_just_pressed(INPUT_LEFT_CLICK);
+    if (clicked) {
+        sound_play(SOUND_UI_CLICK);
+    }
+    return clicked;
 }
 
 bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, size_t item_count, bool disabled) {
@@ -351,11 +369,13 @@ bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, s
             if (item_hovered != -1) {
                 *selected_item = item_hovered;
             } 
+            sound_play(SOUND_UI_CLICK);
             // Return true if the item was changed
             return item_hovered != -1;
         }
     } else if (state.dropdown_open == UI_DROPDOWN_NONE && !disabled && hovered && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
         state.dropdown_open_future = dropdown_id;
+        sound_play(SOUND_UI_CLICK);
     } 
 
     return false;

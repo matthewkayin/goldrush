@@ -107,11 +107,14 @@ bool network_init() {
     state.scanner = ENET_SOCKET_NULL;
     state.status = NETWORK_STATUS_OFFLINE;
 
+    log_info("Initialized network.");
+
     return true;
 }
 
 void network_quit() {
     enet_deinitialize();
+    log_info("Quit network.");
 }
 
 void network_disconnect() {

@@ -5,6 +5,7 @@
 #include "core/animation.h"
 #include "core/input.h"
 #include "core/network.h"
+#include "core/sound.h"
 #include "math/gmath.h"
 #include "render/render.h"
 #include "menu/menu.h"
@@ -12,6 +13,8 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <cstring>
+#include <ctime>
+#include <cstdlib>
 
 int gold_main(int argc, char** argv);
 
@@ -87,8 +90,13 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return -1;
     }
+    if (!sound_init()) {
+        logger_quit();
+        return -1;
+    }
     animation_init();
     input_init(window);
+    srand(time(NULL));
 
     bool is_running = true;
     bool render_debug_info = false;

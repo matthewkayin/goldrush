@@ -3,6 +3,7 @@
 #include "core/input.h"
 #include "core/cursor.h"
 #include "core/logger.h"
+#include "core/sound.h"
 #include "render/sprite.h"
 #include "render/font.h"
 #include "render/render.h"
@@ -364,6 +365,7 @@ void menu_update(MenuState& state) {
             menu_add_chat_message(state, chat_message);
             network_send_lobby_chat(chat_message);
             state.chat_message = "";
+            sound_play(SOUND_UI_CLICK);
         }
 
         // Lobby buttons
