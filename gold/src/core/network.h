@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cstdint>
+#include "defines.h"
+#include "match/noise.h"
 #include <cstddef>
 
 #define NETWORK_LOBBY_NAME_BUFFER_SIZE 40
@@ -54,7 +55,8 @@ enum NetworkEventType {
     NETWORK_EVENT_PLAYER_CONNECTED,
     NETWORK_EVENT_INVALID_VERSION,
     NETWORK_EVENT_JOINED_LOBBY,
-    NETWORK_EVENT_LOBBY_CHAT
+    NETWORK_EVENT_LOBBY_CHAT,
+    NETWORK_EVENT_MATCH_LOAD
 };
 
 struct NetworkEventPlayerDisconnected {
@@ -69,12 +71,18 @@ struct NetworkEventLobbyChat {
     char message[NETWORK_LOBBY_CHAT_BUFFER_SIZE];
 };
 
+struct NetworkEventMatchLoad {
+    int32_t lcg_seed;
+    Noise noise;
+};
+
 struct NetworkEvent {
     NetworkEventType type;
     union {
         NetworkEventPlayerDisconnected player_disconnected;
         NetworkEventPlayerConnected player_connected;
         NetworkEventLobbyChat lobby_chat;
+        NetworkEventMatchLoad match_load;
     };
 };
 
@@ -105,3 +113,4 @@ void network_set_player_color(uint8_t color);
 void network_set_match_setting(uint8_t setting, uint8_t value);
 uint8_t network_get_match_setting(uint8_t setting);
 void network_set_player_team(uint8_t team);
+void network_begin_loading_match(int32_t lcg_seed, const Noise& noise);

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "defines.h"
-#include <cstdint>
+#include "defines.h"
 #include <cstdio>
 
 void platform_clock_init();

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "defines.h"
 
 enum AtlasName {
     ATLAS_UI,

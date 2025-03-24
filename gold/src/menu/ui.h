@@ -4,7 +4,7 @@
 #include "render/sprite.h"
 #include "render/font.h"
 #include <string>
-#include <cstdint>
+#include "defines.h"
 
 #define UI_RENDER_TEXT_BUFFER_SIZE 128
 #define UI_Z_INDEX_COUNT 2

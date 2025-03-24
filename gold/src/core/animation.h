@@ -3,7 +3,7 @@
 #define ANIMATION_LOOPS_INDEFINITELY -1
 
 #include "math/gmath.h"
-#include <cstdint>
+#include "defines.h"
 
 enum AnimationName {
     ANIMATION_UI_MOVE_CELL,

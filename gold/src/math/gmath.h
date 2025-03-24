@@ -1,7 +1,7 @@
 #pragma once
 
 #include "defines.h"
-#include <cstdint>
+#include "defines.h"
 #include <cmath>
 
 // from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c

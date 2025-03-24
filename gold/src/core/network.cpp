@@ -647,6 +647,28 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             state.match_settings[data[1]] = data[2];
             break;
         }
+        case NETWORK_MESSAGE_LOAD_MATCH: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
+                    state.players[player_id].status = NETWORK_PLAYER_STATUS_NOT_READY;
+                }
+            }
+
+            NetworkEvent event;
+            event.type = NETWORK_EVENT_MATCH_LOAD;
+            memcpy(&event.match_load.lcg_seed, data + 1, sizeof(int32_t));
+            memcpy(&event.match_load.noise.width, data + 5, sizeof(uint32_t));
+            memcpy(&event.match_load.noise.height, data + 9, sizeof(uint32_t));
+            event.match_load.noise.map = (int8_t*)malloc(event.match_load.noise.width * event.match_load.noise.height);
+            memcpy(&event.match_load.noise.map[0], data + 13, event.match_load.noise.width * event.match_load.noise.height);
+
+            state.event_queue.push(event);
+            break;
+        }
     }
 }
 
@@ -743,4 +765,32 @@ void network_set_player_team(uint8_t team) {
     ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
     enet_host_broadcast(state.host, 0, packet);
     enet_host_flush(state.host);
+}
+
+void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
+    // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
+            state.players[player_id].status = NETWORK_PLAYER_STATUS_NOT_READY;
+        }
+    }
+
+    state.status = NETWORK_STATUS_CONNECTED;
+
+    // Build message
+    // Message size is 1 byte for type, 4 bytes for LCG seed, 8 bytes for map width / height, and the rest of the bytes are the generated noise values
+    size_t message_size = 1 + 4 + 8 + (noise.width * noise.height * sizeof(int8_t));
+    uint8_t* message = (uint8_t*)malloc(message_size);
+    message[0] = NETWORK_MESSAGE_LOAD_MATCH;
+    memcpy(message + 1, &lcg_seed, sizeof(int32_t));
+    memcpy(message + 5, &noise.width, sizeof(uint32_t));
+    memcpy(message + 9, &noise.height, sizeof(uint32_t));
+    memcpy(message + 13, &noise.map[0], noise.width * noise.height * sizeof(int8_t));
+
+    // Send the packet
+    ENetPacket* packet = enet_packet_create(message, message_size, ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+
+    free(message);
 }

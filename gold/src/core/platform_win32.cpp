@@ -5,7 +5,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <DbgHelp.h>
-#include <cstdint>
+#include "defines.h"
 #include <ctime>
 #include <cstdio>
 

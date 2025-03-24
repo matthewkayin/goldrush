@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1
     #define WIN32_LEAN_AND_MEAN
@@ -23,3 +25,8 @@
 #define TILE_SIZE 16
 #define MAX_PLAYERS 4
 #define MAX_USERNAME_LENGTH 32
+
+typedef uint16_t EntityId;
+const EntityId ID_MAX = 4096;
+const EntityId ID_NULL = ID_MAX + 1;
+const uint32_t INDEX_INVALID = 65535;

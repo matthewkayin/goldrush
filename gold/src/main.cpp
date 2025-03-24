@@ -9,6 +9,8 @@
 #include "math/gmath.h"
 #include "render/render.h"
 #include "menu/menu.h"
+#include "match/match_ui.h"
+#include "match/noise.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -29,6 +31,11 @@ int main(int argc, char** argv) {
     return gold_main(argc, argv);
 }
 #endif
+
+enum GameMode {
+    GAME_MODE_MENU,
+    GAME_MODE_MATCH
+};
 
 int gold_main(int argc, char** argv) {
     char logfile_path[128];
@@ -86,11 +93,11 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return -1;
     }
-    if (!network_init()) {
+    if (!sound_init()) {
         logger_quit();
         return -1;
     }
-    if (!sound_init()) {
+    if (!network_init()) {
         logger_quit();
         return -1;
     }
@@ -109,7 +116,9 @@ int gold_main(int argc, char** argv) {
     uint32_t updates = 0;
     uint32_t ups = 0;
 
+    GameMode game_mode = GAME_MODE_MENU;
     MenuState menu_state = menu_init();
+    MatchUiState match_ui_state;
 
     while (is_running) {
         // TIMEKEEP
@@ -147,7 +156,23 @@ int gold_main(int argc, char** argv) {
             network_service();
             NetworkEvent event;
             while (network_poll_events(&event)) {
-                menu_handle_network_event(menu_state, event);
+                switch (game_mode) {
+                    case GAME_MODE_MENU: {
+                        if (event.type == NETWORK_EVENT_MATCH_LOAD) {
+                            network_scanner_destroy();
+                            match_ui_state = match_ui_init(event.match_load.lcg_seed, event.match_load.noise);
+                            free(event.match_load.noise.map);
+                            game_mode = GAME_MODE_MATCH;
+                        } else {
+                            menu_handle_network_event(menu_state, event);
+                        }
+                        break;
+                    }
+                    case GAME_MODE_MATCH: {
+                        match_ui_handle_network_event(match_ui_state, event);
+                        break;
+                    }
+                }
             }
         }
 
@@ -156,17 +181,59 @@ int gold_main(int argc, char** argv) {
             update_accumulator -= UPDATE_TIME;
             updates++;
 
-            menu_update(menu_state);
-            if (menu_state.mode == MENU_MODE_EXIT) {
-                is_running = false;
-                break;
+            switch (game_mode) {
+                case GAME_MODE_MENU: {
+                    menu_update(menu_state);
+                    if (menu_state.mode == MENU_MODE_EXIT) {
+                        is_running = false;
+                        break;
+                    } else if (menu_state.mode == MENU_MODE_LOAD_MATCH) {
+                        network_scanner_destroy();
+
+                        // This is when the host is beginning a match load
+                        // Set LCG seed
+                        #ifdef GOLD_RAND_SEED
+                            int32_t lcg_seed = GOLD_RAND_SEED;
+                        #else
+                            int32_t lcg_seed = (int32_t)time(NULL);
+                        #endif
+
+                        // Generate noise for map generation
+                        uint64_t noise_seed = (uint64_t)lcg_seed;
+                        uint32_t map_width = 128;
+                        uint32_t map_height = map_width;
+                        Noise noise = noise_generate(noise_seed, map_width, map_height);
+
+                        network_begin_loading_match(lcg_seed, noise);
+
+                        match_ui_state = match_ui_init(lcg_seed, noise);
+                        free(noise.map);
+                        game_mode = GAME_MODE_MATCH;
+                    }
+                    break;
+                }
+                case GAME_MODE_MATCH: {
+                    match_ui_update(match_ui_state);
+                    break;
+                }
             }
+
         }
 
         // RENDER
         render_prepare_frame();
 
-        menu_render(menu_state);
+        switch (game_mode) {
+            case GAME_MODE_MENU: {
+                menu_render(menu_state);
+                break;
+            }
+            case GAME_MODE_MATCH: {
+                match_ui_render(match_ui_state);
+                break;
+            }
+        }
+
         if (render_debug_info) {
             char fps_text[32];
             sprintf(fps_text, "FPS: %u", fps);
@@ -177,6 +244,7 @@ int gold_main(int argc, char** argv) {
     }
 
     network_quit();
+    sound_quit();
     render_quit();
 
     SDL_DestroyWindow(window);
