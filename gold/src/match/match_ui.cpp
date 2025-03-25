@@ -12,29 +12,7 @@ static const int MATCH_CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_SPEED = 16; // TODO: move to options
 static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
 
-enum RenderLayer {
-    RENDER_LAYER_TILE,
-    RENDER_LAYER_MINE_SELECT_RING,
-    RENDER_LAYER_MINE,
-    RENDER_LAYER_SELECT_RING,
-    RENDER_LAYER_ENTITY,
-    RENDER_LAYER_COUNT
-};
-static const uint16_t ELEVATION_COUNT = 3;
-static const uint32_t RENDER_TOTAL_LAYER_COUNT = (RENDER_LAYER_COUNT * ELEVATION_COUNT);
-
-struct RenderSpriteParams {
-    SpriteName sprite;
-    ivec2 frame;
-    ivec2 position;
-    uint32_t options;
-    int recolor_id;
-};
-
-void match_ui_clamp_camera(MatchUiState& state);
-
-int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
-void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
+// INIT
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     MatchUiState state;
@@ -66,9 +44,13 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     return state;
 }
 
+// HANDLE EVENT
+
 void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 }
+
+// UPDATE
 
 void match_ui_update(MatchUiState& state) {
     if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
@@ -104,14 +86,20 @@ void match_ui_update(MatchUiState& state) {
     match_ui_clamp_camera(state);
 }
 
+// UPDATE FUNCTIONS
+
 void match_ui_clamp_camera(MatchUiState& state) {
     state.camera_offset.x = std::clamp(state.camera_offset.x, 0, ((int)state.match.map.width * TILE_SIZE) - SCREEN_WIDTH);
     state.camera_offset.y = std::clamp(state.camera_offset.y, 0, ((int)state.match.map.width * TILE_SIZE) - SCREEN_WIDTH + MATCH_UI_HEIGHT);
 }
 
-uint16_t match_get_render_layer(uint16_t elevation, RenderLayer layer) {
-    return (elevation * RENDER_LAYER_COUNT) + layer;
+void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell) {
+    state.camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    match_ui_clamp_camera(state);
 }
+
+// RENDER
 
 void match_ui_render(const MatchUiState& state) {
     static std::vector<RenderSpriteParams> render_sprite_params[RENDER_TOTAL_LAYER_COUNT];
@@ -207,6 +195,12 @@ void match_ui_render(const MatchUiState& state) {
     render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
     render_sprite(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height), 0, 0);
     render_sprite(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
+}
+
+// RENDER FUNCTIONS
+
+uint16_t match_get_render_layer(uint16_t elevation, RenderLayer layer) {
+    return (elevation * RENDER_LAYER_COUNT) + layer;
 }
 
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high) {

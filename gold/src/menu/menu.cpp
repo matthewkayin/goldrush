@@ -32,7 +32,7 @@ static const int CLOUD_FRAME_X[CLOUD_COUNT] = { 0, 1, 2, 2, 1, 1};
 static const int BUTTON_X = 44;
 static const int BUTTON_Y = 128;
 
-static const Rect MATCHLIST_RECT = (Rect) {
+static const Rect LOBBYLIST_RECT = (Rect) {
     .x = 36, .y = 32, .w = 432, .h = 200
 };
 static const Rect PLAYERLIST_RECT = (Rect) {
@@ -57,17 +57,7 @@ static const int PLAYERLIST_ROW_HEIGHT = 20;
 
 static const uint32_t STATUS_DURATION = 2 * 60; 
 static const uint32_t CONNECTION_TIMEOUT = 5 * 60;
-static const uint32_t MATCHLIST_PAGE_SIZE = 9;
-
-// defined below menu_update()
-void menu_set_mode(MenuState& state, MenuMode mode);
-void menu_show_status(MenuState& state, const char* message);
-void menu_add_chat_message(MenuState& state, const char* message);
-size_t menu_get_matchlist_page_count();
-const char* menu_get_player_status_string(NetworkPlayerStatus status);
-
-// defined below menu_render()
-void menu_render_decoration(const MenuState& state, int index);
+static const uint32_t LOBBYLIST_PAGE_SIZE = 9;
 
 MenuState menu_init() {
     MenuState state;
@@ -79,8 +69,8 @@ MenuState menu_init() {
     state.parallax_timer = PARALLAX_TIMER_DURATION;
     state.parallax_cactus_offset = 0;
     state.connection_timeout = 0;
-    state.matchlist_page = 0;
-    state.matchlist_item_selected = MENU_ITEM_NONE;
+    state.lobbylist_page = 0;
+    state.lobbylist_item_selected = MENU_ITEM_NONE;
 
     state.mode = MENU_MODE_MAIN;
     menu_set_mode(state, state.mode);
@@ -91,12 +81,12 @@ MenuState menu_init() {
 void menu_handle_network_event(MenuState& state, NetworkEvent event) {
     switch (event.type) {
         case NETWORK_EVENT_CONNECTION_FAILED: {
-            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            menu_set_mode(state, MENU_MODE_LOBBYLIST);
             menu_show_status(state, "Connection failed.");
             break;
         }
         case NETWORK_EVENT_INVALID_VERSION: {
-            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            menu_set_mode(state, MENU_MODE_LOBBYLIST);
             menu_show_status(state, "Game version does not match server.");
             break;
         }
@@ -113,7 +103,7 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
         case NETWORK_EVENT_PLAYER_DISCONNECTED: {
             if (event.player_disconnected.player_id == 0) {
                 network_disconnect();
-                menu_set_mode(state, MENU_MODE_MATCHLIST);
+                menu_set_mode(state, MENU_MODE_LOBBYLIST);
                 menu_show_status(state, "The host closed the lobby.");
             } else {
                 char message[128];
@@ -161,7 +151,7 @@ void menu_update(MenuState& state) {
         state.connection_timeout--;
         if (state.connection_timeout == 0) {
             network_disconnect();
-            menu_set_mode(state, MENU_MODE_MATCHLIST);
+            menu_set_mode(state, MENU_MODE_LOBBYLIST);
             menu_show_status(state, "Connection timed out.");
         }
     }
@@ -194,51 +184,51 @@ void menu_update(MenuState& state) {
                 if (state.username.length() == 0) {
                     menu_show_status(state, "Please enter a username.");
                 } else {
-                    menu_set_mode(state, MENU_MODE_MATCHLIST);
+                    menu_set_mode(state, MENU_MODE_LOBBYLIST);
                 }
             }
         ui_end_container();
-    } else if (state.mode == MENU_MODE_MATCHLIST) {
-        ui_frame_rect(MATCHLIST_RECT);
+    } else if (state.mode == MENU_MODE_LOBBYLIST) {
+        ui_frame_rect(LOBBYLIST_RECT);
 
         if (network_get_lobby_count() == 0) {
             int text_width = render_get_text_size(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...").x;
-            ui_element_position(ivec2(MATCHLIST_RECT.x + (MATCHLIST_RECT.w / 2) - (text_width / 2), MATCHLIST_RECT.y + 8));
+            ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
             ui_text(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...");
         }
 
-        // Matchlist search and top buttons
+        // Lobby list search and top buttons
         ui_begin_row(ivec2(44, 4), 4);
             ui_text_input("Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
             if (ui_sprite_button(SPRITE_UI_BUTTON_REFRESH, false, false)) {
                 network_scanner_search(state.lobby_search_query.c_str());
-                state.matchlist_page = 0;
+                state.lobbylist_page = 0;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.matchlist_page == 0, true)) {
-                state.matchlist_page--;
+            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
+                state.lobbylist_page--;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.matchlist_page == menu_get_matchlist_page_count() - 1, false)) {
-                state.matchlist_page++;
+            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count() - 1, false)) {
+                state.lobbylist_page++;
             }
         ui_end_container();
 
-        // Matchlist lobby list
-        int base_index = (state.matchlist_page * MATCHLIST_PAGE_SIZE);
-        for (int lobby_index = base_index; lobby_index < std::min(base_index + MATCHLIST_PAGE_SIZE, (uint32_t)network_get_lobby_count()); lobby_index++) {
+        // Lobby list
+        int base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
+        for (int lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, (uint32_t)network_get_lobby_count()); lobby_index++) {
             char lobby_text[128];
-            bool selected = lobby_index == state.matchlist_item_selected;
+            bool selected = lobby_index == state.lobbylist_item_selected;
             const NetworkLobby& lobby = network_get_lobby(lobby_index);
             sprintf(lobby_text, "%s %s (%u/%u) %s", selected ? "*" : " ", lobby.name, lobby.player_count, MAX_PLAYERS, selected ? "*" : " ");
 
             ivec2 text_frame_size = ui_text_frame_size(lobby_text);
-            ui_element_position(ivec2(MATCHLIST_RECT.x + (MATCHLIST_RECT.w / 2) - (text_frame_size.x / 2), MATCHLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
+            ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
             if (ui_text_frame(lobby_text, false)) {
-                state.matchlist_item_selected = lobby_index;
+                state.lobbylist_item_selected = lobby_index;
             }
         }
 
-        // Matchlist button row
-        ui_begin_row(ivec2(BUTTON_X, MATCHLIST_RECT.y + MATCHLIST_RECT.h + 4), 4); 
+        // Lobbylist button row
+        ui_begin_row(ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
             if (ui_button("BACK")) {
                 menu_set_mode(state, MENU_MODE_USERNAME);
             }
@@ -249,9 +239,9 @@ void menu_update(MenuState& state) {
                     menu_set_mode(state, MENU_MODE_LOBBY);
                 }
             }
-            if (state.matchlist_item_selected != MENU_ITEM_NONE) {
+            if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
                 if (ui_button("JOIN")) {
-                    const NetworkLobby& lobby = network_get_lobby(state.matchlist_item_selected);
+                    const NetworkLobby& lobby = network_get_lobby(state.lobbylist_item_selected);
                     if (!network_client_create(state.username.c_str(), lobby.ip, lobby.port)) {
                         menu_show_status(state, "Could not create client.");
                     } else {
@@ -260,7 +250,7 @@ void menu_update(MenuState& state) {
                 }
             }
         ui_end_container();
-    // End matchlist
+    // End lobbylist
     } else if (state.mode == MENU_MODE_LOBBY) {
         // Playerlist
         ui_frame_rect(PLAYERLIST_RECT);
@@ -372,7 +362,7 @@ void menu_update(MenuState& state) {
         ui_begin_row(ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12, MATCH_SETTINGS_RECT.y + MATCH_SETTINGS_RECT.h + 4), 4);
             if (ui_button("BACK")) {
                 network_disconnect();
-                menu_set_mode(state, MENU_MODE_MATCHLIST);
+                menu_set_mode(state, MENU_MODE_LOBBYLIST);
             }
             if (network_is_server()) {
                 if (ui_button("START")) {
@@ -418,8 +408,8 @@ void menu_update(MenuState& state) {
 
 void menu_set_mode(MenuState& state, MenuMode mode) {
     state.status_timer = 0;
-    state.matchlist_page = 0;
-    state.matchlist_item_selected = MENU_ITEM_NONE;
+    state.lobbylist_page = 0;
+    state.lobbylist_item_selected = MENU_ITEM_NONE;
 
     if (input_is_text_input_active()) {
         input_stop_text_input();
@@ -428,7 +418,7 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
     state.mode = mode;
     if (mode == MENU_MODE_USERNAME) {
         input_start_text_input(&state.username, MAX_USERNAME_LENGTH);
-    } else if (mode == MENU_MODE_MATCHLIST) {
+    } else if (mode == MENU_MODE_LOBBYLIST) {
         if (!network_scanner_create()) {
             menu_set_mode(state, MENU_MODE_MAIN);
             menu_show_status(state, "Error occured while searching for LAN games.");
@@ -491,11 +481,11 @@ void menu_add_chat_message(MenuState& state, const char* message) {
     }
 }
 
-size_t menu_get_matchlist_page_count() {
+size_t menu_get_lobbylist_page_count() {
     if (network_get_lobby_count() == 0) {
         return 1;
     }
-    return (network_get_lobby_count() / MATCHLIST_PAGE_SIZE) + (int)(network_get_lobby_count() % MATCHLIST_PAGE_SIZE != 0);
+    return (network_get_lobby_count() / LOBBYLIST_PAGE_SIZE) + (int)(network_get_lobby_count() % LOBBYLIST_PAGE_SIZE != 0);
 }
 
 const char* menu_get_player_status_string(NetworkPlayerStatus status) {

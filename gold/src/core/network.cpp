@@ -96,8 +96,6 @@ struct NetworkMessageSetMatchSetting {
     uint8_t value;
 };
 
-void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer_id);
-
 bool network_init() {
     if (enet_initialize() != 0) {
         log_error("Unable to initialize enet.");

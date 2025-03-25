@@ -98,6 +98,7 @@ bool network_server_create(const char* username);
 bool network_client_create(const char* username, const char* server_ip, uint16_t port);
 
 void network_service();
+void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer_id);
 bool network_poll_events(NetworkEvent* event);
 
 NetworkStatus network_get_status();

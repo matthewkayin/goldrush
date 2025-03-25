@@ -15,7 +15,7 @@
 enum MenuMode {
     MENU_MODE_MAIN,
     MENU_MODE_USERNAME,
-    MENU_MODE_MATCHLIST,
+    MENU_MODE_LOBBYLIST,
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
     MENU_MODE_EXIT,
@@ -40,8 +40,8 @@ struct MenuState {
     uint32_t status_timer;
     char status_text[128];
     uint32_t connection_timeout;
-    uint32_t matchlist_page;
-    uint32_t matchlist_item_selected;
+    uint32_t lobbylist_page;
+    uint32_t lobbylist_item_selected;
 
     std::vector<std::string> chat;
 };
@@ -49,4 +49,12 @@ struct MenuState {
 MenuState menu_init();
 void menu_handle_network_event(MenuState& state, NetworkEvent event);
 void menu_update(MenuState& state);
+
+void menu_set_mode(MenuState& state, MenuMode mode);
+void menu_show_status(MenuState& state, const char* message);
+void menu_add_chat_message(MenuState& state, const char* message);
+size_t menu_get_lobbylist_page_count();
+const char* menu_get_player_status_string(NetworkPlayerStatus status);
+
 void menu_render(const MenuState& state);
+void menu_render_decoration(const MenuState& state, int index);
