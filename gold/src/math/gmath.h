@@ -345,6 +345,10 @@ struct Rect {
         return !(point.x < x || point.x >= x + w || point.y < y || point.y >= y + h);
     }
 
+    bool intersects(Rect rect) const {
+        return !(x + w <= rect.x || rect.x + rect.w <= x || y + h <= rect.y || rect.y + rect.h <= y);
+    }
+
     ivec2 get_cell_nearest_to(ivec2 start_cell) const {
         ivec2 nearest_cell = ivec2(x, y);
         uint32_t nearest_cell_dist = ivec2::manhattan_distance(start_cell, nearest_cell);

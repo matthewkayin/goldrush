@@ -3,12 +3,14 @@
 #include "core/network.h"
 #include "core/input.h"
 #include "core/logger.h"
+#include "menu/match_setting.h"
 #include "render/sprite.h"
 #include "render/render.h"
 #include <algorithm>
 
 static const int MATCH_CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_SPEED = 16; // TODO: move to options
+static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
 
 enum RenderLayer {
     RENDER_LAYER_TILE,
@@ -36,7 +38,25 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
 
     state.mode = MATCH_UI_MODE_NOT_STARTED;
     state.camera_offset = ivec2(0, 0);
-    state.match = match_init(lcg_seed, noise);
+
+    // Populate match player info using network player info
+    MatchPlayer players[MAX_PLAYERS];
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        const NetworkPlayer& network_player = network_get_player(player_id);
+        if (network_player.status == NETWORK_PLAYER_STATUS_NONE) {
+            memset(&players[player_id], 0, sizeof(MatchPlayer));
+            continue;
+        }
+
+        players[player_id].active = true;
+        strcpy(players[player_id].name, network_player.name);
+        // Use the player_id as the "team" in a FFA game to ensure everyone is on a separate team
+        players[player_id].team = network_get_match_setting(MATCH_SETTING_TEAMS) == MATCH_SETTING_TEAMS_ENABLED 
+                                        ? network_player.team
+                                        : player_id;
+        players[player_id].recolor_id = network_player.recolor_id;
+    }
+    state.match = match_init(lcg_seed, noise, players);
 
     network_set_player_ready(true);
 
@@ -138,6 +158,29 @@ void match_ui_render(const MatchUiState& state) {
             }
         }  // End for each x
     } // End for each y
+
+    // Entities
+    for (const Entity& entity : state.match.entities) {
+        const EntityData& data = entity_data(entity.type);
+        RenderSpriteParams params = (RenderSpriteParams) {
+            .sprite = data.sprite,
+            .frame = ivec2(0, 0),
+            .position = entity.position.to_ivec2() - state.camera_offset,
+            .options = RENDER_SPRITE_NO_CULL,
+            .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : state.match.players[entity.player_id].recolor_id
+        };
+
+        const SpriteInfo& sprite_info = resource_get_sprite_info(params.sprite);
+        Rect render_rect = (Rect) {
+            .x = params.position.x, .y = params.position.y,
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+        };
+        if (!render_rect.intersects(SCREEN_RECT)) {
+            continue;
+        }
+
+        render_sprite_params[match_get_render_layer(2, RENDER_LAYER_ENTITY)].push_back(params);
+    }
 
     // TODO ysort entity layer
     for (int render_layer = 0; render_layer < RENDER_TOTAL_LAYER_COUNT; render_layer++) {

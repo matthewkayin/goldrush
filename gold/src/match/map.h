@@ -28,7 +28,7 @@ struct Map {
     std::vector<EntityId> cells;
 };
 
-void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns);
+void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
 
 uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
 bool map_is_cell_in_bounds(const Map& map, ivec2 cell);
@@ -38,3 +38,4 @@ EntityId map_get_cell(const Map& map, ivec2 cell);
 bool map_is_tile_ramp(const Map& map, ivec2 cell);
 bool map_is_cell_rect_same_elevation(const Map& map, ivec2 cell, ivec2 size);
 bool map_is_cell_rect_occupied(const Map& map, ivec2 cell, ivec2 size);
+void map_set_cell_rect(Map& map, ivec2 cell, int size, EntityId value);

@@ -19,7 +19,7 @@ SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, PoissonDiskParams& params);
 
-void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns) {
+void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.width = noise.width;
     map.height = noise.height;
     log_info("Generating map. Size: %ux%u", map.width, map.height);
@@ -557,10 +557,9 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns) {
             }
         }
 
-        std::vector<ivec2> gold_sample = map_poisson_disk(map, params);
-        for (uint32_t patch_id = 0; patch_id < gold_sample.size(); patch_id++) {
-            // TODO: create gold mine
-            params.avoid_values[gold_sample[patch_id].x + (gold_sample[patch_id].y * map.width)] = 4;
+        goldmine_cells = map_poisson_disk(map, params);
+        for (ivec2 goldmine_cell : goldmine_cells) {
+            params.avoid_values[goldmine_cell.x + (goldmine_cell.y * map.width)] = 4;
         }
     }
     // End generate gold mines
@@ -811,4 +810,12 @@ bool map_is_cell_rect_occupied(const Map& map, ivec2 cell, ivec2 size) {
     }
 
     return true;
+}
+
+void map_set_cell_rect(Map& map, ivec2 cell, int size, EntityId value) {
+    for (int y = cell.y; y < cell.y + size; y++) {
+        for (int x = cell.x; x < cell.x + size; x++) {
+            map.cells[x + (y * map.width)] = value;
+        }
+    }
 }
