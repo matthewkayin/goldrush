@@ -10,7 +10,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }}
 };
 
-const EntityData& entity_data(EntityType type) {
+const EntityData& entity_get_data(EntityType type) {
     return ENTITY_DATA.at(type);
 }
 
@@ -29,7 +29,19 @@ EntityId entity_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_lef
     entity.gold_held = gold_left;
 
     EntityId id = state.entities.push_back(entity);
-    map_set_cell_rect(state.map, entity.cell, entity_data(entity.type).cell_size, id);
+    map_set_cell_rect(state.map, entity.cell, entity_get_data(entity.type).cell_size, id);
 
     return id;
+}
+
+uint16_t entity_get_elevation(const Entity& entity, const Map& map) {
+    uint16_t elevation = map_get_tile(map, entity.cell).elevation;
+    int entity_cell_size = entity_get_data(entity.type).cell_size;
+    for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size; y++) {
+        for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size; x++) {
+            elevation = std::max(elevation, map_get_tile(map, ivec2(x, y)).elevation);
+        }
+    }
+    
+    return elevation;
 }

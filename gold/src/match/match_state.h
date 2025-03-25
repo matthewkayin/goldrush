@@ -55,5 +55,6 @@ struct MatchState {
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]);
 void match_update(MatchState& state);
 
-const EntityData& entity_data(EntityType type);
+const EntityData& entity_get_data(EntityType type);
 EntityId entity_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left);
+uint16_t entity_get_elevation(const Entity& entity, const Map& map);

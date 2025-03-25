@@ -33,6 +33,9 @@ struct RenderSpriteParams {
 
 void match_ui_clamp_camera(MatchUiState& state);
 
+int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
+void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
+
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     MatchUiState state;
 
@@ -161,9 +164,9 @@ void match_ui_render(const MatchUiState& state) {
 
     // Entities
     for (const Entity& entity : state.match.entities) {
-        const EntityData& data = entity_data(entity.type);
+        const EntityData& entity_data = entity_get_data(entity.type);
         RenderSpriteParams params = (RenderSpriteParams) {
-            .sprite = data.sprite,
+            .sprite = entity_data.sprite,
             .frame = ivec2(0, 0),
             .position = entity.position.to_ivec2() - state.camera_offset,
             .options = RENDER_SPRITE_NO_CULL,
@@ -179,14 +182,57 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        render_sprite_params[match_get_render_layer(2, RENDER_LAYER_ENTITY)].push_back(params);
+        render_sprite_params[match_get_render_layer(entity_get_elevation(entity, state.match.map), RENDER_LAYER_ENTITY)].push_back(params);
     }
 
-    // TODO ysort entity layer
+    // Render sprite params
     for (int render_layer = 0; render_layer < RENDER_TOTAL_LAYER_COUNT; render_layer++) {
+        // If this layer is one of the entity layers, y sort it
+        int elevation = render_layer / RENDER_LAYER_COUNT;
+        int render_layer_without_elevation = render_layer - (elevation * RENDER_LAYER_COUNT);
+        if (render_layer_without_elevation == RENDER_LAYER_ENTITY) {
+            match_ui_ysort_render_params(render_sprite_params[render_layer], 0, render_sprite_params[render_layer].size() - 1);
+        }
+
         for (const RenderSpriteParams& params : render_sprite_params[render_layer]) {
             render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
         render_sprite_params[render_layer].clear();
+    }
+
+    // UI frames
+    const SpriteInfo& minimap_sprite_info = resource_get_sprite_info(SPRITE_UI_MINIMAP);
+    const SpriteInfo& bottom_panel_sprite_info = resource_get_sprite_info(SPRITE_UI_BOTTOM_PANEL);
+    const SpriteInfo& button_panel_sprite_info = resource_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
+    render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
+    render_sprite(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height), 0, 0);
+    render_sprite(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
+}
+
+int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high) {
+    RenderSpriteParams pivot = params[high];
+    int i = low - 1;
+
+    for (int j = low; j <= high - 1; j++) {
+        if (params[j].position.y < pivot.position.y) {
+            i++;
+            RenderSpriteParams temp = params[j];
+            params[j] = params[i];
+            params[i] = temp;
+        }
+    }
+
+    RenderSpriteParams temp = params[high];
+    params[high] = params[i + 1];
+    params[i + 1] = temp;
+
+    return i + 1;
+}
+
+void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high) {
+    if (low < high) {
+        int partition_index = match_ui_ysort_render_params_partition(params, low, high);
+        match_ui_ysort_render_params(params, low, partition_index - 1);
+        match_ui_ysort_render_params(params, partition_index + 1, high);
     }
 }
