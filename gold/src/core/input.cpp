@@ -39,7 +39,7 @@ void input_update_window_size() {
 }
 
 void input_poll_events() {
-    memcpy(&state.current, &state.previous, sizeof(state.current));
+    memcpy(&state.previous, &state.current, sizeof(state.current));
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {

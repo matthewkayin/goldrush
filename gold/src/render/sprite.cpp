@@ -125,6 +125,76 @@ static std::unordered_map<SpriteName, SpriteInfo> SPRITE_INFO = {
         .atlas_x = 0, .atlas_y = 352,
         .frame_width = 16, .frame_height = 16
     }},
+    { SPRITE_UI_WHITE, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 16, .atlas_y = 352,
+        .frame_width = 16, .frame_height = 16
+    }},
+    { SPRITE_UI_SELECT_RING_LANDMINE, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 0, .atlas_y = 368,
+        .frame_width = 16, .frame_height = 20
+    }},
+    { SPRITE_UI_SELECT_RING_LANDMINE_ATTACK, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 16, .atlas_y = 368,
+        .frame_width = 16, .frame_height = 20
+    }},
+    { SPRITE_UI_SELECT_RING_UNIT, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 32, .atlas_y = 368,
+        .frame_width = 20, .frame_height = 20
+    }},
+    { SPRITE_UI_SELECT_RING_UNIT_ATTACK, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 52, .atlas_y = 368,
+        .frame_width = 20, .frame_height = 20
+    }},
+    { SPRITE_UI_SELECT_RING_WAGON, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 72, .atlas_y = 368,
+        .frame_width = 40, .frame_height = 36
+    }},
+    { SPRITE_UI_SELECT_RING_WAGON_ATTACK, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 112, .atlas_y = 368,
+        .frame_width = 40, .frame_height = 36
+    }},
+    { SPRITE_UI_SELECT_RING_BUILDING_SIZE2, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 152, .atlas_y = 368,
+        .frame_width = 38, .frame_height = 40
+    }},
+    { SPRITE_UI_SELECT_RING_BUILDING_SIZE2_ATTACK, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 190, .atlas_y = 368,
+        .frame_width = 38, .frame_height = 40
+    }},
+    { SPRITE_UI_SELECT_RING_BUILDING_SIZE3, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 228, .atlas_y = 368,
+        .frame_width = 58, .frame_height = 56
+    }},
+    { SPRITE_UI_SELECT_RING_BUILDING_SIZE3_ATTACK, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 286, .atlas_y = 368,
+        .frame_width = 58, .frame_height = 56
+    }},
+    { SPRITE_UI_SELECT_RING_BUILDING_SIZE4, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 344, .atlas_y = 368,
+        .frame_width = 72, .frame_height = 76
+    }},
+    { SPRITE_UI_SELECT_RING_BUILDING_SIZE4_ATTACK, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 416, .atlas_y = 368,
+        .frame_width = 72, .frame_height = 76
+    }},
+    { SPRITE_UI_SELECT_RING_GOLDMINE, (SpriteInfo) { 
+        .atlas = ATLAS_UI, 
+        .atlas_x = 488, .atlas_y = 368,
+        .frame_width = 58, .frame_height = 50
+    }},
     { SPRITE_GOLDMINE, (SpriteInfo) { 
         .atlas = ATLAS_MISC, 
         .atlas_x = 0, .atlas_y = 0,

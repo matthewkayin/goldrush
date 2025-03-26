@@ -929,10 +929,26 @@ void render_line(ivec2 start, ivec2 end) {
 }
 
 void render_rect(ivec2 start, ivec2 end) {
-    render_line(start, ivec2(end.x, start.y));
-    render_line(ivec2(end.x, start.y), end);
-    render_line(end, ivec2(start.x, end.y));
-    render_line(ivec2(start.x, end.y), start);
+    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_WHITE);
+    Rect src_rect = (Rect) {
+        .x = sprite_info.atlas_x,
+        .y = sprite_info.atlas_y,
+        .w = sprite_info.frame_width,
+        .h = sprite_info.frame_height
+    };
+    Rect dst_rect = (Rect) {
+        .x = start.x, .y = start.y,
+        .w = 1, .h = end.y - start.y
+    };
+    render_atlas(ATLAS_UI, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    dst_rect.x = end.x - 1;
+    render_atlas(ATLAS_UI, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    dst_rect.x = start.x;
+    dst_rect.w = end.x - start.x;
+    dst_rect.h = 1;
+    render_atlas(ATLAS_UI, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    dst_rect.y = end.y - 1;
+    render_atlas(ATLAS_UI, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel) {

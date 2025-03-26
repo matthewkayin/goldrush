@@ -35,6 +35,8 @@ enum MatchUiMode {
 struct MatchUiState {
     MatchUiMode mode;
     ivec2 camera_offset;
+    ivec2 select_origin;
+    std::vector<EntityId> selection;
     MatchState match;
 };
 
@@ -44,9 +46,13 @@ void match_ui_update(MatchUiState& state);
 
 void match_ui_clamp_camera(MatchUiState& state);
 void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell);
+bool match_ui_is_mouse_in_ui();
+bool match_ui_is_selecting(const MatchUiState& state);
+std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect rect);
+void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selection);
 
 void match_ui_render(const MatchUiState& state);
 
-uint16_t match_get_render_layer(uint16_t elevation, RenderLayer layer);
+uint16_t match_ui_get_render_layer(uint16_t elevation, RenderLayer layer);
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);

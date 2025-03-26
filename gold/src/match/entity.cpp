@@ -14,24 +14,12 @@ const EntityData& entity_get_data(EntityType type) {
     return ENTITY_DATA.at(type);
 }
 
-EntityId entity_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left) {
-    Entity entity;
-    entity.type = ENTITY_GOLDMINE;
-    entity.player_id = PLAYER_NONE;
-    entity.flags = 0;
-    entity.mode = ENTITY_MODE_GOLDMINE;
+bool entity_is_unit(EntityType type) {
+    return false;
+}
 
-    entity.cell = cell;
-    entity.position = fvec2(entity.cell * TILE_SIZE);
-    entity.direction = DIRECTION_SOUTH;
-
-    entity.garrison_id = ID_NULL;
-    entity.gold_held = gold_left;
-
-    EntityId id = state.entities.push_back(entity);
-    map_set_cell_rect(state.map, entity.cell, entity_get_data(entity.type).cell_size, id);
-
-    return id;
+bool entity_is_selectable(const Entity& entity) {
+    return true;
 }
 
 uint16_t entity_get_elevation(const Entity& entity, const Map& map) {
@@ -44,4 +32,20 @@ uint16_t entity_get_elevation(const Entity& entity, const Map& map) {
     }
     
     return elevation;
+}
+
+Rect entity_get_rect(const Entity& entity) {
+    int entity_cell_size = entity_get_data(entity.type).cell_size;
+    Rect rect = (Rect) {
+        .x = entity.position.x.integer_part(),
+        .y = entity.position.y.integer_part(),
+        .w = entity_cell_size * TILE_SIZE,
+        .h = entity_cell_size * TILE_SIZE
+    };
+    if (entity_is_unit(entity.type)) {
+        rect.x -= rect.w / 2;
+        rect.y -= rect.h / 2;
+    }
+
+    return rect;
 }

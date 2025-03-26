@@ -19,6 +19,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
 
     state.mode = MATCH_UI_MODE_NOT_STARTED;
     state.camera_offset = ivec2(0, 0);
+    state.select_origin = ivec2(-1, -1);
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
@@ -67,23 +68,43 @@ void match_ui_update(MatchUiState& state) {
 
     // Turn loop
 
+    // Handle input
+    if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+        // Begin selecting
+        state.select_origin = input_get_mouse_position() + state.camera_offset;
+    }
+    if (input_is_action_just_released(INPUT_LEFT_CLICK)) {
+        ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
+        Rect select_rect = (Rect) {
+            .x = std::min(world_pos.x, state.select_origin.x),
+            .y = std::min(world_pos.y, state.select_origin.y),
+            .w = std::max(1, std::abs(state.select_origin.x - world_pos.x)),
+            .h = std::max(1, std::abs(state.select_origin.y - world_pos.y)),
+        };
+
+        std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
+        match_ui_set_selection(state, selection);
+        state.select_origin = ivec2(-1, -1);
+    }
+
     match_update(state.match);
 
     // Camera drag
-    ivec2 camera_drag_direction = ivec2(0, 0);
-    ivec2 mouse_position = input_get_mouse_position();
-    if (mouse_position.x < MATCH_CAMERA_DRAG_MARGIN) {
-        camera_drag_direction.x = -1;
-    } else if (mouse_position.x > SCREEN_WIDTH - MATCH_CAMERA_DRAG_MARGIN) {
-        camera_drag_direction.x = 1;
+    if (!match_ui_is_selecting(state)) {
+        ivec2 camera_drag_direction = ivec2(0, 0);
+        if (input_get_mouse_position().x < MATCH_CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.x = -1;
+        } else if (input_get_mouse_position().x > SCREEN_WIDTH - MATCH_CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.x = 1;
+        }
+        if (input_get_mouse_position().y < MATCH_CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.y = -1;
+        } else if (input_get_mouse_position().y > SCREEN_HEIGHT - MATCH_CAMERA_DRAG_MARGIN) {
+            camera_drag_direction.y = 1;
+        }
+        state.camera_offset += camera_drag_direction * CAMERA_SPEED;
+        match_ui_clamp_camera(state);
     }
-    if (mouse_position.y < MATCH_CAMERA_DRAG_MARGIN) {
-        camera_drag_direction.y = -1;
-    } else if (mouse_position.y > SCREEN_HEIGHT - MATCH_CAMERA_DRAG_MARGIN) {
-        camera_drag_direction.y = 1;
-    }
-    state.camera_offset += camera_drag_direction * CAMERA_SPEED;
-    match_ui_clamp_camera(state);
 }
 
 // UPDATE FUNCTIONS
@@ -97,6 +118,115 @@ void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell) {
     state.camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
     state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
     match_ui_clamp_camera(state);
+}
+
+bool match_ui_is_mouse_in_ui() {
+    ivec2 mouse_position = input_get_mouse_position();
+    return (mouse_position.y >= SCREEN_HEIGHT - MATCH_UI_HEIGHT) ||
+           (mouse_position.x <= 136 && mouse_position.y >= SCREEN_HEIGHT - 136) ||
+           (mouse_position.x >= SCREEN_WIDTH - 132 && mouse_position.y >= SCREEN_HEIGHT - 106);
+}
+
+bool match_ui_is_selecting(const MatchUiState& state) {
+    return state.select_origin.x != -1;
+}
+
+std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect select_rect) {
+    std::vector<EntityId> selection;
+
+    // Select player units
+    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
+        const Entity& entity = state.match.entities[index];
+        if (entity.player_id != network_get_player_id() ||
+                !entity_is_unit(entity.type) ||
+                !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        Rect entity_rect = entity_get_rect(entity);
+        if (entity_rect.intersects(select_rect)) {
+            selection.push_back(state.match.entities.get_id_of(index));
+        }
+    }
+    if (!selection.empty()) {
+        return selection;
+    }
+
+    // Select player buildings
+    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
+        const Entity& entity = state.match.entities[index];
+        if (entity.player_id != network_get_player_id() ||
+                entity_is_unit(entity.type) ||
+                !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        Rect entity_rect = entity_get_rect(entity);
+        if (entity_rect.intersects(select_rect)) {
+            selection.push_back(state.match.entities.get_id_of(index));
+        }
+    }
+    if (!selection.empty()) {
+        return selection;
+    }
+
+    // Select enemy units
+    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
+        const Entity& entity = state.match.entities[index];
+        if (entity.player_id == network_get_player_id() ||
+                !entity_is_unit(entity.type) ||
+                !entity_is_selectable(entity) ||
+                !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+
+        Rect entity_rect = entity_get_rect(entity);
+        if (entity_rect.intersects(select_rect)) {
+            selection.push_back(state.match.entities.get_id_of(index));
+        }
+    }
+    if (!selection.empty()) {
+        return selection;
+    }
+
+    // Select enemy buildings
+    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
+        const Entity& entity = state.match.entities[index];
+        if (entity.player_id == network_get_player_id() ||
+                entity_is_unit(entity.type) ||
+                !entity_is_selectable(entity) ||
+                !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+
+        Rect entity_rect = entity_get_rect(entity);
+        if (entity_rect.intersects(select_rect)) {
+            selection.push_back(state.match.entities.get_id_of(index));
+        }
+    }
+    if (!selection.empty()) {
+        return selection;
+    }
+
+    // Select gold mines
+    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
+        const Entity& entity = state.match.entities[index];
+        if (entity.type != ENTITY_GOLDMINE ||
+                !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+
+        Rect entity_rect = entity_get_rect(entity);
+        if (entity_rect.intersects(select_rect)) {
+            selection.push_back(state.match.entities.get_id_of(index));
+        }
+    }
+
+    return selection;
+}
+
+void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selection) {
+    state.selection = selection;
 }
 
 // RENDER
@@ -120,7 +250,7 @@ void match_ui_render(const MatchUiState& state) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.match.map.width);
             Tile tile = state.match.map.tiles[map_index];
             if (!(tile.sprite >= SPRITE_TILE_SAND && tile.sprite <= SPRITE_TILE_SAND3)) {
-                render_sprite_params[match_get_render_layer(tile.elevation == 0 ? 0 : tile.elevation - 1, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
+                render_sprite_params[match_ui_get_render_layer(tile.elevation == 0 ? 0 : tile.elevation - 1, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
                     .sprite = (SpriteName)SPRITE_TILE_SAND,
                     .frame = ivec2(0, 0),
                     .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
@@ -128,7 +258,7 @@ void match_ui_render(const MatchUiState& state) {
                     .recolor_id = 0
                 });
             }
-            render_sprite_params[match_get_render_layer(tile.elevation, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
+            render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
                 .sprite = (SpriteName)tile.sprite,
                 .frame = ivec2(tile.autotile_index, 0),
                 .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
@@ -139,7 +269,7 @@ void match_ui_render(const MatchUiState& state) {
             // Decorations
             EntityId cell = state.match.map.cells[map_index];
             if (cell >= CELL_DECORATION_1 && cell <= CELL_DECORATION_5) {
-                render_sprite_params[match_get_render_layer(tile.elevation, RENDER_LAYER_ENTITY)].push_back((RenderSpriteParams) {
+                render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_ENTITY)].push_back((RenderSpriteParams) {
                     .sprite = (SpriteName)(SPRITE_TILE_DECORATION0 + (cell - CELL_DECORATION_1)),
                     .frame = ivec2(0, 0),
                     .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
@@ -149,6 +279,27 @@ void match_ui_render(const MatchUiState& state) {
             }
         }  // End for each x
     } // End for each y
+
+    // Select rings and healthbars
+    for (EntityId id : state.selection) {
+        const Entity& entity = state.match.entities.get_by_id(id);
+
+        // Select ring
+        SpriteName select_ring_sprite = SPRITE_UI_SELECT_RING_GOLDMINE;
+        Rect entity_rect = entity_get_rect(entity);
+        ivec2 entity_center_position = entity_is_unit(entity.type) 
+                ? entity.position.to_ivec2()
+                : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
+        entity_center_position -= state.camera_offset;
+        uint16_t entity_elevation = entity_get_elevation(entity, state.match.map);
+        render_sprite_params[match_ui_get_render_layer(entity_elevation, RENDER_LAYER_SELECT_RING)].push_back((RenderSpriteParams) {
+            .sprite = select_ring_sprite,
+            .frame = ivec2(0, 0),
+            .position = entity_center_position,
+            .options = RENDER_SPRITE_CENTERED,
+            .recolor_id = 0
+        });
+    }
 
     // Entities
     for (const Entity& entity : state.match.entities) {
@@ -170,7 +321,7 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        render_sprite_params[match_get_render_layer(entity_get_elevation(entity, state.match.map), RENDER_LAYER_ENTITY)].push_back(params);
+        render_sprite_params[match_ui_get_render_layer(entity_get_elevation(entity, state.match.map), RENDER_LAYER_ENTITY)].push_back(params);
     }
 
     // Render sprite params
@@ -188,6 +339,14 @@ void match_ui_render(const MatchUiState& state) {
         render_sprite_params[render_layer].clear();
     }
 
+    // Select rect
+    if (match_ui_is_selecting(state)) {
+        ivec2 mouse_world_pos = ivec2(input_get_mouse_position().x, std::min(input_get_mouse_position().y, SCREEN_HEIGHT - MATCH_UI_HEIGHT)) + state.camera_offset;
+        ivec2 rect_start = ivec2(std::min(state.select_origin.x, mouse_world_pos.x), std::min(state.select_origin.y, mouse_world_pos.y)) - state.camera_offset;
+        ivec2 rect_end = ivec2(std::max(state.select_origin.x, mouse_world_pos.x), std::max(state.select_origin.y, mouse_world_pos.y)) - state.camera_offset;
+        render_rect(rect_start, rect_end);
+    }
+
     // UI frames
     const SpriteInfo& minimap_sprite_info = resource_get_sprite_info(SPRITE_UI_MINIMAP);
     const SpriteInfo& bottom_panel_sprite_info = resource_get_sprite_info(SPRITE_UI_BOTTOM_PANEL);
@@ -199,7 +358,7 @@ void match_ui_render(const MatchUiState& state) {
 
 // RENDER FUNCTIONS
 
-uint16_t match_get_render_layer(uint16_t elevation, RenderLayer layer) {
+uint16_t match_ui_get_render_layer(uint16_t elevation, RenderLayer layer) {
     return (elevation * RENDER_LAYER_COUNT) + layer;
 }
 

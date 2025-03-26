@@ -17,7 +17,7 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
 
     // Generate goldmines
     for (ivec2 cell : goldmine_cells) {
-        entity_create_goldmine(state, cell, MATCH_GOLDMINE_STARTING_GOLD);
+        match_create_goldmine(state, cell, MATCH_GOLDMINE_STARTING_GOLD);
     }
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -34,4 +34,28 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
 
 void match_update(MatchState& world) {
 
+}
+
+EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left) {
+    Entity entity;
+    entity.type = ENTITY_GOLDMINE;
+    entity.player_id = PLAYER_NONE;
+    entity.flags = 0;
+    entity.mode = ENTITY_MODE_GOLDMINE;
+
+    entity.cell = cell;
+    entity.position = fvec2(entity.cell * TILE_SIZE);
+    entity.direction = DIRECTION_SOUTH;
+
+    entity.garrison_id = ID_NULL;
+    entity.gold_held = gold_left;
+
+    EntityId id = state.entities.push_back(entity);
+    map_set_cell_rect(state.map, entity.cell, entity_get_data(entity.type).cell_size, id);
+
+    return id;
+}
+
+bool match_is_entity_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id) {
+    return true;
 }
