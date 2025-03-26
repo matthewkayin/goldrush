@@ -185,6 +185,7 @@ bool render_init(SDL_Window* window) {
     }
 
     log_info("Initialized renderer. Vendor: %s. Renderer: %s. Version: %s.", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
+    SDL_GL_SetSwapInterval(1);
 
     return true;
 }
@@ -309,7 +310,7 @@ bool render_init_screen_framebuffer() {
 void render_flip_sdl_surface_vertically(SDL_Surface* surface) {
     SDL_LockSurface(surface);
     int sprite_surface_pitch = surface->pitch;
-    uint8_t temp[sprite_surface_pitch];
+    uint8_t* temp = (uint8_t*)malloc(sprite_surface_pitch);
     uint8_t* sprite_surface_pixels = (uint8_t*)surface->pixels;
 
     for (int row = 0; row < surface->h / 2; ++row) {
@@ -320,6 +321,7 @@ void render_flip_sdl_surface_vertically(SDL_Surface* surface) {
         memcpy(row1, row2, sprite_surface_pitch);
         memcpy(row2, temp, sprite_surface_pitch);
     }
+    free(temp);
     SDL_UnlockSurface(surface);
 }
 
