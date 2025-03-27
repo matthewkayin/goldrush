@@ -5,6 +5,9 @@
 #include "render/font.h"
 #include <SDL2/SDL.h>
 
+#define AUTOTILE_HFRAMES 8
+#define AUTOTILE_VFRAMES 6
+
 enum MinimapLayer {
     MINIMAP_LAYER_TILE,
     MINIMAP_LAYER_FOG

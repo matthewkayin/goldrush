@@ -7,8 +7,6 @@
 #define FONT_FIRST_CHAR 32 // space
 #define MINIMAP_TEXTURE_WIDTH 512
 #define MINIMAP_TEXTURE_HEIGHT 256
-#define AUTOTILE_HFRAMES 8
-#define AUTOTILE_VFRAMES 6
 #define ATLAS_WIDTH 1024
 #define ATLAS_HEIGHT 1024
 
@@ -80,6 +78,17 @@ static const PlayerColor PLAYER_COLORS[MAX_PLAYERS] = {
         .skin_color = (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 },
         .clothes_color = (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 },
     }
+};
+
+enum LoadedSurfaceType {
+    LOADED_SURFACE_FONT,
+    LOADED_SURFACE_SPRITE
+};
+
+struct LoadedSurface {
+    LoadedSurfaceType type;
+    int name;
+    SDL_Surface* surface;
 };
 
 struct RenderState {
@@ -332,7 +341,7 @@ void render_flip_sdl_surface_vertically(SDL_Surface* surface) {
 
 SDL_Surface* render_recolor_surface(SDL_Surface* sprite_surface, bool recolor_low_alpha) {
     // Create a surface big enough to hold the recolor atlas
-    SDL_Surface* recolor_surface = SDL_CreateRGBSurfaceWithFormat(0, ATLAS_WIDTH, ATLAS_HEIGHT, 32, sprite_surface->format->format);
+    SDL_Surface* recolor_surface = SDL_CreateRGBSurfaceWithFormat(0, sprite_surface->w, sprite_surface->h * MAX_PLAYERS, 32, sprite_surface->format->format);
     if (recolor_surface == NULL) {
         log_error("Error creating recolor surface for sprite: %s", SDL_GetError());
         return NULL;
@@ -387,7 +396,7 @@ SDL_Surface* render_recolor_surface(SDL_Surface* sprite_surface, bool recolor_lo
 }
 
 SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params) {
-    SDL_Surface* tile_surface = SDL_CreateRGBSurfaceWithFormat(0, TILE_SIZE, TILE_SIZE, 0, tileset_surface->format->format);
+    SDL_Surface* tile_surface = SDL_CreateRGBSurfaceWithFormat(0, TILE_SIZE, TILE_SIZE, 32, tileset_surface->format->format);
     if (tile_surface == NULL) {
         log_error("Could not create single tile surface: %s", SDL_GetError());
         return NULL;
@@ -410,7 +419,7 @@ SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, con
 }
 
 SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params) {
-    SDL_Surface* tile_surface = SDL_CreateRGBSurfaceWithFormat(0, TILE_SIZE * AUTOTILE_HFRAMES, TILE_SIZE * AUTOTILE_VFRAMES, 0, tileset_surface->format->format);
+    SDL_Surface* tile_surface = SDL_CreateRGBSurfaceWithFormat(0, TILE_SIZE * AUTOTILE_HFRAMES, TILE_SIZE * AUTOTILE_VFRAMES, 32, tileset_surface->format->format);
     if (tile_surface == NULL) {
         log_error("Could not create auto tile surface: %s", SDL_GetError());
         return NULL;
@@ -452,12 +461,12 @@ SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const
             };
             SDL_Rect subtile_dst_rect = (SDL_Rect) {
                 .x = (autotile_frame.x * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
-                .y = (autotile_frame.y * TILE_SIZE) + AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2),
+                .y = (autotile_frame.y * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2)),
                 .w = TILE_SIZE / 2,
                 .h = TILE_SIZE / 2
             };
 
-            SDL_BlitSurface(tile_surface, &subtile_src_rect, tileset_surface, &subtile_dst_rect);
+            SDL_BlitSurface(tileset_surface, &subtile_src_rect, tile_surface, &subtile_dst_rect);
         } 
 
         autotile_frame.x++;
@@ -494,7 +503,7 @@ SDL_Surface* render_load_font(FontName name) {
 
     // Since TTF creates surfaces as BGRA but the rest of the atlas rendering
     // code expects RGBA, I'm just flipping the R and the B values here
-    SDL_Color font_color = (SDL_Color) { .r = params.b, .g = params.g, .b = params.r, .a = 255 };
+    SDL_Color font_color = (SDL_Color) { .r = params.r, .g = params.g, .b = params.b, .a = 255 };
     for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
         char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
         glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, font_color);
@@ -508,6 +517,7 @@ SDL_Surface* render_load_font(FontName name) {
     }
 
     // Create a surface to render each glyph onto
+    log_trace("glyph max width %i glyph max height %i", glyph_max_width, glyph_max_height);
     SDL_Surface* font_surface = SDL_CreateRGBSurfaceWithFormat(0, glyph_max_width * FONT_HFRAMES, glyph_max_height * FONT_VFRAMES, 0, SDL_PIXELFORMAT_RGBA8888);
     if (font_surface == NULL) {
         log_error("Error creating font surface: %s", SDL_GetError());
@@ -550,27 +560,27 @@ SDL_Surface* render_load_font(FontName name) {
     return font_surface;
 }
 
-int render_sort_surfaces_partition(SDL_Surface** surfaces, int low, int high) {
-    SDL_Surface* pivot = surfaces[high];
+int render_sort_surfaces_partition(LoadedSurface* surfaces, int low, int high) {
+    LoadedSurface pivot = surfaces[high];
     int i = low - 1;
 
     for (int j = low; j <= high - 1; j++) {
-        if (surfaces[j]->w * surfaces[j]->h > pivot->w * pivot->h) {
+        if (surfaces[j].surface->w * surfaces[j].surface->h > pivot.surface->w * pivot.surface->h) {
             i++;
-            SDL_Surface* temp = surfaces[j];
+            LoadedSurface temp = surfaces[j];
             surfaces[j] = surfaces[i];
             surfaces[i] = temp;
         }
     }
 
-    SDL_Surface* temp = surfaces[high];
+    LoadedSurface temp = surfaces[high];
     surfaces[high] = surfaces[i + 1];
     surfaces[i + 1] = temp;
 
     return i + 1;
 }
 
-void render_sort_surfaces(SDL_Surface** surfaces, int low, int high) {
+void render_sort_surfaces(LoadedSurface* surfaces, int low, int high) {
     if (low < high) {
         int partition_index = render_sort_surfaces_partition(surfaces, low, high);
         render_sort_surfaces(surfaces, low, partition_index - 1);
@@ -580,14 +590,17 @@ void render_sort_surfaces(SDL_Surface** surfaces, int low, int high) {
 
 bool render_load_sprites() {
     // First, load all of the surfaces
-    SDL_Surface* surfaces[FONT_COUNT + SPRITE_COUNT];
+    LoadedSurface surfaces[FONT_COUNT + SPRITE_COUNT];
 
     // Load the font surfaces
     for (int font = 0; font < FONT_COUNT; font++) {
-        surfaces[font] = render_load_font((FontName)font);
-        if (surfaces[font] == NULL) {
+        surfaces[font].surface = render_load_font((FontName)font);
+        if (surfaces[font].surface == NULL) {
             return false;
         }
+        surfaces[font].type = LOADED_SURFACE_FONT;
+        surfaces[font].name = font;
+        log_trace("font surface format %u", surfaces[font].surface->format->format);
     }
 
     // Load the tileset surfaces because we'll need them for the tile sprites
@@ -602,50 +615,46 @@ bool render_load_sprites() {
             log_error("Unable to load tileset %s: %s", tileset_path, IMG_GetError());
             return false;
         }
+        log_trace("tileset sprite format %u", tileset_surfaces[tileset]->format->format);
     }
 
     // Load the sprite surfaces
     for (int sprite = 0; sprite < SPRITE_COUNT; sprite++) {
         const SpriteParams& params = render_get_sprite_params((SpriteName)sprite);
+        surfaces[FONT_COUNT + sprite].type = LOADED_SURFACE_SPRITE;
+        surfaces[FONT_COUNT + sprite].name = sprite;
         if (params.strategy == SPRITE_IMPORT_TILE) {
-            SDL_Surface* tile_surface;
-            if (params.tile.type == TILE_TYPE_SINGLE) {
-                tile_surface = render_create_single_tile_surface(tileset_surfaces[params.tile.tileset], params);
-            } else if (params.tile.type == TILE_TYPE_AUTO) {
-                tile_surface = render_create_auto_tile_surface(tileset_surfaces[params.tile.tileset], params);
-            }
+            SDL_Surface* tile_surface = params.tile.type == TILE_TYPE_SINGLE
+                                                ? render_create_single_tile_surface(tileset_surfaces[params.tile.tileset], params)
+                                                : render_create_auto_tile_surface(tileset_surfaces[params.tile.tileset], params);
             if (tile_surface == NULL) {
                 return false;
             }
 
-            surfaces[FONT_COUNT + sprite] = tile_surface;
+            surfaces[FONT_COUNT + sprite].surface = tile_surface;
         } else {
             char sprite_path[128];
             sprintf(sprite_path, "%ssprite/%s", RESOURCE_PATH, params.sheet.path);
 
-            SDL_Surface* sprite_surface = IMG_Load(params.sheet.path);
+            SDL_Surface* sprite_surface = IMG_Load(sprite_path);
             if (sprite_surface == NULL) {
                 log_error("Unable to load sprite %s: %s", sprite_path, IMG_GetError());
                 return false;
             }
 
-            if (params.strategy == SPRITE_IMPORT_RECOLOR || SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA) {
+            if (params.strategy == SPRITE_IMPORT_RECOLOR || params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA) {
                 sprite_surface = render_recolor_surface(sprite_surface, params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA);
                 if (sprite_surface == NULL) {
                     return false;
                 }
             }
-            surfaces[FONT_COUNT + sprite] = sprite_surface;
+            surfaces[FONT_COUNT + sprite].surface = sprite_surface;
         }
     }
 
-    // Flip all the surfaces vertically
-    for (SDL_Surface* surface : surfaces) {
-        render_flip_sdl_surface_vertically(surface);
-    }
 
     // Sort the surfaces by size, from biggest to smallest
-    render_sort_surfaces(surfaces, 0, FONT_COUNT + SPRITE_COUNT);
+    render_sort_surfaces(surfaces, 0, FONT_COUNT + SPRITE_COUNT - 1);
 
     // Setup a list to keep track of which surfaces have been stored
     bool surface_has_been_stored[FONT_COUNT + SPRITE_COUNT];
@@ -656,7 +665,7 @@ bool render_load_sprites() {
     std::vector<SDL_Surface*> atlas_surfaces;
     while (surface_stored_count < FONT_COUNT + SPRITE_COUNT) {
         // Create the atlas surface
-        SDL_Surface* atlas_surface = SDL_CreateRGBSurfaceWithFormat(0, ATLAS_WIDTH, ATLAS_HEIGHT, 0, SDL_PIXELFORMAT_RGBA8888);
+        SDL_Surface* atlas_surface = SDL_CreateRGBSurfaceWithFormat(0, ATLAS_WIDTH, ATLAS_HEIGHT, 32, SDL_PIXELFORMAT_ABGR8888);
         if (atlas_surface == NULL) {
             log_error("Error creating atlas surface: %s", SDL_GetError());
             return false;
@@ -671,7 +680,7 @@ bool render_load_sprites() {
             if (surface_has_been_stored[surface_index]) {
                 continue;
             }
-            SDL_Surface* surface = surfaces[surface_index];
+            SDL_Surface* surface = surfaces[surface_index].surface;
 
             // Search through the empty spaces backwards so that we choose the smallest one that will fit first
             int space_index;
@@ -694,13 +703,13 @@ bool render_load_sprites() {
             SDL_BlitSurface(surface, NULL, atlas_surface, &dst_rect);
 
             // Set sprite info for this surface
-            if (surface_index < FONT_COUNT) {
-                int font_name = surface_index;
+            if (surfaces[surface_index].type == LOADED_SURFACE_FONT) {
+                int font_name = surfaces[surface_index].name;
                 state.fonts[font_name].atlas = atlas_surfaces.size();
                 state.fonts[font_name].atlas_x = empty_spaces[space_index].x;
                 state.fonts[font_name].atlas_y = empty_spaces[space_index].y;
             } else {
-                int sprite_name = surface_index - FONT_COUNT;
+                int sprite_name = surfaces[surface_index].name;
                 const SpriteParams& params = render_get_sprite_params((SpriteName)sprite_name);
                 SpriteInfo sprite_info; 
                 sprite_info.atlas = atlas_surfaces.size();
@@ -720,11 +729,18 @@ bool render_load_sprites() {
                     sprite_info.hframes = params.sheet.hframes;
                     sprite_info.vframes = params.sheet.vframes;
                     sprite_info.frame_width = surface->w / sprite_info.hframes;
-                    sprite_info.frame_height = surface->h / sprite_info.vframes;
+                    sprite_info.frame_height = (params.strategy == SPRITE_IMPORT_RECOLOR || params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA)
+                                                    ? surface->h / (sprite_info.vframes * MAX_PLAYERS)
+                                                    : surface->h / sprite_info.vframes;
                 }
                 state.sprite_info[sprite_name] = sprite_info;
+
+                if (sprite_name == SPRITE_TILE_WATER) {
+                    log_trace("water info atlas %i x,y %i %i", sprite_info.atlas, sprite_info.atlas_x, sprite_info.atlas_y);
+                }
             }
             surface_has_been_stored[surface_index] = true;
+            surface_stored_count++;
 
             // Split the empty space
             Rect vsplit;
@@ -771,6 +787,7 @@ bool render_load_sprites() {
             }
         } // End for each surface
 
+        render_flip_sdl_surface_vertically(atlas_surface);
         atlas_surfaces.push_back(atlas_surface);
     }
 
@@ -787,7 +804,7 @@ bool render_load_sprites() {
 
     // Cleanup 
     for (int surface_index = 0; surface_index < FONT_COUNT + SPRITE_COUNT; surface_index++) {
-        SDL_FreeSurface(surfaces[surface_index]);
+        SDL_FreeSurface(surfaces[surface_index].surface);
     }
     for (int tileset = 0; tileset < TILESET_COUNT; tileset++) {
         SDL_FreeSurface(tileset_surfaces[tileset]);
@@ -1056,7 +1073,7 @@ void render_text(FontName name, const char* text, ivec2 position) {
         float position_left = (float)(glyph_position.x + state.fonts[name].glyphs[glyph_index].bearing_x);
         float position_right = position_left + (float)state.fonts[name].glyph_width;
 
-        ivec2 glyph_frame = ivec2(glyph_index % FONT_HFRAMES, glyph_index / FONT_VFRAMES);
+        ivec2 glyph_frame = ivec2(glyph_index % FONT_HFRAMES, glyph_index / FONT_HFRAMES);
         float tex_coord_left = (float)(state.fonts[name].atlas_x + (glyph_frame.x * state.fonts[name].glyph_width)) / (float)ATLAS_WIDTH;
         float tex_coord_right = tex_coord_left + frame_size_x;
         float tex_coord_top = 1.0f - ((float)(state.fonts[name].atlas_y + (glyph_frame.y * state.fonts[name].glyph_height)) / (float)ATLAS_HEIGHT);

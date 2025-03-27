@@ -124,12 +124,12 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_TILE_WALL_SW_FRONT, (SpriteParams) {
+    { SPRITE_TILE_WALL_SE_FRONT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = (SpriteParamsTile) {
             .tileset = TILESET_ARIZONA,
             .type = TILE_TYPE_SINGLE,
-            .source_x = 48,
+            .source_x = 80,
             .source_y = 48
         }
     }},
@@ -142,12 +142,12 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_SE_FRONT, (SpriteParams) {
+    { SPRITE_TILE_WALL_SW_FRONT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = (SpriteParamsTile) {
             .tileset = TILESET_ARIZONA,
             .type = TILE_TYPE_SINGLE,
-            .source_x = 80,
+            .source_x = 48,
             .source_y = 48
         }
     }},
@@ -268,6 +268,33 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
+    { SPRITE_TILE_WALL_EAST_STAIR_TOP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 160,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WALL_EAST_STAIR_CENTER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 160,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_EAST_STAIR_BOTTOM, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 160,
+            .source_y = 32
+        }
+    }},
     { SPRITE_TILE_WALL_WEST_STAIR_TOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = (SpriteParamsTile) {
@@ -292,33 +319,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .tileset = TILESET_ARIZONA,
             .type = TILE_TYPE_SINGLE,
             .source_x = 144,
-            .source_y = 32
-        }
-    }},
-    { SPRITE_TILE_WALL_WEST_STAIR_TOP, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_TILE,
-        .tile = (SpriteParamsTile) {
-            .tileset = TILESET_ARIZONA,
-            .type = TILE_TYPE_SINGLE,
-            .source_x = 160,
-            .source_y = 0
-        }
-    }},
-    { SPRITE_TILE_WALL_EAST_STAIR_CENTER, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_TILE,
-        .tile = (SpriteParamsTile) {
-            .tileset = TILESET_ARIZONA,
-            .type = TILE_TYPE_SINGLE,
-            .source_x = 160,
-            .source_y = 16
-        }
-    }},
-    { SPRITE_TILE_WALL_EAST_STAIR_BOTTOM, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_TILE,
-        .tile = (SpriteParamsTile) {
-            .tileset = TILESET_ARIZONA,
-            .type = TILE_TYPE_SINGLE,
-            .source_x = 160,
             .source_y = 32
         }
     }},
@@ -446,7 +446,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "ui_parchment_buttons.png",
-            .hframes = 1,
+            .hframes = 3,
             .vframes = 2
         }
     }},
@@ -570,20 +570,28 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_SELECT_RING_GOLDMINE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_gold_mine.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
     { SPRITE_GOLDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
-            .path = "gold_mine",
+            .path = "gold_mine.png",
             .hframes = 3,
             .vframes = 1
         }
     }},
     { SPRITE_UNIT_WAGON, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
+        .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {
-            .path = "unit_wagon",
+            .path = "unit_wagon.png",
             .hframes = 15,
-            .vframes = 6
+            .vframes = 3
         }
     }}
 };

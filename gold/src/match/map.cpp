@@ -2,6 +2,7 @@
 
 #include "core/logger.h"
 #include "core/asserts.h"
+#include "render/render.h"
 #include "lcg.h"
 #include <unordered_map>
 
@@ -27,7 +28,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
     map.cells = std::vector<EntityId>(map.width * map.height, CELL_EMPTY);
     map.tiles = std::vector<Tile>(map.width * map.height, (Tile) {
         .sprite = SPRITE_TILE_SAND1,
-        .autotile_index = 0,
+        .frame = ivec2(0, 0),
         .elevation = 0
     });
 
@@ -122,7 +123,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
     do {
         std::fill(map.tiles.begin(), map.tiles.end(), (Tile) {
             .sprite = SPRITE_TILE_SAND1,
-            .autotile_index = 0,
+            .frame = ivec2(0, 0),
             .elevation = 0
         });
         for (ivec2 artifact : artifacts) {
@@ -193,9 +194,10 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                         }
                     }
                     // Set the map tile based on the neighbors
+                    uint32_t autotile_index = map_neighbors_to_autotile_index(neighbors);
                     map.tiles[index] = (Tile) {
                         .sprite = SPRITE_TILE_WATER,
-                        .autotile_index = (uint8_t)map_neighbors_to_autotile_index(neighbors),
+                        .frame = ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES),
                         .elevation = 0
                     };
                 // End else if tile is water

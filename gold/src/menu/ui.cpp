@@ -394,7 +394,7 @@ void ui_render() {
                     if (render.sprite.flip_h) {
                         sprite_options |= RENDER_SPRITE_FLIP_H;
                     }
-                    render_sprite(render.sprite.sprite, render.sprite.frame, render.sprite.position, sprite_options, 0);
+                    render_sprite_frame(render.sprite.sprite, render.sprite.frame, render.sprite.position, sprite_options, 0);
                     break;
                 }
                 case UI_RENDER_NINEPATCH: {

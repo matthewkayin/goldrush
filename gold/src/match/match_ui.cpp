@@ -251,7 +251,7 @@ void match_ui_render(const MatchUiState& state) {
             Tile tile = state.match.map.tiles[map_index];
             if (!(tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3)) {
                 render_sprite_params[match_ui_get_render_layer(tile.elevation == 0 ? 0 : tile.elevation - 1, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
-                    .sprite = (SpriteName)SPRITE_TILE_SAND1,
+                    .sprite = SPRITE_TILE_SAND1,
                     .frame = ivec2(0, 0),
                     .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
                     .options = RENDER_SPRITE_NO_CULL,
@@ -259,8 +259,8 @@ void match_ui_render(const MatchUiState& state) {
                 });
             }
             render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
-                .sprite = (SpriteName)tile.sprite,
-                .frame = ivec2(tile.autotile_index, 0),
+                .sprite = tile.sprite,
+                .frame = tile.frame,
                 .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_id = 0
@@ -270,8 +270,8 @@ void match_ui_render(const MatchUiState& state) {
             EntityId cell = state.match.map.cells[map_index];
             if (cell >= CELL_DECORATION_1 && cell <= CELL_DECORATION_5) {
                 render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_ENTITY)].push_back((RenderSpriteParams) {
-                    .sprite = (SpriteName)(SPRITE_TILE_DECORATION0 + (cell - CELL_DECORATION_1)),
-                    .frame = ivec2(0, 0),
+                    .sprite = SPRITE_DECORATION,
+                    .frame = ivec2(cell - CELL_DECORATION_1, 0),
                     .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
                     .options = RENDER_SPRITE_NO_CULL,
                     .recolor_id = 0
@@ -285,7 +285,7 @@ void match_ui_render(const MatchUiState& state) {
         const Entity& entity = state.match.entities.get_by_id(id);
 
         // Select ring
-        SpriteName select_ring_sprite = SPRITE_UI_SELECT_RING_GOLDMINE;
+        SpriteName select_ring_sprite = SPRITE_SELECT_RING_GOLDMINE;
         Rect entity_rect = entity_get_rect(entity);
         ivec2 entity_center_position = entity_is_unit(entity.type) 
                 ? entity.position.to_ivec2()
@@ -334,7 +334,7 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         for (const RenderSpriteParams& params : render_sprite_params[render_layer]) {
-            render_sprite(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
         render_sprite_params[render_layer].clear();
     }
@@ -351,9 +351,9 @@ void match_ui_render(const MatchUiState& state) {
     const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
     const SpriteInfo& bottom_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BOTTOM_PANEL);
     const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
-    render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
-    render_sprite(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height), 0, 0);
-    render_sprite(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
+    render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
+    render_sprite_frame(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height), 0, 0);
+    render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
 }
 
 // RENDER FUNCTIONS

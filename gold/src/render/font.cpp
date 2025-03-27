@@ -68,12 +68,6 @@ static const std::unordered_map<FontName, FontParams> FONT_PARAMS = {
         .size = 8,
         .r = 186, .g = 97, .b = 95,
         .ignore_bearing = false
-    }},
-    { FONT_WESTERN32_OFFBLACK, (FontParams) { 
-        .path = "western.ttf", 
-        .size = 32,
-        .r = 40, .g = 37, .b = 45,
-        .ignore_bearing = false
     }}
 };
 

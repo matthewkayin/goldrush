@@ -160,7 +160,7 @@ void menu_update(MenuState& state) {
 
     if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_USERNAME) {
         ui_element_position(ivec2(24, 24));
-        ui_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH");
+        // ui_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH");
     }
 
     if (state.mode == MENU_MODE_MAIN) {
@@ -503,14 +503,14 @@ const char* menu_get_player_status_string(NetworkPlayerStatus status) {
 
 void menu_render(const MenuState& state) {
     // Sky background
-    const SpriteInfo& sky_sprite_info = render_get_sprite_info(SPRITE_UI_SKY);
+    const SpriteInfo& sky_sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
     Rect sky_src_rect = (Rect) { 
-        .x = sky_sprite_info.atlas_x, 
-        .y = sky_sprite_info.atlas_y, 
+        .x = 0,
+        .y = 0,
         .w = sky_sprite_info.frame_width, 
         .h = sky_sprite_info.frame_height 
     };
-    render_atlas(sky_sprite_info.atlas, sky_src_rect, (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT }, RENDER_SPRITE_NO_CULL);
+    render_sprite(SPRITE_UI_SWATCH, sky_src_rect, (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT }, RENDER_SPRITE_NO_CULL);
 
     // Tiles
     for (int y = 0; y < MENU_TILE_HEIGHT; y++) {
@@ -518,8 +518,8 @@ void menu_render(const MenuState& state) {
             SpriteName sprite = (x + y) % 10 == 0 ? SPRITE_TILE_SAND2 : SPRITE_TILE_SAND1;
             const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
             Rect src_rect = (Rect) {
-                .x = sprite_info.atlas_x,
-                .y = sprite_info.atlas_y,
+                .x = 0,
+                .y = 0,
                 .w = sprite_info.frame_width,
                 .h = sprite_info.frame_height
             };
@@ -529,7 +529,7 @@ void menu_render(const MenuState& state) {
                 .w = TILE_SIZE * 2,
                 .h = TILE_SIZE * 2
             };
-            render_atlas(sprite_info.atlas, src_rect, dst_rect, 0);
+            render_sprite(sprite, src_rect, dst_rect, 0);
         }
     }
 
@@ -546,8 +546,8 @@ void menu_render(const MenuState& state) {
         wagon_recolor_id = network_get_player(network_get_player_id()).recolor_id;
     }
     Rect wagon_src_rect = (Rect) {
-        .x = sprite_wagon_info.atlas_x + (sprite_wagon_info.frame_width * state.wagon_animation.frame.x),
-        .y = sprite_wagon_info.atlas_y + (render_get_sprite_image_size(ATLAS_UNIT_WAGON).y * wagon_recolor_id) + (sprite_wagon_info.frame_height * 2),
+        .x = sprite_wagon_info.frame_width * state.wagon_animation.frame.x,
+        .y = (wagon_recolor_id * sprite_wagon_info.frame_height * sprite_wagon_info.vframes) + (sprite_wagon_info.frame_height * 2),
         .w = sprite_wagon_info.frame_width,
         .h = sprite_wagon_info.frame_height
     };
@@ -557,7 +557,7 @@ void menu_render(const MenuState& state) {
         .w = wagon_src_rect.w * 2,
         .h = wagon_src_rect.h * 2
     };
-    render_atlas(sprite_wagon_info.atlas, wagon_src_rect, wagon_dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(SPRITE_UNIT_WAGON, wagon_src_rect, wagon_dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Render decorations in front of wagon
     menu_render_decoration(state, 1);
@@ -566,8 +566,8 @@ void menu_render(const MenuState& state) {
     const SpriteInfo& cloud_sprite_info = render_get_sprite_info(SPRITE_UI_CLOUDS);
     for (int index = 0; index < CLOUD_COUNT; index++) {
         Rect src_rect = (Rect) {
-            .x = cloud_sprite_info.atlas_x + (CLOUD_FRAME_X[index] * cloud_sprite_info.frame_width),
-            .y = cloud_sprite_info.atlas_y,
+            .x = 0 + (CLOUD_FRAME_X[index] * cloud_sprite_info.frame_width),
+            .y = 0,
             .w = cloud_sprite_info.frame_width,
             .h = cloud_sprite_info.frame_height
         };
@@ -577,7 +577,7 @@ void menu_render(const MenuState& state) {
             .w = src_rect.w * 2,
             .h = src_rect.h * 2
         };
-        render_atlas(cloud_sprite_info.atlas, src_rect, dst_rect, 0);
+        render_sprite(SPRITE_UI_CLOUDS, src_rect, dst_rect, 0);
     }
 
     ui_render();
@@ -608,11 +608,10 @@ void menu_render_decoration(const MenuState& state, int index) {
     if (cactus_index == 2) {
         cactus_index = 0;
     }
-    SpriteName sprite = (SpriteName)(SPRITE_TILE_DECORATION0 + cactus_index);
-    const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_DECORATION);
     Rect src_rect = (Rect) {
-        .x = sprite_info.atlas_x,
-        .y = sprite_info.atlas_y,
+        .x = 0,
+        .y = 0,
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
@@ -622,5 +621,5 @@ void menu_render_decoration(const MenuState& state, int index) {
         .w = TILE_SIZE * 2,
         .h = TILE_SIZE * 2
     };
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, 0);
+    render_sprite(SPRITE_DECORATION, src_rect, dst_rect, 0);
 }

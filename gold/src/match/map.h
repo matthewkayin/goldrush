@@ -16,8 +16,8 @@ const EntityId CELL_DECORATION_4 = ID_MAX + 7;
 const EntityId CELL_DECORATION_5 = ID_MAX + 8;
 
 struct Tile {
-    uint8_t sprite;
-    uint8_t autotile_index;
+    SpriteName sprite;
+    ivec2 frame;
     uint16_t elevation;
 };
 
