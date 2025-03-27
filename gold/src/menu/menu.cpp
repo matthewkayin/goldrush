@@ -159,7 +159,7 @@ void menu_update(MenuState& state) {
     ui_begin();
 
     if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_USERNAME) {
-        ui_element_position(ivec2(24, 24));
+        // ui_element_position(ivec2(24, 24));
         // ui_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH");
     }
 
@@ -578,6 +578,11 @@ void menu_render(const MenuState& state) {
             .h = src_rect.h * 2
         };
         render_sprite(SPRITE_UI_CLOUDS, src_rect, dst_rect, 0);
+    }
+
+    // Render title
+    if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_USERNAME) {
+        render_sprite_frame(SPRITE_UI_TITLE, ivec2(0, 0), ivec2(24, 24), RENDER_SPRITE_NO_CULL, 0);
     }
 
     ui_render();

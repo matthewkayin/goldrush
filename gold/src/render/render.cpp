@@ -501,8 +501,6 @@ SDL_Surface* render_load_font(FontName name) {
     int glyph_max_width = 0;
     int glyph_max_height = 0;
 
-    // Since TTF creates surfaces as BGRA but the rest of the atlas rendering
-    // code expects RGBA, I'm just flipping the R and the B values here
     SDL_Color font_color = (SDL_Color) { .r = params.r, .g = params.g, .b = params.b, .a = 255 };
     for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
         char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};

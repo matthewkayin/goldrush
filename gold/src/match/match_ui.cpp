@@ -249,7 +249,8 @@ void match_ui_render(const MatchUiState& state) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.match.map.width);
             Tile tile = state.match.map.tiles[map_index];
-            if (!(tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3)) {
+            // Render sand below walls
+            if (!(tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_WATER)) {
                 render_sprite_params[match_ui_get_render_layer(tile.elevation == 0 ? 0 : tile.elevation - 1, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
                     .sprite = SPRITE_TILE_SAND1,
                     .frame = ivec2(0, 0),
@@ -258,6 +259,8 @@ void match_ui_render(const MatchUiState& state) {
                     .recolor_id = 0
                 });
             }
+
+            // Render tile
             render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
                 .sprite = tile.sprite,
                 .frame = tile.frame,
