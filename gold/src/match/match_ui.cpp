@@ -11,6 +11,7 @@
 static const int MATCH_CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_SPEED = 16; // TODO: move to options
 static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
+static const Rect MINIMAP_RECT = (Rect) { .x = 4, .y = SCREEN_HEIGHT - 132, .w = 128, .h = 128 };
 
 // INIT
 
@@ -39,6 +40,23 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         players[player_id].recolor_id = network_player.recolor_id;
     }
     state.match = match_init(lcg_seed, noise, players);
+
+    // Init minimap texture
+    for (int y = 0; y < state.match.map.height; y++) {
+        for (int x = 0; x < state.match.map.width; x++) {
+            MinimapPixel pixel; 
+            Tile tile = map_get_tile(state.match.map, ivec2(x, y));
+            if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
+                pixel = MINIMAP_PIXEL_SAND;
+            } else if (tile.sprite == SPRITE_TILE_WATER) {
+                pixel = MINIMAP_PIXEL_WATER;
+            } else {
+                pixel = MINIMAP_PIXEL_WALL;
+            }
+            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), pixel);
+            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
+        }
+    }
 
     network_set_player_ready(true);
 
@@ -111,12 +129,12 @@ void match_ui_update(MatchUiState& state) {
 
 void match_ui_clamp_camera(MatchUiState& state) {
     state.camera_offset.x = std::clamp(state.camera_offset.x, 0, ((int)state.match.map.width * TILE_SIZE) - SCREEN_WIDTH);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, ((int)state.match.map.width * TILE_SIZE) - SCREEN_WIDTH + MATCH_UI_HEIGHT);
+    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, ((int)state.match.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_UI_HEIGHT);
 }
 
 void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell) {
     state.camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
-    state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2);
     match_ui_clamp_camera(state);
 }
 
@@ -357,6 +375,31 @@ void match_ui_render(const MatchUiState& state) {
     render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
     render_sprite_frame(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height), 0, 0);
     render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
+
+    render_sprite_batch();
+
+    // Minimap
+    for (int y = 0; y < state.match.map.height; y++) {
+        for (int x = 0; x < state.match.map.width; x++) {
+            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
+        }
+    }
+    // Minimap camera rect
+    Rect camera_rect = (Rect) {
+        .x = state.camera_offset.x / TILE_SIZE,
+        .y = state.camera_offset.y / TILE_SIZE,
+        .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
+        .h = ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / TILE_SIZE) - 1
+    };
+    for (int y = camera_rect.y; y < camera_rect.y + camera_rect.h + 1; y++) {
+        render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(camera_rect.x, y), MINIMAP_PIXEL_WHITE);
+        render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(camera_rect.x + camera_rect.w, y), MINIMAP_PIXEL_WHITE);
+    }
+    for (int x = camera_rect.x + 1; x < camera_rect.x + camera_rect.w; x++) {
+        render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, camera_rect.y), MINIMAP_PIXEL_WHITE);
+        render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, camera_rect.y + camera_rect.h), MINIMAP_PIXEL_WHITE);
+    }
+    render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 }
 
 // RENDER FUNCTIONS

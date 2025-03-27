@@ -238,6 +238,7 @@ int gold_main(int argc, char** argv) {
             char fps_text[32];
             sprintf(fps_text, "FPS: %u", fps);
             render_text(FONT_HACK_OFFBLACK, fps_text, ivec2(0, 0));
+            render_sprite_batch();
         }
 
         render_present_frame();

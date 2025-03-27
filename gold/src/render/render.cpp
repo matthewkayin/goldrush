@@ -102,6 +102,7 @@ struct RenderState {
     GLuint screen_vao;
 
     GLuint sprite_shader;
+    GLuint minimap_shader;
     GLuint sprite_vao;
     GLuint sprite_vbo;
     uint32_t sprite_texture_array;
@@ -187,6 +188,14 @@ bool render_init(SDL_Window* window) {
     mat4 projection = mat4_ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT, 0.0f, 1.0f);
     glUniformMatrix4fv(glGetUniformLocation(state.sprite_shader, "projection"), 1, GL_FALSE, projection.data);
 
+    // Load minimap shader
+    if (!shader_load(&state.minimap_shader, "sprite.vert.glsl", "minimap.frag.glsl")) {
+        return false;
+    }
+    glUseProgram(state.minimap_shader);
+    glUniform1ui(glGetUniformLocation(state.minimap_shader, "sprite_texture"), 0);
+    glUniformMatrix4fv(glGetUniformLocation(state.minimap_shader, "projection"), 1, GL_FALSE, projection.data);
+
     // Load line shader
     if (!shader_load(&state.line_shader, "line.vert.glsl", "line.frag.glsl")) {
         return false;
@@ -199,7 +208,7 @@ bool render_init(SDL_Window* window) {
     }
 
     log_info("Initialized renderer. Vendor: %s. Renderer: %s. Version: %s.", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
-    SDL_GL_SetSwapInterval(1);
+    SDL_GL_SetSwapInterval(0);
 
     return true;
 }
@@ -281,14 +290,18 @@ void render_init_minimap_texture() {
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    SDL_PixelFormat* format = SDL_AllocFormat(SDL_PIXELFORMAT_RGBA8888);
+    SDL_PixelFormat* format = SDL_AllocFormat(SDL_PIXELFORMAT_ABGR8888);
     state.minimap_pixel_values[MINIMAP_PIXEL_TRANSPARENT] = SDL_MapRGBA(format, 0, 0, 0, 0);
     state.minimap_pixel_values[MINIMAP_PIXEL_OFFBLACK] = SDL_MapRGBA(format, 40, 37, 45, 255);
     state.minimap_pixel_values[MINIMAP_PIXEL_OFFBLACK_TRANSPARENT] = SDL_MapRGBA(format, 40, 37, 45, 128);
     state.minimap_pixel_values[MINIMAP_PIXEL_WHITE] = SDL_MapRGBA(format, 255, 255, 255, 255);
+    log_trace("minimap pixel value %u", state.minimap_pixel_values[MINIMAP_PIXEL_WHITE]);
     for (int player = 0; player < MAX_PLAYERS; player++) {
         state.minimap_pixel_values[MINIMAP_PIXEL_PLAYER0 + player] = SDL_MapRGBA(format, PLAYER_COLORS[player].clothes_color.r, PLAYER_COLORS[player].clothes_color.g, PLAYER_COLORS[player].clothes_color.b, PLAYER_COLORS[player].clothes_color.a);
     }
+    state.minimap_pixel_values[MINIMAP_PIXEL_SAND] = SDL_MapRGBA(format, 204, 162, 139, 255);
+    state.minimap_pixel_values[MINIMAP_PIXEL_WATER] = SDL_MapRGBA(format, 70, 100, 115, 255);
+    state.minimap_pixel_values[MINIMAP_PIXEL_WALL] = SDL_MapRGBA(format, 94, 88, 89, 255);
     SDL_FreeFormat(format);
 
     memset(state.minimap_texture_pixels, 0, sizeof(state.minimap_texture_pixels));
@@ -515,7 +528,6 @@ SDL_Surface* render_load_font(FontName name) {
     }
 
     // Create a surface to render each glyph onto
-    log_trace("glyph max width %i glyph max height %i", glyph_max_width, glyph_max_height);
     SDL_Surface* font_surface = SDL_CreateRGBSurfaceWithFormat(0, glyph_max_width * FONT_HFRAMES, glyph_max_height * FONT_VFRAMES, 0, SDL_PIXELFORMAT_RGBA8888);
     if (font_surface == NULL) {
         log_error("Error creating font surface: %s", SDL_GetError());
@@ -598,7 +610,6 @@ bool render_load_sprites() {
         }
         surfaces[font].type = LOADED_SURFACE_FONT;
         surfaces[font].name = font;
-        log_trace("font surface format %u", surfaces[font].surface->format->format);
     }
 
     // Load the tileset surfaces because we'll need them for the tile sprites
@@ -613,7 +624,6 @@ bool render_load_sprites() {
             log_error("Unable to load tileset %s: %s", tileset_path, IMG_GetError());
             return false;
         }
-        log_trace("tileset sprite format %u", tileset_surfaces[tileset]->format->format);
     }
 
     // Load the sprite surfaces
@@ -732,10 +742,6 @@ bool render_load_sprites() {
                                                     : surface->h / sprite_info.vframes;
                 }
                 state.sprite_info[sprite_name] = sprite_info;
-
-                if (sprite_name == SPRITE_TILE_WATER) {
-                    log_trace("water info atlas %i x,y %i %i", sprite_info.atlas, sprite_info.atlas_x, sprite_info.atlas_y);
-                }
             }
             surface_has_been_stored[surface_index] = true;
             surface_stored_count++;
@@ -828,7 +834,7 @@ void render_prepare_frame() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void render_sprite_vertices() {
+void render_sprite_batch() {
     if (state.sprite_vertices.empty()) {
         return;
     }
@@ -869,9 +875,6 @@ void render_line_vertices() {
 }
 
 void render_present_frame() {
-    render_sprite_vertices();
-    render_line_vertices();
-
     // Switch to default framebuffer
     ivec2 window_size;
     SDL_GetWindowSize(state.window, &window_size.x, &window_size.y);
@@ -1237,7 +1240,7 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
     glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, state.minimap_texture_pixels);
 
-    glUseProgram(state.sprite_shader);
+    glUseProgram(state.minimap_shader);
     glBindVertexArray(state.sprite_vao);
     glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(minimap_vertices), minimap_vertices);

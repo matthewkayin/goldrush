@@ -22,6 +22,9 @@ enum MinimapPixel {
     MINIMAP_PIXEL_PLAYER1,
     MINIMAP_PIXEL_PLAYER2,
     MINIMAP_PIXEL_PLAYER3,
+    MINIMAP_PIXEL_SAND,
+    MINIMAP_PIXEL_WATER,
+    MINIMAP_PIXEL_WALL,
     MINIMAP_PIXEL_COUNT
 };
 
@@ -42,6 +45,7 @@ const uint32_t RENDER_SPRITE_CENTERED = 4;
 bool render_init(SDL_Window* window);
 void render_quit();
 void render_set_window_size(ivec2 window_size);
+void render_sprite_batch();
 void render_prepare_frame();
 void render_present_frame();
 const SpriteInfo& render_get_sprite_info(SpriteName name);

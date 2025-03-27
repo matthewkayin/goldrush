@@ -606,6 +606,8 @@ void menu_render(const MenuState& state) {
         render_ninepatch(SPRITE_UI_FRAME, (Rect) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 80, .w = rect_width, .h = 32 });
         render_text(FONT_HACK_GOLD, "Connecting...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 80 + 16 - (text_size.y / 2)));
     }
+
+    render_sprite_batch();
 }
 
 void menu_render_decoration(const MenuState& state, int index) {
