@@ -177,7 +177,7 @@ bool ui_button(const char* text) {
 
 bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
     ivec2 origin = ui_get_container_origin();
-    const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
+    const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
     ui_update_container(ivec2(sprite_info.frame_width, sprite_info.frame_height));
 
     Rect sprite_rect = (Rect) {
@@ -208,7 +208,7 @@ void ui_text(FontName font, const char* text) {
 }
 
 ivec2 ui_text_frame_size(const char* text) {
-    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_TEXT_FRAME);
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
     ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, text);
     int frame_count = (text_size.x / sprite_info.frame_width) + 1;
     if (text_size.x % sprite_info.frame_width != 0) {
@@ -221,7 +221,7 @@ ivec2 ui_text_frame_size(const char* text) {
 bool ui_text_frame(const char* text, bool disabled) {
     ivec2 origin = ui_get_container_origin();
 
-    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_TEXT_FRAME);
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
     ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, text);
     int frame_count = (text_size.x / sprite_info.frame_width) + 1;
     if (text_size.x % sprite_info.frame_width != 0) {
@@ -299,7 +299,7 @@ void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t ma
 
 bool ui_team_picker(char value, bool disabled) {
     ivec2 origin = ui_get_container_origin();
-    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_TEAM_PICKER);
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_TEAM_PICKER);
     ivec2 size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
     ui_update_container(size);
 
@@ -323,7 +323,7 @@ bool ui_team_picker(char value, bool disabled) {
 
 bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, size_t item_count, bool disabled) {
     ivec2 origin = ui_get_container_origin();
-    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
     ivec2 size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
     ui_update_container(size);
 

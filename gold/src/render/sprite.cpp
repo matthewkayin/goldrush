@@ -2,426 +2,596 @@
 
 #include <unordered_map>
 
-static const std::unordered_map<AtlasName, AtlasParams> ATLAS_PARAMS = {
-    { ATLAS_UI, (AtlasParams) {
-        .path = "ui.png",
-        .strategy = ATLAS_IMPORT_DEFAULT
-    }},
-    { ATLAS_TILESET, (AtlasParams) {
-        .path = "tileset.png",
-        .strategy = ATLAS_IMPORT_TILESET,
-        .tileset = (AtlasParamsTileset) {
-            .begin = SPRITE_TILE_NULL,
-            .end = SPRITE_TILE_DECORATION4
+static const std::unordered_map<Tileset, TilesetParams> TILESET_PARAMS = {
+    { TILESET_ARIZONA, (TilesetParams) { .path = "tileset_arizona.png" }}
+};
+
+static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
+    { SPRITE_TILE_NULL, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 32,
+            .source_y = 16
         }
     }},
-    { ATLAS_MISC, (AtlasParams) {
-        .path = "misc.png",
-        .strategy = ATLAS_IMPORT_DEFAULT,
+    { SPRITE_TILE_SAND1, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 0,
+            .source_y = 0
+        }
     }},
-    { ATLAS_FONT, (AtlasParams) {
-        .path = "",
-        .strategy = ATLAS_IMPORT_FONTS,
+    { SPRITE_TILE_SAND2, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 16,
+            .source_y = 0
+        }
     }},
-    { ATLAS_UNIT_WAGON, (AtlasParams) {
-        .path = "unit_wagon.png",
-        .strategy = ATLAS_IMPORT_RECOLOR,
+    { SPRITE_TILE_SAND3, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 32,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WATER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_AUTO,
+            .source_x = 0,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_NW_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 48,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WALL_NE_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 80,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WALL_SW_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 48,
+            .source_y = 32
+        }
+    }},
+    { SPRITE_TILE_WALL_SE_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 80,
+            .source_y = 32
+        }
+    }},
+    { SPRITE_TILE_WALL_NORTH_EDGE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 64,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WALL_WEST_EDGE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 48,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_EAST_EDGE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 80,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_SOUTH_EDGE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 64,
+            .source_y = 32
+        }
+    }},
+    { SPRITE_TILE_WALL_SW_FRONT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 48,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_SOUTH_FRONT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 64,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_SE_FRONT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 80,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_NW_INNER_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 96,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WALL_NE_INNER_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 112,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WALL_SW_INNER_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 96,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_SE_INNER_CORNER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 112,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_LEFT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 96,
+            .source_y = 32
+        }
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_CENTER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 112,
+            .source_y = 32
+        }
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 128,
+            .source_y = 32
+        }
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_LEFT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 96,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_CENTER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 112,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_RIGHT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 128,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_NORTH_STAIR_LEFT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 144,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_NORTH_STAIR_CENTER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 160,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_NORTH_STAIR_RIGHT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 176,
+            .source_y = 48
+        }
+    }},
+    { SPRITE_TILE_WALL_WEST_STAIR_TOP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 144,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WALL_WEST_STAIR_CENTER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 144,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_WEST_STAIR_BOTTOM, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 144,
+            .source_y = 32
+        }
+    }},
+    { SPRITE_TILE_WALL_WEST_STAIR_TOP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 160,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_WALL_EAST_STAIR_CENTER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 160,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_WALL_EAST_STAIR_BOTTOM, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 160,
+            .source_y = 32
+        }
+    }},
+    { SPRITE_DECORATION, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "tile_decorations.png",
+            .hframes = 5,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_MINIMAP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_minimap.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_BUTTON_PANEL, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_frame_buttons.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_BOTTOM_PANEL, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_frame_bottom.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_FRAME, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_frame.png",
+            .hframes = 3,
+            .vframes = 3
+        }
+    }},
+    { SPRITE_UI_FRAME_SMALL, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_frame_small.png",
+            .hframes = 3,
+            .vframes = 3
+        }
+    }},
+    { SPRITE_UI_BUTTON_REFRESH, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "menu_refresh.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_BUTTON_ARROW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "menu_next.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_BUTTON_BURGER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_menu_button.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_GOLD_ICON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_gold.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_HOUSE_ICON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_house.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_MINER_ICON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_miner.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_DROPDOWN, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_options_dropdown.png",
+            .hframes = 1,
+            .vframes = 5
+        }
+    }},
+    { SPRITE_UI_DROPDOWN_MINI, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_dropdown_mini.png",
+            .hframes = 1,
+            .vframes = 5
+        }
+    }},
+    { SPRITE_UI_TEAM_PICKER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_team_picker.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_MENU_BUTTON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_parchment_buttons.png",
+            .hframes = 1,
+            .vframes = 2
+        }
+    }},
+    { SPRITE_UI_TEXT_FRAME, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_text_frame.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_CLOUDS, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "menu_clouds.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_SWATCH, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_swatch.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_LANDMINE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_mine.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_LANDMINE_ATTACK, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_mine_attack.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_UNIT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_UNIT_ATTACK, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_attack.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_WAGON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_wagon.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_WAGON_ATTACK, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_wagon_attack.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE2, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_building2x2.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE2_ATTACK, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_building2x2_attack.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE3, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_building3x3.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE3_ATTACK, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_building3x3_attack.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE4, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_building4x4.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE4_ATTACK, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "select_ring_building4x4_attack.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_GOLDMINE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "gold_mine",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UNIT_WAGON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_wagon",
+            .hframes = 15,
+            .vframes = 6
+        }
     }}
 };
 
-static std::unordered_map<SpriteName, SpriteInfo> SPRITE_INFO = {
-    { SPRITE_UI_MINIMAP, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 0, .atlas_y = 0,
-        .frame_width = 136, .frame_height = 136
-    }},
-    { SPRITE_UI_BUTTON_PANEL, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 136, .atlas_y = 0,
-        .frame_width = 132, .frame_height = 106
-    }},
-    { SPRITE_UI_BOTTOM_PANEL, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 0, .atlas_y = 136,
-        .frame_width = 372, .frame_height = 88
-    }},
-    { SPRITE_UI_FRAME, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 268, .atlas_y = 0,
-        .frame_width = 16, .frame_height = 16
-    }},
-    { SPRITE_UI_FRAME_SMALL, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 316, .atlas_y = 0,
-        .frame_width = 8, .frame_height = 8
-    }},
-    { SPRITE_UI_BUTTON_REFRESH, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 340, .atlas_y = 0,
-        .frame_width = 24, .frame_height = 24
-    }},
-    { SPRITE_UI_BUTTON_ARROW, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 316, .atlas_y = 24,
-        .frame_width = 24, .frame_height = 24
-    }},
-    { SPRITE_UI_BUTTON_BURGER, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 269, .atlas_y = 49,
-        .frame_width = 19, .frame_height = 18
-    }},
-    { SPRITE_UI_GOLD_ICON, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 269, .atlas_y = 68,
-        .frame_width = 16, .frame_height = 16
-    }},
-    { SPRITE_UI_HOUSE_ICON, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 286, .atlas_y = 68,
-        .frame_width = 19, .frame_height = 16
-    }},
-    { SPRITE_UI_MINER_ICON, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 307, .atlas_y = 68,
-        .frame_width = 12, .frame_height = 10
-    }},
-    { SPRITE_UI_DROPDOWN, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 0, .atlas_y = 224,
-        .frame_width = 112, .frame_height = 21
-    }},
-    { SPRITE_UI_DROPDOWN_MINI, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 113, .atlas_y = 224,
-        .frame_width = 80, .frame_height = 16
-    }},
-    { SPRITE_UI_TEAM_PICKER, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 194, .atlas_y = 224,
-        .frame_width = 16, .frame_height = 16
-    }},
-    { SPRITE_UI_PANEL_BUTTON, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 219, .atlas_y = 241,
-        .frame_width = 32, .frame_height = 32
-    }},
-    { SPRITE_UI_MENU_BUTTON, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 227, .atlas_y = 224,
-        .frame_width = 8, .frame_height = 21
-    }},
-    { SPRITE_UI_TEXT_FRAME, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 252, .atlas_y = 224,
-        .frame_width = 15, .frame_height = 15
-    }},
-    { SPRITE_UI_CLOUDS, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 0, .atlas_y = 330,
-        .frame_width = 70, .frame_height = 16
-    }},
-    { SPRITE_UI_SKY, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 0, .atlas_y = 352,
-        .frame_width = 16, .frame_height = 16
-    }},
-    { SPRITE_UI_WHITE, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 16, .atlas_y = 352,
-        .frame_width = 16, .frame_height = 16
-    }},
-    { SPRITE_UI_SELECT_RING_LANDMINE, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 0, .atlas_y = 368,
-        .frame_width = 16, .frame_height = 20
-    }},
-    { SPRITE_UI_SELECT_RING_LANDMINE_ATTACK, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 16, .atlas_y = 368,
-        .frame_width = 16, .frame_height = 20
-    }},
-    { SPRITE_UI_SELECT_RING_UNIT, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 32, .atlas_y = 368,
-        .frame_width = 20, .frame_height = 20
-    }},
-    { SPRITE_UI_SELECT_RING_UNIT_ATTACK, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 52, .atlas_y = 368,
-        .frame_width = 20, .frame_height = 20
-    }},
-    { SPRITE_UI_SELECT_RING_WAGON, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 72, .atlas_y = 368,
-        .frame_width = 40, .frame_height = 36
-    }},
-    { SPRITE_UI_SELECT_RING_WAGON_ATTACK, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 112, .atlas_y = 368,
-        .frame_width = 40, .frame_height = 36
-    }},
-    { SPRITE_UI_SELECT_RING_BUILDING_SIZE2, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 152, .atlas_y = 368,
-        .frame_width = 38, .frame_height = 40
-    }},
-    { SPRITE_UI_SELECT_RING_BUILDING_SIZE2_ATTACK, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 190, .atlas_y = 368,
-        .frame_width = 38, .frame_height = 40
-    }},
-    { SPRITE_UI_SELECT_RING_BUILDING_SIZE3, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 228, .atlas_y = 368,
-        .frame_width = 58, .frame_height = 56
-    }},
-    { SPRITE_UI_SELECT_RING_BUILDING_SIZE3_ATTACK, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 286, .atlas_y = 368,
-        .frame_width = 58, .frame_height = 56
-    }},
-    { SPRITE_UI_SELECT_RING_BUILDING_SIZE4, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 344, .atlas_y = 368,
-        .frame_width = 72, .frame_height = 76
-    }},
-    { SPRITE_UI_SELECT_RING_BUILDING_SIZE4_ATTACK, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 416, .atlas_y = 368,
-        .frame_width = 72, .frame_height = 76
-    }},
-    { SPRITE_UI_SELECT_RING_GOLDMINE, (SpriteInfo) { 
-        .atlas = ATLAS_UI, 
-        .atlas_x = 488, .atlas_y = 368,
-        .frame_width = 58, .frame_height = 50
-    }},
-    { SPRITE_GOLDMINE, (SpriteInfo) { 
-        .atlas = ATLAS_MISC, 
-        .atlas_x = 0, .atlas_y = 0,
-        .frame_width = 48, .frame_height = 48
-    }},
-    { SPRITE_UNIT_WAGON, (SpriteInfo) { 
-        .atlas = ATLAS_UNIT_WAGON, 
-        .atlas_x = 0, .atlas_y = 0,
-        .frame_width = 40, .frame_height = 34
-    }},
-};
-
-static const std::unordered_map<SpriteName, TileData> TILE_DATA = {
-    { SPRITE_TILE_NULL, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 32,
-        .source_y = 16
-    }},
-    { SPRITE_TILE_SAND, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 0,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_SAND2, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 16,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_SAND3, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 32,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_WATER, (TileData) {
-        .type = TILE_TYPE_AUTO,
-        .source_x = 0,
-        .source_y = 16
-    }},
-    { SPRITE_TILE_WALL_NW_CORNER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 48,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_WALL_NE_CORNER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 80,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_WALL_SW_CORNER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 48,
-        .source_y = 32
-    }},
-    { SPRITE_TILE_WALL_SE_CORNER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 80,
-        .source_y = 32
-    }},
-    { SPRITE_TILE_WALL_NORTH_EDGE, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 64,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_WALL_WEST_EDGE, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 48,
-        .source_y = 16
-    }},
-    { SPRITE_TILE_WALL_EAST_EDGE, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 80,
-        .source_y = 16
-    }},
-    { SPRITE_TILE_WALL_SOUTH_EDGE, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 64,
-        .source_y = 32
-    }},
-    { SPRITE_TILE_WALL_SW_FRONT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 48,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_SOUTH_FRONT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 64,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_SE_FRONT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 80,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_NW_INNER_CORNER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 96,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_WALL_NE_INNER_CORNER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 112,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_WALL_SW_INNER_CORNER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 96,
-        .source_y = 16
-    }},
-    { SPRITE_TILE_WALL_SE_INNER_CORNER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 112,
-        .source_y = 16
-    }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_LEFT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 96,
-        .source_y = 32
-    }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_CENTER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 112,
-        .source_y = 32
-    }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 128,
-        .source_y = 32
-    }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_LEFT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 96,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_CENTER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 112,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_RIGHT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 128,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_NORTH_STAIR_LEFT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 144,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_NORTH_STAIR_CENTER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 160,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_NORTH_STAIR_RIGHT, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 176,
-        .source_y = 48
-    }},
-    { SPRITE_TILE_WALL_WEST_STAIR_TOP, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 144,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_WALL_WEST_STAIR_CENTER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 144,
-        .source_y = 16
-    }},
-    { SPRITE_TILE_WALL_WEST_STAIR_BOTTOM, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 144,
-        .source_y = 32
-    }},
-    { SPRITE_TILE_WALL_EAST_STAIR_TOP, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 160,
-        .source_y = 0
-    }},
-    { SPRITE_TILE_WALL_EAST_STAIR_CENTER, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 160,
-        .source_y = 16
-    }},
-    { SPRITE_TILE_WALL_EAST_STAIR_BOTTOM, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 160,
-        .source_y = 32
-    }},
-    { SPRITE_TILE_DECORATION0, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 0,
-        .source_y = 64
-    }},
-    { SPRITE_TILE_DECORATION1, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 16,
-        .source_y = 64
-    }},
-    { SPRITE_TILE_DECORATION2, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 32,
-        .source_y = 64
-    }},
-    { SPRITE_TILE_DECORATION3, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 48,
-        .source_y = 64
-    }},
-    { SPRITE_TILE_DECORATION4, (TileData) {
-        .type = TILE_TYPE_SINGLE,
-        .source_x = 64,
-        .source_y = 64
-    }}
-};
-
-const AtlasParams& resource_get_atlas_params(AtlasName atlas) {
-    return ATLAS_PARAMS.at(atlas);
+const SpriteParams& render_get_sprite_params(SpriteName sprite) {
+    return SPRITE_PARAMS.at(sprite);
 }
 
-const SpriteInfo& resource_get_sprite_info(SpriteName name) {
-    return SPRITE_INFO.at(name);
-}
-
-void resource_set_sprite_info(SpriteName name, SpriteInfo sprite_info) {
-    SPRITE_INFO[name] = sprite_info;
-}
-
-const TileData& resource_get_tile_data(SpriteName tile) {
-    return TILE_DATA.at(tile);
+const TilesetParams& render_get_tileset_params(Tileset tileset) {
+    return TILESET_PARAMS.at(tileset);
 }

@@ -26,7 +26,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
 
     map.cells = std::vector<EntityId>(map.width * map.height, CELL_EMPTY);
     map.tiles = std::vector<Tile>(map.width * map.height, (Tile) {
-        .sprite = SPRITE_TILE_SAND,
+        .sprite = SPRITE_TILE_SAND1,
         .autotile_index = 0,
         .elevation = 0
     });
@@ -121,7 +121,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
     std::vector<ivec2> artifacts;
     do {
         std::fill(map.tiles.begin(), map.tiles.end(), (Tile) {
-            .sprite = SPRITE_TILE_SAND,
+            .sprite = SPRITE_TILE_SAND1,
             .autotile_index = 0,
             .elevation = 0
         });
@@ -159,7 +159,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                         if (new_index < 4 && index % 3 == 0) {
                             map.tiles[index].sprite = new_index == 1 ? SPRITE_TILE_SAND3 : SPRITE_TILE_SAND2;
                         } else {
-                            map.tiles[index].sprite = SPRITE_TILE_SAND;
+                            map.tiles[index].sprite = SPRITE_TILE_SAND1;
                         }
                     // Wall tile 
                     } else {
@@ -350,7 +350,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
 
     // Block all walls and water
     for (int index = 0; index < map.width * map.height; index++) {
-        if (!(map.tiles[index].sprite == SPRITE_TILE_SAND ||
+        if (!(map.tiles[index].sprite == SPRITE_TILE_SAND1 ||
                 map.tiles[index].sprite == SPRITE_TILE_SAND2 ||
                 map.tiles[index].sprite == SPRITE_TILE_SAND3 ||
                 map_is_tile_ramp(map, ivec2(index % map.width, index / map.width)))) {

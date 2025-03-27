@@ -2,9 +2,13 @@
 
 #define MAX_BATCH_VERTICES 32768
 #define FONT_GLYPH_COUNT 96
+#define FONT_HFRAMES 16
+#define FONT_VFRAMES 6
 #define FONT_FIRST_CHAR 32 // space
 #define MINIMAP_TEXTURE_WIDTH 512
 #define MINIMAP_TEXTURE_HEIGHT 256
+#define AUTOTILE_HFRAMES 8
+#define AUTOTILE_VFRAMES 6
 #define ATLAS_WIDTH 1024
 #define ATLAS_HEIGHT 1024
 
@@ -33,14 +37,15 @@ struct LineVertex {
 };
 
 struct FontGlyph {
-    int atlas_x;
-    int atlas_y;
     int bearing_x;
     int bearing_y;
     int advance;
 };
 
 struct Font {
+    int atlas;
+    int atlas_x;
+    int atlas_y;
     int glyph_width;
     int glyph_height;
     FontGlyph glyphs[FONT_GLYPH_COUNT];
@@ -91,7 +96,7 @@ struct RenderState {
     GLuint sprite_vao;
     GLuint sprite_vbo;
     uint32_t sprite_texture_array;
-    ivec2 sprite_image_size[ATLAS_COUNT];
+    SpriteInfo sprite_info[SPRITE_COUNT];
     std::vector<SpriteVertex> sprite_vertices;
 
     GLuint minimap_texture;
@@ -116,7 +121,7 @@ void render_init_line_vao();
 void render_init_minimap_texture();
 bool render_init_screen_framebuffer();
 
-bool render_load_atlases();
+bool render_load_sprites();
 
 bool render_init(SDL_Window* window) {
     state.window = window;
@@ -180,7 +185,7 @@ bool render_init(SDL_Window* window) {
     glUseProgram(state.line_shader);
     glUniformMatrix4fv(glGetUniformLocation(state.line_shader, "projection"), 1, GL_FALSE, projection.data);
 
-    if (!render_load_atlases()) {
+    if (!render_load_sprites()) {
         return false;
     }
 
@@ -325,7 +330,7 @@ void render_flip_sdl_surface_vertically(SDL_Surface* surface) {
     SDL_UnlockSurface(surface);
 }
 
-SDL_Surface* render_load_atlas_recolor(SDL_Surface* sprite_surface, const AtlasParams params) {
+SDL_Surface* render_recolor_surface(SDL_Surface* sprite_surface, bool recolor_low_alpha) {
     // Create a surface big enough to hold the recolor atlas
     SDL_Surface* recolor_surface = SDL_CreateRGBSurfaceWithFormat(0, ATLAS_WIDTH, ATLAS_HEIGHT, 32, sprite_surface->format->format);
     if (recolor_surface == NULL) {
@@ -358,7 +363,7 @@ SDL_Surface* render_load_atlas_recolor(SDL_Surface* sprite_surface, const AtlasP
                 } else if (source_pixel == skin_reference_pixel) {
                     source_pixel = skin_replacement_pixel;
                 }
-                if (params.strategy == ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA) {
+                if (recolor_low_alpha) {
                     uint8_t r, g, b, a;
                     SDL_GetRGBA(source_pixel, recolor_surface->format, &r, &g, &b, &a);
                     if (a != 0) {
@@ -381,236 +386,412 @@ SDL_Surface* render_load_atlas_recolor(SDL_Surface* sprite_surface, const AtlasP
     return recolor_surface;
 }
 
-SDL_Surface* render_load_atlas_tileset(SDL_Surface* sprite_surface, const AtlasParams params) {
-    SDL_Surface* tileset_surface = SDL_CreateRGBSurfaceWithFormat(0, ATLAS_WIDTH, ATLAS_HEIGHT, 32, sprite_surface->format->format);
-    if (tileset_surface == NULL) {
-        log_error("Unable to create tileset surface: %s", SDL_GetError());
+SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params) {
+    SDL_Surface* tile_surface = SDL_CreateRGBSurfaceWithFormat(0, TILE_SIZE, TILE_SIZE, 0, tileset_surface->format->format);
+    if (tile_surface == NULL) {
+        log_error("Could not create single tile surface: %s", SDL_GetError());
         return NULL;
     }
 
-    SDL_Rect src_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
-    SDL_Rect dst_rect = (SDL_Rect) { .x = 0, .y = 0, .w = TILE_SIZE, .h = TILE_SIZE };
+    SDL_Rect src_rect = (SDL_Rect) { 
+        .x = params.tile.source_x, 
+        .y = params.tile.source_y,
+        .w = TILE_SIZE,
+        .h = TILE_SIZE
+    };
+    SDL_Rect dst_rect = (SDL_Rect) {
+        .x = 0, .y = 0,
+        .w = TILE_SIZE, .h = TILE_SIZE
+    };
 
-    for (int tile = params.tileset.begin; tile < params.tileset.end + 1; tile++) {
-        const TileData& tile_data = resource_get_tile_data((SpriteName)tile);
+    SDL_BlitSurface(tileset_surface, &src_rect, tile_surface, &dst_rect);
 
-        // We can go ahead and set this now since the code is the same for both tile types
-        // and the dst_rect is already pointing in the place where the tile will go on the atlas
-        SpriteInfo tile_info = (SpriteInfo) {
-            .atlas = ATLAS_TILESET,
-            .atlas_x = dst_rect.x,
-            .atlas_y = dst_rect.y,
-            .frame_width = TILE_SIZE,
-            .frame_height = TILE_SIZE
-        };
-        resource_set_sprite_info((SpriteName)tile, tile_info);
-
-        if (tile_data.type == TILE_TYPE_SINGLE) {
-            src_rect.x = tile_data.source_x;
-            src_rect.y = tile_data.source_y;
-            SDL_BlitSurface(sprite_surface, &src_rect, tileset_surface, &dst_rect);
-
-            dst_rect.x += TILE_SIZE;
-            if (dst_rect.x == ATLAS_WIDTH) {
-                dst_rect.x = 0;
-                dst_rect.y += TILE_SIZE;
-            }
-        } else if (tile_data.type == TILE_TYPE_AUTO) {
-            // To generate an autotile, we iterate through each combination of neighbors
-            for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
-                // There are 256 neighbor combinations, but only 47 of them are unique because
-                // a diagonal neighbor does not affect what tile we render when autotiling 
-                // unless there is an adjacent tile in both directions. 
-                // for example: neighbor in NE by itself does not affect which tile we render
-                // but neighbor in NE and neighbor in N and neighbor in E does (both adjacent directions are required)
-                bool is_unique = true;
-                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                    if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
-                        int prev_direction = direction - 1;
-                        int next_direction = (direction + 1) % DIRECTION_COUNT;
-                        if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
-                            (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
-                            is_unique = false;
-                            break;
-                        }
-                    }
-                }
-                if (!is_unique) {
-                    continue;
-                }
-
-                // Each unique autotile is formed by sampling corners off of the source tile
-                // https://gamedev.stackexchange.com/questions/46594/elegant-autotiling
-                for (uint32_t edge = 0; edge < 4; edge++) {
-                    ivec2 edge_source_pos = ivec2(tile_data.source_x, tile_data.source_y) + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
-                    SDL_Rect subtile_src_rect = (SDL_Rect) {
-                        .x = edge_source_pos.x,
-                        .y = edge_source_pos.y,
-                        .w = TILE_SIZE / 2,
-                        .h = TILE_SIZE / 2
-                    };
-                    SDL_Rect subtile_dst_rect = (SDL_Rect) {
-                        .x = dst_rect.x + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
-                        .y = AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2),
-                        .w = TILE_SIZE / 2,
-                        .h = TILE_SIZE / 2
-                    };
-
-                    SDL_BlitSurface(sprite_surface, &subtile_src_rect, tileset_surface, &subtile_dst_rect);
-                } 
-
-                dst_rect.x += TILE_SIZE;
-                if (dst_rect.x == ATLAS_WIDTH) {
-                    dst_rect.x = 0;
-                    dst_rect.y += TILE_SIZE;
-                }
-            } // End for each neighbor combo
-        } // End if tile type is auto
-    } // End for each tile
-
-    SDL_FreeSurface(sprite_surface);
-    return tileset_surface;
+    return tile_surface;
 }
 
-SDL_Surface* render_load_atlas_fonts() {
-    ivec2 font_atlas_position = ivec2(0, 0);
-    SDL_Surface* atlas_surface = SDL_CreateRGBSurface(0, ATLAS_WIDTH, ATLAS_HEIGHT, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
-    if (atlas_surface == NULL) {
-        log_error("Unable to create font atlas: %s", SDL_GetError());
+SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params) {
+    SDL_Surface* tile_surface = SDL_CreateRGBSurfaceWithFormat(0, TILE_SIZE * AUTOTILE_HFRAMES, TILE_SIZE * AUTOTILE_VFRAMES, 0, tileset_surface->format->format);
+    if (tile_surface == NULL) {
+        log_error("Could not create auto tile surface: %s", SDL_GetError());
         return NULL;
     }
 
-    for (int name = 0; name < FONT_COUNT; name++) {
-        const FontParams& params = resource_get_font_params((FontName)name);
-        Font& font = state.fonts[name];
+    // To generate an autotile, we iterate through each combination of neighbors
+    ivec2 autotile_frame = ivec2(0, 0);
+    for (uint32_t neighbors = 0; neighbors < 256; neighbors++) {
+        // There are 256 neighbor combinations, but only 47 of them are unique because
+        // a diagonal neighbor does not affect what tile we render when autotiling 
+        // unless there is an adjacent tile in both directions. 
+        // for example: neighbor in NE by itself does not affect which tile we render
+        // but neighbor in NE and neighbor in N and neighbor in E does (both adjacent directions are required)
+        bool is_unique = true;
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            if (direction % 2 == 1 && (DIRECTION_MASK[direction] & neighbors) == DIRECTION_MASK[direction]) {
+                int prev_direction = direction - 1;
+                int next_direction = (direction + 1) % DIRECTION_COUNT;
+                if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                    (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                    is_unique = false;
+                    break;
+                }
+            }
+        }
+        if (!is_unique) {
+            continue;
+        }
 
-        char path[128];
-        sprintf(path, "%sfont/%s", RESOURCE_PATH, params.path);
+        // Each unique autotile is formed by sampling corners off of the source tile
+        // https://gamedev.stackexchange.com/questions/46594/elegant-autotiling
+        for (uint32_t edge = 0; edge < 4; edge++) {
+            ivec2 edge_source_pos = ivec2(params.tile.source_x, params.tile.source_y) + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
+            SDL_Rect subtile_src_rect = (SDL_Rect) {
+                .x = edge_source_pos.x,
+                .y = edge_source_pos.y,
+                .w = TILE_SIZE / 2,
+                .h = TILE_SIZE / 2
+            };
+            SDL_Rect subtile_dst_rect = (SDL_Rect) {
+                .x = (autotile_frame.x * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
+                .y = (autotile_frame.y * TILE_SIZE) + AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2),
+                .w = TILE_SIZE / 2,
+                .h = TILE_SIZE / 2
+            };
 
-        log_info("Loading font %s size %u color %u,%u,%u", path, params.size, params.r, params.g, params.b);
+            SDL_BlitSurface(tile_surface, &subtile_src_rect, tileset_surface, &subtile_dst_rect);
+        } 
 
-        // Open the font
-        TTF_Font* ttf_font = TTF_OpenFont(path, params.size);
-        if (ttf_font == NULL) {
-            log_error("Unable to open font %s: %s", path, TTF_GetError());
+        autotile_frame.x++;
+        if (autotile_frame.x == AUTOTILE_HFRAMES) {
+            autotile_frame.x = 0;
+            autotile_frame.y++;
+        }
+    } // End for each neighbor combo
+
+    return tile_surface;
+}
+
+SDL_Surface* render_load_font(FontName name) {
+    const FontParams& params = resource_get_font_params((FontName)name);
+    Font& font = state.fonts[name];
+
+    char path[128];
+    sprintf(path, "%sfont/%s", RESOURCE_PATH, params.path);
+
+    log_info("Loading font %s size %u color %u,%u,%u", path, params.size, params.r, params.g, params.b);
+
+    // Open the font
+    TTF_Font* ttf_font = TTF_OpenFont(path, params.size);
+    if (ttf_font == NULL) {
+        log_error("Unable to open font %s: %s", path, TTF_GetError());
+        return NULL;
+    }
+
+    // Render each glyph to a surface
+    SDL_Surface* glyphs[FONT_GLYPH_COUNT];
+    ivec2 glyph_surface_position = ivec2(0, 0);
+    int glyph_max_width = 0;
+    int glyph_max_height = 0;
+
+    // Since TTF creates surfaces as BGRA but the rest of the atlas rendering
+    // code expects RGBA, I'm just flipping the R and the B values here
+    SDL_Color font_color = (SDL_Color) { .r = params.b, .g = params.g, .b = params.r, .a = 255 };
+    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+        char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
+        glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, font_color);
+        if (glyphs[glyph_index] == NULL) {
+            log_error("Error rendering glyph %s for font %s: %s", text, path, TTF_GetError());
             return NULL;
         }
 
-        // Render each glyph to a surface
-        SDL_Surface* glyphs[FONT_GLYPH_COUNT];
-        int glyph_max_width = 0;
-        int glyph_max_height = 0;
-
-        // Hack alert!
-        // Since TTF creates surfaces as BGRA but the rest of the atlas rendering
-        // code expects RGBA, I'm just flipping the R and the B values here
-        SDL_Color font_color = (SDL_Color) { .r = params.b, .g = params.g, .b = params.r, .a = 255 };
-        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
-            char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
-            glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, font_color);
-            if (glyphs[glyph_index] == NULL) {
-                log_error("Error rendering glyph %s for font %s: %s", text, path, TTF_GetError());
-                return NULL;
-            }
-
-            glyph_max_width = std::max(glyph_max_width, glyphs[glyph_index]->w);
-            glyph_max_height = std::max(glyph_max_height, glyphs[glyph_index]->h);
-        }
-
-        // Render each surface glyph onto a single atlas surface
-        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
-            if (font_atlas_position.x + glyphs[glyph_index]->w >= ATLAS_WIDTH) {
-                font_atlas_position.x = 0;
-                font_atlas_position.y += glyph_max_height;
-            }
-
-            SDL_Rect dest_rect = (SDL_Rect) { 
-                .x = font_atlas_position.x, 
-                .y = font_atlas_position.y, 
-                .w = glyphs[glyph_index]->w, 
-                .h = glyphs[glyph_index]->h 
-            };
-            SDL_BlitSurface(glyphs[glyph_index], NULL, atlas_surface, &dest_rect);
-
-            font.glyphs[glyph_index].atlas_x = font_atlas_position.x;
-            font.glyphs[glyph_index].atlas_y = font_atlas_position.y;
-            font_atlas_position.x += glyph_max_width;
-        }
-
-        // Finish filling out the font struct
-        font.glyph_width = glyph_max_width;
-        font.glyph_height = glyph_max_height;
-        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
-            int bearing_y;
-            TTF_GlyphMetrics(ttf_font, FONT_FIRST_CHAR + glyph_index, &font.glyphs[glyph_index].bearing_x, NULL, NULL, &bearing_y, &font.glyphs[glyph_index].advance);
-            font.glyphs[glyph_index].bearing_y = glyph_max_height - bearing_y;
-            if (params.ignore_bearing) {
-                font.glyphs[glyph_index].bearing_x = 0;
-                font.glyphs[glyph_index].bearing_y = 0;
-            }
-        }
-
-        // Free all the resources
-        for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
-            SDL_FreeSurface(glyphs[glyph_index]);
-        }
-        TTF_CloseFont(ttf_font);
-
-        font_atlas_position.x = 0;
-        font_atlas_position.y += glyph_max_height;
+        glyph_max_width = std::max(glyph_max_width, glyphs[glyph_index]->w);
+        glyph_max_height = std::max(glyph_max_height, glyphs[glyph_index]->h);
     }
 
-    return atlas_surface;
+    // Create a surface to render each glyph onto
+    SDL_Surface* font_surface = SDL_CreateRGBSurfaceWithFormat(0, glyph_max_width * FONT_HFRAMES, glyph_max_height * FONT_VFRAMES, 0, SDL_PIXELFORMAT_RGBA8888);
+    if (font_surface == NULL) {
+        log_error("Error creating font surface: %s", SDL_GetError());
+        return NULL;
+    }
+
+    // Render each surface glyph onto a single atlas surface
+    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+        int glyph_index_x = glyph_index % FONT_HFRAMES;
+        int glyph_index_y = glyph_index / FONT_HFRAMES;
+
+        SDL_Rect dest_rect = (SDL_Rect) { 
+            .x = glyph_index_x * glyph_max_width, 
+            .y = glyph_index_y * glyph_max_height, 
+            .w = glyphs[glyph_index]->w, 
+            .h = glyphs[glyph_index]->h 
+        };
+        SDL_BlitSurface(glyphs[glyph_index], NULL, font_surface, &dest_rect);
+    }
+
+    // Finish filling out the font struct
+    font.glyph_width = glyph_max_width;
+    font.glyph_height = glyph_max_height;
+    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+        int bearing_y;
+        TTF_GlyphMetrics(ttf_font, FONT_FIRST_CHAR + glyph_index, &font.glyphs[glyph_index].bearing_x, NULL, NULL, &bearing_y, &font.glyphs[glyph_index].advance);
+        font.glyphs[glyph_index].bearing_y = glyph_max_height - bearing_y;
+        if (params.ignore_bearing) {
+            font.glyphs[glyph_index].bearing_x = 0;
+            font.glyphs[glyph_index].bearing_y = 0;
+        }
+    }
+
+    // Free all the resources
+    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+        SDL_FreeSurface(glyphs[glyph_index]);
+    }
+    TTF_CloseFont(ttf_font);
+
+    return font_surface;
 }
 
-bool render_load_atlases() {
-    glGenTextures(1, &state.sprite_texture_array);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, ATLAS_WIDTH, ATLAS_HEIGHT, ATLAS_COUNT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+int render_sort_surfaces_partition(SDL_Surface** surfaces, int low, int high) {
+    SDL_Surface* pivot = surfaces[high];
+    int i = low - 1;
 
-    for (int atlas = 0; atlas < ATLAS_COUNT; atlas++) {
-        const AtlasParams& params = resource_get_atlas_params((AtlasName)atlas);
+    for (int j = low; j <= high - 1; j++) {
+        if (surfaces[j]->w * surfaces[j]->h > pivot->w * pivot->h) {
+            i++;
+            SDL_Surface* temp = surfaces[j];
+            surfaces[j] = surfaces[i];
+            surfaces[i] = temp;
+        }
+    }
 
-        SDL_Surface* sprite_surface;
-        if (params.strategy == ATLAS_IMPORT_FONTS) {
-            sprite_surface = render_load_atlas_fonts();
-        } else {
-            char path[128];
-            sprintf(path, "%ssprite/%s", RESOURCE_PATH, params.path);
+    SDL_Surface* temp = surfaces[high];
+    surfaces[high] = surfaces[i + 1];
+    surfaces[i + 1] = temp;
 
-            log_info("Loading atlas %s", path);
+    return i + 1;
+}
 
-            sprite_surface = IMG_Load(path);
-            if (sprite_surface == NULL) {
-                log_error("Error loading surface for sprite %s: %s", path, IMG_GetError());
+void render_sort_surfaces(SDL_Surface** surfaces, int low, int high) {
+    if (low < high) {
+        int partition_index = render_sort_surfaces_partition(surfaces, low, high);
+        render_sort_surfaces(surfaces, low, partition_index - 1);
+        render_sort_surfaces(surfaces, partition_index + 1, high);
+    }
+}
+
+bool render_load_sprites() {
+    // First, load all of the surfaces
+    SDL_Surface* surfaces[FONT_COUNT + SPRITE_COUNT];
+
+    // Load the font surfaces
+    for (int font = 0; font < FONT_COUNT; font++) {
+        surfaces[font] = render_load_font((FontName)font);
+        if (surfaces[font] == NULL) {
+            return false;
+        }
+    }
+
+    // Load the tileset surfaces because we'll need them for the tile sprites
+    SDL_Surface* tileset_surfaces[TILESET_COUNT];
+    for (int tileset = 0; tileset < TILESET_COUNT; tileset++) {
+        const TilesetParams& params = render_get_tileset_params((Tileset)tileset);
+        char tileset_path[128];
+        sprintf(tileset_path, "%ssprite/%s", RESOURCE_PATH, params.path);
+
+        tileset_surfaces[tileset] = IMG_Load(tileset_path);
+        if (tileset_surfaces[tileset] == NULL) {
+            log_error("Unable to load tileset %s: %s", tileset_path, IMG_GetError());
+            return false;
+        }
+    }
+
+    // Load the sprite surfaces
+    for (int sprite = 0; sprite < SPRITE_COUNT; sprite++) {
+        const SpriteParams& params = render_get_sprite_params((SpriteName)sprite);
+        if (params.strategy == SPRITE_IMPORT_TILE) {
+            SDL_Surface* tile_surface;
+            if (params.tile.type == TILE_TYPE_SINGLE) {
+                tile_surface = render_create_single_tile_surface(tileset_surfaces[params.tile.tileset], params);
+            } else if (params.tile.type == TILE_TYPE_AUTO) {
+                tile_surface = render_create_auto_tile_surface(tileset_surfaces[params.tile.tileset], params);
+            }
+            if (tile_surface == NULL) {
                 return false;
             }
-            GOLD_ASSERT(sprite_surface->format->BytesPerPixel == 4);
 
-            state.sprite_image_size[atlas] = ivec2(sprite_surface->w, sprite_surface->h);
+            surfaces[FONT_COUNT + sprite] = tile_surface;
+        } else {
+            char sprite_path[128];
+            sprintf(sprite_path, "%ssprite/%s", RESOURCE_PATH, params.sheet.path);
 
-            if (params.strategy == ATLAS_IMPORT_DEFAULT) {
-                GOLD_ASSERT(sprite_surface->w == ATLAS_WIDTH && sprite_surface->h == ATLAS_HEIGHT);
-            } else if (params.strategy == ATLAS_IMPORT_RECOLOR || params.strategy == ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA) {
-                sprite_surface = render_load_atlas_recolor(sprite_surface, params);
-            } else if (params.strategy == ATLAS_IMPORT_TILESET) {
-                sprite_surface = render_load_atlas_tileset(sprite_surface, params);
+            SDL_Surface* sprite_surface = IMG_Load(params.sheet.path);
+            if (sprite_surface == NULL) {
+                log_error("Unable to load sprite %s: %s", sprite_path, IMG_GetError());
+                return false;
             }
-        }
 
-        if (sprite_surface == NULL) {
+            if (params.strategy == SPRITE_IMPORT_RECOLOR || SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA) {
+                sprite_surface = render_recolor_surface(sprite_surface, params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA);
+                if (sprite_surface == NULL) {
+                    return false;
+                }
+            }
+            surfaces[FONT_COUNT + sprite] = sprite_surface;
+        }
+    }
+
+    // Flip all the surfaces vertically
+    for (SDL_Surface* surface : surfaces) {
+        render_flip_sdl_surface_vertically(surface);
+    }
+
+    // Sort the surfaces by size, from biggest to smallest
+    render_sort_surfaces(surfaces, 0, FONT_COUNT + SPRITE_COUNT);
+
+    // Setup a list to keep track of which surfaces have been stored
+    bool surface_has_been_stored[FONT_COUNT + SPRITE_COUNT];
+    memset(surface_has_been_stored, 0, sizeof(surface_has_been_stored));
+    uint32_t surface_stored_count = 0;
+
+    // Place the surfaces inside packed texture atlases
+    std::vector<SDL_Surface*> atlas_surfaces;
+    while (surface_stored_count < FONT_COUNT + SPRITE_COUNT) {
+        // Create the atlas surface
+        SDL_Surface* atlas_surface = SDL_CreateRGBSurfaceWithFormat(0, ATLAS_WIDTH, ATLAS_HEIGHT, 0, SDL_PIXELFORMAT_RGBA8888);
+        if (atlas_surface == NULL) {
+            log_error("Error creating atlas surface: %s", SDL_GetError());
             return false;
         }
 
-        render_flip_sdl_surface_vertically(sprite_surface);
+        // Store of a list of empty spaces inside the atlas
+        std::vector<Rect> empty_spaces;
+        empty_spaces.push_back((Rect) { .x = 0, .y = 0, .w = ATLAS_WIDTH, .h = ATLAS_HEIGHT });
 
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, atlas, sprite_surface->w, sprite_surface->h, 1, GL_RGBA, GL_UNSIGNED_BYTE, sprite_surface->pixels);
+        // For each surface that still needs to be stored, search through the empty spaces list to find a place for the surface to go
+        for (int surface_index = 0; surface_index < FONT_COUNT + SPRITE_COUNT; surface_index++) {
+            if (surface_has_been_stored[surface_index]) {
+                continue;
+            }
+            SDL_Surface* surface = surfaces[surface_index];
 
-        SDL_FreeSurface(sprite_surface);
+            // Search through the empty spaces backwards so that we choose the smallest one that will fit first
+            int space_index;
+            for (space_index = empty_spaces.size() - 1; space_index >= 0; space_index--) {
+                if (surface->w <= empty_spaces[space_index].w && surface->h <= empty_spaces[space_index].h) {
+                    break;
+                }
+            }
+            // No space was found, so skip this surface (it will be rendered to a different atlas)
+            if (space_index == -1) {
+                continue;
+            }
+
+            // Render the surface onto the chosen empty space
+            SDL_Rect dst_rect = (SDL_Rect) { 
+                .x = empty_spaces[space_index].x,
+                .y = empty_spaces[space_index].y,
+                .w = surface->w, .h = surface->h
+            };
+            SDL_BlitSurface(surface, NULL, atlas_surface, &dst_rect);
+
+            // Set sprite info for this surface
+            if (surface_index < FONT_COUNT) {
+                int font_name = surface_index;
+                state.fonts[font_name].atlas = atlas_surfaces.size();
+                state.fonts[font_name].atlas_x = empty_spaces[space_index].x;
+                state.fonts[font_name].atlas_y = empty_spaces[space_index].y;
+            } else {
+                int sprite_name = surface_index - FONT_COUNT;
+                const SpriteParams& params = render_get_sprite_params((SpriteName)sprite_name);
+                SpriteInfo sprite_info; 
+                sprite_info.atlas = atlas_surfaces.size();
+                sprite_info.atlas_x = empty_spaces[space_index].x;
+                sprite_info.atlas_y = empty_spaces[space_index].y;
+                if (params.strategy == SPRITE_IMPORT_TILE) {
+                    if (params.tile.type == TILE_TYPE_SINGLE) {
+                        sprite_info.hframes = 1;
+                        sprite_info.vframes = 1;
+                    } else if (params.tile.type == TILE_TYPE_AUTO) {
+                        sprite_info.hframes = AUTOTILE_HFRAMES;
+                        sprite_info.vframes = AUTOTILE_VFRAMES;
+                    }
+                    sprite_info.frame_width = TILE_SIZE;
+                    sprite_info.frame_height = TILE_SIZE;
+                } else {
+                    sprite_info.hframes = params.sheet.hframes;
+                    sprite_info.vframes = params.sheet.vframes;
+                    sprite_info.frame_width = surface->w / sprite_info.hframes;
+                    sprite_info.frame_height = surface->h / sprite_info.vframes;
+                }
+                state.sprite_info[sprite_name] = sprite_info;
+            }
+            surface_has_been_stored[surface_index] = true;
+
+            // Split the empty space
+            Rect vsplit;
+            vsplit.x = -1; // mark as uninitialized
+            if (surface->w < empty_spaces[space_index].w) {
+                vsplit = (Rect) {
+                    .x = empty_spaces[space_index].x + surface->w,
+                    .y = empty_spaces[space_index].y,
+                    .w = empty_spaces[space_index].w - surface->w,
+                    .h = surface->h
+                };
+            }
+
+            Rect hsplit;
+            hsplit.x = -1;
+            if (surface->h < empty_spaces[space_index].h) {
+                hsplit = (Rect) {
+                    .x = empty_spaces[space_index].x,
+                    .y = empty_spaces[space_index].y + surface->h,
+                    .w = empty_spaces[space_index].w,
+                    .h = empty_spaces[space_index].h - surface->h
+                };
+            }
+
+            // Remove the empty space by swapping and popping
+            empty_spaces[space_index] = empty_spaces.back();
+            empty_spaces.pop_back();
+
+            // Add the splits to the list
+            // Note: it is possible for no splits to be added if the surface was a perfect fit
+            if (vsplit.x != -1 && hsplit.x != -1) {
+                // Push back the bigger of the two first
+                if (vsplit.w * vsplit.h >= hsplit.w * hsplit.h) {
+                    empty_spaces.push_back(vsplit);
+                    empty_spaces.push_back(hsplit);
+                } else {
+                    empty_spaces.push_back(hsplit);
+                    empty_spaces.push_back(vsplit);
+                }
+            } else if (vsplit.x != -1) {
+                empty_spaces.push_back(vsplit);
+            } else if (hsplit.x != -1) {
+                empty_spaces.push_back(hsplit);
+            }
+        } // End for each surface
+
+        atlas_surfaces.push_back(atlas_surface);
     }
 
+    glGenTextures(1, &state.sprite_texture_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, ATLAS_WIDTH, ATLAS_HEIGHT, atlas_surfaces.size(), 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    for (int atlas = 0; atlas < atlas_surfaces.size(); atlas++) {
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, atlas, ATLAS_WIDTH, ATLAS_HEIGHT, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlas_surfaces[atlas]->pixels);
+        SDL_FreeSurface(atlas_surfaces[atlas]);
+    }
+
+    // Cleanup 
+    for (int surface_index = 0; surface_index < FONT_COUNT + SPRITE_COUNT; surface_index++) {
+        SDL_FreeSurface(surfaces[surface_index]);
+    }
+    for (int tileset = 0; tileset < TILESET_COUNT; tileset++) {
+        SDL_FreeSurface(tileset_surfaces[tileset]);
+    }
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
     return true;
@@ -697,12 +878,16 @@ void render_present_frame() {
     SDL_GL_SwapWindow(state.window);
 }
 
-void render_sprite(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id) {
-    const SpriteInfo& sprite_info = resource_get_sprite_info(name);
+const SpriteInfo& render_get_sprite_info(SpriteName name) {
+    return state.sprite_info[name];
+}
+
+void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id) {
+    const SpriteInfo& sprite_info = render_get_sprite_info(name);
 
     Rect src_rect = (Rect) { 
-        .x = sprite_info.atlas_x + (frame.x * sprite_info.frame_width), 
-        .y = sprite_info.atlas_y + (recolor_id * state.sprite_image_size[sprite_info.atlas].y) + (frame.y * sprite_info.frame_height), 
+        .x = frame.x * sprite_info.frame_width, 
+        .y = (recolor_id * sprite_info.frame_height * sprite_info.vframes) + (frame.y * sprite_info.frame_height), 
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
@@ -712,20 +897,16 @@ void render_sprite(SpriteName name, ivec2 frame, ivec2 position, uint32_t option
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, options);
-}
-
-ivec2 render_get_sprite_image_size(AtlasName atlas) {
-    return state.sprite_image_size[atlas];
+    render_sprite(name, src_rect, dst_rect, options);
 }
 
 void render_ninepatch(SpriteName sprite, Rect rect) {
-    const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
+    const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
     GOLD_ASSERT(rect.w > sprite_info.frame_width * 2 && rect.h > sprite_info.frame_height * 2);
 
     Rect src_rect = (Rect) {
-        .x = sprite_info.atlas_x, 
-        .y = sprite_info.atlas_y,
+        .x = 0,
+        .y = 0,
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
@@ -737,63 +918,68 @@ void render_ninepatch(SpriteName sprite, Rect rect) {
     };
 
     // Top left
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Top right
-    src_rect.x = sprite_info.atlas_x + (2 * sprite_info.frame_width);
+    src_rect.x = 0 + (2 * sprite_info.frame_width);
     dst_rect.x = rect.x + rect.w - sprite_info.frame_width;
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom left
-    src_rect.x = sprite_info.atlas_x;
-    src_rect.y = sprite_info.atlas_y + (2 * sprite_info.frame_height);
+    src_rect.x = 0;
+    src_rect.y = 0 + (2 * sprite_info.frame_height);
     dst_rect.x = rect.x;
     dst_rect.y = rect.y + rect.h - sprite_info.frame_height;
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom right
-    src_rect.x = sprite_info.atlas_x + (2 * sprite_info.frame_width);
+    src_rect.x = 0 + (2 * sprite_info.frame_width);
     dst_rect.x = rect.x + rect.w - sprite_info.frame_width;
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Top edge
-    src_rect.x = sprite_info.atlas_x + sprite_info.frame_width;
-    src_rect.y = sprite_info.atlas_y;
+    src_rect.x = 0 + sprite_info.frame_width;
+    src_rect.y = 0;
     dst_rect.x = rect.x + sprite_info.frame_width;
     dst_rect.y = rect.y;
     dst_rect.w = (rect.x + rect.w - sprite_info.frame_width) - dst_rect.x;
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom edge
-    src_rect.y = sprite_info.atlas_y + (2 * sprite_info.frame_height);
+    src_rect.y = 0 + (2 * sprite_info.frame_height);
     dst_rect.y = (rect.y + rect.h - sprite_info.frame_height);
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Left edge
-    src_rect.x = sprite_info.atlas_x;
-    src_rect.y = sprite_info.atlas_y + sprite_info.frame_height;
+    src_rect.x = 0;
+    src_rect.y = 0 + sprite_info.frame_height;
     dst_rect.x = rect.x;
     dst_rect.w = sprite_info.frame_width;
     dst_rect.y = rect.y + sprite_info.frame_height;
     dst_rect.h = (rect.y + rect.h - sprite_info.frame_height) - dst_rect.y;
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Right edge
-    src_rect.x = sprite_info.atlas_x + (2 * sprite_info.frame_width);
+    src_rect.x = 0 + (2 * sprite_info.frame_width);
     dst_rect.x = rect.x + rect.w - sprite_info.frame_width;
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Center
-    src_rect.x = sprite_info.atlas_x + sprite_info.frame_width;
-    src_rect.y = sprite_info.atlas_y + sprite_info.frame_height;
+    src_rect.x = 0 + sprite_info.frame_width;
+    src_rect.y = 0 + sprite_info.frame_height;
     dst_rect.x = rect.x + sprite_info.frame_width;
     dst_rect.y = rect.y + sprite_info.frame_height;
     dst_rect.w = (rect.x + rect.w - sprite_info.frame_width) - dst_rect.x;
     dst_rect.h = (rect.y + rect.h - sprite_info.frame_height) - dst_rect.y;
-    render_atlas(sprite_info.atlas, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 
-void render_atlas(AtlasName atlas, Rect src_rect, Rect dst_rect, uint32_t options) {
+void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t options) {
+    const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
+
+    src_rect.x += sprite_info.atlas_x;
+    src_rect.y += sprite_info.atlas_y;
+
     bool flip_h = (options & RENDER_SPRITE_FLIP_H) == RENDER_SPRITE_FLIP_H;
     bool centered = (options & RENDER_SPRITE_CENTERED) == RENDER_SPRITE_CENTERED;
     bool cull = !((options & RENDER_SPRITE_NO_CULL) == RENDER_SPRITE_NO_CULL);
@@ -825,29 +1011,30 @@ void render_atlas(AtlasName atlas, Rect src_rect, Rect dst_rect, uint32_t option
         tex_coord_right = temp;
     }
 
+    float atlas = (float)sprite_info.atlas;
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_top },
-        .tex_coord = { tex_coord_left, tex_coord_top, (float)atlas }
+        .tex_coord = { tex_coord_left, tex_coord_top, atlas }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_bottom },
-        .tex_coord = { tex_coord_right, tex_coord_bottom, (float)atlas }
+        .tex_coord = { tex_coord_right, tex_coord_bottom, atlas }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_bottom },
-        .tex_coord = { tex_coord_left, tex_coord_bottom, (float)atlas }
+        .tex_coord = { tex_coord_left, tex_coord_bottom, atlas }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_top },
-        .tex_coord = { tex_coord_left, tex_coord_top, (float)atlas }
+        .tex_coord = { tex_coord_left, tex_coord_top, atlas }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_top },
-        .tex_coord = { tex_coord_right, tex_coord_top, (float)atlas }
+        .tex_coord = { tex_coord_right, tex_coord_top, atlas }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_bottom },
-        .tex_coord = { tex_coord_right, tex_coord_bottom, (float)atlas }
+        .tex_coord = { tex_coord_right, tex_coord_bottom, atlas }
     });
 }
 
@@ -869,34 +1056,36 @@ void render_text(FontName name, const char* text, ivec2 position) {
         float position_left = (float)(glyph_position.x + state.fonts[name].glyphs[glyph_index].bearing_x);
         float position_right = position_left + (float)state.fonts[name].glyph_width;
 
-        float tex_coord_left = (float)state.fonts[name].glyphs[glyph_index].atlas_x / (float)ATLAS_WIDTH;
+        ivec2 glyph_frame = ivec2(glyph_index % FONT_HFRAMES, glyph_index / FONT_VFRAMES);
+        float tex_coord_left = (float)(state.fonts[name].atlas_x + (glyph_frame.x * state.fonts[name].glyph_width)) / (float)ATLAS_WIDTH;
         float tex_coord_right = tex_coord_left + frame_size_x;
-        float tex_coord_top = 1.0f - ((float)state.fonts[name].glyphs[glyph_index].atlas_y / (float)ATLAS_HEIGHT);
+        float tex_coord_top = 1.0f - ((float)(state.fonts[name].atlas_y + (glyph_frame.y * state.fonts[name].glyph_height)) / (float)ATLAS_HEIGHT);
         float tex_coord_bottom = tex_coord_top - frame_size_y;
 
+        float font_atlas = (float)state.fonts[name].atlas;
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_left, tex_coord_top, (float)ATLAS_FONT }
+            .tex_coord = { tex_coord_left, tex_coord_top, font_atlas }
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_right, tex_coord_bottom, (float)ATLAS_FONT }
+            .tex_coord = { tex_coord_right, tex_coord_bottom, font_atlas }
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_bottom },
-            .tex_coord = { tex_coord_left, tex_coord_bottom, (float)ATLAS_FONT }
+            .tex_coord = { tex_coord_left, tex_coord_bottom, font_atlas }
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_left, tex_coord_top, (float)ATLAS_FONT }
+            .tex_coord = { tex_coord_left, tex_coord_top, font_atlas }
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_top },
-            .tex_coord = { tex_coord_right, tex_coord_top, (float)ATLAS_FONT }
+            .tex_coord = { tex_coord_right, tex_coord_top, font_atlas}
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_right, tex_coord_bottom, (float)ATLAS_FONT }
+            .tex_coord = { tex_coord_right, tex_coord_bottom, font_atlas }
         });
 
         glyph_position.x += state.fonts[name].glyphs[glyph_index].advance;
@@ -931,10 +1120,10 @@ void render_line(ivec2 start, ivec2 end) {
 }
 
 void render_rect(ivec2 start, ivec2 end) {
-    const SpriteInfo& sprite_info = resource_get_sprite_info(SPRITE_UI_WHITE);
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
     Rect src_rect = (Rect) {
-        .x = sprite_info.atlas_x,
-        .y = sprite_info.atlas_y,
+        .x = sprite_info.frame_width,
+        .y = 0,
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
@@ -942,15 +1131,15 @@ void render_rect(ivec2 start, ivec2 end) {
         .x = start.x, .y = start.y,
         .w = 1, .h = end.y - start.y
     };
-    render_atlas(ATLAS_UI, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
     dst_rect.x = end.x - 1;
-    render_atlas(ATLAS_UI, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
     dst_rect.x = start.x;
     dst_rect.w = end.x - start.x;
     dst_rect.h = 1;
-    render_atlas(ATLAS_UI, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
     dst_rect.y = end.y - 1;
-    render_atlas(ATLAS_UI, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel) {

@@ -2,74 +2,14 @@
 
 #include "defines.h"
 
-enum AtlasName {
-    ATLAS_UI,
-    ATLAS_TILESET,
-    ATLAS_MISC,
-    ATLAS_UNIT_WAGON,
-    ATLAS_FONT,
-    ATLAS_COUNT
-};
-
-enum AtlasImportStrategy {
-    ATLAS_IMPORT_DEFAULT,
-    ATLAS_IMPORT_RECOLOR,
-    ATLAS_IMPORT_RECOLOR_AND_LOW_ALPHA,
-    ATLAS_IMPORT_TILESET,
-    ATLAS_IMPORT_FONTS
-};
-
-struct AtlasParamsTileset {
-    int begin;
-    int end;
-};
-
-struct AtlasParams {
-    const char* path;
-    AtlasImportStrategy strategy;
-    union {
-        AtlasParamsTileset tileset;
-    };
+enum Tileset {
+    TILESET_ARIZONA,
+    TILESET_COUNT
 };
 
 enum SpriteName {
-    SPRITE_UI_MINIMAP,
-    SPRITE_UI_BUTTON_PANEL,
-    SPRITE_UI_BOTTOM_PANEL,
-    SPRITE_UI_FRAME,
-    SPRITE_UI_FRAME_SMALL,
-    SPRITE_UI_BUTTON_REFRESH,
-    SPRITE_UI_BUTTON_ARROW,
-    SPRITE_UI_BUTTON_BURGER,
-    SPRITE_UI_GOLD_ICON,
-    SPRITE_UI_HOUSE_ICON,
-    SPRITE_UI_MINER_ICON,
-    SPRITE_UI_DROPDOWN,
-    SPRITE_UI_DROPDOWN_MINI,
-    SPRITE_UI_TEAM_PICKER,
-    SPRITE_UI_PANEL_BUTTON,
-    SPRITE_UI_MENU_BUTTON,
-    SPRITE_UI_TEXT_FRAME,
-    SPRITE_UI_CLOUDS,
-    SPRITE_UI_SKY,
-    SPRITE_UI_WHITE,
-    SPRITE_UI_SELECT_RING_LANDMINE,
-    SPRITE_UI_SELECT_RING_LANDMINE_ATTACK,
-    SPRITE_UI_SELECT_RING_UNIT,
-    SPRITE_UI_SELECT_RING_UNIT_ATTACK,
-    SPRITE_UI_SELECT_RING_WAGON,
-    SPRITE_UI_SELECT_RING_WAGON_ATTACK,
-    SPRITE_UI_SELECT_RING_BUILDING_SIZE2,
-    SPRITE_UI_SELECT_RING_BUILDING_SIZE2_ATTACK,
-    SPRITE_UI_SELECT_RING_BUILDING_SIZE3,
-    SPRITE_UI_SELECT_RING_BUILDING_SIZE3_ATTACK,
-    SPRITE_UI_SELECT_RING_BUILDING_SIZE4,
-    SPRITE_UI_SELECT_RING_BUILDING_SIZE4_ATTACK,
-    SPRITE_UI_SELECT_RING_GOLDMINE,
-    SPRITE_GOLDMINE,
-    SPRITE_UNIT_WAGON,
     SPRITE_TILE_NULL,
-    SPRITE_TILE_SAND,
+    SPRITE_TILE_SAND1,
     SPRITE_TILE_SAND2,
     SPRITE_TILE_SAND3,
     SPRITE_TILE_WATER,
@@ -103,20 +43,54 @@ enum SpriteName {
     SPRITE_TILE_WALL_WEST_STAIR_TOP,
     SPRITE_TILE_WALL_WEST_STAIR_CENTER,
     SPRITE_TILE_WALL_WEST_STAIR_BOTTOM,
-    SPRITE_TILE_DECORATION0,
-    SPRITE_TILE_DECORATION1,
-    SPRITE_TILE_DECORATION2,
-    SPRITE_TILE_DECORATION3,
-    SPRITE_TILE_DECORATION4,
+    SPRITE_DECORATION,
+    SPRITE_UI_MINIMAP,
+    SPRITE_UI_BUTTON_PANEL,
+    SPRITE_UI_BOTTOM_PANEL,
+    SPRITE_UI_FRAME,
+    SPRITE_UI_FRAME_SMALL,
+    SPRITE_UI_BUTTON_REFRESH,
+    SPRITE_UI_BUTTON_ARROW,
+    SPRITE_UI_BUTTON_BURGER,
+    SPRITE_UI_GOLD_ICON,
+    SPRITE_UI_HOUSE_ICON,
+    SPRITE_UI_MINER_ICON,
+    SPRITE_UI_DROPDOWN,
+    SPRITE_UI_DROPDOWN_MINI,
+    SPRITE_UI_TEAM_PICKER,
+    SPRITE_UI_MENU_BUTTON,
+    SPRITE_UI_TEXT_FRAME,
+    SPRITE_UI_CLOUDS,
+    SPRITE_UI_SWATCH,
+    SPRITE_SELECT_RING_LANDMINE,
+    SPRITE_SELECT_RING_LANDMINE_ATTACK,
+    SPRITE_SELECT_RING_UNIT,
+    SPRITE_SELECT_RING_UNIT_ATTACK,
+    SPRITE_SELECT_RING_WAGON,
+    SPRITE_SELECT_RING_WAGON_ATTACK,
+    SPRITE_SELECT_RING_BUILDING_SIZE2,
+    SPRITE_SELECT_RING_BUILDING_SIZE2_ATTACK,
+    SPRITE_SELECT_RING_BUILDING_SIZE3,
+    SPRITE_SELECT_RING_BUILDING_SIZE3_ATTACK,
+    SPRITE_SELECT_RING_BUILDING_SIZE4,
+    SPRITE_SELECT_RING_BUILDING_SIZE4_ATTACK,
+    SPRITE_SELECT_RING_GOLDMINE,
+    SPRITE_GOLDMINE,
+    SPRITE_UNIT_WAGON,
     SPRITE_COUNT
 };
 
-struct SpriteInfo {
-    AtlasName atlas;
-    int atlas_x;
-    int atlas_y;
-    int frame_width;
-    int frame_height;
+enum SpriteImportStrategy {
+    SPRITE_IMPORT_DEFAULT,
+    SPRITE_IMPORT_RECOLOR,
+    SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA,
+    SPRITE_IMPORT_TILE
+};
+
+struct SpriteParamsSheet {
+    const char* path;
+    int hframes;
+    int vframes;
 };
 
 enum TileType {
@@ -124,13 +98,24 @@ enum TileType {
     TILE_TYPE_AUTO
 };
 
-struct TileData {
+struct SpriteParamsTile {
+    Tileset tileset;
     TileType type;
     int source_x;
     int source_y;
 };
 
-const AtlasParams& resource_get_atlas_params(AtlasName atlas);
-const SpriteInfo& resource_get_sprite_info(SpriteName name);
-void resource_set_sprite_info(SpriteName name, SpriteInfo sprite_info);
-const TileData& resource_get_tile_data(SpriteName tile);
+struct SpriteParams {
+    SpriteImportStrategy strategy;
+    union {
+        SpriteParamsSheet sheet;
+        SpriteParamsTile tile;
+    };
+};
+
+struct TilesetParams {
+    const char* path;
+};
+
+const SpriteParams& render_get_sprite_params(SpriteName sprite);
+const TilesetParams& render_get_tileset_params(Tileset tileset);

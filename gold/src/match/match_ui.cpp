@@ -249,9 +249,9 @@ void match_ui_render(const MatchUiState& state) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.match.map.width);
             Tile tile = state.match.map.tiles[map_index];
-            if (!(tile.sprite >= SPRITE_TILE_SAND && tile.sprite <= SPRITE_TILE_SAND3)) {
+            if (!(tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3)) {
                 render_sprite_params[match_ui_get_render_layer(tile.elevation == 0 ? 0 : tile.elevation - 1, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
-                    .sprite = (SpriteName)SPRITE_TILE_SAND,
+                    .sprite = (SpriteName)SPRITE_TILE_SAND1,
                     .frame = ivec2(0, 0),
                     .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
                     .options = RENDER_SPRITE_NO_CULL,
@@ -312,7 +312,7 @@ void match_ui_render(const MatchUiState& state) {
             .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : state.match.players[entity.player_id].recolor_id
         };
 
-        const SpriteInfo& sprite_info = resource_get_sprite_info(params.sprite);
+        const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
         Rect render_rect = (Rect) {
             .x = params.position.x, .y = params.position.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
@@ -348,9 +348,9 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // UI frames
-    const SpriteInfo& minimap_sprite_info = resource_get_sprite_info(SPRITE_UI_MINIMAP);
-    const SpriteInfo& bottom_panel_sprite_info = resource_get_sprite_info(SPRITE_UI_BOTTOM_PANEL);
-    const SpriteInfo& button_panel_sprite_info = resource_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
+    const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
+    const SpriteInfo& bottom_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BOTTOM_PANEL);
+    const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
     render_sprite(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
     render_sprite(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height), 0, 0);
     render_sprite(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);

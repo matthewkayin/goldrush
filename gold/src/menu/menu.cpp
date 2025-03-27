@@ -320,7 +320,7 @@ void menu_update(MenuState& state) {
         ui_text(FONT_HACK_GOLD, "Settings");
 
         ui_begin_column(ivec2(MATCH_SETTINGS_RECT.x + 8, MATCH_SETTINGS_RECT.y + 22), 4);
-            int dropdown_width = resource_get_sprite_info(SPRITE_UI_DROPDOWN_MINI).frame_width;
+            int dropdown_width = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI).frame_width;
             const int setting_name_element_size = MATCH_SETTINGS_RECT.w - 16 - dropdown_width;
             for (int index = 0; index < MATCH_SETTING_COUNT; index++) {
                 MatchSettingData setting_data = match_setting_data((MatchSetting)index);
@@ -503,7 +503,7 @@ const char* menu_get_player_status_string(NetworkPlayerStatus status) {
 
 void menu_render(const MenuState& state) {
     // Sky background
-    const SpriteInfo& sky_sprite_info = resource_get_sprite_info(SPRITE_UI_SKY);
+    const SpriteInfo& sky_sprite_info = render_get_sprite_info(SPRITE_UI_SKY);
     Rect sky_src_rect = (Rect) { 
         .x = sky_sprite_info.atlas_x, 
         .y = sky_sprite_info.atlas_y, 
@@ -515,8 +515,8 @@ void menu_render(const MenuState& state) {
     // Tiles
     for (int y = 0; y < MENU_TILE_HEIGHT; y++) {
         for (int x = 0; x < MENU_TILE_WIDTH; x++) {
-            SpriteName sprite = (x + y) % 10 == 0 ? SPRITE_TILE_SAND2 : SPRITE_TILE_SAND;
-            const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
+            SpriteName sprite = (x + y) % 10 == 0 ? SPRITE_TILE_SAND2 : SPRITE_TILE_SAND1;
+            const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
             Rect src_rect = (Rect) {
                 .x = sprite_info.atlas_x,
                 .y = sprite_info.atlas_y,
@@ -538,7 +538,7 @@ void menu_render(const MenuState& state) {
     menu_render_decoration(state, 2);
 
     // Wagon animation
-    const SpriteInfo& sprite_wagon_info = resource_get_sprite_info(SPRITE_UNIT_WAGON);
+    const SpriteInfo& sprite_wagon_info = render_get_sprite_info(SPRITE_UNIT_WAGON);
     // Wagon color defaults to blue
     int wagon_recolor_id = 0;
     if (state.mode == MENU_MODE_LOBBY) { 
@@ -563,7 +563,7 @@ void menu_render(const MenuState& state) {
     menu_render_decoration(state, 1);
 
     // Render clouds
-    const SpriteInfo& cloud_sprite_info = resource_get_sprite_info(SPRITE_UI_CLOUDS);
+    const SpriteInfo& cloud_sprite_info = render_get_sprite_info(SPRITE_UI_CLOUDS);
     for (int index = 0; index < CLOUD_COUNT; index++) {
         Rect src_rect = (Rect) {
             .x = cloud_sprite_info.atlas_x + (CLOUD_FRAME_X[index] * cloud_sprite_info.frame_width),
@@ -609,7 +609,7 @@ void menu_render_decoration(const MenuState& state, int index) {
         cactus_index = 0;
     }
     SpriteName sprite = (SpriteName)(SPRITE_TILE_DECORATION0 + cactus_index);
-    const SpriteInfo& sprite_info = resource_get_sprite_info(sprite);
+    const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
     Rect src_rect = (Rect) {
         .x = sprite_info.atlas_x,
         .y = sprite_info.atlas_y,

@@ -22,6 +22,16 @@ enum MinimapPixel {
     MINIMAP_PIXEL_COUNT
 };
 
+struct SpriteInfo {
+    int atlas;
+    int atlas_x;
+    int atlas_y;
+    int hframes;
+    int vframes;
+    int frame_width;
+    int frame_height;
+};
+
 const uint32_t RENDER_SPRITE_NO_CULL = 1;
 const uint32_t RENDER_SPRITE_FLIP_H = 2;
 const uint32_t RENDER_SPRITE_CENTERED = 4;
@@ -31,10 +41,10 @@ void render_quit();
 void render_set_window_size(ivec2 window_size);
 void render_prepare_frame();
 void render_present_frame();
-void render_sprite(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id);
-ivec2 render_get_sprite_image_size(AtlasName atlas);
+const SpriteInfo& render_get_sprite_info(SpriteName name);
+void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id);
 void render_ninepatch(SpriteName sprite, Rect rect);
-void render_atlas(AtlasName atlas, Rect src_rect, Rect dst_rect, uint32_t options);
+void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t options);
 void render_text(FontName name, const char* text, ivec2 position);
 ivec2 render_get_text_size(FontName name, const char* text);
 void render_line(ivec2 start, ivec2 end);
