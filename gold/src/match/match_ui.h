@@ -36,6 +36,7 @@ struct MatchUiState {
     MatchUiMode mode;
     ivec2 camera_offset;
     ivec2 select_origin;
+    bool is_minimap_dragging;
     std::vector<EntityId> selection;
     MatchState match;
 };

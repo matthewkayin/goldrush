@@ -21,6 +21,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.mode = MATCH_UI_MODE_NOT_STARTED;
     state.camera_offset = ivec2(0, 0);
     state.select_origin = ivec2(-1, -1);
+    state.is_minimap_dragging = false;
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
@@ -71,6 +72,45 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // UPDATE
 
+void match_ui_handle_left_mouse_press(MatchUiState& state) {
+    // Begin minimap drag
+    if (MINIMAP_RECT.has_point(input_get_mouse_position())) {
+        state.is_minimap_dragging = true;
+        return;
+    }
+
+    // Begin selecting
+    if (!match_ui_is_mouse_in_ui()) {
+        state.select_origin = input_get_mouse_position() + state.camera_offset;
+        return;
+    }
+}
+
+void match_ui_handle_left_mouse_release(MatchUiState& state) {
+    // End minimap drag
+    if (state.is_minimap_dragging) {
+        state.is_minimap_dragging = false;
+        return;
+    }
+
+    // End selecting
+    if (match_ui_is_selecting(state)) {
+        ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
+        Rect select_rect = (Rect) {
+            .x = std::min(world_pos.x, state.select_origin.x),
+            .y = std::min(world_pos.y, state.select_origin.y),
+            .w = std::max(1, std::abs(state.select_origin.x - world_pos.x)),
+            .h = std::max(1, std::abs(state.select_origin.y - world_pos.y)),
+        };
+
+        std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
+        match_ui_set_selection(state, selection);
+        state.select_origin = ivec2(-1, -1);
+
+        return;
+    }
+}
+
 void match_ui_update(MatchUiState& state) {
     if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
         // Check that all players are ready
@@ -88,21 +128,10 @@ void match_ui_update(MatchUiState& state) {
 
     // Handle input
     if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
-        // Begin selecting
-        state.select_origin = input_get_mouse_position() + state.camera_offset;
+        match_ui_handle_left_mouse_press(state);
     }
     if (input_is_action_just_released(INPUT_LEFT_CLICK)) {
-        ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
-        Rect select_rect = (Rect) {
-            .x = std::min(world_pos.x, state.select_origin.x),
-            .y = std::min(world_pos.y, state.select_origin.y),
-            .w = std::max(1, std::abs(state.select_origin.x - world_pos.x)),
-            .h = std::max(1, std::abs(state.select_origin.y - world_pos.y)),
-        };
-
-        std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
-        match_ui_set_selection(state, selection);
-        state.select_origin = ivec2(-1, -1);
+        match_ui_handle_left_mouse_release(state);
     }
 
     match_update(state.match);
@@ -123,6 +152,18 @@ void match_ui_update(MatchUiState& state) {
         state.camera_offset += camera_drag_direction * CAMERA_SPEED;
         match_ui_clamp_camera(state);
     }
+
+    // Minimap drag
+    if (state.is_minimap_dragging) {
+        ivec2 minimap_pos = ivec2(
+            std::clamp(input_get_mouse_position().x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w),
+            std::clamp(input_get_mouse_position().y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
+        ivec2 map_pos = ivec2(
+            (state.match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+            (state.match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+        match_ui_center_camera_on_cell(state, map_pos / TILE_SIZE);
+    }
+
 }
 
 // UPDATE FUNCTIONS
