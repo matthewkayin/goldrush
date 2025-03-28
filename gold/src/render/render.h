@@ -22,6 +22,7 @@ enum MinimapPixel {
     MINIMAP_PIXEL_PLAYER1,
     MINIMAP_PIXEL_PLAYER2,
     MINIMAP_PIXEL_PLAYER3,
+    MINIMAP_PIXEL_GOLD,
     MINIMAP_PIXEL_SAND,
     MINIMAP_PIXEL_WATER,
     MINIMAP_PIXEL_WALL,
@@ -57,4 +58,7 @@ ivec2 render_get_text_size(FontName name, const char* text);
 void render_line(ivec2 start, ivec2 end);
 void render_rect(ivec2 start, ivec2 end);
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel);
+void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
+void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
+void render_update_minimap_texture();
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size);

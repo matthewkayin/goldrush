@@ -48,23 +48,6 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     }
     state.match = match_init(lcg_seed, noise, players);
 
-    // Init minimap texture
-    for (int y = 0; y < state.match.map.height; y++) {
-        for (int x = 0; x < state.match.map.width; x++) {
-            MinimapPixel pixel; 
-            Tile tile = map_get_tile(state.match.map, ivec2(x, y));
-            if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
-                pixel = MINIMAP_PIXEL_SAND;
-            } else if (tile.sprite == SPRITE_TILE_WATER) {
-                pixel = MINIMAP_PIXEL_WATER;
-            } else {
-                pixel = MINIMAP_PIXEL_WALL;
-            }
-            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), pixel);
-            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
-        }
-    }
-
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
@@ -268,6 +251,46 @@ void match_ui_update(MatchUiState& state) {
             }
         }
     }
+
+    // Update Minimap
+    for (int y = 0; y < state.match.map.height; y++) {
+        for (int x = 0; x < state.match.map.width; x++) {
+            MinimapPixel pixel; 
+            Tile tile = map_get_tile(state.match.map, ivec2(x, y));
+            if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
+                pixel = MINIMAP_PIXEL_SAND;
+            } else if (tile.sprite == SPRITE_TILE_WATER) {
+                pixel = MINIMAP_PIXEL_WATER;
+            } else {
+                pixel = MINIMAP_PIXEL_WALL;
+            }
+            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), pixel);
+            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
+        }
+    }
+    // Minimap entities
+    for (const Entity& entity : state.match.entities) {
+        if (!entity_is_selectable(entity) || !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+
+        MinimapPixel pixel = entity.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + entity.player_id);
+        int entity_cell_size = entity_get_data(entity.type).cell_size;
+        Rect entity_rect = (Rect) {
+            .x = entity.cell.x, .y = entity.cell.y,
+            .w = entity_cell_size, .h = entity_cell_size
+        };
+        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
+    }
+    // Minimap camera rect
+    Rect camera_rect = (Rect) {
+        .x = state.camera_offset.x / TILE_SIZE,
+        .y = state.camera_offset.y / TILE_SIZE,
+        .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
+        .h = ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / TILE_SIZE) - 1
+    };
+    render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
+    render_update_minimap_texture();
 }
 
 // UPDATE FUNCTIONS
@@ -523,27 +546,6 @@ void match_ui_render(const MatchUiState& state) {
 
     render_sprite_batch();
 
-    // Minimap
-    for (int y = 0; y < state.match.map.height; y++) {
-        for (int x = 0; x < state.match.map.width; x++) {
-            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
-        }
-    }
-    // Minimap camera rect
-    Rect camera_rect = (Rect) {
-        .x = state.camera_offset.x / TILE_SIZE,
-        .y = state.camera_offset.y / TILE_SIZE,
-        .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
-        .h = ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / TILE_SIZE) - 1
-    };
-    for (int y = camera_rect.y; y < camera_rect.y + camera_rect.h + 1; y++) {
-        render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(camera_rect.x, y), MINIMAP_PIXEL_WHITE);
-        render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(camera_rect.x + camera_rect.w, y), MINIMAP_PIXEL_WHITE);
-    }
-    for (int x = camera_rect.x + 1; x < camera_rect.x + camera_rect.w; x++) {
-        render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, camera_rect.y), MINIMAP_PIXEL_WHITE);
-        render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, camera_rect.y + camera_rect.h), MINIMAP_PIXEL_WHITE);
-    }
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 }
 

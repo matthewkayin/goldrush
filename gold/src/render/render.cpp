@@ -208,7 +208,7 @@ bool render_init(SDL_Window* window) {
     }
 
     log_info("Initialized renderer. Vendor: %s. Renderer: %s. Version: %s.", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
-    SDL_GL_SetSwapInterval(0);
+    SDL_GL_SetSwapInterval(1);
 
     return true;
 }
@@ -282,9 +282,9 @@ void render_init_line_vao() {
 
 void render_init_minimap_texture() {
     glGenTextures(1, &state.minimap_texture);
+
     glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_FALSE, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -295,10 +295,10 @@ void render_init_minimap_texture() {
     state.minimap_pixel_values[MINIMAP_PIXEL_OFFBLACK] = SDL_MapRGBA(format, 40, 37, 45, 255);
     state.minimap_pixel_values[MINIMAP_PIXEL_OFFBLACK_TRANSPARENT] = SDL_MapRGBA(format, 40, 37, 45, 128);
     state.minimap_pixel_values[MINIMAP_PIXEL_WHITE] = SDL_MapRGBA(format, 255, 255, 255, 255);
-    log_trace("minimap pixel value %u", state.minimap_pixel_values[MINIMAP_PIXEL_WHITE]);
     for (int player = 0; player < MAX_PLAYERS; player++) {
         state.minimap_pixel_values[MINIMAP_PIXEL_PLAYER0 + player] = SDL_MapRGBA(format, PLAYER_COLORS[player].clothes_color.r, PLAYER_COLORS[player].clothes_color.g, PLAYER_COLORS[player].clothes_color.b, PLAYER_COLORS[player].clothes_color.a);
     }
+    state.minimap_pixel_values[MINIMAP_PIXEL_GOLD] = SDL_MapRGBA(format, 238, 209, 158, 255);
     state.minimap_pixel_values[MINIMAP_PIXEL_SAND] = SDL_MapRGBA(format, 204, 162, 139, 255);
     state.minimap_pixel_values[MINIMAP_PIXEL_WATER] = SDL_MapRGBA(format, 70, 100, 115, 255);
     state.minimap_pixel_values[MINIMAP_PIXEL_WALL] = SDL_MapRGBA(format, 94, 88, 89, 255);
@@ -826,12 +826,10 @@ void render_quit() {
 void render_prepare_frame() {
     glBindFramebuffer(GL_FRAMEBUFFER, state.screen_framebuffer);
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT);
 }
 
 void render_sprite_batch() {
@@ -1167,6 +1165,31 @@ void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pi
     state.minimap_texture_pixels[position.x + (position.y * MINIMAP_TEXTURE_WIDTH)] = state.minimap_pixel_values[pixel];
 }
 
+void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel) {
+    for (int y = rect.y; y < rect.y + rect.h + 1; y++) {
+        render_minimap_putpixel(layer, ivec2(rect.x, y), pixel);
+        render_minimap_putpixel(layer, ivec2(rect.x + rect.w, y), pixel);
+    }
+    for (int x = rect.x + 1; x < rect.x + rect.w; x++) {
+        render_minimap_putpixel(layer, ivec2(x, rect.y), pixel);
+        render_minimap_putpixel(layer, ivec2(x, rect.y + rect.h), pixel);
+    }
+}
+
+void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel) {
+    for (int y = rect.y; y < rect.y + rect.h + 1; y++) {
+        for (int x = rect.x; x < rect.x + rect.w + 1; x++) {
+            render_minimap_putpixel(layer, ivec2(x, y), pixel);
+        }
+    }
+}
+
+void render_update_minimap_texture() {
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, state.minimap_texture_pixels);
+}
+
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
     GOLD_ASSERT(size.x <= MINIMAP_TEXTURE_WIDTH / 2 && size.y <= MINIMAP_TEXTURE_HEIGHT);
 
@@ -1238,7 +1261,6 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, state.minimap_texture_pixels);
 
     glUseProgram(state.minimap_shader);
     glBindVertexArray(state.sprite_vao);
