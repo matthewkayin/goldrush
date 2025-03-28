@@ -11,6 +11,7 @@
 #define NETWORK_LOBBY_CHAT_BUFFER_SIZE 128
 #define NETWORK_SCANNER_PORT 6529
 #define NETWORK_BASE_PORT 6530
+#define NETWORK_INPUT_BUFFER_SIZE 1024
 
 enum NetworkStatus {
     NETWORK_STATUS_OFFLINE,
@@ -56,7 +57,8 @@ enum NetworkEventType {
     NETWORK_EVENT_INVALID_VERSION,
     NETWORK_EVENT_JOINED_LOBBY,
     NETWORK_EVENT_LOBBY_CHAT,
-    NETWORK_EVENT_MATCH_LOAD
+    NETWORK_EVENT_MATCH_LOAD,
+    NETWORK_EVENT_INPUT
 };
 
 struct NetworkEventPlayerDisconnected {
@@ -76,6 +78,12 @@ struct NetworkEventMatchLoad {
     Noise noise;
 };
 
+struct NetworkEventInput {
+    uint8_t in_buffer[NETWORK_INPUT_BUFFER_SIZE];
+    uint8_t in_buffer_length;
+    uint8_t player_id;
+};
+
 struct NetworkEvent {
     NetworkEventType type;
     union {
@@ -83,6 +91,7 @@ struct NetworkEvent {
         NetworkEventPlayerConnected player_connected;
         NetworkEventLobbyChat lobby_chat;
         NetworkEventMatchLoad match_load;
+        NetworkEventInput input;
     };
 };
 
@@ -115,3 +124,4 @@ void network_set_match_setting(uint8_t setting, uint8_t value);
 uint8_t network_get_match_setting(uint8_t setting);
 void network_set_player_team(uint8_t team);
 void network_begin_loading_match(int32_t lcg_seed, const Noise& noise);
+void network_send_input(uint8_t* out_buffer, size_t out_buffer_length);

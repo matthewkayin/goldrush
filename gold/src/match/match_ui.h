@@ -5,6 +5,7 @@
 #include "core/network.h"
 #include "noise.h"
 #include "match_state.h"
+#include "match_input.h"
 
 #define MATCH_UI_HEIGHT 88
 
@@ -34,10 +35,18 @@ enum MatchUiMode {
 
 struct MatchUiState {
     MatchUiMode mode;
+    uint32_t turn_timer;
+    uint32_t turn_counter;
+    uint32_t disconnect_timer;
+    std::vector<std::vector<MatchInput>> inputs[MAX_PLAYERS];
+    std::vector<MatchInput> input_queue;
+
     ivec2 camera_offset;
-    ivec2 select_origin;
     bool is_minimap_dragging;
+
+    ivec2 select_origin;
     std::vector<EntityId> selection;
+
     MatchState match;
 };
 

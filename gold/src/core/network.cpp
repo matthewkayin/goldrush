@@ -667,6 +667,23 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             state.event_queue.push(event);
             break;
         }
+        case NETWORK_MESSAGE_INPUT: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
+            uint8_t* player_id_ptr = (uint8_t*)state.host->peers[incoming_peer_id].data;
+
+            NetworkEvent event;
+            event.type = NETWORK_EVENT_INPUT;
+            event.input.in_buffer_length = length;
+            event.input.player_id = *player_id_ptr;
+            memcpy(event.input.in_buffer, data, length);
+
+            state.event_queue.push(event);
+
+            break;
+        }
     }
 }
 
@@ -791,4 +808,11 @@ void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
     enet_host_flush(state.host);
 
     free(message);
+}
+
+void network_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
+    out_buffer[0] = NETWORK_MESSAGE_INPUT;
+    ENetPacket* packet = enet_packet_create(out_buffer, out_buffer_length, ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
 }

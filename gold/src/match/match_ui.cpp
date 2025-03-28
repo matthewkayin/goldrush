@@ -8,6 +8,9 @@
 #include "render/render.h"
 #include <algorithm>
 
+static const uint32_t TURN_OFFSET = 2;
+static const uint32_t TURN_DURATION = 4;
+
 static const int MATCH_CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_SPEED = 16; // TODO: move to options
 static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
@@ -22,6 +25,9 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.camera_offset = ivec2(0, 0);
     state.select_origin = ivec2(-1, -1);
     state.is_minimap_dragging = false;
+    state.turn_timer = 0;
+    state.turn_counter = 0;
+    state.disconnect_timer = 0;
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
@@ -59,6 +65,17 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         }
     }
 
+    // Init input queues
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
+            continue;
+        }
+
+        for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
+            state.inputs[player_id].push_back({ (MatchInput) { .type = MATCH_INPUT_NONE } });
+        }
+    }
+
     network_set_player_ready(true);
 
     return state;
@@ -67,7 +84,24 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
 // HANDLE EVENT
 
 void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
+    switch (event.type) {
+        case NETWORK_EVENT_INPUT: {
+            // Deserialize input
+            std::vector<MatchInput> inputs;
 
+            const uint8_t* in_buffer = event.input.in_buffer;
+            size_t in_buffer_head = 1; // Advance the head by once since the first byte will contain the network message type
+
+            while (in_buffer_head < event.input.in_buffer_length) {
+                inputs.push_back(match_input_deserialize(in_buffer, in_buffer_head));
+            }
+
+            state.inputs[event.input.player_id].push_back(inputs);
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 // UPDATE
@@ -125,6 +159,64 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Turn loop
+    if (state.turn_timer == 0) {
+        bool all_inputs_received = true;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
+                continue;
+            }
+
+            if (state.inputs[player_id].empty() || state.inputs[player_id][0].empty()) {
+                all_inputs_received = false;
+                continue;
+            }
+        }
+
+        if (!all_inputs_received) {
+            state.disconnect_timer++;
+            return;
+        }
+
+        // Reset the disconnect timer if we recevied inputs
+        state.disconnect_timer = 0;
+
+        // All inputs received. Begin next turn
+        state.turn_timer = TURN_DURATION;
+        state.turn_counter++;
+
+        // Handle input
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
+                continue;
+            }
+
+            for (const MatchInput& input : state.inputs[player_id][0]) {
+                // TODO: handle input
+            }
+            state.inputs[player_id].erase(state.inputs[player_id].begin());
+        }
+
+        // Flush input
+        // Always send at least one input per turn
+        if (state.input_queue.empty()) {
+            state.input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
+        }
+
+        // Serialize the inputs
+        uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
+        size_t out_buffer_length = 1;
+        for (const MatchInput& input : state.input_queue) {
+            match_input_serialize(out_buffer, out_buffer_length, input);
+        }
+        state.inputs[network_get_player_id()].push_back(state.input_queue);
+        state.input_queue.clear();
+
+        // Send inputs to other players
+        network_send_input(out_buffer, out_buffer_length);
+    } 
+    // End if tick timer is 0
+
+    state.turn_timer--;
 
     // Handle input
     if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
@@ -164,6 +256,18 @@ void match_ui_update(MatchUiState& state) {
         match_ui_center_camera_on_cell(state, map_pos / TILE_SIZE);
     }
 
+    // Clear hidden units from selection
+    {
+        int selection_index = 0;
+        while (selection_index < state.selection.size()) {
+            Entity& selected_entity = state.match.entities.get_by_id(state.selection[selection_index]);
+            if (!entity_is_selectable(selected_entity) || !match_is_entity_visible_to_player(state.match, selected_entity, network_get_player_id())) {
+                state.selection.erase(state.selection.begin() + selection_index);
+            } else {
+                selection_index++;
+            }
+        }
+    }
 }
 
 // UPDATE FUNCTIONS
