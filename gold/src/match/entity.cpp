@@ -6,7 +6,33 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     { ENTITY_GOLDMINE, (EntityData) {
         .name = "Gold Mine",
         .sprite = SPRITE_GOLDMINE,
-        .cell_size = 3
+        .cell_size = 3,
+    }},
+    { ENTITY_MINER, (EntityData) {
+        .name = "Miner",
+        .sprite = SPRITE_UNIT_MINER,
+        .cell_size = 1,
+        
+        .gold_cost = 50,
+        .train_duration = 20,
+        .max_health = 25,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 1,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 200),
+
+            .damage = 3,
+            .attack_cooldown = 22,
+            .range_squared = 1,
+            .min_range_squared = 1
+        }
     }}
 };
 
@@ -15,7 +41,7 @@ const EntityData& entity_get_data(EntityType type) {
 }
 
 bool entity_is_unit(EntityType type) {
-    return false;
+    return type > ENTITY_GOLDMINE;
 }
 
 bool entity_is_selectable(const Entity& entity) {
@@ -48,4 +74,9 @@ Rect entity_get_rect(const Entity& entity) {
     }
 
     return rect;
+}
+
+fvec2 entity_get_target_position(const Entity& entity) {
+    int unit_size = entity_get_data(entity.type).cell_size * TILE_SIZE;
+    return fvec2((entity.cell * TILE_SIZE) + ivec2(unit_size / 2, unit_size / 2));
 }

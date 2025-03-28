@@ -601,6 +601,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .hframes = 15,
             .vframes = 3
         }
+    }},
+    { SPRITE_UNIT_MINER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_miner.png",
+            .hframes = 15,
+            .vframes = 6
+        }
     }}
 };
 

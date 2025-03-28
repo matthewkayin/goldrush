@@ -59,6 +59,15 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         }
     }
 
+    // Init camera
+    for (const Entity& entity : state.match.entities) {
+        // TODO choose the first Town Hall instead
+        if (entity.type == ENTITY_MINER && entity.player_id == network_get_player_id()) {
+            match_ui_center_camera_on_cell(state, entity.cell);
+            break;
+        }
+    }
+
     network_set_player_ready(true);
 
     return state;
@@ -475,6 +484,13 @@ void match_ui_render(const MatchUiState& state) {
 
         // Select ring
         SpriteName select_ring_sprite = SPRITE_SELECT_RING_GOLDMINE;
+        if (entity_is_unit(entity.type)) {
+            select_ring_sprite = SPRITE_SELECT_RING_UNIT;
+        }
+        if (select_ring_sprite != SPRITE_SELECT_RING_GOLDMINE && entity.player_id != network_get_player_id()) {
+            select_ring_sprite = (SpriteName)(select_ring_sprite + 1);
+        }
+
         Rect entity_rect = entity_get_rect(entity);
         ivec2 entity_center_position = entity_is_unit(entity.type) 
                 ? entity.position.to_ivec2()
@@ -493,6 +509,7 @@ void match_ui_render(const MatchUiState& state) {
     // Entities
     for (const Entity& entity : state.match.entities) {
         const EntityData& entity_data = entity_get_data(entity.type);
+
         RenderSpriteParams params = (RenderSpriteParams) {
             .sprite = entity_data.sprite,
             .frame = ivec2(0, 0),
@@ -502,6 +519,14 @@ void match_ui_render(const MatchUiState& state) {
         };
 
         const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
+        if (entity_is_unit(entity.type)) {
+            params.position.x -= sprite_info.frame_width / 2;
+            params.position.y -= sprite_info.frame_height / 2;
+            if (entity.direction > DIRECTION_SOUTH) {
+                params.options |= RENDER_SPRITE_FLIP_H;
+            }
+        }
+
         Rect render_rect = (Rect) {
             .x = params.position.x, .y = params.position.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height

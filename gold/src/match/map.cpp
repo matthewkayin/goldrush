@@ -545,10 +545,8 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
         // Place a gold mine on each player's spawn
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             ivec2 mine_cell = player_spawns[player_id];
-            // TODO: create gold mine
+            goldmine_cells.push_back(mine_cell);
             params.avoid_values[mine_cell.x + (mine_cell.y * map.width)] = params.disk_radius;
-
-            // TODO: alter player spawn based on gold mine location
             GOLD_ASSERT(player_spawns[player_id].x != -1);
         }
 
@@ -559,7 +557,8 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
             }
         }
 
-        goldmine_cells = map_poisson_disk(map, params);
+        std::vector<ivec2> goldmine_results = map_poisson_disk(map, params);
+        goldmine_cells.insert(goldmine_cells.end(), goldmine_results.begin(), goldmine_results.end());
         for (ivec2 goldmine_cell : goldmine_cells) {
             params.avoid_values[goldmine_cell.x + (goldmine_cell.y * map.width)] = 4;
         }
@@ -769,6 +768,119 @@ std::vector<ivec2> map_poisson_disk(const Map& map, PoissonDiskParams& params) {
     return sample;
 }
 
+ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
+    ivec2 nearest_cell;
+    int nearest_cell_dist = -1;
+    ivec2 rect_position = mine_cell - ivec2(4, 4);
+    int rect_size = 11;
+    int start_size = 4;
+    ivec2 start = mine_cell;
+
+    ivec2 cell_begin[4] = { 
+        rect_position + ivec2(-start_size, -(start_size - 1)),
+        rect_position + ivec2(-(start_size - 1), rect_size),
+        rect_position + ivec2(rect_size, rect_size - 1),
+        rect_position + ivec2(rect_size - 1, -start_size)
+    };
+    ivec2 cell_end[4] = { 
+        ivec2(cell_begin[0].x, rect_position.y + rect_size - 1),
+        ivec2(rect_position.x + rect_size - 1, cell_begin[1].y),
+        ivec2(cell_begin[2].x, cell_begin[0].y),
+        ivec2(cell_begin[0].x + 1, cell_begin[3].y)
+    };
+
+    ivec2 cell_step[4] = { ivec2(0, 1), ivec2(1, 0), ivec2(0, -1), ivec2(-1, 0) };
+    uint32_t index = 0;
+    ivec2 cell = cell_begin[index];
+    while (index < 4) {
+        // check if cell is valid
+        bool cell_is_valid = map_is_cell_rect_in_bounds(map, cell, ivec2(start_size, start_size));
+        if (cell_is_valid) {
+            cell_is_valid = !map_is_cell_rect_occupied(map, cell, ivec2(start_size, start_size)) && 
+                    map_is_cell_rect_same_elevation(map, cell, ivec2(start_size, start_size)) && 
+                    map_get_tile(map, cell).elevation == map_get_tile(map, mine_cell).elevation &&
+                    (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist);
+        }
+        // after the initial check, check the surrounding cells
+        if (cell_is_valid) {
+            const int STAIR_RADIUS = 2;
+            for (int x = cell.x - STAIR_RADIUS; x < cell.x + start_size + STAIR_RADIUS + 1; x++) {
+                for (int y = cell.y - STAIR_RADIUS; y < cell.y + start_size + STAIR_RADIUS + 1; y++) {
+                    if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
+                        continue;
+                    }
+                    if (map_is_tile_ramp(map, ivec2(x, y)) || map_get_cell(map, ivec2(x, y)) != CELL_EMPTY) {
+                        cell_is_valid = false;
+                        break;
+                    }
+                }
+                if (!cell_is_valid) {
+                    break;
+                }
+            }
+        }
+
+        if (cell_is_valid) {
+            nearest_cell = cell;
+            nearest_cell_dist = ivec2::manhattan_distance(start, cell);
+        }
+
+        if (cell == cell_end[index]) {
+            index++;
+            if (index < 4) {
+                cell = cell_begin[index];
+            }
+        } else {
+            cell += cell_step[index];
+        }
+    }
+
+    // return the cell if we found one, otherwise default back to the non-stair sensitive version of this function
+    return nearest_cell_dist != -1 ? nearest_cell : map_get_nearest_cell_around_rect(map, start, start_size, rect_position, rect_size);
+}
+
+// Returns the nearest cell around the rect relative to start_cell
+// If there are no free cells around the rect in a radius of 1, then this returns the start cell
+ivec2 map_get_nearest_cell_around_rect(const Map& map, ivec2 start, int start_size, ivec2 rect_position, int rect_size) {
+    ivec2 nearest_cell;
+    int nearest_cell_dist = -1;
+
+    ivec2 cell_begin[4] = { 
+        rect_position + ivec2(-start_size, -(start_size - 1)),
+        rect_position + ivec2(-(start_size - 1), rect_size),
+        rect_position + ivec2(rect_size, rect_size - 1),
+        rect_position + ivec2(rect_size - 1, -start_size)
+    };
+    ivec2 cell_end[4] = { 
+        ivec2(cell_begin[0].x, rect_position.y + rect_size - 1),
+        ivec2(rect_position.x + rect_size - 1, cell_begin[1].y),
+        ivec2(cell_begin[2].x, cell_begin[0].y),
+        ivec2(cell_begin[0].x + 1, cell_begin[3].y)
+    };
+    ivec2 cell_step[4] = { ivec2(0, 1), ivec2(1, 0), ivec2(0, -1), ivec2(-1, 0) };
+    uint32_t index = 0;
+    ivec2 cell = cell_begin[index];
+    while (index < 4) {
+        if (map_is_cell_rect_in_bounds(map, cell, ivec2(start_size, start_size))) {
+            if (!map_is_cell_rect_occupied(map, cell, ivec2(start_size, start_size)) && (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist)) {
+                nearest_cell = cell;
+                nearest_cell_dist = ivec2::manhattan_distance(start, cell);
+            }
+        } 
+
+        if (cell == cell_end[index]) {
+            index++;
+            if (index < 4) {
+                cell = cell_begin[index];
+            }
+        } else {
+            cell += cell_step[index];
+        }
+    }
+
+    return nearest_cell_dist != -1 ? nearest_cell : start;
+}
+
 bool map_is_cell_in_bounds(const Map& map, ivec2 cell) {
     return !(cell.x < 0 || cell.y < 0 || cell.x >= map.width || cell.y >= map.height);
 }
@@ -806,12 +918,12 @@ bool map_is_cell_rect_occupied(const Map& map, ivec2 cell, ivec2 size) {
     for (int y = cell.y; y < cell.y + size.y; y++) {
         for (int x = cell.x; x < cell.x + size.x; x++) {
             if (map_get_cell(map, ivec2(x, y)) != CELL_EMPTY) {
-                return false;
+                return true;
             }
         }
     }
 
-    return true;
+    return false;
 }
 
 void map_set_cell_rect(Map& map, ivec2 cell, int size, EntityId value) {

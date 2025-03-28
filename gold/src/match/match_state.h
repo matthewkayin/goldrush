@@ -26,5 +26,6 @@ struct MatchState {
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]);
 void match_update(MatchState& state);
+EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uint8_t player_id);
 EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left);
 bool match_is_entity_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);

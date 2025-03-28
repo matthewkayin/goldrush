@@ -31,6 +31,8 @@ struct Map {
 void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
 
 uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
+ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell);
+ivec2 map_get_nearest_cell_around_rect(const Map& map, ivec2 start, int start_size, ivec2 rect_position, int rect_size);
 bool map_is_cell_in_bounds(const Map& map, ivec2 cell);
 bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, ivec2 size);
 Tile map_get_tile(const Map& map, ivec2 cell);
