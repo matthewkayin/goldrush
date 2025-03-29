@@ -66,6 +66,8 @@ struct MatchUiState {
     std::string status_message;
     uint32_t status_timer;
 
+    uint32_t sound_cooldown_timers[SOUND_COUNT];
+
     MatchState match;
 };
 

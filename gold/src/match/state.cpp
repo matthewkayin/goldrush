@@ -195,7 +195,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
         .type = entity_is_unit(type) ? CELL_UNIT : CELL_BUILDING,
         .id = id
     });
-    // map fog update
+    // TODO map fog update
 
     return id;
 }
@@ -288,9 +288,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                 // Pathfind
                 map_pathfind(state.map, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity));
-                if (entity.type == ENTITY_MINER) {
-                    log_trace("pathfind? %u", entity.path.size());
-                }
                 if (!entity.path.empty()) {
                     entity.pathfind_attempts = 0;
                     entity.mode = MODE_UNIT_MOVE;
@@ -362,6 +359,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         // On step finished
                         // Check to see if we triggered a mine
                         /*
+                        TODO
                         for (entity_t& mine : state.entities) {
                             if (mine.type != ENTITY_LAND_MINE || mine.health == 0 || mine.mode != MODE_BUILDING_FINISHED || network_get_player(mine.player_id).team == network_get_player(entity.player_id).team ||
                                     std::abs(entity.cell.x - mine.cell.x) > 1 || std::abs(entity.cell.y - mine.cell.y) > 1) {
@@ -474,13 +472,11 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
         }
         int prev_hframe = entity.animation.frame.x;
         animation_update(entity.animation);
-        /*
         if (prev_hframe != entity.animation.frame.x) {
             if ((entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD) && prev_hframe == 0) {
-                match_event_play_sound(state, SOUND_HAMMER, entity.position.to_xy());
+                match_event_play_sound(state, SOUND_HAMMER, entity.position.to_ivec2());
             } 
         }
-        */
     }
 }
 
@@ -605,6 +601,7 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
             const Entity& target = state.entities.get_by_id(entity.target.id);
             ivec2 ignore_cell = ivec2(-1, -1);
             /*
+            TODO
             if (target.type == ENTITY_GOLDMINE) {
                 Target camp_target = entity_target_nearest_camp(state, entity);
                 if (camp_target.type != TARGET_NONE) {

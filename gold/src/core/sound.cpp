@@ -16,6 +16,126 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
     { SOUND_UI_CLICK, (SoundParams) {
         .path = "ui_select",
         .variants = 1
+    }},
+    { SOUND_DEATH, (SoundParams) {
+        .path = "death",
+        .variants = 9
+    }},
+    { SOUND_MUSKET, (SoundParams) {
+        .path = "musket",
+        .variants = 9
+    }},
+    { SOUND_GUN, (SoundParams) {
+        .path = "gun",
+        .variants = 5
+    }},
+    { SOUND_EXPLOSION, (SoundParams) {
+        .path = "explosion",
+        .variants = 4
+    }},
+    { SOUND_PICKAXE, (SoundParams) {
+        .path = "impact",
+        .variants = 3
+    }},
+    { SOUND_HAMMER, (SoundParams) {
+        .path = "hammer",
+        .variants = 4
+    }},
+    { SOUND_BUILDING_PLACE, (SoundParams) {
+        .path = "building_place",
+        .variants = 1
+    }},
+    { SOUND_SWORD, (SoundParams) {
+        .path = "sword",
+        .variants = 3
+    }},
+    { SOUND_PUNCH, (SoundParams) {
+        .path = "punch",
+        .variants = 3
+    }},
+    { SOUND_DEATH_CHICKEN, (SoundParams) {
+        .path = "death_chicken",
+        .variants = 4
+    }},
+    { SOUND_CANNON, (SoundParams) {
+        .path = "cannon",
+        .variants = 4
+    }},
+    { SOUND_BUILDING_DESTROY, (SoundParams) {
+        .path = "building_destroy",
+        .variants = 1
+    }},
+    { SOUND_BUNKER_DESTROY, (SoundParams) {
+        .path = "bunker_destroy",
+        .variants = 1
+    }},
+    { SOUND_MINE_DESTROY, (SoundParams) {
+        .path = "mine_destroy",
+        .variants = 1
+    }},
+    { SOUND_MINE_INSERT, (SoundParams) {
+        .path = "mine_insert",
+        .variants = 1
+    }},
+    { SOUND_MINE_ARM, (SoundParams) {
+        .path = "mine_arm",
+        .variants = 1
+    }},
+    { SOUND_MINE_PRIME, (SoundParams) {
+        .path = "mine_prime",
+        .variants = 1
+    }},
+    { SOUND_SMOKE, (SoundParams) {
+        .path = "smoke",
+        .variants = 1
+    }},
+    { SOUND_THROW, (SoundParams) {
+        .path = "throw",
+        .variants = 1
+    }},
+    { SOUND_FLAG_THUMP, (SoundParams) {
+        .path = "flag_thump",
+        .variants = 1
+    }},
+    { SOUND_GARRISON_IN, (SoundParams) {
+        .path = "garrison_in",
+        .variants = 1
+    }},
+    { SOUND_GARRISON_OUT, (SoundParams) {
+        .path = "garrison_out",
+        .variants = 1
+    }},
+    { SOUND_ALERT_BELL, (SoundParams) {
+        .path = "alert_bell",
+        .variants = 1
+    }},
+    { SOUND_ALERT_BUILDING, (SoundParams) {
+        .path = "alert_building",
+        .variants = 1
+    }},
+    { SOUND_ALERT_RESEARCH, (SoundParams) {
+        .path = "alert_research",
+        .variants = 1
+    }},
+    { SOUND_ALERT_UNIT, (SoundParams) {
+        .path = "harmonica",
+        .variants = 1
+    }},
+    { SOUND_GOLD_MINE_COLLAPSE, (SoundParams) {
+        .path = "gold_mine_collapse",
+        .variants = 1
+    }},
+    { SOUND_UNIT_HEY, (SoundParams) {
+        .path = "voice_hey",
+        .variants = 6
+    }},
+    { SOUND_UNIT_OK, (SoundParams) {
+        .path = "voice_awk",
+        .variants = 7
+    }},
+    { SOUND_UNIT_HAW, (SoundParams) {
+        .path = "voice_haw",
+        .variants = 5
     }}
 };
 

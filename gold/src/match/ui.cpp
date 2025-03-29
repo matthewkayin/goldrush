@@ -17,6 +17,8 @@ static const int MATCH_CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_SPEED = 16; // TODO: move to options
 static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
 static const Rect MINIMAP_RECT = (Rect) { .x = 4, .y = SCREEN_HEIGHT - 132, .w = 128, .h = 128 };
+static const int SOUND_LISTEN_MARGIN = 128;
+static const uint32_t SOUND_COOLDOWN_DURATION = 5;
 
 // INIT
 
@@ -30,6 +32,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.turn_timer = 0;
     state.turn_counter = 0;
     state.disconnect_timer = 0;
+    memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
@@ -228,7 +231,33 @@ void match_ui_update(MatchUiState& state) {
         match_ui_handle_left_mouse_release(state);
     }
 
+    // Match update
     match_update(state.match);
+
+    // Match events
+    while (!state.match.events.empty()) {
+        MatchEvent event = state.match.events[0];
+        state.match.events.erase(state.match.events.begin());
+        switch (event.type) {
+            case MATCH_EVENT_SOUND: {
+                if (state.sound_cooldown_timers[event.sound.sound] != 0) {
+                    break;
+                }
+                Rect listen_rect = (Rect) {
+                    .x = state.camera_offset.x - SOUND_LISTEN_MARGIN,
+                    .y = state.camera_offset.y - SOUND_LISTEN_MARGIN,
+                    .w = SCREEN_WIDTH + (SOUND_LISTEN_MARGIN * 2),
+                    .h = SCREEN_HEIGHT + (SOUND_LISTEN_MARGIN * 2),
+                };
+                if (listen_rect.has_point(event.sound.position)) {
+                    sound_play(event.sound.sound);
+                    state.sound_cooldown_timers[event.sound.sound] = SOUND_COOLDOWN_DURATION;
+                }
+                
+                break;
+            }
+        }
+    }
 
     // Camera drag
     if (!match_ui_is_selecting(state)) {
@@ -256,6 +285,13 @@ void match_ui_update(MatchUiState& state) {
             (state.match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
             (state.match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         match_ui_center_camera_on_cell(state, map_pos / TILE_SIZE);
+    }
+
+    // Update timers
+    for (int sound = 0; sound < SOUND_COUNT; sound++) {
+        if (state.sound_cooldown_timers[sound] != 0) {
+            state.sound_cooldown_timers[sound]--;
+        }
     }
 
     // Clear hidden units from selection
