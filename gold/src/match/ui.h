@@ -68,6 +68,10 @@ struct MatchUiState {
 
     uint32_t sound_cooldown_timers[SOUND_COUNT];
 
+    Animation move_animation;
+    ivec2 move_animation_position;
+    EntityId move_animation_entity_id;
+
     MatchState match;
 };
 
@@ -78,6 +82,7 @@ void match_ui_update(MatchUiState& state);
 void match_ui_clamp_camera(MatchUiState& state);
 void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell);
 bool match_ui_is_mouse_in_ui();
+bool match_ui_is_targeting(const MatchUiState& state);
 bool match_ui_is_selecting(const MatchUiState& state);
 std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect rect);
 void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selection);
@@ -88,5 +93,6 @@ void match_ui_show_status(MatchUiState& state, const char* message);
 void match_ui_render(const MatchUiState& state);
 
 uint16_t match_ui_get_render_layer(uint16_t elevation, RenderLayer layer);
+SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking);
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);

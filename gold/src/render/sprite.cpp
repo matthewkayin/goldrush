@@ -501,6 +501,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_UI_MOVE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_move.png",
+            .hframes = 5,
+            .vframes = 1
+        }
+    }},
     { SPRITE_SELECT_RING_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

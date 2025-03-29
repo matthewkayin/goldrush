@@ -515,7 +515,7 @@ bool match_is_entity_visible_to_player(const MatchState& state, const Entity& en
     for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size; y++) {
         for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size; x++) {
             if (state.fog[player_team][x + (y * state.map.width)] > 0 && 
-                    (!entity_is_invisible || state.detection[player_team][x + (y * state.map.width)] == 1)) {
+                    (!entity_is_invisible || state.detection[player_team][x + (y * state.map.width)] > 0)) {
                 return true;
             }
         }

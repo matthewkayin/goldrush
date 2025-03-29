@@ -154,7 +154,7 @@ bool sound_init() {
 
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
         const SoundParams& params = SOUND_PARAMS.at((SoundName)sound);
-        state.sound_index[SOUND_UI_CLICK] = state.sounds.size();
+        state.sound_index[sound] = state.sounds.size();
 
         for (int variant = 0; variant < params.variants; variant++) {
             char sound_path[256];
