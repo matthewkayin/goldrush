@@ -1,5 +1,6 @@
-#include "match_state.h"
+#include "entity.h"
 
+#include "core/asserts.h"
 #include <unordered_map>
 
 static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
@@ -44,6 +45,10 @@ bool entity_is_unit(EntityType type) {
     return type > ENTITY_GOLDMINE;
 }
 
+bool entity_is_building(EntityType type) {
+    return false;
+}
+
 bool entity_is_selectable(const Entity& entity) {
     return true;
 }
@@ -79,4 +84,104 @@ Rect entity_get_rect(const Entity& entity) {
 fvec2 entity_get_target_position(const Entity& entity) {
     int unit_size = entity_get_data(entity.type).cell_size * TILE_SIZE;
     return fvec2((entity.cell * TILE_SIZE) + ivec2(unit_size / 2, unit_size / 2));
+}
+
+void entity_set_target(Entity& entity, Target target) {
+    GOLD_ASSERT(entity.mode != MODE_UNIT_BUILD);
+    entity.target = target;
+    entity.path.clear();
+    entity.gold_mine_id = ID_NULL;
+    entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, false);
+
+    if (entity.mode != MODE_UNIT_MOVE) {
+        // Abandon current behavior in favor of new order
+        entity.timer = 0;
+        entity.pathfind_attempts = 0;
+        entity.mode = MODE_UNIT_IDLE;
+    }
+}
+
+bool entity_check_flag(const Entity& entity, uint32_t flag) {
+    return (entity.flags & flag) == flag;
+}
+
+void entity_set_flag(Entity& entity, uint32_t flag, bool value) {
+    if (value) {
+        entity.flags |= flag;
+    } else {
+        entity.flags &= ~flag;
+    }
+}
+
+AnimationName entity_get_expected_animation(const Entity& entity) {
+    switch (entity.mode) {
+        case MODE_UNIT_MOVE:
+            return ANIMATION_UNIT_MOVE;
+        case MODE_UNIT_BUILD:
+        case MODE_UNIT_REPAIR:
+            return ANIMATION_UNIT_BUILD;
+        case MODE_UNIT_ATTACK_WINDUP:
+        case MODE_UNIT_TINKER_THROW:
+            return ANIMATION_UNIT_ATTACK;
+        case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
+            return ANIMATION_SOLDIER_RANGED_ATTACK;
+        case MODE_SOLDIER_CHARGE:
+            return ANIMATION_SOLDIER_CHARGE;
+        case MODE_UNIT_DEATH:
+            return ANIMATION_UNIT_DEATH;
+        case MODE_UNIT_DEATH_FADE:
+            return ANIMATION_UNIT_DEATH_FADE;
+        default:
+            return ANIMATION_UNIT_IDLE;
+    }
+}
+
+ivec2 entity_get_animation_frame(const Entity& entity) {
+    if (entity_is_unit(entity.type)) {
+        ivec2 frame = entity.animation.frame;
+
+        if (entity.mode == MODE_UNIT_BUILD) {
+            frame.y = 2;
+        } else if (entity.animation.name == ANIMATION_UNIT_DEATH || entity.animation.name == ANIMATION_UNIT_DEATH_FADE || entity.animation.name == ANIMATION_CANNON_DEATH || entity.animation.name == ANIMATION_CANNON_DEATH_FADE) {
+            frame.y = entity.direction == DIRECTION_NORTH ? 1 : 0;
+        } else if (entity.direction == DIRECTION_NORTH) {
+            frame.y = 1;
+        } else if (entity.direction == DIRECTION_SOUTH) {
+            frame.y = 0;
+        } else {
+            frame.y = 2;
+        }
+
+        if (entity.gold_held && (entity.animation.name == ANIMATION_UNIT_MOVE || entity.animation.name == ANIMATION_UNIT_IDLE)) {
+            frame.y += 3;
+        }
+        /*
+        if (entity.type == ENTITY_SAPPER && entity.target.type == TARGET_ATTACK_ENTITY) {
+            frame.y += 3;
+        }
+            */
+
+        return frame;
+    } else if (entity_is_building(entity.type)) {
+        if (entity.mode == MODE_BUILDING_DESTROYED || entity.mode == MODE_MINE_ARM) {
+            return ivec2(0, 0);
+        }
+        if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
+            return ivec2((3 * entity.health) / ENTITY_DATA.at(entity.type).max_health, 0);
+        } 
+        if (entity.mode == MODE_MINE_PRIME) {
+            return entity.animation.frame;
+        }
+        // Building finished frame
+        return ivec2(3, 0);
+    } else {
+        // Gold
+        if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
+            return ivec2(2, 0);
+        }
+        if (!entity.garrisoned_units.empty()) {
+            return ivec2(1, 0);
+        }
+        return ivec2(0, 0);
+    }
 }

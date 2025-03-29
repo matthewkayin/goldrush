@@ -4,8 +4,9 @@
 #include "math/gmath.h"
 #include "core/network.h"
 #include "noise.h"
-#include "match_state.h"
-#include "match_input.h"
+#include "match/state.h"
+#include "match/input.h"
+#include <string>
 
 #define MATCH_UI_HEIGHT 88
 
@@ -28,9 +29,24 @@ struct RenderSpriteParams {
     int recolor_id;
 };
 
+enum MatchUiSelectionType {
+    MATCH_UI_SELECTION_NONE,
+    MATCH_UI_SELECTION_UNITS,
+    MATCH_UI_SELECTION_ENEMY_UNIT,
+    MATCH_UI_SELECTION_BUILDINGS,
+    MATCH_UI_SELECTION_ENEMY_BUILDING,
+    MATCH_UI_SELECTION_GOLD
+};
+
 enum MatchUiMode {
     MATCH_UI_MODE_NOT_STARTED,
-    MATCH_UI_MODE_NONE
+    MATCH_UI_MODE_NONE,
+    MATCH_UI_MODE_BUILDING_PLACE,
+    MATCH_UI_MODE_TARGET_ATTACK,
+    MATCH_UI_MODE_TARGET_UNLOAD,
+    MATCH_UI_MODE_TARGET_REPAIR,
+    MATCH_UI_MODE_TARGET_SMOKE,
+    MATCH_UI_MODE_CHAT
 };
 
 struct MatchUiState {
@@ -47,6 +63,9 @@ struct MatchUiState {
     ivec2 select_origin;
     std::vector<EntityId> selection;
 
+    std::string status_message;
+    uint32_t status_timer;
+
     MatchState match;
 };
 
@@ -60,6 +79,9 @@ bool match_ui_is_mouse_in_ui();
 bool match_ui_is_selecting(const MatchUiState& state);
 std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect rect);
 void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selection);
+MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, const std::vector<EntityId>& selection);
+void match_ui_order_move(MatchUiState& state);
+void match_ui_show_status(MatchUiState& state, const char* message);
 
 void match_ui_render(const MatchUiState& state);
 

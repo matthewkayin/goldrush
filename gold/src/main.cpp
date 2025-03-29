@@ -9,7 +9,7 @@
 #include "math/gmath.h"
 #include "render/render.h"
 #include "menu/menu.h"
-#include "match/match_ui.h"
+#include "match/ui.h"
 #include "match/noise.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>

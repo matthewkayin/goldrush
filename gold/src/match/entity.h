@@ -16,35 +16,54 @@ enum EntityType {
 };
 
 enum EntityMode {
-    ENTITY_MODE_IDLE,
-    ENTITY_MODE_GOLDMINE
+    MODE_UNIT_IDLE,
+    MODE_UNIT_BLOCKED,
+    MODE_UNIT_MOVE,
+    MODE_UNIT_MOVE_FINISHED,
+    MODE_UNIT_BUILD,
+    MODE_UNIT_REPAIR,
+    MODE_UNIT_ATTACK_WINDUP,
+    MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP,
+    MODE_SOLDIER_CHARGE,
+    MODE_UNIT_IN_MINE,
+    MODE_UNIT_OUT_MINE,
+    MODE_UNIT_TINKER_THROW,
+    MODE_UNIT_DEATH,
+    MODE_UNIT_DEATH_FADE,
+    MODE_BUILDING_IN_PROGRESS,
+    MODE_BUILDING_FINISHED,
+    MODE_BUILDING_DESTROYED,
+    MODE_MINE_ARM,
+    MODE_MINE_PRIME,
+    MODE_GOLDMINE,
+    MODE_GOLDMINE_COLLAPSED
 };
 
-enum EntityTargetType {
-    ENTITY_TARGET_NONE,
-    ENTITY_TARGET_CELL,
-    ENTITY_TARGET_ENTITY,
-    ENTITY_TARGET_ATTACK_CELL,
-    ENTITY_TARGET_ATTACK_ENTITY,
-    ENTITY_TARGET_REPAIR,
-    ENTITY_TARGET_UNLOAD,
-    ENTITY_TARGET_SMOKE,
-    ENTITY_TARGET_BUILD,
-    ENTITY_TARGET_BUILD_ASSIST
+enum TargetType {
+    TARGET_NONE,
+    TARGET_CELL,
+    TARGET_ENTITY,
+    TARGET_ATTACK_CELL,
+    TARGET_ATTACK_ENTITY,
+    TARGET_REPAIR,
+    TARGET_UNLOAD,
+    TARGET_SMOKE,
+    TARGET_BUILD,
+    TARGET_BUILD_ASSIST
 };
 
-struct EntityTargetBuild {
+struct TargetBuild {
     ivec2 unit_cell;
     ivec2 building_cell;
     EntityType building_type;
 };
 
-struct EntityTarget {
-    EntityTargetType type;
+struct Target {
+    TargetType type;
     EntityId id;
     ivec2 cell;
     union {
-        EntityTargetBuild build;
+        TargetBuild build;
     };
 };
 
@@ -59,8 +78,8 @@ struct Entity {
     Direction direction;
 
     int health;
-    EntityTarget target;
-    std::vector<EntityTarget> target_queue;
+    Target target;
+    std::vector<Target> target_queue;
     std::vector<ivec2> path;
     ivec2 rally_point;
     uint32_t pathfind_attempts;
@@ -113,7 +132,13 @@ struct EntityData {
 
 const EntityData& entity_get_data(EntityType type);
 bool entity_is_unit(EntityType type);
+bool entity_is_building(EntityType type);
 bool entity_is_selectable(const Entity& entity);
 uint16_t entity_get_elevation(const Entity& entity, const Map& map);
 Rect entity_get_rect(const Entity& entity);
 fvec2 entity_get_target_position(const Entity& entity);
+void entity_set_target(Entity& entity, Target target);
+bool entity_check_flag(const Entity& entity, uint32_t flag);
+void entity_set_flag(Entity& entity, uint32_t flag, bool value);
+AnimationName entity_get_expected_animation(const Entity& entity);
+ivec2 entity_get_animation_frame(const Entity& entity);

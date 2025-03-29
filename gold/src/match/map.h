@@ -6,38 +6,56 @@
 #include "math/gmath.h"
 #include <vector>
 
-const EntityId CELL_EMPTY = ID_NULL;
-const EntityId CELL_BLOCKED = ID_MAX + 2;
-const EntityId CELL_UNREACHABLE = ID_MAX + 3;
-const EntityId CELL_DECORATION_1 = ID_MAX + 4;
-const EntityId CELL_DECORATION_2 = ID_MAX + 5;
-const EntityId CELL_DECORATION_3 = ID_MAX + 6;
-const EntityId CELL_DECORATION_4 = ID_MAX + 7;
-const EntityId CELL_DECORATION_5 = ID_MAX + 8;
-
 struct Tile {
     SpriteName sprite;
     ivec2 frame;
     uint16_t elevation;
 };
 
+enum CellType {
+    CELL_EMPTY,
+    CELL_BLOCKED,
+    CELL_UNREACHABLE,
+    CELL_DECORATION_1,
+    CELL_DECORATION_2,
+    CELL_DECORATION_3,
+    CELL_DECORATION_4,
+    CELL_DECORATION_5,
+    CELL_UNIT,
+    CELL_BUILDING,
+    CELL_MINER,
+    CELL_GOLDMINE
+};
+
+struct Cell {
+    CellType type;
+    EntityId id;
+};
+
 struct Map {
     uint32_t width;
     uint32_t height;
     std::vector<Tile> tiles;
-    std::vector<EntityId> cells;
+    std::vector<Cell> cells;
 };
 
 void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
 
 uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
-ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell);
-ivec2 map_get_nearest_cell_around_rect(const Map& map, ivec2 start, int start_size, ivec2 rect_position, int rect_size);
+
 bool map_is_cell_in_bounds(const Map& map, ivec2 cell);
-bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, ivec2 size);
+bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, int size);
+
 Tile map_get_tile(const Map& map, ivec2 cell);
-EntityId map_get_cell(const Map& map, ivec2 cell);
 bool map_is_tile_ramp(const Map& map, ivec2 cell);
-bool map_is_cell_rect_same_elevation(const Map& map, ivec2 cell, ivec2 size);
-bool map_is_cell_rect_occupied(const Map& map, ivec2 cell, ivec2 size);
-void map_set_cell_rect(Map& map, ivec2 cell, int size, EntityId value);
+bool map_is_cell_rect_same_elevation(const Map& map, ivec2 cell, int size);
+
+Cell map_get_cell(const Map& map, ivec2 cell);
+void map_set_cell_rect(Map& map, ivec2 cell, int size, Cell value);
+bool map_is_cell_rect_equal_to(const Map& map, ivec2 cell, int size, EntityId id);
+
+bool map_is_cell_rect_occupied(const Map& map, ivec2 cell, int size, ivec2 origin = ivec2(-1, -1), bool gold_walk = false);
+ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell);
+ivec2 map_get_nearest_cell_around_rect(const Map& map, ivec2 start, int start_size, ivec2 rect_position, int rect_size, bool allow_blocked_cells = false, ivec2 ignore_cell = ivec2(-1, -1));
+
+void map_pathfind(const Map& map, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, bool gold_walk, std::vector<ivec2>* ignore_cells = NULL);

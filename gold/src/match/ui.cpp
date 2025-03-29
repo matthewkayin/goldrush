@@ -1,4 +1,4 @@
-#include "match_ui.h"
+#include "match/ui.h"
 
 #include "core/network.h"
 #include "core/input.h"
@@ -10,6 +10,8 @@
 
 static const uint32_t TURN_OFFSET = 2;
 static const uint32_t TURN_DURATION = 4;
+
+static const uint32_t UI_STATUS_DURATION = 32;
 
 static const int MATCH_CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_SPEED = 16; // TODO: move to options
@@ -183,7 +185,7 @@ void match_ui_update(MatchUiState& state) {
             }
 
             for (const MatchInput& input : state.inputs[player_id][0]) {
-                // TODO: handle input
+                match_handle_input(state.match, input);
             }
             state.inputs[player_id].erase(state.inputs[player_id].begin());
         }
@@ -209,6 +211,14 @@ void match_ui_update(MatchUiState& state) {
     // End if tick timer is 0
 
     state.turn_timer--;
+
+    // Order movement
+    if (input_is_action_just_pressed(INPUT_RIGHT_CLICK) && 
+            match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_UNITS &&
+            state.mode != MATCH_UI_MODE_BUILDING_PLACE && !state.is_minimap_dragging &&
+            (MINIMAP_RECT.has_point(input_get_mouse_position()) || !match_ui_is_mouse_in_ui())) {
+        match_ui_order_move(state);
+    }
 
     // Handle input
     if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
@@ -424,6 +434,116 @@ void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selectio
     state.selection = selection;
 }
 
+MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, const std::vector<EntityId>& selection) {
+    if (selection.empty()) {
+        return MATCH_UI_SELECTION_NONE;
+    }
+
+    const Entity& entity = state.match.entities.get_by_id(selection[0]);
+    if (entity_is_unit(entity.type)) {
+        if (entity.player_id == network_get_player_id()) {
+            return MATCH_UI_SELECTION_UNITS;
+        } else {
+            return MATCH_UI_SELECTION_ENEMY_UNIT;
+        }
+    } else if (entity_is_building(entity.type)) {
+        if (entity.player_id == network_get_player_id()) {
+            return MATCH_UI_SELECTION_BUILDINGS;
+        } else {
+            return MATCH_UI_SELECTION_ENEMY_BUILDING;
+        }
+    } else {
+        return MATCH_UI_SELECTION_GOLD;
+    }
+}
+
+void match_ui_order_move(MatchUiState& state) {
+    // Determine move target
+    ivec2 move_target;
+    if (match_ui_is_mouse_in_ui()) {
+        ivec2 minimap_pos = input_get_mouse_position() - ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y);
+        move_target = ivec2((state.match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                            (state.match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+    } else {
+        move_target = input_get_mouse_position() + state.camera_offset;
+    }
+
+    // Create move input
+    MatchInput input;
+    input.move.shift_command = input_is_action_pressed(INPUT_SHIFT);
+    input.move.target_cell = move_target / TILE_SIZE;
+    input.move.target_id = ID_NULL;
+    /*
+    int fog_value = map_get_fog(state.match_state, network_get_player_id(), input.move.target_cell);
+    // don't target enemies in hidden fog or when minimap clicking
+    if (fog_value != FOG_HIDDEN && !ui_is_mouse_in_ui()) {
+        for (uint32_t entity_index = 0; entity_index < state.match_state.entities.size(); entity_index++) {
+            const Entity& entity = state.match.entities[entity_index];
+            // don't target unselectable entities, unless it's gold and the player doesn't know that the gold is unselectable
+            // It's also saying, don't target a hidden mine
+            if (!entity_is_selectable(entity) || 
+                    (fog_value == FOG_EXPLORED && entity.type != ENTITY_GOLD_MINE) ||
+                    (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && network_get_player(entity.player_id).team != network_get_player(network_get_player_id()).team && !map_is_cell_detected(state.match_state, network_get_player_id(), entity.cell))) {
+                continue;
+            }
+
+            Rect entity_rect = entity_get_rect(state.match.entities[entity_index]);
+            if (entity_rect.has_point(move_target)) {
+                input.move.target_id = state.match.entities.get_id_of(entity_index);
+                break;
+            }
+        }
+    }
+    */
+
+    if (state.mode == MATCH_UI_MODE_TARGET_UNLOAD) {
+        input.type = MATCH_INPUT_MOVE_UNLOAD;
+    } else if (state.mode == MATCH_UI_MODE_TARGET_REPAIR) {
+        input.type = MATCH_INPUT_MOVE_REPAIR;
+    } else if (state.mode == MATCH_UI_MODE_TARGET_SMOKE) {
+        input.type = MATCH_INPUT_MOVE_SMOKE;
+    } else if (input.move.target_id != ID_NULL && state.match.entities.get_by_id(input.move.target_id).type != ENTITY_GOLDMINE &&
+               (state.mode == MATCH_UI_MODE_TARGET_ATTACK || 
+                network_get_player(state.match.entities.get_by_id(input.move.target_id).player_id).team != network_get_player(network_get_player_id()).team)) {
+        input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
+    } else if (input.move.target_id == ID_NULL && state.mode == MATCH_UI_MODE_TARGET_ATTACK) {
+        input.type = MATCH_INPUT_MOVE_ATTACK_CELL;
+    } else if (input.move.target_id != ID_NULL) {
+        input.type = MATCH_INPUT_MOVE_ENTITY;
+    } else {
+        input.type = MATCH_INPUT_MOVE_CELL;
+    }
+
+    // Populate move input entity ids
+    input.move.entity_count = (uint16_t)state.selection.size();
+    memcpy(input.move.entity_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
+
+    if (input.type == MATCH_INPUT_MOVE_REPAIR) {
+        bool is_repair_target_valid = true;
+        if (input.move.target_id == ID_NULL) {
+            is_repair_target_valid = false;
+        } else {
+            const Entity& repair_target = state.match.entities.get_by_id(input.move.target_id);
+            if (repair_target.player_id != network_get_player_id() || !entity_is_building(repair_target.type)) {
+                is_repair_target_valid = false;
+            }
+        }
+
+        if (!is_repair_target_valid) {
+            match_ui_show_status(state, MATCH_UI_STATUS_REPAIR_TARGET_INVALID);
+            state.mode = MATCH_UI_MODE_NONE;
+            return;
+        }
+    }
+
+    state.input_queue.push_back(input);
+}
+
+void match_ui_show_status(MatchUiState& state, const char* message) {
+    state.status_message = std::string(message);
+    state.status_timer = UI_STATUS_DURATION;
+}
+
 // RENDER
 
 void match_ui_render(const MatchUiState& state) {
@@ -465,11 +585,11 @@ void match_ui_render(const MatchUiState& state) {
             });
 
             // Decorations
-            EntityId cell = state.match.map.cells[map_index];
-            if (cell >= CELL_DECORATION_1 && cell <= CELL_DECORATION_5) {
+            Cell cell = state.match.map.cells[map_index];
+            if (cell.type >= CELL_DECORATION_1 && cell.type <= CELL_DECORATION_5) {
                 render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_ENTITY)].push_back((RenderSpriteParams) {
                     .sprite = SPRITE_DECORATION,
-                    .frame = ivec2(cell - CELL_DECORATION_1, 0),
+                    .frame = ivec2(cell.type - CELL_DECORATION_1, 0),
                     .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
                     .options = RENDER_SPRITE_NO_CULL,
                     .recolor_id = 0
@@ -512,7 +632,7 @@ void match_ui_render(const MatchUiState& state) {
 
         RenderSpriteParams params = (RenderSpriteParams) {
             .sprite = entity_data.sprite,
-            .frame = ivec2(0, 0),
+            .frame = entity_get_animation_frame(entity),
             .position = entity.position.to_ivec2() - state.camera_offset,
             .options = RENDER_SPRITE_NO_CULL,
             .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : state.match.players[entity.player_id].recolor_id

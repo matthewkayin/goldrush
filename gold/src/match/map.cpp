@@ -6,7 +6,7 @@
 #include "lcg.h"
 #include <unordered_map>
 
-static const ivec2 MAP_PLAYER_SPAWN_SIZE = ivec2(11, 11);
+static const int MAP_PLAYER_SPAWN_SIZE = 11;
 static const int MAP_PLAYER_SPAWN_MARGIN = 11;
 
 struct PoissonDiskParams {
@@ -25,7 +25,10 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
     map.height = noise.height;
     log_info("Generating map. Size: %ux%u", map.width, map.height);
 
-    map.cells = std::vector<EntityId>(map.width * map.height, CELL_EMPTY);
+    map.cells = std::vector<Cell>(map.width * map.height, (Cell) {
+        .type = CELL_EMPTY,
+        .id = ID_NULL
+    });
     map.tiles = std::vector<Tile>(map.width * map.height, (Tile) {
         .sprite = SPRITE_TILE_SAND1,
         .frame = ivec2(0, 0),
@@ -246,7 +249,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                     stair_min += step_direction;
                     if (tile.sprite == SPRITE_TILE_WALL_EAST_EDGE || tile.sprite == SPRITE_TILE_WALL_WEST_EDGE) {
                         ivec2 adjacent_cell = stair_min + ivec2(tile.sprite == SPRITE_TILE_WALL_EAST_EDGE ? 1 : -1, 0);
-                        if (!map_is_cell_in_bounds(map, adjacent_cell) || map_get_cell(map, adjacent_cell) != CELL_EMPTY) {
+                        if (!map_is_cell_in_bounds(map, adjacent_cell) || map_get_cell(map, adjacent_cell).type != CELL_EMPTY) {
                             break;
                         }
                     }
@@ -258,7 +261,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                     stair_max += step_direction;
                     if (tile.sprite == SPRITE_TILE_WALL_EAST_EDGE || tile.sprite == SPRITE_TILE_WALL_WEST_EDGE) {
                         ivec2 adjacent_cell = stair_min + ivec2(tile.sprite == SPRITE_TILE_WALL_EAST_EDGE ? 1 : -1, 0);
-                        if (!map_is_cell_in_bounds(map, adjacent_cell) || map_get_cell(map, adjacent_cell) != CELL_EMPTY) {
+                        if (!map_is_cell_in_bounds(map, adjacent_cell) || map_get_cell(map, adjacent_cell).type != CELL_EMPTY) {
                             break;
                         }
                     }
@@ -356,7 +359,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                 map.tiles[index].sprite == SPRITE_TILE_SAND2 ||
                 map.tiles[index].sprite == SPRITE_TILE_SAND3 ||
                 map_is_tile_ramp(map, ivec2(index % map.width, index / map.width)))) {
-            map.cells[index] = CELL_BLOCKED;
+            map.cells[index].type = CELL_BLOCKED;
         }
     }
 
@@ -364,8 +367,8 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
     {
         // Assume any previously unreachable cells are now empty / reachable
         for (int index = 0; index < map.width * map.height; index++) {
-            if (map.cells[index] == CELL_UNREACHABLE) {
-                map.cells[index] = CELL_EMPTY;
+            if (map.cells[index].type == CELL_UNREACHABLE) {
+                map.cells[index].type = CELL_EMPTY;
             }
         }
 
@@ -377,7 +380,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
             // Set index equal to the index of the first unassigned tile in the array
             int index;
             for (index = 0; index < map.width * map.height; index++) {
-                if (map.cells[index] == CELL_BLOCKED) {
+                if (map.cells[index].type == CELL_BLOCKED) {
                     continue;
                 }
 
@@ -405,7 +408,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                 if (!map_is_cell_in_bounds(map, next)) {
                     continue;
                 }
-                EntityId cell_value = map.cells[next.x + (next.y * map.width)];
+                EntityId cell_value = map.cells[next.x + (next.y * map.width)].id;
                 if (cell_value == CELL_BLOCKED) {
                     continue;
                 }
@@ -432,8 +435,8 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
         // Everything that's not on the main "island" is considered blocked
         // This makes it so that we don't place any player spawns or gold at these locations
         for (int index = 0; index < map.width * map.height; index++) {
-            if (map.cells[index] == CELL_EMPTY && map_tile_islands[index] != biggest_island) {
-                map.cells[index] = CELL_UNREACHABLE;
+            if (map.cells[index].type == CELL_EMPTY && map_tile_islands[index] != biggest_island) {
+                map.cells[index].type = CELL_UNREACHABLE;
             }
         }
     }
@@ -484,7 +487,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                             if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
                                 continue;
                             }
-                            if (map_is_tile_ramp(map, ivec2(x, y)) || map_get_cell(map, ivec2(x, y)) != CELL_EMPTY) {
+                            if (map_is_tile_ramp(map, ivec2(x, y)) || map_get_cell(map, ivec2(x, y)).type != CELL_EMPTY) {
                                 is_candidate_valid = false;
                                 break;
                             }
@@ -552,7 +555,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
 
         // Generate the avoid values
         for (int index = 0; index < map.width * map.height; index++) {
-            if (map.cells[index] == CELL_BLOCKED || map_is_tile_ramp(map, ivec2(index % map.width, index / map.width))) {
+            if (map.cells[index].type == CELL_BLOCKED || map_is_tile_ramp(map, ivec2(index % map.width, index / map.width))) {
                 params.avoid_values[index] = 4;
             }
         }
@@ -572,7 +575,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
         params.margin = ivec2(0, 0);
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, params);
         for (ivec2 cell : decoration_cells) {
-            map.cells[cell.x + (cell.y * map.width)] = CELL_DECORATION_1 + (lcg_rand() % 5);
+            map.cells[cell.x + (cell.y * map.width)].type = CELL_DECORATION_1 + (lcg_rand() % 5);
         }
     }
 }
@@ -672,10 +675,10 @@ bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params,
         return false;
     }
 
-    EntityId cell_value = map_get_cell(map, point);
-    if (cell_value == CELL_UNREACHABLE && !params.allow_unreachable_cells) {
+    Cell cell = map_get_cell(map, point);
+    if (cell.type == CELL_UNREACHABLE && !params.allow_unreachable_cells) {
         return false;
-    } else if (cell_value != CELL_EMPTY) {
+    } else if (cell.type != CELL_EMPTY) {
         return false;
     }
     if (map_is_tile_ramp(map, point)) {
@@ -768,6 +771,88 @@ std::vector<ivec2> map_poisson_disk(const Map& map, PoissonDiskParams& params) {
     return sample;
 }
 
+bool map_is_cell_in_bounds(const Map& map, ivec2 cell) {
+    return !(cell.x < 0 || cell.y < 0 || cell.x >= map.width || cell.y >= map.height);
+}
+
+bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, int size) {
+    return !(cell.x < 0 || cell.y < 0 || cell.x + size >= map.width || cell.y + size >= map.height);
+}
+
+Tile map_get_tile(const Map& map, ivec2 cell) {
+    return map.tiles[cell.x + (cell.y * map.width)];
+}
+
+bool map_is_tile_ramp(const Map& map, ivec2 cell) {
+    uint8_t tile_sprite = map.tiles[cell.x + (cell.y * map.width)].sprite;
+    return tile_sprite >= SPRITE_TILE_WALL_SOUTH_STAIR_LEFT && tile_sprite <= SPRITE_TILE_WALL_WEST_STAIR_BOTTOM;
+}
+
+bool map_is_cell_rect_same_elevation(const Map& map, ivec2 cell, int size) {
+    for (int y = cell.y; y < cell.y + size; y++) {
+        for (int x = cell.x; x < cell.x + size; x++) {
+            if (map_get_tile(map, ivec2(x, y)).elevation != map_get_tile(map, cell).elevation) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+Cell map_get_cell(const Map& map, ivec2 cell) {
+    return map.cells[cell.x + (cell.y * map.width)];
+}
+
+void map_set_cell_rect(Map& map, ivec2 cell, int size, Cell value) {
+    for (int y = cell.y; y < cell.y + size; y++) {
+        for (int x = cell.x; x < cell.x + size; x++) {
+            map.cells[x + (y * map.width)] = value;
+        }
+    }
+}
+
+bool map_is_cell_rect_equal_to(const Map& map, ivec2 cell, int size, EntityId id) {
+    for (int y = cell.y; y < cell.y + size; y++) {
+        for (int x = cell.x; x < cell.x + size; x++) {
+            if (map.cells[x + (y * map.width)].id != id) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+
+bool map_is_cell_rect_occupied(const Map& map, ivec2 cell, int size, ivec2 origin, bool gold_walk) {
+    EntityId origin_id = origin.x == -1 ? ID_NULL : map_get_cell(map, origin).id;
+    Rect origin_rect = (Rect) { .x = origin.x, .y = origin.y, .w = size, .h = size };
+
+    for (int y = cell.y; y < cell.y + size; y++) {
+        for (int x = cell.x; x < cell.x + size; x++) {
+            Cell cell = map_get_cell(map, ivec2(x, y));
+            // If the cell is empty or the cells is not empty but it is within the origin's rect, then it's not occupied
+            if (cell.type == CELL_EMPTY || origin_rect.has_point(ivec2(x, y))) {
+                continue;
+            }  
+            // If the cell is a unit that is far enough away from the origin, then it is not occupied
+            // This allows units paths to ignore a unit ahead of them whose position may change
+            if ((cell.type == CELL_UNIT || cell.type == CELL_MINER) && origin_id != ID_NULL
+                    && ivec2::manhattan_distance(origin, ivec2(x, y)) > 5) {
+                continue;
+            }
+            // If cell is a miner and we are gold walking, then it is not blocked
+            if (cell.type == CELL_MINER && gold_walk) {
+                continue;
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
 ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
     ivec2 nearest_cell;
     int nearest_cell_dist = -1;
@@ -794,10 +879,10 @@ ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
     ivec2 cell = cell_begin[index];
     while (index < 4) {
         // check if cell is valid
-        bool cell_is_valid = map_is_cell_rect_in_bounds(map, cell, ivec2(start_size, start_size));
+        bool cell_is_valid = map_is_cell_rect_in_bounds(map, cell, start_size);
         if (cell_is_valid) {
-            cell_is_valid = !map_is_cell_rect_occupied(map, cell, ivec2(start_size, start_size)) && 
-                    map_is_cell_rect_same_elevation(map, cell, ivec2(start_size, start_size)) && 
+            cell_is_valid = !map_is_cell_rect_occupied(map, cell, start_size) && 
+                    map_is_cell_rect_same_elevation(map, cell, start_size) && 
                     map_get_tile(map, cell).elevation == map_get_tile(map, mine_cell).elevation &&
                     (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist);
         }
@@ -809,7 +894,7 @@ ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
                     if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
                         continue;
                     }
-                    if (map_is_tile_ramp(map, ivec2(x, y)) || map_get_cell(map, ivec2(x, y)) != CELL_EMPTY) {
+                    if (map_is_tile_ramp(map, ivec2(x, y)) || map_get_cell(map, ivec2(x, y)).type != CELL_EMPTY) {
                         cell_is_valid = false;
                         break;
                     }
@@ -841,7 +926,7 @@ ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
 
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
-ivec2 map_get_nearest_cell_around_rect(const Map& map, ivec2 start, int start_size, ivec2 rect_position, int rect_size) {
+ivec2 map_get_nearest_cell_around_rect(const Map& map, ivec2 start, int start_size, ivec2 rect_position, int rect_size, bool allow_blocked_cells, ivec2 ignore_cell) {
     ivec2 nearest_cell;
     int nearest_cell_dist = -1;
 
@@ -861,8 +946,8 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, ivec2 start, int start_si
     uint32_t index = 0;
     ivec2 cell = cell_begin[index];
     while (index < 4) {
-        if (map_is_cell_rect_in_bounds(map, cell, ivec2(start_size, start_size))) {
-            if (!map_is_cell_rect_occupied(map, cell, ivec2(start_size, start_size)) && (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist)) {
+        if (map_is_cell_rect_in_bounds(map, cell, start_size) && cell != ignore_cell) {
+            if (!map_is_cell_rect_occupied(map, cell, start_size, ivec2(-1, -1), allow_blocked_cells) && (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = ivec2::manhattan_distance(start, cell);
             }
@@ -881,55 +966,267 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, ivec2 start, int start_si
     return nearest_cell_dist != -1 ? nearest_cell : start;
 }
 
-bool map_is_cell_in_bounds(const Map& map, ivec2 cell) {
-    return !(cell.x < 0 || cell.y < 0 || cell.x >= map.width || cell.y >= map.height);
-}
+void map_pathfind(const Map& map, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, bool gold_walk, std::vector<ivec2>* ignore_cells) {
+    struct Node {
+        fixed cost;
+        fixed distance;
+        // The parent is the previous node stepped in the path to reach this node
+        // It should be an index in the explored list or -1 if it is the start node
+        int parent;
+        ivec2 cell;
 
-bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, ivec2 size) {
-    return !(cell.x < 0 || cell.y < 0 || cell.x + size.x >= map.width || cell.y + size.y >= map.height);
-}
+        fixed score() const {
+            return cost + distance;
+        };
+    };
 
-Tile map_get_tile(const Map& map, ivec2 cell) {
-    return map.tiles[cell.x + (cell.y * map.width)];
-}
+    // Don't bother pathing to the unit's cell
+    if (from == to) {
+        path->clear();
+        return;
+    }
 
-EntityId map_get_cell(const Map& map, ivec2 cell) {
-    return map.cells[cell.x + (cell.y * map.width)];
-}
+    // Find an alternate cell for large units
+    if (cell_size > 1 && map_is_cell_rect_occupied(map, to, cell_size, from, gold_walk)) {
+        ivec2 nearest_alternative;
+        int nearest_alternative_distance = -1;
+        for (int x = 0; x < cell_size; x++) {
+            for (int y = 0; y < cell_size; y++) {
+                if (x == 0 && y == 0) {
+                    continue;
+                }
 
-bool map_is_tile_ramp(const Map& map, ivec2 cell) {
-    uint8_t tile_sprite = map.tiles[cell.x + (cell.y * map.width)].sprite;
-    return tile_sprite >= SPRITE_TILE_WALL_SOUTH_STAIR_LEFT && tile_sprite <= SPRITE_TILE_WALL_WEST_STAIR_BOTTOM;
-}
-
-bool map_is_cell_rect_same_elevation(const Map& map, ivec2 cell, ivec2 size) {
-    for (int y = cell.y; y < cell.y + size.y; y++) {
-        for (int x = cell.x; x < cell.x + size.x; x++) {
-            if (map_get_tile(map, ivec2(x, y)).elevation != map_get_tile(map, cell).elevation) {
-                return false;
+                ivec2 alternative = to - ivec2(x, y);
+                if (map_is_cell_rect_in_bounds(map, alternative, cell_size) &&
+                    !map_is_cell_rect_occupied(map, alternative, cell_size, from, gold_walk)) {
+                    if (nearest_alternative_distance == -1 || ivec2::manhattan_distance(from, alternative) < nearest_alternative_distance) {
+                        nearest_alternative = alternative;
+                        nearest_alternative_distance = ivec2::manhattan_distance(from, alternative);
+                    }
+                }
             }
+        }
+
+        if (nearest_alternative_distance != -1) {
+            to = nearest_alternative;
         }
     }
 
-    return true;
-}
+    std::vector<Node> frontier;
+    std::vector<Node> explored;
+    std::vector<int> explored_indices = std::vector<int>(map.width * map.height, -1);
 
-bool map_is_cell_rect_occupied(const Map& map, ivec2 cell, ivec2 size) {
-    for (int y = cell.y; y < cell.y + size.y; y++) {
-        for (int x = cell.x; x < cell.x + size.x; x++) {
-            if (map_get_cell(map, ivec2(x, y)) != CELL_EMPTY) {
-                return true;
-            }
+    if (ignore_cells != NULL) {
+        for (ivec2 cell : *ignore_cells) {
+            explored_indices[cell.x + (cell.y * map.width)] = 1;
         }
     }
 
-    return false;
-}
+    bool is_target_unreachable = false;
+    for (int y = to.y; y < to.y + cell_size; y++) {
+        for (int x = to.x; x < to.x + cell_size; x++) {
+            Cell cell = map_get_cell(map, ivec2(x, y));
+            if (cell.type == CELL_BLOCKED || cell.type == CELL_UNREACHABLE) {
+                is_target_unreachable = true;
+                // Cause break on both inner and outer loops
+                x = to.x + cell_size;
+                y = to.y + cell_size;
+            }
+        }
+    }
+    if (is_target_unreachable) {
+        // Reverse pathfind to find the nearest reachable cell
+        frontier.push_back((Node) {
+            .cost = fixed::from_int(0),
+            .distance = fixed::from_int(0),
+            .parent = -1,
+            .cell = to
+        });
 
-void map_set_cell_rect(Map& map, ivec2 cell, int size, EntityId value) {
-    for (int y = cell.y; y < cell.y + size; y++) {
-        for (int x = cell.x; x < cell.x + size; x++) {
-            map.cells[x + (y * map.width)] = value;
+        while (!frontier.empty()) {
+            // Find the smallest path
+            uint32_t smallest_index = 0;
+            for (uint32_t i = 1; i < frontier.size(); i++) {
+                if (frontier[i].score() < frontier[smallest_index].score()) {
+                    smallest_index = i;
+                }
+            }
+
+            // Pop the smallest path
+            Node smallest = frontier[smallest_index];
+            frontier.erase(frontier.begin() + smallest_index);
+
+            // If it's the solution, return it
+            if (!map_is_cell_rect_occupied(map, smallest.cell, cell_size, from, gold_walk)) {
+                to = smallest.cell;
+                break; // breaks while frontier not empty
+            }
+
+            // Otherwise mark this cell as explored
+            explored_indices[smallest.cell.x + (smallest.cell.y * map.width)] = 1;
+
+            // Consider all children
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                Node child = (Node) {
+                    .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
+                    .distance = fixed::from_int(ivec2::manhattan_distance(smallest.cell + DIRECTION_IVEC2[direction], to)),
+                    .parent = -1,
+                    .cell = smallest.cell + DIRECTION_IVEC2[direction]
+                };
+
+                // Don't consider out of bounds children
+                if (!map_is_cell_rect_in_bounds(map, child.cell, cell_size)) {
+                    continue;
+                }
+
+                // Don't consider explored indices
+                if (explored_indices[child.cell.x + (child.cell.y * map.width)] != -1) {
+                    continue;
+                }
+
+                // Check if it's in the frontier
+                uint32_t frontier_index;
+                for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                    Node& frontier_node = frontier[frontier_index];
+                    if (frontier_node.cell == child.cell) {
+                        break;
+                    }
+                }
+                // If it's in the frontier...
+                if (frontier_index < frontier.size()) {
+                    // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
+                    if (child.score() < frontier[frontier_index].score()) {
+                        frontier[frontier_index] = child;
+                    }
+                    continue;
+                }
+                // If it's not in the frontier, then add it
+                frontier.push_back(child);
+            } // End for each child / direction
+        } // End while frontier not empty
+
+        frontier.clear();
+        memset(&explored_indices[0], -1, map.width * map.height * sizeof(int));
+    } // End if target_is_unreachable
+
+    uint32_t closest_explored = 0;
+    bool found_path = false;
+    Node path_end;
+
+    frontier.push_back((Node) {
+        .cost = fixed::from_int(0),
+        .distance = fixed::from_int(ivec2::manhattan_distance(from, to)),
+        .parent = -1,
+        .cell = from
+    });
+
+    while (!frontier.empty()) {
+        // Find the smallest path
+        uint32_t smallest_index = 0;
+        for (uint32_t i = 1; i < frontier.size(); i++) {
+            if (frontier[i].score() < frontier[smallest_index].score()) {
+                smallest_index = i;
+            }
+        }
+
+        // Pop the smallest path
+        Node smallest = frontier[smallest_index];
+        frontier.erase(frontier.begin() + smallest_index);
+
+        // If it's the solution, return it
+        if (smallest.cell == to) {
+            found_path = true;
+            path_end = smallest;
+            break;
+        }
+
+        // Otherwise, add this tile to the explored list
+        explored.push_back(smallest);
+        explored_indices[smallest.cell.x + (smallest.cell.y * map.width)] = explored.size() - 1;
+        if (explored[explored.size() - 1].distance < explored[closest_explored].distance) {
+            closest_explored = explored.size() - 1;
+        }
+
+        if (explored.size() > 1999) {
+            log_trace("Pathfinding too long, going with closest explored...");
+            break;
+        }
+
+        // Consider all children
+        // Adjacent cells are considered first so that we can use information about them to inform whether or not a diagonal movement is allowed
+        bool is_adjacent_direction_blocked[4] = { true, true, true, true };
+        const int CHILD_DIRECTIONS[DIRECTION_COUNT] = { DIRECTION_NORTH, DIRECTION_EAST, DIRECTION_SOUTH, DIRECTION_WEST, 
+                                                        DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST, DIRECTION_NORTHWEST };
+        for (int direction_index = 0; direction_index < DIRECTION_COUNT; direction_index++) {
+            int direction = CHILD_DIRECTIONS[direction_index];
+            Node child = (Node) {
+                .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
+                .distance = fixed::from_int(ivec2::manhattan_distance(smallest.cell + DIRECTION_IVEC2[direction], to)),
+                .parent = (int)explored.size() - 1,
+                .cell = smallest.cell + DIRECTION_IVEC2[direction]
+            };
+
+            // Don't consider out of bounds children
+            if (!map_is_cell_rect_in_bounds(map, child.cell, cell_size)) {
+                continue;
+            }
+
+            // Skip occupied cells (unless the child is the goal. this avoids worst-case pathing)
+            if (map_is_cell_rect_occupied(map, child.cell, cell_size, from, gold_walk) &&
+                !(child.cell == to && ivec2::manhattan_distance(smallest.cell, child.cell) == 1)) {
+                continue;
+            }
+
+            // Don't allow diagonal movement through cracks
+            if (direction % 2 == 0) {
+                is_adjacent_direction_blocked[direction / 2] = false;
+            } else {
+                int next_direction = direction + 1 == DIRECTION_COUNT ? 0 : direction + 1;
+                int prev_direction = direction - 1;
+                if (is_adjacent_direction_blocked[next_direction / 2] && is_adjacent_direction_blocked[prev_direction / 2]) {
+                    continue;
+                }
+            }
+
+            // Don't consider already explored children
+            if (explored_indices[child.cell.x + (child.cell.y * map.width)] != -1) {
+                continue;
+            }
+
+            uint32_t frontier_index;
+            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                Node& frontier_node = frontier[frontier_index];
+                if (frontier_node.cell == child.cell) {
+                    break;
+                }
+            }
+            // If it is in the frontier...
+            if (frontier_index < frontier.size()) {
+                // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
+                if (child.score() < frontier[frontier_index].score()) {
+                    frontier[frontier_index] = child;
+                }
+                continue;
+            }
+            // If it's not in the frontier, then add it to the frontier
+            frontier.push_back(child);
+        } // End for each child
+    } // End while not frontier empty
+
+    // Backtrack to build the path
+    Node current = found_path ? path_end : explored[closest_explored];
+    path->clear();
+    path->reserve(current.cost.integer_part() + 1);
+    while (current.parent != -1) {
+        path->insert(path->begin(), current.cell);
+        current = explored[current.parent];
+    }
+
+    if (!path->empty()) {
+        // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,
+        // but if the target_cell really is blocked, we need to remove it from the path. The unit will path as close as they can.
+        if ((*path)[path->size() - 1] == to && map_is_cell_rect_occupied(map, to, cell_size, from, gold_walk)) {
+            path->pop_back();
         }
     }
 }
