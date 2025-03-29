@@ -504,7 +504,24 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 }
 
 bool match_is_entity_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id) {
-    return true;
+    if (entity.garrison_id != ID_NULL) {
+        return false;
+    }
+
+    uint8_t player_team = state.players[player_id].team;
+    bool entity_is_invisible = entity_check_flag(entity, ENTITY_FLAG_INVISIBLE);
+    int entity_cell_size = entity_get_data(entity.type).cell_size;
+
+    for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size; y++) {
+        for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size; x++) {
+            if (state.fog[player_team][x + (y * state.map.width)] > 0 && 
+                    (!entity_is_invisible || state.detection[player_team][x + (y * state.map.width)] == 1)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 bool match_is_target_invalid(const MatchState& state, const Target& target) {
@@ -694,13 +711,13 @@ int match_get_fog(const MatchState& state, uint8_t team, ivec2 cell) {
 bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 cell, int cell_size) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            if (state.fog[team][x + (y * state.map.width)] <= 0) {
-                return false;
+            if (state.fog[team][x + (y * state.map.width)] > 0) {
+                return true;
             }
         }
     }
 
-    return true;
+    return false;
 }
 
 void match_fog_update(MatchState& state, uint8_t player_team, ivec2 cell, int cell_size, int sight, bool has_detection, bool increment) { 

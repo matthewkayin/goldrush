@@ -348,6 +348,15 @@ void match_ui_update(MatchUiState& state) {
         };
         render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
     }
+    // Minimap remembered entities
+    for (auto it : state.match.remembered_entities[network_get_player(network_get_player_id()).team]) {
+        Rect entity_rect = (Rect) {
+            .x = it.second.cell.x, .y = it.second.cell.y,
+            .w = it.second.cell_size, .h = it.second.cell_size
+        };
+        MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
+        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
+    }
     // Minimap camera rect
     Rect camera_rect = (Rect) {
         .x = state.camera_offset.x / TILE_SIZE,
@@ -675,6 +684,10 @@ void match_ui_render(const MatchUiState& state) {
 
     // Entities
     for (const Entity& entity : state.match.entities) {
+        if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+
         const EntityData& entity_data = entity_get_data(entity.type);
 
         RenderSpriteParams params = (RenderSpriteParams) {
@@ -703,6 +716,35 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         render_sprite_params[match_ui_get_render_layer(entity_get_elevation(entity, state.match.map), RENDER_LAYER_ENTITY)].push_back(params);
+    }
+
+    // Remembered entities
+    for (auto it : state.match.remembered_entities[network_get_player(network_get_player_id()).team]) {
+        // Don't draw the remembered entity if we can see it, otherwise we will double draw them
+        if (match_is_cell_rect_revealed(state.match, network_get_player(network_get_player_id()).team, it.second.cell, it.second.cell_size)) {
+            continue;
+        }
+
+        const EntityData& entity_data = entity_get_data(it.second.type);
+        const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
+
+        RenderSpriteParams params = (RenderSpriteParams) {
+            .sprite = entity_data.sprite,
+            .frame = it.second.frame,
+            .position = (it.second.cell * TILE_SIZE) - state.camera_offset,
+            .options = RENDER_SPRITE_NO_CULL,
+            .recolor_id = it.second.recolor_id
+        };
+
+        Rect render_rect = (Rect) {
+            .x = params.position.x, .y = params.position.y,
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+        };
+        if (!render_rect.intersects(SCREEN_RECT)) {
+            continue;
+        }
+
+        render_sprite_params[match_ui_get_render_layer(map_get_tile(state.match.map, it.second.cell).elevation, RENDER_LAYER_ENTITY)].push_back(params);
     }
 
     // Render sprite params
