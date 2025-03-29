@@ -3,7 +3,8 @@
 #include <unordered_map>
 
 static const std::unordered_map<Tileset, TilesetParams> TILESET_PARAMS = {
-    { TILESET_ARIZONA, (TilesetParams) { .path = "tileset_arizona.png" }}
+    { TILESET_ARIZONA, (TilesetParams) { .path = "tileset_arizona.png" }},
+    { TILESET_FOG, (TilesetParams) { .path = "fog_of_war.png" }}
 };
 
 static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
@@ -328,6 +329,24 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .path = "tile_decorations.png",
             .hframes = 5,
             .vframes = 1
+        }
+    }},
+    { SPRITE_FOG_HIDDEN, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_FOG,
+            .type = TILE_TYPE_AUTO,
+            .source_x = 0,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_FOG_EXPLORED, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = (SpriteParamsTile) {
+            .tileset = TILESET_FOG,
+            .type = TILE_TYPE_AUTO,
+            .source_x = 32,
+            .source_y = 0
         }
     }},
     { SPRITE_UI_MINIMAP, (SpriteParams) {

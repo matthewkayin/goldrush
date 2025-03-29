@@ -308,6 +308,7 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Update Minimap
+    uint8_t player_team = network_get_player(network_get_player_id()).team;
     for (int y = 0; y < state.match.map.height; y++) {
         for (int x = 0; x < state.match.map.width; x++) {
             MinimapPixel pixel; 
@@ -320,7 +321,17 @@ void match_ui_update(MatchUiState& state) {
                 pixel = MINIMAP_PIXEL_WALL;
             }
             render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), pixel);
-            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
+
+            MinimapPixel fog_pixel;
+            int fog_value = match_get_fog(state.match, player_team, ivec2(x, y));
+            if (fog_value == FOG_HIDDEN) {
+                fog_pixel = MINIMAP_PIXEL_OFFBLACK;
+            } else if (fog_value == FOG_EXPLORED) {
+                fog_pixel = MINIMAP_PIXEL_OFFBLACK_TRANSPARENT;
+            } else {
+                fog_pixel = MINIMAP_PIXEL_TRANSPARENT;
+            }
+            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), fog_pixel);
         }
     }
     // Minimap entities
@@ -621,7 +632,7 @@ void match_ui_render(const MatchUiState& state) {
             });
 
             // Decorations
-            Cell cell = state.match.map.cells[map_index];
+            Cell cell = state.match.map.cells[CELL_LAYER_GROUND][map_index];
             if (cell.type >= CELL_DECORATION_1 && cell.type <= CELL_DECORATION_5) {
                 render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_ENTITY)].push_back((RenderSpriteParams) {
                     .sprite = SPRITE_DECORATION,
@@ -707,6 +718,61 @@ void match_ui_render(const MatchUiState& state) {
             render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
         render_sprite_params[render_layer].clear();
+    }
+
+    // Fog of War
+    int player_team = network_get_player(network_get_player_id()).team;
+    for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
+        for (int y = 0; y < max_visible_tiles.y; y++) {
+            for (int x = 0; x < max_visible_tiles.x; x++) {
+                ivec2 fog_cell = base_coords + ivec2(x, y);
+                int fog = match_get_fog(state.match, player_team, fog_cell);
+                if (fog > 0) {
+                    continue;
+                }
+                if (fog_pass == 1 && fog == FOG_EXPLORED) {
+                    continue;
+                }
+
+                uint32_t neighbors = 0;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 neighbor_cell = fog_cell + DIRECTION_IVEC2[direction];
+                    if (!map_is_cell_in_bounds(state.match.map, neighbor_cell)) {
+                        neighbors += DIRECTION_MASK[direction];
+                        continue;
+                    }
+                    if ((fog_pass == 0 && match_get_fog(state.match, player_team, neighbor_cell) < 1) ||
+                        (fog_pass != 0 && match_get_fog(state.match, player_team, neighbor_cell) == FOG_HIDDEN)) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+
+                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 neighbor_cell = fog_cell + DIRECTION_IVEC2[direction];
+                    int prev_direction = direction - 1;
+                    int next_direction = (direction + 1) % DIRECTION_COUNT;
+                    if ((neighbors & DIRECTION_MASK[prev_direction]) != DIRECTION_MASK[prev_direction] ||
+                        (neighbors & DIRECTION_MASK[next_direction]) != DIRECTION_MASK[next_direction]) {
+                        continue;
+                    }
+                    if (!map_is_cell_in_bounds(state.match.map, neighbor_cell)) {
+                        neighbors += DIRECTION_MASK[direction];
+                        continue;
+                    }
+                    if ((fog_pass == 0 && match_get_fog(state.match, player_team, neighbor_cell) < 1) ||
+                        (fog_pass != 0 && match_get_fog(state.match, player_team, neighbor_cell) == FOG_HIDDEN)) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+                int autotile_index = map_neighbors_to_autotile_index(neighbors);
+                #ifndef GOLD_DEBUG_FOG_DISABLED
+                    render_sprite_frame(
+                            fog_pass == 0 ? SPRITE_FOG_EXPLORED : SPRITE_FOG_HIDDEN, 
+                            ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES), 
+                            base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                #endif
+            }
+        }
     }
 
     // Select rect

@@ -6,6 +6,8 @@
 #include "container/id_array.h"
 #include "match/input.h"
 #include "core/sound.h"
+#include <vector>
+#include <unordered_map>
 
 #define MATCH_UI_STATUS_CANT_BUILD "You can't build there."
 #define MATCH_UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
@@ -21,6 +23,9 @@
 
 #define MATCH_MAX_ENTITIES (400 * MAX_PLAYERS)
 #define PLAYER_NONE UINT8_MAX
+
+const int FOG_HIDDEN = -1;
+const int FOG_EXPLORED = 0;
 
 struct MatchPlayer {
     bool active;
@@ -96,8 +101,21 @@ struct MatchEvent {
     };
 };
 
+struct RememberedEntity {
+    EntityType type;
+    ivec2 frame;
+    ivec2 cell;
+    int cell_size;
+    int recolor_id;
+};
+
 struct MatchState {
     Map map;
+    std::vector<int> fog[MAX_PLAYERS];
+    std::vector<int> detection[MAX_PLAYERS];
+    std::unordered_map<EntityId, RememberedEntity> remembered_entities[MAX_PLAYERS];
+    bool is_fog_dirty;
+
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
     MatchPlayer players[MAX_PLAYERS];
     std::vector<MatchEvent> events;
@@ -123,3 +141,9 @@ bool match_is_entity_mining(const MatchState& state, const Entity& entity);
 void match_event_play_sound(MatchState& state, SoundName sound, ivec2 position);
 void match_event_alert(MatchState& state, MatchAlertType type, uint8_t player_id, ivec2 cell, int cell_size);
 void match_event_show_status(MatchState& state, uint8_t player_id, const char* message);
+
+// Fog
+
+int match_get_fog(const MatchState& state, uint8_t team, ivec2 cell);
+bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
+void match_fog_update(MatchState& state, uint8_t team, ivec2 cell, int cell_size, int sight, bool has_detection, bool increment);

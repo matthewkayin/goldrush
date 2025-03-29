@@ -27,17 +27,22 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
         match_create_goldmine(state, cell, MATCH_GOLDMINE_STARTING_GOLD);
     }
 
+    // Init players
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state.players[player_id].active) {
-            continue;
-        }
         state.players[player_id].gold = MATCH_PLAYER_STARTING_GOLD;
         state.players[player_id].upgrades = 0;
         state.players[player_id].upgrades_in_progress = 0;
 
-        ivec2 town_hall_cell = map_get_player_town_hall_cell(state.map, player_spawns[player_id]);
-        match_create_entity(state, ENTITY_MINER, town_hall_cell, player_id);
+        state.fog[player_id] = std::vector<int>(state.map.width * state.map.height, FOG_HIDDEN);
+        state.detection[player_id] = std::vector<int>(state.map.width * state.map.height, 0);
+
+        if (state.players[player_id].active) {
+            ivec2 town_hall_cell = map_get_player_town_hall_cell(state.map, player_spawns[player_id]);
+            match_create_entity(state, ENTITY_MINER, town_hall_cell, player_id);
+        }
     }
+
+    state.is_fog_dirty = false;
 
     return state;
 }
@@ -152,6 +157,24 @@ void match_update(MatchState& state) {
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         match_entity_update(state, entity_index);
     }
+
+    // Update remembered entities
+    if (state.is_fog_dirty) {
+        for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
+            // Remove any remembered entities (but only if the players can see that they should be removed)
+            auto it = state.remembered_entities[team].begin();
+            while (it != state.remembered_entities[team].end()) {
+                if ((state.entities.get_index_of(it->first) == INDEX_INVALID || state.entities.get_by_id(it->first).health == 0) &&
+                        match_is_cell_rect_revealed(state, team, it->second.cell, it->second.cell_size)) {
+                    it = state.remembered_entities[team].erase(it);
+                } else {
+                    it++;
+                }
+            }
+        }
+
+        state.is_fog_dirty = false;
+    }
 }
 
 // ENTITY
@@ -191,11 +214,11 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.health_regen_timer = 0;
 
     EntityId id = state.entities.push_back(entity);
-    map_set_cell_rect(state.map, entity.cell, entity_data.cell_size, (Cell) {
+    map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
         .type = entity_is_unit(type) ? CELL_UNIT : CELL_BUILDING,
         .id = id
     });
-    // TODO map fog update
+    match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, true);
 
     return id;
 }
@@ -215,7 +238,7 @@ EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left
     entity.gold_held = gold_left;
 
     EntityId id = state.entities.push_back(entity);
-    map_set_cell_rect(state.map, entity.cell, entity_get_data(entity.type).cell_size, (Cell) {
+    map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_get_data(entity.type).cell_size, (Cell) {
         .type = CELL_GOLDMINE,
         .id = id
     });
@@ -287,7 +310,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 // Attempt to move and avoid ideal mine exit path
 
                 // Pathfind
-                map_pathfind(state.map, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity));
+                map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity));
                 if (!entity.path.empty()) {
                     entity.pathfind_attempts = 0;
                     entity.mode = MODE_UNIT_MOVE;
@@ -327,25 +350,25 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     // If the unit is not moving between tiles, then pop the next cell off the path
                     if (entity.position == entity_get_target_position(entity) && !entity.path.empty()) {
                         entity.direction = enum_from_ivec2_direction(entity.path[0] - entity.cell);
-                        if (map_is_cell_rect_occupied(state.map, entity.path[0], entity_data.cell_size, entity.cell, false)) {
+                        if (map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, entity.path[0], entity_data.cell_size, entity.cell, false)) {
                             path_is_blocked = true;
                             // breaks out of while movement left
                             break;
                         }
 
-                        if (map_is_cell_rect_equal_to(state.map, entity.cell, entity_data.cell_size, entity_id)) {
-                            map_set_cell_rect(state.map, entity.cell, entity_data.cell_size, (Cell) {
+                        if (map_is_cell_rect_equal_to(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, entity_id)) {
+                            map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
                                 .type = CELL_EMPTY,
                                 .id = ID_NULL
                             });
                         }
-                        // map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, false, ENTITY_DATA.at(entity.type).has_detection);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, false);
                         entity.cell = entity.path[0];
-                        map_set_cell_rect(state.map, entity.cell, entity_data.cell_size, (Cell) {
+                        map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
                             .type = match_is_entity_mining(state, entity) ? CELL_MINER : CELL_UNIT,
                             .id = entity_id
                         });
-                        // map_fog_update(state, entity.player_id, entity.cell, entity_cell_size(entity.type), ENTITY_DATA.at(entity.type).sight, true, ENTITY_DATA.at(entity.type).has_detection);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, true);
                         entity.path.erase(entity.path.begin());
                     }
 
@@ -405,7 +428,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     bool try_walk_around_blocker = false;
                     bool is_entity_mining = match_is_entity_mining(state, entity);
                     if (is_entity_mining) {
-                        Cell blocking_cell = map_get_cell(state.map, entity.path[0]);
+                        Cell blocking_cell = map_get_cell(state.map, CELL_LAYER_GROUND, entity.path[0]);
                         if (blocking_cell.type == CELL_MINER) {
                             const Entity& blocker = state.entities.get_by_id(blocking_cell.id);
                             if (entity.direction == ((blocker.direction + 4) % DIRECTION_COUNT)) {
@@ -415,7 +438,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     }
                     if (try_walk_around_blocker) {
                         entity.path.clear();
-                        map_pathfind(state.map, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, false);
+                        map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, false);
                         update_finished = true;
                         break;
                     }
@@ -584,6 +607,7 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
             const Entity& builder = state.entities.get_by_id(entity.target.id);
             return map_get_nearest_cell_around_rect(
                         state.map, 
+                        CELL_LAYER_GROUND,
                         entity.cell, 
                         entity_get_data(entity.type).cell_size, 
                         builder.target.build.building_cell, 
@@ -613,7 +637,7 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
             */
             int entity_cell_size = entity_get_data(entity.type).cell_size;
             int target_cell_size = entity_get_data(target.type).cell_size;
-            return map_get_nearest_cell_around_rect(state.map, entity.cell, entity_cell_size, target.cell, target_cell_size, match_is_entity_mining(state, entity), ignore_cell);
+            return map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_cell_size, target.cell, target_cell_size, match_is_entity_mining(state, entity), ignore_cell);
         }
     }
 }
@@ -659,4 +683,140 @@ void match_event_show_status(MatchState& state, uint8_t player_id, const char* m
             .message = message
         }
     });
+}
+
+// FOG
+
+int match_get_fog(const MatchState& state, uint8_t team, ivec2 cell) {
+    return state.fog[team][cell.x + (cell.y * state.map.width)];
+}
+
+bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 cell, int cell_size) {
+    for (int y = cell.y; y < cell.y + cell_size; y++) {
+        for (int x = cell.x; x < cell.x + cell_size; x++) {
+            if (state.fog[team][x + (y * state.map.width)] <= 0) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+void match_fog_update(MatchState& state, uint8_t player_team, ivec2 cell, int cell_size, int sight, bool has_detection, bool increment) { 
+    /*
+    * This function does a raytrace from the cell center outwards to determine what this unit can see
+    * Raytracing is done using Bresenham's Line Generation Algorithm (https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/)
+    */
+
+    ivec2 search_corners[4] = {
+        cell - ivec2(sight, sight),
+        cell + ivec2((cell_size - 1) + sight, -sight),
+        cell + ivec2((cell_size - 1) + sight, (cell_size - 1) + sight),
+        cell + ivec2(-sight, (cell_size - 1) + sight)
+    };
+    for (int search_index = 0; search_index < 4; search_index++) {
+        ivec2 search_goal = search_corners[search_index + 1 == 4 ? 0 : search_index + 1];
+        ivec2 search_step = DIRECTION_IVEC2[(search_index * 2) + 2 == DIRECTION_COUNT 
+                                            ? DIRECTION_NORTH 
+                                            : (search_index * 2) + 2];
+        for (ivec2 line_end = search_corners[search_index]; line_end != search_goal; line_end += search_step) {
+            ivec2 line_start;
+            switch (cell_size) {
+                case 1:
+                    line_start = cell;
+                    break;
+                case 3:
+                    line_start = cell + ivec2(1, 1);
+                    break;
+                case 2:
+                case 4: {
+                    ivec2 center_cell = cell_size == 2 ? cell : cell + ivec2(1, 1);
+                    if (line_end.x < center_cell.x) {
+                        line_start.x = center_cell.x;
+                    } else if (line_end.x > center_cell.x + 1) {
+                        line_start.x = center_cell.x + 1;
+                    } else {
+                        line_start.x = line_end.x;
+                    }
+                    if (line_end.y < center_cell.y) {
+                        line_start.y = center_cell.y;
+                    } else if (line_end.y > center_cell.y + 1) {
+                        line_start.y = center_cell.y + 1;
+                    } else {
+                        line_start.y = line_end.y;
+                    }
+                    break;
+                }
+                default:
+                    log_warn("cell size of %i not handled in map_fog_update", cell_size);
+                    line_start = cell;
+                    break;
+            }
+
+            // we want slope to be between 0 and 1
+            // if "run" is greater than "rise" then m is naturally between 0 and 1, we will step with x in increments of 1 and handle y increments that are less than 1
+            // if "rise" is greater than "run" (use_x_step is false) then we will swap x and y so that we can step with y in increments of 1 and handle x increments that are less than 1
+            bool use_x_step = std::abs(line_end.x - line_start.x) >= std::abs(line_end.y - line_start.y);
+            int slope = std::abs(2 * (use_x_step ? (line_end.y - line_start.y) : (line_end.x - line_start.x)));
+            int slope_error = slope - std::abs((use_x_step ? (line_end.x - line_start.x) : (line_end.y - line_start.y)));
+            ivec2 line_step;
+            ivec2 line_opposite_step;
+            if (use_x_step) {
+                line_step = ivec2(1, 0) * (line_end.x >= line_start.x ? 1 : -1);
+                line_opposite_step = ivec2(0, 1) * (line_end.y >= line_start.y ? 1 : -1);
+            } else {
+                line_step = ivec2(0, 1) * (line_end.y >= line_start.y ? 1 : -1);
+                line_opposite_step = ivec2(1, 0) * (line_end.x >= line_start.x ? 1 : -1);
+            }
+            for (ivec2 line_cell = line_start; line_cell != line_end; line_cell += line_step) {
+                if (!map_is_cell_in_bounds(state.map, line_cell) || ivec2::euclidean_distance_squared(line_start, line_cell) > sight * sight) {
+                    break;
+                }
+
+                if (increment) {
+                    if (state.fog[player_team][line_cell.x + (line_cell.y * state.map.width)] == FOG_HIDDEN) {
+                        state.fog[player_team][line_cell.x + (line_cell.y * state.map.width)] = 1;
+                    } else {
+                        state.fog[player_team][line_cell.x + (line_cell.y * state.map.width)]++;
+                    }
+                    if (has_detection) {
+                        state.detection[player_team][line_cell.x + (line_cell.y * state.map.width)]++;
+                    }
+                } else {
+                    state.fog[player_team][line_cell.x + (line_cell.y * state.map.width)]--;
+                    if (has_detection) {
+                        state.detection[player_team][line_cell.x + (line_cell.y * state.map.width)]--;
+                    }
+
+                    // Remember revealed entities
+                    Cell cell = map_get_cell(state.map, CELL_LAYER_GROUND, line_cell);
+                    if (cell.type == CELL_BUILDING || cell.type == CELL_GOLDMINE) {
+                        Entity& entity = state.entities.get_by_id(cell.id);
+                        if (entity_is_selectable(entity)) {
+                            state.remembered_entities[player_team][cell.id] = (RememberedEntity) {
+                                .type = entity.type,
+                                .frame = entity_get_animation_frame(entity),
+                                .cell = entity.cell,
+                                .cell_size = entity_get_data(entity.type).cell_size,
+                                .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLDMINE ? 0 : state.players[entity.player_id].recolor_id
+                            };
+                        }
+                    } // End if cell value < cell empty
+                } // End if !increment
+
+                if (map_get_tile(state.map, line_cell).elevation > map_get_tile(state.map, line_start).elevation) {
+                    break;
+                }
+
+                slope_error += slope;
+                if (slope_error >= 0) {
+                    line_cell += line_opposite_step;
+                    slope_error -= 2 * std::abs((use_x_step ? (line_end.x - line_start.x) : (line_end.y - line_start.y)));
+                }
+            } // End for each line cell in line
+        } // End for each line end from corner to corner
+    } // End for each search index
+
+    state.is_fog_dirty = true;
 }
