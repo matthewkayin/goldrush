@@ -205,7 +205,13 @@ void match_ui_update(MatchUiState& state) {
     // Update UI buttons
     {
         uint32_t hotkey_group = 0;
-        if (!state.selection.empty()) {
+        if (state.mode == MATCH_UI_MODE_BUILD) {
+            hotkey_group = INPUT_HOTKEY_GROUP_BUILD;
+        } else if (state.mode == MATCH_UI_MODE_BUILD2) {
+            hotkey_group = INPUT_HOTKEY_GROUP_BUILD2;
+        } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_targeting(state)) {
+            hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
+        } else if (!state.selection.empty()) {
             Entity& first_entity = state.match.entities.get_by_id(state.selection[0]);
             if (first_entity.player_id == network_get_player_id()) {
                 bool is_selection_uniform = true;
@@ -246,7 +252,24 @@ void match_ui_update(MatchUiState& state) {
 
             ui_element_position(MATCH_UI_BUTTON_POSITIONS[hotkey_index]);
             if (ui_icon_button(hotkey, hotkey_mode)) {
-
+                switch (hotkey) {
+                    case INPUT_HOTKEY_BUILD: {
+                        state.mode = MATCH_UI_MODE_BUILD;
+                        break;
+                    }
+                    case INPUT_HOTKEY_BUILD2: {
+                        state.mode = MATCH_UI_MODE_BUILD2;
+                        break;
+                    }
+                    case INPUT_HOTKEY_CANCEL: {
+                        if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
+                            state.mode = MATCH_UI_MODE_NONE;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
             }
         }
     }
@@ -360,8 +383,7 @@ void match_ui_update(MatchUiState& state) {
 
     // Update cursor
     cursor_set(match_ui_is_targeting(state) ? CURSOR_TARGET : CURSOR_DEFAULT);
-    // TODO ? if ((match_ui_is_targeting(state) || state.mode == MATCH_UI_MODE_BUILDING_PLACE || state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2) && state.selection.empty()) {
-    if ((match_ui_is_targeting(state) || state.mode == MATCH_UI_MODE_BUILDING_PLACE) && state.selection.empty()) {
+    if ((match_ui_is_targeting(state) || state.mode == MATCH_UI_MODE_BUILDING_PLACE || state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2) && state.selection.empty()) {
         state.mode = MATCH_UI_MODE_NONE;
     }
 

@@ -112,9 +112,6 @@ void input_poll_events() {
                     case SDLK_SPACE:
                         state.current[INPUT_SPACE] = event.type == SDL_KEYDOWN;
                         break;
-                    case SDLK_ESCAPE:
-                        state.current[INPUT_ESC] = event.type == SDL_KEYDOWN;
-                        break;
                     case SDLK_F3:
                         state.current[INPUT_F3] = event.type == SDL_KEYDOWN;
                         break;
@@ -204,6 +201,14 @@ void input_set_hotkey_group(uint32_t group) {
     if ((group & INPUT_HOTKEY_GROUP_CANCEL) == INPUT_HOTKEY_GROUP_CANCEL) {
         state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
     }
+    if ((group & INPUT_HOTKEY_GROUP_BUILD) == INPUT_HOTKEY_GROUP_BUILD) {
+        state.hotkey_group[0] = INPUT_HOTKEY_HALL;
+        state.hotkey_group[1] = INPUT_HOTKEY_HOUSE;
+        state.hotkey_group[2] = INPUT_HOTKEY_SALOON;
+        state.hotkey_group[3] = INPUT_HOTKEY_SMITH;
+        state.hotkey_group[4] = INPUT_HOTKEY_BUNKER;
+        state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+    }
 }
 
 InputAction input_get_hotkey(uint32_t index) {
@@ -218,4 +223,9 @@ void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_BUILD2] = SDLK_v;
     state.hotkey_mapping[INPUT_HOTKEY_REPAIR] = SDLK_r;
     state.hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
+    state.hotkey_mapping[INPUT_HOTKEY_HALL] = SDLK_t;
+    state.hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDLK_e;
+    state.hotkey_mapping[INPUT_HOTKEY_SALOON] = SDLK_a;
+    state.hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_s;
+    state.hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_b;
 }
