@@ -79,6 +79,7 @@ struct MatchUiState {
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise);
 void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event);
+void match_ui_handle_input(MatchUiState& state);
 void match_ui_update(MatchUiState& state);
 
 void match_ui_clamp_camera(MatchUiState& state);

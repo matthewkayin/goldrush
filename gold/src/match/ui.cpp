@@ -118,6 +118,60 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // UPDATE
 
+// This function returns after it handles a single input to avoid double input happening
+void match_ui_handle_input(MatchUiState& state) {
+    // Order movement
+    {
+        // Check that the left or right mouse button is being pressed
+        InputAction action_required = match_ui_is_targeting(state) ? INPUT_LEFT_CLICK : INPUT_RIGHT_CLICK;
+        bool is_action_pressed = input_is_action_just_pressed(action_required);
+        // Check that a move command can be executed in the current UI state
+        bool is_movement_allowed = state.mode != MATCH_UI_MODE_BUILDING_PLACE && 
+                                  !state.is_minimap_dragging && 
+                                  match_ui_get_selection_type(state, state.selection) 
+                                        == MATCH_UI_SELECTION_UNITS;
+        // Check that the mouse is either in the world or in the minimap
+        bool is_mouse_in_position = !match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position());
+
+        if (is_action_pressed && is_movement_allowed && is_mouse_in_position) {
+            match_ui_order_move(state);
+            return;
+        }
+    }
+
+    // Begin minimap drag
+    if (MINIMAP_RECT.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+        state.is_minimap_dragging = true;
+        return;
+    } 
+    // End minimap drag
+    if (state.is_minimap_dragging && input_is_action_just_released(INPUT_LEFT_CLICK)) {
+        state.is_minimap_dragging = false;
+        return;
+    }
+
+    // Begin selecting
+    if (!match_ui_is_mouse_in_ui() && !match_ui_is_targeting(state) && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+        state.select_origin = input_get_mouse_position() + state.camera_offset;
+        return;
+    }
+    // End selecting
+    if (match_ui_is_selecting(state) && input_is_action_just_released(INPUT_LEFT_CLICK)) {
+        ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
+        Rect select_rect = (Rect) {
+            .x = std::min(world_pos.x, state.select_origin.x),
+            .y = std::min(world_pos.y, state.select_origin.y),
+            .w = std::max(1, std::abs(state.select_origin.x - world_pos.x)),
+            .h = std::max(1, std::abs(state.select_origin.y - world_pos.y)),
+        };
+
+        std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
+        match_ui_set_selection(state, selection);
+        state.select_origin = ivec2(-1, -1);
+        return;
+    }
+}
+
 void match_ui_update(MatchUiState& state) {
     if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
         // Check that all players are ready
@@ -191,18 +245,10 @@ void match_ui_update(MatchUiState& state) {
 
     state.turn_timer--;
 
-    // Order movement
-    if (input_is_action_just_pressed(INPUT_RIGHT_CLICK) && 
-            match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_UNITS &&
-            state.mode != MATCH_UI_MODE_BUILDING_PLACE && !state.is_minimap_dragging &&
-            (MINIMAP_RECT.has_point(input_get_mouse_position()) || !match_ui_is_mouse_in_ui())) {
-        match_ui_order_move(state);
-    }
-
-    // Handle input
-    ui_begin();
-
     // Update UI buttons
+    ui_begin();
+    // This flag is to make sure that we only handle a single input
+    bool menu_button_was_pressed = false;
     {
         uint32_t hotkey_group = 0;
         if (state.mode == MATCH_UI_MODE_BUILD) {
@@ -251,8 +297,12 @@ void match_ui_update(MatchUiState& state) {
             }
 
             ui_element_position(MATCH_UI_BUTTON_POSITIONS[hotkey_index]);
-            if (ui_icon_button(hotkey, hotkey_mode)) {
+            if (ui_icon_button(hotkey, hotkey_mode) && !menu_button_was_pressed) {
                 switch (hotkey) {
+                    case INPUT_HOTKEY_ATTACK: {
+                        state.mode = MATCH_UI_MODE_TARGET_ATTACK;
+                        break;
+                    }
                     case INPUT_HOTKEY_BUILD: {
                         state.mode = MATCH_UI_MODE_BUILD;
                         break;
@@ -270,36 +320,13 @@ void match_ui_update(MatchUiState& state) {
                     default:
                         break;
                 }
+
+                menu_button_was_pressed = true;
             }
         }
     }
-
-    // Begin minimap drag
-    if (MINIMAP_RECT.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
-        state.is_minimap_dragging = true;
-    } 
-    // End minimap drag
-    if (state.is_minimap_dragging && input_is_action_just_released(INPUT_LEFT_CLICK)) {
-        state.is_minimap_dragging = false;
-    }
-
-    // Begin selecting
-    if (!match_ui_is_mouse_in_ui() && !match_ui_is_targeting(state) && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
-        state.select_origin = input_get_mouse_position() + state.camera_offset;
-    }
-    // End selecting
-    if (match_ui_is_selecting(state) && input_is_action_just_released(INPUT_LEFT_CLICK)) {
-        ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
-        Rect select_rect = (Rect) {
-            .x = std::min(world_pos.x, state.select_origin.x),
-            .y = std::min(world_pos.y, state.select_origin.y),
-            .w = std::max(1, std::abs(state.select_origin.x - world_pos.x)),
-            .h = std::max(1, std::abs(state.select_origin.y - world_pos.y)),
-        };
-
-        std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
-        match_ui_set_selection(state, selection);
-        state.select_origin = ivec2(-1, -1);
+    if (!menu_button_was_pressed) {
+        match_ui_handle_input(state);
     }
 
     // Match update
