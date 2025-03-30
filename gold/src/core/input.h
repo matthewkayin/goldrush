@@ -13,8 +13,32 @@ enum InputAction {
     INPUT_ESC,
     INPUT_F3,
     INPUT_ENTER,
+    INPUT_HOTKEY_NONE,
+    INPUT_HOTKEY_ATTACK,
+    INPUT_HOTKEY_STOP,
+    INPUT_HOTKEY_DEFEND,
+    INPUT_HOTKEY_BUILD,
+    INPUT_HOTKEY_BUILD2,
+    INPUT_HOTKEY_REPAIR,
+    INPUT_HOTKEY_CANCEL,
     INPUT_COUNT
 };
+
+const uint32_t INPUT_HOTKEY_GROUP_EMPTY = 0;
+const uint32_t INPUT_HOTKEY_GROUP_UNIT = 1;
+const uint32_t INPUT_HOTKEY_GROUP_MINER = 2;
+const uint32_t INPUT_HOTKEY_GROUP_UNLOAD = 2 << 1;
+const uint32_t INPUT_HOTKEY_GROUP_CANCEL = 2 << 2;
+const uint32_t INPUT_HOTKEY_GROUP_EXPLODE = 2 << 3;
+const uint32_t INPUT_HOTKEY_GROUP_TINKER = 2 << 4;
+const uint32_t INPUT_HOTKEY_GROUP_HALL = 2 << 5;
+const uint32_t INPUT_HOTKEY_GROUP_SALOON = 2 << 6;
+const uint32_t INPUT_HOTKEY_GROUP_BARRACKS = 2 << 7;
+const uint32_t INPUT_HOTKEY_GROUP_SMITH = 2 << 8;
+const uint32_t INPUT_HOTKEY_GROUP_BUILD = 2 << 9;
+const uint32_t INPUT_HOTKEY_GROUP_BUIL2 = 2 << 10;
+const uint32_t INPUT_HOTKEY_GROUP_SHERIFFS = 2 << 11;
+const uint32_t INPUT_HOTKEY_GROUP_COOP = 2 << 12;
 
 void input_init(SDL_Window* window);
 void input_poll_events();
@@ -28,3 +52,7 @@ bool input_user_requests_exit();
 bool input_is_action_pressed(InputAction action);
 bool input_is_action_just_pressed(InputAction action);
 bool input_is_action_just_released(InputAction action);
+
+void input_set_hotkey_group(uint32_t group);
+InputAction input_get_hotkey(uint32_t index);
+void input_use_hotkey_mapping_default();

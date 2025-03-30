@@ -17,6 +17,9 @@ struct InputState {
 
     std::string* text_input_str;
     size_t text_input_max_length;
+
+    InputAction hotkey_group[HOTKEY_GROUP_SIZE];
+    SDL_Keycode hotkey_mapping[INPUT_COUNT];
 };
 static InputState state;
 
@@ -27,6 +30,10 @@ void input_init(SDL_Window* window) {
     state.window = window;
     input_update_window_size();
     input_stop_text_input();
+    input_use_hotkey_mapping_default();
+    for (uint32_t index = 0; index < HOTKEY_GROUP_SIZE; index++) {
+        state.hotkey_group[index] = INPUT_HOTKEY_NONE;
+    }
 }
 
 void input_update_window_size() {
@@ -120,8 +127,14 @@ void input_poll_events() {
                         }
                         break;
                     }
-                    default:
+                    default: {
+                        for (uint32_t hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_COUNT; hotkey++) {
+                            if (event.key.keysym.sym == state.hotkey_mapping[hotkey]) {
+                                state.current[hotkey] = event.type == SDL_KEYDOWN;
+                            }
+                        }
                         break;
+                    }
                 }
                 break;
             }
@@ -171,4 +184,38 @@ bool input_is_action_just_pressed(InputAction action) {
 
 bool input_is_action_just_released(InputAction action) {
     return state.previous[action] && !state.current[action];
+}
+
+void input_set_hotkey_group(uint32_t group) {
+    for (uint32_t index = 0; index < HOTKEY_GROUP_SIZE; index++) {
+        state.hotkey_group[index] = INPUT_HOTKEY_NONE;
+    }
+
+    if ((group & INPUT_HOTKEY_GROUP_UNIT) == INPUT_HOTKEY_GROUP_UNIT) {
+        state.hotkey_group[0] = INPUT_HOTKEY_ATTACK;
+        state.hotkey_group[1] = INPUT_HOTKEY_STOP;
+        state.hotkey_group[2] = INPUT_HOTKEY_DEFEND;
+    }
+    if ((group & INPUT_HOTKEY_GROUP_MINER) == INPUT_HOTKEY_GROUP_MINER) {
+        state.hotkey_group[3] = INPUT_HOTKEY_REPAIR;
+        state.hotkey_group[4] = INPUT_HOTKEY_BUILD;
+        state.hotkey_group[5] = INPUT_HOTKEY_BUILD2;
+    }
+    if ((group & INPUT_HOTKEY_GROUP_CANCEL) == INPUT_HOTKEY_GROUP_CANCEL) {
+        state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+    }
+}
+
+InputAction input_get_hotkey(uint32_t index) {
+    return state.hotkey_group[index];
+}
+
+void input_use_hotkey_mapping_default() {
+    state.hotkey_mapping[INPUT_HOTKEY_ATTACK] = SDLK_a;
+    state.hotkey_mapping[INPUT_HOTKEY_STOP] = SDLK_s;
+    state.hotkey_mapping[INPUT_HOTKEY_DEFEND] = SDLK_d;
+    state.hotkey_mapping[INPUT_HOTKEY_BUILD] = SDLK_b;
+    state.hotkey_mapping[INPUT_HOTKEY_BUILD2] = SDLK_v;
+    state.hotkey_mapping[INPUT_HOTKEY_REPAIR] = SDLK_r;
+    state.hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
 }

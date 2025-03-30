@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math/gmath.h"
+#include "core/input.h"
 #include "render/sprite.h"
 #include "render/font.h"
 #include <string>
@@ -8,6 +9,15 @@
 
 #define UI_RENDER_TEXT_BUFFER_SIZE 128
 #define UI_Z_INDEX_COUNT 2
+
+enum UiIconButtonMode {
+    // The button can be hovered and clicked
+    UI_ICON_BUTTON_ENABLED,
+    // The button cannot hovered or clicked
+    UI_ICON_BUTTON_DISABLED,
+    // The button cannot be hovered or clicked and it is also grayed out
+    UI_ICON_BUTTON_GRAYED_OUT
+};
 
 /**
  * Clears the UI render list. Should be called every frame
@@ -61,6 +71,14 @@ bool ui_button(const char* text);
  * @return True if the button has been clicked this frame
  */
 bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h);
+
+/**
+ * Creates a button with the specified icon
+ * @param hotkey If the hotkey is pressed, it will trigger the button the same as if it was clicked
+ * @param mode Determines how the button is rendered and how it reacts to inputs
+ * @return True if the button has been triggered this frame
+ */
+bool ui_icon_button(InputAction hotkey, UiIconButtonMode mode);
 
 /**
  * Creates text

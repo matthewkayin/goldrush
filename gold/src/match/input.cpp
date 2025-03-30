@@ -7,7 +7,7 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
     out_buffer_length++;
 
     switch (input.type) {
-        MATCH_INPUT_NONE:
+        case MATCH_INPUT_NONE:
             break;
         case MATCH_INPUT_MOVE_CELL:
         case MATCH_INPUT_MOVE_ENTITY:
@@ -41,7 +41,7 @@ MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_h
     in_buffer_head++;
 
     switch (input.type) {
-        MATCH_INPUT_NONE:
+        case MATCH_INPUT_NONE:
             break;
         case MATCH_INPUT_MOVE_CELL:
         case MATCH_INPUT_MOVE_ENTITY:

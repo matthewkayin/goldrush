@@ -509,6 +509,278 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_UI_ICON_BUTTON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_ATTACK, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_attack.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_STOP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_stop.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_DEFEND, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_defend.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_BUILD, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_build.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_BUILD2, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_build2.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_REPAIR, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_repair.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_CANCEL, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_cancel.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_EXPLODE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_explode.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_BOMB, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_bomb.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_HALL, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_hall.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_HOUSE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_house.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_SALOON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_saloon.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_BUNKER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_bunker.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_SMITH, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_smith.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_COOP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_coop.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_BARRACKS, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_barracks.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_SHERIFFS, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_sheriffs.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_MINER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_miner.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_WAGON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_wagon.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_WAR_WAGON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_war_wagon.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_COWBOY, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_cowboy.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_BANDIT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_bandit.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_SAPPER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_sapper.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_TINKER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_tinker.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_SOLDIER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_soldier.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_CANNON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_cannon.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_JOCKEY, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_jockey.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_DETECTIVE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_detective.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_LANDMINE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_landmine.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_GOLDMINE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_goldmine.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_WAGON_ARMOR, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_wagon_armor.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_EXPLOSIVES, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_tnt.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_BAYONETS, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_bayonets.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
     { SPRITE_SELECT_RING_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

@@ -4,6 +4,7 @@
 #include "core/input.h"
 #include "core/logger.h"
 #include "core/cursor.h"
+#include "menu/ui.h"
 #include "menu/match_setting.h"
 #include "render/sprite.h"
 #include "render/render.h"
@@ -20,6 +21,19 @@ static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h =
 static const Rect MINIMAP_RECT = (Rect) { .x = 4, .y = SCREEN_HEIGHT - 132, .w = 128, .h = 128 };
 static const int SOUND_LISTEN_MARGIN = 128;
 static const uint32_t SOUND_COOLDOWN_DURATION = 5;
+
+static const int MATCH_UI_BUTTON_X = SCREEN_WIDTH - 132 + 14; 
+static const int MATCH_UI_BUTTON_Y = SCREEN_HEIGHT - MATCH_UI_HEIGHT + 10;
+static const int MATCH_UI_BUTTON_PADDING_X = 32 + 4;
+static const int MATCH_UI_BUTTON_PADDING_Y = 32 + 6;
+static const ivec2 MATCH_UI_BUTTON_POSITIONS[HOTKEY_GROUP_SIZE] = {
+    ivec2(MATCH_UI_BUTTON_X, MATCH_UI_BUTTON_Y),
+    ivec2(MATCH_UI_BUTTON_X + MATCH_UI_BUTTON_PADDING_X, MATCH_UI_BUTTON_Y),
+    ivec2(MATCH_UI_BUTTON_X + (2 * MATCH_UI_BUTTON_PADDING_X), MATCH_UI_BUTTON_Y),
+    ivec2(MATCH_UI_BUTTON_X, MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y),
+    ivec2(MATCH_UI_BUTTON_X + MATCH_UI_BUTTON_PADDING_X, MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y),
+    ivec2(MATCH_UI_BUTTON_X + (2 * MATCH_UI_BUTTON_PADDING_X), MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y)
+};
 
 // INIT
 
@@ -104,45 +118,6 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // UPDATE
 
-void match_ui_handle_left_mouse_press(MatchUiState& state) {
-    // Begin minimap drag
-    if (MINIMAP_RECT.has_point(input_get_mouse_position())) {
-        state.is_minimap_dragging = true;
-        return;
-    }
-
-    // Begin selecting
-    if (!match_ui_is_mouse_in_ui()) {
-        state.select_origin = input_get_mouse_position() + state.camera_offset;
-        return;
-    }
-}
-
-void match_ui_handle_left_mouse_release(MatchUiState& state) {
-    // End minimap drag
-    if (state.is_minimap_dragging) {
-        state.is_minimap_dragging = false;
-        return;
-    }
-
-    // End selecting
-    if (match_ui_is_selecting(state)) {
-        ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
-        Rect select_rect = (Rect) {
-            .x = std::min(world_pos.x, state.select_origin.x),
-            .y = std::min(world_pos.y, state.select_origin.y),
-            .w = std::max(1, std::abs(state.select_origin.x - world_pos.x)),
-            .h = std::max(1, std::abs(state.select_origin.y - world_pos.y)),
-        };
-
-        std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
-        match_ui_set_selection(state, selection);
-        state.select_origin = ivec2(-1, -1);
-
-        return;
-    }
-}
-
 void match_ui_update(MatchUiState& state) {
     if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
         // Check that all players are ready
@@ -225,11 +200,83 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Handle input
-    if (input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
-        match_ui_handle_left_mouse_press(state);
+    ui_begin();
+
+    // Update UI buttons
+    {
+        uint32_t hotkey_group = 0;
+        if (!state.selection.empty()) {
+            Entity& first_entity = state.match.entities.get_by_id(state.selection[0]);
+            if (first_entity.player_id == network_get_player_id()) {
+                bool is_selection_uniform = true;
+                for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
+                    if (state.match.entities.get_by_id(state.selection[selection_index]).type != first_entity.type) {
+                        is_selection_uniform = false;
+                        break;
+                    }
+                }
+
+                if (is_selection_uniform) {
+                    if (entity_is_unit(first_entity.type)) {
+                        hotkey_group |= INPUT_HOTKEY_GROUP_UNIT;
+                    }
+                    switch (first_entity.type) {
+                        case ENTITY_MINER: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_MINER;
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+        input_set_hotkey_group(hotkey_group);
+
+        for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
+            InputAction hotkey = input_get_hotkey(hotkey_index);
+            if (hotkey == INPUT_HOTKEY_NONE) {
+                continue;
+            }
+
+            UiIconButtonMode hotkey_mode = UI_ICON_BUTTON_ENABLED;
+            if (state.is_minimap_dragging || match_ui_is_selecting(state)) {
+                hotkey_mode = UI_ICON_BUTTON_DISABLED;
+            }
+
+            ui_element_position(MATCH_UI_BUTTON_POSITIONS[hotkey_index]);
+            if (ui_icon_button(hotkey, hotkey_mode)) {
+
+            }
+        }
     }
-    if (input_is_action_just_released(INPUT_LEFT_CLICK)) {
-        match_ui_handle_left_mouse_release(state);
+
+    // Begin minimap drag
+    if (MINIMAP_RECT.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+        state.is_minimap_dragging = true;
+    } 
+    // End minimap drag
+    if (state.is_minimap_dragging && input_is_action_just_released(INPUT_LEFT_CLICK)) {
+        state.is_minimap_dragging = false;
+    }
+
+    // Begin selecting
+    if (!match_ui_is_mouse_in_ui() && !match_ui_is_targeting(state) && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+        state.select_origin = input_get_mouse_position() + state.camera_offset;
+    }
+    // End selecting
+    if (match_ui_is_selecting(state) && input_is_action_just_released(INPUT_LEFT_CLICK)) {
+        ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
+        Rect select_rect = (Rect) {
+            .x = std::min(world_pos.x, state.select_origin.x),
+            .y = std::min(world_pos.y, state.select_origin.y),
+            .w = std::max(1, std::abs(state.select_origin.x - world_pos.x)),
+            .h = std::max(1, std::abs(state.select_origin.y - world_pos.y)),
+        };
+
+        std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
+        match_ui_set_selection(state, selection);
+        state.select_origin = ivec2(-1, -1);
     }
 
     // Match update
@@ -956,6 +1003,8 @@ void match_ui_render(const MatchUiState& state) {
     render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
     render_sprite_frame(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height), 0, 0);
     render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
+
+    ui_render();
 
     render_sprite_batch();
 
