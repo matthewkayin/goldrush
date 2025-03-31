@@ -7,11 +7,24 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     { ENTITY_GOLDMINE, (EntityData) {
         .name = "Gold Mine",
         .sprite = SPRITE_GOLDMINE,
+        .icon = SPRITE_BUTTON_ICON_GOLDMINE,
         .cell_size = 3,
+
+        .gold_cost = 0,
+        .train_duration = 0,
+        .max_health = 0,
+        .sight = 0,
+        .armor = 0,
+        .attack_priority = 0,
+        
+        .garrison_capacity = 4,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false
     }},
     { ENTITY_MINER, (EntityData) {
         .name = "Miner",
         .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_MINER,
         .cell_size = 1,
         
         .gold_cost = 50,
@@ -33,6 +46,492 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .attack_cooldown = 22,
             .range_squared = 1,
             .min_range_squared = 1
+        }
+    }},
+    { ENTITY_COWBOY, (EntityData) {
+        .name = "Cowboy",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_COWBOY,
+        .cell_size = 1,
+        
+        .gold_cost = 100,
+        .train_duration = 25,
+        .max_health = 30,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 200),
+
+            .damage = 8,
+            .attack_cooldown = 40,
+            .range_squared = 25,
+            .min_range_squared = 1
+        }
+    }},
+    { ENTITY_BANDIT, (EntityData) {
+        .name = "Bandit",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_BANDIT,
+        .cell_size = 1,
+        
+        .gold_cost = 75,
+        .train_duration = 20,
+        .max_health = 40,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 225),
+
+            .damage = 6,
+            .attack_cooldown = 15,
+            .range_squared = 1,
+            .min_range_squared = 1
+        }
+    }},
+    { ENTITY_WAGON, (EntityData) {
+        .name = "Wagon",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_WAGON,
+        .cell_size = 1,
+        
+        .gold_cost = 200,
+        .train_duration = 38,
+        .max_health = 120,
+        .sight = 9,
+        .armor = 1,
+        .attack_priority = 1,
+
+        .garrison_capacity = 4,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 2,
+            .speed = fixed::from_int_and_raw_decimal(1, 20),
+
+            .damage = 0,
+            .attack_cooldown = 0,
+            .range_squared = 1,
+            .min_range_squared = 1
+        }
+    }},
+    { ENTITY_WAR_WAGON, (EntityData) {
+        .name = "War Wagon",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_WAR_WAGON,
+        .cell_size = 1,
+        
+        .gold_cost = 200,
+        .train_duration = 38,
+        .max_health = 120,
+        .sight = 9,
+        .armor = 3,
+        .attack_priority = 1,
+
+        .garrison_capacity = 4,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 2,
+            .speed = fixed::from_int_and_raw_decimal(1, 20),
+
+            .damage = 0,
+            .attack_cooldown = 0,
+            .range_squared = 1,
+            .min_range_squared = 1
+        }
+    }},
+    { ENTITY_JOCKEY, (EntityData) {
+        .name = "Jockey",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_JOCKEY,
+        .cell_size = 1,
+        
+        .gold_cost = 100,
+        .train_duration = 30,
+        .max_health = 80,
+        .sight = 9,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 2,
+            .speed = fixed::from_int_and_raw_decimal(1, 40),
+
+            .damage = 8,
+            .attack_cooldown = 30,
+            .range_squared = 25,
+            .min_range_squared = 1
+        }
+    }},
+    { ENTITY_SAPPER, (EntityData) {
+        .name = "Sapper",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_SAPPER,
+        .cell_size = 1,
+        
+        .gold_cost = 100,
+        .train_duration = 27,
+        .max_health = 40,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 225),
+
+            .damage = 200,
+            .attack_cooldown = 15,
+            .range_squared = 1,
+            .min_range_squared = 1
+        }
+    }},
+    { ENTITY_TINKER, (EntityData) {
+        .name = "Tinker",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_TINKER,
+        .cell_size = 1,
+        
+        .gold_cost = 150,
+        .train_duration = 30,
+        .max_health = 30,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = true,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 200),
+
+            .damage = 0,
+            .attack_cooldown = 15,
+            .range_squared = 1,
+            .min_range_squared = 1
+        }
+    }},
+    { ENTITY_SOLDIER, (EntityData) {
+        .name = "Soldier",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_SOLDIER,
+        .cell_size = 1,
+        
+        .gold_cost = 125,
+        .train_duration = 30,
+        .max_health = 40,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 170),
+
+            .damage = 15,
+            .attack_cooldown = 30,
+            .range_squared = 49,
+            .min_range_squared = 4 
+        }
+    }},
+    { ENTITY_CANNON, (EntityData) {
+        .name = "Cannoneer",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_CANNON,
+        .cell_size = 2,
+        
+        .gold_cost = 200,
+        .train_duration = 45,
+        .max_health = 100,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 2,
+            .speed = fixed::from_int_and_raw_decimal(0, 140),
+
+            .damage = 20,
+            .attack_cooldown = 60,
+            .range_squared = 49,
+            .min_range_squared = 9 
+        }
+    }},
+    { ENTITY_DETECTIVE, (EntityData) {
+        .name = "Detective",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_DETECTIVE,
+        .cell_size = 1,
+        
+        .gold_cost = 175,
+        .train_duration = 30,
+        .max_health = 50,
+        .sight = 7,
+        .armor = 0,
+        .attack_priority = 2,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = false,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 170),
+
+            .damage = 5,
+            .attack_cooldown = 45,
+            .range_squared = 24,
+            .min_range_squared = 1 
+        }
+    }},
+    { ENTITY_HALL, (EntityData) {
+        .name = "Town Hall",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_HALL,
+        .cell_size = 4,
+        
+        .gold_cost = 400,
+        .train_duration = 0,
+        .max_health = 840,
+        .sight = 9,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 16, 23, 7 },
+            .builder_positions_y = { 43, 25, 22 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_HOUSE, (EntityData) {
+        .name = "House",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_HOUSE,
+        .cell_size = 2,
+        
+        .gold_cost = 100,
+        .train_duration = 0,
+        .max_health = 300,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 3, 16, -4 },
+            .builder_positions_y = { 15, 15, 3 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = false
+        }
+    }},
+    { ENTITY_SALOON, (EntityData) {
+        .name = "House",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_SALOON,
+        .cell_size = 3,
+        
+        .gold_cost = 150,
+        .train_duration = 0,
+        .max_health = 600,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 6, 27, 9 },
+            .builder_positions_y = { 32, 27, 9 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_BUNKER, (EntityData) {
+        .name = "Bunker",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_BUNKER,
+        .cell_size = 2,
+        
+        .gold_cost = 100,
+        .train_duration = 0,
+        .max_health = 200,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 4,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 1, 14, 5 },
+            .builder_positions_y = { 15, 9, -3 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = false
+        }
+    }},
+    { ENTITY_COOP, (EntityData) {
+        .name = "Chicken Coop",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_COOP,
+        .cell_size = 3,
+        
+        .gold_cost = 150,
+        .train_duration = 0,
+        .max_health = 500,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 9, 27, 26 },
+            .builder_positions_y = { 24, 18, 4 },
+            .builder_flip_h = { false, true, true },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_SMITH, (EntityData) {
+        .name = "Blacksmith",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_SMITH,
+        .cell_size = 3,
+        
+        .gold_cost = 250,
+        .train_duration = 0,
+        .max_health = 560,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 10, 28, 28 },
+            .builder_positions_y = { 29, 17, 4 },
+            .builder_flip_h = { false, true, true },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_BARRACKS, (EntityData) {
+        .name = "Barracks",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_BARRACKS,
+        .cell_size = 3,
+        
+        .gold_cost = 300,
+        .train_duration = 0,
+        .max_health = 600,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 6, 27, 3 },
+            .builder_positions_y = { 27, 7, 3 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_SHERIFFS, (EntityData) {
+        .name = "Sheriff's Office",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_SHERIFFS,
+        .cell_size = 3,
+        
+        .gold_cost = 200,
+        .train_duration = 0,
+        .max_health = 560,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 6, 27, 14 },
+            .builder_positions_y = { 27, 7, 1 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
+        }
+    }},
+    { ENTITY_LANDMINE, (EntityData) {
+        .name = "Land Mine",
+        .sprite = SPRITE_UNIT_MINER,
+        .icon = SPRITE_BUTTON_ICON_LANDMINE,
+        .cell_size = 1,
+        
+        .gold_cost = 50,
+        .train_duration = 0,
+        .max_health = 5,
+        .sight = 3,
+        .armor = 0,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 6, 27, 14 },
+            .builder_positions_y = { 27, 7, 1 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = false
         }
     }}
 };

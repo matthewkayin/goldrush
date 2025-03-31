@@ -3,27 +3,14 @@
 #include "render/render.h"
 #include "core/input.h"
 #include "core/sound.h"
+#include "core/logger.h"
+#include "match/hotkey.h"
+#include "match/entity.h"
 #include <vector>
 #include <algorithm>
-#include <unordered_map>
 
 static const uint32_t UI_TEXT_INPUT_BLINK_DURATION = 30;
 static const int UI_DROPDOWN_NONE = -1;
-
-static const std::unordered_map<InputAction, SpriteName> HOTKEY_SPRITE = {
-    { INPUT_HOTKEY_ATTACK, SPRITE_BUTTON_ICON_ATTACK },
-    { INPUT_HOTKEY_STOP, SPRITE_BUTTON_ICON_STOP },
-    { INPUT_HOTKEY_DEFEND, SPRITE_BUTTON_ICON_DEFEND },
-    { INPUT_HOTKEY_REPAIR, SPRITE_BUTTON_ICON_REPAIR },
-    { INPUT_HOTKEY_BUILD, SPRITE_BUTTON_ICON_BUILD },
-    { INPUT_HOTKEY_BUILD2, SPRITE_BUTTON_ICON_BUILD2 },
-    { INPUT_HOTKEY_CANCEL, SPRITE_BUTTON_ICON_CANCEL },
-    { INPUT_HOTKEY_HALL, SPRITE_BUTTON_ICON_HALL },
-    { INPUT_HOTKEY_HOUSE, SPRITE_BUTTON_ICON_HOUSE },
-    { INPUT_HOTKEY_SALOON, SPRITE_BUTTON_ICON_SALOON },
-    { INPUT_HOTKEY_SMITH, SPRITE_BUTTON_ICON_SMITH },
-    { INPUT_HOTKEY_BUNKER, SPRITE_BUTTON_ICON_BUNKER }
-};
 
 enum UiRenderType {
     UI_RENDER_TEXT,
@@ -216,7 +203,7 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
     return clicked;
 }
 
-bool ui_icon_button(InputAction hotkey, UiIconButtonMode mode) {
+bool ui_hotkey_button(InputAction hotkey, UiHotkeyButtonMode mode) {
     ivec2 origin = ui_get_container_origin();
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
     ui_update_container(ivec2(sprite_info.frame_width, sprite_info.frame_height));
@@ -233,8 +220,24 @@ bool ui_icon_button(InputAction hotkey, UiIconButtonMode mode) {
         origin.y--;
     }
 
+    SpriteName sprite;
+    const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
+    switch (hotkey_info.type) {
+        case HOTKEY_BUTTON_ACTION:
+            sprite = hotkey_info.action.sprite;
+            break;
+        case HOTKEY_BUTTON_TRAIN:
+        case HOTKEY_BUTTON_BUILD:
+            sprite = entity_get_data(hotkey_info.entity_type).icon;
+            break;
+        case HOTKEY_BUTTON_RESEARCH:
+            log_warn("ui_hotkey_button(): sprite info not setup for HOTKEY_BUTTON_RESEARCH");
+            sprite = SPRITE_BUTTON_ICON_CANCEL;
+            break;
+    }
+
     ui_queue_sprite(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), ivec2(origin.x, origin.y), 0);
-    ui_queue_sprite(HOTKEY_SPRITE.at(hotkey), ivec2(hframe, 0), ivec2(origin.x, origin.y), 0);
+    ui_queue_sprite(sprite, ivec2(hframe, 0), ivec2(origin.x, origin.y), 0);
 
     bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && mode == UI_ICON_BUTTON_ENABLED && 
                         ((input_is_action_just_pressed(INPUT_LEFT_CLICK) && 

@@ -517,6 +517,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_UI_TOOLTIP_FRAME, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_tooltip_frame.png",
+            .hframes = 3,
+            .vframes = 3
+        }
+    }},
     { SPRITE_BUTTON_ICON_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

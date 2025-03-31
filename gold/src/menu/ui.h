@@ -10,7 +10,7 @@
 #define UI_RENDER_TEXT_BUFFER_SIZE 128
 #define UI_Z_INDEX_COUNT 2
 
-enum UiIconButtonMode {
+enum UiHotkeyButtonMode {
     // The button can be hovered and clicked
     UI_ICON_BUTTON_ENABLED,
     // The button cannot hovered or clicked
@@ -78,7 +78,7 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h);
  * @param mode Determines how the button is rendered and how it reacts to inputs
  * @return True if the button has been triggered this frame
  */
-bool ui_icon_button(InputAction hotkey, UiIconButtonMode mode);
+bool ui_hotkey_button(InputAction hotkey, UiHotkeyButtonMode mode);
 
 /**
  * Creates text

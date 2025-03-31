@@ -8,6 +8,7 @@
 #include "menu/match_setting.h"
 #include "render/sprite.h"
 #include "render/render.h"
+#include "hotkey.h"
 #include <algorithm>
 
 static const uint32_t TURN_OFFSET = 2;
@@ -291,13 +292,13 @@ void match_ui_update(MatchUiState& state) {
                 continue;
             }
 
-            UiIconButtonMode hotkey_mode = UI_ICON_BUTTON_ENABLED;
+            UiHotkeyButtonMode hotkey_mode = UI_ICON_BUTTON_ENABLED;
             if (state.is_minimap_dragging || match_ui_is_selecting(state)) {
                 hotkey_mode = UI_ICON_BUTTON_DISABLED;
             }
 
             ui_element_position(MATCH_UI_BUTTON_POSITIONS[hotkey_index]);
-            if (ui_icon_button(hotkey, hotkey_mode) && !menu_button_was_pressed) {
+            if (ui_hotkey_button(hotkey, hotkey_mode) && !menu_button_was_pressed) {
                 switch (hotkey) {
                     case INPUT_HOTKEY_ATTACK: {
                         state.mode = MATCH_UI_MODE_TARGET_ATTACK;
@@ -409,7 +410,7 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Update cursor
-    cursor_set(match_ui_is_targeting(state) ? CURSOR_TARGET : CURSOR_DEFAULT);
+    cursor_set(match_ui_is_targeting(state) && !match_ui_is_mouse_in_ui() ? CURSOR_TARGET : CURSOR_DEFAULT);
     if ((match_ui_is_targeting(state) || state.mode == MATCH_UI_MODE_BUILDING_PLACE || state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2) && state.selection.empty()) {
         state.mode = MATCH_UI_MODE_NONE;
     }
@@ -1054,6 +1055,112 @@ void match_ui_render(const MatchUiState& state) {
     render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
 
     ui_render();
+
+    // UI Tooltip
+    {
+        uint32_t hotkey_hovered_index;
+        for (hotkey_hovered_index = 0; hotkey_hovered_index < HOTKEY_GROUP_SIZE; hotkey_hovered_index++) {
+            Rect hotkey_rect = (Rect) {
+                .x = MATCH_UI_BUTTON_POSITIONS[hotkey_hovered_index].x,
+                .y = MATCH_UI_BUTTON_POSITIONS[hotkey_hovered_index].y,
+                .w = 32,
+                .h = 32
+            };
+            if (hotkey_rect.has_point(input_get_mouse_position())) {
+                break;
+            }
+        }
+
+        // If we are actually hovering a hotkey
+        if (hotkey_hovered_index != HOTKEY_GROUP_SIZE) {
+            InputAction hotkey_hovered = input_get_hotkey(hotkey_hovered_index);
+            if (hotkey_hovered != INPUT_HOTKEY_NONE) {
+                const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey_hovered);
+                const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
+
+                // Get tooltip info
+                char tooltip_text[64];
+                uint32_t tooltip_gold_cost;
+                uint32_t tooltip_population_cost;
+                switch (hotkey_info.type) {
+                    case HOTKEY_BUTTON_ACTION: {
+                        sprintf(tooltip_text, "%s", hotkey_info.action.name);
+                        tooltip_gold_cost = 0;
+                        tooltip_population_cost = 0;
+                        break;
+                    }
+                    case HOTKEY_BUTTON_TRAIN:
+                    case HOTKEY_BUTTON_BUILD: {
+                        const EntityData& entity_data = entity_get_data(hotkey_info.entity_type);
+                        sprintf(tooltip_text, "%s %s", hotkey_info.type == HOTKEY_BUTTON_TRAIN ? "Hire" : "Build", entity_data.name);
+                        tooltip_gold_cost = entity_data.gold_cost;
+                        tooltip_population_cost = hotkey_info.type == HOTKEY_BUTTON_TRAIN ? entity_data.unit_data.population_cost : 0;
+                        break;
+                    }
+                    case HOTKEY_BUTTON_RESEARCH: {
+                        sprintf(tooltip_text, "Research fixme!");
+                        tooltip_gold_cost = 0;
+                        tooltip_population_cost = 0;
+                        break;
+                    }
+                }
+
+                // Render the tooltip frame
+                int tooltip_text_width = render_get_text_size(FONT_WESTERN8_OFFBLACK, tooltip_text).x;
+                int tooltip_min_width = 10 + tooltip_text_width;
+                int tooltip_cell_width = tooltip_min_width / 8;
+                int tooltip_cell_height = tooltip_gold_cost != 0 ? 5 : 3;
+                if (tooltip_min_width % 8 != 0) {
+                    tooltip_cell_width++;
+                }
+                ivec2 tooltip_top_left = ivec2(
+                    SCREEN_WIDTH - (tooltip_cell_width * 8) - 2,
+                    SCREEN_HEIGHT - button_panel_sprite_info.frame_height - (tooltip_cell_height * 8) - 2
+                );
+                for (int y = 0; y < tooltip_cell_height; y++) {
+                    for (int x = 0; x < tooltip_cell_width; x++) {
+                        ivec2 frame;
+                        if (x == 0) {
+                            frame.x = 0;
+                        } else if (x == tooltip_cell_width - 1) {
+                            frame.x = 2;
+                        } else {
+                            frame.x = 1;
+                        }
+                        if (y == 0) {
+                            frame.y = 0;
+                        } else if (y == tooltip_cell_height - 1) {
+                            frame.y = 2;
+                        } else {
+                            frame.y = 1;
+                        }
+
+                        render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, frame, tooltip_top_left + (ivec2(x, y) * 8), RENDER_SPRITE_NO_CULL, 0);
+                    }
+                }
+
+                // Render tooltip text
+                render_text(FONT_WESTERN8_OFFBLACK, tooltip_text, tooltip_top_left + ivec2(5, 5));
+
+                // Render gold icon and text
+                if (tooltip_gold_cost != 0) {
+                    render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5, 21), RENDER_SPRITE_NO_CULL, 0);
+                    char gold_text[4];
+                    sprintf(gold_text, "%u", tooltip_gold_cost);
+                    render_text(FONT_WESTERN8_OFFBLACK, gold_text, tooltip_top_left + ivec2(23, 21));
+                }
+
+                // Render population icon and text
+                if (tooltip_population_cost != 0) {
+                    render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5 + 18 + 32, 19), RENDER_SPRITE_NO_CULL, 0);
+                    char population_text[4];
+                    sprintf(population_text, "%u", tooltip_population_cost);
+                    render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + ivec2(5 + 18 + 32 + 22, 23));
+                }
+            } 
+        }
+    }
+    // End render tooltip
 
     render_sprite_batch();
 

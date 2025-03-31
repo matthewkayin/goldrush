@@ -10,9 +10,30 @@ const uint32_t ENTITY_FLAG_DAMAGE_FLICKER = 2;
 const uint32_t ENTITY_FLAG_INVISIBLE = 4;
 const uint32_t ENTITY_FLAG_CHARGED = 8;
 
+const uint32_t ENTITY_CANNOT_GARRISON = 0;
+
 enum EntityType {
     ENTITY_GOLDMINE,
-    ENTITY_MINER
+    ENTITY_MINER,
+    ENTITY_COWBOY,
+    ENTITY_BANDIT,
+    ENTITY_WAGON,
+    ENTITY_WAR_WAGON,
+    ENTITY_JOCKEY,
+    ENTITY_SAPPER,
+    ENTITY_TINKER,
+    ENTITY_SOLDIER,
+    ENTITY_CANNON,
+    ENTITY_DETECTIVE,
+    ENTITY_HALL,
+    ENTITY_HOUSE,
+    ENTITY_SALOON,
+    ENTITY_BUNKER,
+    ENTITY_COOP,
+    ENTITY_SMITH,
+    ENTITY_BARRACKS,
+    ENTITY_SHERIFFS,
+    ENTITY_LANDMINE
 };
 
 enum EntityMode {
@@ -109,9 +130,17 @@ struct EntityDataUnit {
     int min_range_squared;
 };
 
+struct EntityDataBuilding {
+    int builder_positions_x[3];
+    int builder_positions_y[3];
+    int builder_flip_h[3];
+    bool can_rally;
+};
+
 struct EntityData {
     const char* name;
     SpriteName sprite;
+    SpriteName icon;
     int cell_size;
 
     uint32_t gold_cost;
@@ -127,6 +156,7 @@ struct EntityData {
 
     union {
         EntityDataUnit unit_data;
+        EntityDataBuilding building_data;
     };
 };
 
