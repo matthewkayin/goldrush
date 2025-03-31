@@ -81,6 +81,8 @@ struct MatchUiState {
     std::string status_message;
     uint32_t status_timer;
 
+    EntityType building_type;
+
     uint32_t sound_cooldown_timers[SOUND_COUNT];
 
     Animation move_animation;

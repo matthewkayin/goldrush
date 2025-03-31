@@ -367,7 +367,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         }
     }},
     { ENTITY_SALOON, (EntityData) {
-        .name = "House",
+        .name = "Saloon",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_SALOON,
         .cell_size = 3,

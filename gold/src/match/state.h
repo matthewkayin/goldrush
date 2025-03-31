@@ -5,6 +5,7 @@
 #include "entity.h"
 #include "container/id_array.h"
 #include "match/input.h"
+#include "core/input.h"
 #include "core/sound.h"
 #include <vector>
 #include <unordered_map>
@@ -124,6 +125,10 @@ struct MatchState {
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]);
 uint32_t match_get_player_population(const MatchState& state, uint8_t player_id);
 uint32_t match_get_player_max_population(const MatchState& state, uint8_t player_id);
+bool match_player_has_upgrade(const MatchState& state, uint8_t player_id, uint32_t upgrade);
+bool match_player_upgrade_is_available(const MatchState& state, uint8_t player_id, uint32_t upgrade);
+void match_grant_player_upgrade(MatchState& state, uint8_t player_id, uint32_t upgrade);
+bool match_does_player_meet_hotkey_requirements(const MatchState& state, uint8_t player_id, InputAction hotkey);
 void match_handle_input(MatchState& state, const MatchInput& input);
 void match_update(MatchState& state);
 

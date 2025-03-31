@@ -215,6 +215,39 @@ InputAction input_get_hotkey(uint32_t index) {
     return state.hotkey_group[index];
 }
 
+int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey) {
+    SDL_Keycode key = state.hotkey_mapping[hotkey];
+    if (key == SDLK_ESCAPE) {
+        return sprintf(str_ptr, "ESC");
+    } else if (key >= SDLK_a && key <= SDLK_z) {
+        return sprintf(str_ptr, "%c", (char)(key - 32));
+    } else if (key == SDLK_LEFTBRACKET) {
+        return sprintf(str_ptr, "[");
+    } else if (key == SDLK_RIGHTBRACKET) {
+        return sprintf(str_ptr, "]");
+    } else if (key == SDLK_BACKSLASH) {
+        return sprintf(str_ptr, "\\");
+    } else if (key == SDLK_BACKQUOTE) {
+        return sprintf(str_ptr, "`");
+    } else if (key == SDLK_MINUS) {
+        return sprintf(str_ptr, "-");
+    } else if (key == SDLK_EQUALS) {
+        return sprintf(str_ptr, "=");
+    } else if (key == SDLK_COMMA) {
+        return sprintf(str_ptr, ",");
+    } else if (key == SDLK_PERIOD) {
+        return sprintf(str_ptr, ".");
+    } else if (key == SDLK_SLASH) {
+        return sprintf(str_ptr, "/");
+    } else if (key == SDLK_SEMICOLON) {
+        return sprintf(str_ptr, ";");
+    } else if (key == SDLK_QUOTE) {
+        return sprintf(str_ptr, "'");
+    } else {
+        return 0;
+    }
+}
+
 void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_ATTACK] = SDLK_a;
     state.hotkey_mapping[INPUT_HOTKEY_STOP] = SDLK_s;

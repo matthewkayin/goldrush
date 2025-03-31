@@ -1,6 +1,7 @@
 #include "match/state.h"
 
 #include "core/logger.h"
+#include "hotkey.h"
 #include "lcg.h"
 
 static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
@@ -67,6 +68,39 @@ uint32_t match_get_player_max_population(const MatchState& state, uint8_t player
     }
 
     return max_population;
+}
+
+bool match_player_has_upgrade(const MatchState& state, uint8_t player_id, uint32_t upgrade) {
+    return (state.players[player_id].upgrades & upgrade) == upgrade;
+}
+
+bool match_player_upgrade_is_available(const MatchState& state, uint8_t player_id, uint32_t upgrade) {
+    return ((state.players[player_id].upgrades | state.players[player_id].upgrades) & upgrade) == 0;
+}
+
+void match_grant_player_upgrade(MatchState& state, uint8_t player_id, uint32_t upgrade) {
+    state.players[player_id].upgrades |= upgrade;
+}
+
+bool match_does_player_meet_hotkey_requirements(const MatchState& state, uint8_t player_id, InputAction hotkey) {
+    const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
+
+    switch (hotkey_info.requirements.type) {
+        case HOTKEY_REQUIRES_NONE: {
+            return true;
+        }
+        case HOTKEY_REQUIRES_BUILDING: {
+            for (const Entity& entity : state.entities) {
+                if (entity.player_id == player_id && entity.type == hotkey_info.requirements.building) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        case HOTKEY_REQUIRES_UPGRADE: {
+            return match_player_has_upgrade(state, player_id, hotkey_info.requirements.upgrade);
+        }
+    }
 }
 
 void match_handle_input(MatchState& state, const MatchInput& input) {

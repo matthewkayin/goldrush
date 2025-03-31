@@ -59,4 +59,5 @@ bool input_is_action_just_released(InputAction action);
 
 void input_set_hotkey_group(uint32_t group);
 InputAction input_get_hotkey(uint32_t index);
+int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey);
 void input_use_hotkey_mapping_default();

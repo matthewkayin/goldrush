@@ -14,7 +14,7 @@
 static const uint32_t TURN_OFFSET = 2;
 static const uint32_t TURN_DURATION = 4;
 
-static const uint32_t UI_STATUS_DURATION = 32;
+static const uint32_t UI_STATUS_DURATION = 60;
 
 static const int MATCH_CAMERA_DRAG_MARGIN = 4;
 static const int CAMERA_SPEED = 16; // TODO: move to options
@@ -51,6 +51,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.turn_timer = 0;
     state.turn_counter = 0;
     state.disconnect_timer = 0;
+    state.status_timer = 0;
     memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
 
     // Populate match player info using network player info
@@ -298,31 +299,44 @@ void match_ui_update(MatchUiState& state) {
             UiHotkeyButtonMode hotkey_mode = UI_ICON_BUTTON_ENABLED;
             if (state.is_minimap_dragging || match_ui_is_selecting(state)) {
                 hotkey_mode = UI_ICON_BUTTON_DISABLED;
+            } else if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
+                hotkey_mode = UI_ICON_BUTTON_GRAYED_OUT;
             }
 
             ui_element_position(MATCH_UI_BUTTON_POSITIONS[hotkey_index]);
             if (ui_hotkey_button(hotkey, hotkey_mode) && !menu_button_was_pressed) {
-                switch (hotkey) {
-                    case INPUT_HOTKEY_ATTACK: {
-                        state.mode = MATCH_UI_MODE_TARGET_ATTACK;
-                        break;
-                    }
-                    case INPUT_HOTKEY_BUILD: {
-                        state.mode = MATCH_UI_MODE_BUILD;
-                        break;
-                    }
-                    case INPUT_HOTKEY_BUILD2: {
-                        state.mode = MATCH_UI_MODE_BUILD2;
-                        break;
-                    }
-                    case INPUT_HOTKEY_CANCEL: {
-                        if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
-                            state.mode = MATCH_UI_MODE_NONE;
+                const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
+
+                if (hotkey_info.type == HOTKEY_BUTTON_ACTION) {
+                    switch (hotkey) {
+                        case INPUT_HOTKEY_ATTACK: {
+                            state.mode = MATCH_UI_MODE_TARGET_ATTACK;
+                            break;
                         }
-                        break;
+                        case INPUT_HOTKEY_BUILD: {
+                            state.mode = MATCH_UI_MODE_BUILD;
+                            break;
+                        }
+                        case INPUT_HOTKEY_BUILD2: {
+                            state.mode = MATCH_UI_MODE_BUILD2;
+                            break;
+                        }
+                        case INPUT_HOTKEY_CANCEL: {
+                            if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
+                                state.mode = MATCH_UI_MODE_NONE;
+                            }
+                            break;
+                        }
+                        default:
+                            break;
                     }
-                    default:
-                        break;
+                } else if (hotkey_info.type == HOTKEY_BUTTON_BUILD) {
+                    if (state.match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
+                        match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
+                    } else {
+                        state.mode = MATCH_UI_MODE_BUILDING_PLACE;
+                        state.building_type = hotkey_info.entity_type;
+                    }
                 }
 
                 menu_button_was_pressed = true;
@@ -392,6 +406,9 @@ void match_ui_update(MatchUiState& state) {
     // Update timers and animations
     if (animation_is_playing(state.move_animation)) {
         animation_update(state.move_animation);
+    }
+    if (state.status_timer != 0) {
+        state.status_timer--;
     }
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
         if (state.sound_cooldown_timers[sound] != 0) {
@@ -1097,6 +1114,12 @@ void match_ui_render(const MatchUiState& state) {
 
     ui_render();
 
+    // UI Status message
+    if (state.status_timer != 0) {
+        int status_message_width = render_get_text_size(FONT_HACK_WHITE, state.status_message.c_str()).x;
+        render_text(FONT_HACK_WHITE, state.status_message.c_str(), ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 148));
+    }
+
     // UI Tooltip
     {
         uint32_t hotkey_hovered_index;
@@ -1123,27 +1146,53 @@ void match_ui_render(const MatchUiState& state) {
                 char tooltip_text[64];
                 uint32_t tooltip_gold_cost;
                 uint32_t tooltip_population_cost;
-                switch (hotkey_info.type) {
-                    case HOTKEY_BUTTON_ACTION: {
-                        sprintf(tooltip_text, "%s", hotkey_info.action.name);
-                        tooltip_gold_cost = 0;
-                        tooltip_population_cost = 0;
-                        break;
+                if (match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey_hovered)) {
+                    char* tooltip_text_ptr = tooltip_text;
+
+                    switch (hotkey_info.type) {
+                        case HOTKEY_BUTTON_ACTION: {
+                            tooltip_text_ptr += sprintf(tooltip_text, "%s", hotkey_info.action.name);
+                            tooltip_gold_cost = 0;
+                            tooltip_population_cost = 0;
+                            break;
+                        }
+                        case HOTKEY_BUTTON_TRAIN:
+                        case HOTKEY_BUTTON_BUILD: {
+                            const EntityData& entity_data = entity_get_data(hotkey_info.entity_type);
+                            tooltip_text_ptr += sprintf(tooltip_text, "%s %s", hotkey_info.type == HOTKEY_BUTTON_TRAIN ? "Hire" : "Build", entity_data.name);
+                            tooltip_gold_cost = entity_data.gold_cost;
+                            tooltip_population_cost = hotkey_info.type == HOTKEY_BUTTON_TRAIN ? entity_data.unit_data.population_cost : 0;
+                            break;
+                        }
+                        case HOTKEY_BUTTON_RESEARCH: {
+                            tooltip_text_ptr += sprintf(tooltip_text, "Research fixme!");
+                            tooltip_gold_cost = 0;
+                            tooltip_population_cost = 0;
+                            break;
+                        }
                     }
-                    case HOTKEY_BUTTON_TRAIN:
-                    case HOTKEY_BUTTON_BUILD: {
-                        const EntityData& entity_data = entity_get_data(hotkey_info.entity_type);
-                        sprintf(tooltip_text, "%s %s", hotkey_info.type == HOTKEY_BUTTON_TRAIN ? "Hire" : "Build", entity_data.name);
-                        tooltip_gold_cost = entity_data.gold_cost;
-                        tooltip_population_cost = hotkey_info.type == HOTKEY_BUTTON_TRAIN ? entity_data.unit_data.population_cost : 0;
-                        break;
+
+                    tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
+                    tooltip_text_ptr += input_sprintf_hotkey_str(tooltip_text_ptr, hotkey_hovered);
+                    tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
+                } else {
+                    switch (hotkey_info.requirements.type) {
+                        case HOTKEY_REQUIRES_NONE: {
+                            GOLD_ASSERT(false);
+                            break;
+                        }
+                        case HOTKEY_REQUIRES_BUILDING: {
+                            sprintf(tooltip_text, "Requires %s", entity_get_data(hotkey_info.requirements.building).name);
+                            break;
+                        }
+                        case HOTKEY_REQUIRES_UPGRADE: {
+                            // TODO
+                            sprintf(tooltip_text, "Requires Upgrade");
+                            break;
+                        }
                     }
-                    case HOTKEY_BUTTON_RESEARCH: {
-                        sprintf(tooltip_text, "Research fixme!");
-                        tooltip_gold_cost = 0;
-                        tooltip_population_cost = 0;
-                        break;
-                    }
+                    tooltip_gold_cost = 0;
+                    tooltip_population_cost = 0;
                 }
 
                 // Render the tooltip frame
