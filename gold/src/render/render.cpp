@@ -658,8 +658,8 @@ bool render_load_sprites() {
             }
             surfaces[FONT_COUNT + sprite].surface = sprite_surface;
         }
+        SDL_SetSurfaceBlendMode(surfaces[FONT_COUNT + sprite].surface, SDL_BLENDMODE_NONE);
     }
-
 
     // Sort the surfaces by size, from biggest to smallest
     render_sort_surfaces(surfaces, 0, FONT_COUNT + SPRITE_COUNT - 1);
