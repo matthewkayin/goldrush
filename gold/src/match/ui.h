@@ -107,6 +107,7 @@ void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selectio
 MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, const std::vector<EntityId>& selection);
 void match_ui_order_move(MatchUiState& state);
 void match_ui_show_status(MatchUiState& state, const char* message);
+ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset);
 
 void match_ui_render(const MatchUiState& state);
 

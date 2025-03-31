@@ -320,7 +320,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_HALL, (EntityData) {
         .name = "Town Hall",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_BUILDING_HALL,
         .icon = SPRITE_BUTTON_ICON_HALL,
         .cell_size = 4,
         
@@ -662,11 +662,9 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
         if (entity.gold_held && (entity.animation.name == ANIMATION_UNIT_MOVE || entity.animation.name == ANIMATION_UNIT_IDLE)) {
             frame.y += 3;
         }
-        /*
         if (entity.type == ENTITY_SAPPER && entity.target.type == TARGET_ATTACK_ENTITY) {
             frame.y += 3;
         }
-            */
 
         return frame;
     } else if (entity_is_building(entity.type)) {
@@ -691,4 +689,8 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
         }
         return ivec2(0, 0);
     }
+}
+
+Rect entity_goldmine_get_block_building_rect(ivec2 cell) {
+    return (Rect) { .x = cell.x - 4, .y = cell.y - 4, .w = 11, .h = 11 };
 }

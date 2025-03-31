@@ -142,6 +142,7 @@ bool match_is_target_invalid(const MatchState& state, const Target& target);
 bool match_has_entity_reached_target(const MatchState& state, const Entity& entity);
 ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity);
 bool match_is_entity_mining(const MatchState& state, const Entity& entity);
+EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell);
 
 // Event
 

@@ -4,7 +4,7 @@
 #include "hotkey.h"
 #include "lcg.h"
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 5000;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
@@ -722,6 +722,20 @@ bool match_is_entity_mining(const MatchState& state, const Entity& entity) {
 
     const Entity& target = state.entities.get_by_id(entity.target.id);
     return (target.type == ENTITY_GOLDMINE && target.gold_held > 0);
+}
+
+EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell) {
+    EntityId nearest_unit_id; 
+    int nearest_unit_dist = -1;
+    for (EntityId id : builders) {
+        int selection_dist = ivec2::manhattan_distance(cell, state.entities.get_by_id(id).cell);
+        if (nearest_unit_dist == -1 || selection_dist < nearest_unit_dist) {
+            nearest_unit_id = id;
+            nearest_unit_dist = selection_dist;
+        }
+    }
+
+    return nearest_unit_id;
 }
 
 // EVENTS

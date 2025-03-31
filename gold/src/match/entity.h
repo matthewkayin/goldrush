@@ -172,3 +172,4 @@ bool entity_check_flag(const Entity& entity, uint32_t flag);
 void entity_set_flag(Entity& entity, uint32_t flag, bool value);
 AnimationName entity_get_expected_animation(const Entity& entity);
 ivec2 entity_get_animation_frame(const Entity& entity);
+Rect entity_goldmine_get_block_building_rect(ivec2 cell);

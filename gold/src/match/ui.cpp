@@ -784,6 +784,14 @@ void match_ui_show_status(MatchUiState& state, const char* message) {
     state.status_timer = UI_STATUS_DURATION;
 }
 
+ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset) {
+    ivec2 offset = building_size == 1 ? ivec2(0, 0) : ivec2(building_size, building_size) - ivec2(2, 2);
+    ivec2 building_cell = ((input_get_mouse_position() + camera_offset) / TILE_SIZE) - offset;
+    building_cell.x = std::max(0, building_cell.x);
+    building_cell.y = std::max(0, building_cell.y);
+    return building_cell;
+}
+
 // RENDER
 
 void match_ui_render(const MatchUiState& state) {
@@ -1091,6 +1099,55 @@ void match_ui_render(const MatchUiState& state) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
     }
     above_fog_sprite_params.clear();
+
+    // UI Building Placement
+    if (state.mode == MATCH_UI_MODE_BUILDING_PLACE && !match_ui_is_mouse_in_ui()) {
+        const EntityData& building_data = entity_get_data(state.building_type);
+
+        // First draw the building
+        ivec2 building_cell = match_ui_get_building_cell(building_data.cell_size, state.camera_offset);
+        render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state.camera_offset, RENDER_SPRITE_NO_CULL, state.match.players[network_get_player_id()].recolor_id);
+
+        // Then draw the green / red squares
+        bool is_placement_out_of_bounds = building_cell.x + building_data.cell_size > state.match.map.width ||
+                                          building_cell.y + building_data.cell_size > state.match.map.height;
+        ivec2 miner_cell = state.match.entities.get_by_id(match_get_nearest_builder(state.match, state.selection, building_cell)).cell;
+        for (int y = building_cell.y; y < building_cell.y + building_data.cell_size; y++) {
+            for (int x = building_cell.x; x < building_cell.x + building_data.cell_size; x++) {
+                ivec2 cell = ivec2(x, y);
+                // Don't allow buildings out of bounds
+                bool is_cell_red = is_placement_out_of_bounds ||
+                    // Don't allow buildings in hidden fog
+                    match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell) == FOG_HIDDEN ||
+                    // Don't allow buildings on ramps
+                    map_is_tile_ramp(state.match.map, cell) ||
+                    // Don't allow buildings on top of units (unless it's the unit who will be building the building)
+                    (cell != miner_cell && map_get_cell(state.match.map, CELL_LAYER_GROUND, cell).type != CELL_EMPTY) ||
+                    // Don't allow buildigns on top of landmines
+                    map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, cell).type != CELL_EMPTY;
+                
+                // Don't allow buildings too close to goldmines
+                if (state.building_type == ENTITY_HALL) {
+                    for (const Entity& goldmine : state.match.entities) {
+                        if (goldmine.type == ENTITY_GOLDMINE && entity_goldmine_get_block_building_rect(goldmine.cell).has_point(cell)) {
+                            is_cell_red = true;
+                            break;
+                        }
+                    }
+                }
+
+                RenderColor cell_color = is_cell_red ? RENDER_COLOR_RED_TRANSPARENT : RENDER_COLOR_GREEN_TRANSPARENT;
+                Rect cell_rect = (Rect) {
+                    .x = (x * TILE_SIZE) - state.camera_offset.x,
+                    .y = (y * TILE_SIZE) - state.camera_offset.y,
+                    .w = TILE_SIZE,
+                    .h = TILE_SIZE
+                };
+                render_fill_rect(cell_rect, cell_color);
+            }
+        }
+    }
+    // End UI building placement
 
     // Select rect
     if (match_ui_is_selecting(state)) {
