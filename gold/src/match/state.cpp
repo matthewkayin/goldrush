@@ -47,6 +47,28 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
     return state;
 }
 
+uint32_t match_get_player_population(const MatchState& state, uint8_t player_id) {
+    uint32_t population = 0;
+    for (const Entity& entity : state.entities) {
+        if (entity.player_id == player_id && entity_is_unit(entity.type)) {
+            population += entity_get_data(entity.type).unit_data.population_cost;
+        }
+    }
+
+    return population;
+}
+
+uint32_t match_get_player_max_population(const MatchState& state, uint8_t player_id) {
+    uint32_t max_population = 0;
+    for (const Entity& entity : state.entities) {
+        if (entity.player_id == player_id && (entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE)) {
+            max_population += 10;
+        }
+    }
+
+    return max_population;
+}
+
 void match_handle_input(MatchState& state, const MatchInput& input) {
     switch (input.type) {
         case MATCH_INPUT_NONE:

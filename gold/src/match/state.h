@@ -122,6 +122,8 @@ struct MatchState {
 };
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]);
+uint32_t match_get_player_population(const MatchState& state, uint8_t player_id);
+uint32_t match_get_player_max_population(const MatchState& state, uint8_t player_id);
 void match_handle_input(MatchState& state, const MatchInput& input);
 void match_update(MatchState& state);
 

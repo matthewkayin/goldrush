@@ -1203,6 +1203,19 @@ void match_ui_render(const MatchUiState& state) {
     }
     // End render tooltip
 
+    // Resource counters
+    {
+        char gold_text[8];
+        sprintf(gold_text, "%u", state.match.players[network_get_player_id()].gold);
+        render_text(FONT_WESTERN8_WHITE, gold_text, ivec2(SCREEN_WIDTH - 172 + 18, 2));
+        render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(SCREEN_WIDTH - 172, 2), RENDER_SPRITE_NO_CULL, 0);
+
+        char population_text[8];
+        sprintf(population_text, "%u/%u", match_get_player_population(state.match, network_get_player_id()), match_get_player_max_population(state.match, network_get_player_id()));
+        render_text(FONT_WESTERN8_WHITE, population_text, ivec2(SCREEN_WIDTH - 88 + 22, 2));
+        render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL, 0);
+    }
+
     render_sprite_batch();
 
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
