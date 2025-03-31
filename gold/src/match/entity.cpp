@@ -541,15 +541,23 @@ const EntityData& entity_get_data(EntityType type) {
 }
 
 bool entity_is_unit(EntityType type) {
-    return type > ENTITY_GOLDMINE;
+    return type > ENTITY_GOLDMINE && type < ENTITY_HALL;
 }
 
 bool entity_is_building(EntityType type) {
-    return false;
+    return type >= ENTITY_HALL;
 }
 
 bool entity_is_selectable(const Entity& entity) {
-    return true;
+    if (entity.type == ENTITY_GOLDMINE) {
+        return true;
+    }
+
+    return !(
+        entity.health == 0 ||
+        entity.mode == MODE_UNIT_BUILD ||
+        entity.garrison_id != ID_NULL
+    );
 }
 
 uint16_t entity_get_elevation(const Entity& entity, const Map& map) {

@@ -39,6 +39,14 @@ struct SpriteInfo {
     int frame_height;
 };
 
+enum RenderColor {
+    RENDER_COLOR_SKYBLUE,
+    RENDER_COLOR_WHITE,
+    RENDER_COLOR_OFFBLACK,
+    RENDER_COLOR_RED,
+    RENDER_COLOR_GREEN
+};
+
 const uint32_t RENDER_SPRITE_NO_CULL = 1;
 const uint32_t RENDER_SPRITE_FLIP_H = 2;
 const uint32_t RENDER_SPRITE_CENTERED = 4;
@@ -55,8 +63,9 @@ void render_ninepatch(SpriteName sprite, Rect rect);
 void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t options);
 void render_text(FontName name, const char* text, ivec2 position);
 ivec2 render_get_text_size(FontName name, const char* text);
-void render_line(ivec2 start, ivec2 end);
-void render_rect(ivec2 start, ivec2 end);
+void render_line(ivec2 start, ivec2 end, RenderColor color);
+void render_draw_rect(Rect rect, RenderColor color);
+void render_fill_rect(Rect rect, RenderColor color);
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel);
 void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
 void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);

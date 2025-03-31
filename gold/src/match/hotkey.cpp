@@ -6,50 +6,50 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
     { INPUT_HOTKEY_ATTACK, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {
-            .sprite = SPRITE_BUTTON_ICON_ATTACK,
-            .name = "Attack"
+            .name = "Attack",
+            .sprite = SPRITE_BUTTON_ICON_ATTACK
         }
     }},
     { INPUT_HOTKEY_STOP, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {
-            .sprite = SPRITE_BUTTON_ICON_STOP,
-            .name = "Stop"
+            .name = "Stop",
+            .sprite = SPRITE_BUTTON_ICON_STOP
         }
     }},
     { INPUT_HOTKEY_DEFEND, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {
-            .sprite = SPRITE_BUTTON_ICON_DEFEND,
-            .name = "Defend"
+            .name = "Defend",
+            .sprite = SPRITE_BUTTON_ICON_DEFEND
         }
     }},
     { INPUT_HOTKEY_REPAIR, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {
-            .sprite = SPRITE_BUTTON_ICON_REPAIR,
-            .name = "Repair"
+            .name = "Repair",
+            .sprite = SPRITE_BUTTON_ICON_REPAIR
         }
     }},
     { INPUT_HOTKEY_BUILD, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {
-            .sprite = SPRITE_BUTTON_ICON_BUILD,
-            .name = "Build"
+            .name = "Build",
+            .sprite = SPRITE_BUTTON_ICON_BUILD
         }
     }},
     { INPUT_HOTKEY_BUILD2, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {
-            .sprite = SPRITE_BUTTON_ICON_BUILD2,
-            .name = "Advanced Build"
+            .name = "Advanced Build",
+            .sprite = SPRITE_BUTTON_ICON_BUILD2
         }
     }},
     { INPUT_HOTKEY_CANCEL, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {
-            .sprite = SPRITE_BUTTON_ICON_CANCEL,
-            .name = "Cancel"
+            .name = "Cancel",
+            .sprite = SPRITE_BUTTON_ICON_CANCEL
         }
     }},
     { INPUT_HOTKEY_HALL, (HotkeyButtonInfo) {

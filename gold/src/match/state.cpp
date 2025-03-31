@@ -194,7 +194,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
                         : fvec2(entity.cell * TILE_SIZE);
     entity.direction = DIRECTION_SOUTH;
 
-    entity.health = entity_is_unit(type)
+    entity.health = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
                         ? entity_data.max_health
                         : (entity_data.max_health / 10);
     entity.target = (Target) { .type = TARGET_NONE };

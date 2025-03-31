@@ -1126,19 +1126,10 @@ ivec2 render_get_text_size(FontName name, const char* text) {
     return size;
 }
 
-void render_line(ivec2 start, ivec2 end) {
-    state.line_vertices.push_back((LineVertex) {
-        .position = { (float)start.x, (float)(SCREEN_HEIGHT - start.y) }
-    });
-    state.line_vertices.push_back((LineVertex) {
-        .position = { (float)end.x, (float)(SCREEN_HEIGHT - end.y) }
-    });
-}
-
-void render_rect(ivec2 start, ivec2 end) {
+void render_line(ivec2 start, ivec2 end, RenderColor color) {
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
     Rect src_rect = (Rect) {
-        .x = sprite_info.frame_width,
+        .x = sprite_info.frame_width * color,
         .y = 0,
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
@@ -1148,14 +1139,40 @@ void render_rect(ivec2 start, ivec2 end) {
         .w = 1, .h = end.y - start.y
     };
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
-    dst_rect.x = end.x - 1;
+}
+
+void render_draw_rect(Rect rect, RenderColor color) {
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
+    Rect src_rect = (Rect) {
+        .x = sprite_info.frame_width * color,
+        .y = 0,
+        .w = sprite_info.frame_width,
+        .h = sprite_info.frame_height
+    };
+    Rect dst_rect = (Rect) {
+        .x = rect.x, .y = rect.y,
+        .w = 1, .h = rect.h
+    };
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
-    dst_rect.x = start.x;
-    dst_rect.w = end.x - start.x;
+    dst_rect.x = rect.x + rect.w - 1;
+    render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    dst_rect.x = rect.x;
+    dst_rect.w = rect.w;
     dst_rect.h = 1;
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
-    dst_rect.y = end.y - 1;
+    dst_rect.y = rect.y + rect.h - 1;
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+}
+
+void render_fill_rect(Rect rect, RenderColor color) {
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
+    Rect src_rect = (Rect) {
+        .x = sprite_info.frame_width * color,
+        .y = 0,
+        .w = sprite_info.frame_width,
+        .h = sprite_info.frame_height
+    };
+    render_sprite(SPRITE_UI_SWATCH, src_rect, rect, RENDER_SPRITE_NO_CULL);
 }
 
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel) {

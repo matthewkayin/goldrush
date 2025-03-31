@@ -29,6 +29,19 @@ struct RenderSpriteParams {
     int recolor_id;
 };
 
+enum RenderHealthbarParamsType {
+    RENDER_HEALTHBAR,
+    RENDER_GARRISONBAR,
+};
+
+struct RenderHealthbarParams {
+    RenderHealthbarParamsType type;
+    ivec2 position;
+    ivec2 size;
+    int amount;
+    int max;
+};
+
 enum MatchUiSelectionType {
     MATCH_UI_SELECTION_NONE,
     MATCH_UI_SELECTION_UNITS,
@@ -99,3 +112,4 @@ uint16_t match_ui_get_render_layer(uint16_t elevation, RenderLayer layer);
 SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking);
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
+void match_ui_render_healthbar(const RenderHealthbarParams& params);

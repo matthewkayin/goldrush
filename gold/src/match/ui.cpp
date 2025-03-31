@@ -36,6 +36,9 @@ static const ivec2 MATCH_UI_BUTTON_POSITIONS[HOTKEY_GROUP_SIZE] = {
     ivec2(MATCH_UI_BUTTON_X + (2 * MATCH_UI_BUTTON_PADDING_X), MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y)
 };
 
+static const int HEALTHBAR_HEIGHT = 4;
+static const int HEALTHBAR_PADDING = 3;
+
 // INIT
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
@@ -768,6 +771,7 @@ void match_ui_show_status(MatchUiState& state, const char* message) {
 
 void match_ui_render(const MatchUiState& state) {
     static std::vector<RenderSpriteParams> render_sprite_params[RENDER_TOTAL_LAYER_COUNT];
+    static std::vector<RenderHealthbarParams> render_healthbar_params[RENDER_TOTAL_LAYER_COUNT];
     static std::vector<RenderSpriteParams> above_fog_sprite_params;
 
     ivec2 base_pos = ivec2(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
@@ -822,20 +826,48 @@ void match_ui_render(const MatchUiState& state) {
     // Select rings and healthbars
     for (EntityId id : state.selection) {
         const Entity& entity = state.match.entities.get_by_id(id);
-
+        const EntityData& entity_data = entity_get_data(entity.type);
         Rect entity_rect = entity_get_rect(entity);
+        uint16_t entity_elevation = entity_get_elevation(entity, state.match.map);
+        uint16_t render_layer = match_ui_get_render_layer(entity_elevation, RENDER_LAYER_SELECT_RING);
+
+        // Render select ring
         ivec2 entity_center_position = entity_is_unit(entity.type) 
                 ? entity.position.to_ivec2()
                 : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
         entity_center_position -= state.camera_offset;
-        uint16_t entity_elevation = entity_get_elevation(entity, state.match.map);
-        render_sprite_params[match_ui_get_render_layer(entity_elevation, RENDER_LAYER_SELECT_RING)].push_back((RenderSpriteParams) {
-            .sprite = match_ui_get_entity_select_ring(entity.type, state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team),
+        render_sprite_params[render_layer].push_back((RenderSpriteParams) {
+            .sprite = match_ui_get_entity_select_ring(entity.type, entity.type == ENTITY_GOLDMINE ||
+                            (state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team)),
             .frame = ivec2(0, 0),
             .position = entity_center_position,
             .options = RENDER_SPRITE_CENTERED,
             .recolor_id = 0
         });
+
+        // Render healthbar
+        ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state.camera_offset;
+        if (entity_data.max_health != 0) {
+            render_healthbar_params[render_layer].push_back((RenderHealthbarParams) {
+                .type = RENDER_HEALTHBAR,
+                .position = healthbar_position,
+                .size = ivec2(entity_rect.w, HEALTHBAR_HEIGHT),
+                .amount = entity.health,
+                .max = entity_data.max_health
+            });
+            healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+        }
+
+        // Render garrison bar
+        if (entity_data.garrison_capacity != 0) {
+            render_healthbar_params[render_layer].push_back((RenderHealthbarParams) {
+                .type = RENDER_GARRISONBAR,
+                .position = healthbar_position,
+                .size = ivec2(entity_rect.w, HEALTHBAR_HEIGHT),
+                .amount = (int)entity.garrisoned_units.size(),
+                .max = (int)entity_data.garrison_capacity
+            });
+        }
     }
 
     // Entities
@@ -976,6 +1008,11 @@ void match_ui_render(const MatchUiState& state) {
             render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
         render_sprite_params[render_layer].clear();
+
+        for (const RenderHealthbarParams& params : render_healthbar_params[render_layer]) {
+            match_ui_render_healthbar(params);
+        }
+        render_healthbar_params[render_layer].clear();
     }
 
     // Fog of War
@@ -1041,9 +1078,13 @@ void match_ui_render(const MatchUiState& state) {
     // Select rect
     if (match_ui_is_selecting(state)) {
         ivec2 mouse_world_pos = ivec2(input_get_mouse_position().x, std::min(input_get_mouse_position().y, SCREEN_HEIGHT - MATCH_UI_HEIGHT)) + state.camera_offset;
-        ivec2 rect_start = ivec2(std::min(state.select_origin.x, mouse_world_pos.x), std::min(state.select_origin.y, mouse_world_pos.y)) - state.camera_offset;
-        ivec2 rect_end = ivec2(std::max(state.select_origin.x, mouse_world_pos.x), std::max(state.select_origin.y, mouse_world_pos.y)) - state.camera_offset;
-        render_rect(rect_start, rect_end);
+        Rect select_rect = (Rect) {
+            .x = std::min(state.select_origin.x, mouse_world_pos.x) - state.camera_offset.x, 
+            .y = std::min(state.select_origin.y, mouse_world_pos.y) - state.camera_offset.y,
+            .w = std::abs(state.select_origin.x - mouse_world_pos.x),
+            .h = std::abs(state.select_origin.y - mouse_world_pos.y)
+        };
+        render_draw_rect(select_rect, RENDER_COLOR_WHITE);
     }
 
     // UI frames
@@ -1217,5 +1258,41 @@ void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int l
         int partition_index = match_ui_ysort_render_params_partition(params, low, high);
         match_ui_ysort_render_params(params, low, partition_index - 1);
         match_ui_ysort_render_params(params, partition_index + 1, high);
+    }
+}
+
+void match_ui_render_healthbar(const RenderHealthbarParams& params) {
+    Rect healthbar_rect = (Rect) { 
+        .x = params.position.x, 
+        .y = params.position.y, 
+        .w = params.size.x, 
+        .h = params.size.y 
+    };
+
+    // Cull the healthbar
+    if (!healthbar_rect.intersects(SCREEN_RECT)) {
+        return;
+    }
+
+    Rect healthbar_subrect = healthbar_rect;
+    healthbar_subrect.w = (healthbar_rect.w * params.amount) / params.max;
+    
+    RenderColor healthbar_color;
+    if (params.type == RENDER_GARRISONBAR) {
+        healthbar_color = RENDER_COLOR_WHITE;
+    } else if (healthbar_subrect.w <= healthbar_rect.w / 3) {
+        healthbar_color = RENDER_COLOR_RED;
+    } else {
+        healthbar_color = RENDER_COLOR_GREEN;
+    }
+
+    render_fill_rect(healthbar_subrect, healthbar_color);
+    render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK);
+
+    if (params.type == RENDER_GARRISONBAR) {
+        for (int line_index = 1; line_index < params.max; line_index++) {
+            int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / params.max);
+            render_line(ivec2(line_x, healthbar_rect.y), ivec2(line_x, healthbar_rect.y + healthbar_rect.h - 1), RENDER_COLOR_OFFBLACK);
+        }
     }
 }

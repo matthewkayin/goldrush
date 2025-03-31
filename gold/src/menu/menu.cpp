@@ -503,14 +503,7 @@ const char* menu_get_player_status_string(NetworkPlayerStatus status) {
 
 void menu_render(const MenuState& state) {
     // Sky background
-    const SpriteInfo& sky_sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
-    Rect sky_src_rect = (Rect) { 
-        .x = 0,
-        .y = 0,
-        .w = sky_sprite_info.frame_width, 
-        .h = sky_sprite_info.frame_height 
-    };
-    render_sprite(SPRITE_UI_SWATCH, sky_src_rect, (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT }, RENDER_SPRITE_NO_CULL);
+    render_fill_rect((Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT }, RENDER_COLOR_SKYBLUE);
 
     // Tiles
     for (int y = 0; y < MENU_TILE_HEIGHT; y++) {
