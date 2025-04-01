@@ -620,6 +620,34 @@ void entity_set_flag(Entity& entity, uint32_t flag, bool value) {
     }
 }
 
+SpriteName entity_get_sprite(const Entity& entity) {
+    const EntityData& entity_data = ENTITY_DATA.at(entity.type);
+
+    if (entity.mode == MODE_BUILDING_DESTROYED) {
+        if (entity.type == ENTITY_BUNKER) {
+            return SPRITE_BUILDING_DESTROYED_BUNKER;
+        }
+        if (entity.type == ENTITY_LANDMINE) {
+            return SPRITE_BUILDING_DESTROYED_MINE;
+        }
+        switch (entity_data.cell_size) {
+            case 2:
+                return SPRITE_BUILDING_DESTROYED_2;
+            case 3:
+                return SPRITE_BUILDING_DESTROYED_3;
+            case 4:
+                return SPRITE_BUILDING_DESTROYED_4;
+            default:
+                GOLD_ASSERT_MESSAGE(false, "Destroyed sprite needed for building of this size");
+                return SPRITE_BUILDING_DESTROYED_2;
+        }
+    }
+    if (entity.mode == MODE_UNIT_BUILD || entity.mode == MODE_UNIT_REPAIR) {
+        return SPRITE_MINER_BUILDING;
+    }
+    return entity_data.sprite;
+}
+
 AnimationName entity_get_expected_animation(const Entity& entity) {
     switch (entity.mode) {
         case MODE_UNIT_MOVE:

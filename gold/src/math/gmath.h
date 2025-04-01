@@ -349,23 +349,6 @@ struct Rect {
         return !(x + w <= rect.x || rect.x + rect.w <= x || y + h <= rect.y || rect.y + rect.h <= y);
     }
 
-    ivec2 get_cell_nearest_to(ivec2 start_cell) const {
-        ivec2 nearest_cell = ivec2(x, y);
-        uint32_t nearest_cell_dist = ivec2::manhattan_distance(start_cell, nearest_cell);
-
-        for (int cell_y = y; cell_y < y + h; cell_y++) {
-            for (int cell_x = x; cell_x < x + w; cell_x++) {
-                uint32_t cell_dist = ivec2::manhattan_distance(start_cell, ivec2(cell_x, cell_y));
-                if (cell_dist < nearest_cell_dist) {
-                    nearest_cell = ivec2(cell_x, cell_y);
-                    nearest_cell_dist = cell_dist;
-                }
-            }
-        }
-
-        return nearest_cell;
-    }
-
     static ivec2 cell_in_a_nearest_to_b(const Rect a, const Rect b) {
         ivec2 cell;
         if (b.y + b.h - 1 < a.y) {
@@ -398,24 +381,24 @@ struct Rect {
     }
 };
 
-inline Direction enum_direction_to_rect(ivec2 from, Rect rect) {
-    if (from.y < rect.y) {
-        if (from.x < rect.x) {
+inline Direction enum_direction_to_rect(ivec2 from, ivec2 rect_position, int rect_size) {
+    if (from.y < rect_position.y) {
+        if (from.x < rect_position.x) {
             return DIRECTION_SOUTHEAST;
-        } else if (from.x >= rect.x + rect.w) {
+        } else if (from.x >= rect_position.x + rect_size) {
             return DIRECTION_SOUTHWEST;
         } else {
             return DIRECTION_SOUTH;
         }
-    } else if (from.y >= rect.y + rect.h) {
-        if (from.x < rect.x) {
+    } else if (from.y >= rect_position.y + rect_size) {
+        if (from.x < rect_position.x) {
             return DIRECTION_NORTHEAST;
-        } else if (from.x >= rect.x + rect.w) {
+        } else if (from.x >= rect_position.x + rect_size) {
             return DIRECTION_NORTHWEST;
         } else {
             return DIRECTION_NORTH;
         }
-    } else if (from.x < rect.x) {
+    } else if (from.x < rect_position.x) {
         return DIRECTION_EAST;
     } else {
         return DIRECTION_WEST;
@@ -436,4 +419,22 @@ inline int next_largest_power_of_two(int number) {
     }
     
     return power_of_two;
+}
+
+inline ivec2 get_nearest_cell_in_rect(ivec2 start_cell, ivec2 rect_position, int rect_size) {
+    ivec2 nearest_cell = rect_position;
+    uint32_t nearest_cell_dist = ivec2::manhattan_distance(start_cell, nearest_cell);
+
+    for (int y = rect_position.y; y < rect_position.y + rect_size; y++) {
+        for (int x = rect_position.x; x < rect_position.x + rect_size; x++) {
+            ivec2 cell = ivec2(x, y);
+            uint32_t cell_dist = ivec2::manhattan_distance(start_cell, cell);
+            if (cell_dist < nearest_cell_dist) {
+                nearest_cell = cell;
+                nearest_cell_dist = cell_dist;
+            }
+        }
+    }
+
+    return nearest_cell;
 }

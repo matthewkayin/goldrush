@@ -22,6 +22,10 @@ static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h =
 static const Rect MINIMAP_RECT = (Rect) { .x = 4, .y = SCREEN_HEIGHT - 132, .w = 128, .h = 128 };
 static const int SOUND_LISTEN_MARGIN = 128;
 static const uint32_t SOUND_COOLDOWN_DURATION = 5;
+static const uint32_t UI_ALERT_DURATION = 90;
+static const uint32_t UI_ALERT_LINGER_DURATION = 60 * 20;
+static const uint32_t UI_ALERT_TOTAL_DURATION = UI_ALERT_DURATION + UI_ALERT_LINGER_DURATION;
+static const uint32_t UI_ATTACK_ALERT_DISTANCE = 20;
 
 static const int MATCH_UI_BUTTON_X = SCREEN_WIDTH - 132 + 14; 
 static const int MATCH_UI_BUTTON_Y = SCREEN_HEIGHT - MATCH_UI_HEIGHT + 10;
@@ -155,8 +159,37 @@ void match_ui_handle_input(MatchUiState& state) {
         return;
     }
 
+    // Building placement
+    if (state.mode == MATCH_UI_MODE_BUILDING_PLACE && 
+            !state.is_minimap_dragging && 
+            !match_ui_is_mouse_in_ui() && 
+            input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+        if (!match_ui_building_can_be_placed(state)) {
+            match_ui_show_status(state, MATCH_UI_STATUS_CANT_BUILD);
+            return;
+        }
+
+        MatchInput input;
+        input.type = MATCH_INPUT_BUILD;
+        input.build.shift_command = input_is_action_pressed(INPUT_SHIFT);
+        input.build.building_type = state.building_type;
+        input.build.entity_count = state.selection.size();
+        memcpy(&input.build.entity_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
+        input.build.target_cell = match_ui_get_building_cell(entity_get_data(state.building_type).cell_size, state.camera_offset);
+        state.input_queue.push_back(input);
+
+        if (!input.build.shift_command) {
+            state.mode = MATCH_UI_MODE_NONE;
+        }
+
+        sound_play(SOUND_BUILDING_PLACE);
+        return;
+    }
+
     // Begin selecting
-    if (!match_ui_is_mouse_in_ui() && !match_ui_is_targeting(state) && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+    if (!match_ui_is_mouse_in_ui() && 
+            (state.mode == MATCH_UI_MODE_NONE || state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2) &&
+            input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
         state.select_origin = input_get_mouse_position() + state.camera_offset;
         return;
     }
@@ -264,7 +297,9 @@ void match_ui_update(MatchUiState& state) {
             hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
         } else if (!state.selection.empty()) {
             Entity& first_entity = state.match.entities.get_by_id(state.selection[0]);
-            if (first_entity.player_id == network_get_player_id()) {
+            if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS) {
+                hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
+            } else if (first_entity.player_id == network_get_player_id()) {
                 bool is_selection_uniform = true;
                 for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
                     if (state.match.entities.get_by_id(state.selection[selection_index]).type != first_entity.type) {
@@ -324,7 +359,45 @@ void match_ui_update(MatchUiState& state) {
                         case INPUT_HOTKEY_CANCEL: {
                             if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
                                 state.mode = MATCH_UI_MODE_NONE;
+                            } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE) {
+                                switch (state.building_type) {
+                                    case ENTITY_HALL:
+                                    case ENTITY_HOUSE:
+                                    case ENTITY_SALOON:
+                                    case ENTITY_SMITH:
+                                    case ENTITY_BUNKER:
+                                        state.mode = MATCH_UI_MODE_BUILD;
+                                        break;
+                                    case ENTITY_BARRACKS:
+                                    case ENTITY_COOP:
+                                    case ENTITY_SHERIFFS:
+                                        state.mode = MATCH_UI_MODE_BUILD2;
+                                        break;
+                                    case ENTITY_LANDMINE:
+                                        state.mode = MATCH_UI_MODE_NONE;
+                                        break;
+                                    default:
+                                        log_warn("Tried to cancel building place with unhandled type of %u", state.building_type);
+                                        state.mode = MATCH_UI_MODE_NONE;
+                                        break;
+                                }
+                            } else if (state.selection.size() == 1 && state.match.entities.get_by_id(state.selection[0]).mode == MODE_BUILDING_IN_PROGRESS) {
+                                state.input_queue.push_back((MatchInput) {
+                                    .type = MATCH_INPUT_BUILD_CANCEL,
+                                    .build_cancel = (MatchInputBuildCancel) {
+                                        .building_id = state.selection[0]
+                                    }
+                                });
                             }
+                            break;
+                        }
+                        case INPUT_HOTKEY_STOP:
+                        case INPUT_HOTKEY_DEFEND: {
+                            MatchInput input;
+                            input.type = hotkey == INPUT_HOTKEY_STOP ? MATCH_INPUT_STOP : MATCH_INPUT_DEFEND;
+                            input.stop.entity_count = (uint8_t)state.selection.size();
+                            memcpy(&input.stop.entity_ids, &state.selection[0], input.stop.entity_count * sizeof(EntityId));
+                            state.input_queue.push_back(input);
                             break;
                         }
                         default:
@@ -370,6 +443,114 @@ void match_ui_update(MatchUiState& state) {
                     state.sound_cooldown_timers[event.sound.sound] = SOUND_COOLDOWN_DURATION;
                 }
                 
+                break;
+            }
+            case MATCH_EVENT_ALERT: {
+                if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && network_get_player(event.alert.player_id).team != network_get_player(network_get_player_id()).team) ||
+                    (event.alert.type != MATCH_ALERT_TYPE_ATTACK && event.alert.player_id != network_get_player_id())) {
+                    break;
+                }
+
+                // Check if an existing attack alert already exists nearby
+                if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
+                    bool is_existing_attack_alert_nearby = false;
+                    for (const Alert& existing_alert : state.alerts) {
+                        if (existing_alert.pixel == MINIMAP_PIXEL_WHITE && ivec2::manhattan_distance(existing_alert.cell, event.alert.cell) < UI_ATTACK_ALERT_DISTANCE) {
+                            is_existing_attack_alert_nearby = true;
+                            break;
+                        }
+                    }
+                    if (is_existing_attack_alert_nearby) {
+                        break;
+                    }
+                }
+
+                // Play the sound even if we don't show the alert
+                switch (event.alert.type) {
+                    case MATCH_ALERT_TYPE_BUILDING:
+                        sound_play(SOUND_ALERT_BUILDING);
+                        break;
+                    case MATCH_ALERT_TYPE_UNIT:
+                        sound_play(SOUND_ALERT_UNIT);
+                        break;
+                    case MATCH_ALERT_TYPE_RESEARCH:
+                        sound_play(SOUND_ALERT_RESEARCH);
+                        break;
+                    case MATCH_ALERT_TYPE_MINE_COLLAPSE:
+                        sound_play(SOUND_GOLD_MINE_COLLAPSE);
+                        break;
+                    default:
+                        break;
+                }
+
+                Rect camera_rect = (Rect) { 
+                    .x = state.camera_offset.x, 
+                    .y = state.camera_offset.y, 
+                    .w = SCREEN_WIDTH, 
+                    .h = SCREEN_HEIGHT 
+                };
+                Rect alert_rect = (Rect) { 
+                    .x = event.alert.cell.x * TILE_SIZE, 
+                    .y = event.alert.cell.y * TILE_SIZE, 
+                    .w = event.alert.cell_size * TILE_SIZE, 
+                    .h = event.alert.cell_size * TILE_SIZE 
+                };
+                if (camera_rect.intersects(alert_rect)) {
+                    break;
+                }
+
+                MinimapPixel pixel;
+                if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
+                    pixel = MINIMAP_PIXEL_WHITE;
+                } else if (event.alert.type == MATCH_ALERT_TYPE_MINE_COLLAPSE) {
+                    pixel = MINIMAP_PIXEL_GOLD;
+                } else {
+                    pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.match.players[network_get_player_id()].recolor_id);
+                }
+
+                state.alerts.push_back((Alert) {
+                    .pixel = pixel,
+                    .cell = event.alert.cell,
+                    .cell_size = event.alert.cell_size,
+                    .timer = UI_ALERT_TOTAL_DURATION
+                });
+
+                if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
+                    match_ui_show_status(state, event.alert.player_id == network_get_player_id() 
+                                                    ? MATCH_UI_STATUS_UNDER_ATTACK 
+                                                    : MATCH_UI_STATUS_ALLY_UNDER_ATTACK);
+                    sound_play(SOUND_ALERT_BELL);
+                } 
+                break;
+            }
+            case MATCH_EVENT_SELECTION_HANDOFF: {
+                if (event.selection_handoff.player_id != network_get_player_id()) {
+                    break;
+                }
+
+                if (state.selection.size() == 1 && state.selection[0] == event.selection_handoff.to_deselect) {
+                    std::vector<EntityId> new_selection;
+                    new_selection.push_back(event.selection_handoff.to_select);
+                    match_ui_set_selection(state, new_selection);
+                    state.mode = MATCH_UI_MODE_NONE;
+                }
+                break;
+            }
+            case MATCH_EVENT_STATUS: {
+                if (network_get_player_id() == event.status.player_id) {
+                    match_ui_show_status(state, event.status.message);
+                }
+                break;
+            }
+            case MATCH_EVENT_RESEARCH_COMPLETE: {
+                if (event.research_complete.player_id != network_get_player_id()) {
+                    break;
+                }
+
+                // char message[128];
+                // TODO
+                // sprintf(message, "%s research complete.", UPGRADE_DATA.at(event.research_complete.upgrade).name);
+                // ui_show_status(state, message);
                 break;
             }
         }
@@ -468,7 +649,7 @@ void match_ui_update(MatchUiState& state) {
             continue;
         }
 
-        MinimapPixel pixel = entity.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + entity.player_id);
+        MinimapPixel pixel = entity.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.match.players[entity.player_id].recolor_id);
         int entity_cell_size = entity_get_data(entity.type).cell_size;
         Rect entity_rect = (Rect) {
             .x = entity.cell.x, .y = entity.cell.y,
@@ -792,6 +973,51 @@ ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset) {
     return building_cell;
 }
 
+bool match_ui_building_can_be_placed(const MatchUiState& state) {
+    const EntityData& entity_data = entity_get_data(state.building_type);
+    ivec2 building_cell = match_ui_get_building_cell(entity_data.cell_size, state.camera_offset);
+    ivec2 miner_cell = state.match.entities.get_by_id(match_get_nearest_builder(state.match, state.selection, building_cell)).cell;
+
+    // Check that the building is in bounds
+    if (!map_is_cell_rect_in_bounds(state.match.map, building_cell, entity_data.cell_size)) {
+        return false;
+    }
+
+    // If building a hall, check that it is not too close to goldmines
+    if (state.building_type == ENTITY_HALL) {
+        Rect building_rect = (Rect) {
+            .x = building_cell.x, .y = building_cell.y,
+            .w = entity_data.cell_size, .h = entity_data.cell_size
+        };
+
+        for (const Entity& entity : state.match.entities) {
+            if (entity.type == ENTITY_GOLDMINE) {
+                Rect goldmine_block_rect = entity_goldmine_get_block_building_rect(entity.cell);
+                if (building_rect.intersects(goldmine_block_rect)) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    // Check individual squares in the building's rect to make sure they are valid
+    for (int y = building_cell.y; y < building_cell.y + entity_data.cell_size; y++) {
+        for (int x = building_cell.x; x < building_cell.x + entity_data.cell_size; x++) {
+            ivec2 cell = ivec2(x, y);
+            // Check that no entities are occupying the building rect
+            if ((cell != miner_cell && map_get_cell(state.match.map, CELL_LAYER_GROUND, cell).type != CELL_EMPTY) ||
+                    // Check that we're not building on a ramp
+                    map_is_tile_ramp(state.match.map, cell) ||
+                    // Check that we're not building on top of a landmine
+                    map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, cell).type != CELL_EMPTY) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 // RENDER
 
 void match_ui_render(const MatchUiState& state) {
@@ -901,10 +1127,8 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        const EntityData& entity_data = entity_get_data(entity.type);
-
         RenderSpriteParams params = (RenderSpriteParams) {
-            .sprite = entity_data.sprite,
+            .sprite = entity_get_sprite(entity),
             .frame = entity_get_animation_frame(entity),
             .position = entity.position.to_ivec2() - state.camera_offset,
             .options = RENDER_SPRITE_NO_CULL,
@@ -913,10 +1137,23 @@ void match_ui_render(const MatchUiState& state) {
 
         const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
         if (entity_is_unit(entity.type)) {
-            params.position.x -= sprite_info.frame_width / 2;
-            params.position.y -= sprite_info.frame_height / 2;
-            if (entity.direction > DIRECTION_SOUTH) {
-                params.options |= RENDER_SPRITE_FLIP_H;
+            if (entity.mode == MODE_UNIT_BUILD) {
+                const Entity& building = state.match.entities.get_by_id(entity.target.id);
+                const EntityData& building_data = entity_get_data(building.type);
+                int building_hframe = entity_get_animation_frame(building).x;
+                params.position = building.position.to_ivec2() + 
+                                    ivec2(building_data.building_data.builder_positions_x[building_hframe],
+                                          building_data.building_data.builder_positions_y[building_hframe])
+                                    - state.camera_offset;
+                if (building_data.building_data.builder_flip_h[building_hframe]) {
+                    params.options |= RENDER_SPRITE_FLIP_H;
+                }
+            } else {
+                params.position.x -= sprite_info.frame_width / 2;
+                params.position.y -= sprite_info.frame_height / 2;
+                if (entity.direction > DIRECTION_SOUTH) {
+                    params.options |= RENDER_SPRITE_FLIP_H;
+                }
             }
         }
 
@@ -1334,9 +1571,11 @@ uint16_t match_ui_get_render_layer(uint16_t elevation, RenderLayer layer) {
 }
 
 SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking) {
-    // TODO landmine select ring
     if (type == ENTITY_GOLDMINE) {
         return SPRITE_SELECT_RING_GOLDMINE;
+    }
+    if (type == ENTITY_LANDMINE) {
+        return attacking ? SPRITE_SELECT_RING_LANDMINE_ATTACK : SPRITE_SELECT_RING_LANDMINE;
     }
 
     SpriteName select_ring;
@@ -1344,7 +1583,7 @@ SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking) {
     if (entity_is_unit(type)) {
         select_ring = (SpriteName)(SPRITE_SELECT_RING_UNIT + ((entity_cell_size - 1) * 2));
     } else {
-        select_ring = (SpriteName)(SPRITE_SELECT_RING_BUILDING_SIZE2 + ((entity_cell_size - 1) * 2));
+        select_ring = (SpriteName)(SPRITE_SELECT_RING_BUILDING_SIZE2 + ((entity_cell_size - 2) * 2));
     }
     if (attacking) {
         select_ring = (SpriteName)(select_ring + 1);

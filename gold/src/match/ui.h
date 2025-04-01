@@ -6,6 +6,7 @@
 #include "noise.h"
 #include "match/state.h"
 #include "match/input.h"
+#include "render/render.h"
 #include <string>
 
 #define MATCH_UI_HEIGHT 88
@@ -64,6 +65,13 @@ enum MatchUiMode {
     MATCH_UI_MODE_CHAT
 };
 
+struct Alert {
+    MinimapPixel pixel;
+    ivec2 cell;
+    int cell_size;
+    uint32_t timer;
+};
+
 struct MatchUiState {
     MatchUiMode mode;
     uint32_t turn_timer;
@@ -83,6 +91,7 @@ struct MatchUiState {
 
     EntityType building_type;
 
+    std::vector<Alert> alerts;
     uint32_t sound_cooldown_timers[SOUND_COUNT];
 
     Animation move_animation;
@@ -108,6 +117,7 @@ MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, cons
 void match_ui_order_move(MatchUiState& state);
 void match_ui_show_status(MatchUiState& state, const char* message);
 ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset);
+bool match_ui_building_can_be_placed(const MatchUiState& state);
 
 void match_ui_render(const MatchUiState& state);
 

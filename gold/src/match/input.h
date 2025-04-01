@@ -11,7 +11,11 @@ enum MatchInputType {
     MATCH_INPUT_MOVE_ATTACK_ENTITY,
     MATCH_INPUT_MOVE_REPAIR,
     MATCH_INPUT_MOVE_UNLOAD,
-    MATCH_INPUT_MOVE_SMOKE
+    MATCH_INPUT_MOVE_SMOKE,
+    MATCH_INPUT_STOP,
+    MATCH_INPUT_DEFEND,
+    MATCH_INPUT_BUILD,
+    MATCH_INPUT_BUILD_CANCEL
 };
 
 struct MatchInputMove {
@@ -22,10 +26,30 @@ struct MatchInputMove {
     EntityId entity_ids[SELECTION_LIMIT];
 };
 
+struct MatchInputStop {
+    uint8_t entity_count;
+    EntityId entity_ids[SELECTION_LIMIT];
+};
+
+struct MatchInputBuild {
+    uint8_t shift_command;
+    uint8_t building_type;
+    ivec2 target_cell;
+    uint8_t entity_count;
+    EntityId entity_ids[SELECTION_LIMIT];
+};
+
+struct MatchInputBuildCancel {
+    EntityId building_id;
+};
+
 struct MatchInput {
     uint8_t type;
     union {
         MatchInputMove move;
+        MatchInputStop stop;
+        MatchInputBuild build;
+        MatchInputBuildCancel build_cancel;
     };
 };
 

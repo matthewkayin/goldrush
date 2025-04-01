@@ -170,6 +170,7 @@ fvec2 entity_get_target_position(const Entity& entity);
 void entity_set_target(Entity& entity, Target target);
 bool entity_check_flag(const Entity& entity, uint32_t flag);
 void entity_set_flag(Entity& entity, uint32_t flag, bool value);
+SpriteName entity_get_sprite(const Entity& entity);
 AnimationName entity_get_expected_animation(const Entity& entity);
 ivec2 entity_get_animation_frame(const Entity& entity);
 Rect entity_goldmine_get_block_building_rect(ivec2 cell);

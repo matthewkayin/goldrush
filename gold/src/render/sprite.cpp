@@ -917,10 +917,58 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 6
         }
     }},
+    { SPRITE_MINER_BUILDING, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_miner_building.png",
+            .hframes = 2,
+            .vframes = 3
+        }
+    }},
     { SPRITE_BUILDING_HALL, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {
             .path = "building_hall.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUILDING_DESTROYED_BUNKER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_destroyed_bunker.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUILDING_DESTROYED_MINE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_destroyed_mine.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUILDING_DESTROYED_2, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_destroyed2x2.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUILDING_DESTROYED_3, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_destroyed3x3.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUILDING_DESTROYED_4, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_destroyed4x4.png",
             .hframes = 4,
             .vframes = 1
         }

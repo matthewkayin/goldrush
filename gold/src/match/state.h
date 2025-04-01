@@ -51,8 +51,7 @@ enum MatchEventType {
     MATCH_EVENT_ALERT,
     MATCH_EVENT_SELECTION_HANDOFF,
     MATCH_EVENT_RESEARCH_COMPLETE,
-    MATCH_EVENT_STATUS,
-    MATCH_EVENT_CHAT
+    MATCH_EVENT_STATUS
 };
 
 struct MatchEventSound {
@@ -143,6 +142,9 @@ bool match_has_entity_reached_target(const MatchState& state, const Entity& enti
 ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity);
 bool match_is_entity_mining(const MatchState& state, const Entity& entity);
 EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell);
+void match_entity_stop_building(MatchState& state, EntityId entity_id);
+void match_entity_building_finish(MatchState& state, EntityId building_id);
+Target match_entity_target_nearest_gold_mine(const MatchState& state, const Entity& entity);
 
 // Event
 
