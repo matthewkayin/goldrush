@@ -8,6 +8,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Gold Mine",
         .sprite = SPRITE_GOLDMINE,
         .icon = SPRITE_BUTTON_ICON_GOLDMINE,
+        .death_sound = SOUND_BUNKER_DESTROY,
         .cell_size = 3,
 
         .gold_cost = 0,
@@ -25,6 +26,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Miner",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_MINER,
+        .death_sound = SOUND_DEATH,
         .cell_size = 1,
         
         .gold_cost = 50,
@@ -52,6 +54,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Cowboy",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_COWBOY,
+        .death_sound = SOUND_DEATH,
         .cell_size = 1,
         
         .gold_cost = 100,
@@ -79,6 +82,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Bandit",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_BANDIT,
+        .death_sound = SOUND_DEATH,
         .cell_size = 1,
         
         .gold_cost = 75,
@@ -106,6 +110,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Wagon",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_WAGON,
+        .death_sound = SOUND_DEATH_CHICKEN,
         .cell_size = 1,
         
         .gold_cost = 200,
@@ -133,6 +138,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "War Wagon",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_WAR_WAGON,
+        .death_sound = SOUND_DEATH_CHICKEN,
         .cell_size = 1,
         
         .gold_cost = 200,
@@ -160,6 +166,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Jockey",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_JOCKEY,
+        .death_sound = SOUND_DEATH_CHICKEN,
         .cell_size = 1,
         
         .gold_cost = 100,
@@ -187,6 +194,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Sapper",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_SAPPER,
+        .death_sound = SOUND_DEATH,
         .cell_size = 1,
         
         .gold_cost = 100,
@@ -214,6 +222,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Tinker",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_TINKER,
+        .death_sound = SOUND_DEATH,
         .cell_size = 1,
         
         .gold_cost = 150,
@@ -241,6 +250,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Soldier",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_SOLDIER,
+        .death_sound = SOUND_DEATH,
         .cell_size = 1,
         
         .gold_cost = 125,
@@ -268,6 +278,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Cannoneer",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_CANNON,
+        .death_sound = SOUND_DEATH,
         .cell_size = 2,
         
         .gold_cost = 200,
@@ -295,6 +306,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Detective",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_DETECTIVE,
+        .death_sound = SOUND_DEATH,
         .cell_size = 1,
         
         .gold_cost = 175,
@@ -322,6 +334,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Town Hall",
         .sprite = SPRITE_BUILDING_HALL,
         .icon = SPRITE_BUTTON_ICON_HALL,
+        .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 4,
         
         .gold_cost = 400,
@@ -346,6 +359,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "House",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_HOUSE,
+        .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 2,
         
         .gold_cost = 100,
@@ -370,6 +384,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Saloon",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_SALOON,
+        .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 3,
         
         .gold_cost = 150,
@@ -394,6 +409,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Bunker",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_BUNKER,
+        .death_sound = SOUND_BUNKER_DESTROY,
         .cell_size = 2,
         
         .gold_cost = 100,
@@ -418,6 +434,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Chicken Coop",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_COOP,
+        .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 3,
         
         .gold_cost = 150,
@@ -442,6 +459,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Blacksmith",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_SMITH,
+        .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 3,
         
         .gold_cost = 250,
@@ -466,6 +484,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Barracks",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_BARRACKS,
+        .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 3,
         
         .gold_cost = 300,
@@ -490,6 +509,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Sheriff's Office",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_SHERIFFS,
+        .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 3,
         
         .gold_cost = 200,
@@ -514,6 +534,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Land Mine",
         .sprite = SPRITE_UNIT_MINER,
         .icon = SPRITE_BUTTON_ICON_LANDMINE,
+        .death_sound = SOUND_MINE_DESTROY,
         .cell_size = 1,
         
         .gold_cost = 50,
@@ -721,4 +742,25 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
 
 Rect entity_goldmine_get_block_building_rect(ivec2 cell) {
     return (Rect) { .x = cell.x - 4, .y = cell.y - 4, .w = 11, .h = 11 };
+}
+
+bool entity_should_die(const Entity& entity) {
+    if (entity.health != 0) {
+        return false;
+    }
+
+    if (entity_is_unit(entity.type)) {
+        if (entity.mode == MODE_UNIT_DEATH || entity.mode == MODE_UNIT_DEATH_FADE) {
+            return false;
+        }
+        if (entity.garrison_id != ID_NULL) {
+            return false;
+        }
+
+        return true;
+    } else if (entity_is_building(entity.type)) {
+        return entity.mode != MODE_BUILDING_DESTROYED;
+    }
+
+    return false;
 }

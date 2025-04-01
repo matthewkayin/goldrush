@@ -937,7 +937,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "building_destroyed_bunker.png",
-            .hframes = 4,
+            .hframes = 1,
             .vframes = 1
         }
     }},
@@ -945,7 +945,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "building_destroyed_mine.png",
-            .hframes = 4,
+            .hframes = 1,
             .vframes = 1
         }
     }},
@@ -953,7 +953,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "building_destroyed2x2.png",
-            .hframes = 4,
+            .hframes = 1,
             .vframes = 1
         }
     }},
@@ -961,7 +961,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "building_destroyed3x3.png",
-            .hframes = 4,
+            .hframes = 1,
             .vframes = 1
         }
     }},
@@ -969,7 +969,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "building_destroyed4x4.png",
-            .hframes = 4,
+            .hframes = 1,
             .vframes = 1
         }
     }}

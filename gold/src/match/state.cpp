@@ -12,6 +12,7 @@ static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const int UNIT_BLOCKED_DURATION = 30;
 static const int SMOKE_BOMB_THROW_RANGE_SQUARED = 36;
+static const uint32_t BUILDING_FADE_DURATION = 300;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -439,21 +440,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     const EntityData& entity_data = entity_get_data(entity.type);
 
     // Check if entity should die
-    bool entity_should_die = false;
-    if (entity.health == 0) {
-        if (entity_is_unit(entity.type)) {
-            // Unit should die if health is 0, but not if its garrisoned and not if its already dying
-            if (entity.mode != MODE_UNIT_DEATH && entity.mode != MODE_UNIT_DEATH_FADE && entity.garrison_id == ID_NULL) {
-                entity_should_die = true;
-            }
-        } else {
-            // Building should die if health is 0, but only if its not already destroyed
-            if (entity.mode != MODE_BUILDING_DESTROYED) {
-                entity_should_die = true;
-            }
-        }
-    }
-    if (entity_should_die) {
+    if (entity_should_die(entity)) {
         if (entity_is_unit(entity.type)) {
             entity.mode = MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
@@ -462,12 +449,30 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             entity.timer = BUILDING_FADE_DURATION;
             // TODO: entity.queue.clear();
 
-            CellLayer layer = entity.type == ENTITY_LANDMINE ? CELL_LAYER_UNDERGROUND : CELL_LAYER_GROUND;
-            map_set_cell_rect(state.map, layer, entity.cell, entity_data.cell_size, (Cell) {
-                .type = CELL_EMPTY, .id = ID_NULL
-            });
+            if (entity.type == ENTITY_LANDMINE) {
+                map_set_cell_rect(state.map, CELL_LAYER_UNDERGROUND, entity.cell, entity_data.cell_size, (Cell) {
+                    .type = CELL_EMPTY, .id = ID_NULL
+                });
+            } else {
+                // Set building cells to empty
+                // but don't override the miner cell
+                for (int y = entity.cell.y; y < entity.cell.y + entity_data.cell_size; y++) {
+                    for (int x = entity.cell.x; x < entity.cell.x + entity_data.cell_size; x++) {
+                        ivec2 cell = ivec2(x, y);
+                        if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).id == entity_id) {
+                            map_set_cell(state.map, CELL_LAYER_GROUND, cell, (Cell) {
+                                .type = CELL_EMPTY,
+                                .id = ID_NULL
+                            });
+                        }
+                    }
+                }
+            }
+
+            match_event_play_sound(state, entity_data.death_sound, entity.position.to_ivec2());
         }
     }
+    // End if entity should die
 
     bool update_finished = false;
     fixed movement_left = entity_is_unit(entity.type) ? entity_data.unit_data.speed : fixed::from_raw(0);
@@ -831,6 +836,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     }
                 }
 
+                update_finished = true;
+                break;
+            }
+            case MODE_BUILDING_DESTROYED: {
+                if (entity.timer != 0) {
+                    entity.timer--;
+                }
                 update_finished = true;
                 break;
             }

@@ -1165,7 +1165,11 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        render_sprite_params[match_ui_get_render_layer(entity_get_elevation(entity, state.match.map), RENDER_LAYER_ENTITY)].push_back(params);
+        RenderLayer layer = entity.mode == MODE_UNIT_DEATH_FADE || 
+                            entity.mode == MODE_BUILDING_DESTROYED || 
+                            entity.type == ENTITY_LANDMINE
+                                ? RENDER_LAYER_MINE : RENDER_LAYER_ENTITY;
+        render_sprite_params[match_ui_get_render_layer(entity_get_elevation(entity, state.match.map), layer)].push_back(params);
     }
 
     // Remembered entities

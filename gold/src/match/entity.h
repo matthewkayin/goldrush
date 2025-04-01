@@ -4,6 +4,7 @@
 #include "math/gmath.h"
 #include "render/sprite.h"
 #include "core/animation.h"
+#include "core/sound.h"
 
 const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
 const uint32_t ENTITY_FLAG_DAMAGE_FLICKER = 2;
@@ -141,6 +142,7 @@ struct EntityData {
     const char* name;
     SpriteName sprite;
     SpriteName icon;
+    SoundName death_sound;
     int cell_size;
 
     uint32_t gold_cost;
@@ -174,3 +176,4 @@ SpriteName entity_get_sprite(const Entity& entity);
 AnimationName entity_get_expected_animation(const Entity& entity);
 ivec2 entity_get_animation_frame(const Entity& entity);
 Rect entity_goldmine_get_block_building_rect(ivec2 cell);
+bool entity_should_die(const Entity& entity);

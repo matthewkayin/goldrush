@@ -806,6 +806,10 @@ Cell map_get_cell(const Map& map, CellLayer layer, ivec2 cell) {
     return map.cells[layer][cell.x + (cell.y * map.width)];
 }
 
+void map_set_cell(Map& map, CellLayer layer, ivec2 cell, Cell value) {
+    map.cells[layer][cell.x + (cell.y * map.width)] = value;
+}
+
 void map_set_cell_rect(Map& map, CellLayer layer, ivec2 cell, int size, Cell value) {
     for (int y = cell.y; y < cell.y + size; y++) {
         for (int x = cell.x; x < cell.x + size; x++) {
