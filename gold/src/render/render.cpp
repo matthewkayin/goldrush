@@ -5,7 +5,7 @@
 #define FONT_HFRAMES 16
 #define FONT_VFRAMES 6
 #define FONT_FIRST_CHAR 32 // space
-#define MINIMAP_TEXTURE_WIDTH 512
+#define MINIMAP_TEXTURE_WIDTH 256
 #define MINIMAP_TEXTURE_HEIGHT 256
 #define ATLAS_WIDTH 1024
 #define ATLAS_HEIGHT 1024
@@ -208,7 +208,7 @@ bool render_init(SDL_Window* window) {
     }
 
     log_info("Initialized renderer. Vendor: %s. Renderer: %s. Version: %s.", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
-    SDL_GL_SetSwapInterval(1);
+    SDL_GL_SetSwapInterval(0);
 
     return true;
 }
@@ -1175,36 +1175,27 @@ void render_fill_rect(Rect rect, RenderColor color) {
     render_sprite(SPRITE_UI_SWATCH, src_rect, rect, RENDER_SPRITE_NO_CULL);
 }
 
-void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel) {
-    if (layer == MINIMAP_LAYER_FOG) {
-        position.x += MINIMAP_TEXTURE_WIDTH / 2;
-    }
+void render_minimap_putpixel(ivec2 position, MinimapPixel pixel) {
     state.minimap_texture_pixels[position.x + (position.y * MINIMAP_TEXTURE_WIDTH)] = state.minimap_pixel_values[pixel];
 }
 
-void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel) {
+void render_minimap_draw_rect(Rect rect, MinimapPixel pixel) {
     for (int y = rect.y; y < rect.y + rect.h + 1; y++) {
-        render_minimap_putpixel(layer, ivec2(rect.x, y), pixel);
-        render_minimap_putpixel(layer, ivec2(rect.x + rect.w, y), pixel);
+        render_minimap_putpixel(ivec2(rect.x, y), pixel);
+        render_minimap_putpixel(ivec2(rect.x + rect.w, y), pixel);
     }
     for (int x = rect.x + 1; x < rect.x + rect.w; x++) {
-        render_minimap_putpixel(layer, ivec2(x, rect.y), pixel);
-        render_minimap_putpixel(layer, ivec2(x, rect.y + rect.h), pixel);
+        render_minimap_putpixel(ivec2(x, rect.y), pixel);
+        render_minimap_putpixel(ivec2(x, rect.y + rect.h), pixel);
     }
 }
 
-void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel) {
+void render_minimap_fill_rect(Rect rect, MinimapPixel pixel) {
     for (int y = rect.y; y < rect.y + rect.h + 1; y++) {
         for (int x = rect.x; x < rect.x + rect.w + 1; x++) {
-            render_minimap_putpixel(layer, ivec2(x, y), pixel);
+            render_minimap_putpixel(ivec2(x, y), pixel);
         }
     }
-}
-
-void render_update_minimap_texture() {
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, state.minimap_texture_pixels);
 }
 
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
@@ -1217,12 +1208,10 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
 
     float tex_coord_left = 0.0f;
     float tex_coord_right = (float)src_size.x / (float)MINIMAP_TEXTURE_WIDTH;
-    float tex_coord_fog_left = 0.5f;
-    float tex_coord_fog_right = 0.5f + tex_coord_right;
     float tex_coord_top = 0.0f;
     float tex_coord_bottom = ((float)src_size.y / (float)MINIMAP_TEXTURE_HEIGHT);
 
-    SpriteVertex minimap_vertices[12] = {
+    SpriteVertex minimap_vertices[6] = {
         // minimap tiles
         (SpriteVertex) {
             .position = { position_left, position_top },
@@ -1247,43 +1236,21 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
         (SpriteVertex) {
             .position = { position_right, position_bottom },
             .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
-        },
-
-        // minimap fog of war
-        (SpriteVertex) {
-            .position = { position_left, position_top },
-            .tex_coord = { tex_coord_fog_left, tex_coord_top, 0.0f }
-        },
-        (SpriteVertex) {
-            .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_fog_right, tex_coord_bottom, 0.0f }
-        },
-        (SpriteVertex) {
-            .position = { position_left, position_bottom },
-            .tex_coord = { tex_coord_fog_left, tex_coord_bottom, 0.0f }
-        },
-        (SpriteVertex) {
-            .position = { position_left, position_top },
-            .tex_coord = { tex_coord_fog_left, tex_coord_top, 0.0f }
-        },
-        (SpriteVertex) {
-            .position = { position_right, position_top },
-            .tex_coord = { tex_coord_fog_right, tex_coord_top, 0.0f }
-        },
-        (SpriteVertex) {
-            .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_fog_right, tex_coord_bottom, 0.0f }
-        },
+        }
     };
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
 
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, state.minimap_texture_pixels);
+
     glUseProgram(state.minimap_shader);
     glBindVertexArray(state.sprite_vao);
     glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(minimap_vertices), minimap_vertices);
-    glDrawArrays(GL_TRIANGLES, 0, 12);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);

@@ -8,11 +8,6 @@
 #define AUTOTILE_HFRAMES 8
 #define AUTOTILE_VFRAMES 6
 
-enum MinimapLayer {
-    MINIMAP_LAYER_TILE,
-    MINIMAP_LAYER_FOG
-};
-
 enum MinimapPixel {
     MINIMAP_PIXEL_TRANSPARENT,
     MINIMAP_PIXEL_OFFBLACK,
@@ -68,8 +63,7 @@ ivec2 render_get_text_size(FontName name, const char* text);
 void render_line(ivec2 start, ivec2 end, RenderColor color);
 void render_draw_rect(Rect rect, RenderColor color);
 void render_fill_rect(Rect rect, RenderColor color);
-void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel);
-void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
-void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
-void render_update_minimap_texture();
+void render_minimap_putpixel(ivec2 position, MinimapPixel pixel);
+void render_minimap_draw_rect(Rect rect, MinimapPixel pixel);
+void render_minimap_fill_rect(Rect rect, MinimapPixel pixel);
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size);

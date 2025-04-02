@@ -208,6 +208,11 @@ void match_ui_handle_input(MatchUiState& state) {
         state.select_origin = ivec2(-1, -1);
         return;
     }
+
+    // Jump to latest alert
+    if (input_is_action_just_pressed(INPUT_SPACE) && !state.alerts.empty()) {
+        match_ui_center_camera_on_cell(state, state.alerts.back().cell);
+    }
 }
 
 void match_ui_update(MatchUiState& state) {
@@ -597,6 +602,19 @@ void match_ui_update(MatchUiState& state) {
         }
     }
 
+    // Update alerts
+    {
+        uint32_t alert_index = 0;
+        while (alert_index < state.alerts.size()) {
+            state.alerts[alert_index].timer--;
+            if (state.alerts[alert_index].timer == 0) {
+                state.alerts.erase(state.alerts.begin() + alert_index);
+            } else {
+                alert_index++;
+            }
+        }
+    }
+
     // Clear hidden units from selection
     {
         int selection_index = 0;
@@ -616,65 +634,6 @@ void match_ui_update(MatchUiState& state) {
         state.mode = MATCH_UI_MODE_NONE;
     }
 
-    // Update Minimap
-    uint8_t player_team = state.match.players[network_get_player_id()].team;
-    for (int y = 0; y < state.match.map.height; y++) {
-        for (int x = 0; x < state.match.map.width; x++) {
-            MinimapPixel pixel; 
-            Tile tile = map_get_tile(state.match.map, ivec2(x, y));
-            if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
-                pixel = MINIMAP_PIXEL_SAND;
-            } else if (tile.sprite == SPRITE_TILE_WATER) {
-                pixel = MINIMAP_PIXEL_WATER;
-            } else {
-                pixel = MINIMAP_PIXEL_WALL;
-            }
-            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), pixel);
-
-            MinimapPixel fog_pixel;
-            int fog_value = match_get_fog(state.match, player_team, ivec2(x, y));
-            if (fog_value == FOG_HIDDEN) {
-                fog_pixel = MINIMAP_PIXEL_OFFBLACK;
-            } else if (fog_value == FOG_EXPLORED) {
-                fog_pixel = MINIMAP_PIXEL_OFFBLACK_TRANSPARENT;
-            } else {
-                fog_pixel = MINIMAP_PIXEL_TRANSPARENT;
-            }
-            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), fog_pixel);
-        }
-    }
-    // Minimap entities
-    for (const Entity& entity : state.match.entities) {
-        if (!entity_is_selectable(entity) || !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
-            continue;
-        }
-
-        MinimapPixel pixel = entity.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.match.players[entity.player_id].recolor_id);
-        int entity_cell_size = entity_get_data(entity.type).cell_size;
-        Rect entity_rect = (Rect) {
-            .x = entity.cell.x, .y = entity.cell.y,
-            .w = entity_cell_size, .h = entity_cell_size
-        };
-        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
-    }
-    // Minimap remembered entities
-    for (auto it : state.match.remembered_entities[state.match.players[network_get_player_id()].team]) {
-        Rect entity_rect = (Rect) {
-            .x = it.second.cell.x, .y = it.second.cell.y,
-            .w = it.second.cell_size, .h = it.second.cell_size
-        };
-        MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
-        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
-    }
-    // Minimap camera rect
-    Rect camera_rect = (Rect) {
-        .x = state.camera_offset.x / TILE_SIZE,
-        .y = state.camera_offset.y / TILE_SIZE,
-        .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
-        .h = ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / TILE_SIZE) - 1
-    };
-    render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
-    render_update_minimap_texture();
 }
 
 // UPDATE FUNCTIONS
@@ -1565,6 +1524,83 @@ void match_ui_render(const MatchUiState& state) {
 
     render_sprite_batch();
 
+    // MINIMAP
+    // Minimap tiles
+    for (int y = 0; y < state.match.map.height; y++) {
+        for (int x = 0; x < state.match.map.width; x++) {
+            MinimapPixel pixel; 
+            Tile tile = map_get_tile(state.match.map, ivec2(x, y));
+            if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
+                pixel = MINIMAP_PIXEL_SAND;
+            } else if (tile.sprite == SPRITE_TILE_WATER) {
+                pixel = MINIMAP_PIXEL_WATER;
+            } else {
+                pixel = MINIMAP_PIXEL_WALL;
+            }
+            render_minimap_putpixel(ivec2(x, y), pixel);
+        }
+    }
+    // Minimap entities
+    for (const Entity& entity : state.match.entities) {
+        if (!entity_is_selectable(entity) || !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+
+        MinimapPixel pixel = entity.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.match.players[entity.player_id].recolor_id);
+        int entity_cell_size = entity_get_data(entity.type).cell_size;
+        Rect entity_rect = (Rect) {
+            .x = entity.cell.x, .y = entity.cell.y,
+            .w = entity_cell_size, .h = entity_cell_size
+        };
+        render_minimap_fill_rect(entity_rect, pixel);
+    }
+    // Minimap remembered entities
+    for (auto it : state.match.remembered_entities[state.match.players[network_get_player_id()].team]) {
+        Rect entity_rect = (Rect) {
+            .x = it.second.cell.x, .y = it.second.cell.y,
+            .w = it.second.cell_size, .h = it.second.cell_size
+        };
+        MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
+        render_minimap_fill_rect(entity_rect, pixel);
+    }
+    // Minimap fog of war
+    for (int y = 0; y < state.match.map.height; y++) {
+        for (int x = 0; x < state.match.map.width; x++) {
+            int fog_value = match_get_fog(state.match, player_team, ivec2(x, y));
+            if (fog_value > 0) {
+                continue;
+            }
+
+            render_minimap_putpixel(ivec2(x, y), fog_value == FOG_HIDDEN ? MINIMAP_PIXEL_OFFBLACK : MINIMAP_PIXEL_OFFBLACK_TRANSPARENT);
+        }
+    }
+    // Minimap alerts
+    for (const Alert& alert : state.alerts) {
+        if (alert.timer <= UI_ALERT_LINGER_DURATION) {
+            continue;
+        }
+
+        int alert_timer = alert.timer - UI_ALERT_LINGER_DURATION;
+        int alert_rect_margin = 3 + (alert_timer <= 60 
+                                        ? 0
+                                        : ((alert_timer - 60) / 3));
+        Rect alert_rect = (Rect) {
+            .x = alert.cell.x - alert_rect_margin,
+            .y = alert.cell.y - alert_rect_margin,
+            .w = alert.cell_size + 1 + (alert_rect_margin * 2),
+            .h = alert.cell_size + 1 + (alert_rect_margin * 2),
+        };
+        // We want this on the fog layer because the minimap rect might go into the fog
+        render_minimap_draw_rect(alert_rect, alert.pixel);
+    }
+    // Minimap camera rect
+    Rect camera_rect = (Rect) {
+        .x = state.camera_offset.x / TILE_SIZE,
+        .y = state.camera_offset.y / TILE_SIZE,
+        .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
+        .h = ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / TILE_SIZE) - 1
+    };
+    render_minimap_draw_rect(camera_rect, MINIMAP_PIXEL_WHITE);
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 }
 

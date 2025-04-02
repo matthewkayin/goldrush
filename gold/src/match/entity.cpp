@@ -589,6 +589,15 @@ uint16_t entity_get_elevation(const Entity& entity, const Map& map) {
             elevation = std::max(elevation, map_get_tile(map, ivec2(x, y)).elevation);
         }
     }
+
+    if (entity.mode == MODE_UNIT_MOVE) {
+        ivec2 unit_prev_cell = entity.cell - DIRECTION_IVEC2[entity.direction];
+        for (int y = unit_prev_cell.y; y < unit_prev_cell.y + entity_cell_size; y++) {
+            for (int x = unit_prev_cell.x; x < unit_prev_cell.x + entity_cell_size; x++) {
+                elevation = std::max(elevation, map_get_tile(map, ivec2(x, y)).elevation);
+            }
+        }
+    }
     
     return elevation;
 }
