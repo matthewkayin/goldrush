@@ -1365,11 +1365,11 @@ void match_ui_render(const MatchUiState& state) {
     const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
     const SpriteInfo& bottom_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BOTTOM_PANEL);
     const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
+    ivec2 ui_frame_bottom_position = ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height);
+    ivec2 selection_list_top_left = ui_frame_bottom_position + ivec2(28, 12);
     render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
-    render_sprite_frame(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height), 0, 0);
-    render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(minimap_sprite_info.frame_width + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
-
-    ui_render();
+    render_sprite_frame(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ui_frame_bottom_position, 0, 0);
+    render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(ui_frame_bottom_position.x + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
 
     // UI Status message
     if (state.status_timer != 0) {
@@ -1509,6 +1509,69 @@ void match_ui_render(const MatchUiState& state) {
     }
     // End render tooltip
 
+    // UI Selection list
+    if (state.selection.size() == 1) {
+        const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
+        const EntityData& entity_data = entity_get_data(entity.type);
+
+        // Entity name
+        const SpriteInfo& frame_sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
+        ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, entity_data.name);
+        int frame_count = (text_size.x / frame_sprite_info.frame_width) + 1;
+        if (text_size.x % frame_sprite_info.frame_width != 0) {
+            frame_count++;
+        }
+        for (int frame = 0; frame < frame_count; frame++) {
+            int hframe = 1;
+            if (frame == 0) {
+                hframe = 0;
+            } else if (frame == frame_count - 1) {
+                hframe = 2;
+            }
+            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), selection_list_top_left + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
+        }
+        ivec2 frame_size = ivec2(frame_count * frame_sprite_info.frame_width, frame_sprite_info.frame_height);
+        render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, selection_list_top_left + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
+
+        // Entity icon
+        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), selection_list_top_left + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(entity_data.icon, ivec2(0, 0), selection_list_top_left + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+
+        if (entity.type == ENTITY_GOLDMINE) {
+            if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
+                render_text(FONT_WESTERN8_GOLD, "Collapsed!", selection_list_top_left + ivec2(36, 22));
+            } else {
+                char gold_left_str[17];
+                sprintf(gold_left_str, "Gold Left: %u", entity.gold_held);
+                render_text(FONT_WESTERN8_GOLD, gold_left_str, selection_list_top_left + ivec2(36, 22));
+            }
+        } else {
+            RenderHealthbarParams params = (RenderHealthbarParams) {
+                .type = RENDER_HEALTHBAR,
+                .position = selection_list_top_left + ivec2(0, 18 + 35),
+                .size = ivec2(64, 12),
+                .amount = entity.health,
+                .max = entity_data.max_health
+            };
+            match_ui_render_healthbar(params);
+
+            char health_text[16];
+            sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
+            ivec2 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
+            ivec2 health_text_position = params.position + (params.size / 2) - (health_text_size / 2);
+            render_text(FONT_HACK_WHITE, health_text, health_text_position);
+
+            if (entity_data.has_detection) {
+                render_text(FONT_WESTERN8_GOLD, "Detection", selection_list_top_left + ivec2(36, 22));
+            }
+            if (entity.type == ENTITY_TINKER && entity.cooldown_timer != 0) {
+                char cooldown_text[32];
+                sprintf(cooldown_text, "Smoke Bomb cooldown: %us", entity.cooldown_timer / 60);
+                render_text(FONT_WESTERN8_GOLD, cooldown_text, selection_list_top_left + ivec2(36, 36));
+            }
+        }
+    }
+
     // Resource counters
     {
         char gold_text[8];
@@ -1522,6 +1585,7 @@ void match_ui_render(const MatchUiState& state) {
         render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL, 0);
     }
 
+    ui_render();
     render_sprite_batch();
 
     // MINIMAP
