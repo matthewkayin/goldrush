@@ -486,12 +486,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UI_SWATCH, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_swatch.png",
-            .hframes = 5,
-            .vframes = 1
-        }
+        .strategy = SPRITE_IMPORT_SWATCH
     }},
     { SPRITE_UI_TITLE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,

@@ -24,6 +24,7 @@
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <unordered_map>
 
 struct SpriteVertex {
     float position[2];
@@ -49,35 +50,26 @@ struct Font {
     FontGlyph glyphs[FONT_GLYPH_COUNT];
 };
 
-struct PlayerColor {
-    const char* name;
-    SDL_Color skin_color;
-    SDL_Color clothes_color;
-};
-
 static const SDL_Color RECOLOR_CLOTHES_REF = { .r = 255, .g = 0, .b = 255, .a = 255 };
 static const SDL_Color RECOLOR_SKIN_REF = { .r = 123, .g = 174, .b = 121, .a = 255 };
-static const PlayerColor PLAYER_COLORS[MAX_PLAYERS] = {
-    (PlayerColor) {
-        .name = "Blue",
-        .skin_color = (SDL_Color) { .r = 125, .g = 181, .b = 164, .a = 255 },
-        .clothes_color = (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 }
-    },
-    (PlayerColor) {
-        .name = "Red",
-        .skin_color = (SDL_Color) { .r = 219, .g = 151, .b = 114, .a = 255 },
-        .clothes_color = (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }
-    },
-    (PlayerColor) {
-        .name = "Green",
-        .skin_color = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 },
-        .clothes_color = (SDL_Color) { .r = 77, .g = 135, .b = 115, .a = 255 },
-    },
-    (PlayerColor) {
-        .name = "Purple",
-        .skin_color = (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 },
-        .clothes_color = (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 },
-    }
+static const std::unordered_map<RenderColor, SDL_Color> RENDER_COLOR_VALUES = {
+    { RENDER_COLOR_WHITE, (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 }},
+    { RENDER_COLOR_OFFBLACK, (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 255 }},
+    { RENDER_COLOR_OFFBLACK_TRANSPARENT, (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 128 }},
+    { RENDER_COLOR_DARK_GRAY, (SDL_Color) { .r = 94, .g = 88, .b = 89, .a = 255 }},
+    { RENDER_COLOR_BLUE, (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 }},
+    { RENDER_COLOR_DIM_BLUE, (SDL_Color) { .r = 70, .g = 100, .b = 115, .a = 255 }},
+    { RENDER_COLOR_LIGHT_BLUE, (SDL_Color) { .r = 125, .g = 181, .b = 164, .a = 255 }},
+    { RENDER_COLOR_RED, (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }},
+    { RENDER_COLOR_RED_TRANSPARENT, (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 128 }},
+    { RENDER_COLOR_LIGHT_RED, (SDL_Color) { .r = 219, .g = 151, .b = 114, .a = 255 }},
+    { RENDER_COLOR_GOLD, (SDL_Color) { .r = 238, .g = 209, .b = 158, .a = 255 }},
+    { RENDER_COLOR_DIM_SAND, (SDL_Color) { .r = 204, .g = 162, .b = 139, .a = 255 }},
+    { RENDER_COLOR_GREEN, (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 }},
+    { RENDER_COLOR_GREEN_TRANSPARENT, (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 128 }},
+    { RENDER_COLOR_DARK_GREEN, (SDL_Color) { .r = 77, .g = 135, .b = 115, .a = 255 }},
+    { RENDER_COLOR_PURPLE, (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 }},
+    { RENDER_COLOR_LIGHT_PURPLE, (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 }}
 };
 
 enum LoadedSurfaceType {
@@ -116,18 +108,11 @@ struct RenderState {
     GLuint font_vao;
     GLuint font_vbo;
     Font fonts[FONT_COUNT];
-
-    GLuint line_shader;
-    GLint line_shader_color_location;
-    GLuint line_vao;
-    GLuint line_vbo;
-    std::vector<LineVertex> line_vertices;
 };
 static RenderState state;
 
 void render_init_quad_vao();
 void render_init_sprite_vao();
-void render_init_line_vao();
 void render_init_minimap_texture();
 bool render_init_screen_framebuffer();
 
@@ -158,7 +143,6 @@ bool render_init(SDL_Window* window) {
 
     render_init_quad_vao();
     render_init_sprite_vao();
-    render_init_line_vao();
     render_init_minimap_texture();
     if (!render_init_screen_framebuffer()) {
         return false;
@@ -195,13 +179,6 @@ bool render_init(SDL_Window* window) {
     glUseProgram(state.minimap_shader);
     glUniform1ui(glGetUniformLocation(state.minimap_shader, "sprite_texture"), 0);
     glUniformMatrix4fv(glGetUniformLocation(state.minimap_shader, "projection"), 1, GL_FALSE, projection.data);
-
-    // Load line shader
-    if (!shader_load(&state.line_shader, "line.vert.glsl", "line.frag.glsl")) {
-        return false;
-    }
-    glUseProgram(state.line_shader);
-    glUniformMatrix4fv(glGetUniformLocation(state.line_shader, "projection"), 1, GL_FALSE, projection.data);
 
     if (!render_load_sprites()) {
         return false;
@@ -265,21 +242,6 @@ void render_init_sprite_vao() {
     glBindVertexArray(0);
 }
 
-void render_init_line_vao() {
-    glGenVertexArrays(1, &state.line_vao);
-    glGenBuffers(1, &state.line_vbo);
-    glBindVertexArray(state.line_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
-    glBufferData(GL_ARRAY_BUFFER, 256 * sizeof(LineVertex), NULL, GL_DYNAMIC_DRAW);
-
-    // position
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
 void render_init_minimap_texture() {
     glGenTextures(1, &state.minimap_texture);
 
@@ -296,7 +258,8 @@ void render_init_minimap_texture() {
     state.minimap_pixel_values[MINIMAP_PIXEL_OFFBLACK_TRANSPARENT] = SDL_MapRGBA(format, 40, 37, 45, 128);
     state.minimap_pixel_values[MINIMAP_PIXEL_WHITE] = SDL_MapRGBA(format, 255, 255, 255, 255);
     for (int player = 0; player < MAX_PLAYERS; player++) {
-        state.minimap_pixel_values[MINIMAP_PIXEL_PLAYER0 + player] = SDL_MapRGBA(format, PLAYER_COLORS[player].clothes_color.r, PLAYER_COLORS[player].clothes_color.g, PLAYER_COLORS[player].clothes_color.b, PLAYER_COLORS[player].clothes_color.a);
+        SDL_Color player_color = RENDER_COLOR_VALUES.at(RENDER_PLAYER_COLORS[player]);
+        state.minimap_pixel_values[MINIMAP_PIXEL_PLAYER0 + player] = SDL_MapRGBA(format, player_color.r, player_color.g, player_color.b, player_color.a);
     }
     state.minimap_pixel_values[MINIMAP_PIXEL_GOLD] = SDL_MapRGBA(format, 238, 209, 158, 255);
     state.minimap_pixel_values[MINIMAP_PIXEL_SAND] = SDL_MapRGBA(format, 204, 162, 139, 255);
@@ -372,8 +335,10 @@ SDL_Surface* render_recolor_surface(SDL_Surface* sprite_surface, bool recolor_lo
     // Copy the original sprite onto our recolor atlas 4 times, once for each player color
     for (int recolor_id = 0; recolor_id < MAX_PLAYERS; recolor_id++) {
         // Get the replacement pixel bytes from the player color
-        uint32_t clothes_replacement_pixel = SDL_MapRGBA(recolor_surface->format, PLAYER_COLORS[recolor_id].clothes_color.r, PLAYER_COLORS[recolor_id].clothes_color.g, PLAYER_COLORS[recolor_id].clothes_color.b, PLAYER_COLORS[recolor_id].clothes_color.a);
-        uint32_t skin_replacement_pixel = SDL_MapRGBA(recolor_surface->format, PLAYER_COLORS[recolor_id].skin_color.r, PLAYER_COLORS[recolor_id].skin_color.g, PLAYER_COLORS[recolor_id].skin_color.b, PLAYER_COLORS[recolor_id].skin_color.a);
+        SDL_Color player_color = RENDER_COLOR_VALUES.at(RENDER_PLAYER_COLORS[recolor_id]);
+        uint32_t clothes_replacement_pixel = SDL_MapRGBA(recolor_surface->format, player_color.r, player_color.g, player_color.b, player_color.a);
+        SDL_Color skin_color = RENDER_COLOR_VALUES.at(RENDER_PLAYER_SKIN_COLORS[recolor_id]);
+        uint32_t skin_replacement_pixel = SDL_MapRGBA(recolor_surface->format, skin_color.r, skin_color.g, skin_color.b, skin_color.a);
 
         // Loop through each pixel of the original sprite
         for (int y = 0; y < sprite_surface->h; y++) {
@@ -640,6 +605,20 @@ bool render_load_sprites() {
             }
 
             surfaces[FONT_COUNT + sprite].surface = tile_surface;
+        } else if (params.strategy == SPRITE_IMPORT_SWATCH) {
+            SDL_Surface* swatch_surface = SDL_CreateRGBSurfaceWithFormat(0, RENDER_COLOR_COUNT, 1, 32, SDL_PIXELFORMAT_BGRA8888);
+            if (swatch_surface == NULL) {
+                log_error("Unable to create swatch surface: %s", SDL_GetError());
+                return false;
+            }
+            uint32_t* swatch_pixels = (uint32_t*)swatch_surface->pixels;
+            for (uint32_t render_color = 0; render_color < RENDER_COLOR_COUNT; render_color++) {
+                SDL_Color value = RENDER_COLOR_VALUES.at((RenderColor)render_color);
+                uint32_t color_value = SDL_MapRGBA(swatch_surface->format, value.r, value.g, value.b, value.a);
+                swatch_pixels[render_color] = color_value;
+            }
+
+            surfaces[FONT_COUNT + sprite].surface = swatch_surface;
         } else {
             char sprite_path[128];
             sprintf(sprite_path, "%ssprite/%s", RESOURCE_PATH, params.sheet.path);
@@ -733,6 +712,11 @@ bool render_load_sprites() {
                     }
                     sprite_info.frame_width = TILE_SIZE;
                     sprite_info.frame_height = TILE_SIZE;
+                } else if (params.strategy == SPRITE_IMPORT_SWATCH) {
+                    sprite_info.hframes = RENDER_COLOR_COUNT;
+                    sprite_info.vframes = 1;
+                    sprite_info.frame_width = 1;
+                    sprite_info.frame_height = 1;
                 } else {
                     sprite_info.hframes = params.sheet.hframes;
                     sprite_info.vframes = params.sheet.vframes;
@@ -855,21 +839,6 @@ void render_sprite_batch() {
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
     state.sprite_vertices.clear();
-}
-
-void render_line_vertices() {
-    glUseProgram(state.line_shader);
-    glLineWidth(1);
-
-    glBindVertexArray(state.line_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, state.line_vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(LineVertex) * state.line_vertices.size(), &state.line_vertices[0]);
-    glDrawArrays(GL_LINES, 0, state.line_vertices.size());
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    state.line_vertices.clear();
 }
 
 void render_present_frame() {
