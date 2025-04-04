@@ -659,7 +659,7 @@ void match_ui_update(MatchUiState& state) {
                         sound_play(SOUND_ALERT_BUILDING);
                         break;
                     case MATCH_ALERT_TYPE_UNIT:
-                        sound_play(SOUND_ALERT_UNIT);
+                        // sound_play(SOUND_ALERT_UNIT);
                         break;
                     case MATCH_ALERT_TYPE_RESEARCH:
                         sound_play(SOUND_ALERT_RESEARCH);
@@ -1144,9 +1144,9 @@ void match_ui_order_move(MatchUiState& state) {
         state.move_animation_entity_id = input.move.target_id;
     }
 
-    // Play awk sound
+    // Play ack sound
     // TODO: only play this if unit voices are on
-    sound_play(input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_ENTITY ? SOUND_UNIT_HAW : SOUND_UNIT_OK);
+    // sound_play(input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_ENTITY ? SOUND_UNIT_HAW : SOUND_UNIT_OK);
 
     // Reset UI mode if targeting
     if (match_ui_is_targeting(state)) {
@@ -1966,6 +1966,122 @@ void match_ui_render(const MatchUiState& state) {
         render_text(FONT_WESTERN8_WHITE, population_text, ivec2(SCREEN_WIDTH - 88 + 22, 2));
         render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL, 0);
     }
+
+    // Debug unit info
+    #ifdef GOLD_DEBUG_UNIT_INFO
+        if (!match_ui_is_mouse_in_ui()) {
+            ivec2 mouse_cell = (input_get_mouse_position() + state.camera_offset) / TILE_SIZE;
+            Cell cell_value = map_get_cell(state.match.map, CELL_LAYER_GROUND, mouse_cell);
+            char debug_text[128];
+            char* debug_text_ptr = debug_text;
+            debug_text_ptr += sprintf(debug_text, "%i,%i ", mouse_cell.x, mouse_cell.y);
+            switch (cell_value.type) {
+                case CELL_EMPTY:
+                    debug_text_ptr += sprintf(debug_text_ptr, "EMPTY");
+                    break;
+                case CELL_BLOCKED:
+                    debug_text_ptr += sprintf(debug_text_ptr, "BLOCKED");
+                    break;
+                case CELL_UNREACHABLE:
+                    debug_text_ptr += sprintf(debug_text_ptr, "UNREACHABLE");
+                    break;
+                case CELL_DECORATION_1:
+                case CELL_DECORATION_2:
+                case CELL_DECORATION_3:
+                case CELL_DECORATION_4:
+                case CELL_DECORATION_5:
+                    debug_text_ptr += sprintf(debug_text_ptr, "DECORATION");
+                    break;
+                case CELL_UNIT:
+                    debug_text_ptr += sprintf(debug_text_ptr, "UNIT");
+                    break;
+                case CELL_BUILDING:
+                    debug_text_ptr += sprintf(debug_text_ptr, "BUILDING");
+                    break;
+                case CELL_GOLDMINE:
+                    debug_text_ptr += sprintf(debug_text_ptr, "GOLDMINE");
+                    break;
+                case CELL_MINER:
+                    debug_text_ptr += sprintf(debug_text_ptr, "MINER");
+                    break;
+            }
+            render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 12));
+
+            debug_text_ptr = debug_text;
+            if (cell_value.type == CELL_MINER || cell_value.type == CELL_UNIT || cell_value.type == CELL_BUILDING) {
+                const Entity& entity = state.match.entities.get_by_id(cell_value.id);
+                debug_text_ptr += sprintf(debug_text_ptr, "%u %s | Mode: ", cell_value.id, entity_get_data(entity.type).name);
+                switch (entity.mode) {
+                    case MODE_UNIT_IDLE:
+                        debug_text_ptr += sprintf(debug_text_ptr, "IDLE");
+                        break;
+                    case MODE_UNIT_MOVE:
+                        debug_text_ptr += sprintf(debug_text_ptr, "MOVE");
+                        break;
+                    case MODE_UNIT_BLOCKED:
+                        debug_text_ptr += sprintf(debug_text_ptr, "BLOCKED");
+                        break;
+                    case MODE_UNIT_MOVE_FINISHED:
+                        debug_text_ptr += sprintf(debug_text_ptr, "MOVE FINISHED");
+                        break;
+                    case MODE_UNIT_IN_MINE:
+                        debug_text_ptr += sprintf(debug_text_ptr, "IN_MINE");
+                        break;
+                    case MODE_UNIT_ATTACK_WINDUP:
+                        debug_text_ptr += sprintf(debug_text_ptr, "ATTACKING");
+                        break;
+                    case MODE_UNIT_DEATH:
+                        debug_text_ptr += sprintf(debug_text_ptr, "DEATH");
+                        break;
+                    case MODE_UNIT_DEATH_FADE:
+                        debug_text_ptr += sprintf(debug_text_ptr, "DEATH FADE");
+                        break;
+                    case MODE_UNIT_REPAIR:
+                        debug_text_ptr += sprintf(debug_text_ptr, "REPAIR");
+                        break;
+                    case MODE_UNIT_BUILD:
+                        debug_text_ptr += sprintf(debug_text_ptr, "BUILD");
+                        break;
+                    case MODE_UNIT_SOLDIER_CHARGE:
+                        debug_text_ptr += sprintf(debug_text_ptr, "CHARGE");
+                        break;
+                    case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
+                        debug_text_ptr += sprintf(debug_text_ptr, "SOLDIER ATTACKING");
+                        break;
+                    case MODE_UNIT_TINKER_THROW:
+                        debug_text_ptr += sprintf(debug_text_ptr, "TINKER THROW");
+                        break;
+                    case MODE_BUILDING_IN_PROGRESS:
+                        debug_text_ptr += sprintf(debug_text_ptr, "IN PROGRESS");
+                        break;
+                    case MODE_BUILDING_FINISHED:
+                        debug_text_ptr += sprintf(debug_text_ptr, "FINISHED");
+                        break;
+                    case MODE_BUILDING_DESTROYED:
+                        debug_text_ptr += sprintf(debug_text_ptr, "DESTROYED");
+                        break;
+                    case MODE_MINE_ARM:
+                        debug_text_ptr += sprintf(debug_text_ptr, "ARM");
+                        break;
+                    case MODE_MINE_PRIME:
+                        debug_text_ptr += sprintf(debug_text_ptr, "PRIME");
+                        break;
+                    case MODE_GOLDMINE:
+                        debug_text_ptr += sprintf(debug_text_ptr, "GOLDMINE");
+                        break;
+                    case MODE_GOLDMINE_COLLAPSED:
+                        debug_text_ptr += sprintf(debug_text_ptr, "COLLAPSED");
+                        break;
+                }
+
+                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 24));
+
+                debug_text_ptr = debug_text;
+                debug_text_ptr += sprintf(debug_text_ptr, "Target: %u Reached? %i", entity.target.type, (int)match_has_entity_reached_target(state.match, entity));
+                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 36));
+            }
+        }
+    #endif
 
     ui_render();
     render_sprite_batch();

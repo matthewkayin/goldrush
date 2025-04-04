@@ -904,8 +904,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         // End return gold
 
                         // Enter mine
-                        if (entity.type == ENTITY_MINER && target.type == ENTITY_GOLDMINE && target.gold_held > 0 && 
-                                target.garrisoned_units.size() + entity_data.garrison_size <= target_data.garrison_capacity) {
+                        if (entity.type == ENTITY_MINER && target.type == ENTITY_GOLDMINE && target.gold_held > 0) {
                             if (entity.gold_held != 0) {
                                 entity.target = match_entity_target_nearest_hall(state, entity);
                                 entity.mode = MODE_UNIT_IDLE;
@@ -913,16 +912,18 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 break;
                             }
 
-                            target.garrisoned_units.push_back(entity_id);
-                            entity.garrison_id = entity.target.id;
-                            entity.mode = MODE_UNIT_IN_MINE;
-                            entity.timer = UNIT_IN_MINE_DURATION;
-                            entity.target = (Target) { .type = TARGET_NONE };
-                            entity.gold_held = std::min(UNIT_MAX_GOLD_HELD, target.gold_held);
-                            target.gold_held -= entity.gold_held;
-                            map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
-                                .type = CELL_EMPTY, .id = ID_NULL
-                            });
+                            if (target.garrisoned_units.size() + entity_data.garrison_size <= target_data.garrison_capacity) {
+                                target.garrisoned_units.push_back(entity_id);
+                                entity.garrison_id = entity.target.id;
+                                entity.mode = MODE_UNIT_IN_MINE;
+                                entity.timer = UNIT_IN_MINE_DURATION;
+                                entity.target = (Target) { .type = TARGET_NONE };
+                                entity.gold_held = std::min(UNIT_MAX_GOLD_HELD, target.gold_held);
+                                target.gold_held -= entity.gold_held;
+                                map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
+                                    .type = CELL_EMPTY, .id = ID_NULL
+                                });
+                            }
 
                             update_finished = true;
                             break;
