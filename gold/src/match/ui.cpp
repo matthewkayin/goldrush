@@ -26,6 +26,7 @@ static const uint32_t UI_ALERT_DURATION = 90;
 static const uint32_t UI_ALERT_LINGER_DURATION = 60 * 20;
 static const uint32_t UI_ALERT_TOTAL_DURATION = UI_ALERT_DURATION + UI_ALERT_LINGER_DURATION;
 static const uint32_t UI_ATTACK_ALERT_DISTANCE = 20;
+static const uint32_t MATCH_UI_DOUBLE_CLICK_DURATION = 16;
 
 static const int MATCH_UI_BUTTON_X = SCREEN_WIDTH - 132 + 14; 
 static const int MATCH_UI_BUTTON_Y = SCREEN_HEIGHT - MATCH_UI_HEIGHT + 10;
@@ -57,6 +58,9 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.turn_counter = 0;
     state.disconnect_timer = 0;
     state.status_timer = 0;
+    state.control_group_selected = MATCH_UI_CONTROL_GROUP_NONE;
+    state.double_click_timer = 0;
+    state.control_group_double_tap_timer = 0;
     memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
 
     // Populate match player info using network player info
@@ -324,8 +328,49 @@ void match_ui_handle_input(MatchUiState& state) {
         };
 
         std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
-        match_ui_set_selection(state, selection);
         state.select_origin = ivec2(-1, -1);
+        state.control_group_selected = MATCH_UI_CONTROL_GROUP_NONE;
+
+        // Append selection
+        if (input_is_action_pressed(INPUT_CTRL)) {
+            // Don't append selection if units are not same type
+            if (match_ui_get_selection_type(state, selection) != match_ui_get_selection_type(state, state.selection)) {
+                return;
+            }
+            for (EntityId incoming_id : selection) {
+                if (std::find(state.selection.begin(), state.selection.end(), incoming_id) == state.selection.end()) {
+                    state.selection.push_back(incoming_id);
+                }
+            }
+
+            match_ui_set_selection(state, state.selection);
+            return;
+        }
+
+        if (selection.size() == 1) {
+            if (state.double_click_timer == 0) {
+                state.double_click_timer = MATCH_UI_DOUBLE_CLICK_DURATION;
+            } else if (state.selection.size() == 1 && state.selection[0] == selection[0] &&
+                        state.match.entities.get_by_id(state.selection[0]).player_id == network_get_player_id()) {
+                EntityType selected_type = state.match.entities.get_by_id(state.selection[0]).type;
+                selection.clear();
+
+                for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
+                    if (state.match.entities[entity_index].type != selected_type || state.match.entities[entity_index].player_id != network_get_player_id()) {
+                        continue;
+                    }
+
+                    Rect entity_rect = entity_get_rect(state.match.entities[entity_index]);
+                    entity_rect.x -= state.camera_offset.x;
+                    entity_rect.y -= state.camera_offset.y;
+                    if (SCREEN_RECT.intersects(entity_rect)) {
+                        selection.push_back(state.match.entities.get_id_of(entity_index));
+                    }
+                }
+            }
+        }
+
+        match_ui_set_selection(state, selection);
         return;
     }
 
@@ -581,6 +626,12 @@ void match_ui_update(MatchUiState& state) {
     }
     if (state.status_timer != 0) {
         state.status_timer--;
+    }
+    if (state.double_click_timer != 0) {
+        state.double_click_timer--;
+    }
+    if (state.control_group_double_tap_timer != 0) {
+        state.control_group_double_tap_timer--;
     }
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
         if (state.sound_cooldown_timers[sound] != 0) {

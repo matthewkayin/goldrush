@@ -10,6 +10,8 @@
 #include <string>
 
 #define MATCH_UI_HEIGHT 88
+#define MATCH_UI_CONTROL_GROUP_COUNT 10
+#define MATCH_UI_CONTROL_GROUP_NONE -1
 
 enum RenderLayer {
     RENDER_LAYER_TILE,
@@ -84,6 +86,10 @@ struct MatchUiState {
     bool is_minimap_dragging;
 
     ivec2 select_origin;
+    uint32_t double_click_timer;
+    int control_group_selected;
+    uint32_t control_group_double_tap_timer;
+    std::vector<EntityId> control_groups[MATCH_UI_CONTROL_GROUP_COUNT];
     std::vector<EntityId> selection;
 
     std::string status_message;
