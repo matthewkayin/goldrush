@@ -39,6 +39,7 @@ static const ivec2 MATCH_UI_BUTTON_POSITIONS[HOTKEY_GROUP_SIZE] = {
     ivec2(MATCH_UI_BUTTON_X + MATCH_UI_BUTTON_PADDING_X, MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y),
     ivec2(MATCH_UI_BUTTON_X + (2 * MATCH_UI_BUTTON_PADDING_X), MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y)
 };
+static const ivec2 SELECTION_LIST_TOP_LEFT = ivec2(164, 284);
 
 static const int HEALTHBAR_HEIGHT = 4;
 static const int HEALTHBAR_PADDING = 3;
@@ -129,6 +130,125 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // This function returns after it handles a single input to avoid double input happening
 void match_ui_handle_input(MatchUiState& state) {
+    // Hotkey click
+    for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
+        InputAction hotkey = input_get_hotkey(hotkey_index);
+        if (hotkey == INPUT_HOTKEY_NONE) {
+            continue;
+        }
+        if (state.is_minimap_dragging || match_ui_is_selecting(state)) {
+            continue;
+        }
+        if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
+            continue;
+        }
+
+        const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+        ivec2 hotkey_position = MATCH_UI_BUTTON_POSITIONS[hotkey_index];
+        Rect hotkey_rect = (Rect) {
+            .x = hotkey_position.x, .y = hotkey_position.y,
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+        };
+
+        if (input_is_action_just_pressed(hotkey) || (
+            input_is_action_just_pressed(INPUT_LEFT_CLICK) && hotkey_rect.has_point(input_get_mouse_position())
+        )) {
+            const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
+
+            if (hotkey_info.type == HOTKEY_BUTTON_ACTION) {
+                switch (hotkey) {
+                    case INPUT_HOTKEY_ATTACK: {
+                        state.mode = MATCH_UI_MODE_TARGET_ATTACK;
+                        break;
+                    }
+                    case INPUT_HOTKEY_BUILD: {
+                        state.mode = MATCH_UI_MODE_BUILD;
+                        break;
+                    }
+                    case INPUT_HOTKEY_BUILD2: {
+                        state.mode = MATCH_UI_MODE_BUILD2;
+                        break;
+                    }
+                    case INPUT_HOTKEY_CANCEL: {
+                        if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
+                            state.mode = MATCH_UI_MODE_NONE;
+                        } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE) {
+                            switch (state.building_type) {
+                                case ENTITY_HALL:
+                                case ENTITY_HOUSE:
+                                case ENTITY_SALOON:
+                                case ENTITY_SMITH:
+                                case ENTITY_BUNKER:
+                                    state.mode = MATCH_UI_MODE_BUILD;
+                                    break;
+                                case ENTITY_BARRACKS:
+                                case ENTITY_COOP:
+                                case ENTITY_SHERIFFS:
+                                    state.mode = MATCH_UI_MODE_BUILD2;
+                                    break;
+                                case ENTITY_LANDMINE:
+                                    state.mode = MATCH_UI_MODE_NONE;
+                                    break;
+                                default:
+                                    log_warn("Tried to cancel building place with unhandled type of %u", state.building_type);
+                                    state.mode = MATCH_UI_MODE_NONE;
+                                    break;
+                            }
+                        } else if (state.selection.size() == 1 && state.match.entities.get_by_id(state.selection[0]).mode == MODE_BUILDING_IN_PROGRESS) {
+                            state.input_queue.push_back((MatchInput) {
+                                .type = MATCH_INPUT_BUILD_CANCEL,
+                                .build_cancel = (MatchInputBuildCancel) {
+                                    .building_id = state.selection[0]
+                                }
+                            });
+                        }
+                        break;
+                    }
+                    case INPUT_HOTKEY_STOP:
+                    case INPUT_HOTKEY_DEFEND: {
+                        MatchInput input;
+                        input.type = hotkey == INPUT_HOTKEY_STOP ? MATCH_INPUT_STOP : MATCH_INPUT_DEFEND;
+                        input.stop.entity_count = (uint8_t)state.selection.size();
+                        memcpy(&input.stop.entity_ids, &state.selection[0], input.stop.entity_count * sizeof(EntityId));
+                        state.input_queue.push_back(input);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            } else if (hotkey_info.type == HOTKEY_BUTTON_BUILD) {
+                if (state.match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
+                    match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
+                } else {
+                    state.mode = MATCH_UI_MODE_BUILDING_PLACE;
+                    state.building_type = hotkey_info.entity_type;
+                }
+            }
+
+            sound_play(SOUND_UI_CLICK);
+            return;
+        }
+    }
+
+    // Selection list click
+    if (state.selection.size() > 1 && input_is_action_just_pressed(INPUT_LEFT_CLICK) &&
+        !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
+        for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+            Rect icon_rect = match_ui_get_selection_list_item_rect(selection_index);
+            if (icon_rect.has_point(input_get_mouse_position())) {
+                if (input_is_action_pressed(INPUT_SHIFT)) {
+                    state.selection.erase(state.selection.begin() + selection_index);
+                } else {
+                    std::vector<EntityId> selection;
+                    selection.push_back(state.selection[selection_index]);
+                    match_ui_set_selection(state, selection);
+                }
+                sound_play(SOUND_UI_CLICK);
+                return;
+            }
+        }
+    }
+
     // Order movement
     {
         // Check that the left or right mouse button is being pressed
@@ -288,142 +408,8 @@ void match_ui_update(MatchUiState& state) {
 
     state.turn_timer--;
 
-    // Update UI buttons
     ui_begin();
-    // This flag is to make sure that we only handle a single input
-    bool menu_button_was_pressed = false;
-    {
-        uint32_t hotkey_group = 0;
-        if (state.mode == MATCH_UI_MODE_BUILD) {
-            hotkey_group = INPUT_HOTKEY_GROUP_BUILD;
-        } else if (state.mode == MATCH_UI_MODE_BUILD2) {
-            hotkey_group = INPUT_HOTKEY_GROUP_BUILD2;
-        } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_targeting(state)) {
-            hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
-        } else if (!state.selection.empty()) {
-            Entity& first_entity = state.match.entities.get_by_id(state.selection[0]);
-            if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS) {
-                hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
-            } else if (first_entity.player_id == network_get_player_id()) {
-                bool is_selection_uniform = true;
-                for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
-                    if (state.match.entities.get_by_id(state.selection[selection_index]).type != first_entity.type) {
-                        is_selection_uniform = false;
-                        break;
-                    }
-                }
-
-                if (is_selection_uniform) {
-                    if (entity_is_unit(first_entity.type)) {
-                        hotkey_group |= INPUT_HOTKEY_GROUP_UNIT;
-                    }
-                    switch (first_entity.type) {
-                        case ENTITY_MINER: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_MINER;
-                            break;
-                        }
-                        default:
-                            break;
-                    }
-                }
-            }
-        }
-        input_set_hotkey_group(hotkey_group);
-
-        for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-            InputAction hotkey = input_get_hotkey(hotkey_index);
-            if (hotkey == INPUT_HOTKEY_NONE) {
-                continue;
-            }
-
-            UiHotkeyButtonMode hotkey_mode = UI_ICON_BUTTON_ENABLED;
-            if (state.is_minimap_dragging || match_ui_is_selecting(state)) {
-                hotkey_mode = UI_ICON_BUTTON_DISABLED;
-            } else if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
-                hotkey_mode = UI_ICON_BUTTON_GRAYED_OUT;
-            }
-
-            ui_element_position(MATCH_UI_BUTTON_POSITIONS[hotkey_index]);
-            if (ui_hotkey_button(hotkey, hotkey_mode) && !menu_button_was_pressed) {
-                const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
-
-                if (hotkey_info.type == HOTKEY_BUTTON_ACTION) {
-                    switch (hotkey) {
-                        case INPUT_HOTKEY_ATTACK: {
-                            state.mode = MATCH_UI_MODE_TARGET_ATTACK;
-                            break;
-                        }
-                        case INPUT_HOTKEY_BUILD: {
-                            state.mode = MATCH_UI_MODE_BUILD;
-                            break;
-                        }
-                        case INPUT_HOTKEY_BUILD2: {
-                            state.mode = MATCH_UI_MODE_BUILD2;
-                            break;
-                        }
-                        case INPUT_HOTKEY_CANCEL: {
-                            if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
-                                state.mode = MATCH_UI_MODE_NONE;
-                            } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE) {
-                                switch (state.building_type) {
-                                    case ENTITY_HALL:
-                                    case ENTITY_HOUSE:
-                                    case ENTITY_SALOON:
-                                    case ENTITY_SMITH:
-                                    case ENTITY_BUNKER:
-                                        state.mode = MATCH_UI_MODE_BUILD;
-                                        break;
-                                    case ENTITY_BARRACKS:
-                                    case ENTITY_COOP:
-                                    case ENTITY_SHERIFFS:
-                                        state.mode = MATCH_UI_MODE_BUILD2;
-                                        break;
-                                    case ENTITY_LANDMINE:
-                                        state.mode = MATCH_UI_MODE_NONE;
-                                        break;
-                                    default:
-                                        log_warn("Tried to cancel building place with unhandled type of %u", state.building_type);
-                                        state.mode = MATCH_UI_MODE_NONE;
-                                        break;
-                                }
-                            } else if (state.selection.size() == 1 && state.match.entities.get_by_id(state.selection[0]).mode == MODE_BUILDING_IN_PROGRESS) {
-                                state.input_queue.push_back((MatchInput) {
-                                    .type = MATCH_INPUT_BUILD_CANCEL,
-                                    .build_cancel = (MatchInputBuildCancel) {
-                                        .building_id = state.selection[0]
-                                    }
-                                });
-                            }
-                            break;
-                        }
-                        case INPUT_HOTKEY_STOP:
-                        case INPUT_HOTKEY_DEFEND: {
-                            MatchInput input;
-                            input.type = hotkey == INPUT_HOTKEY_STOP ? MATCH_INPUT_STOP : MATCH_INPUT_DEFEND;
-                            input.stop.entity_count = (uint8_t)state.selection.size();
-                            memcpy(&input.stop.entity_ids, &state.selection[0], input.stop.entity_count * sizeof(EntityId));
-                            state.input_queue.push_back(input);
-                            break;
-                        }
-                        default:
-                            break;
-                    }
-                } else if (hotkey_info.type == HOTKEY_BUTTON_BUILD) {
-                    if (state.match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
-                        match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
-                    } else {
-                        state.mode = MATCH_UI_MODE_BUILDING_PLACE;
-                        state.building_type = hotkey_info.entity_type;
-                    }
-                }
-
-                menu_button_was_pressed = true;
-            }
-        }
-    }
-    if (!menu_button_was_pressed) {
-        match_ui_handle_input(state);
-    }
+    match_ui_handle_input(state);
 
     // Match update
     match_update(state.match);
@@ -634,6 +620,45 @@ void match_ui_update(MatchUiState& state) {
         state.mode = MATCH_UI_MODE_NONE;
     }
 
+    // Update UI buttons
+    {
+        uint32_t hotkey_group = 0;
+        if (state.mode == MATCH_UI_MODE_BUILD) {
+            hotkey_group = INPUT_HOTKEY_GROUP_BUILD;
+        } else if (state.mode == MATCH_UI_MODE_BUILD2) {
+            hotkey_group = INPUT_HOTKEY_GROUP_BUILD2;
+        } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_targeting(state)) {
+            hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
+        } else if (!state.selection.empty()) {
+            Entity& first_entity = state.match.entities.get_by_id(state.selection[0]);
+            if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS) {
+                hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
+            } else if (first_entity.player_id == network_get_player_id()) {
+                bool is_selection_uniform = true;
+                for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
+                    if (state.match.entities.get_by_id(state.selection[selection_index]).type != first_entity.type) {
+                        is_selection_uniform = false;
+                        break;
+                    }
+                }
+
+                if (is_selection_uniform) {
+                    if (entity_is_unit(first_entity.type)) {
+                        hotkey_group |= INPUT_HOTKEY_GROUP_UNIT;
+                    }
+                    switch (first_entity.type) {
+                        case ENTITY_MINER: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_MINER;
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+        input_set_hotkey_group(hotkey_group);
+    }
 }
 
 // UPDATE FUNCTIONS
@@ -975,6 +1000,11 @@ bool match_ui_building_can_be_placed(const MatchUiState& state) {
     }
 
     return true;
+}
+
+Rect match_ui_get_selection_list_item_rect(uint32_t selection_index) {
+    ivec2 pos = SELECTION_LIST_TOP_LEFT + ivec2(((selection_index % 10) * 34) - 12, (selection_index / 10) * 34);
+    return (Rect) { .x = pos.x, .y = pos.y, .w = 32, .h = 32 };
 }
 
 // RENDER
@@ -1366,7 +1396,6 @@ void match_ui_render(const MatchUiState& state) {
     const SpriteInfo& bottom_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BOTTOM_PANEL);
     const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
     ivec2 ui_frame_bottom_position = ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height);
-    ivec2 selection_list_top_left = ui_frame_bottom_position + ivec2(28, 12);
     render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
     render_sprite_frame(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ui_frame_bottom_position, 0, 0);
     render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(ui_frame_bottom_position.x + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
@@ -1376,9 +1405,34 @@ void match_ui_render(const MatchUiState& state) {
         int status_message_width = render_get_text_size(FONT_HACK_WHITE, state.status_message.c_str()).x;
         render_text(FONT_HACK_WHITE, state.status_message.c_str(), ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 148));
     }
+    
+    // Hotkeys
+    for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
+        InputAction hotkey = input_get_hotkey(hotkey_index);
+        if (hotkey == INPUT_HOTKEY_NONE) {
+            continue;
+        }
+
+        const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+        ivec2 hotkey_position = MATCH_UI_BUTTON_POSITIONS[hotkey_index];
+        Rect hotkey_rect = (Rect) { 
+            .x = hotkey_position.x, .y = hotkey_position.y,
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height 
+        };
+        int hframe = 0;
+        if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
+            hframe = 2;
+        } else if (!(state.is_minimap_dragging || match_ui_is_selecting(state)) && hotkey_rect.has_point(input_get_mouse_position())) {
+            hframe = 1;
+            hotkey_position.y--;
+        }
+
+        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(hotkey_get_sprite(hotkey), ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
+    }
 
     // UI Tooltip
-    {
+    if (!(state.is_minimap_dragging || match_ui_is_selecting(state))) {
         uint32_t hotkey_hovered_index;
         for (hotkey_hovered_index = 0; hotkey_hovered_index < HOTKEY_GROUP_SIZE; hotkey_hovered_index++) {
             Rect hotkey_rect = (Rect) {
@@ -1528,27 +1582,27 @@ void match_ui_render(const MatchUiState& state) {
             } else if (frame == frame_count - 1) {
                 hframe = 2;
             }
-            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), selection_list_top_left + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), SELECTION_LIST_TOP_LEFT + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
         }
         ivec2 frame_size = ivec2(frame_count * frame_sprite_info.frame_width, frame_sprite_info.frame_height);
-        render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, selection_list_top_left + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
+        render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, SELECTION_LIST_TOP_LEFT + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
 
         // Entity icon
-        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), selection_list_top_left + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(entity_data.icon, ivec2(0, 0), selection_list_top_left + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(entity_data.icon, ivec2(0, 0), SELECTION_LIST_TOP_LEFT+ ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
 
         if (entity.type == ENTITY_GOLDMINE) {
             if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
-                render_text(FONT_WESTERN8_GOLD, "Collapsed!", selection_list_top_left + ivec2(36, 22));
+                render_text(FONT_WESTERN8_GOLD, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(36, 22));
             } else {
                 char gold_left_str[17];
                 sprintf(gold_left_str, "Gold Left: %u", entity.gold_held);
-                render_text(FONT_WESTERN8_GOLD, gold_left_str, selection_list_top_left + ivec2(36, 22));
+                render_text(FONT_WESTERN8_GOLD, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(36, 22));
             }
         } else {
             RenderHealthbarParams params = (RenderHealthbarParams) {
                 .type = RENDER_HEALTHBAR,
-                .position = selection_list_top_left + ivec2(0, 18 + 35),
+                .position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 35),
                 .size = ivec2(64, 12),
                 .amount = entity.health,
                 .max = entity_data.max_health
@@ -1562,15 +1616,34 @@ void match_ui_render(const MatchUiState& state) {
             render_text(FONT_HACK_WHITE, health_text, health_text_position);
 
             if (entity_data.has_detection) {
-                render_text(FONT_WESTERN8_GOLD, "Detection", selection_list_top_left + ivec2(36, 22));
+                render_text(FONT_WESTERN8_GOLD, "Detection", SELECTION_LIST_TOP_LEFT + ivec2(36, 22));
             }
             if (entity.type == ENTITY_TINKER && entity.cooldown_timer != 0) {
                 char cooldown_text[32];
                 sprintf(cooldown_text, "Smoke Bomb cooldown: %us", entity.cooldown_timer / 60);
-                render_text(FONT_WESTERN8_GOLD, cooldown_text, selection_list_top_left + ivec2(36, 36));
+                render_text(FONT_WESTERN8_GOLD, cooldown_text, SELECTION_LIST_TOP_LEFT + ivec2(36, 36));
             }
         }
+    } else {
+        for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+            const Entity& entity = state.match.entities.get_by_id(state.selection[selection_index]);
+            const EntityData& entity_data = entity_get_data(entity.type);
+
+            Rect icon_rect = match_ui_get_selection_list_item_rect(selection_index);
+            bool icon_hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) &&
+                                    icon_rect.has_point(input_get_mouse_position());
+            render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(entity_data.icon, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
+            match_ui_render_healthbar((RenderHealthbarParams) {
+                .type = RENDER_HEALTHBAR,
+                .position = ivec2(icon_rect.x + 1, icon_rect.y + 27 - (int)icon_hovered),
+                .size = ivec2(30, 4),
+                .amount = entity.health,
+                .max = entity_data.max_health
+            });
+        }
     }
+    // End UI Selection List
 
     // Resource counters
     {

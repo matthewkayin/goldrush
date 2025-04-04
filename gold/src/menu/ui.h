@@ -73,14 +73,6 @@ bool ui_button(const char* text);
 bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h);
 
 /**
- * Creates a button with the specified icon
- * @param hotkey If the hotkey is pressed, it will trigger the button the same as if it was clicked
- * @param mode Determines how the button is rendered and how it reacts to inputs
- * @return True if the button has been triggered this frame
- */
-bool ui_hotkey_button(InputAction hotkey, UiHotkeyButtonMode mode);
-
-/**
  * Creates text
  * @param font The font of the text
  * @param text The value of the text

@@ -117,3 +117,16 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
 HotkeyButtonInfo hotkey_get_button_info(InputAction hotkey) {
     return HOTKEY_BUTTON_INFO.at(hotkey);
 }
+
+SpriteName hotkey_get_sprite(InputAction hotkey) {
+    const HotkeyButtonInfo& info = HOTKEY_BUTTON_INFO.at(hotkey);
+    switch (info.type) {
+        case HOTKEY_BUTTON_ACTION:
+            return info.action.sprite;
+        case HOTKEY_BUTTON_BUILD:
+        case HOTKEY_BUTTON_TRAIN:
+            return entity_get_data(info.entity_type).icon;
+        case HOTKEY_BUTTON_RESEARCH:
+            return SPRITE_BUTTON_ICON_CANCEL;
+    }
+}

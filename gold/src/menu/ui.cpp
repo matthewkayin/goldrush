@@ -4,8 +4,6 @@
 #include "core/input.h"
 #include "core/sound.h"
 #include "core/logger.h"
-#include "match/hotkey.h"
-#include "match/entity.h"
 #include <vector>
 #include <algorithm>
 
@@ -197,52 +195,6 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
     ui_queue_sprite(sprite, ivec2(hframe, 0), origin, 0, flip_h);
 
     bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && !disabled && input_is_action_just_pressed(INPUT_LEFT_CLICK) && sprite_rect.has_point(input_get_mouse_position());
-    if (clicked) {
-        sound_play(SOUND_UI_CLICK);
-    }
-    return clicked;
-}
-
-bool ui_hotkey_button(InputAction hotkey, UiHotkeyButtonMode mode) {
-    ivec2 origin = ui_get_container_origin();
-    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
-    ui_update_container(ivec2(sprite_info.frame_width, sprite_info.frame_height));
-
-    Rect button_rect = (Rect) {
-        .x = origin.x, .y = origin.y,
-        .w = sprite_info.frame_width, .h = sprite_info.frame_height
-    };
-    int hframe = 0;
-    if (mode == UI_ICON_BUTTON_GRAYED_OUT) {
-        hframe = 2;
-    } else if (mode == UI_ICON_BUTTON_ENABLED && button_rect.has_point(input_get_mouse_position())) {
-        hframe = 1;
-        origin.y--;
-    }
-
-    SpriteName sprite;
-    const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
-    switch (hotkey_info.type) {
-        case HOTKEY_BUTTON_ACTION:
-            sprite = hotkey_info.action.sprite;
-            break;
-        case HOTKEY_BUTTON_TRAIN:
-        case HOTKEY_BUTTON_BUILD:
-            sprite = entity_get_data(hotkey_info.entity_type).icon;
-            break;
-        case HOTKEY_BUTTON_RESEARCH:
-            log_warn("ui_hotkey_button(): sprite info not setup for HOTKEY_BUTTON_RESEARCH");
-            sprite = SPRITE_BUTTON_ICON_CANCEL;
-            break;
-    }
-
-    ui_queue_sprite(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), ivec2(origin.x, origin.y), 0);
-    ui_queue_sprite(sprite, ivec2(hframe, 0), ivec2(origin.x, origin.y), 0);
-
-    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && mode == UI_ICON_BUTTON_ENABLED && 
-                        ((input_is_action_just_pressed(INPUT_LEFT_CLICK) && 
-                          button_rect.has_point(input_get_mouse_position())) ||
-                            input_is_action_just_pressed(hotkey));
     if (clicked) {
         sound_play(SOUND_UI_CLICK);
     }

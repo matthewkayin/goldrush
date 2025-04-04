@@ -118,6 +118,7 @@ void match_ui_order_move(MatchUiState& state);
 void match_ui_show_status(MatchUiState& state, const char* message);
 ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset);
 bool match_ui_building_can_be_placed(const MatchUiState& state);
+Rect match_ui_get_selection_list_item_rect(uint32_t selection_index);
 
 void match_ui_render(const MatchUiState& state);
 

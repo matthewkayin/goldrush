@@ -43,6 +43,9 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
         if (state.players[player_id].active) {
             ivec2 town_hall_cell = map_get_player_town_hall_cell(state.map, player_spawns[player_id]);
             match_create_entity(state, ENTITY_MINER, town_hall_cell, player_id);
+            match_create_entity(state, ENTITY_MINER, town_hall_cell + ivec2(1, 0), player_id);
+            match_create_entity(state, ENTITY_MINER, town_hall_cell + ivec2(1, 1), player_id);
+            match_create_entity(state, ENTITY_MINER, town_hall_cell + ivec2(0, 1), player_id);
         }
     }
 
