@@ -88,6 +88,19 @@ struct Target {
     };
 };
 
+enum BuildingQueueItemType {
+    BUILDING_QUEUE_ITEM_UNIT,
+    BUILDING_QUEUE_ITEM_UPGRADE
+};
+
+struct BuildingQueueItem {
+    BuildingQueueItemType type;
+    union {
+        EntityType unit_type;
+        uint32_t upgrade;
+    };
+};
+
 struct Entity {
     EntityType type;
     EntityMode mode;
@@ -102,6 +115,7 @@ struct Entity {
     Target target;
     std::vector<Target> target_queue;
     std::vector<ivec2> path;
+    std::vector<BuildingQueueItem> queue;
     ivec2 rally_point;
     uint32_t pathfind_attempts;
     uint32_t timer;
@@ -176,3 +190,9 @@ AnimationName entity_get_expected_animation(const Entity& entity);
 ivec2 entity_get_animation_frame(const Entity& entity);
 Rect entity_goldmine_get_block_building_rect(ivec2 cell);
 bool entity_should_die(const Entity& entity);
+
+// Building queue items
+
+uint32_t building_queue_item_duration(const BuildingQueueItem& item);
+uint32_t building_queue_item_cost(const BuildingQueueItem& item);
+uint32_t building_queue_population_cost(const BuildingQueueItem& item);

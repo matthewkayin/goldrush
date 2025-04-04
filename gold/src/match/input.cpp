@@ -63,6 +63,45 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += sizeof(uint8_t);
             break;
         }
+        case MATCH_INPUT_BUILDING_ENQUEUE: {
+            memcpy(out_buffer + out_buffer_length, &input.building_enqueue.building_id, sizeof(EntityId));
+            out_buffer += sizeof(EntityId);
+
+            out_buffer[out_buffer_length] = (uint8_t)input.building_enqueue.item.type;
+            out_buffer_length += sizeof(uint8_t);
+
+            switch (input.building_enqueue.item.type) {
+                case BUILDING_QUEUE_ITEM_UNIT: {
+                    out_buffer[out_buffer_length] = (uint8_t)input.building_enqueue.item.unit_type;
+                    out_buffer_length += sizeof(uint8_t);
+                    break;
+                }
+                case BUILDING_QUEUE_ITEM_UPGRADE: {
+                    memcpy(out_buffer + out_buffer_length, &input.building_enqueue.item.upgrade, sizeof(uint32_t));
+                    out_buffer_length += sizeof(uint32_t);
+                }
+            }
+            break;
+        }
+        case MATCH_INPUT_BUILDING_DEQUEUE: {
+            memcpy(out_buffer + out_buffer_length, &input.building_dequeue.building_id, sizeof(EntityId));
+            out_buffer += sizeof(EntityId);
+
+            memcpy(out_buffer + out_buffer_length, &input.building_dequeue.index, sizeof(uint8_t));
+            out_buffer += sizeof(uint8_t);
+            break;
+        }
+        case MATCH_INPUT_RALLY: {
+            memcpy(out_buffer + out_buffer_length, &input.rally.rally_point, sizeof(ivec2));
+            out_buffer += sizeof(ivec2);
+
+            memcpy(out_buffer + out_buffer_length, &input.rally.building_count, sizeof(uint8_t));
+            out_buffer += sizeof(uint8_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.rally.building_ids, input.rally.building_count * sizeof(EntityId));
+            out_buffer += input.rally.building_count * sizeof(EntityId);
+            break;
+        }
     }
 }
 
@@ -126,6 +165,45 @@ MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_h
         case MATCH_INPUT_BUILD_CANCEL: {
             memcpy(&input.build_cancel.building_id, in_buffer + in_buffer_head, sizeof(uint8_t));
             in_buffer_head += sizeof(uint8_t);
+            break;
+        }
+        case MATCH_INPUT_BUILDING_ENQUEUE: {
+            memcpy(&input.building_enqueue.building_id, in_buffer + in_buffer_head, sizeof(EntityId));
+            in_buffer_head += sizeof(EntityId);
+
+            input.building_enqueue.item.type = (BuildingQueueItemType)in_buffer[in_buffer_head];
+            in_buffer_head += sizeof(uint8_t);
+
+            switch (input.building_enqueue.item.type) {
+                case BUILDING_QUEUE_ITEM_UNIT: {
+                    input.building_enqueue.item.unit_type = (EntityType)in_buffer[in_buffer_head];
+                    in_buffer_head += sizeof(uint8_t);
+                    break;
+                }
+                case BUILDING_QUEUE_ITEM_UPGRADE: {
+                    memcpy(&input.building_enqueue.item.upgrade, in_buffer + in_buffer_head, sizeof(uint32_t));
+                    in_buffer_head += sizeof(uint32_t);
+                }
+            }
+            break;
+        }
+        case MATCH_INPUT_BUILDING_DEQUEUE: {
+            memcpy(&input.building_dequeue.building_id, in_buffer + in_buffer_head, sizeof(EntityId));
+            in_buffer_head += sizeof(EntityId);
+
+            memcpy(&input.building_dequeue.index, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+            break;
+        }
+        case MATCH_INPUT_RALLY: {
+            memcpy(&input.rally.rally_point, in_buffer + in_buffer_head, sizeof(ivec2));
+            in_buffer_head += sizeof(ivec2);
+
+            memcpy(&input.rally.building_count, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
+            memcpy(&input.rally.building_ids, in_buffer + in_buffer_head, input.rally.building_count * sizeof(EntityId));
+            in_buffer += input.rally.building_count * sizeof(EntityId);
             break;
         }
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math/gmath.h"
+#include "entity.h"
 #include <cstdint>
 
 enum MatchInputType {
@@ -15,7 +16,10 @@ enum MatchInputType {
     MATCH_INPUT_STOP,
     MATCH_INPUT_DEFEND,
     MATCH_INPUT_BUILD,
-    MATCH_INPUT_BUILD_CANCEL
+    MATCH_INPUT_BUILD_CANCEL,
+    MATCH_INPUT_BUILDING_ENQUEUE,
+    MATCH_INPUT_BUILDING_DEQUEUE,
+    MATCH_INPUT_RALLY
 };
 
 struct MatchInputMove {
@@ -43,6 +47,22 @@ struct MatchInputBuildCancel {
     EntityId building_id;
 };
 
+struct MatchInputBuildingEnqueue {
+    EntityId building_id;
+    BuildingQueueItem item;
+};
+
+struct MatchInputBuildingDequeue {
+    EntityId building_id;
+    uint8_t index;
+};
+
+struct MatchInputRally {
+    ivec2 rally_point;
+    uint8_t building_count;
+    EntityId building_ids[SELECTION_LIMIT];
+};
+
 struct MatchInput {
     uint8_t type;
     union {
@@ -50,6 +70,9 @@ struct MatchInput {
         MatchInputStop stop;
         MatchInputBuild build;
         MatchInputBuildCancel build_cancel;
+        MatchInputBuildingEnqueue building_enqueue;
+        MatchInputBuildingDequeue building_dequeue;
+        MatchInputRally rally;
     };
 };
 

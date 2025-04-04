@@ -10,6 +10,11 @@
 #include <vector>
 #include <unordered_map>
 
+#define BUILDING_QUEUE_MAX 5
+#define BUILDING_DEQUEUE_POP_FRONT BUILDING_QUEUE_MAX
+#define BUILDING_QUEUE_BLOCKED UINT32_MAX
+#define BUILDING_QUEUE_EXIT_BLOCKED UINT32_MAX - 1
+
 #define MATCH_UI_STATUS_CANT_BUILD "You can't build there."
 #define MATCH_UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
 #define MATCH_UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."
@@ -144,6 +149,9 @@ bool match_is_entity_mining(const MatchState& state, const Entity& entity);
 EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell);
 void match_entity_stop_building(MatchState& state, EntityId entity_id);
 void match_entity_building_finish(MatchState& state, EntityId building_id);
+void match_building_enqueue(MatchState& state, Entity& building, BuildingQueueItem item);
+void match_building_dequeue(MatchState& state, Entity& building);
+bool match_is_building_supply_blocked(const MatchState& state, const Entity& building);
 Target match_entity_target_nearest_gold_mine(const MatchState& state, const Entity& entity);
 Target match_entity_target_nearest_hall(const MatchState& state, const Entity& entity);
 

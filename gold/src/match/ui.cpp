@@ -41,6 +41,19 @@ static const ivec2 MATCH_UI_BUTTON_POSITIONS[HOTKEY_GROUP_SIZE] = {
     ivec2(MATCH_UI_BUTTON_X + (2 * MATCH_UI_BUTTON_PADDING_X), MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y)
 };
 static const ivec2 SELECTION_LIST_TOP_LEFT = ivec2(164, 284);
+static const ivec2 BUILDING_QUEUE_TOP_LEFT = ivec2(320, 284);
+static const ivec2 UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
+    BUILDING_QUEUE_TOP_LEFT,
+    BUILDING_QUEUE_TOP_LEFT + ivec2(0, 35),
+    BUILDING_QUEUE_TOP_LEFT + ivec2(36, 35),
+    BUILDING_QUEUE_TOP_LEFT + ivec2(36 * 2, 35),
+    BUILDING_QUEUE_TOP_LEFT + ivec2(36 * 3, 35)
+};
+static const Rect UI_BUILDING_QUEUE_PROGRESS_BAR_RECT = (Rect) {
+    .x = 320 + 36,
+    .y = 284 + 24,
+    .w = 104, .h = 6
+};
 
 static const int HEALTHBAR_HEIGHT = 4;
 static const int HEALTHBAR_PADDING = 3;
@@ -198,14 +211,25 @@ void match_ui_handle_input(MatchUiState& state) {
                                     state.mode = MATCH_UI_MODE_NONE;
                                     break;
                             }
-                        } else if (state.selection.size() == 1 && state.match.entities.get_by_id(state.selection[0]).mode == MODE_BUILDING_IN_PROGRESS) {
-                            state.input_queue.push_back((MatchInput) {
-                                .type = MATCH_INPUT_BUILD_CANCEL,
-                                .build_cancel = (MatchInputBuildCancel) {
-                                    .building_id = state.selection[0]
-                                }
-                            });
-                        }
+                        } else if (state.selection.size() == 1) { 
+                            const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
+                            if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
+                                state.input_queue.push_back((MatchInput) {
+                                    .type = MATCH_INPUT_BUILD_CANCEL,
+                                    .build_cancel = (MatchInputBuildCancel) {
+                                        .building_id = state.selection[0]
+                                    }
+                                });
+                            } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty()) {
+                                state.input_queue.push_back((MatchInput) {
+                                    .type = MATCH_INPUT_BUILDING_DEQUEUE,
+                                    .building_dequeue = (MatchInputBuildingDequeue) {
+                                        .building_id = state.selection[0],
+                                        .index = BUILDING_DEQUEUE_POP_FRONT
+                                    }
+                                });
+                            }
+                        } 
                         break;
                     }
                     case INPUT_HOTKEY_STOP:
@@ -227,6 +251,34 @@ void match_ui_handle_input(MatchUiState& state) {
                     state.mode = MATCH_UI_MODE_BUILDING_PLACE;
                     state.building_type = hotkey_info.entity_type;
                 }
+            } else if (hotkey_info.type == HOTKEY_BUTTON_TRAIN) {
+                // Decide which building to enqueue
+                uint32_t selected_building_index = state.match.entities.get_index_of(state.selection[0]);
+                for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
+                    if (state.match.entities.get_by_id(state.selection[selection_index]).queue.size() < state.match.entities[selected_building_index].queue.size()) {
+                        selected_building_index = state.match.entities.get_index_of(state.selection[selection_index]);
+                    }
+                }
+                const Entity& building = state.match.entities[selected_building_index];
+
+                BuildingQueueItem item = (BuildingQueueItem) {
+                    .type = BUILDING_QUEUE_ITEM_UNIT,
+                    .unit_type = hotkey_info.entity_type
+                };
+
+                if (building.queue.size() == BUILDING_QUEUE_MAX) {
+                    match_ui_show_status(state, MATCH_UI_STATUS_BUILDING_QUEUE_FULL);
+                } else if (state.match.players[network_get_player_id()].gold < building_queue_item_cost(item)) {
+                    match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
+                } else {
+                    state.input_queue.push_back((MatchInput) {
+                        .type = MATCH_INPUT_BUILDING_ENQUEUE,
+                        .building_enqueue = (MatchInputBuildingEnqueue) {
+                            .building_id = state.match.entities.get_id_of(selected_building_index),
+                            .item = item
+                        }
+                    });
+                }
             }
 
             sound_play(SOUND_UI_CLICK);
@@ -247,6 +299,31 @@ void match_ui_handle_input(MatchUiState& state) {
                     selection.push_back(state.selection[selection_index]);
                     match_ui_set_selection(state, selection);
                 }
+                sound_play(SOUND_UI_CLICK);
+                return;
+            }
+        }
+    }
+
+    // Building queue click
+    if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+        !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
+        const Entity& building = state.match.entities.get_by_id(state.selection[0]);
+        const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+        for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
+            Rect icon_rect = (Rect) {
+                .x = UI_BUILDING_QUEUE_POSITIONS[building_queue_index].x,
+                .y = UI_BUILDING_QUEUE_POSITIONS[building_queue_index].y,
+                .w = icon_sprite_info.frame_width, .h = icon_sprite_info.frame_height
+            };
+            if (icon_rect.has_point(input_get_mouse_position())) {
+                state.input_queue.push_back((MatchInput) {
+                    .type = MATCH_INPUT_BUILDING_DEQUEUE,
+                    .building_dequeue = (MatchInputBuildingDequeue) {
+                        .building_id = state.selection[0],
+                        .index = (uint8_t)building_queue_index
+                    }
+                });
                 sound_play(SOUND_UI_CLICK);
                 return;
             }
@@ -771,10 +848,16 @@ void match_ui_update(MatchUiState& state) {
                 if (is_selection_uniform) {
                     if (entity_is_unit(first_entity.type)) {
                         hotkey_group |= INPUT_HOTKEY_GROUP_UNIT;
+                    } else if (entity_is_building(first_entity.type) && !first_entity.queue.empty() && state.selection.size() == 1) {
+                        hotkey_group |= INPUT_HOTKEY_CANCEL;
                     }
                     switch (first_entity.type) {
                         case ENTITY_MINER: {
                             hotkey_group |= INPUT_HOTKEY_GROUP_MINER;
+                            break;
+                        }
+                        case ENTITY_HALL: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_HALL;
                             break;
                         }
                         default:
@@ -1823,6 +1906,53 @@ void match_ui_render(const MatchUiState& state) {
         }
     }
     // End UI Selection List
+
+    // UI Building queues
+    if (state.selection.size() == 1) {
+        const Entity& building = state.match.entities.get_by_id(state.selection[0]);
+        if (entity_is_building(building.type) && 
+                building.player_id == network_get_player_id() &&
+                !building.queue.empty()) {
+            // Render building queue icon buttons
+            const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+            for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
+                Rect icon_rect = (Rect) {
+                    .x = UI_BUILDING_QUEUE_POSITIONS[building_queue_index].x,
+                    .y = UI_BUILDING_QUEUE_POSITIONS[building_queue_index].y,
+                    .w = icon_sprite_info.frame_width,
+                    .h = icon_sprite_info.frame_height
+                };
+                SpriteName item_sprite;
+                switch (building.queue[building_queue_index].type) {
+                    case BUILDING_QUEUE_ITEM_UNIT: {
+                        item_sprite = entity_get_data(building.queue[building_queue_index].unit_type).icon;
+                        break;
+                    }
+                    case BUILDING_QUEUE_ITEM_UPGRADE: {
+                        // TODO
+                        item_sprite = SPRITE_BUTTON_ICON_CANCEL;
+                        break;
+                    }
+                }
+                bool hovered = icon_rect.has_point(input_get_mouse_position());
+                render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
+                render_sprite_frame(item_sprite, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
+            }
+
+            // Render building queue progress bar
+            if (building.timer == BUILDING_QUEUE_BLOCKED) {
+                render_text(FONT_WESTERN8_GOLD, "Build more houses.", ivec2(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 2, UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
+            } else if (building.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
+                render_text(FONT_WESTERN8_GOLD, "Exit is blocked.", ivec2(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 2, UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
+            } else {
+                int item_duration = (int)building_queue_item_duration(building.queue[0]);
+                Rect building_queue_progress_bar_subrect = UI_BUILDING_QUEUE_PROGRESS_BAR_RECT;
+                building_queue_progress_bar_subrect.w = (UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.w * (item_duration - (int)building.timer) / item_duration);
+                render_fill_rect(building_queue_progress_bar_subrect, RENDER_COLOR_WHITE);
+                render_draw_rect(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT, RENDER_COLOR_OFFBLACK);
+            }
+        }
+    }
 
     // Resource counters
     {

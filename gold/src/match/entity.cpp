@@ -773,3 +773,41 @@ bool entity_should_die(const Entity& entity) {
 
     return false;
 }
+
+// Building queue items
+
+uint32_t building_queue_item_duration(const BuildingQueueItem& item) {
+    switch (item.type) {
+        case BUILDING_QUEUE_ITEM_UNIT: {
+            return ENTITY_DATA.at(item.unit_type).train_duration * 60;
+        }
+        case BUILDING_QUEUE_ITEM_UPGRADE: {
+            return 0;
+            // TODO
+            // return UPGRADE_DATA.at(item.upgrade).research_duration * 60;
+        }
+    }
+}
+
+uint32_t building_queue_item_cost(const BuildingQueueItem& item) {
+    switch (item.type) {
+        case BUILDING_QUEUE_ITEM_UNIT: {
+            return ENTITY_DATA.at(item.unit_type).gold_cost;
+        }
+        case BUILDING_QUEUE_ITEM_UPGRADE: {
+            return 0;
+            // TODO
+            // return UPGRADE_DATA.at(item.upgrade).gold_cost;
+        }
+    }
+}
+
+uint32_t building_queue_population_cost(const BuildingQueueItem& item) {
+    switch (item.type) {
+        case BUILDING_QUEUE_ITEM_UNIT: {
+            return ENTITY_DATA.at(item.unit_type).unit_data.population_cost;
+        }
+        default:
+            return 0;
+    }
+}

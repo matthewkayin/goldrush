@@ -4,7 +4,7 @@
 #include "hotkey.h"
 #include "lcg.h"
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 500;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 5000;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
@@ -322,6 +322,73 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 
             // Destroy the building
             state.entities[building_index].health = 0;
+            break;
+        }
+        case MATCH_INPUT_BUILDING_ENQUEUE: {
+            uint32_t building_index = state.entities.get_index_of(input.building_enqueue.building_id);
+            BuildingQueueItem item = input.building_enqueue.item;
+            if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
+                return;
+            }
+
+            Entity& building = state.entities[building_index];
+            if (state.players[building.player_id].gold < building_queue_item_cost(item)) {
+                return;
+            }
+            if (building.queue.size() == BUILDING_QUEUE_MAX) {
+                return;
+            }
+
+            // Reject this enqueue if the upgrade is already being researched
+            if (item.type == BUILDING_QUEUE_ITEM_UPGRADE && !match_player_upgrade_is_available(state, building.player_id, item.upgrade)) {
+                return;
+            }
+
+            // Check if the player has the war wagon upgrade
+            // TODO
+            /*
+            if (item.type == BUILDING_QUEUE_ITEM_UNIT && item.unit_type == ENTITY_WAGON && match_player_has_upgrade(state, building.player_id, UPGRADE_WAR_WAGON)) {
+                item.unit_type = ENTITY_WAR_WAGON;
+            }
+            */
+
+            // Mark upgrades as in-progress when we enqueue them
+            if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
+                state.players[building.player_id].upgrades_in_progress |= item.upgrade;
+            }
+
+            state.players[building.player_id].gold -= building_queue_item_cost(item);
+            match_building_enqueue(state, building, item);
+            break;
+        }
+        case MATCH_INPUT_BUILDING_DEQUEUE: {
+            uint32_t building_index = state.entities.get_index_of(input.building_dequeue.building_id);
+            if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
+                return;
+            }
+
+            Entity& building = state.entities[building_index];
+            if (building.queue.empty()) {
+                return;
+            }
+
+            uint32_t index = input.building_dequeue.index == BUILDING_DEQUEUE_POP_FRONT
+                                    ? building.queue.size() - 1
+                                    : input.building_dequeue.index;
+            if (index >= building.queue.size()) {
+                return;
+            }
+
+            state.players[building.player_id].gold += building_queue_item_cost(building.queue[index]);
+            if (building.queue[index].type == BUILDING_QUEUE_ITEM_UPGRADE) {
+                state.players[building.player_id].upgrades_in_progress &= ~building.queue[index].upgrade;
+            }
+
+            if (index == 0) {
+                match_building_dequeue(state, building);
+            } else {
+                building.queue.erase(building.queue.begin() + index);
+            }
             break;
         }
     }
@@ -862,7 +929,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         }
 
                         // Begin repair
-                        if (state.players[entity.player_id].team == state.players[target.player_id].team && entity.type == ENTITY_MINER && 
+                        if (entity_is_building(target.type) && entity.type == ENTITY_MINER && 
+                                state.players[entity.player_id].team == state.players[target.player_id].team &&
                                 entity_is_building(target.type) && target.health < target_data.max_health) {
                             entity.mode = MODE_UNIT_REPAIR;
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, target_data.cell_size);
@@ -1010,6 +1078,104 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         }
                     }
                 }
+
+                update_finished = true;
+                break;
+            }
+            case MODE_BUILDING_FINISHED: {
+                if (!entity.queue.empty() && entity.timer != 0) {
+                    if (entity.timer == BUILDING_QUEUE_BLOCKED && !match_is_building_supply_blocked(state, entity)) {
+                        entity.timer = building_queue_item_duration(entity.queue[0]);
+                    } else if (entity.timer != BUILDING_QUEUE_BLOCKED && match_is_building_supply_blocked(state, entity)) {
+                        entity.timer = BUILDING_QUEUE_BLOCKED;
+                    }
+
+                    if (entity.timer != BUILDING_QUEUE_BLOCKED && entity.timer != BUILDING_QUEUE_EXIT_BLOCKED) {
+                        #ifdef GOLD_DEBUG_FAST_TRAIN
+                            entity.timer = std::max((int)entity.timer - 10, 0);
+                        #else
+                            entity.timer--;
+                        #endif
+                    }
+
+                    if ((entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) || 
+                            entity.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
+                        ivec2 rally_cell = entity.rally_point.x == -1 
+                                            ? entity.cell + ivec2(0, entity_data.cell_size)
+                                            : entity.rally_point / TILE_SIZE;
+                        ivec2 exit_cell = map_get_exit_cell(state.map, entity.cell, entity_data.cell_size, entity_get_data(entity.queue[0].unit_type).cell_size, rally_cell, false);
+                        if (exit_cell.x == -1) {
+                            if (entity.timer == 0) {
+                                match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_BUILDING_EXIT_BLOCKED);
+                            }
+                            entity.timer = BUILDING_QUEUE_EXIT_BLOCKED;
+                            update_finished = true;
+                            break;
+                        } 
+
+                        entity.timer = 0;
+                        EntityId unit_id = match_create_entity(state, entity.queue[0].unit_type, exit_cell, entity.player_id);
+
+                        // Rally unit
+                        Entity& unit = state.entities.get_by_id(unit_id);
+                        Cell rally_cell_value = map_get_cell(state.map, CELL_LAYER_GROUND, rally_cell);
+                        if (unit.type == ENTITY_MINER && rally_cell_value.type == CELL_GOLDMINE) {
+                            // Rally to gold
+                            unit.target = (Target) {
+                                .type = TARGET_ENTITY,
+                                .id = rally_cell_value.id
+                            };
+                        } else {
+                            // Rally to cell
+                            unit.target = (Target) {
+                                .type = TARGET_CELL,
+                                .cell = rally_cell
+                            };
+                        }
+
+                        // Create alert
+                        match_event_alert(state, MATCH_ALERT_TYPE_UNIT, unit.player_id, unit.cell, entity_get_data(unit.type).cell_size);
+
+                        match_building_dequeue(state, entity);
+                    } else if (entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UPGRADE) {
+                        /*
+                        TODO
+                        match_grant_player_upgrade(state, entity.player_id, entity.queue[0].upgrade);
+
+                        // Set all existing wagons to war wagons
+                        if (entity.queue[0].upgrade == UPGRADE_WAR_WAGON) {
+                            for (Entity& other_entity : state.entities) {
+                                if (other_entity.player_id != entity.player_id) {
+                                    continue;
+                                }
+                                if (other_entity.type == ENTITY_WAGON) {
+                                    other_entity.type = ENTITY_WAR_WAGON;
+                                } else if (entity_is_building(other_entity.type)) {
+                                    for (BuildingQueueItem& other_item : other_entity.queue) {
+                                        if (other_item.type == BUILDING_QUEUE_ITEM_UNIT && other_item.unit_type == ENTITY_WAGON) {
+                                            other_item.unit_type = ENTITY_WAR_WAGON;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Show status
+                        state.events.push_back((MatchEvent) {
+                            .type = MATCH_EVENT_RESEARCH_COMPLETE,
+                            .research_complete = (MatchEventResearchComplete) {
+                                .upgrade = entity.queue[0].upgrade,
+                                .player_id = entity.player_id
+                            }
+                        });
+
+                        // Create alert
+                        match_event_alert(state, MATCH_ALERT_TYPE_RESEARCH, entity.player_id, entity.cell, entity_data.cell_size);
+
+                        */
+                        match_building_dequeue(state, entity);
+                    }
+                } 
 
                 update_finished = true;
                 break;
@@ -1315,6 +1481,50 @@ void match_entity_building_finish(MatchState& state, EntityId building_id) {
                             ? match_entity_target_nearest_gold_mine(state, entity)
                             : (Target) { .type = TARGET_NONE };
     }
+}
+
+void match_building_enqueue(MatchState& state, Entity& building, BuildingQueueItem item) {
+    GOLD_ASSERT(building.queue.size() < BUILDING_QUEUE_MAX);
+    building.queue.push_back(item);
+    if (building.queue.size() == 1) {
+        if (match_is_building_supply_blocked(state, building)) {
+            if (building.timer != BUILDING_QUEUE_BLOCKED) {
+                match_event_show_status(state, building.player_id, MATCH_UI_STATUS_NOT_ENOUGH_HOUSE);
+            }
+            building.timer = BUILDING_QUEUE_BLOCKED;
+        } else {
+            building.timer = building_queue_item_duration(item);
+        }
+    }
+}
+
+void match_building_dequeue(MatchState& state, Entity& building) {
+    GOLD_ASSERT(!building.queue.empty());
+
+    building.queue.erase(building.queue.begin());
+    if (building.queue.empty()) {
+        building.timer = 0;
+    } else {
+        if (match_is_building_supply_blocked(state, building)) {
+            if (building.timer != BUILDING_QUEUE_BLOCKED) {
+                match_event_show_status(state, building.player_id, MATCH_UI_STATUS_NOT_ENOUGH_HOUSE);
+            }
+            building.timer = BUILDING_QUEUE_BLOCKED;
+        } else {
+            building.timer = building_queue_item_duration(building.queue[0]);
+        }
+    }
+}
+
+bool match_is_building_supply_blocked(const MatchState& state, const Entity& building) {
+    const BuildingQueueItem& item = building.queue[0];
+    if (item.type == BUILDING_QUEUE_ITEM_UNIT) {
+        uint32_t required_population = match_get_player_population(state, building.player_id) + entity_get_data(item.unit_type).unit_data.population_cost;
+        if (match_get_player_max_population(state, building.player_id) < required_population) {
+            return true;
+        }
+    }
+    return false;
 }
 
 Target match_entity_target_nearest_gold_mine(const MatchState& state, const Entity& entity) {
