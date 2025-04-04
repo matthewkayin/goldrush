@@ -10,6 +10,8 @@ static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_REPAIR_RATE = 4;
+static const uint32_t UNIT_IN_MINE_DURATION = 150;
+static const uint32_t UNIT_MAX_GOLD_HELD = 5;
 static const int UNIT_BLOCKED_DURATION = 30;
 static const int SMOKE_BOMB_THROW_RANGE_SQUARED = 36;
 static const uint32_t BUILDING_FADE_DURATION = 300;
@@ -534,6 +536,29 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 }
 
                 // Attempt to move and avoid ideal mine exit path
+                if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY) {
+                    const Entity& mine = state.entities.get_by_id(entity.target.id);
+                    if (mine.type == ENTITY_GOLDMINE) {
+                        Target hall_target = match_entity_target_nearest_hall(state, entity);
+                        if (hall_target.type == TARGET_ENTITY) {
+                            const Entity& hall = state.entities.get_by_id(hall_target.id);
+                            ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, mine.cell + ivec2(1, 1), 1, hall.cell, entity_get_data(hall.type).cell_size, true);
+                            ivec2 mine_exit_cell = map_get_exit_cell(state.map, mine.cell, entity_get_data(mine.type).cell_size, entity_data.cell_size, rally_cell, true);
+
+                            GOLD_ASSERT(mine_exit_cell.x != -1);
+                            std::vector<ivec2> mine_exit_path;
+                            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &mine_exit_path, true);
+                            mine_exit_path.push_back(mine_exit_cell);
+
+                            map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), 1, &entity.path, true, &mine_exit_path);
+                            if (!entity.path.empty()) {
+                                entity.pathfind_attempts = 0;
+                                entity.mode = MODE_UNIT_MOVE;
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 // Pathfind
                 map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity));
@@ -762,6 +787,96 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         }
                         break;
                     }
+                    case TARGET_REPAIR:
+                    case TARGET_ENTITY:
+                    case TARGET_ATTACK_ENTITY: {
+                        if (match_is_target_invalid(state, entity.target)) {
+                            entity.target = (Target) {
+                                .type = TARGET_NONE
+                            };
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
+                        if (!match_has_entity_reached_target(state, entity)) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
+                        Entity& target = state.entities.get_by_id(entity.target.id);
+                        const EntityData& target_data = entity_get_data(target.type);
+
+                        // Return gold
+                        if (entity.type == ENTITY_MINER && target.type == ENTITY_HALL && 
+                                target.mode == MODE_BUILDING_FINISHED && entity.player_id == target.player_id &&
+                                entity.gold_held != 0 && entity.target.type != TARGET_REPAIR) {
+                            state.players[entity.player_id].gold += entity.gold_held;
+                            entity.gold_held = 0;
+
+                            // First clear entity's target
+                            entity.target = (Target) { .type = TARGET_NONE };
+                            // Then try to set its target based on the gold mine it just visited
+                            if (entity.gold_mine_id != ID_NULL) {
+                                // It's safe to do this because gold mines never get removed from the array
+                                const Entity& gold_mine = state.entities.get_by_id(entity.gold_mine_id);
+                                if (gold_mine.gold_held != 0) {
+                                    entity.target = (Target) {
+                                        .type = TARGET_ENTITY,
+                                        .id = entity.gold_mine_id
+                                    };
+                                }
+                            // If it doesn't have a last visited gold mine, then find a mine to visit
+                            } else {
+                                entity.target = match_entity_target_nearest_gold_mine(state, entity);
+                            }
+
+                            entity.mode = MODE_UNIT_IDLE;
+                            update_finished = true;
+                            break;
+                        }
+                        // End return gold
+
+                        // Enter mine
+                        if (entity.type == ENTITY_MINER && target.type == ENTITY_GOLDMINE && target.gold_held > 0 && 
+                                target.garrisoned_units.size() + entity_data.garrison_size <= target_data.garrison_capacity) {
+                            if (entity.gold_held != 0) {
+                                entity.target = match_entity_target_nearest_hall(state, entity);
+                                entity.mode = MODE_UNIT_IDLE;
+                                update_finished = true;
+                                break;
+                            }
+
+                            target.garrisoned_units.push_back(entity_id);
+                            entity.garrison_id = entity.target.id;
+                            entity.mode = MODE_UNIT_IN_MINE;
+                            entity.timer = UNIT_IN_MINE_DURATION;
+                            entity.target = (Target) { .type = TARGET_NONE };
+                            entity.gold_held = std::min(UNIT_MAX_GOLD_HELD, target.gold_held);
+                            target.gold_held -= entity.gold_held;
+                            map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
+                                .type = CELL_EMPTY, .id = ID_NULL
+                            });
+
+                            update_finished = true;
+                            break;
+                        }
+
+                        // Begin repair
+                        if (state.players[entity.player_id].team == state.players[target.player_id].team && entity.type == ENTITY_MINER && 
+                                entity_is_building(target.type) && target.health < target_data.max_health) {
+                            entity.mode = MODE_UNIT_REPAIR;
+                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, target_data.cell_size);
+                            entity.timer = UNIT_BUILD_TICK_DURATION;
+                            break;
+                        }
+
+                        entity.mode = MODE_UNIT_IDLE;
+                        entity.target = (Target) {
+                            .type = TARGET_NONE
+                        };
+                        update_finished = true;
+                        break;
+                    }
                 }
 
                 update_finished = update_finished || !(entity.mode == MODE_UNIT_MOVE && movement_left.raw_value > 0);
@@ -836,6 +951,63 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         }
                     } else {
                         entity.timer = UNIT_BUILD_TICK_DURATION;
+                    }
+                }
+
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_IN_MINE: {
+                if (entity.timer != 0) {
+                    entity.timer--;
+                }
+                if (entity.timer == 0) {
+                    const EntityData& mine_data = entity_get_data(ENTITY_GOLDMINE);
+                    const EntityData& hall_data = entity_get_data(ENTITY_HALL);
+
+                    Entity& mine = state.entities.get_by_id(entity.garrison_id);
+                    Target hall_target = match_entity_target_nearest_hall(state, entity);
+                    uint32_t hall_index = hall_target.type == TARGET_NONE ? INDEX_INVALID : state.entities.get_index_of(hall_target.id);
+                    ivec2 rally_cell = hall_target.type == TARGET_NONE 
+                                        ? (mine.cell + ivec2(1, mine_data.cell_size)) 
+                                        : map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, mine.cell + ivec2(1, 1), 1, state.entities[hall_index].cell, hall_data.cell_size, true);
+                    ivec2 exit_cell = map_get_exit_cell(state.map, mine.cell, mine_data.cell_size, entity_data.cell_size, rally_cell, true);
+
+                    if (exit_cell.x == -1) {
+                        match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_MINE_EXIT_BLOCKED);
+                    } else if (map_get_cell(state.map, CELL_LAYER_GROUND, exit_cell).type == CELL_EMPTY) {
+                        // Remove unit from mine
+                        for (uint32_t index = 0; index < mine.garrisoned_units.size(); index++) {
+                            if (mine.garrisoned_units[index] == entity_id) {
+                                mine.garrisoned_units.erase(mine.garrisoned_units.begin() + index);
+                                break;
+                            }
+                        }
+
+                        entity.garrison_id = ID_NULL;
+                        entity.target = hall_target;
+                        if (entity.target.type == TARGET_NONE) {
+                            entity.gold_mine_id = ID_NULL;
+                        }
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, false);
+                        entity.cell = exit_cell;
+                        ivec2 exit_from_cell = get_nearest_cell_in_rect(exit_cell, mine.cell, mine_data.cell_size);
+                        entity.direction = enum_from_ivec2_direction(exit_cell - exit_from_cell);
+                        entity.position = cell_center(exit_from_cell);
+                        entity.mode = MODE_UNIT_MOVE;
+                        map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
+                            .type = hall_target.type == TARGET_ENTITY
+                                        ? CELL_MINER 
+                                        : CELL_UNIT,
+                            .id = entity_id
+                        });
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, true);
+
+                        if (mine.garrisoned_units.empty() && mine.gold_held == 0) {
+                            mine.mode = MODE_GOLDMINE_COLLAPSED;
+                            match_event_alert(state, MATCH_ALERT_TYPE_MINE_COLLAPSE, entity.player_id, mine.cell, mine_data.cell_size);
+                            match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_MINE_COLLAPSED);
+                        }
                     }
                 }
 
@@ -1029,20 +1201,18 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {
             const Entity& target = state.entities.get_by_id(entity.target.id);
-            ivec2 ignore_cell = ivec2(-1, -1);
-            /*
-            TODO
-            if (target.type == ENTITY_GOLDMINE) {
-                Target camp_target = entity_target_nearest_camp(state, entity);
-                if (camp_target.type != TARGET_NONE) {
-                    const entity_t& camp = state.entities.get_by_id(camp_target.id);
-                    xy rally_cell = map_get_nearest_cell_around_rect(state, target.cell + xy(1, 1), 1, camp.cell, entity_cell_size(camp.type), true);
-                    ignore_cell = entity_get_exit_cell(state, target.cell, entity_cell_size(target.type), entity_cell_size(ENTITY_MINER), rally_cell, true);
-                }
-            }
-            */
             int entity_cell_size = entity_get_data(entity.type).cell_size;
             int target_cell_size = entity_get_data(target.type).cell_size;
+            ivec2 ignore_cell = ivec2(-1, -1);
+            if (target.type == ENTITY_GOLDMINE) {
+                Target hall_target = match_entity_target_nearest_hall(state, entity);
+                if (hall_target.type != TARGET_NONE) {
+                    const Entity& hall = state.entities.get_by_id(hall_target.id);
+                    const EntityData& hall_data = entity_get_data(ENTITY_HALL);
+                    ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, target.cell + ivec2(1, 1), 1, hall.cell, hall_data.cell_size, true);
+                    ignore_cell = map_get_exit_cell(state.map, target.cell, target_cell_size, entity_cell_size, rally_cell, true);
+                }
+            }
             return map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_cell_size, target.cell, target_cell_size, match_is_entity_mining(state, entity), ignore_cell);
         }
     }
@@ -1054,7 +1224,9 @@ bool match_is_entity_mining(const MatchState& state, const Entity& entity) {
     }
 
     const Entity& target = state.entities.get_by_id(entity.target.id);
-    return (target.type == ENTITY_GOLDMINE && target.gold_held > 0);
+    return (target.type == ENTITY_GOLDMINE && target.gold_held > 0) ||
+           (target.type == ENTITY_HALL && target.mode == MODE_BUILDING_FINISHED && 
+                entity.player_id == target.player_id && entity.gold_held > 0);
 }
 
 EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell) {
@@ -1183,6 +1355,47 @@ Target match_entity_target_nearest_gold_mine(const MatchState& state, const Enti
     return (Target) {
         .type = TARGET_ENTITY,
         .id = state.entities.get_id_of(nearest_index)
+    };
+}
+
+Target match_entity_target_nearest_hall(const MatchState& state, const Entity& entity) {
+    const EntityData& entity_data = entity_get_data(entity.type);
+    Rect entity_rect = (Rect) { 
+        .x = entity.cell.x, .y = entity.cell.y, 
+        .w = entity_data.cell_size, .h = entity_data.cell_size
+    };
+    uint32_t nearest_enemy_index = INDEX_INVALID;
+    int nearest_enemy_dist = -1;
+
+    for (uint32_t other_index = 0; other_index < state.entities.size(); other_index++) {
+        const Entity& other = state.entities[other_index];
+
+        if (other.player_id != entity.player_id || other.type != ENTITY_HALL || other.mode != MODE_BUILDING_FINISHED) {
+            continue;
+        }
+
+        const EntityData& other_data = entity_get_data(other.type);
+        Rect other_rect = (Rect) { 
+            .x = other.cell.x, .y = other.cell.y, 
+            .w = other_data.cell_size, .h = other_data.cell_size
+        };
+
+        int other_dist = Rect::euclidean_distance_squared_between(entity_rect, other_rect);
+        if (nearest_enemy_index == INDEX_INVALID || other_dist < nearest_enemy_dist) {
+            nearest_enemy_index = other_index;
+            nearest_enemy_dist = other_dist;
+        }
+    }
+
+    if (nearest_enemy_index == INDEX_INVALID) {
+        return (Target) {
+            .type = TARGET_NONE
+        };
+    }
+
+    return (Target) {
+        .type = TARGET_ENTITY,
+        .id = state.entities.get_id_of(nearest_enemy_index)
     };
 }
 

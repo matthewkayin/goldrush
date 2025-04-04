@@ -145,6 +145,7 @@ EntityId match_get_nearest_builder(const MatchState& state, const std::vector<En
 void match_entity_stop_building(MatchState& state, EntityId entity_id);
 void match_entity_building_finish(MatchState& state, EntityId building_id);
 Target match_entity_target_nearest_gold_mine(const MatchState& state, const Entity& entity);
+Target match_entity_target_nearest_hall(const MatchState& state, const Entity& entity);
 
 // Event
 

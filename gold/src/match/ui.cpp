@@ -883,7 +883,8 @@ void match_ui_order_move(MatchUiState& state) {
             is_repair_target_valid = false;
         } else {
             const Entity& repair_target = state.match.entities.get_by_id(input.move.target_id);
-            if (repair_target.player_id != network_get_player_id() || !entity_is_building(repair_target.type)) {
+            if (state.match.players[repair_target.player_id].team != state.match.players[network_get_player_id()].team || 
+                    !entity_is_building(repair_target.type)) {
                 is_repair_target_valid = false;
             }
         }

@@ -830,7 +830,6 @@ bool map_is_cell_rect_equal_to(const Map& map, CellLayer layer, ivec2 cell, int 
     return true;
 }
 
-
 bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int size, ivec2 origin, bool gold_walk) {
     EntityId origin_id = origin.x == -1 ? ID_NULL : map_get_cell(map, layer, origin).id;
     Rect origin_rect = (Rect) { .x = origin.x, .y = origin.y, .w = size, .h = size };
@@ -970,6 +969,49 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 st
     }
 
     return nearest_cell_dist != -1 ? nearest_cell : start;
+}
+
+ivec2 map_get_exit_cell(const Map& map, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, bool allow_blocked_cells) {
+    ivec2 exit_cell = ivec2(-1, -1);
+    int exit_cell_dist = -1;
+    for (int x = building_cell.x - unit_size; x < building_cell.x + building_size + unit_size; x++) {
+        ivec2 cell = ivec2(x, building_cell.y - unit_size);
+        int cell_dist = ivec2::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
+                !map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, cell, unit_size, ivec2(-1, -1), allow_blocked_cells) &&
+                (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+        cell = ivec2(x, building_cell.y + building_size);
+        cell_dist = ivec2::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
+                !map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, cell, unit_size, ivec2(-1, -1), allow_blocked_cells) &&
+                (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+    }
+    for (int y = building_cell.y - unit_size; y < building_cell.y + building_size + unit_size; y++) {
+        ivec2 cell = ivec2(building_cell.x - unit_size, y);
+        int cell_dist = ivec2::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
+                !map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, cell, unit_size, ivec2(-1, -1), allow_blocked_cells) &&
+                (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+        cell = ivec2(building_cell.x + building_size, y);
+        cell_dist = ivec2::manhattan_distance(cell, rally_cell);
+        if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
+                !map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, cell, unit_size, ivec2(-1, -1), allow_blocked_cells) &&
+                (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
+            exit_cell = cell;
+            exit_cell_dist = cell_dist;
+        }
+    }
+
+    return exit_cell;
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, bool gold_walk, std::vector<ivec2>* ignore_cells) {
@@ -1154,7 +1196,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         }
 
         if (explored.size() > 1999) {
-            log_trace("Pathfinding too long, going with closest explored...");
+            log_warn("Pathfinding from %vi to %vi too long, going with closest explored...", &from, &to);
             break;
         }
 
