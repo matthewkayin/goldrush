@@ -149,7 +149,7 @@ int gold_main(int argc, char** argv) {
                 break;
             }
 
-            if (input_is_action_just_pressed(INPUT_F3)) {
+            if (input_is_action_just_pressed(INPUT_ACTION_F3)) {
                 render_debug_info = !render_debug_info;
             }
 

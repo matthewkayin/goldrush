@@ -68,6 +68,18 @@ static const std::unordered_map<FontName, FontParams> FONT_PARAMS = {
         .size = 8,
         .r = 186, .g = 97, .b = 95,
         .ignore_bearing = false
+    }},
+    { FONT_M3X6_OFFBLACK, (FontParams) { 
+        .path = "m3x6.ttf", 
+        .size = 16,
+        .r = 40, .g = 37, .b = 45,
+        .ignore_bearing = false
+    }},
+    { FONT_M3X6_DARKBLACK, (FontParams) { 
+        .path = "m3x6.ttf", 
+        .size = 16,
+        .r = 16, .g = 15, .b = 18,
+        .ignore_bearing = false
     }}
 };
 

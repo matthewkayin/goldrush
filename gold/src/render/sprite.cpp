@@ -504,6 +504,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_UI_CONTROL_GROUP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_control_group_frame.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
     { SPRITE_UI_ICON_BUTTON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

@@ -11,15 +11,15 @@ struct InputState {
     int scaled_screen_y;
 
     ivec2 mouse_position;
-    bool current[INPUT_COUNT];
-    bool previous[INPUT_COUNT];
+    bool current[INPUT_ACTION_COUNT];
+    bool previous[INPUT_ACTION_COUNT];
     bool user_requests_exit;
 
     std::string* text_input_str;
     size_t text_input_max_length;
 
     InputAction hotkey_group[HOTKEY_GROUP_SIZE];
-    SDL_Keycode hotkey_mapping[INPUT_COUNT];
+    SDL_Keycode hotkey_mapping[INPUT_ACTION_COUNT];
 };
 static InputState state;
 
@@ -88,10 +88,10 @@ void input_poll_events() {
             case SDL_MOUSEBUTTONUP: {
                 switch (event.button.button) {
                     case SDL_BUTTON_LEFT:
-                        state.current[INPUT_LEFT_CLICK] = event.type == SDL_MOUSEBUTTONDOWN;
+                        state.current[INPUT_ACTION_LEFT_CLICK] = event.type == SDL_MOUSEBUTTONDOWN;
                         break;
                     case SDL_BUTTON_RIGHT:
-                        state.current[INPUT_RIGHT_CLICK] = event.type == SDL_MOUSEBUTTONDOWN;
+                        state.current[INPUT_ACTION_RIGHT_CLICK] = event.type == SDL_MOUSEBUTTONDOWN;
                         break;
                     default:
                         break;
@@ -103,20 +103,20 @@ void input_poll_events() {
                 switch (event.key.keysym.sym) {
                     case SDLK_LSHIFT:
                     case SDLK_RSHIFT:
-                        state.current[INPUT_SHIFT] = event.type == SDL_KEYDOWN;
+                        state.current[INPUT_ACTION_SHIFT] = event.type == SDL_KEYDOWN;
                         break;
                     case SDLK_LCTRL:
                     case SDLK_RCTRL:
-                        state.current[INPUT_CTRL] = event.type == SDL_KEYDOWN;
+                        state.current[INPUT_ACTION_CTRL] = event.type == SDL_KEYDOWN;
                         break;
                     case SDLK_SPACE:
-                        state.current[INPUT_SPACE] = event.type == SDL_KEYDOWN;
+                        state.current[INPUT_ACTION_SPACE] = event.type == SDL_KEYDOWN;
                         break;
                     case SDLK_F3:
-                        state.current[INPUT_F3] = event.type == SDL_KEYDOWN;
+                        state.current[INPUT_ACTION_F3] = event.type == SDL_KEYDOWN;
                         break;
                     case SDLK_RETURN: 
-                        state.current[INPUT_ENTER] = event.type == SDL_KEYDOWN;
+                        state.current[INPUT_ACTION_ENTER] = event.type == SDL_KEYDOWN;
                         break;
                     case SDLK_BACKSPACE: {
                         if (event.type == SDL_KEYDOWN && SDL_IsTextInputActive() && state.text_input_str->length() > 0) {
@@ -125,9 +125,14 @@ void input_poll_events() {
                         break;
                     }
                     default: {
-                        for (uint32_t hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_COUNT; hotkey++) {
-                            if (event.key.keysym.sym == state.hotkey_mapping[hotkey]) {
-                                state.current[hotkey] = event.type == SDL_KEYDOWN;
+                        if (event.key.keysym.sym >= SDLK_0 && event.key.keysym.sym <= SDLK_9) {
+                            int key_index = event.key.keysym.sym - SDLK_0;
+                            state.current[INPUT_ACTION_NUM0 + key_index] = event.type == SDL_KEYDOWN;
+                        } else {
+                            for (uint32_t hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
+                                if (event.key.keysym.sym == state.hotkey_mapping[hotkey]) {
+                                    state.current[hotkey] = event.type == SDL_KEYDOWN;
+                                }
                             }
                         }
                         break;

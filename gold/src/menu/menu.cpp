@@ -349,7 +349,7 @@ void menu_update(MenuState& state) {
         // Chat input
         ui_element_position(ivec2(24, 128 + 158 + 8 + 4));
         ui_text_input("Chat: ", ivec2(432 - 16, 24), &state.chat_message, MENU_CHAT_MAX_MESSAGE_LENGTH);
-        if (input_is_action_just_pressed(INPUT_ENTER) && input_is_text_input_active()) {
+        if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active()) {
             char chat_message[128];
             sprintf(chat_message, "%s: %s", network_get_player(network_get_player_id()).name, state.chat_message.c_str());
             menu_add_chat_message(state, chat_message);

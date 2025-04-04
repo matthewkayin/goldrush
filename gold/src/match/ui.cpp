@@ -155,7 +155,7 @@ void match_ui_handle_input(MatchUiState& state) {
         };
 
         if (input_is_action_just_pressed(hotkey) || (
-            input_is_action_just_pressed(INPUT_LEFT_CLICK) && hotkey_rect.has_point(input_get_mouse_position())
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && hotkey_rect.has_point(input_get_mouse_position())
         )) {
             const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
 
@@ -235,12 +235,12 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Selection list click
-    if (state.selection.size() > 1 && input_is_action_just_pressed(INPUT_LEFT_CLICK) &&
+    if (state.selection.size() > 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
         !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
         for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
             Rect icon_rect = match_ui_get_selection_list_item_rect(selection_index);
             if (icon_rect.has_point(input_get_mouse_position())) {
-                if (input_is_action_pressed(INPUT_SHIFT)) {
+                if (input_is_action_pressed(INPUT_ACTION_SHIFT)) {
                     state.selection.erase(state.selection.begin() + selection_index);
                 } else {
                     std::vector<EntityId> selection;
@@ -256,7 +256,7 @@ void match_ui_handle_input(MatchUiState& state) {
     // Order movement
     {
         // Check that the left or right mouse button is being pressed
-        InputAction action_required = match_ui_is_targeting(state) ? INPUT_LEFT_CLICK : INPUT_RIGHT_CLICK;
+        InputAction action_required = match_ui_is_targeting(state) ? INPUT_ACTION_LEFT_CLICK : INPUT_ACTION_RIGHT_CLICK;
         bool is_action_pressed = input_is_action_just_pressed(action_required);
         // Check that a move command can be executed in the current UI state
         bool is_movement_allowed = state.mode != MATCH_UI_MODE_BUILDING_PLACE && 
@@ -273,12 +273,12 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Begin minimap drag
-    if (MINIMAP_RECT.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+    if (MINIMAP_RECT.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         state.is_minimap_dragging = true;
         return;
     } 
     // End minimap drag
-    if (state.is_minimap_dragging && input_is_action_just_released(INPUT_LEFT_CLICK)) {
+    if (state.is_minimap_dragging && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
         state.is_minimap_dragging = false;
         return;
     }
@@ -287,7 +287,7 @@ void match_ui_handle_input(MatchUiState& state) {
     if (state.mode == MATCH_UI_MODE_BUILDING_PLACE && 
             !state.is_minimap_dragging && 
             !match_ui_is_mouse_in_ui() && 
-            input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         if (!match_ui_building_can_be_placed(state)) {
             match_ui_show_status(state, MATCH_UI_STATUS_CANT_BUILD);
             return;
@@ -295,7 +295,7 @@ void match_ui_handle_input(MatchUiState& state) {
 
         MatchInput input;
         input.type = MATCH_INPUT_BUILD;
-        input.build.shift_command = input_is_action_pressed(INPUT_SHIFT);
+        input.build.shift_command = input_is_action_pressed(INPUT_ACTION_SHIFT);
         input.build.building_type = state.building_type;
         input.build.entity_count = state.selection.size();
         memcpy(&input.build.entity_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
@@ -313,12 +313,12 @@ void match_ui_handle_input(MatchUiState& state) {
     // Begin selecting
     if (!match_ui_is_mouse_in_ui() && 
             (state.mode == MATCH_UI_MODE_NONE || state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2) &&
-            input_is_action_just_pressed(INPUT_LEFT_CLICK)) {
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         state.select_origin = input_get_mouse_position() + state.camera_offset;
         return;
     }
     // End selecting
-    if (match_ui_is_selecting(state) && input_is_action_just_released(INPUT_LEFT_CLICK)) {
+    if (match_ui_is_selecting(state) && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
         ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
         Rect select_rect = (Rect) {
             .x = std::min(world_pos.x, state.select_origin.x),
@@ -332,7 +332,7 @@ void match_ui_handle_input(MatchUiState& state) {
         state.control_group_selected = MATCH_UI_CONTROL_GROUP_NONE;
 
         // Append selection
-        if (input_is_action_pressed(INPUT_CTRL)) {
+        if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
             // Don't append selection if units are not same type
             if (match_ui_get_selection_type(state, selection) != match_ui_get_selection_type(state, state.selection)) {
                 return;
@@ -374,8 +374,83 @@ void match_ui_handle_input(MatchUiState& state) {
         return;
     }
 
+    // Control group key press
+    {
+        uint32_t number_key_pressed;
+        for (number_key_pressed = 0; number_key_pressed < 10; number_key_pressed++) {
+            if (input_is_action_just_pressed((InputAction)(INPUT_ACTION_NUM0 + number_key_pressed))) {
+                break;
+            }
+        }
+        if (number_key_pressed != 10) {
+            uint32_t control_group_index = number_key_pressed == 0 ? 9 : (number_key_pressed - 1);
+            // Set control group
+            if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
+                if (state.selection.empty() || state.match.entities.get_by_id(state.selection[0]).player_id != network_get_player_id()) {
+                    return;
+                }
+
+                state.control_groups[control_group_index] = state.selection;
+                state.control_group_selected = control_group_index;
+                return;
+            }
+
+            // Append control group
+            if (input_is_action_pressed(INPUT_ACTION_SHIFT)) {
+                if (state.selection.empty() || state.match.entities.get_by_id(state.selection[0]).player_id != network_get_player_id()) {
+                    return;
+                }
+                
+                for (EntityId entity_id : state.selection) {
+                    if (std::find(state.control_groups[control_group_index].begin(), state.control_groups[control_group_index].end(), entity_id) 
+                            == state.control_groups[control_group_index].end()) {
+                        state.control_groups[control_group_index].push_back(entity_id);
+                    }
+                }
+
+                return;
+            }
+
+            // Snap to control group
+            if (state.control_group_double_tap_timer != 0 && state.control_group_selected == control_group_index) {
+                ivec2 group_min;
+                ivec2 group_max;
+                for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+                    const Entity& entity = state.match.entities.get_by_id(state.selection[selection_index]);
+                    if (selection_index == 0) {
+                        group_min = entity.cell;
+                        group_max = entity.cell;
+                        continue;
+                    }
+
+                    group_min.x = std::min(group_min.x, entity.cell.x);
+                    group_min.y = std::min(group_min.y, entity.cell.y);
+                    group_max.x = std::max(group_max.x, entity.cell.x);
+                    group_max.y = std::max(group_max.y, entity.cell.y);
+                }
+
+                Rect group_rect = (Rect) {
+                    .x = group_min.x, .y = group_min.y,
+                    .w = group_max.x - group_min.x, .h = group_max.y - group_min.y
+                };
+                ivec2 group_center = ivec2(group_rect.x + (group_rect.w / 2), group_rect.y + (group_rect.h / 2));
+                match_ui_center_camera_on_cell(state, group_center);
+                return;
+            }
+
+            // Select control group
+            if (!state.control_groups[control_group_index].empty()) {
+                match_ui_set_selection(state, state.control_groups[control_group_index]);
+                if (!state.selection.empty()) {
+                    state.control_group_double_tap_timer = MATCH_UI_DOUBLE_CLICK_DURATION;
+                    state.control_group_selected = control_group_index;
+                }
+            }
+        }
+    }
+
     // Jump to latest alert
-    if (input_is_action_just_pressed(INPUT_SPACE) && !state.alerts.empty()) {
+    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && !state.alerts.empty()) {
         match_ui_center_camera_on_cell(state, state.alerts.back().cell);
     }
 }
@@ -874,7 +949,7 @@ void match_ui_order_move(MatchUiState& state) {
 
     // Create move input
     MatchInput input;
-    input.move.shift_command = input_is_action_pressed(INPUT_SHIFT);
+    input.move.shift_command = input_is_action_pressed(INPUT_ACTION_SHIFT);
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
 
@@ -1451,6 +1526,58 @@ void match_ui_render(const MatchUiState& state) {
     render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
     render_sprite_frame(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ui_frame_bottom_position, 0, 0);
     render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(ui_frame_bottom_position.x + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
+
+    // UI Control groups
+    for (uint32_t control_group_index = 0; control_group_index < MATCH_UI_CONTROL_GROUP_COUNT; control_group_index++) {
+        // Count the entities in this control group and determine which is the most common
+        uint32_t entity_count = 0;
+        std::unordered_map<EntityType, uint32_t> entity_occurances;
+        EntityType most_common_entity_type = ENTITY_MINER;
+        entity_occurances[ENTITY_MINER] = 0;
+
+        for (EntityId id : state.control_groups[control_group_index]) {
+            uint32_t entity_index = state.match.entities.get_index_of(id);
+            if (entity_index == INDEX_INVALID || !entity_is_selectable(state.match.entities[entity_index])) {
+                continue;
+            }
+
+            EntityType entity_type = state.match.entities[entity_index].type;
+            auto occurances_it = entity_occurances.find(entity_type);
+            if (occurances_it == entity_occurances.end()) {
+                entity_occurances[entity_type] = 1;
+            } else {
+                occurances_it->second++;
+            }
+            if (entity_occurances[entity_type] > entity_occurances[most_common_entity_type]) {
+                most_common_entity_type = entity_type;
+            }
+            entity_count++;
+        }
+
+        if (entity_count == 0) {
+            continue;
+        }
+
+        int button_frame = 0;
+        FontName font = FONT_M3X6_OFFBLACK;
+        if (state.control_group_selected != control_group_index) {
+            font = FONT_M3X6_DARKBLACK;
+            button_frame = 2;
+        }
+
+        SpriteName button_icon = entity_get_data(most_common_entity_type).icon;
+        const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_CONTROL_GROUP);
+        ivec2 render_pos = ui_frame_bottom_position + ivec2(2, 0) + ivec2((3 + sprite_info.frame_width) * control_group_index, -32);
+        render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(button_icon, ivec2(button_frame, 0), render_pos + ivec2(1, 0), RENDER_SPRITE_NO_CULL, 0);
+        char control_group_number_text[4];
+        sprintf(control_group_number_text, "%u", control_group_index == 9 ? 0 : control_group_index + 1);
+        render_text(font, control_group_number_text, render_pos + ivec2(3, -9));
+        char control_group_count_text[4];
+        sprintf(control_group_count_text, "%u", entity_count);
+        ivec2 count_text_size = render_get_text_size(font, control_group_count_text);
+        render_text(font, control_group_count_text, render_pos + ivec2(32 - count_text_size.x, 23 - count_text_size.y));
+    }
 
     // UI Status message
     if (state.status_timer != 0) {
