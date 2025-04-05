@@ -5,7 +5,7 @@
 #include "lcg.h"
 
 static const uint32_t MATCH_PLAYER_STARTING_GOLD = 500;
-static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 5000;
+static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 50;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
@@ -1283,6 +1283,18 @@ bool match_is_entity_visible_to_player(const MatchState& state, const Entity& en
             if (state.fog[player_team][x + (y * state.map.width)] > 0 && 
                     (!entity_is_invisible || state.detection[player_team][x + (y * state.map.width)] > 0)) {
                 return true;
+            }
+        }
+    }
+
+    if (entity.mode == MODE_UNIT_MOVE) {
+        ivec2 prev_cell = entity.cell - DIRECTION_IVEC2[entity.direction];
+        for (int y = prev_cell.y; y < prev_cell.y + entity_cell_size; y++) {
+            for (int x = prev_cell.x; x < prev_cell.x + entity_cell_size; x++) {
+                if (state.fog[player_team][x + (y * state.map.width)] > 0 && 
+                        (!entity_is_invisible || state.detection[player_team][x + (y * state.map.width)] > 0)) {
+                    return true;
+                }
             }
         }
     }
