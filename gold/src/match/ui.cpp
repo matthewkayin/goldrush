@@ -462,8 +462,13 @@ void match_ui_handle_input(MatchUiState& state) {
 
         // Append selection
         if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
+            MatchUiSelectionType current_selection_type = match_ui_get_selection_type(state, state.selection);
+            // Don't append selection if selection is not allied units or buildings
+            if (!(current_selection_type == MATCH_UI_SELECTION_UNITS || current_selection_type == MATCH_UI_SELECTION_BUILDINGS)) {
+                return;
+            }
             // Don't append selection if units are not same type
-            if (match_ui_get_selection_type(state, selection) != match_ui_get_selection_type(state, state.selection)) {
+            if (match_ui_get_selection_type(state, selection) != current_selection_type) {
                 return;
             }
             for (EntityId incoming_id : selection) {
@@ -1711,6 +1716,24 @@ void match_ui_render(const MatchUiState& state) {
     }
     // End UI building placement
 
+    // UI queued building placements
+    for (EntityId entity_id : state.selection) {
+        const Entity& entity = state.match.entities.get_by_id(entity_id);
+        // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
+        if (!entity_is_unit(entity.type) || entity.player_id != network_get_player_id()) {
+            break;
+        }
+
+        if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
+            match_ui_render_target_build(state, entity.target);
+        }
+        for (const Target& target : entity.target_queue) {
+            if (target.type == TARGET_BUILD) {
+                match_ui_render_target_build(state, target);
+            }
+        }
+    }
+
     // Select rect
     if (match_ui_is_selecting(state)) {
         ivec2 mouse_world_pos = ivec2(input_get_mouse_position().x, std::min(input_get_mouse_position().y, SCREEN_HEIGHT - MATCH_UI_HEIGHT)) + state.camera_offset;
@@ -2382,4 +2405,16 @@ void match_ui_render_healthbar(const RenderHealthbarParams& params) {
             render_line(ivec2(line_x, healthbar_rect.y), ivec2(line_x, healthbar_rect.y + healthbar_rect.h - 1), RENDER_COLOR_OFFBLACK);
         }
     }
+}
+
+void match_ui_render_target_build(const MatchUiState& state, const Target& target) {
+    const EntityData& building_data = entity_get_data(target.build.building_type);
+    Rect building_rect = (Rect) {
+        .x = (target.build.building_cell.x * TILE_SIZE) - state.camera_offset.x,
+        .y = (target.build.building_cell.y * TILE_SIZE) - state.camera_offset.y,
+        .w = building_data.cell_size * TILE_SIZE,
+        .h = building_data.cell_size * TILE_SIZE
+    };
+    render_sprite_frame(building_data.sprite, ivec2(3, 0), ivec2(building_rect.x, building_rect.y), 0, state.match.players[network_get_player_id()].recolor_id);
+    render_fill_rect(building_rect, RENDER_COLOR_GREEN_TRANSPARENT);
 }

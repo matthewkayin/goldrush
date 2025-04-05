@@ -357,7 +357,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_HOUSE, (EntityData) {
         .name = "House",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_BUILDING_HOUSE,
         .icon = SPRITE_BUTTON_ICON_HOUSE,
         .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 2,
@@ -382,7 +382,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_SALOON, (EntityData) {
         .name = "Saloon",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_BUILDING_SALOON,
         .icon = SPRITE_BUTTON_ICON_SALOON,
         .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 3,
@@ -407,7 +407,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_BUNKER, (EntityData) {
         .name = "Bunker",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_BUILDING_BUNKER,
         .icon = SPRITE_BUTTON_ICON_BUNKER,
         .death_sound = SOUND_BUNKER_DESTROY,
         .cell_size = 2,
@@ -457,7 +457,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_SMITH, (EntityData) {
         .name = "Blacksmith",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_BUILDING_SMITH,
         .icon = SPRITE_BUTTON_ICON_SMITH,
         .death_sound = SOUND_BUILDING_DESTROY,
         .cell_size = 3,

@@ -80,7 +80,7 @@ uint32_t match_get_player_population(const MatchState& state, uint8_t player_id)
 uint32_t match_get_player_max_population(const MatchState& state, uint8_t player_id) {
     uint32_t max_population = 0;
     for (const Entity& entity : state.entities) {
-        if (entity.player_id == player_id && (entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE)) {
+        if (entity.player_id == player_id && (entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE) && entity.mode == MODE_BUILDING_FINISHED) {
             max_population += 10;
         }
     }
@@ -833,6 +833,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
                             entity.target = (Target) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
+                            entity.target_queue.clear();
+                            break;
                         }
 
                         state.players[entity.player_id].gold -= building_data.gold_cost;

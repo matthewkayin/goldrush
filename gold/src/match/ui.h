@@ -134,3 +134,4 @@ SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking);
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_render_healthbar(const RenderHealthbarParams& params);
+void match_ui_render_target_build(const MatchUiState& state, const Target& target);
