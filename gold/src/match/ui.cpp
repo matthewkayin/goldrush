@@ -1558,6 +1558,49 @@ void match_ui_render(const MatchUiState& state) {
         render_healthbar_params[render_layer].clear();
     }
 
+    // Miners on gold counter
+    for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
+        const Entity& entity = state.match.entities[entity_index];
+        // Make sure the entity is actually a goldmine
+        if (entity.type != ENTITY_GOLDMINE || entity.mode != MODE_GOLDMINE) {
+            continue;
+        }
+        // Make sure the player can see the goldmine
+        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, entity.cell, entity_get_data(entity.type).cell_size)) {
+            continue;
+        }
+        // Make sure the goldmine is actually on screen
+        Rect entity_rect = entity_get_rect(entity);
+        entity_rect.x -= state.camera_offset.x;
+        entity_rect.y -= state.camera_offset.y;
+        if (!SCREEN_RECT.intersects(entity_rect)) {
+            continue;
+        }
+
+        // Count how many miners are mining from this mine
+        EntityId entity_id = state.match.entities.get_id_of(entity_index);
+        uint32_t miner_count = 0;
+        for (const Entity& miner : state.match.entities) {
+            if (miner.type == ENTITY_MINER && 
+                    miner.player_id == network_get_player_id() && 
+                    miner.gold_mine_id == entity_id) {
+                miner_count++;
+            }
+        }
+        if (miner_count == 0) {
+            continue;
+        }
+
+        char counter_text[4];
+        sprintf(counter_text, "%u", miner_count);
+        ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, counter_text);
+        const SpriteInfo& miner_icon_info = render_get_sprite_info(SPRITE_UI_MINER_ICON);
+        text_size.x += miner_icon_info.frame_width;
+        ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 6);
+        render_text(miner_count > 8 ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2(miner_icon_info.frame_width + 2, 0));
+        render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[network_get_player_id()].recolor_id);
+    }
+
     // Fog of War
     int player_team = state.match.players[network_get_player_id()].team;
     for (int fog_pass = 0; fog_pass < 2; fog_pass++) {

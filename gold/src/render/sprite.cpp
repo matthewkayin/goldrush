@@ -430,7 +430,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UI_MINER_ICON, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
+        .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {
             .path = "ui_miner.png",
             .hframes = 1,
