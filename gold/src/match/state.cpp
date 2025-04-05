@@ -614,6 +614,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 }
 
                 // Attempt to move and avoid ideal mine exit path
+                bool used_ideal_mining_path = false;
                 if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY) {
                     const Entity& mine = state.entities.get_by_id(entity.target.id);
                     if (mine.type == ENTITY_GOLDMINE) {
@@ -629,17 +630,17 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             mine_exit_path.push_back(mine_exit_cell);
 
                             map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), 1, &entity.path, true, &mine_exit_path);
-                            if (!entity.path.empty()) {
-                                entity.pathfind_attempts = 0;
-                                entity.mode = MODE_UNIT_MOVE;
-                                break;
-                            }
+                            used_ideal_mining_path = true;
                         }
                     }
                 }
 
                 // Pathfind
-                map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity));
+                if (!used_ideal_mining_path) {
+                    map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity));
+                }
+
+                // Check path
                 if (!entity.path.empty()) {
                     entity.pathfind_attempts = 0;
                     entity.mode = MODE_UNIT_MOVE;
