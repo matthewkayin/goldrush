@@ -2177,7 +2177,7 @@ void match_ui_render(const MatchUiState& state) {
             } else {
                 pixel = MINIMAP_PIXEL_WALL;
             }
-            render_minimap_putpixel(ivec2(x, y), pixel);
+            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), pixel);
         }
     }
     // Minimap entities
@@ -2192,7 +2192,7 @@ void match_ui_render(const MatchUiState& state) {
             .x = entity.cell.x, .y = entity.cell.y,
             .w = entity_cell_size, .h = entity_cell_size
         };
-        render_minimap_fill_rect(entity_rect, pixel);
+        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
     }
     // Minimap remembered entities
     for (auto it : state.match.remembered_entities[state.match.players[network_get_player_id()].team]) {
@@ -2201,17 +2201,22 @@ void match_ui_render(const MatchUiState& state) {
             .w = it.second.cell_size, .h = it.second.cell_size
         };
         MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
-        render_minimap_fill_rect(entity_rect, pixel);
+        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
     }
     // Minimap fog of war
     for (int y = 0; y < state.match.map.height; y++) {
         for (int x = 0; x < state.match.map.width; x++) {
             int fog_value = match_get_fog(state.match, player_team, ivec2(x, y));
+            MinimapPixel pixel;
             if (fog_value > 0) {
-                continue;
+                pixel = MINIMAP_PIXEL_TRANSPARENT;
+            } else if (fog_value == 0) {
+                pixel = MINIMAP_PIXEL_OFFBLACK_TRANSPARENT;
+            } else {
+                pixel = MINIMAP_PIXEL_OFFBLACK;
             }
 
-            render_minimap_putpixel(ivec2(x, y), fog_value == FOG_HIDDEN ? MINIMAP_PIXEL_OFFBLACK : MINIMAP_PIXEL_OFFBLACK_TRANSPARENT);
+            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), pixel);
         }
     }
     // Minimap alerts
@@ -2231,7 +2236,7 @@ void match_ui_render(const MatchUiState& state) {
             .h = alert.cell_size + 1 + (alert_rect_margin * 2),
         };
         // We want this on the fog layer because the minimap rect might go into the fog
-        render_minimap_draw_rect(alert_rect, alert.pixel);
+        render_minimap_draw_rect(MINIMAP_LAYER_FOG, alert_rect, alert.pixel);
     }
     // Minimap camera rect
     Rect camera_rect = (Rect) {
@@ -2240,7 +2245,7 @@ void match_ui_render(const MatchUiState& state) {
         .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
         .h = ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / TILE_SIZE) - 1
     };
-    render_minimap_draw_rect(camera_rect, MINIMAP_PIXEL_WHITE);
+    render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 }
 
