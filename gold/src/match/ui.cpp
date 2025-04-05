@@ -75,6 +75,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.double_click_timer = 0;
     state.control_group_double_tap_timer = 0;
     memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
+    state.rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
@@ -347,6 +348,56 @@ void match_ui_handle_input(MatchUiState& state) {
             match_ui_order_move(state);
             return;
         }
+    }
+
+    // Set building rally
+    if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK) && 
+            match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_BUILDINGS &&
+            !(state.is_minimap_dragging || match_ui_is_selecting(state) || match_ui_is_targeting(state)) &&
+            (!match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
+        // Check to make sure that all buildings can rally
+        for (EntityId id : state.selection) {
+            const Entity& entity = state.match.entities.get_by_id(id);
+            if (entity.mode == MODE_BUILDING_IN_PROGRESS || !entity_get_data(entity.type).building_data.can_rally) {
+                return;
+            }
+        }
+
+        // Create rally input
+        MatchInput input;
+        input.type = MATCH_INPUT_RALLY;
+
+        // Determine rally point
+        if (match_ui_is_mouse_in_ui()) {
+            ivec2 minimap_pos = input_get_mouse_position() - ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y);
+            input.rally.rally_point = ivec2((state.match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                                            (state.match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+        } else {
+            input.rally.rally_point = input_get_mouse_position() + state.camera_offset;
+        }
+
+        // Check if rallied onto gold
+        Cell cell = map_get_cell(state.match.map, CELL_LAYER_GROUND, input.rally.rally_point / TILE_SIZE);
+        if (cell.type == CELL_GOLDMINE) {
+            // If they rallied onto their gold, adjust their rally point and play an animation to clearly indicate that units will rally out to the mine
+            // But only do this if the goldmine has been explored, otherwise we would reveal to players that there is a goldmine where they clicked
+            const Entity& goldmine = state.match.entities.get_by_id(cell.id);
+            if (match_is_cell_rect_explored(state.match, state.match.players[network_get_player_id()].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
+                input.rally.rally_point = (goldmine.cell * TILE_SIZE) + ivec2(23, 16);
+                state.move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
+                state.move_animation_entity_id = cell.id;
+                state.move_animation_position = goldmine.cell * TILE_SIZE;
+            }
+        }
+
+        // Add buildings to rally point input
+        input.rally.building_count = (uint8_t)state.selection.size();
+        memcpy(&input.rally.building_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
+
+        state.input_queue.push_back(input);
+        sound_play(SOUND_FLAG_THUMP);
+
+        return;
     }
 
     // Begin minimap drag
@@ -776,6 +827,7 @@ void match_ui_update(MatchUiState& state) {
     if (animation_is_playing(state.move_animation)) {
         animation_update(state.move_animation);
     }
+    animation_update(state.rally_flag_animation);
     if (state.status_timer != 0) {
         state.status_timer--;
     }
@@ -1456,6 +1508,32 @@ void match_ui_render(const MatchUiState& state) {
                     uint16_t render_layer = match_ui_get_render_layer(map_get_tile(state.match.map, it->second.cell).elevation, RENDER_LAYER_SELECT_RING);
                     render_sprite_params[render_layer].push_back(params);
                 }
+            }
+        }
+    }
+
+    // Rally points
+    if (match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_BUILDINGS) {
+        for (EntityId id : state.selection) {
+            const Entity& building = state.match.entities.get_by_id(id);
+            if (building.mode != MODE_BUILDING_FINISHED || building.rally_point.x == -1) {
+                continue;
+            }
+
+            RenderSpriteParams params = (RenderSpriteParams) {
+                .sprite = SPRITE_RALLY_FLAG,
+                .frame = state.rally_flag_animation.frame,
+                .position = building.rally_point - ivec2(4, 15) - state.camera_offset,
+                .options = 0,
+                .recolor_id = state.match.players[network_get_player_id()].recolor_id
+            };
+
+            ivec2 rally_cell = building.rally_point / TILE_SIZE;
+            if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, rally_cell) > 0) {
+                uint16_t layer = match_ui_get_render_layer(map_get_tile(state.match.map, rally_cell).elevation, RENDER_LAYER_ENTITY);
+                render_sprite_params[layer].push_back(params);
+            } else {
+                above_fog_sprite_params.push_back(params);
             }
         }
     }

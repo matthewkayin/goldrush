@@ -391,6 +391,17 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
             break;
         }
+        case MATCH_INPUT_RALLY: {
+            for (uint32_t id_index = 0; id_index < input.rally.building_count; id_index++) {
+                uint32_t building_index = state.entities.get_index_of(input.rally.building_ids[id_index]);
+                if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
+                    continue;
+                }
+
+                state.entities[building_index].rally_point = input.rally.rally_point;
+            }
+            break;
+        }
     }
 }
 
@@ -1654,6 +1665,18 @@ bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 ce
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
             if (state.fog[team][x + (y * state.map.width)] > 0) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool match_is_cell_rect_explored(const MatchState& state, uint8_t team, ivec2 cell, int cell_size) {
+    for (int y = cell.y; y < cell.y + cell_size; y++) {
+        for (int x = cell.x; x < cell.x + cell_size; x++) {
+            if (state.fog[team][x + (y * state.map.width)] != FOG_HIDDEN) {
                 return true;
             }
         }

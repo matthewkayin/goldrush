@@ -690,7 +690,7 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
             return ANIMATION_UNIT_ATTACK;
         case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
             return ANIMATION_SOLDIER_RANGED_ATTACK;
-        case MODE_SOLDIER_CHARGE:
+        case MODE_UNIT_SOLDIER_CHARGE:
             return ANIMATION_SOLDIER_CHARGE;
         case MODE_UNIT_DEATH:
             return ANIMATION_UNIT_DEATH;

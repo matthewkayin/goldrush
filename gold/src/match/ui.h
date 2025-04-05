@@ -100,6 +100,7 @@ struct MatchUiState {
     std::vector<Alert> alerts;
     uint32_t sound_cooldown_timers[SOUND_COUNT];
 
+    Animation rally_flag_animation;
     Animation move_animation;
     ivec2 move_animation_position;
     EntityId move_animation_entity_id;

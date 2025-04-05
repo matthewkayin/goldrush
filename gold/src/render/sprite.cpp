@@ -975,6 +975,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .hframes = 1,
             .vframes = 1
         }
+    }},
+    { SPRITE_RALLY_FLAG, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "rally_flag.png",
+            .hframes = 6,
+            .vframes = 1
+        }
     }}
 };
 

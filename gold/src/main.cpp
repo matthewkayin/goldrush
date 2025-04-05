@@ -106,7 +106,7 @@ int gold_main(int argc, char** argv) {
     srand(time(NULL));
 
     bool is_running = true;
-    bool render_debug_info = false;
+    bool render_debug_info = true;
     const double UPDATE_TIME = 1.0 / 60;
     double last_time = platform_get_absolute_time();
     double last_second = last_time;

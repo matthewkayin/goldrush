@@ -165,4 +165,5 @@ void match_event_show_status(MatchState& state, uint8_t player_id, const char* m
 
 int match_get_fog(const MatchState& state, uint8_t team, ivec2 cell);
 bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
+bool match_is_cell_rect_explored(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
 void match_fog_update(MatchState& state, uint8_t team, ivec2 cell, int cell_size, int sight, bool has_detection, bool increment);
