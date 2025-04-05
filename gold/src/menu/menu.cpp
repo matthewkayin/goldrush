@@ -94,9 +94,9 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             menu_set_mode(state, MENU_MODE_LOBBY);
             break;
         }
-        case NETWORK_EVENT_LOBBY_CHAT: {
+        case NETWORK_EVENT_CHAT: {
             if (state.mode == MENU_MODE_LOBBY) {
-                menu_add_chat_message(state, event.lobby_chat.message);
+                menu_add_chat_message(state, event.chat.message);
             }
             return;
         }
@@ -116,7 +116,7 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             char message[128];
             sprintf(message, "%s joined the lobby.", network_get_player(event.player_connected.player_id).name);
             menu_add_chat_message(state, message);
-            network_send_lobby_chat(message);
+            network_send_chat(message);
             return;
         }
         default:
@@ -350,11 +350,13 @@ void menu_update(MenuState& state) {
         ui_element_position(ivec2(24, 128 + 158 + 8 + 4));
         ui_text_input("Chat: ", ivec2(432 - 16, 24), &state.chat_message, MENU_CHAT_MAX_MESSAGE_LENGTH);
         if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active()) {
-            char chat_message[128];
-            sprintf(chat_message, "%s: %s", network_get_player(network_get_player_id()).name, state.chat_message.c_str());
-            menu_add_chat_message(state, chat_message);
-            network_send_lobby_chat(chat_message);
-            state.chat_message = "";
+            if (!state.chat_message.empty()) {
+                char chat_message[128];
+                sprintf(chat_message, "%s: %s", network_get_player(network_get_player_id()).name, state.chat_message.c_str());
+                menu_add_chat_message(state, chat_message);
+                network_send_chat(chat_message);
+                state.chat_message = "";
+            }
             sound_play(SOUND_UI_CLICK);
         }
 

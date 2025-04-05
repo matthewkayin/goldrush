@@ -8,7 +8,7 @@
 #define NETWORK_IP_BUFFER_SIZE 32
 #define NETWORK_PLAYER_NAME_BUFFER_SIZE 36
 #define NETWORK_APP_VERSION_BUFFER_SIZE 16
-#define NETWORK_LOBBY_CHAT_BUFFER_SIZE 128
+#define NETWORK_CHAT_BUFFER_SIZE 128
 #define NETWORK_SCANNER_PORT 6529
 #define NETWORK_BASE_PORT 6530
 #define NETWORK_INPUT_BUFFER_SIZE 1024
@@ -56,7 +56,7 @@ enum NetworkEventType {
     NETWORK_EVENT_PLAYER_CONNECTED,
     NETWORK_EVENT_INVALID_VERSION,
     NETWORK_EVENT_JOINED_LOBBY,
-    NETWORK_EVENT_LOBBY_CHAT,
+    NETWORK_EVENT_CHAT,
     NETWORK_EVENT_MATCH_LOAD,
     NETWORK_EVENT_INPUT
 };
@@ -69,8 +69,9 @@ struct NetworkEventPlayerConnected {
     uint8_t player_id;
 };
 
-struct NetworkEventLobbyChat {
-    char message[NETWORK_LOBBY_CHAT_BUFFER_SIZE];
+struct NetworkEventChat {
+    char message[NETWORK_CHAT_BUFFER_SIZE];
+    uint8_t player_id;
 };
 
 struct NetworkEventMatchLoad {
@@ -89,7 +90,7 @@ struct NetworkEvent {
     union {
         NetworkEventPlayerDisconnected player_disconnected;
         NetworkEventPlayerConnected player_connected;
-        NetworkEventLobbyChat lobby_chat;
+        NetworkEventChat chat;
         NetworkEventMatchLoad match_load;
         NetworkEventInput input;
     };
@@ -117,7 +118,7 @@ uint8_t network_get_player_id();
 const size_t network_get_lobby_count();
 const NetworkLobby& network_get_lobby(size_t index);
 const char* network_get_lobby_name();
-void network_send_lobby_chat(const char* message);
+void network_send_chat(const char* message);
 void network_set_player_ready(bool ready);
 void network_set_player_color(uint8_t color);
 void network_set_match_setting(uint8_t setting, uint8_t value);

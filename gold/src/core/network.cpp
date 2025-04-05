@@ -38,7 +38,7 @@ enum NetworkMessageType {
     NETWORK_MESSAGE_SET_COLOR,
     NETWORK_MESSAGE_SET_MATCH_SETTING,
     NETWORK_MESSAGE_SET_TEAM,
-    NETWORK_MESSAGE_LOBBY_CHAT,
+    NETWORK_MESSAGE_CHAT,
     NETWORK_MESSAGE_LOAD_MATCH,
     NETWORK_MESSAGE_INPUT
 };
@@ -85,9 +85,9 @@ struct NetworkMessageSetTeam {
     uint8_t team;
 };
 
-struct NetworkMessageLobbyChat {
-    const uint8_t type = NETWORK_MESSAGE_LOBBY_CHAT;
-    char message[NETWORK_LOBBY_CHAT_BUFFER_SIZE];
+struct NetworkMessageChat {
+    const uint8_t type = NETWORK_MESSAGE_CHAT;
+    char message[NETWORK_CHAT_BUFFER_SIZE];
 };
 
 struct NetworkMessageSetMatchSetting {
@@ -625,14 +625,16 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
 
             break;
         }
-        case NETWORK_MESSAGE_LOBBY_CHAT: {
+        case NETWORK_MESSAGE_CHAT: {
             if (!(state.status == NETWORK_STATUS_CONNECTED || state.status == NETWORK_STATUS_SERVER)) {
                 return;
             }
 
             NetworkEvent event;
-            event.type = NETWORK_EVENT_LOBBY_CHAT;
-            strncpy(event.lobby_chat.message, (char*)(data + 1), NETWORK_LOBBY_CHAT_BUFFER_SIZE);
+            event.type = NETWORK_EVENT_CHAT;
+            uint8_t* player_id = (uint8_t*)state.host->peers[incoming_peer_id].data;
+            event.chat.player_id = *player_id;
+            strncpy(event.chat.message, (char*)(data + 1), NETWORK_CHAT_BUFFER_SIZE);
             state.event_queue.push(event);
 
             break;
@@ -728,8 +730,8 @@ const char* network_get_lobby_name() {
     return state.lobby_name;
 }
 
-void network_send_lobby_chat(const char* message) {
-    NetworkMessageLobbyChat out_message;
+void network_send_chat(const char* message) {
+    NetworkMessageChat out_message;
     strcpy(out_message.message, message);
 
     ENetPacket* packet = enet_packet_create(&out_message, sizeof(out_message), ENET_PACKET_FLAG_RELIABLE);

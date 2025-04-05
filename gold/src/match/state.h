@@ -28,7 +28,6 @@
 #define MATCH_UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
 
 #define MATCH_MAX_ENTITIES (400 * MAX_PLAYERS)
-#define PLAYER_NONE UINT8_MAX
 
 const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;

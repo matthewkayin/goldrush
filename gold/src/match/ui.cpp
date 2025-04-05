@@ -58,6 +58,11 @@ static const Rect UI_BUILDING_QUEUE_PROGRESS_BAR_RECT = (Rect) {
 static const int HEALTHBAR_HEIGHT = 4;
 static const int HEALTHBAR_PADDING = 3;
 
+static const size_t CHAT_MAX_LENGTH = 64;
+static const uint32_t CHAT_MESSAGE_DURATION = 180;
+static const uint32_t CHAT_MAX_LINES = 8;
+static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
+
 // INIT
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
@@ -74,6 +79,8 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.control_group_selected = MATCH_UI_CONTROL_GROUP_NONE;
     state.double_click_timer = 0;
     state.control_group_double_tap_timer = 0;
+    state.chat_cursor_blink_timer = 0;
+    state.chat_cursor_visible = false;
     memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
     state.rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
 
@@ -139,6 +146,10 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
             state.inputs[event.input.player_id].push_back(inputs);
             break;
         }
+        case NETWORK_EVENT_CHAT: {
+            match_ui_add_chat_message(state, event.chat.player_id, event.chat.message);
+            break;
+        }
         default:
             break;
     }
@@ -148,6 +159,26 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // This function returns after it handles a single input to avoid double input happening
 void match_ui_handle_input(MatchUiState& state) {
+    // Begin chat
+    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active()) {
+        state.chat_message = "";
+        state.chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
+        state.chat_cursor_visible = false;
+        input_start_text_input(&state.chat_message, CHAT_MAX_LENGTH);
+        sound_play(SOUND_UI_CLICK);
+        return;
+    }
+
+    // End chat
+    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active()) {
+        if (!state.chat_message.empty()) {
+            network_send_chat(state.chat_message.c_str());
+            match_ui_add_chat_message(state, network_get_player_id(), state.chat_message.c_str());
+        }
+        sound_play(SOUND_UI_CLICK);
+        input_stop_text_input();
+    }
+
     // Hotkey click
     for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
         InputAction hotkey = input_get_hotkey(hotkey_index);
@@ -168,7 +199,7 @@ void match_ui_handle_input(MatchUiState& state) {
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
         };
 
-        if (input_is_action_just_pressed(hotkey) || (
+        if ((input_is_action_just_pressed(hotkey) && !input_is_text_input_active()) || (
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && hotkey_rect.has_point(input_get_mouse_position())
         )) {
             const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
@@ -848,6 +879,13 @@ void match_ui_update(MatchUiState& state) {
             state.sound_cooldown_timers[sound]--;
         }
     }
+    if (input_is_text_input_active()) {
+        state.chat_cursor_blink_timer--;
+        if (state.chat_cursor_blink_timer == 0) {
+            state.chat_cursor_visible = !state.chat_cursor_visible;
+            state.chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
+        }
+    }
 
     // Update alerts
     {
@@ -859,6 +897,15 @@ void match_ui_update(MatchUiState& state) {
             } else {
                 alert_index++;
             }
+        }
+    }
+
+    // Update chat
+    for (uint32_t chat_index = 0; chat_index < state.chat.size(); chat_index++) {
+        state.chat[chat_index].timer--;
+        if (state.chat[chat_index].timer == 0) {
+            state.chat.erase(state.chat.begin() + chat_index);
+            chat_index--;
         }
     }
 
@@ -1273,6 +1320,18 @@ bool match_ui_building_can_be_placed(const MatchUiState& state) {
 Rect match_ui_get_selection_list_item_rect(uint32_t selection_index) {
     ivec2 pos = SELECTION_LIST_TOP_LEFT + ivec2(((selection_index % 10) * 34) - 12, (selection_index / 10) * 34);
     return (Rect) { .x = pos.x, .y = pos.y, .w = 32, .h = 32 };
+}
+
+void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const char* message) {
+    ChatMessage chat_message = (ChatMessage) {
+        .message = std::string(message),
+        .timer = CHAT_MESSAGE_DURATION,
+        .player_id = player_id
+    };
+    if (state.chat.size() == CHAT_MAX_LINES) {
+        state.chat.erase(state.chat.begin());
+    }
+    state.chat.push_back(chat_message);
 }
 
 // RENDER
@@ -1731,6 +1790,30 @@ void match_ui_render(const MatchUiState& state) {
             if (target.type == TARGET_BUILD) {
                 match_ui_render_target_build(state, target);
             }
+        }
+    }
+
+    // UI Chat
+    for (uint32_t chat_index = 0; chat_index < state.chat.size(); chat_index++) {
+        const ChatMessage& message = state.chat[state.chat.size() - chat_index - 1];
+        ivec2 message_pos = ivec2(16, MINIMAP_RECT.y - 48 - (chat_index * 16));
+        if (message.player_id != PLAYER_NONE) {
+            const MatchPlayer& player = state.match.players[message.player_id];
+            char player_text[40];
+            sprintf(player_text, "%s: ", player.name);
+            render_text((FontName)(FONT_HACK_PLAYER0 + player.recolor_id), player_text, message_pos);
+            message_pos.x += render_get_text_size(FONT_HACK_WHITE, player_text).x;
+        }
+        render_text(FONT_HACK_WHITE, message.message.c_str(), message_pos);
+    }
+    if (input_is_text_input_active()) {
+        char prompt_str[128];
+        sprintf(prompt_str, "Chat: %s", state.chat_message.c_str());
+        render_text(FONT_HACK_WHITE, prompt_str, ivec2(16, MINIMAP_RECT.y - 32));
+        if (state.chat_cursor_visible) {
+            int prompt_width = render_get_text_size(FONT_HACK_WHITE, prompt_str).x;
+            ivec2 cursor_pos = ivec2(16 + prompt_width - 2, MINIMAP_RECT.y - 33);
+            render_text(FONT_HACK_WHITE, "|", cursor_pos);
         }
     }
 

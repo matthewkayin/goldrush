@@ -74,6 +74,12 @@ struct Alert {
     uint32_t timer;
 };
 
+struct ChatMessage {
+    std::string message;
+    uint32_t timer;
+    uint8_t player_id;
+};
+
 struct MatchUiState {
     MatchUiMode mode;
     uint32_t turn_timer;
@@ -97,8 +103,12 @@ struct MatchUiState {
 
     EntityType building_type;
 
+    std::string chat_message;
+    std::vector<ChatMessage> chat;
     std::vector<Alert> alerts;
     uint32_t sound_cooldown_timers[SOUND_COUNT];
+    bool chat_cursor_visible;
+    uint32_t chat_cursor_blink_timer;
 
     Animation rally_flag_animation;
     Animation move_animation;
@@ -126,6 +136,7 @@ void match_ui_show_status(MatchUiState& state, const char* message);
 ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset);
 bool match_ui_building_can_be_placed(const MatchUiState& state);
 Rect match_ui_get_selection_list_item_rect(uint32_t selection_index);
+void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const char* message);
 
 void match_ui_render(const MatchUiState& state);
 
