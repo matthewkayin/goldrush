@@ -276,7 +276,8 @@ void match_ui_handle_input(MatchUiState& state) {
                         .type = MATCH_INPUT_BUILDING_ENQUEUE,
                         .building_enqueue = (MatchInputBuildingEnqueue) {
                             .building_id = state.match.entities.get_id_of(selected_building_index),
-                            .item = item
+                            .item_type = (uint8_t)item.type,
+                            .item_subtype = (uint32_t)item.unit_type
                         }
                     });
                 }
@@ -391,7 +392,7 @@ void match_ui_handle_input(MatchUiState& state) {
         }
 
         // Add buildings to rally point input
-        input.rally.building_count = (uint8_t)state.selection.size();
+        input.rally.building_count = state.selection.size();
         memcpy(&input.rally.building_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
 
         state.input_queue.push_back(input);
@@ -1135,7 +1136,7 @@ void match_ui_order_move(MatchUiState& state) {
     }
 
     // Populate move input entity ids
-    input.move.entity_count = (uint16_t)state.selection.size();
+    input.move.entity_count = state.selection.size();
     memcpy(input.move.entity_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
 
     if (input.type == MATCH_INPUT_MOVE_REPAIR) {

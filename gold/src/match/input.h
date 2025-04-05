@@ -49,7 +49,8 @@ struct MatchInputBuildCancel {
 
 struct MatchInputBuildingEnqueue {
     EntityId building_id;
-    BuildingQueueItem item;
+    uint8_t item_type;
+    uint32_t item_subtype;
 };
 
 struct MatchInputBuildingDequeue {

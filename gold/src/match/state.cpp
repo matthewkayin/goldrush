@@ -43,11 +43,21 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
         state.detection[player_id] = std::vector<int>(state.map.width * state.map.height, 0);
 
         if (state.players[player_id].active) {
+            // Place town hall
             ivec2 town_hall_cell = map_get_player_town_hall_cell(state.map, player_spawns[player_id]);
-            match_create_entity(state, ENTITY_MINER, town_hall_cell, player_id);
-            match_create_entity(state, ENTITY_MINER, town_hall_cell + ivec2(1, 0), player_id);
-            match_create_entity(state, ENTITY_MINER, town_hall_cell + ivec2(1, 1), player_id);
-            match_create_entity(state, ENTITY_MINER, town_hall_cell + ivec2(0, 1), player_id);
+            EntityId hall_id = match_create_entity(state, ENTITY_HALL, town_hall_cell, player_id);
+            Entity& hall = state.entities.get_by_id(hall_id);
+            hall.health = entity_get_data(hall.type).max_health;
+            hall.mode = MODE_BUILDING_FINISHED;
+
+            // Place miners
+            Target goldmine_target = match_entity_target_nearest_gold_mine(state, hall);
+            GOLD_ASSERT(goldmine_target.type != TARGET_NONE);
+            Entity& mine = state.entities.get_by_id(goldmine_target.id);
+            for (int index = 0; index < 3; index++) {
+                ivec2 exit_cell = map_get_exit_cell(state.map, hall.cell, entity_get_data(hall.type).cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+                match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
+            }
         }
     }
 
@@ -326,7 +336,16 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
         }
         case MATCH_INPUT_BUILDING_ENQUEUE: {
             uint32_t building_index = state.entities.get_index_of(input.building_enqueue.building_id);
-            BuildingQueueItem item = input.building_enqueue.item;
+            BuildingQueueItem item;
+            item.type = (BuildingQueueItemType)input.building_enqueue.item_type;
+            switch (item.type) {
+                case BUILDING_QUEUE_ITEM_UNIT:
+                    item.unit_type = (EntityType)input.building_enqueue.item_subtype;
+                    break;
+                case BUILDING_QUEUE_ITEM_UPGRADE: 
+                    item.upgrade = input.building_enqueue.item_subtype;
+                    break;
+            }
             if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
                 return;
             }
