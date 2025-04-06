@@ -217,6 +217,10 @@ void input_set_hotkey_group(uint32_t group) {
     if ((group & INPUT_HOTKEY_GROUP_HALL) == INPUT_HOTKEY_GROUP_HALL) {
         state.hotkey_group[0] = INPUT_HOTKEY_MINER;
     }
+    if ((group & INPUT_HOTKEY_GROUP_SALOON) == INPUT_HOTKEY_GROUP_SALOON) {
+        state.hotkey_group[0] = INPUT_HOTKEY_COWBOY;
+        state.hotkey_group[1] = INPUT_HOTKEY_BANDIT;
+    } 
 }
 
 InputAction input_get_hotkey(uint32_t index) {
@@ -266,8 +270,10 @@ void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
     state.hotkey_mapping[INPUT_HOTKEY_HALL] = SDLK_t;
     state.hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDLK_e;
-    state.hotkey_mapping[INPUT_HOTKEY_SALOON] = SDLK_a;
-    state.hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_s;
-    state.hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_b;
+    state.hotkey_mapping[INPUT_HOTKEY_SALOON] = SDLK_s;
+    state.hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_b;
+    state.hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_r;
     state.hotkey_mapping[INPUT_HOTKEY_MINER] = SDLK_e;
+    state.hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_c;
+    state.hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_b;
 }

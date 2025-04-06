@@ -923,7 +923,7 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Update cursor
-    cursor_set(match_ui_is_targeting(state) && !match_ui_is_mouse_in_ui() ? CURSOR_TARGET : CURSOR_DEFAULT);
+    cursor_set(match_ui_is_targeting(state) && (!match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position())) ? CURSOR_TARGET : CURSOR_DEFAULT);
     if ((match_ui_is_targeting(state) || state.mode == MATCH_UI_MODE_BUILDING_PLACE || state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2) && state.selection.empty()) {
         state.mode = MATCH_UI_MODE_NONE;
     }
@@ -963,6 +963,10 @@ void match_ui_update(MatchUiState& state) {
                         }
                         case ENTITY_HALL: {
                             hotkey_group |= INPUT_HOTKEY_GROUP_HALL;
+                            break;
+                        }
+                        case ENTITY_SALOON: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_SALOON;
                             break;
                         }
                         default:
@@ -1099,6 +1103,27 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
 
 void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selection) {
     state.selection = selection;
+
+    for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+        uint32_t entity_index = state.match.entities.get_index_of(state.selection[selection_index]);
+        if (entity_index == INDEX_INVALID || !entity_is_selectable(state.match.entities[entity_index])) {
+            state.selection.erase(state.selection.begin() + selection_index);
+            selection_index--;
+            continue;
+        }
+    }
+
+    while (state.selection.size() > SELECTION_LIMIT) {
+        state.selection.pop_back();
+    }
+
+    state.mode = MATCH_UI_MODE_NONE;
+    /*
+    TODO
+    if (engine.options[OPTION_UNIT_VOICES] == VOICES_ON && match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_TYPE_UNITS) {
+        sound_play(SOUND_UNIT_HEY);
+    }
+    */
 }
 
 MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, const std::vector<EntityId>& selection) {
@@ -1241,7 +1266,7 @@ void match_ui_order_move(MatchUiState& state) {
         state.move_animation_entity_id = remembered_entity_id;
     } else if (input.type == MATCH_INPUT_MOVE_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_UNLOAD || input.type == MATCH_INPUT_MOVE_SMOKE) {
         state.move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
-        state.move_animation_position = input_get_mouse_position() + state.camera_offset;
+        state.move_animation_position = move_target;
         state.move_animation_entity_id = ID_NULL;
     } else {
         state.move_animation = animation_create(input.type == MATCH_INPUT_MOVE_ATTACK_ENTITY ? ANIMATION_UI_MOVE_ATTACK_ENTITY : ANIMATION_UI_MOVE_ENTITY);
@@ -2336,7 +2361,14 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        MinimapPixel pixel = entity.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.match.players[entity.player_id].recolor_id);
+        MinimapPixel pixel;
+        if (entity.type == ENTITY_GOLDMINE) {
+            pixel = MINIMAP_PIXEL_GOLD;
+        } else if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
+            pixel = MINIMAP_PIXEL_WHITE;
+        } else {
+            pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.match.players[entity.player_id].recolor_id);
+        }
         int entity_cell_size = entity_get_data(entity.type).cell_size;
         Rect entity_rect = (Rect) {
             .x = entity.cell.x, .y = entity.cell.y,

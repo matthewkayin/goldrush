@@ -920,6 +920,22 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 6
         }
     }},
+    { SPRITE_UNIT_COWBOY, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_cowboy.png",
+            .hframes = 15,
+            .vframes = 3 
+        }
+    }},
+    { SPRITE_UNIT_BANDIT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_bandit.png",
+            .hframes = 15,
+            .vframes = 3
+        }
+    }},
     { SPRITE_MINER_BUILDING, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {

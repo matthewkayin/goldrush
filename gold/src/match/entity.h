@@ -138,6 +138,7 @@ struct EntityDataUnit {
     uint32_t population_cost;
     fixed speed;
 
+    SoundName attack_sound;
     int damage;
     int attack_cooldown;
     int range_squared;

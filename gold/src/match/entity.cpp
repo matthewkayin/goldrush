@@ -44,6 +44,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 200),
 
+            .attack_sound = SOUND_PICKAXE,
             .damage = 3,
             .attack_cooldown = 22,
             .range_squared = 1,
@@ -52,7 +53,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_COWBOY, (EntityData) {
         .name = "Cowboy",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_COWBOY,
         .icon = SPRITE_BUTTON_ICON_COWBOY,
         .death_sound = SOUND_DEATH,
         .cell_size = 1,
@@ -72,6 +73,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 200),
 
+            .attack_sound = SOUND_GUN,
             .damage = 8,
             .attack_cooldown = 40,
             .range_squared = 25,
@@ -80,7 +82,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_BANDIT, (EntityData) {
         .name = "Bandit",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_BANDIT,
         .icon = SPRITE_BUTTON_ICON_BANDIT,
         .death_sound = SOUND_DEATH,
         .cell_size = 1,
@@ -100,6 +102,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
 
+            .attack_sound = SOUND_SWORD,
             .damage = 6,
             .attack_cooldown = 15,
             .range_squared = 1,
@@ -128,6 +131,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(1, 20),
 
+            .attack_sound = SOUND_PICKAXE,
             .damage = 0,
             .attack_cooldown = 0,
             .range_squared = 1,
@@ -156,6 +160,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(1, 20),
 
+            .attack_sound = SOUND_PICKAXE,
             .damage = 0,
             .attack_cooldown = 0,
             .range_squared = 1,
@@ -184,6 +189,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(1, 40),
 
+            .attack_sound = SOUND_GUN,
             .damage = 8,
             .attack_cooldown = 30,
             .range_squared = 25,
@@ -212,6 +218,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
 
+            .attack_sound = SOUND_PICKAXE,
             .damage = 200,
             .attack_cooldown = 15,
             .range_squared = 1,
@@ -240,6 +247,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 200),
 
+            .attack_sound = SOUND_PICKAXE,
             .damage = 0,
             .attack_cooldown = 15,
             .range_squared = 1,
@@ -268,6 +276,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 170),
 
+            .attack_sound = SOUND_MUSKET,
             .damage = 15,
             .attack_cooldown = 30,
             .range_squared = 49,
@@ -296,6 +305,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(0, 140),
 
+            .attack_sound = SOUND_CANNON,
             .damage = 20,
             .attack_cooldown = 60,
             .range_squared = 49,
@@ -324,10 +334,11 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 170),
 
+            .attack_sound = SOUND_GUN,
             .damage = 5,
             .attack_cooldown = 45,
             .range_squared = 24,
-            .min_range_squared = 1 
+            .min_range_squared = 1
         }
     }},
     { ENTITY_HALL, (EntityData) {

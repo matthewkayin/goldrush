@@ -118,6 +118,20 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }
+    }},
+    { INPUT_HOTKEY_COWBOY, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_COWBOY,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_BANDIT, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_BANDIT,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
     }}
 };
 

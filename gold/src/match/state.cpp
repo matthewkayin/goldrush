@@ -8,6 +8,7 @@ static const uint32_t MATCH_PLAYER_STARTING_GOLD = 500;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 50;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
+static const uint32_t UNIT_HEALTH_REGEN_DELAY = 600;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t UNIT_IN_MINE_DURATION = 150;
@@ -15,6 +16,8 @@ static const uint32_t UNIT_MAX_GOLD_HELD = 5;
 static const int UNIT_BLOCKED_DURATION = 30;
 static const int SMOKE_BOMB_THROW_RANGE_SQUARED = 36;
 static const uint32_t BUILDING_FADE_DURATION = 300;
+static const uint32_t ENTITY_BUNKER_FIRE_OFFSET = 10;
+static const int SOLDIER_BAYONET_DAMAGE = 4;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -527,6 +530,10 @@ EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left
     entity.garrison_id = ID_NULL;
     entity.gold_held = gold_left;
 
+    entity.taking_damage_counter = 0;
+    entity.taking_damage_timer = 0;
+    entity.health_regen_timer = 0;
+
     EntityId id = state.entities.push_back(entity);
     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_get_data(entity.type).cell_size, (Cell) {
         .type = CELL_GOLDMINE,
@@ -594,6 +601,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 }
 
                 // If unit is idle, try to find a nearby target
+                if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && entity_data.unit_data.damage != 0) {
+                    entity.target = match_entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
+                }
 
                 // If unit is still idle, do nothing
                 if (entity.target.type == TARGET_NONE) {
@@ -742,17 +752,17 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             mine.mode = MODE_MINE_PRIME;
                             entity_set_flag(mine, ENTITY_FLAG_INVISIBLE, false);
                         }
+                        */
                         if (entity.target.type == TARGET_ATTACK_CELL) {
-                            target_t attack_target = entity_target_nearest_enemy(state, entity);
+                            Target attack_target = match_entity_target_nearest_enemy(state, entity);
                             if (attack_target.type != TARGET_NONE) {
                                 entity.target = attack_target;
                                 entity.path.clear();
-                                entity.mode = entity_has_reached_target(state, entity) ? MODE_UNIT_MOVE_FINISHED : MODE_UNIT_IDLE;
+                                entity.mode = match_has_entity_reached_target(state, entity) ? MODE_UNIT_MOVE_FINISHED : MODE_UNIT_IDLE;
                                 // breaks out of while movement left > 0
                                 break;
                             }
                         }
-                        */
                         if (match_is_target_invalid(state, entity.target)) {
                             entity.mode = MODE_UNIT_IDLE;
                             entity.target = (Target) { .type = TARGET_NONE };
@@ -804,10 +814,12 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 switch (entity.target.type) {
                     case TARGET_NONE:
                     case TARGET_ATTACK_CELL:
-                    case TARGET_CELL: 
-                    default: {
+                    case TARGET_CELL: {
                         entity.target = (Target) { .type = TARGET_NONE };
                         entity.mode = MODE_UNIT_IDLE;
+                        break;
+                    }
+                    case TARGET_SMOKE: {
                         break;
                     }
                     case TARGET_BUILD: {
@@ -905,6 +917,62 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                         Entity& target = state.entities.get_by_id(entity.target.id);
                         const EntityData& target_data = entity_get_data(target.type);
+
+                        // Begin attack
+                        if (entity.target.type == TARGET_ATTACK_ENTITY && entity_data.unit_data.damage != 0) {
+                            if (entity.cooldown_timer != 0) {
+                                entity.mode = MODE_UNIT_IDLE;
+                                update_finished = true;
+                                break;
+                            }
+
+                            // Check min range
+                            Rect entity_rect = (Rect) {
+                                .x = entity.cell.x, .y = entity.cell.y,
+                                .w = entity_data.cell_size, .h = entity_data.cell_size
+                            };
+                            Rect target_rect = (Rect) {
+                                .x = target.cell.x, .y = target.cell.y,
+                                .w = target_data.cell_size, .h = target_data.cell_size
+                            };
+                            bool attack_with_bayonets = false;
+                            if (Rect::euclidean_distance_squared_between(entity_rect, target_rect) < entity_data.unit_data.min_range_squared) {
+                                // if (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
+                                    // attack_with_bayonets = true;
+                                // } else {
+                                    entity.direction = enum_direction_to_rect(entity.cell, target.cell, target_data.cell_size);
+                                    entity.mode = MODE_UNIT_IDLE;
+                                    update_finished = true;
+                                    break;
+                                // }
+                            }
+
+                            if (entity.type == ENTITY_SOLDIER && !attack_with_bayonets && !entity_check_flag(entity, ENTITY_FLAG_CHARGED)) {
+                                entity.mode = MODE_UNIT_SOLDIER_CHARGE;
+                                update_finished = true;
+                                break;
+                            }
+
+                            // Attack inside bunker
+                            if (entity.garrison_id != ID_NULL) {
+                                Entity& carrier = state.entities.get_by_id(entity.garrison_id);
+                                // Don't attack during bunker cooldown or if this is a melee unit
+                                if (carrier.cooldown_timer != 0 || entity_data.unit_data.range_squared == 1) {
+                                    update_finished = true;
+                                    break;
+                                }
+
+                                carrier.cooldown_timer = ENTITY_BUNKER_FIRE_OFFSET;
+                            }
+
+                            // Begin attack windup
+                            entity.direction = enum_direction_to_rect(entity.cell, target.cell, target_data.cell_size);
+                            entity.mode = entity.type == ENTITY_SOLDIER && !attack_with_bayonets
+                                            ? MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP
+                                            : MODE_UNIT_ATTACK_WINDUP;
+                            update_finished = true;
+                            break;
+                        }
 
                         // Return gold
                         if (entity.type == ENTITY_MINER && target.type == ENTITY_HALL && 
@@ -1113,6 +1181,47 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     }
                 }
 
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_ATTACK_WINDUP:
+            case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP: {
+                if (match_is_target_invalid(state, entity.target)) {
+                    entity.target = (Target) {
+                        .type = TARGET_NONE
+                    };
+                    entity.mode = MODE_UNIT_IDLE;
+                    break;
+                }
+
+                if (!animation_is_playing(entity.animation)) {
+                    match_entity_attack_target(state, entity_id, state.entities.get_by_id(entity.target.id));
+                    match_event_play_sound(state, entity_data.unit_data.attack_sound, entity.position.to_ivec2());
+                    if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
+                        entity_set_flag(entity, ENTITY_FLAG_CHARGED, false);
+                        entity.mode = MODE_UNIT_SOLDIER_CHARGE;
+                    } else {
+                        entity.cooldown_timer = entity_data.unit_data.attack_cooldown;
+                        entity.mode = MODE_UNIT_IDLE;
+                    }
+
+                    // If garrisoned, re-asses targets
+                    if (entity.garrison_id != ID_NULL) {
+                        entity.target = match_entity_target_nearest_enemy(state, entity);
+                    }
+                }
+
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_DEATH: {
+                if (!animation_is_playing(entity.animation)) {
+                    map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
+                        .type = CELL_EMPTY, .id = ID_NULL
+                    });
+                    // TOOD: entity on death release garrisoned units
+                    entity.mode = MODE_UNIT_DEATH_FADE;
+                }
                 update_finished = true;
                 break;
             }
@@ -1653,6 +1762,144 @@ Target match_entity_target_nearest_hall(const MatchState& state, const Entity& e
         .type = TARGET_ENTITY,
         .id = state.entities.get_id_of(nearest_enemy_index)
     };
+}
+
+Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& entity) {
+    const EntityData& entity_data = entity_get_data(entity.type);
+    Rect entity_rect = (Rect) { 
+        .x = entity.cell.x, .y = entity.cell.y, 
+        .w = entity_data.cell_size, .h = entity_data.cell_size
+    };
+    Rect entity_sight_rect = (Rect) {
+        .x = entity.cell.x - entity_data.sight,
+        .y = entity.cell.y - entity_data.sight,
+        .w = 2 * entity_data.sight,
+        .h = 2 * entity_data.sight
+    };
+    uint32_t nearest_enemy_index = INDEX_INVALID;
+    int nearest_enemy_dist = -1;
+    uint32_t nearest_attack_priority;
+
+    for (uint32_t other_index = 0; other_index < state.entities.size(); other_index++) {
+        const Entity& other = state.entities[other_index];
+        const EntityData& other_data = entity_get_data(other.type);
+
+        // Goldmines are not enemies
+        if (other.type == ENTITY_GOLDMINE) {
+            continue;
+        }
+        // Allies are not enemies
+        if (state.players[other.player_id].team == state.players[entity.player_id].team) {
+            continue;
+        } 
+        // Don't attack non-selectable entities
+        if (!entity_is_selectable(other)) {
+            continue;
+        }
+        // Don't attack entities that the player can't see
+        if (!match_is_entity_visible_to_player(state, other, entity.player_id)) {
+            continue;
+        }
+        // Don't attack entities that this unit can't see
+        Rect other_rect = (Rect) { 
+            .x = other.cell.x, .y = other.cell.y, 
+            .w = other_data.cell_size, .h = other_data.cell_size
+        };
+        if (!entity_sight_rect.intersects(other_rect)) {
+            continue;
+        }
+
+        int other_dist = Rect::euclidean_distance_squared_between(entity_rect, other_rect);
+        uint32_t other_attack_priority = other_data.attack_priority;
+        if (nearest_enemy_index == INDEX_INVALID || other_attack_priority > nearest_attack_priority || (other_dist < nearest_enemy_dist && other_attack_priority == nearest_attack_priority)) {
+            nearest_enemy_index = other_index;
+            nearest_enemy_dist = other_dist;
+            nearest_attack_priority = other_attack_priority;
+        }
+    }
+
+    if (nearest_enemy_index == INDEX_INVALID) {
+        return (Target) {
+            .type = TARGET_NONE
+        };
+    }
+
+    return (Target) {
+        .type = TARGET_ATTACK_ENTITY,
+        .id = state.entities.get_id_of(nearest_enemy_index)
+    };
+}
+
+void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity& defender) {
+    const Entity& attacker = state.entities.get_by_id(attacker_id);
+    const EntityData& attacker_data = entity_get_data(attacker.type);
+    const EntityData& defender_data = entity_get_data(defender.type);
+
+    // Calculate damage
+    bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;
+    int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
+    int damage = std::max(1, attacker_damage - defender_data.armor);
+
+    // Calculate accuracy
+    int accuracy = 100;
+    if (defender.type == ENTITY_LANDMINE && defender.mode == MODE_MINE_PRIME) {
+        accuracy = 0;
+        damage = 0;
+    }
+    if (entity_get_elevation(attacker, state.map) < entity_get_elevation(defender, state.map)) {
+        accuracy /= 2;
+    } 
+
+    // TODO: check for smoke clouds
+
+    // TODO: create bunker particle, even on misses
+    // TODO: reveal cell on highground, even on misses
+
+    bool attack_missed = accuracy < lcg_rand() % 100;
+    if (attack_missed) {
+        return;
+    }
+
+    // TODO: cannon splash damage
+    if (attacker.type == ENTITY_CANNON) {
+
+    } else {
+        defender.health = std::max(0, defender.health - damage);
+    }
+    // TODO: particle effect
+
+    match_entity_on_attack(state, attacker_id, defender);
+}
+
+void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& defender) {
+    const Entity& attacker = state.entities.get_by_id(attacker_id);
+    const EntityData& defender_data = entity_get_data(defender.type);
+
+    // Alerts / taking damage flicker
+    if (attacker.player_id != defender.player_id) {
+        if (defender.taking_damage_counter == 0) {
+            match_event_alert(state, MATCH_ALERT_TYPE_ATTACK, defender.player_id, defender.cell, defender_data.cell_size);
+        }
+    }
+    defender.taking_damage_counter = 3;
+    if (defender.taking_damage_timer == 0) {
+        defender.taking_damage_timer = MATCH_TAKING_DAMAGE_FLICKER_DURATION;
+    }
+
+    // Health regen timer
+    if (entity_is_unit(defender.type)) {
+        defender.health_regen_timer = UNIT_HEALTH_REGEN_DURATION + UNIT_HEALTH_REGEN_DELAY;
+    }
+
+    // Make defender attack back
+    if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE &&
+            defender.target.type == TARGET_NONE && defender_data.unit_data.damage != 0 &&
+            defender.player_id != attacker.player_id && match_is_entity_visible_to_player(state, attacker, defender.player_id)) {
+        defender.target = (Target) {
+            .type = TARGET_ATTACK_ENTITY,
+            .id = attacker_id
+        };
+    }
 }
 
 // EVENTS
