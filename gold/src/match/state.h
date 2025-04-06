@@ -113,6 +113,15 @@ struct RememberedEntity {
     int recolor_id;
 };
 
+// Particles
+
+struct Particle {
+    SpriteName sprite;
+    Animation animation;
+    int vframe;
+    ivec2 position;
+};
+
 struct MatchState {
     Map map;
     std::vector<int> fog[MAX_PLAYERS];
@@ -121,6 +130,7 @@ struct MatchState {
     bool is_fog_dirty;
 
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
+    std::vector<Particle> particles;
     MatchPlayer players[MAX_PLAYERS];
     std::vector<MatchEvent> events;
 };

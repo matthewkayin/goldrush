@@ -912,6 +912,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
+    { SPRITE_UNIT_WAR_WAGON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_war_wagon.png",
+            .hframes = 15,
+            .vframes = 3
+        }
+    }},
     { SPRITE_UNIT_MINER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {
@@ -1029,6 +1037,22 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .sheet = (SpriteParamsSheet) {
             .path = "rally_flag.png",
             .hframes = 6,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_PARTICLE_SPARKS, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "particle_sparks.png",
+            .hframes = 4,
+            .vframes = 3
+        }
+    }},
+    { SPRITE_PARTICLE_BUNKER_FIRE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "particle_bunker_cowboy.png",
+            .hframes = 2,
             .vframes = 1
         }
     }}

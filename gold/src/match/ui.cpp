@@ -62,6 +62,7 @@ static const size_t CHAT_MAX_LENGTH = 64;
 static const uint32_t CHAT_MESSAGE_DURATION = 180;
 static const uint32_t CHAT_MAX_LINES = 8;
 static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
+static const int PARTICLE_SMOKE_CELL_SIZE = 7;
 
 // INIT
 
@@ -1646,6 +1647,33 @@ void match_ui_render(const MatchUiState& state) {
             match_ui_render_healthbar(params);
         }
         render_healthbar_params[render_layer].clear();
+    }
+
+    // Particles
+    for (const Particle& particle : state.match.particles) {
+        // Check if particle can be seen by player
+        if (particle.animation.name == ANIMATION_PARTICLE_SMOKE) {
+            ivec2 particle_top_left_cell = (particle.position / TILE_SIZE) - ivec2((PARTICLE_SMOKE_CELL_SIZE - 1) / 2, (PARTICLE_SMOKE_CELL_SIZE - 1) / 2);
+            bool particle_is_revealed = false;
+            for (int y = particle_top_left_cell.y; y < particle_top_left_cell.y + PARTICLE_SMOKE_CELL_SIZE; y++) {
+                for (int x = particle_top_left_cell.x; x < particle_top_left_cell.x + PARTICLE_SMOKE_CELL_SIZE; x++) {
+                    if (map_is_cell_in_bounds(state.match.map, ivec2(x, y)) && match_get_fog(state.match, state.match.players[network_get_player_id()].team, ivec2(x, y)) > 0) {
+                        particle_is_revealed = true;
+                        break;
+                    }
+                }
+                if (particle_is_revealed) {
+                    break;
+                }
+            }
+            if (!particle_is_revealed) {
+                continue;
+            }
+        } else if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, particle.position / TILE_SIZE, 1)) {
+            continue;
+        }
+
+        render_sprite_frame(particle.sprite, ivec2(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED, 0);
     }
 
     // Miners on gold counter

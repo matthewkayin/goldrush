@@ -1,6 +1,7 @@
 #include "match/state.h"
 
 #include "core/logger.h"
+#include "render/render.h"
 #include "hotkey.h"
 #include "lcg.h"
 
@@ -18,6 +19,10 @@ static const int SMOKE_BOMB_THROW_RANGE_SQUARED = 36;
 static const uint32_t BUILDING_FADE_DURATION = 300;
 static const uint32_t ENTITY_BUNKER_FIRE_OFFSET = 10;
 static const int SOLDIER_BAYONET_DAMAGE = 4;
+static const ivec2 BUNKER_PARTICLE_OFFSETS[4] = { ivec2(3, 23), ivec2(11, 26), ivec2(20, 25), ivec2(28, 23) };
+static const ivec2 WAR_WAGON_DOWN_PARTICLE_OFFSETS[4] = { ivec2(14, 6), ivec2(17, 8), ivec2(21, 6), ivec2(24, 8) };
+static const ivec2 WAR_WAGON_UP_PARTICLE_OFFSETS[4] = { ivec2(16, 20), ivec2(18, 22), ivec2(21, 20), ivec2(23, 22) };
+static const ivec2 WAR_WAGON_RIGHT_PARTICLE_OFFSETS[4] = { ivec2(7, 18), ivec2(11, 19), ivec2(12, 20), ivec2(16, 18) };
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -430,6 +435,30 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 void match_update(MatchState& state) {
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         match_entity_update(state, entity_index);
+    }
+
+    // Update particles
+    {
+        uint32_t particle_index = 0;
+        while (particle_index < state.particles.size()) {
+            animation_update(state.particles[particle_index].animation);
+
+            // On particle finish
+            if (!animation_is_playing(state.particles[particle_index].animation)) {
+                if (state.particles[particle_index].animation.name == ANIMATION_PARTICLE_SMOKE_START) {
+                    state.particles[particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE);
+                } else if (state.particles[particle_index].animation.name == ANIMATION_PARTICLE_SMOKE) {
+                    state.particles[particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE_END);
+                }
+            }
+
+            // If particle finished and is not playing an animation, then remove it
+            if (!animation_is_playing(state.particles[particle_index].animation)) {
+                state.particles.erase(state.particles.begin() + particle_index);
+            } else {
+                particle_index++;
+            }
+        }
     }
 
     // Remove any dead entities
@@ -1852,7 +1881,36 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
 
     // TODO: check for smoke clouds
 
-    // TODO: create bunker particle, even on misses
+    if (attacker.garrison_id != ID_NULL) {
+        Entity& carrier = state.entities.get_by_id(attacker.garrison_id);
+        int particle_index = lcg_rand() % 4;
+        ivec2 particle_position;
+        if (carrier.type == ENTITY_BUNKER) {
+            particle_position = (carrier.cell * TILE_SIZE) + BUNKER_PARTICLE_OFFSETS[particle_index];
+        } else if (carrier.type == ENTITY_WAR_WAGON) {
+            const SpriteInfo& wagon_sprite_info = render_get_sprite_info(SPRITE_UNIT_WAR_WAGON);
+            particle_position = carrier.position.to_ivec2() - (ivec2(wagon_sprite_info.frame_width, wagon_sprite_info.frame_height) / 2);
+            if (carrier.direction == DIRECTION_SOUTH) {
+                particle_position += WAR_WAGON_DOWN_PARTICLE_OFFSETS[particle_index];
+            } else if (carrier.direction == DIRECTION_NORTH) {
+                particle_position += WAR_WAGON_UP_PARTICLE_OFFSETS[particle_index];
+            } else {
+                ivec2 offset = WAR_WAGON_RIGHT_PARTICLE_OFFSETS[particle_index];
+                if (carrier.direction > DIRECTION_SOUTH) {
+                    offset.x = wagon_sprite_info.frame_width - offset.x;
+                }
+                particle_position += offset;
+            }
+        }
+
+        state.particles.push_back((Particle) {
+            .sprite = SPRITE_PARTICLE_BUNKER_FIRE,
+            .animation = animation_create(ANIMATION_PARTICLE_BUNKER_COWBOY),
+            .vframe = 0,
+            .position = particle_position
+        });
+    }
+
     // TODO: reveal cell on highground, even on misses
 
     bool attack_missed = accuracy < lcg_rand() % 100;
@@ -1866,7 +1924,23 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     } else {
         defender.health = std::max(0, defender.health - damage);
     }
-    // TODO: particle effect
+
+    // Create particle effect
+    if (attacker.type == ENTITY_CANNON) {
+
+    } else if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_DETECTIVE || attacker.type == ENTITY_JOCKEY) {
+        Rect defender_rect = entity_get_rect(defender);
+
+        ivec2 particle_position = ivec2(
+            defender_rect.x + (defender_rect.w / 4) + (lcg_rand() % (defender_rect.w / 2)),
+            defender_rect.y + (defender_rect.h / 4) + (lcg_rand() % (defender_rect.h / 2)));
+        state.particles.push_back((Particle) {
+            .sprite = SPRITE_PARTICLE_SPARKS,
+            .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
+            .vframe = lcg_rand() % 3,
+            .position = particle_position
+        });
+    }
 
     match_entity_on_attack(state, attacker_id, defender);
 }
