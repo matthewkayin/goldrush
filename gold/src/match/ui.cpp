@@ -1363,9 +1363,8 @@ void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const cha
 // RENDER
 
 void match_ui_render(const MatchUiState& state) {
-    static std::vector<RenderSpriteParams> render_sprite_params[RENDER_TOTAL_LAYER_COUNT];
-    static std::vector<RenderHealthbarParams> render_healthbar_params[RENDER_TOTAL_LAYER_COUNT];
-    static std::vector<RenderSpriteParams> above_fog_sprite_params;
+    static std::vector<RenderParams> ysort_params;
+    static std::vector<RenderParams> above_fog_sprite_params;
 
     ivec2 base_pos = ivec2(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
     ivec2 base_coords = ivec2(state.camera_offset.x / TILE_SIZE, state.camera_offset.y / TILE_SIZE);
@@ -1382,102 +1381,58 @@ void match_ui_render(const MatchUiState& state) {
         for (int x = 0; x < max_visible_tiles.x; x++) {
             int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.match.map.width);
             Tile tile = state.match.map.tiles[map_index];
-            // Render sand below walls
-            if (!(tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_WATER)) {
-                render_sprite_params[match_ui_get_render_layer(tile.elevation == 0 ? 0 : tile.elevation - 1, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
-                    .sprite = SPRITE_TILE_SAND1,
-                    .frame = ivec2(0, 0),
-                    .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
+
+            RenderParams tile_params = (RenderParams) {
+                .type = RENDER_PARAMS_SPRITE,
+                .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
+                .sprite = (RenderSpriteParams) {
+                    .sprite = tile.sprite,
+                    .frame = tile.frame,
                     .options = RENDER_SPRITE_NO_CULL,
                     .recolor_id = 0
-                });
-            }
+                }
+            };
 
-            // Render tile
-            render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_TILE)].push_back((RenderSpriteParams) {
-                .sprite = tile.sprite,
-                .frame = tile.frame,
-                .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
-                .options = RENDER_SPRITE_NO_CULL,
-                .recolor_id = 0
-            });
+            if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_WATER) {
+                render_sprite_frame(tile_params.sprite.sprite, tile_params.sprite.frame, tile_params.position, tile_params.sprite.options, tile_params.sprite.recolor_id);
+            } else if (map_is_tile_ramp(state.match.map, base_coords + ivec2(x, y))) {
+                render_sprite_frame(SPRITE_TILE_SAND1, ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                render_sprite_frame(tile_params.sprite.sprite, tile_params.sprite.frame, tile_params.position, tile_params.sprite.options, tile_params.sprite.recolor_id);
+            } else {
+                render_sprite_frame(SPRITE_TILE_SAND1, ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                ysort_params.push_back(tile_params);
+            }
 
             // Decorations
             Cell cell = state.match.map.cells[CELL_LAYER_GROUND][map_index];
             if (cell.type >= CELL_DECORATION_1 && cell.type <= CELL_DECORATION_5) {
-                render_sprite_params[match_ui_get_render_layer(tile.elevation, RENDER_LAYER_ENTITY)].push_back((RenderSpriteParams) {
-                    .sprite = SPRITE_DECORATION,
-                    .frame = ivec2(cell.type - CELL_DECORATION_1, 0),
+                ysort_params.push_back((RenderParams) {
+                    .type = RENDER_PARAMS_SPRITE,
                     .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
-                    .options = RENDER_SPRITE_NO_CULL,
-                    .recolor_id = 0
+                    .sprite = (RenderSpriteParams) {
+                        .sprite = SPRITE_DECORATION,
+                        .frame = ivec2(cell.type - CELL_DECORATION_1, 0),
+                        .options = RENDER_SPRITE_NO_CULL,
+                        .recolor_id = 0
+                    }
                 });
             }
         }  // End for each x
     } // End for each y
 
-    // Select rings and healthbars
-    for (EntityId id : state.selection) {
-        const Entity& entity = state.match.entities.get_by_id(id);
-        const EntityData& entity_data = entity_get_data(entity.type);
-        Rect entity_rect = entity_get_rect(entity);
-        uint16_t entity_elevation = entity_get_elevation(entity, state.match.map);
-        uint16_t render_layer = match_ui_get_render_layer(entity_elevation, RENDER_LAYER_SELECT_RING);
-
-        // Render select ring
-        ivec2 entity_center_position = entity_is_unit(entity.type) 
-                ? entity.position.to_ivec2()
-                : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
-        entity_center_position -= state.camera_offset;
-        render_sprite_params[render_layer].push_back((RenderSpriteParams) {
-            .sprite = match_ui_get_entity_select_ring(entity.type, entity.type == ENTITY_GOLDMINE ||
-                            (state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team)),
-            .frame = ivec2(0, 0),
-            .position = entity_center_position,
-            .options = RENDER_SPRITE_CENTERED,
-            .recolor_id = 0
-        });
-
-        // Render healthbar
-        ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state.camera_offset;
-        if (entity_data.max_health != 0) {
-            render_healthbar_params[render_layer].push_back((RenderHealthbarParams) {
-                .type = RENDER_HEALTHBAR,
-                .position = healthbar_position,
-                .size = ivec2(entity_rect.w, HEALTHBAR_HEIGHT),
-                .amount = entity.health,
-                .max = entity_data.max_health
-            });
-            healthbar_position.y += HEALTHBAR_HEIGHT + 1;
-        }
-
-        // Render garrison bar
-        if (entity_data.garrison_capacity != 0) {
-            render_healthbar_params[render_layer].push_back((RenderHealthbarParams) {
-                .type = RENDER_GARRISONBAR,
-                .position = healthbar_position,
-                .size = ivec2(entity_rect.w, HEALTHBAR_HEIGHT),
-                .amount = (int)entity.garrisoned_units.size(),
-                .max = (int)entity_data.garrison_capacity
-            });
-        }
-    }
-
     // Entities
-    for (const Entity& entity : state.match.entities) {
+    for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
+        const Entity& entity = state.match.entities[entity_index];
         if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
             continue;
         }
 
-        RenderSpriteParams params = (RenderSpriteParams) {
-            .sprite = entity_get_sprite(entity),
-            .frame = entity_get_animation_frame(entity),
+        RenderParams params = (RenderParams) {
+            .type = RENDER_PARAMS_ENTITY,
             .position = entity.position.to_ivec2() - state.camera_offset,
-            .options = RENDER_SPRITE_NO_CULL,
-            .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : state.match.players[entity.player_id].recolor_id
+            .entity_index = entity_index
         };
-
-        const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
+        const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
         if (entity_is_unit(entity.type)) {
             if (entity.mode == MODE_UNIT_BUILD) {
                 const Entity& building = state.match.entities.get_by_id(entity.target.id);
@@ -1487,15 +1442,9 @@ void match_ui_render(const MatchUiState& state) {
                                     ivec2(building_data.building_data.builder_positions_x[building_hframe],
                                           building_data.building_data.builder_positions_y[building_hframe])
                                     - state.camera_offset;
-                if (building_data.building_data.builder_flip_h[building_hframe]) {
-                    params.options |= RENDER_SPRITE_FLIP_H;
-                }
             } else {
                 params.position.x -= sprite_info.frame_width / 2;
                 params.position.y -= sprite_info.frame_height / 2;
-                if (entity.direction > DIRECTION_SOUTH) {
-                    params.options |= RENDER_SPRITE_FLIP_H;
-                }
             }
         }
 
@@ -1507,11 +1456,7 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        RenderLayer layer = entity.mode == MODE_UNIT_DEATH_FADE || 
-                            entity.mode == MODE_BUILDING_DESTROYED || 
-                            entity.type == ENTITY_LANDMINE
-                                ? RENDER_LAYER_MINE : RENDER_LAYER_ENTITY;
-        render_sprite_params[match_ui_get_render_layer(entity_get_elevation(entity, state.match.map), layer)].push_back(params);
+        ysort_params.push_back(params);
     }
 
     // Remembered entities
@@ -1524,12 +1469,15 @@ void match_ui_render(const MatchUiState& state) {
         const EntityData& entity_data = entity_get_data(it.second.type);
         const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
 
-        RenderSpriteParams params = (RenderSpriteParams) {
-            .sprite = entity_data.sprite,
-            .frame = it.second.frame,
+        RenderParams params = (RenderParams) {
+            .type = RENDER_PARAMS_SPRITE,
             .position = (it.second.cell * TILE_SIZE) - state.camera_offset,
-            .options = RENDER_SPRITE_NO_CULL,
-            .recolor_id = it.second.recolor_id
+            .sprite = (RenderSpriteParams) {
+                .sprite = entity_data.sprite,
+                .frame = it.second.frame,
+                .options = RENDER_SPRITE_NO_CULL,
+                .recolor_id = it.second.recolor_id
+            }
         };
 
         Rect render_rect = (Rect) {
@@ -1540,24 +1488,25 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        render_sprite_params[match_ui_get_render_layer(map_get_tile(state.match.map, it.second.cell).elevation, RENDER_LAYER_ENTITY)].push_back(params);
+        ysort_params.push_back(params);
     }
 
     // Move animation
     if (animation_is_playing(state.move_animation)) {
         if (state.move_animation.name == ANIMATION_UI_MOVE_CELL) {
-            RenderSpriteParams params = (RenderSpriteParams) {
-                .sprite = SPRITE_UI_MOVE,
-                .frame = state.move_animation.frame,
+            RenderParams params = (RenderParams) {
+                .type = RENDER_PARAMS_SPRITE,
                 .position = state.move_animation_position - state.camera_offset,
-                .options = RENDER_SPRITE_CENTERED,
-                .recolor_id = 0
+                .sprite = (RenderSpriteParams) {
+                    .sprite = SPRITE_UI_MOVE,
+                    .frame = state.move_animation.frame,
+                    .options = RENDER_SPRITE_CENTERED,
+                    .recolor_id = 0
+                }
             };
             ivec2 ui_move_cell = state.move_animation_position / TILE_SIZE;
             if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, ui_move_cell) > 0) {
-                render_sprite_params[match_ui_get_render_layer(
-                    map_get_tile(state.match.map, ui_move_cell).elevation, 
-                    RENDER_LAYER_SELECT_RING)].push_back(params);
+                ysort_params.push_back(params);
             } else {
                 above_fog_sprite_params.push_back(params);
             }
@@ -1573,31 +1522,13 @@ void match_ui_render(const MatchUiState& state) {
                         : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
                 entity_center_position -= state.camera_offset;
 
-                RenderSpriteParams params = (RenderSpriteParams) {
-                    .sprite = match_ui_get_entity_select_ring(entity.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY),
-                    .frame = ivec2(0, 0),
-                    .position = entity_center_position,
-                    .options = RENDER_SPRITE_CENTERED,
-                    .recolor_id = 0
-                };
-
-                uint16_t render_layer = match_ui_get_render_layer(entity_get_elevation(entity, state.match.map), RENDER_LAYER_SELECT_RING);
-                render_sprite_params[render_layer].push_back(params);
+                render_sprite_frame(match_ui_get_entity_select_ring(entity.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
             } else {
                 auto it = state.match.remembered_entities[state.match.players[network_get_player_id()].team].find(state.move_animation_entity_id);
                 if (it != state.match.remembered_entities[state.match.players[network_get_player_id()].team].end()) {
                     ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
 
-                    RenderSpriteParams params = (RenderSpriteParams) {
-                        .sprite = match_ui_get_entity_select_ring(it->second.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY),
-                        .frame = ivec2(0, 0),
-                        .position = entity_center_position,
-                        .options = RENDER_SPRITE_CENTERED,
-                        .recolor_id = 0
-                    };
-
-                    uint16_t render_layer = match_ui_get_render_layer(map_get_tile(state.match.map, it->second.cell).elevation, RENDER_LAYER_SELECT_RING);
-                    render_sprite_params[render_layer].push_back(params);
+                    render_sprite_frame(match_ui_get_entity_select_ring(it->second.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
                 }
             }
         }
@@ -1611,18 +1542,20 @@ void match_ui_render(const MatchUiState& state) {
                 continue;
             }
 
-            RenderSpriteParams params = (RenderSpriteParams) {
-                .sprite = SPRITE_RALLY_FLAG,
-                .frame = state.rally_flag_animation.frame,
+            RenderParams params = (RenderParams) {
+                .type = RENDER_PARAMS_SPRITE,
                 .position = building.rally_point - ivec2(4, 15) - state.camera_offset,
-                .options = 0,
-                .recolor_id = state.match.players[network_get_player_id()].recolor_id
+                .sprite = (RenderSpriteParams) {
+                    .sprite = SPRITE_RALLY_FLAG,
+                    .frame = state.rally_flag_animation.frame,
+                    .options = 0,
+                    .recolor_id = state.match.players[network_get_player_id()].recolor_id
+                }
             };
 
             ivec2 rally_cell = building.rally_point / TILE_SIZE;
             if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, rally_cell) > 0) {
-                uint16_t layer = match_ui_get_render_layer(map_get_tile(state.match.map, rally_cell).elevation, RENDER_LAYER_ENTITY);
-                render_sprite_params[layer].push_back(params);
+                ysort_params.push_back(params);
             } else {
                 above_fog_sprite_params.push_back(params);
             }
@@ -1630,24 +1563,67 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // Render sprite params
-    for (int render_layer = 0; render_layer < RENDER_TOTAL_LAYER_COUNT; render_layer++) {
-        // If this layer is one of the entity layers, y sort it
-        int elevation = render_layer / RENDER_LAYER_COUNT;
-        int render_layer_without_elevation = render_layer - (elevation * RENDER_LAYER_COUNT);
-        if (render_layer_without_elevation == RENDER_LAYER_ENTITY) {
-            match_ui_ysort_render_params(render_sprite_params[render_layer], 0, render_sprite_params[render_layer].size() - 1);
-        }
+    match_ui_ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+    for (const RenderParams& params : ysort_params) {
+        if (params.type == RENDER_PARAMS_SPRITE) {
+            render_sprite_frame(params.sprite.sprite, params.sprite.frame, params.position, params.sprite.options, params.sprite.recolor_id);
+        } else {
+            // Render entity
+            bool entity_is_selected = false;
+            for (EntityId id : state.selection) {
+                if (state.match.entities.get_index_of(id) == params.entity_index) {
+                    entity_is_selected = true;
+                }
+            }
 
-        for (const RenderSpriteParams& params : render_sprite_params[render_layer]) {
-            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
-        }
-        render_sprite_params[render_layer].clear();
+            const Entity& entity = state.match.entities[params.entity_index];
+            const EntityData& entity_data = entity_get_data(entity.type);
+            Rect entity_rect = entity_get_rect(entity);
 
-        for (const RenderHealthbarParams& params : render_healthbar_params[render_layer]) {
-            match_ui_render_healthbar(params);
+            if (entity_is_selected) {
+                // Select ring first 
+                ivec2 entity_center_position = entity_is_unit(entity.type) 
+                        ? entity.position.to_ivec2()
+                        : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
+                entity_center_position -= state.camera_offset;
+                SpriteName select_ring_sprite = match_ui_get_entity_select_ring(entity.type, entity.type == ENTITY_GOLDMINE ||
+                                        (state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team));
+                render_sprite_frame(select_ring_sprite, ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+
+                // Render healthbar
+                ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state.camera_offset;
+                if (entity_data.max_health != 0) {
+                    match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
+                    healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+                }
+
+                // Render garrison bar
+                if (entity_data.garrison_capacity != 0) {
+                    match_ui_render_healthbar(RENDER_GARRISONBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
+                }
+            }
+
+            // Render entity
+            uint32_t options = RENDER_SPRITE_NO_CULL;
+            if (entity_is_unit(entity.type)) {
+                if (entity.mode == MODE_UNIT_BUILD) {
+                    const Entity& building = state.match.entities.get_by_id(entity.target.id);
+                    const EntityData& building_data = entity_get_data(building.type);
+                    int building_hframe = entity_get_animation_frame(building).x;
+                    if (building_data.building_data.builder_flip_h[building_hframe]) {
+                        options |= RENDER_SPRITE_FLIP_H;
+                    }
+                } else {
+                    if (entity.direction > DIRECTION_SOUTH) {
+                        options |= RENDER_SPRITE_FLIP_H;
+                    }
+                }
+            }
+
+            render_sprite_frame(entity_get_sprite(entity), entity_get_animation_frame(entity), params.position, options, entity.type == ENTITY_GOLDMINE ? 0 : state.match.players[entity.player_id].recolor_id);
         }
-        render_healthbar_params[render_layer].clear();
     }
+    ysort_params.clear();
 
     // Particles
     for (const Particle& particle : state.match.particles) {
@@ -1774,8 +1750,8 @@ void match_ui_render(const MatchUiState& state) {
         }
     }
 
-    for (const RenderSpriteParams& params : above_fog_sprite_params) {
-        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+    for (const RenderParams& params : above_fog_sprite_params) {
+        render_sprite_frame(params.sprite.sprite, params.sprite.frame, params.position, params.sprite.options, params.sprite.recolor_id);
     }
     above_fog_sprite_params.clear();
 
@@ -2143,19 +2119,14 @@ void match_ui_render(const MatchUiState& state) {
                 render_text(FONT_WESTERN8_GOLD, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(36, 22));
             }
         } else {
-            RenderHealthbarParams params = (RenderHealthbarParams) {
-                .type = RENDER_HEALTHBAR,
-                .position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 35),
-                .size = ivec2(64, 12),
-                .amount = entity.health,
-                .max = entity_data.max_health
-            };
-            match_ui_render_healthbar(params);
+            ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 35);
+            ivec2 healthbar_size = ivec2(64, 12);
+            match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 
             char health_text[16];
             sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
             ivec2 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
-            ivec2 health_text_position = params.position + (params.size / 2) - (health_text_size / 2);
+            ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2);
             render_text(FONT_HACK_WHITE, health_text, health_text_position);
 
             if (entity_data.has_detection) {
@@ -2177,13 +2148,7 @@ void match_ui_render(const MatchUiState& state) {
                                     icon_rect.has_point(input_get_mouse_position());
             render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
             render_sprite_frame(entity_data.icon, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
-            match_ui_render_healthbar((RenderHealthbarParams) {
-                .type = RENDER_HEALTHBAR,
-                .position = ivec2(icon_rect.x + 1, icon_rect.y + 27 - (int)icon_hovered),
-                .size = ivec2(30, 4),
-                .amount = entity.health,
-                .max = entity_data.max_health
-            });
+            match_ui_render_healthbar(RENDER_HEALTHBAR, ivec2(icon_rect.x + 1, icon_rect.y + 27 - (int)icon_hovered), ivec2(30, 4), entity.health, entity_data.max_health);
         }
     }
     // End UI Selection List
@@ -2461,10 +2426,6 @@ void match_ui_render(const MatchUiState& state) {
 
 // RENDER FUNCTIONS
 
-uint16_t match_ui_get_render_layer(uint16_t elevation, RenderLayer layer) {
-    return (elevation * RENDER_LAYER_COUNT) + layer;
-}
-
 SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking) {
     if (type == ENTITY_GOLDMINE) {
         return SPRITE_SELECT_RING_GOLDMINE;
@@ -2486,27 +2447,27 @@ SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking) {
     return select_ring;
 }
 
-int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high) {
-    RenderSpriteParams pivot = params[high];
+int match_ui_ysort_render_params_partition(std::vector<RenderParams>& params, int low, int high) {
+    RenderParams pivot = params[high];
     int i = low - 1;
 
     for (int j = low; j <= high - 1; j++) {
         if (params[j].position.y < pivot.position.y) {
             i++;
-            RenderSpriteParams temp = params[j];
+            RenderParams temp = params[j];
             params[j] = params[i];
             params[i] = temp;
         }
     }
 
-    RenderSpriteParams temp = params[high];
+    RenderParams temp = params[high];
     params[high] = params[i + 1];
     params[i + 1] = temp;
 
     return i + 1;
 }
 
-void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high) {
+void match_ui_ysort_render_params(std::vector<RenderParams>& params, int low, int high) {
     if (low < high) {
         int partition_index = match_ui_ysort_render_params_partition(params, low, high);
         match_ui_ysort_render_params(params, low, partition_index - 1);
@@ -2514,12 +2475,12 @@ void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int l
     }
 }
 
-void match_ui_render_healthbar(const RenderHealthbarParams& params) {
+void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max) {
     Rect healthbar_rect = (Rect) { 
-        .x = params.position.x, 
-        .y = params.position.y, 
-        .w = params.size.x, 
-        .h = params.size.y 
+        .x = position.x, 
+        .y = position.y, 
+        .w = size.x, 
+        .h = size.y 
     };
 
     // Cull the healthbar
@@ -2528,10 +2489,10 @@ void match_ui_render_healthbar(const RenderHealthbarParams& params) {
     }
 
     Rect healthbar_subrect = healthbar_rect;
-    healthbar_subrect.w = (healthbar_rect.w * params.amount) / params.max;
+    healthbar_subrect.w = (healthbar_rect.w * amount) / max;
     
     RenderColor healthbar_color;
-    if (params.type == RENDER_GARRISONBAR) {
+    if (type == RENDER_GARRISONBAR) {
         healthbar_color = RENDER_COLOR_WHITE;
     } else if (healthbar_subrect.w <= healthbar_rect.w / 3) {
         healthbar_color = RENDER_COLOR_RED;
@@ -2542,9 +2503,9 @@ void match_ui_render_healthbar(const RenderHealthbarParams& params) {
     render_fill_rect(healthbar_subrect, healthbar_color);
     render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK);
 
-    if (params.type == RENDER_GARRISONBAR) {
-        for (int line_index = 1; line_index < params.max; line_index++) {
-            int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / params.max);
+    if (type == RENDER_GARRISONBAR) {
+        for (int line_index = 1; line_index < max; line_index++) {
+            int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / max);
             render_line(ivec2(line_x, healthbar_rect.y), ivec2(line_x, healthbar_rect.y + healthbar_rect.h - 1), RENDER_COLOR_OFFBLACK);
         }
     }
