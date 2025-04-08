@@ -221,6 +221,9 @@ void input_set_hotkey_group(uint32_t group) {
         state.hotkey_group[0] = INPUT_HOTKEY_COWBOY;
         state.hotkey_group[1] = INPUT_HOTKEY_BANDIT;
     } 
+    if ((group & INPUT_HOTKEY_GROUP_UNLOAD) == INPUT_HOTKEY_GROUP_UNLOAD) {
+        state.hotkey_group[3] = INPUT_HOTKEY_UNLOAD;
+    }
 }
 
 InputAction input_get_hotkey(uint32_t index) {
@@ -267,6 +270,7 @@ void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_BUILD] = SDLK_b;
     state.hotkey_mapping[INPUT_HOTKEY_BUILD2] = SDLK_v;
     state.hotkey_mapping[INPUT_HOTKEY_REPAIR] = SDLK_r;
+    state.hotkey_mapping[INPUT_HOTKEY_UNLOAD] = SDLK_x;
     state.hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
     state.hotkey_mapping[INPUT_HOTKEY_HALL] = SDLK_t;
     state.hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDLK_e;

@@ -442,6 +442,20 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 
             break;
         }
+        case MATCH_INPUT_UNLOAD: {
+            for (uint32_t id_index = 0; id_index < input.unload.carrier_count; id_index++) {
+                uint32_t carrier_index = state.entities.get_index_of(input.unload.carrier_ids[id_index]);
+                if (carrier_index == INDEX_INVALID || 
+                        !entity_is_selectable(state.entities[carrier_index]) || 
+                        state.entities[carrier_index].garrisoned_units.empty()) {
+                    continue;
+                }
+
+                Entity& carrier = state.entities[carrier_index];
+                match_entity_unload_unit(state, carrier, MATCH_ENTITY_UNLOAD_ALL);
+            }
+            break;
+        }
     }
 }
 

@@ -99,6 +99,14 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += sizeof(EntityId);
             break;
         }
+        case MATCH_INPUT_UNLOAD: {
+            memcpy(out_buffer + out_buffer_length, &input.unload.carrier_count, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.unload.carrier_ids, input.unload.carrier_count * sizeof(EntityId));
+            out_buffer_length += input.unload.carrier_count * sizeof(EntityId);
+            break;
+        }
     }
 }
 
@@ -197,6 +205,14 @@ MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_h
         case MATCH_INPUT_SINGLE_UNLOAD: {
             memcpy(&input.single_unload.entity_id, in_buffer + in_buffer_head, sizeof(EntityId));
             in_buffer_head += sizeof(EntityId);
+            break;
+        }
+        case MATCH_INPUT_UNLOAD: {
+            memcpy(&input.unload.carrier_count, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
+            memcpy(&input.unload.carrier_ids, in_buffer + in_buffer_head, input.unload.carrier_count * sizeof(EntityId));
+            in_buffer_head += input.unload.carrier_count * sizeof(EntityId);
             break;
         }
     }

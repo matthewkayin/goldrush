@@ -20,7 +20,8 @@ enum MatchInputType {
     MATCH_INPUT_BUILDING_ENQUEUE,
     MATCH_INPUT_BUILDING_DEQUEUE,
     MATCH_INPUT_RALLY,
-    MATCH_INPUT_SINGLE_UNLOAD
+    MATCH_INPUT_SINGLE_UNLOAD,
+    MATCH_INPUT_UNLOAD
 };
 
 struct MatchInputMove {
@@ -69,6 +70,11 @@ struct MatchInputSingleUnload {
     EntityId entity_id;
 };
 
+struct MatchInputUnload {
+    uint8_t carrier_count;
+    EntityId carrier_ids[SELECTION_LIMIT];
+};
+
 struct MatchInput {
     uint8_t type;
     union {
@@ -80,6 +86,7 @@ struct MatchInput {
         MatchInputBuildingDequeue building_dequeue;
         MatchInputRally rally;
         MatchInputSingleUnload single_unload;
+        MatchInputUnload unload;
     };
 };
 

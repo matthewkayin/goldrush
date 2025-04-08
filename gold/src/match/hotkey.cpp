@@ -63,6 +63,16 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .type = HOTKEY_REQUIRES_NONE
         }
     }},
+    { INPUT_HOTKEY_UNLOAD, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_ACTION,
+        .action = (HotkeyButtonActionInfo) {
+            .name = "Unload",
+            .sprite = SPRITE_BUTTON_ICON_UNLOAD
+        },
+        .requirements = (HotkeyButtonRequirements) { 
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
     { INPUT_HOTKEY_CANCEL, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {

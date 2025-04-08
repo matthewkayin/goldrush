@@ -280,6 +280,14 @@ void match_ui_handle_input(MatchUiState& state) {
                         state.input_queue.push_back(input);
                         break;
                     }
+                    case INPUT_HOTKEY_UNLOAD: {
+                        MatchInput input;
+                        input.type = MATCH_INPUT_UNLOAD;
+                        input.unload.carrier_count = (uint8_t)state.selection.size();
+                        memcpy(&input.unload.carrier_ids, &state.selection[0], input.unload.carrier_count * sizeof(EntityId));
+                        state.input_queue.push_back(input);
+                        break;
+                    }
                     default:
                         break;
                 }
@@ -997,7 +1005,10 @@ void match_ui_update(MatchUiState& state) {
                     if (entity_is_unit(first_entity.type)) {
                         hotkey_group |= INPUT_HOTKEY_GROUP_UNIT;
                     } else if (entity_is_building(first_entity.type) && !first_entity.queue.empty() && state.selection.size() == 1) {
-                        hotkey_group |= INPUT_HOTKEY_CANCEL;
+                        hotkey_group |= INPUT_HOTKEY_GROUP_CANCEL;
+                    }
+                    if (!first_entity.garrisoned_units.empty()) {
+                        hotkey_group |= INPUT_HOTKEY_GROUP_UNLOAD;
                     }
                     switch (first_entity.type) {
                         case ENTITY_MINER: {
