@@ -166,6 +166,7 @@ Target match_entity_target_nearest_hall(const MatchState& state, const Entity& e
 Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& entity);
 void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity& defender);
 void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& defender);
+uint32_t match_get_entity_garrisoned_occupancy(const MatchState& state, const Entity& entity);
 
 // Event
 

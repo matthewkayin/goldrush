@@ -1059,6 +1059,23 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             break;
                         }
 
+                        // Garrison
+                        if (entity.player_id == target.player_id && entity_data.garrison_size != ENTITY_CANNOT_GARRISON && 
+                                entity.target.type != TARGET_REPAIR && (entity_is_unit(target.type) || target.mode == MODE_BUILDING_FINISHED) &&
+                                match_get_entity_garrisoned_occupancy(state, target) + entity_data.garrison_size <= target_data.garrison_capacity) {
+                            target.garrisoned_units.push_back(entity_id);
+                            entity.garrison_id = entity.target.id;
+                            entity.mode = MODE_UNIT_IDLE;
+                            entity.target = (Target) { .type = TARGET_NONE };
+                            map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
+                                .type = CELL_EMPTY, .id = ID_NULL
+                            });
+                            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, false);
+                            match_event_play_sound(state, SOUND_GARRISON_IN, target.position.to_ivec2());
+                            update_finished = true;
+                            break;
+                        }
+
                         // Begin repair
                         if (entity_is_building(target.type) && entity.type == ENTITY_MINER && 
                                 state.players[entity.player_id].team == state.players[target.player_id].team &&
@@ -1974,6 +1991,14 @@ void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& def
             .id = attacker_id
         };
     }
+}
+
+uint32_t match_get_entity_garrisoned_occupancy(const MatchState& state, const Entity& entity) {
+    uint32_t occupancy = 0;
+    for (EntityId id : entity.garrisoned_units) {
+        occupancy += entity_get_data(state.entities.get_by_id(id).type).garrison_size;
+    }
+    return occupancy;
 }
 
 // EVENTS

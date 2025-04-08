@@ -141,3 +141,5 @@ int match_ui_ysort_render_params_partition(std::vector<RenderParams>& params, in
 void match_ui_ysort_render_params(std::vector<RenderParams>& params, int low, int high);
 void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max);
 void match_ui_render_target_build(const MatchUiState& state, const Target& target);
+void match_ui_render_entity_select_ring_and_healthbar(const MatchUiState& state, const Entity& entity);
+void match_ui_render_entity(const MatchUiState& state, const Entity& entity);
