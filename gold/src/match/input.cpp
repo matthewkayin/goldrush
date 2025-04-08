@@ -94,6 +94,11 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             out_buffer_length += input.rally.building_count * sizeof(EntityId);
             break;
         }
+        case MATCH_INPUT_SINGLE_UNLOAD: {
+            memcpy(out_buffer + out_buffer_length, &input.single_unload.entity_id, sizeof(EntityId));
+            out_buffer_length += sizeof(EntityId);
+            break;
+        }
     }
 }
 
@@ -187,6 +192,11 @@ MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_h
 
             memcpy(&input.rally.building_ids, in_buffer + in_buffer_head, input.rally.building_count * sizeof(EntityId));
             in_buffer_head += input.rally.building_count * sizeof(EntityId);
+            break;
+        }
+        case MATCH_INPUT_SINGLE_UNLOAD: {
+            memcpy(&input.single_unload.entity_id, in_buffer + in_buffer_head, sizeof(EntityId));
+            in_buffer_head += sizeof(EntityId);
             break;
         }
     }

@@ -54,6 +54,12 @@ static const Rect UI_BUILDING_QUEUE_PROGRESS_BAR_RECT = (Rect) {
     .y = 284 + 24,
     .w = 104, .h = 6
 };
+static const ivec2 MATCH_UI_GARRISON_ICON_POSITIONS[4] = {
+    BUILDING_QUEUE_TOP_LEFT,
+    BUILDING_QUEUE_TOP_LEFT + ivec2(36, 0),
+    BUILDING_QUEUE_TOP_LEFT + ivec2(36 * 2, 0),
+    BUILDING_QUEUE_TOP_LEFT + ivec2(36 * 3, 0)
+};
 
 static const int HEALTHBAR_HEIGHT = 4;
 static const int HEALTHBAR_PADDING = 3;
@@ -360,6 +366,42 @@ void match_ui_handle_input(MatchUiState& state) {
                 });
                 sound_play(SOUND_UI_CLICK);
                 return;
+            }
+        }
+    }
+
+    // Garrisoned unit click
+    if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+        !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
+        const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
+        if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
+            const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+            int index = 0;
+            for (EntityId entity_id : carrier.garrisoned_units) {
+                const Entity& garrisoned_unit = state.match.entities.get_by_id(entity_id);
+                // We have to make this check here because goldmines might have both allied and enemy units in them
+                if (garrisoned_unit.player_id != network_get_player_id()) {
+                    continue;
+                }
+
+                Rect icon_rect = (Rect) {
+                    .x = MATCH_UI_GARRISON_ICON_POSITIONS[index].x,
+                    .y = MATCH_UI_GARRISON_ICON_POSITIONS[index].y,
+                    .w = icon_sprite_info.frame_width,
+                    .h = icon_sprite_info.frame_height
+                };
+                if (icon_rect.has_point(input_get_mouse_position())) {
+                    state.input_queue.push_back((MatchInput) {
+                        .type = MATCH_INPUT_SINGLE_UNLOAD,
+                        .single_unload = (MatchInputSingleUnload) {
+                            .entity_id = entity_id
+                        }
+                    });
+                    sound_play(SOUND_UI_CLICK);
+                    return;
+                }
+
+                index++;
             }
         }
     }
@@ -2164,7 +2206,8 @@ void match_ui_render(const MatchUiState& state) {
                         break;
                     }
                 }
-                bool hovered = icon_rect.has_point(input_get_mouse_position());
+                bool hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
+                                    icon_rect.has_point(input_get_mouse_position());
                 render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
                 render_sprite_frame(item_sprite, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
             }
@@ -2180,6 +2223,36 @@ void match_ui_render(const MatchUiState& state) {
                 building_queue_progress_bar_subrect.w = (UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.w * (item_duration - (int)building.timer) / item_duration);
                 render_fill_rect(building_queue_progress_bar_subrect, RENDER_COLOR_WHITE);
                 render_draw_rect(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT, RENDER_COLOR_OFFBLACK);
+            }
+        }
+    }
+
+    // UI Garrisoned units
+    if (state.selection.size() == 1) {
+        const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
+        if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
+            const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+            int index = 0;
+            for (EntityId entity_id : carrier.garrisoned_units) {
+                const Entity& garrisoned_unit = state.match.entities.get_by_id(entity_id);
+                // We have to make this check here because goldmines might have both allied and enemy units in them
+                if (garrisoned_unit.player_id != network_get_player_id()) {
+                    continue;
+                }
+
+                const EntityData& garrisoned_unit_data = entity_get_data(garrisoned_unit.type);
+                Rect icon_rect = (Rect) {
+                    .x = MATCH_UI_GARRISON_ICON_POSITIONS[index].x,
+                    .y = MATCH_UI_GARRISON_ICON_POSITIONS[index].y,
+                    .w = icon_sprite_info.frame_width,
+                    .h = icon_sprite_info.frame_height
+                };
+                bool hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
+                                    icon_rect.has_point(input_get_mouse_position());
+                render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
+                render_sprite_frame(garrisoned_unit_data.icon, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
+                match_ui_render_healthbar(RENDER_HEALTHBAR, ivec2(icon_rect.x + 1, icon_rect.y + icon_rect.h - 5 - (int)hovered), ivec2(icon_rect.w - 2, 4), garrisoned_unit.health, garrisoned_unit_data.max_health);
+                index++;
             }
         }
     }

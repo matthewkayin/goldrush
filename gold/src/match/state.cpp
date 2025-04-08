@@ -429,6 +429,19 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
             break;
         }
+        case MATCH_INPUT_SINGLE_UNLOAD: {
+            uint32_t garrisoned_unit_index = state.entities.get_index_of(input.single_unload.entity_id);
+            if (garrisoned_unit_index == INDEX_INVALID || 
+                    state.entities[garrisoned_unit_index].health == 0 ||
+                    state.entities[garrisoned_unit_index].garrison_id == ID_NULL) {
+                return;
+            }
+
+            Entity& carrier = state.entities.get_by_id(state.entities[garrisoned_unit_index].garrison_id);
+            match_entity_unload_unit(state, carrier, input.single_unload.entity_id);
+
+            break;
+        }
     }
 }
 
@@ -1999,6 +2012,45 @@ uint32_t match_get_entity_garrisoned_occupancy(const MatchState& state, const En
         occupancy += entity_get_data(state.entities.get_by_id(id).type).garrison_size;
     }
     return occupancy;
+}
+
+void match_entity_unload_unit(MatchState& state, Entity& carrier, EntityId garrisoned_unit_id) {
+    const EntityData& carrier_data = entity_get_data(carrier.type);
+    uint32_t index = 0;
+    while (index < carrier.garrisoned_units.size()) {
+        if (garrisoned_unit_id == MATCH_ENTITY_UNLOAD_ALL || carrier.garrisoned_units[index] == garrisoned_unit_id) {
+            Entity& garrisoned_unit = state.entities.get_by_id(carrier.garrisoned_units[index]);
+            const EntityData& garrisoned_unit_data = entity_get_data(garrisoned_unit.type);
+
+            // Find the exit cell
+            ivec2 exit_cell = map_get_exit_cell(state.map, carrier.cell, carrier_data.cell_size, garrisoned_unit_data.cell_size, carrier.cell + ivec2(0, carrier_data.cell_size), false);
+            if (exit_cell.x == -1) {
+                if (entity_is_building(carrier.type)) {
+                    match_event_show_status(state, garrisoned_unit.player_id, MATCH_UI_STATUS_BUILDING_EXIT_BLOCKED);
+                }
+                return;
+            }
+
+            // Place the unit in the world
+            garrisoned_unit.cell = exit_cell;
+            garrisoned_unit.position = entity_get_target_position(garrisoned_unit);
+            map_set_cell_rect(state.map, CELL_LAYER_GROUND, garrisoned_unit.cell, garrisoned_unit_data.cell_size, (Cell) {
+                .type = CELL_UNIT, .id = carrier.garrisoned_units[index]
+            });
+            match_fog_update(state, state.players[garrisoned_unit.player_id].team, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, garrisoned_unit_data.has_detection, true);
+            garrisoned_unit.mode = MODE_UNIT_IDLE;
+            garrisoned_unit.target = (Target) { .type = TARGET_NONE };
+            garrisoned_unit.garrison_id = ID_NULL;
+            garrisoned_unit.gold_mine_id = ID_NULL;
+
+            // Remove the unit from the garrisoned units list
+            carrier.garrisoned_units.erase(carrier.garrisoned_units.begin() + index);
+
+            match_event_play_sound(state, SOUND_GARRISON_OUT, carrier.position.to_ivec2());
+        } else {
+            index++;
+        }
+    }
 }
 
 // EVENTS
