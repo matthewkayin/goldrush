@@ -281,11 +281,15 @@ void match_ui_handle_input(MatchUiState& state) {
                         break;
                     }
                     case INPUT_HOTKEY_UNLOAD: {
-                        MatchInput input;
-                        input.type = MATCH_INPUT_UNLOAD;
-                        input.unload.carrier_count = (uint8_t)state.selection.size();
-                        memcpy(&input.unload.carrier_ids, &state.selection[0], input.unload.carrier_count * sizeof(EntityId));
-                        state.input_queue.push_back(input);
+                        if (entity_is_unit(state.match.entities.get_by_id(state.selection[0]).type)) {
+                            state.mode = MATCH_UI_MODE_TARGET_UNLOAD;
+                        } else {
+                            MatchInput input;
+                            input.type = MATCH_INPUT_UNLOAD;
+                            input.unload.carrier_count = (uint8_t)state.selection.size();
+                            memcpy(&input.unload.carrier_ids, &state.selection[0], input.unload.carrier_count * sizeof(EntityId));
+                            state.input_queue.push_back(input);
+                        }
                         break;
                     }
                     default:
@@ -1509,7 +1513,11 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        ysort_params.push_back(params);
+        if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+            match_ui_render_entity(state, entity);
+        } else {
+            ysort_params.push_back(params);
+        }
     }
 
     // Remembered entities

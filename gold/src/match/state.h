@@ -169,6 +169,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
 void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& defender);
 uint32_t match_get_entity_garrisoned_occupancy(const MatchState& state, const Entity& entity);
 void match_entity_unload_unit(MatchState& state, Entity& carrier, EntityId garrisoned_unit_id);
+void match_entity_release_garrisoned_units_on_death(MatchState& state, Entity& entity);
 
 // Event
 

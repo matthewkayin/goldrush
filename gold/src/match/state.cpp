@@ -5,7 +5,7 @@
 #include "hotkey.h"
 #include "lcg.h"
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 500;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 50;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
@@ -55,7 +55,8 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
             ivec2 town_hall_cell = map_get_player_town_hall_cell(state.map, player_spawns[player_id]);
             EntityId hall_id = match_create_entity(state, ENTITY_HALL, town_hall_cell, player_id);
             Entity& hall = state.entities.get_by_id(hall_id);
-            hall.health = entity_get_data(hall.type).max_health;
+            const EntityData& hall_data = entity_get_data(hall.type);
+            hall.health = hall_data.max_health;
             hall.mode = MODE_BUILDING_FINISHED;
 
             // Place miners
@@ -63,8 +64,46 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
             GOLD_ASSERT(goldmine_target.type != TARGET_NONE);
             Entity& mine = state.entities.get_by_id(goldmine_target.id);
             for (int index = 0; index < 3; index++) {
-                ivec2 exit_cell = map_get_exit_cell(state.map, hall.cell, entity_get_data(hall.type).cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+                ivec2 exit_cell = map_get_exit_cell(state.map, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
+            }
+
+            // Place scout
+            {
+                const EntityData& mine_data = entity_get_data(ENTITY_GOLDMINE);
+                ivec2 scout_cell = ivec2(-1, -1);
+                if (hall.cell.y + hall_data.cell_size < mine.cell.y || mine.cell.y + mine_data.cell_size < hall.cell.y) {
+                    // if y-aligned, place 
+                    for (int x = hall.cell.x - 3; x < hall.cell.x + 4 + 4; x++) {
+                        for (int y = hall.cell.y; y < hall.cell.y + 4; y++) {
+                            ivec2 cell = ivec2(x, y);
+                            if (!map_is_cell_rect_in_bounds(state.map, cell, 2) || map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, cell, 2)) {
+                                continue;
+                            }
+                            scout_cell = cell;
+                            break;
+                        }
+                        if (scout_cell.x != -1) {
+                            break;
+                        }
+                    }
+                } else {
+                    for (int x = hall.cell.x; x < hall.cell.x + 4; x++) {
+                        for (int y = hall.cell.y - 3; y < hall.cell.y + 4 + 4; y++) {
+                            ivec2 cell = ivec2(x, y);
+                            if (!map_is_cell_rect_in_bounds(state.map, cell, 2) || map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, cell, 2)) {
+                                continue;
+                            }
+                            scout_cell = cell;
+                            break;
+                        }
+                        if (scout_cell.x != -1) {
+                            break;
+                        }
+                    }
+                }
+                GOLD_ASSERT(scout_cell.x != -1);
+                match_create_entity(state, ENTITY_WAGON, scout_cell, player_id);
             }
         }
     }
@@ -612,7 +651,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;
-            // TODO: entity.queue.clear();
+            entity.queue.clear();
 
             if (entity.type == ENTITY_LANDMINE) {
                 map_set_cell_rect(state.map, CELL_LAYER_UNDERGROUND, entity.cell, entity_data.cell_size, (Cell) {
@@ -633,8 +672,14 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     }
                 }
             }
+        }
 
-            match_event_play_sound(state, entity_data.death_sound, entity.position.to_ivec2());
+        match_event_play_sound(state, entity_data.death_sound, entity.position.to_ivec2());
+
+        // If it's a building, release garrisoned units
+        // If it's a unit, it will release them once its death animation is over
+        if (!entity_is_unit(entity.type)) {
+            match_entity_release_garrisoned_units_on_death(state, entity);
         }
     }
     // End if entity should die
@@ -873,6 +918,17 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     case TARGET_CELL: {
                         entity.target = (Target) { .type = TARGET_NONE };
                         entity.mode = MODE_UNIT_IDLE;
+                        break;
+                    }
+                    case TARGET_UNLOAD: {
+                        if (!match_has_entity_reached_target(state, entity)) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
+                        match_entity_unload_unit(state, entity, MATCH_ENTITY_UNLOAD_ALL);
+                        entity.mode = MODE_UNIT_IDLE;
+                        entity.target = (Target) { .type = TARGET_NONE };
                         break;
                     }
                     case TARGET_SMOKE: {
@@ -1292,7 +1348,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
                         .type = CELL_EMPTY, .id = ID_NULL
                     });
-                    // TOOD: entity on death release garrisoned units
+                    match_entity_release_garrisoned_units_on_death(state, entity);
                     entity.mode = MODE_UNIT_DEATH_FADE;
                 }
                 update_finished = true;
@@ -2063,6 +2119,40 @@ void match_entity_unload_unit(MatchState& state, Entity& carrier, EntityId garri
             match_event_play_sound(state, SOUND_GARRISON_OUT, carrier.position.to_ivec2());
         } else {
             index++;
+        }
+    }
+}
+
+void match_entity_release_garrisoned_units_on_death(MatchState& state, Entity& entity) {
+    const EntityData& entity_data = entity_get_data(entity.type);
+    for (EntityId garrisoned_unit_id : entity.garrisoned_units) {
+        Entity& garrisoned_unit = state.entities.get_by_id(garrisoned_unit_id);
+        const EntityData& garrisoned_unit_data = entity_get_data(garrisoned_unit.type);
+        // place garrisoned units inside former-self
+        bool unit_is_placed = false;
+        for (int x = entity.cell.x; x < entity.cell.x + entity_data.cell_size; x++) {
+            for (int y = entity.cell.y; y < entity.cell.y + entity_data.cell_size; y++) {
+                if (!map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, ivec2(x, y), garrisoned_unit_data.cell_size)) {
+                    garrisoned_unit.cell = ivec2(x, y);
+                    garrisoned_unit.position = entity_get_target_position(garrisoned_unit);
+                    garrisoned_unit.garrison_id = ID_NULL;
+                    garrisoned_unit.mode = MODE_UNIT_IDLE;
+                    garrisoned_unit.target = (Target) { .type = TARGET_NONE };
+                    map_set_cell_rect(state.map, CELL_LAYER_GROUND, garrisoned_unit.cell, garrisoned_unit_data.cell_size, (Cell) {
+                        .type = CELL_UNIT, .id = garrisoned_unit_id
+                    });
+                    match_fog_update(state, state.players[garrisoned_unit.player_id].team, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, garrisoned_unit_data.has_detection, true);
+                    unit_is_placed = true;
+                    break;
+                }
+            }
+            if (unit_is_placed) {
+                break;
+            }
+        }
+
+        if (!unit_is_placed) {
+            log_warn("Unable to place garrisoned unit.");
         }
     }
 }

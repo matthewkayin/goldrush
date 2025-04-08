@@ -111,10 +111,10 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_WAGON, (EntityData) {
         .name = "Wagon",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_WAGON,
         .icon = SPRITE_BUTTON_ICON_WAGON,
         .death_sound = SOUND_DEATH_CHICKEN,
-        .cell_size = 1,
+        .cell_size = 2,
         
         .gold_cost = 200,
         .train_duration = 38,
@@ -140,10 +140,10 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_WAR_WAGON, (EntityData) {
         .name = "War Wagon",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_WAR_WAGON,
         .icon = SPRITE_BUTTON_ICON_WAR_WAGON,
         .death_sound = SOUND_DEATH_CHICKEN,
-        .cell_size = 1,
+        .cell_size = 2,
         
         .gold_cost = 200,
         .train_duration = 38,
