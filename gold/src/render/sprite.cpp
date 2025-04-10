@@ -792,6 +792,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_BUTTON_ICON_WORKSHOP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_workshop.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
     { SPRITE_BUTTON_ICON_BAYONETS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
@@ -944,6 +952,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
+    { SPRITE_UNIT_SAPPER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_sapper.png",
+            .hframes = 15,
+            .vframes = 6 
+        }
+    }},
     { SPRITE_UNIT_BANDIT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {
@@ -997,6 +1013,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .sheet = (SpriteParamsSheet) {
             .path = "building_smith.png",
             .hframes = 4,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUILDING_WORKSHOP, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_workshop.png",
+            .hframes = 19,
             .vframes = 1
         }
     }},
@@ -1061,6 +1085,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .sheet = (SpriteParamsSheet) {
             .path = "particle_bunker_cowboy.png",
             .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_WORKSHOP_STEAM, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_workshop_steam.png",
+            .hframes = 5,
             .vframes = 1
         }
     }}

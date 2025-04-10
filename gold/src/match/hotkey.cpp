@@ -106,6 +106,14 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .building = ENTITY_HALL
         }
     }},
+    { INPUT_HOTKEY_WORKSHOP, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_BUILD,
+        .entity_type = ENTITY_WORKSHOP,
+        .requirements = (HotkeyButtonRequirements) { 
+            .type = HOTKEY_REQUIRES_BUILDING,
+            .building = ENTITY_SALOON
+        }
+    }},
     { INPUT_HOTKEY_SMITH, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_BUILD,
         .entity_type = ENTITY_SMITH,
@@ -139,6 +147,13 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
     { INPUT_HOTKEY_BANDIT, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_TRAIN,
         .entity_type = ENTITY_BANDIT,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_SAPPER, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_SAPPER,
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }

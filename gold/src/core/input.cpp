@@ -210,8 +210,8 @@ void input_set_hotkey_group(uint32_t group) {
         state.hotkey_group[0] = INPUT_HOTKEY_HALL;
         state.hotkey_group[1] = INPUT_HOTKEY_HOUSE;
         state.hotkey_group[2] = INPUT_HOTKEY_SALOON;
-        state.hotkey_group[3] = INPUT_HOTKEY_SMITH;
-        state.hotkey_group[4] = INPUT_HOTKEY_BUNKER;
+        state.hotkey_group[3] = INPUT_HOTKEY_BUNKER;
+        state.hotkey_group[4] = INPUT_HOTKEY_WORKSHOP;
         state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
     }
     if ((group & INPUT_HOTKEY_GROUP_HALL) == INPUT_HOTKEY_GROUP_HALL) {
@@ -223,6 +223,9 @@ void input_set_hotkey_group(uint32_t group) {
     } 
     if ((group & INPUT_HOTKEY_GROUP_UNLOAD) == INPUT_HOTKEY_GROUP_UNLOAD) {
         state.hotkey_group[3] = INPUT_HOTKEY_UNLOAD;
+    }
+    if ((group & INPUT_HOTKEY_GROUP_WORKSHOP) == INPUT_HOTKEY_GROUP_WORKSHOP) {
+        state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
     }
 }
 
@@ -275,9 +278,11 @@ void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_HALL] = SDLK_t;
     state.hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDLK_e;
     state.hotkey_mapping[INPUT_HOTKEY_SALOON] = SDLK_s;
-    state.hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_b;
-    state.hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_r;
+    state.hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_b;
+    state.hotkey_mapping[INPUT_HOTKEY_WORKSHOP] = SDLK_w;
+    state.hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_s;
     state.hotkey_mapping[INPUT_HOTKEY_MINER] = SDLK_e;
     state.hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_c;
     state.hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_b;
+    state.hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_s;
 }

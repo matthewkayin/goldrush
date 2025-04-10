@@ -1027,6 +1027,10 @@ void match_ui_update(MatchUiState& state) {
                             hotkey_group |= INPUT_HOTKEY_GROUP_SALOON;
                             break;
                         }
+                        case ENTITY_WORKSHOP: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_WORKSHOP;
+                            break;
+                        }
                         default:
                             break;
                     }
@@ -1387,11 +1391,19 @@ bool match_ui_building_can_be_placed(const MatchUiState& state) {
         for (int x = building_cell.x; x < building_cell.x + entity_data.cell_size; x++) {
             ivec2 cell = ivec2(x, y);
             // Check that no entities are occupying the building rect
-            if ((cell != miner_cell && map_get_cell(state.match.map, CELL_LAYER_GROUND, cell).type != CELL_EMPTY) ||
-                    // Check that we're not building on a ramp
-                    map_is_tile_ramp(state.match.map, cell) ||
-                    // Check that we're not building on top of a landmine
-                    map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, cell).type != CELL_EMPTY) {
+            if ((cell != miner_cell && map_get_cell(state.match.map, CELL_LAYER_GROUND, cell).type != CELL_EMPTY)) {
+                return false;
+            } 
+            // Check that we're not building on a ramp
+            if (map_is_tile_ramp(state.match.map, cell)) {
+                return false;
+            } 
+            // Check that we're not building on top of a landmine
+            if (map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, cell).type != CELL_EMPTY) {
+                return false;
+            }
+            // Check that we're not building on hidden fog
+            if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell) == FOG_HIDDEN) {
                 return false;
             }
         }
@@ -1669,6 +1681,41 @@ void match_ui_render(const MatchUiState& state) {
         }
     }
     ysort_params.clear();
+
+    // Smith and workshop smoke animations
+    for (const Entity& entity : state.match.entities) {
+        if (entity.animation.name == ANIMATION_WORKSHOP && match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            int hframe = -1;
+            switch (entity.animation.frame.x) {
+                case 5:
+                    hframe = 0;
+                    break;
+                case 6:
+                case 8:
+                case 10:
+                    hframe = 1;
+                    break;
+                case 7:
+                case 9:
+                case 11:
+                    hframe = 2;
+                    break;
+                case 12:
+                    hframe = 3;
+                    break;
+                case 13:
+                    hframe = 4;
+                    break;
+                default:
+                    break;
+            }
+            if (hframe != -1) {
+                Rect building_rect = entity_get_rect(entity);
+                ivec2 steam_position = ivec2(building_rect.x, building_rect.y) + (ivec2(building_rect.w, building_rect.h) / 2) - state.camera_offset;
+                render_sprite_frame(SPRITE_WORKSHOP_STEAM, ivec2(hframe, 0), steam_position, RENDER_SPRITE_CENTERED, 0);
+            }
+        }
+    }
 
     // Particles
     for (const Particle& particle : state.match.particles) {

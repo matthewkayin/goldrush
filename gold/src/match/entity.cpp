@@ -198,7 +198,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_SAPPER, (EntityData) {
         .name = "Sapper",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_SAPPER,
         .icon = SPRITE_BUTTON_ICON_SAPPER,
         .death_sound = SOUND_DEATH,
         .cell_size = 1,
@@ -439,6 +439,31 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .builder_positions_y = { 15, 9, -3 },
             .builder_flip_h = { false, true, false },
             .can_rally = false
+        }
+    }},
+    { ENTITY_WORKSHOP, (EntityData) {
+        .name = "Workshop",
+        .sprite = SPRITE_BUILDING_WORKSHOP,
+        .icon = SPRITE_BUTTON_ICON_WORKSHOP,
+        .death_sound = SOUND_BUILDING_DESTROY,
+        .cell_size = 3,
+        
+        .gold_cost = 300,
+        .train_duration = 0,
+        .max_health = 600,
+        .sight = 7,
+        .armor = 1,
+        .attack_priority = 0,
+
+        .garrison_capacity = 0,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
+        .has_detection = false,
+
+        .building_data = (EntityDataBuilding) {
+            .builder_positions_x = { 3, 16, 6 },
+            .builder_positions_y = { 29, 13, 7 },
+            .builder_flip_h = { false, true, false },
+            .can_rally = true
         }
     }},
     { ENTITY_COOP, (EntityData) {
@@ -707,6 +732,13 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
             return ANIMATION_UNIT_DEATH;
         case MODE_UNIT_DEATH_FADE:
             return ANIMATION_UNIT_DEATH_FADE;
+        case MODE_BUILDING_FINISHED: {
+            if (entity.type == ENTITY_WORKSHOP && !entity.queue.empty()) {
+                return ANIMATION_WORKSHOP;
+            } else {
+                return ANIMATION_UNIT_IDLE;
+            }
+        }
         default:
             return ANIMATION_UNIT_IDLE;
     }
@@ -744,6 +776,9 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
             return ivec2((3 * entity.health) / ENTITY_DATA.at(entity.type).max_health, 0);
         } 
         if (entity.mode == MODE_MINE_PRIME) {
+            return entity.animation.frame;
+        }
+        if (entity.animation.name != ANIMATION_UNIT_IDLE) {
             return entity.animation.frame;
         }
         // Building finished frame

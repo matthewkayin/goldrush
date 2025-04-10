@@ -156,7 +156,7 @@ bool match_does_player_meet_hotkey_requirements(const MatchState& state, uint8_t
         }
         case HOTKEY_REQUIRES_BUILDING: {
             for (const Entity& entity : state.entities) {
-                if (entity.player_id == player_id && entity.type == hotkey_info.requirements.building) {
+                if (entity.player_id == player_id && entity.type == hotkey_info.requirements.building && entity.mode == MODE_BUILDING_FINISHED) {
                     return true;
                 }
             }
@@ -1492,18 +1492,16 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     }
 
     // Update animation
-    if (entity_is_unit(entity.type)) {
-        AnimationName expected_animation = entity_get_expected_animation(entity);
-        if (entity.animation.name != expected_animation || !animation_is_playing(entity.animation)) {
-            entity.animation = animation_create(expected_animation);
-        }
-        int prev_hframe = entity.animation.frame.x;
-        animation_update(entity.animation);
-        if (prev_hframe != entity.animation.frame.x) {
-            if ((entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD) && prev_hframe == 0) {
-                match_event_play_sound(state, SOUND_HAMMER, entity.position.to_ivec2());
-            } 
-        }
+    AnimationName expected_animation = entity_get_expected_animation(entity);
+    if (entity.animation.name != expected_animation || !animation_is_playing(entity.animation)) {
+        entity.animation = animation_create(expected_animation);
+    }
+    int prev_hframe = entity.animation.frame.x;
+    animation_update(entity.animation);
+    if (prev_hframe != entity.animation.frame.x) {
+        if ((entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD) && prev_hframe == 0) {
+            match_event_play_sound(state, SOUND_HAMMER, entity.position.to_ivec2());
+        } 
     }
 }
 

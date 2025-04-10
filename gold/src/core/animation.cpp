@@ -17,31 +17,29 @@ struct AnimationData {
 
 static std::unordered_map<AnimationName, AnimationData> ANIMATION_DATA;
 
+std::vector<AnimationFrame> animation_frame_range(int start_hframe, int end_hframe, uint32_t duration) {
+    std::vector<AnimationFrame> frames;
+    for (int hframe = start_hframe; hframe < end_hframe + 1; hframe++) {
+        frames.push_back((AnimationFrame) { .hframe = hframe, .duration = duration });
+    }
+
+    return frames;
+}
+
 void animation_init() {
     ANIMATION_DATA[ANIMATION_UI_MOVE_CELL] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 4 },
-            (AnimationFrame) { .hframe = 1, .duration = 4 },
-            (AnimationFrame) { .hframe = 2, .duration = 4 },
-            (AnimationFrame) { .hframe = 3, .duration = 4 }
-        },
+        .frames = animation_frame_range(0, 3, 4),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_UI_MOVE_ENTITY] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 8 },
-            (AnimationFrame) { .hframe = 1, .duration = 8 }
-        },
+        .frames = animation_frame_range(0, 1, 8),
         .loops = 2
     };
     ANIMATION_DATA[ANIMATION_UI_MOVE_ATTACK_ENTITY] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 8 },
-            (AnimationFrame) { .hframe = 1, .duration = 8 }
-        },
+        .frames = animation_frame_range(0, 1, 8),
         .loops = 2
     };
     ANIMATION_DATA[ANIMATION_UNIT_IDLE] = (AnimationData) {
@@ -53,45 +51,22 @@ void animation_init() {
     };
     ANIMATION_DATA[ANIMATION_UNIT_MOVE] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 1, .duration = 8 },
-            (AnimationFrame) { .hframe = 2, .duration = 8 },
-            (AnimationFrame) { .hframe = 3, .duration = 8 },
-            (AnimationFrame) { .hframe = 4, .duration = 8 }
-        },
+        .frames = animation_frame_range(1, 4, 8),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
     ANIMATION_DATA[ANIMATION_UNIT_MOVE_SLOW] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 1, .duration = 10 },
-            (AnimationFrame) { .hframe = 2, .duration = 10 },
-            (AnimationFrame) { .hframe = 3, .duration = 10 },
-            (AnimationFrame) { .hframe = 4, .duration = 10 }
-        },
+        .frames = animation_frame_range(1, 4, 10),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
     ANIMATION_DATA[ANIMATION_UNIT_MOVE_CANNON] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 1, .duration = 4 },
-            (AnimationFrame) { .hframe = 2, .duration = 4 },
-            (AnimationFrame) { .hframe = 3, .duration = 4 },
-            (AnimationFrame) { .hframe = 4, .duration = 4 },
-            (AnimationFrame) { .hframe = 5, .duration = 4 },
-            (AnimationFrame) { .hframe = 6, .duration = 4 },
-            (AnimationFrame) { .hframe = 7, .duration = 4 },
-            (AnimationFrame) { .hframe = 8, .duration = 4 }
-        },
+        .frames = animation_frame_range(1, 8, 4),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
     ANIMATION_DATA[ANIMATION_UNIT_ATTACK] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 5, .duration = 8 },
-            (AnimationFrame) { .hframe = 6, .duration = 8 },
-            (AnimationFrame) { .hframe = 7, .duration = 8 }
-        },
+        .frames = animation_frame_range(5, 7, 8),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_SOLDIER_RANGED_ATTACK] = (AnimationData) {
@@ -124,13 +99,7 @@ void animation_init() {
     };
     ANIMATION_DATA[ANIMATION_CANNON_ATTACK] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 9, .duration = 8 },
-            (AnimationFrame) { .hframe = 10, .duration = 8 },
-            (AnimationFrame) { .hframe = 11, .duration = 8 },
-            (AnimationFrame) { .hframe = 12, .duration = 8 },
-            (AnimationFrame) { .hframe = 13, .duration = 8 }
-        },
+        .frames = animation_frame_range(9, 13, 8),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_UNIT_MINE] = (AnimationData) {
@@ -144,161 +113,92 @@ void animation_init() {
     };
     ANIMATION_DATA[ANIMATION_UNIT_BUILD] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 8 },
-            (AnimationFrame) { .hframe = 1, .duration = 8 }
-        },
+        .frames = animation_frame_range(0, 1, 8),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
     ANIMATION_DATA[ANIMATION_UNIT_DEATH] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 8, .duration = 4 },
-            (AnimationFrame) { .hframe = 9, .duration = 4 },
-            (AnimationFrame) { .hframe = 10, .duration = 4 },
-            (AnimationFrame) { .hframe = 11, .duration = 4 }
-        },
+        .frames = animation_frame_range(8, 11, 4),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_UNIT_DEATH_FADE] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 12, .duration = 180 },
-            (AnimationFrame) { .hframe = 13, .duration = 180 },
-            (AnimationFrame) { .hframe = 14, .duration = 180 }
-        },
+        .frames = animation_frame_range(12, 14, 180),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_CANNON_DEATH] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 14, .duration = 4 },
-            (AnimationFrame) { .hframe = 15, .duration = 4 },
-            (AnimationFrame) { .hframe = 16, .duration = 4 },
-            (AnimationFrame) { .hframe = 17, .duration = 4 }
-        },
+        .frames = animation_frame_range(14, 17, 4),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_CANNON_DEATH_FADE] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 18, .duration = 180 },
-            (AnimationFrame) { .hframe = 19, .duration = 180 },
-            (AnimationFrame) { .hframe = 20, .duration = 180 }
-        },
+        .frames = animation_frame_range(18, 20, 180),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_RALLY_FLAG] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 6 },
-            (AnimationFrame) { .hframe = 1, .duration = 6 },
-            (AnimationFrame) { .hframe = 2, .duration = 6 },
-            (AnimationFrame) { .hframe = 3, .duration = 6 },
-            (AnimationFrame) { .hframe = 4, .duration = 6 },
-            (AnimationFrame) { .hframe = 5, .duration = 6 },
-        },
+        .frames = animation_frame_range(0, 5, 6),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
     ANIMATION_DATA[ANIMATION_PARTICLE_SPARKS] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 3 },
-            (AnimationFrame) { .hframe = 1, .duration = 3 },
-            (AnimationFrame) { .hframe = 2, .duration = 3 },
-            (AnimationFrame) { .hframe = 3, .duration = 3 },
-        },
+        .frames = animation_frame_range(0, 3, 3),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_PARTICLE_BUNKER_COWBOY] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 4 },
-            (AnimationFrame) { .hframe = 1, .duration = 4 },
-        },
+        .frames = animation_frame_range(0, 1, 4),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_PARTICLE_EXPLOSION] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 4 },
-            (AnimationFrame) { .hframe = 1, .duration = 4 },
-            (AnimationFrame) { .hframe = 2, .duration = 4 },
-            (AnimationFrame) { .hframe = 3, .duration = 4 },
-            (AnimationFrame) { .hframe = 4, .duration = 4 },
-            (AnimationFrame) { .hframe = 5, .duration = 4 }
-        },
+        .frames = animation_frame_range(0, 5, 4),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_PARTICLE_CANNON_EXPLOSION] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 4 },
-            (AnimationFrame) { .hframe = 1, .duration = 4 },
-            (AnimationFrame) { .hframe = 2, .duration = 4 },
-            (AnimationFrame) { .hframe = 3, .duration = 4 }
-        },
+        .frames = animation_frame_range(0, 3, 4),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_PARTICLE_SMOKE_START] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 4 },
-            (AnimationFrame) { .hframe = 1, .duration = 4 },
-            (AnimationFrame) { .hframe = 2, .duration = 4 }
-        },
+        .frames = animation_frame_range(0, 2, 4),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_PARTICLE_SMOKE] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 3, .duration = 30 },
-            (AnimationFrame) { .hframe = 4, .duration = 30 },
-        },
+        .frames = animation_frame_range(3, 4, 30),
         .loops = 36 
     };
     ANIMATION_DATA[ANIMATION_PARTICLE_SMOKE_END] = (AnimationData) {
         .vframe = -1,
-        .frames = {
-            (AnimationFrame) { .hframe = 5, .duration = 4 },
-            (AnimationFrame) { .hframe = 6, .duration = 4 },
-            (AnimationFrame) { .hframe = 7, .duration = 4 },
-        },
+        .frames = animation_frame_range(5, 7, 4),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_SMITH_BEGIN] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 0, .duration = 8 },
-            (AnimationFrame) { .hframe = 1, .duration = 8 },
-            (AnimationFrame) { .hframe = 2, .duration = 8 },
-            (AnimationFrame) { .hframe = 3, .duration = 8 }
-        },
+        .frames = animation_frame_range(0, 3, 8),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_SMITH_LOOP] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 4, .duration = 8 },
-            (AnimationFrame) { .hframe = 5, .duration = 8 },
-            (AnimationFrame) { .hframe = 6, .duration = 8 }
-        },
+        .frames = animation_frame_range(4, 6, 8),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
     ANIMATION_DATA[ANIMATION_SMITH_END] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 7, .duration = 8 },
-            (AnimationFrame) { .hframe = 8, .duration = 8 }
-        },
+        .frames = animation_frame_range(7, 8, 8),
         .loops = 1
     };
     ANIMATION_DATA[ANIMATION_MINE_PRIME] = (AnimationData) {
         .vframe = 0,
-        .frames = {
-            (AnimationFrame) { .hframe = 1, .duration = 6 },
-            (AnimationFrame) { .hframe = 0, .duration = 6 },
-        },
+        .frames = animation_frame_range(0, 1, 6),
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
+    ANIMATION_DATA[ANIMATION_WORKSHOP] = (AnimationData) {
+        .vframe = 0,
+        .frames = animation_frame_range(3, 18, 8),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
 }
