@@ -1088,6 +1088,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_PARTICLE_EXPLOSION, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "particle_explosion.png",
+            .hframes = 6,
+            .vframes = 1
+        }
+    }},
     { SPRITE_WORKSHOP_STEAM, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

@@ -1227,6 +1227,7 @@ void match_ui_order_move(MatchUiState& state) {
     input.move.shift_command = input_is_action_pressed(INPUT_ACTION_SHIFT);
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
+    EntityId remembered_entity_id = ID_NULL;
 
     // Checks if clicked on entity
     uint8_t player_team = state.match.players[network_get_player_id()].team;
@@ -1235,9 +1236,16 @@ void match_ui_order_move(MatchUiState& state) {
     if (fog_value != FOG_HIDDEN && !match_ui_is_mouse_in_ui()) {
         for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
             const Entity& entity = state.match.entities[entity_index];
-            // Only gold mines can be moved to underneath explored fog
-            if (fog_value == FOG_EXPLORED && entity.type != ENTITY_GOLDMINE) {
+            // Can't select units under explored fog
+            if (fog_value == FOG_EXPLORED && entity_is_unit(entity.type)) {
                 continue;
+            }
+            // Non-units *can* be selected under explored fog, but only if we have explored that the building exists
+            if (fog_value == FOG_EXPLORED) {
+                auto it = state.match.remembered_entities[player_team].find(state.match.entities.get_id_of(entity_index));
+                if (it == state.match.remembered_entities[player_team].end()) {
+                    continue;
+                }
             }
             // Don't target unselectable units
             if (!entity_is_selectable(entity)) {
@@ -1251,6 +1259,9 @@ void match_ui_order_move(MatchUiState& state) {
             Rect entity_rect = entity_get_rect(state.match.entities[entity_index]);
             if (entity_rect.has_point(move_target)) {
                 input.move.target_id = state.match.entities.get_id_of(entity_index);
+                if (fog_value == FOG_EXPLORED) {
+                    remembered_entity_id = state.match.entities.get_id_of(entity_index);
+                }
                 break;
             }
         }
@@ -1298,25 +1309,6 @@ void match_ui_order_move(MatchUiState& state) {
     }
 
     state.input_queue.push_back(input);
-
-    // Check if clicked on remembered building
-    EntityId remembered_entity_id = ID_NULL;
-    if ((input.type == MATCH_INPUT_MOVE_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_CELL) &&
-            !match_ui_is_mouse_in_ui() &&
-            match_get_fog(state.match, player_team, input.move.target_cell) == FOG_EXPLORED) {
-        ivec2 move_target = input_get_mouse_position() + state.camera_offset;
-
-        for (auto it : state.match.remembered_entities[player_team]) {
-            Rect remembered_entity_rect = (Rect) {
-                .x = it.second.cell.x * TILE_SIZE, .y = it.second.cell.y * TILE_SIZE,
-                .w = it.second.cell_size * TILE_SIZE, .h = it.second.cell_size * TILE_SIZE
-            };
-            if (remembered_entity_rect.has_point(move_target)) {
-                remembered_entity_id = it.first;
-                break;
-            }
-        }
-    }
 
     // Play animation
     if (remembered_entity_id != ID_NULL) {
@@ -2667,7 +2659,7 @@ void match_ui_render_entity_select_ring_and_healthbar(const MatchUiState& state,
     }
 
     // Render garrison bar
-    if (entity_data.garrison_capacity != 0) {
+    if (entity_data.garrison_capacity != 0 && (entity.player_id == network_get_player_id() || entity.type == ENTITY_GOLDMINE)) {
         match_ui_render_healthbar(RENDER_GARRISONBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
     }
 }

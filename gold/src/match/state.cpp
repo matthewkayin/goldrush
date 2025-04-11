@@ -23,6 +23,7 @@ static const ivec2 BUNKER_PARTICLE_OFFSETS[4] = { ivec2(3, 23), ivec2(11, 26), i
 static const ivec2 WAR_WAGON_DOWN_PARTICLE_OFFSETS[4] = { ivec2(14, 6), ivec2(17, 8), ivec2(21, 6), ivec2(24, 8) };
 static const ivec2 WAR_WAGON_UP_PARTICLE_OFFSETS[4] = { ivec2(16, 20), ivec2(18, 22), ivec2(21, 20), ivec2(23, 22) };
 static const ivec2 WAR_WAGON_RIGHT_PARTICLE_OFFSETS[4] = { ivec2(7, 18), ivec2(11, 19), ivec2(12, 20), ivec2(16, 18) };
+static const int MINE_EXPLOSION_DAMAGE = 200;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -116,7 +117,7 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
 uint32_t match_get_player_population(const MatchState& state, uint8_t player_id) {
     uint32_t population = 0;
     for (const Entity& entity : state.entities) {
-        if (entity.player_id == player_id && entity_is_unit(entity.type)) {
+        if (entity.player_id == player_id && entity_is_unit(entity.type) && entity.health != 0) {
             population += entity_get_data(entity.type).unit_data.population_cost;
         }
     }
@@ -1029,6 +1030,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                         Entity& target = state.entities.get_by_id(entity.target.id);
                         const EntityData& target_data = entity_get_data(target.type);
+
+                        // Sapper explosion
+                        if (entity.target.type == TARGET_ATTACK_ENTITY && entity.type == ENTITY_SAPPER) {
+                            match_entity_explode(state, entity_id);
+                            update_finished = true;
+                            break;
+                        }
 
                         // Begin attack
                         if (entity.target.type == TARGET_ATTACK_ENTITY && entity_data.unit_data.damage != 0) {
@@ -2153,6 +2161,62 @@ void match_entity_release_garrisoned_units_on_death(MatchState& state, Entity& e
             log_warn("Unable to place garrisoned unit.");
         }
     }
+}
+
+void match_entity_explode(MatchState& state, EntityId entity_id) {
+    Entity& entity = state.entities.get_by_id(entity_id);
+    const EntityData& entity_data = entity_get_data(entity.type);
+
+    // Apply damage
+    Rect explosion_rect = (Rect) { 
+        .x = (entity.cell.x - 1) * TILE_SIZE,
+        .y = (entity.cell.y - 1) * TILE_SIZE,
+        .w = TILE_SIZE * 3,
+        .h = TILE_SIZE * 3
+    };
+    int explosion_damage = entity.type == ENTITY_SAPPER ? entity_data.unit_data.damage : MINE_EXPLOSION_DAMAGE;
+    for (uint32_t defender_index = 0; defender_index < state.entities.size(); defender_index++) {
+        if (defender_index == state.entities.get_index_of(entity_id)) {
+            continue;
+        }
+        Entity& defender = state.entities[defender_index];
+        if (defender.type == ENTITY_GOLDMINE || !entity_is_selectable(defender)) {
+            continue;
+        }
+
+        Rect defender_rect = entity_get_rect(defender);
+        if (explosion_rect.intersects(defender_rect)) {
+            int defender_armor = entity_get_data(defender.type).armor;
+            int damage = std::max(1, explosion_damage - defender_armor);
+            defender.health = std::max(defender.health - damage, 0);
+            match_entity_on_attack(state, entity_id, defender);
+        }
+    }
+
+    // Kill the entity
+    entity.health = 0;
+    if (entity.type == ENTITY_SAPPER) {
+        entity.target = (Target) { .type = TARGET_NONE };
+        entity.mode = MODE_UNIT_DEATH_FADE;
+        entity.animation = animation_create(ANIMATION_UNIT_DEATH_FADE);
+        map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
+            .type = CELL_EMPTY, .id = ID_NULL
+        });
+    } else {
+        entity.mode = MODE_BUILDING_DESTROYED;
+        entity.timer = BUILDING_FADE_DURATION;
+        map_set_cell(state.map, CELL_LAYER_UNDERGROUND, entity.cell, (Cell) { .type = CELL_EMPTY, .id = ID_NULL });
+    }
+
+    match_event_play_sound(state, SOUND_EXPLOSION, entity.position.to_ivec2());
+
+    // Create particle
+    state.particles.push_back((Particle) {
+        .sprite = SPRITE_PARTICLE_EXPLOSION,
+        .animation = animation_create(ANIMATION_PARTICLE_EXPLOSION),
+        .vframe = 0,
+        .position = entity.type == ENTITY_SAPPER ? entity.position.to_ivec2() : cell_center(entity.cell).to_ivec2()
+    });
 }
 
 // EVENTS
