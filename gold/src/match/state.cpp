@@ -25,6 +25,8 @@ static const ivec2 WAR_WAGON_UP_PARTICLE_OFFSETS[4] = { ivec2(16, 20), ivec2(18,
 static const ivec2 WAR_WAGON_RIGHT_PARTICLE_OFFSETS[4] = { ivec2(7, 18), ivec2(11, 19), ivec2(12, 20), ivec2(16, 18) };
 static const int MINE_EXPLOSION_DAMAGE = 200;
 static const fixed PROJECTILE_MOLOTOV_SPEED = fixed::from_int(4);
+static const uint32_t PROJECTILE_MOLOTOV_FIRE_SPREAD = 3;
+static const uint32_t FIRE_TTL = 30 * 30;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -37,6 +39,8 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
     std::vector<ivec2> goldmine_cells;
     map_init(state.map, noise, player_spawns, goldmine_cells);
     memcpy(state.players, players, sizeof(state.players));
+
+    state.fire_cells = std::vector<int>(state.map.width * state.map.height, 0);
 
     // Generate goldmines
     for (ivec2 cell : goldmine_cells) {
@@ -575,10 +579,53 @@ void match_update(MatchState& state) {
             Projectile& projectile = state.projectiles[projectile_index];
             if (projectile.position.distance_to(projectile.target) <= PROJECTILE_MOLOTOV_SPEED) {
                 // On projectile finish
+                if (projectile.type == PROJECTILE_MOLOTOV) {
+                    match_set_cell_on_fire(state, projectile.target.to_ivec2() / TILE_SIZE, PROJECTILE_MOLOTOV_FIRE_SPREAD);
+                }
                 state.projectiles.erase(state.projectiles.begin() + projectile_index);
             } else {
                 projectile.position += ((projectile.target - projectile.position) * PROJECTILE_MOLOTOV_SPEED / projectile.position.distance_to(projectile.target));
                 projectile_index++;
+            }
+        }
+    }
+
+    // Update fire
+    {
+        uint32_t fire_index = 0;
+        while (fire_index < state.fires.size()) {
+            Fire& fire = state.fires[fire_index];
+            animation_update(fire.animation);
+
+            // Start animation finished, enter prolonged burn and spread more flames
+            if (fire.animation.name == ANIMATION_FIRE_START && !animation_is_playing(fire.animation)) {
+                fire.animation = animation_create(ANIMATION_FIRE_BURN);
+                if (fire.spread != 0) {
+                    uint16_t fire_elevation = map_get_tile(state.map, fire.cell).elevation;
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                        ivec2 child_cell = fire.cell + DIRECTION_IVEC2[direction];
+                        if (!map_is_cell_in_bounds(state.map, child_cell)) {
+                            continue;
+                        }
+                        if (map_get_tile(state.map, child_cell).elevation != fire_elevation && !map_is_tile_ramp(state.map, child_cell)) {
+                            continue;
+                        }
+                        if (match_is_cell_on_fire(state, child_cell)) {
+                            continue;
+                        }
+                        match_set_cell_on_fire(state, child_cell, fire.spread - 1);
+                    }
+                }
+            // Fire is in prolonged burn, count down time to live
+            } else if (fire.animation.name == ANIMATION_FIRE_BURN) {
+                fire.time_to_live--;
+            }
+            // Time to live is 0, extinguish fire
+            if (fire.time_to_live == 0) {
+                state.fires.erase(state.fires.begin() + fire_index);
+                state.fire_cells[fire.cell.x + (fire.cell.y * state.map.width)] = 0;
+            } else {
+                fire_index++;
             }
         }
     }
@@ -2485,4 +2532,26 @@ void match_fog_update(MatchState& state, uint8_t player_team, ivec2 cell, int ce
     } // End for each search index
 
     state.is_fog_dirty = true;
+}
+
+// FIRE
+
+bool match_is_cell_on_fire(const MatchState& state, ivec2 cell) {
+    return state.fire_cells[cell.x + (cell.y * state.map.width)] == 1;
+}
+
+void match_set_cell_on_fire(MatchState& state, ivec2 cell, uint32_t spread) {
+    if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED) {
+        return;
+    }
+    if (map_get_tile(state.map, cell).sprite == SPRITE_TILE_WATER) {
+        return;
+    }
+    state.fires.push_back((Fire) {
+        .cell = cell,
+        .spread = spread,
+        .time_to_live = FIRE_TTL,
+        .animation = animation_create(ANIMATION_FIRE_START)
+    });
+    state.fire_cells[cell.x + (cell.y * state.map.width)] = 1;
 }

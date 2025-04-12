@@ -1112,6 +1112,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_PARTICLE_FIRE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "particle_fire.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
     { SPRITE_PROJECTILE_MOLOTOV, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

@@ -118,6 +118,13 @@ struct Particle {
     ivec2 position;
 };
 
+struct Fire {
+    ivec2 cell;
+    uint32_t spread;
+    uint32_t time_to_live;
+    Animation animation;
+};
+
 // Projectiles
 
 enum ProjectileType {
@@ -140,6 +147,8 @@ struct MatchState {
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
     std::vector<Particle> particles;
     std::vector<Projectile> projectiles;
+    std::vector<Fire> fires;
+    std::vector<int> fire_cells;
     MatchPlayer players[MAX_PLAYERS];
     std::vector<MatchEvent> events;
 };
@@ -192,3 +201,8 @@ int match_get_fog(const MatchState& state, uint8_t team, ivec2 cell);
 bool match_is_cell_rect_revealed(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
 bool match_is_cell_rect_explored(const MatchState& state, uint8_t team, ivec2 cell, int cell_size);
 void match_fog_update(MatchState& state, uint8_t team, ivec2 cell, int cell_size, int sight, bool has_detection, bool increment);
+
+// Fire
+
+bool match_is_cell_on_fire(const MatchState& state, ivec2 cell);
+void match_set_cell_on_fire(MatchState& state, ivec2 cell, uint32_t spread);

@@ -1568,6 +1568,17 @@ void match_ui_render(const MatchUiState& state) {
         }
     } // End for each elevation
 
+    // Fires
+    for (const Fire& fire : state.match.fires) {
+        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, fire.cell, 1)) {
+            continue;
+        }
+        if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
+            continue;
+        }
+        render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);
+    }
+
     // Entities
     for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
         const Entity& entity = state.match.entities[entity_index];
@@ -1651,6 +1662,17 @@ void match_ui_render(const MatchUiState& state) {
     match_ui_ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
     for (const RenderSpriteParams& params : ysort_params) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+    }
+
+    // Fires above entities
+    for (const Fire& fire : state.match.fires) {
+        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, fire.cell, 1)) {
+            continue;
+        }
+        if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_UNIT) {
+            continue;
+        }
+        render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);
     }
 
     // Smith and workshop smoke animations

@@ -201,6 +201,16 @@ void animation_init() {
         .frames = animation_frame_range(3, 18, 8),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
+    ANIMATION_DATA[ANIMATION_FIRE_START] = (AnimationData) {
+        .vframe = 0,
+        .frames = animation_frame_range(0, 1, 8),
+        .loops = 1
+    };
+    ANIMATION_DATA[ANIMATION_FIRE_BURN] = (AnimationData) {
+        .vframe = 0,
+        .frames = animation_frame_range(2, 3, 8),
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
 }
 
 Animation animation_create(AnimationName name) {
