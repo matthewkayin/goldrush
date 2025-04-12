@@ -83,6 +83,16 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .type = HOTKEY_REQUIRES_NONE
         }
     }},
+    { INPUT_HOTKEY_MOLOTOV, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_ACTION,
+        .action = (HotkeyButtonActionInfo) {
+            .name = "Throw Molotov",
+            .sprite = SPRITE_BUTTON_ICON_MOLOTOV
+        },
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
     { INPUT_HOTKEY_HALL, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_BUILD,
         .entity_type = ENTITY_HALL,
@@ -161,6 +171,13 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
     { INPUT_HOTKEY_PYRO, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_TRAIN,
         .entity_type = ENTITY_PYRO,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_LANDMINE, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_BUILD,
+        .entity_type = ENTITY_LANDMINE,
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }

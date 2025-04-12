@@ -15,7 +15,7 @@ static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t UNIT_IN_MINE_DURATION = 150;
 static const uint32_t UNIT_MAX_GOLD_HELD = 5;
 static const int UNIT_BLOCKED_DURATION = 30;
-static const int SMOKE_BOMB_THROW_RANGE_SQUARED = 36;
+static const int MOLOTOV_RANGE_SQUARED = 49;
 static const uint32_t BUILDING_FADE_DURATION = 300;
 static const uint32_t ENTITY_BUNKER_FIRE_OFFSET = 10;
 static const int SOLDIER_BAYONET_DAMAGE = 4;
@@ -24,6 +24,7 @@ static const ivec2 WAR_WAGON_DOWN_PARTICLE_OFFSETS[4] = { ivec2(14, 6), ivec2(17
 static const ivec2 WAR_WAGON_UP_PARTICLE_OFFSETS[4] = { ivec2(16, 20), ivec2(18, 22), ivec2(21, 20), ivec2(23, 22) };
 static const ivec2 WAR_WAGON_RIGHT_PARTICLE_OFFSETS[4] = { ivec2(7, 18), ivec2(11, 19), ivec2(12, 20), ivec2(16, 18) };
 static const int MINE_EXPLOSION_DAMAGE = 200;
+static const fixed PROJECTILE_MOLOTOV_SPEED = fixed::from_int(4);
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -269,7 +270,46 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             } // End for each unit in move input
             break;
         } // End case MATCH_INPUT_MOVE
-        case MATCH_INPUT_MOVE_SMOKE: {
+        case MATCH_INPUT_MOVE_MOLOTOV: {
+            uint32_t thrower_index = INDEX_INVALID;
+            uint8_t player_id;
+            bool all_units_are_dead = true;
+            for (uint32_t id_index = 0; id_index < input.move.entity_count; id_index++) {
+                uint32_t unit_index = state.entities.get_index_of(input.move.entity_ids[id_index]);
+                if (unit_index == INDEX_INVALID || !entity_is_selectable(state.entities[unit_index])) {
+                    continue;
+                }
+                all_units_are_dead = false;
+                player_id = state.entities[unit_index].player_id;
+                // TODO: consider thrower cooldown
+                if (thrower_index == INDEX_INVALID ||
+                        ivec2::manhattan_distance(state.entities[unit_index].cell, input.move.target_cell) <
+                        ivec2::manhattan_distance(state.entities[thrower_index].cell, input.move.target_cell)) {
+                    thrower_index = unit_index;
+                }
+            }
+
+            if (thrower_index == INDEX_INVALID) {
+                if (!all_units_are_dead) {
+                    // TODO: not enough energy?
+                    match_event_show_status(state, player_id, MATCH_UI_STATUS_SMOKE_COOLDOWN);
+                }
+                return;
+            }
+
+            Target target = (Target) {
+                .type = TARGET_MOLOTOV,
+                .cell = input.move.target_cell
+            };
+
+            if (!input.move.shift_command || 
+                    (state.entities[thrower_index].target.type == TARGET_NONE && state.entities[thrower_index].target_queue.empty())) {
+                state.entities[thrower_index].target_queue.clear();
+                entity_set_target(state.entities[thrower_index], target);
+            } else {
+                state.entities[thrower_index].target_queue.push_back(target);
+            }
+
             break;
         }
         case MATCH_INPUT_STOP:
@@ -524,6 +564,21 @@ void match_update(MatchState& state) {
                 state.particles.erase(state.particles.begin() + particle_index);
             } else {
                 particle_index++;
+            }
+        }
+    }
+
+    // Update projectiles
+    {
+        uint32_t projectile_index = 0;
+        while (projectile_index < state.projectiles.size()) {
+            Projectile& projectile = state.projectiles[projectile_index];
+            if (projectile.position.distance_to(projectile.target) <= PROJECTILE_MOLOTOV_SPEED) {
+                // On projectile finish
+                state.projectiles.erase(state.projectiles.begin() + projectile_index);
+            } else {
+                projectile.position += ((projectile.target - projectile.position) * PROJECTILE_MOLOTOV_SPEED / projectile.position.distance_to(projectile.target));
+                projectile_index++;
             }
         }
     }
@@ -935,7 +990,16 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         entity.target = (Target) { .type = TARGET_NONE };
                         break;
                     }
-                    case TARGET_SMOKE: {
+                    case TARGET_MOLOTOV: {
+                        if (!match_has_entity_reached_target(state, entity)) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
+                        }
+
+                        entity.direction = enum_direction_to_rect(entity.cell, entity.target.cell, 1);
+                        entity.mode = MODE_UNIT_PYRO_THROW;
+                        entity.animation = animation_create(ANIMATION_UNIT_ATTACK);
+                        match_event_play_sound(state, SOUND_THROW, entity.position.to_ivec2());
                         break;
                     }
                     case TARGET_BUILD: {
@@ -1354,6 +1418,15 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 update_finished = true;
                 break;
             }
+            case MODE_UNIT_PYRO_THROW: {
+                if (!animation_is_playing(entity.animation)) {
+                    entity.target = (Target) { .type = TARGET_NONE };
+                    entity.mode = MODE_UNIT_IDLE;
+                }
+
+                update_finished = true;
+                break;
+            }
             case MODE_UNIT_DEATH: {
                 if (!animation_is_playing(entity.animation)) {
                     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
@@ -1513,6 +1586,16 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
         if ((entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD) && prev_hframe == 0) {
             match_event_play_sound(state, SOUND_HAMMER, entity.position.to_ivec2());
         } 
+
+        if (entity.mode == MODE_UNIT_PYRO_THROW && entity.animation.frame.x == 6) {
+            if (entity.target.type == TARGET_MOLOTOV) {
+                state.projectiles.push_back((Projectile) {
+                    .type = PROJECTILE_MOLOTOV,
+                    .position = entity.position + ivec2(DIRECTION_IVEC2[entity.direction] * 6),
+                    .target = cell_center(entity.target.cell)
+                });
+            }
+        }
     }
 }
 
@@ -1624,8 +1707,8 @@ bool match_has_entity_reached_target(const MatchState& state, const Entity& enti
                         ? entity_rect.is_adjacent_to(target_rect)
                         : Rect::euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
         }
-        case TARGET_SMOKE: {
-            return ivec2::euclidean_distance_squared(entity.cell, entity.target.cell) <= SMOKE_BOMB_THROW_RANGE_SQUARED;
+        case TARGET_MOLOTOV: {
+            return ivec2::euclidean_distance_squared(entity.cell, entity.target.cell) <= MOLOTOV_RANGE_SQUARED;
         }
     }
 }
@@ -1654,7 +1737,7 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
         case TARGET_CELL:
         case TARGET_ATTACK_CELL:
         case TARGET_UNLOAD:
-        case TARGET_SMOKE:
+        case TARGET_MOLOTOV:
             return entity.target.cell;
         case TARGET_ENTITY:
         case TARGET_ATTACK_ENTITY:

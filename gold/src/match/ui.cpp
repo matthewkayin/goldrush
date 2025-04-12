@@ -292,6 +292,10 @@ void match_ui_handle_input(MatchUiState& state) {
                         }
                         break;
                     }
+                    case INPUT_HOTKEY_MOLOTOV: {
+                        state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
+                        break;
+                    }
                     default:
                         break;
                 }
@@ -1031,6 +1035,10 @@ void match_ui_update(MatchUiState& state) {
                             hotkey_group |= INPUT_HOTKEY_GROUP_WORKSHOP;
                             break;
                         }
+                        case ENTITY_PYRO: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_PYRO;
+                            break;
+                        }
                         default:
                             break;
                     }
@@ -1271,8 +1279,8 @@ void match_ui_order_move(MatchUiState& state) {
         input.type = MATCH_INPUT_MOVE_UNLOAD;
     } else if (state.mode == MATCH_UI_MODE_TARGET_REPAIR) {
         input.type = MATCH_INPUT_MOVE_REPAIR;
-    } else if (state.mode == MATCH_UI_MODE_TARGET_SMOKE) {
-        input.type = MATCH_INPUT_MOVE_SMOKE;
+    } else if (state.mode == MATCH_UI_MODE_TARGET_MOLOTOV) {
+        input.type = MATCH_INPUT_MOVE_MOLOTOV;
     } else if (input.move.target_id != ID_NULL && state.match.entities.get_by_id(input.move.target_id).type != ENTITY_GOLDMINE &&
                (state.mode == MATCH_UI_MODE_TARGET_ATTACK || 
                 state.match.players[state.match.entities.get_by_id(input.move.target_id).player_id].team != state.match.players[network_get_player_id()].team)) {
@@ -1318,7 +1326,7 @@ void match_ui_order_move(MatchUiState& state) {
                                                         : ANIMATION_UI_MOVE_ATTACK_ENTITY);
         state.move_animation_position = cell_center(input.move.target_cell).to_ivec2();
         state.move_animation_entity_id = remembered_entity_id;
-    } else if (input.type == MATCH_INPUT_MOVE_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_UNLOAD || input.type == MATCH_INPUT_MOVE_SMOKE) {
+    } else if (input.type == MATCH_INPUT_MOVE_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_UNLOAD || input.type == MATCH_INPUT_MOVE_MOLOTOV) {
         state.move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
         state.move_animation_position = move_target;
         state.move_animation_entity_id = ID_NULL;
@@ -1705,6 +1713,18 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         render_sprite_frame(particle.sprite, ivec2(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED, 0);
+    }
+
+    // Projectiles
+    for (const Projectile& projectile : state.match.projectiles) {
+        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, projectile.position.to_ivec2() / TILE_SIZE, 1)) {
+            continue;
+        }
+        uint32_t options = RENDER_SPRITE_CENTERED;
+        if (projectile.position.x > projectile.target.x) {
+            options |= RENDER_SPRITE_FLIP_H;
+        }
+        render_sprite_frame(SPRITE_PROJECTILE_MOLOTOV, ivec2(0, 0), projectile.position.to_ivec2() - state.camera_offset, options, 0);
     }
 
     // Miners on gold counter

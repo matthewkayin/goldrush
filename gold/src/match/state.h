@@ -118,6 +118,18 @@ struct Particle {
     ivec2 position;
 };
 
+// Projectiles
+
+enum ProjectileType {
+    PROJECTILE_MOLOTOV
+};
+
+struct Projectile {
+    ProjectileType type;
+    fvec2 position;
+    fvec2 target;
+};
+
 struct MatchState {
     Map map;
     std::vector<int> fog[MAX_PLAYERS];
@@ -127,6 +139,7 @@ struct MatchState {
 
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
     std::vector<Particle> particles;
+    std::vector<Projectile> projectiles;
     MatchPlayer players[MAX_PLAYERS];
     std::vector<MatchEvent> events;
 };

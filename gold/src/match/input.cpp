@@ -16,7 +16,7 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
         case MATCH_INPUT_MOVE_ATTACK_ENTITY:
         case MATCH_INPUT_MOVE_REPAIR:
         case MATCH_INPUT_MOVE_UNLOAD:
-        case MATCH_INPUT_MOVE_SMOKE: {
+        case MATCH_INPUT_MOVE_MOLOTOV: {
             memcpy(out_buffer + out_buffer_length, &input.move.shift_command, sizeof(uint8_t));
             out_buffer_length += sizeof(uint8_t);
 
@@ -124,7 +124,7 @@ MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_h
         case MATCH_INPUT_MOVE_ATTACK_ENTITY:
         case MATCH_INPUT_MOVE_REPAIR:
         case MATCH_INPUT_MOVE_UNLOAD:
-        case MATCH_INPUT_MOVE_SMOKE: {
+        case MATCH_INPUT_MOVE_MOLOTOV: {
             memcpy(&input.move.shift_command, in_buffer + in_buffer_head, sizeof(uint8_t));
             in_buffer_head += sizeof(uint8_t);
 

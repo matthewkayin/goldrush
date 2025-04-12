@@ -228,6 +228,10 @@ void input_set_hotkey_group(uint32_t group) {
         state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
         state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
     }
+    if ((group & INPUT_HOTKEY_GROUP_PYRO) == INPUT_HOTKEY_GROUP_PYRO) {
+        state.hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
+        state.hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
+    }
 }
 
 InputAction input_get_hotkey(uint32_t index) {
@@ -287,4 +291,6 @@ void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_b;
     state.hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_s;
     state.hotkey_mapping[INPUT_HOTKEY_PYRO] = SDLK_r;
+    state.hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_v;
+    state.hotkey_mapping[INPUT_HOTKEY_LANDMINE] = SDLK_e;
 }

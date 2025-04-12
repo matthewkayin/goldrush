@@ -808,6 +808,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_BUTTON_ICON_MOLOTOV, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_molotov.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
     { SPRITE_SELECT_RING_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
@@ -1101,6 +1109,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .sheet = (SpriteParamsSheet) {
             .path = "particle_explosion.png",
             .hframes = 6,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_PROJECTILE_MOLOTOV, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "projectile_molotov.png",
+            .hframes = 1,
             .vframes = 1
         }
     }},
