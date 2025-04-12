@@ -692,8 +692,11 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             case MODE_UNIT_IDLE: {
                 // Do nothing if unit is garrisoned
                 if (entity.garrison_id != ID_NULL) {
-                    update_finished = true;
-                    break;
+                    const Entity& carrier = state.entities.get_by_id(entity.garrison_id);
+                    if (!(carrier.type == ENTITY_BUNKER || carrier.type == ENTITY_WAR_WAGON)) {
+                        update_finished = true;
+                        break;
+                    }
                 }
 
                 // If unit is idle, check target queue

@@ -15,25 +15,12 @@
 
 const uint16_t ELEVATION_COUNT = 3;
 
-enum RenderParamsType {
-    RENDER_PARAMS_ENTITY,
-    RENDER_PARAMS_SPRITE
-};
-
 struct RenderSpriteParams {
     SpriteName sprite;
     ivec2 frame;
+    ivec2 position;
     uint32_t options;
     int recolor_id;
-};
-
-struct RenderParams {
-    RenderParamsType type;
-    ivec2 position;
-    union {
-        uint32_t entity_index;
-        RenderSpriteParams sprite;
-    };
 };
 
 enum RenderHealthbarType {
@@ -137,9 +124,7 @@ void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const cha
 void match_ui_render(const MatchUiState& state);
 
 SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking);
-int match_ui_ysort_render_params_partition(std::vector<RenderParams>& params, int low, int high);
-void match_ui_ysort_render_params(std::vector<RenderParams>& params, int low, int high);
+int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
+void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max);
 void match_ui_render_target_build(const MatchUiState& state, const Target& target);
-void match_ui_render_entity_select_ring_and_healthbar(const MatchUiState& state, const Entity& entity);
-void match_ui_render_entity(const MatchUiState& state, const Entity& entity);
