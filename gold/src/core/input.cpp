@@ -226,6 +226,7 @@ void input_set_hotkey_group(uint32_t group) {
     }
     if ((group & INPUT_HOTKEY_GROUP_WORKSHOP) == INPUT_HOTKEY_GROUP_WORKSHOP) {
         state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
+        state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
     }
 }
 
@@ -285,4 +286,5 @@ void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_c;
     state.hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_b;
     state.hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_s;
+    state.hotkey_mapping[INPUT_HOTKEY_PYRO] = SDLK_r;
 }

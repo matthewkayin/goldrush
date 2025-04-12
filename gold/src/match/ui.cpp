@@ -1475,6 +1475,20 @@ void match_ui_render(const MatchUiState& state) {
             }  // End for each x
         } // End for each y
 
+        // Dead entities
+        for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
+            const Entity& entity = state.match.entities[entity_index];
+            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
+                continue;
+            }
+            if (entity_get_elevation(entity, state.match.map) != elevation) {
+                continue;
+            }
+            
+            RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
+            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+        }
+
         // Select rings and healthbars
         for (EntityId id : state.selection) {
             const Entity& entity = state.match.entities.get_by_id(id);
@@ -1503,7 +1517,6 @@ void match_ui_render(const MatchUiState& state) {
                 match_ui_render_healthbar(RENDER_GARRISONBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
             }
         }
-
 
         // Move animation
         if (animation_is_playing(state.move_animation) &&
@@ -1550,40 +1563,16 @@ void match_ui_render(const MatchUiState& state) {
     // Entities
     for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
         const Entity& entity = state.match.entities[entity_index];
+        if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+            continue;
+        }
 
         if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
             continue;
         }
 
-        RenderSpriteParams params = (RenderSpriteParams) {
-            .sprite = entity_get_sprite(entity),
-            .frame = entity_get_animation_frame(entity),
-            .position = entity.position.to_ivec2() - state.camera_offset,
-            .options = RENDER_SPRITE_NO_CULL,
-            .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : state.match.players[entity.player_id].recolor_id
-        };
+        RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
         const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
-        if (entity_is_unit(entity.type)) {
-            if (entity.mode == MODE_UNIT_BUILD) {
-                const Entity& building = state.match.entities.get_by_id(entity.target.id);
-                const EntityData& building_data = entity_get_data(building.type);
-                int building_hframe = entity_get_animation_frame(building).x;
-                params.position = building.position.to_ivec2() + 
-                                    ivec2(building_data.building_data.builder_positions_x[building_hframe],
-                                        building_data.building_data.builder_positions_y[building_hframe])
-                                    - state.camera_offset;
-                if (building_data.building_data.builder_flip_h[building_hframe]) {
-                    params.options |= RENDER_SPRITE_FLIP_H;
-                }
-            } else {
-                params.position.x -= sprite_info.frame_width / 2;
-                params.position.y -= sprite_info.frame_height / 2;
-                if (entity.direction > DIRECTION_SOUTH) {
-                    params.options |= RENDER_SPRITE_FLIP_H;
-                }
-            }
-        }
-
         Rect render_rect = (Rect) {
             .x = params.position.x, .y = params.position.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
@@ -1591,12 +1580,9 @@ void match_ui_render(const MatchUiState& state) {
         if (!render_rect.intersects(SCREEN_RECT)) {
             continue;
         }
+        params.options |= RENDER_SPRITE_NO_CULL;
 
-        if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
-            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
-        } else {
-            ysort_params.push_back(params);
-        }
+        ysort_params.push_back(params);
     }
 
     // Remembered entities
@@ -2201,11 +2187,6 @@ void match_ui_render(const MatchUiState& state) {
             if (entity_data.has_detection) {
                 render_text(FONT_WESTERN8_GOLD, "Detection", SELECTION_LIST_TOP_LEFT + ivec2(36, 22));
             }
-            if (entity.type == ENTITY_TINKER && entity.cooldown_timer != 0) {
-                char cooldown_text[32];
-                sprintf(cooldown_text, "Smoke Bomb cooldown: %us", entity.cooldown_timer / 60);
-                render_text(FONT_WESTERN8_GOLD, cooldown_text, SELECTION_LIST_TOP_LEFT + ivec2(36, 36));
-            }
         }
     } else {
         for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
@@ -2394,8 +2375,8 @@ void match_ui_render(const MatchUiState& state) {
                     case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
                         debug_text_ptr += sprintf(debug_text_ptr, "SOLDIER ATTACKING");
                         break;
-                    case MODE_UNIT_TINKER_THROW:
-                        debug_text_ptr += sprintf(debug_text_ptr, "TINKER THROW");
+                    case MODE_UNIT_PYRO_THROW:
+                        debug_text_ptr += sprintf(debug_text_ptr, "PYRO THROW");
                         break;
                     case MODE_BUILDING_IN_PROGRESS:
                         debug_text_ptr += sprintf(debug_text_ptr, "IN PROGRESS");
@@ -2621,4 +2602,37 @@ void match_ui_render_target_build(const MatchUiState& state, const Target& targe
     };
     render_sprite_frame(building_data.sprite, ivec2(3, 0), ivec2(building_rect.x, building_rect.y), 0, state.match.players[network_get_player_id()].recolor_id);
     render_fill_rect(building_rect, RENDER_COLOR_GREEN_TRANSPARENT);
+}
+
+RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& state, const Entity& entity) {
+    RenderSpriteParams params = (RenderSpriteParams) {
+        .sprite = entity_get_sprite(entity),
+        .frame = entity_get_animation_frame(entity),
+        .position = entity.position.to_ivec2() - state.camera_offset,
+        .options = 0,
+        .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : state.match.players[entity.player_id].recolor_id
+    };
+    const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
+    if (entity_is_unit(entity.type)) {
+        if (entity.mode == MODE_UNIT_BUILD) {
+            const Entity& building = state.match.entities.get_by_id(entity.target.id);
+            const EntityData& building_data = entity_get_data(building.type);
+            int building_hframe = entity_get_animation_frame(building).x;
+            params.position = building.position.to_ivec2() + 
+                                ivec2(building_data.building_data.builder_positions_x[building_hframe],
+                                    building_data.building_data.builder_positions_y[building_hframe])
+                                - state.camera_offset;
+            if (building_data.building_data.builder_flip_h[building_hframe]) {
+                params.options |= RENDER_SPRITE_FLIP_H;
+            }
+        } else {
+            params.position.x -= sprite_info.frame_width / 2;
+            params.position.y -= sprite_info.frame_height / 2;
+            if (entity.direction > DIRECTION_SOUTH) {
+                params.options |= RENDER_SPRITE_FLIP_H;
+            }
+        }
+    }
+
+    return params;
 }

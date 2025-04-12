@@ -973,7 +973,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                             entity.direction = enum_direction_to_rect(entity.cell, entity.target.build.building_cell, building_data.cell_size);
                             entity.target = (Target) { .type = TARGET_NONE };
-                            entity.mode = MODE_UNIT_TINKER_THROW;
+                            entity.mode = MODE_UNIT_PYRO_THROW;
                             entity.animation = animation_create(ANIMATION_UNIT_ATTACK);
                         } else {
                             log_trace("Starting build");

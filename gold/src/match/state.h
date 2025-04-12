@@ -10,11 +10,6 @@
 #include <vector>
 #include <unordered_map>
 
-#define BUILDING_QUEUE_MAX 5
-#define BUILDING_DEQUEUE_POP_FRONT BUILDING_QUEUE_MAX
-#define BUILDING_QUEUE_BLOCKED UINT32_MAX
-#define BUILDING_QUEUE_EXIT_BLOCKED UINT32_MAX - 1
-
 #define MATCH_UI_STATUS_CANT_BUILD "You can't build there."
 #define MATCH_UI_STATUS_NOT_ENOUGH_GOLD "Not enough gold."
 #define MATCH_UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."

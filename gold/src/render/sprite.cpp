@@ -720,10 +720,10 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_TINKER, (SpriteParams) {
+    { SPRITE_BUTTON_ICON_PYRO, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
-            .path = "ui_button_icon_tinker.png",
+            .path = "ui_button_icon_pyro.png",
             .hframes = 3,
             .vframes = 1
         }
@@ -958,6 +958,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .path = "unit_sapper.png",
             .hframes = 15,
             .vframes = 6 
+        }
+    }},
+    { SPRITE_UNIT_PYRO, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_pyro.png",
+            .hframes = 15,
+            .vframes = 3 
         }
     }},
     { SPRITE_UNIT_BANDIT, (SpriteParams) {

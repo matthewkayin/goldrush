@@ -225,10 +225,10 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .min_range_squared = 1
         }
     }},
-    { ENTITY_TINKER, (EntityData) {
-        .name = "Tinker",
-        .sprite = SPRITE_UNIT_MINER,
-        .icon = SPRITE_BUTTON_ICON_TINKER,
+    { ENTITY_PYRO, (EntityData) {
+        .name = "Pyro",
+        .sprite = SPRITE_UNIT_PYRO,
+        .icon = SPRITE_BUTTON_ICON_PYRO,
         .death_sound = SOUND_DEATH,
         .cell_size = 1,
         
@@ -722,7 +722,7 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
         case MODE_UNIT_REPAIR:
             return ANIMATION_UNIT_BUILD;
         case MODE_UNIT_ATTACK_WINDUP:
-        case MODE_UNIT_TINKER_THROW:
+        case MODE_UNIT_PYRO_THROW:
             return ANIMATION_UNIT_ATTACK;
         case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
             return ANIMATION_SOLDIER_RANGED_ATTACK;
@@ -733,7 +733,7 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
         case MODE_UNIT_DEATH_FADE:
             return ANIMATION_UNIT_DEATH_FADE;
         case MODE_BUILDING_FINISHED: {
-            if (entity.type == ENTITY_WORKSHOP && !entity.queue.empty()) {
+            if (entity.type == ENTITY_WORKSHOP && !entity.queue.empty() && !(entity.timer == BUILDING_QUEUE_BLOCKED || entity.timer == BUILDING_QUEUE_EXIT_BLOCKED)) {
                 return ANIMATION_WORKSHOP;
             } else {
                 return ANIMATION_UNIT_IDLE;
