@@ -10,6 +10,7 @@ static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 50;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 static const uint32_t UNIT_HEALTH_REGEN_DELAY = 600;
+static const uint32_t UNIT_ENERGY_REGEN_DURATION = 64;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t UNIT_IN_MINE_DURATION = 150;
@@ -74,6 +75,8 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
+            ivec2 exit_cell = map_get_exit_cell(state.map, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+            match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
 
             // Place scout
             {
@@ -691,6 +694,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.health = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
                         ? entity_data.max_health
                         : (entity_data.max_health / 10);
+    entity.energy = entity_is_unit(type) ? entity_data.unit_data.max_energy / 4 : 0;
     entity.target = (Target) { .type = TARGET_NONE };
     entity.pathfind_attempts = 0;
     entity.timer = 0;
@@ -707,6 +711,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.taking_damage_timer = 0;
     entity.health_regen_timer = 0;
     entity.fire_damage_timer = 0;
+    entity.energy_regen_timer = 0;
 
     EntityId id = state.entities.push_back(entity);
     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
@@ -1655,6 +1660,16 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             if (entity.health != entity_data.max_health) {
                 entity.health_regen_timer = UNIT_HEALTH_REGEN_DURATION;
             }
+        }
+    }
+
+    if (entity_is_unit(entity.type) && entity.energy < entity_data.unit_data.max_energy) {
+        if (entity.energy_regen_timer != 0) {
+            entity.energy_regen_timer--;
+        }
+        if (entity.energy_regen_timer == 0) {
+            entity.energy_regen_timer = UNIT_ENERGY_REGEN_DURATION;
+            entity.energy++;
         }
     }
 

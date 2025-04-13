@@ -25,7 +25,8 @@ struct RenderSpriteParams {
 
 enum RenderHealthbarType {
     RENDER_HEALTHBAR,
-    RENDER_GARRISONBAR,
+    RENDER_GARRISON_BAR,
+    RENDER_ENERGY_BAR
 };
 
 enum MatchUiSelectionType {
@@ -130,3 +131,4 @@ void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int l
 void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max);
 void match_ui_render_target_build(const MatchUiState& state, const Target& target);
 RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& state, const Entity& entity);
+void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity, Rect icon_rect);

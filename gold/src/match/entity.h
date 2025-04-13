@@ -119,6 +119,7 @@ struct Entity {
     Direction direction;
 
     int health;
+    uint32_t energy;
     Target target;
     std::vector<Target> target_queue;
     std::vector<ivec2> path;
@@ -140,11 +141,13 @@ struct Entity {
     uint32_t taking_damage_timer;
     uint32_t health_regen_timer;
     uint32_t fire_damage_timer;
+    uint32_t energy_regen_timer;
 };
 
 struct EntityDataUnit {
     uint32_t population_cost;
     fixed speed;
+    uint32_t max_energy;
 
     SoundName attack_sound;
     int damage;

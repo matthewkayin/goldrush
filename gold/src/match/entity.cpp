@@ -43,6 +43,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 200),
+            .max_energy = 0,
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 3,
@@ -72,6 +73,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 200),
+            .max_energy = 0,
 
             .attack_sound = SOUND_GUN,
             .damage = 8,
@@ -101,6 +103,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
+            .max_energy = 0,
 
             .attack_sound = SOUND_SWORD,
             .damage = 6,
@@ -130,6 +133,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(1, 20),
+            .max_energy = 0,
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 0,
@@ -159,6 +163,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(1, 20),
+            .max_energy = 0,
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 0,
@@ -188,6 +193,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(1, 40),
+            .max_energy = 0,
 
             .attack_sound = SOUND_GUN,
             .damage = 8,
@@ -217,6 +223,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 225),
+            .max_energy = 0,
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 200,
@@ -246,6 +253,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 200),
+            .max_energy = 100,
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 0,
@@ -275,6 +283,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 170),
+            .max_energy = 0,
 
             .attack_sound = SOUND_MUSKET,
             .damage = 15,
@@ -304,6 +313,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 2,
             .speed = fixed::from_int_and_raw_decimal(0, 140),
+            .max_energy = 0,
 
             .attack_sound = SOUND_CANNON,
             .damage = 20,
@@ -333,6 +343,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 170),
+            .max_energy = 0,
 
             .attack_sound = SOUND_GUN,
             .damage = 5,

@@ -1571,12 +1571,19 @@ void match_ui_render(const MatchUiState& state) {
 
             // Render healthbar
             ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state.camera_offset;
-            match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
-            healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+            if (entity_data.max_health != 0) {
+                match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
+                healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+            }
 
             // Render garrison bar
             if (entity_data.garrison_capacity != 0) {
-                match_ui_render_healthbar(RENDER_GARRISONBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
+                match_ui_render_healthbar(RENDER_GARRISON_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
+                healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+            } 
+            // Render energy bar
+            if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0) {
+                match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.energy, (int)entity_data.unit_data.max_energy);
             }
         }
 
@@ -2281,14 +2288,14 @@ void match_ui_render(const MatchUiState& state) {
 
         if (entity.type == ENTITY_GOLDMINE) {
             if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
-                render_text(FONT_WESTERN8_GOLD, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(36, 22));
+                render_text(FONT_WESTERN8_GOLD, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 33));
             } else {
                 char gold_left_str[17];
                 sprintf(gold_left_str, "Gold Left: %u", entity.gold_held);
-                render_text(FONT_WESTERN8_GOLD, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(36, 22));
+                render_text(FONT_WESTERN8_GOLD, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 33));
             }
         } else {
-            ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 35);
+            ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(34, 18 + 2);
             ivec2 healthbar_size = ivec2(64, 12);
             match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 
@@ -2298,21 +2305,25 @@ void match_ui_render(const MatchUiState& state) {
             ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2);
             render_text(FONT_HACK_WHITE, health_text, health_text_position);
 
+            if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0)  {
+                healthbar_position += ivec2(0, healthbar_size.y + 2);
+                match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_data.unit_data.max_energy);
+                sprintf(health_text, "%i/%i", entity.energy, entity_data.unit_data.max_energy);
+                health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
+                health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2);
+                render_text(FONT_HACK_WHITE, health_text, health_text_position);
+            }
+
             if (entity_data.has_detection) {
-                render_text(FONT_WESTERN8_GOLD, "Detection", SELECTION_LIST_TOP_LEFT + ivec2(36, 22));
+                render_text(FONT_WESTERN8_GOLD, "Has Detection", SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 33));
             }
         }
     } else {
         for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
-            const Entity& entity = state.match.entities.get_by_id(state.selection[selection_index]);
-            const EntityData& entity_data = entity_get_data(entity.type);
-
-            Rect icon_rect = match_ui_get_selection_list_item_rect(selection_index);
-            bool icon_hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) &&
-                                    icon_rect.has_point(input_get_mouse_position());
-            render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
-            render_sprite_frame(entity_data.icon, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
-            match_ui_render_healthbar(RENDER_HEALTHBAR, ivec2(icon_rect.x + 1, icon_rect.y + 27 - (int)icon_hovered), ivec2(30, 4), entity.health, entity_data.max_health);
+            match_ui_render_entity_icon(
+                state, 
+                state.match.entities.get_by_id(state.selection[selection_index]), 
+                match_ui_get_selection_list_item_rect(selection_index));
         }
     }
     // End UI Selection List
@@ -2378,18 +2389,13 @@ void match_ui_render(const MatchUiState& state) {
                     continue;
                 }
 
-                const EntityData& garrisoned_unit_data = entity_get_data(garrisoned_unit.type);
                 Rect icon_rect = (Rect) {
                     .x = MATCH_UI_GARRISON_ICON_POSITIONS[index].x,
                     .y = MATCH_UI_GARRISON_ICON_POSITIONS[index].y,
                     .w = icon_sprite_info.frame_width,
                     .h = icon_sprite_info.frame_height
                 };
-                bool hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
-                                    icon_rect.has_point(input_get_mouse_position());
-                render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
-                render_sprite_frame(garrisoned_unit_data.icon, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
-                match_ui_render_healthbar(RENDER_HEALTHBAR, ivec2(icon_rect.x + 1, icon_rect.y + icon_rect.h - 5 - (int)hovered), ivec2(icon_rect.w - 2, 4), garrisoned_unit.health, garrisoned_unit_data.max_health);
+                match_ui_render_entity_icon(state, garrisoned_unit, icon_rect);
                 index++;
             }
         }
@@ -2688,8 +2694,10 @@ void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 s
     healthbar_subrect.w = (healthbar_rect.w * amount) / max;
     
     RenderColor healthbar_color;
-    if (type == RENDER_GARRISONBAR) {
+    if (type == RENDER_GARRISON_BAR) {
         healthbar_color = RENDER_COLOR_WHITE;
+    } else if (type == RENDER_ENERGY_BAR) {
+        healthbar_color = RENDER_COLOR_BLUE;
     } else if (healthbar_subrect.w <= healthbar_rect.w / 3) {
         healthbar_color = RENDER_COLOR_RED;
     } else {
@@ -2699,7 +2707,7 @@ void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 s
     render_fill_rect(healthbar_subrect, healthbar_color);
     render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK);
 
-    if (type == RENDER_GARRISONBAR) {
+    if (type == RENDER_GARRISON_BAR) {
         for (int line_index = 1; line_index < max; line_index++) {
             int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / max);
             render_line(ivec2(line_x, healthbar_rect.y), ivec2(line_x, healthbar_rect.y + healthbar_rect.h - 1), RENDER_COLOR_OFFBLACK);
@@ -2750,4 +2758,20 @@ RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& stat
     }
 
     return params;
+}
+
+void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity, Rect icon_rect) {
+    const EntityData& entity_data = entity_get_data(entity.type);
+    bool icon_hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) &&
+                            icon_rect.has_point(input_get_mouse_position());
+
+    render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
+    render_sprite_frame(entity_data.icon, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
+    ivec2 healthbar_position = ivec2(icon_rect.x + 1, icon_rect.y + 27 - (int)icon_hovered);
+    ivec2 healthbar_size = ivec2(30, 4);
+    if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0) {
+        match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_data.unit_data.max_energy);
+        healthbar_position -= ivec2(0, healthbar_size.y + 1);
+    }
+    match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 }
