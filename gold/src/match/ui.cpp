@@ -300,6 +300,17 @@ void match_ui_handle_input(MatchUiState& state) {
                         break;
                     }
                     case INPUT_HOTKEY_MOLOTOV: {
+                        bool has_enough_energy = false;
+                        for (EntityId id : state.selection) {
+                            if (state.match.entities.get_by_id(id).energy >= MOLOTOV_ENERGY_COST) {
+                                has_enough_energy = true;
+                                break;
+                            }
+                        }
+                        if (!has_enough_energy) {
+                            match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
+                            return;
+                        }
                         state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
                         break;
                     }
@@ -1395,7 +1406,7 @@ void match_ui_order_move(MatchUiState& state) {
     // sound_play(input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_ENTITY ? SOUND_UNIT_HAW : SOUND_UNIT_OK);
 
     // Reset UI mode if targeting
-    if (match_ui_is_targeting(state)) {
+    if (match_ui_is_targeting(state) && !input_is_action_pressed(INPUT_ACTION_SHIFT)) {
         state.mode = MATCH_UI_MODE_NONE;
     }
 }
@@ -2152,6 +2163,7 @@ void match_ui_render(const MatchUiState& state) {
                 char tooltip_text[64];
                 uint32_t tooltip_gold_cost;
                 uint32_t tooltip_population_cost;
+                uint32_t tooltip_energy_cost;
                 if (match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey_hovered)) {
                     char* tooltip_text_ptr = tooltip_text;
 
@@ -2160,6 +2172,11 @@ void match_ui_render(const MatchUiState& state) {
                             tooltip_text_ptr += sprintf(tooltip_text, "%s", hotkey_info.action.name);
                             tooltip_gold_cost = 0;
                             tooltip_population_cost = 0;
+                            if (hotkey_hovered == INPUT_HOTKEY_MOLOTOV) {
+                                tooltip_energy_cost = MOLOTOV_ENERGY_COST;
+                            } else {
+                                tooltip_energy_cost = 0;
+                            }
                             break;
                         }
                         case HOTKEY_BUTTON_TRAIN:
@@ -2168,12 +2185,14 @@ void match_ui_render(const MatchUiState& state) {
                             tooltip_text_ptr += sprintf(tooltip_text, "%s %s", hotkey_info.type == HOTKEY_BUTTON_TRAIN ? "Hire" : "Build", entity_data.name);
                             tooltip_gold_cost = entity_data.gold_cost;
                             tooltip_population_cost = hotkey_info.type == HOTKEY_BUTTON_TRAIN ? entity_data.unit_data.population_cost : 0;
+                            tooltip_energy_cost = 0;
                             break;
                         }
                         case HOTKEY_BUTTON_RESEARCH: {
                             tooltip_text_ptr += sprintf(tooltip_text, "Research fixme!");
                             tooltip_gold_cost = 0;
                             tooltip_population_cost = 0;
+                            tooltip_energy_cost = 0;
                             break;
                         }
                     }
@@ -2199,13 +2218,14 @@ void match_ui_render(const MatchUiState& state) {
                     }
                     tooltip_gold_cost = 0;
                     tooltip_population_cost = 0;
+                    tooltip_energy_cost = 0;
                 }
 
                 // Render the tooltip frame
                 int tooltip_text_width = render_get_text_size(FONT_WESTERN8_OFFBLACK, tooltip_text).x;
                 int tooltip_min_width = 10 + tooltip_text_width;
                 int tooltip_cell_width = tooltip_min_width / 8;
-                int tooltip_cell_height = tooltip_gold_cost != 0 ? 5 : 3;
+                int tooltip_cell_height = tooltip_gold_cost != 0 || tooltip_energy_cost != 0 ? 5 : 3;
                 if (tooltip_min_width % 8 != 0) {
                     tooltip_cell_width++;
                 }
@@ -2252,6 +2272,14 @@ void match_ui_render(const MatchUiState& state) {
                     char population_text[4];
                     sprintf(population_text, "%u", tooltip_population_cost);
                     render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + ivec2(5 + 18 + 32 + 22, 23));
+                }
+
+                // Render energy text
+                if (tooltip_energy_cost != 0) {
+                    render_sprite_frame(SPRITE_UI_ENERGY_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5, 21), RENDER_SPRITE_NO_CULL, 0);
+                    char energy_text[4];
+                    sprintf(energy_text, "%u", tooltip_energy_cost);
+                    render_text(FONT_WESTERN8_OFFBLACK, energy_text, tooltip_top_left + ivec2(22, 21));
                 }
             } 
         }

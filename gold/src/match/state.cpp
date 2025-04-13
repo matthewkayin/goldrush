@@ -280,16 +280,14 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
         } // End case MATCH_INPUT_MOVE
         case MATCH_INPUT_MOVE_MOLOTOV: {
             uint32_t thrower_index = INDEX_INVALID;
-            uint8_t player_id;
-            bool all_units_are_dead = true;
             for (uint32_t id_index = 0; id_index < input.move.entity_count; id_index++) {
                 uint32_t unit_index = state.entities.get_index_of(input.move.entity_ids[id_index]);
                 if (unit_index == INDEX_INVALID || !entity_is_selectable(state.entities[unit_index])) {
                     continue;
                 }
-                all_units_are_dead = false;
-                player_id = state.entities[unit_index].player_id;
-                // TODO: consider thrower cooldown
+                if (state.entities[unit_index].energy < MOLOTOV_ENERGY_COST) {
+                    continue;
+                }
                 if (thrower_index == INDEX_INVALID ||
                         ivec2::manhattan_distance(state.entities[unit_index].cell, input.move.target_cell) <
                         ivec2::manhattan_distance(state.entities[thrower_index].cell, input.move.target_cell)) {
@@ -298,10 +296,6 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
 
             if (thrower_index == INDEX_INVALID) {
-                if (!all_units_are_dead) {
-                    // TODO: not enough energy?
-                    match_event_show_status(state, player_id, MATCH_UI_STATUS_SMOKE_COOLDOWN);
-                }
                 return;
             }
 
@@ -1053,7 +1047,14 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
+                        if (entity.energy < MOLOTOV_ENERGY_COST) {
+                            match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
+                            entity.mode = MODE_UNIT_IDLE;
+                            entity.target = (Target) { .type = TARGET_NONE };
+                            break;
+                        }
 
+                        entity.energy -= MOLOTOV_ENERGY_COST;
                         entity.direction = enum_direction_to_rect(entity.cell, entity.target.cell, 1);
                         entity.mode = MODE_UNIT_PYRO_THROW;
                         entity.animation = animation_create(ANIMATION_UNIT_ATTACK);
@@ -2618,6 +2619,5 @@ void match_set_cell_on_fire(MatchState& state, ivec2 cell, uint32_t spread) {
         .time_to_live = FIRE_TTL,
         .animation = animation_create(ANIMATION_FIRE_START)
     });
-    uint32_t fire_index = state.fires.size() - 1;
     state.fire_cells[cell.x + (cell.y * state.map.width)] = 1;
 }

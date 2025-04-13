@@ -21,9 +21,12 @@
 #define MATCH_UI_STATUS_BUILDING_EXIT_BLOCKED "Building exit is blocked."
 #define MATCH_UI_STATUS_REPAIR_TARGET_INVALID "Must target an allied building."
 #define MATCH_UI_STATUS_SMOKE_COOLDOWN "Smoke bomb is on cooldown."
+#define MATCH_UI_STATUS_NOT_ENOUGH_ENERGY "Not enough energy."
 
 #define MATCH_MAX_ENTITIES (400 * MAX_PLAYERS)
 #define MATCH_ENTITY_UNLOAD_ALL ID_NULL
+
+#define MOLOTOV_ENERGY_COST 60
 
 const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;
