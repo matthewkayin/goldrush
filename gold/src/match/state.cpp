@@ -27,7 +27,7 @@ static const int MINE_EXPLOSION_DAMAGE = 200;
 static const fixed PROJECTILE_MOLOTOV_SPEED = fixed::from_int(4);
 static const uint32_t PROJECTILE_MOLOTOV_FIRE_SPREAD = 3;
 static const uint32_t FIRE_TTL = 30 * 30;
-static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 15;
+static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 8;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -582,6 +582,11 @@ void match_update(MatchState& state) {
                 // On projectile finish
                 if (projectile.type == PROJECTILE_MOLOTOV) {
                     match_set_cell_on_fire(state, projectile.target.to_ivec2() / TILE_SIZE, PROJECTILE_MOLOTOV_FIRE_SPREAD);
+                    // Check that it's actually on fire before playing the sound
+                    // TODO? isolate the glass and fire begin sound, play the glass regardless of whether fire begins or not
+                    if (match_is_cell_on_fire(state, projectile.target.to_ivec2() / TILE_SIZE)) {
+                        match_event_play_sound(state, SOUND_MOLOTOV_IMPACT, projectile.target.to_ivec2());
+                    }
                 }
                 state.projectiles.erase(state.projectiles.begin() + projectile_index);
             } else {

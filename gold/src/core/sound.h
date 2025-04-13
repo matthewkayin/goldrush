@@ -32,6 +32,7 @@ enum SoundName {
     SOUND_UNIT_HEY,
     SOUND_UNIT_OK,
     SOUND_UNIT_HAW,
+    SOUND_MOLOTOV_IMPACT,
     SOUND_COUNT
 };
 

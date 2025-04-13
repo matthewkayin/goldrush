@@ -57,6 +57,7 @@ https://freesound.org/people/eneibol/
 Cannon fire
 Wood cracks / hits / destructions
 Puff of Smoke
+Glass shatter 2 (modified)
 qubodup
 https://freesound.org/people/qubodup/
 
@@ -116,3 +117,7 @@ https://freesound.org/people/Artninja/sounds/750822/
 R21-22-Cowboy Shouts at Cattle (modified)
 craigsmith
 https://freesound.org/people/craigsmith/sounds/481757/
+
+Fire - Short - Swoosh Reverse 07 (modified)
+GregorQuendel
+https://freesound.org/people/GregorQuendel/
