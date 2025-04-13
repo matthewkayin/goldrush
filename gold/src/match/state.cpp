@@ -603,32 +603,31 @@ void match_update(MatchState& state) {
     {
         uint32_t fire_index = 0;
         while (fire_index < state.fires.size()) {
-            Fire& fire = state.fires[fire_index];
-            animation_update(fire.animation);
+            animation_update(state.fires[fire_index].animation);
 
             // Start animation finished, enter prolonged burn and spread more flames
-            if (fire.animation.name == ANIMATION_FIRE_START && !animation_is_playing(fire.animation)) {
-                fire.animation = animation_create(ANIMATION_FIRE_BURN);
-                if (fire.spread != 0) {
-                    uint16_t fire_elevation = map_get_tile(state.map, fire.cell).elevation;
+            if (state.fires[fire_index].animation.name == ANIMATION_FIRE_START && !animation_is_playing(state.fires[fire_index].animation)) {
+                state.fires[fire_index].animation = animation_create(ANIMATION_FIRE_BURN);
+                if (state.fires[fire_index].spread != 0) {
+                    uint16_t fire_elevation = map_get_tile(state.map, state.fires[fire_index].cell).elevation;
                     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                        ivec2 child_cell = fire.cell + DIRECTION_IVEC2[direction];
+                        ivec2 child_cell = state.fires[fire_index].cell + DIRECTION_IVEC2[direction];
                         if (!map_is_cell_in_bounds(state.map, child_cell)) {
                             continue;
                         }
                         if (map_get_tile(state.map, child_cell).elevation != fire_elevation && !map_is_tile_ramp(state.map, child_cell)) {
                             continue;
                         }
-                        match_set_cell_on_fire(state, child_cell, fire.spread - 1);
+                        match_set_cell_on_fire(state, child_cell, state.fires[fire_index].spread - 1);
                     }
                 }
             // Fire is in prolonged burn, count down time to live
-            } else if (fire.animation.name == ANIMATION_FIRE_BURN) {
-                fire.time_to_live--;
+            } else if (state.fires[fire_index].animation.name == ANIMATION_FIRE_BURN) {
+                state.fires[fire_index].time_to_live--;
             }
             // Time to live is 0, extinguish fire
-            if (fire.time_to_live == 0) {
-                state.fire_cells[fire.cell.x + (fire.cell.y * state.map.width)] = 0;
+            if (state.fires[fire_index].time_to_live == 0) {
+                state.fire_cells[state.fires[fire_index].cell.x + (state.fires[fire_index].cell.y * state.map.width)] = 0;
                 state.fires.erase(state.fires.begin() + fire_index);
             } else {
                 fire_index++;
@@ -2619,5 +2618,6 @@ void match_set_cell_on_fire(MatchState& state, ivec2 cell, uint32_t spread) {
         .time_to_live = FIRE_TTL,
         .animation = animation_create(ANIMATION_FIRE_START)
     });
+    uint32_t fire_index = state.fires.size() - 1;
     state.fire_cells[cell.x + (cell.y * state.map.width)] = 1;
 }
