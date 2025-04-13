@@ -578,9 +578,8 @@ void match_update(MatchState& state) {
             if (projectile.position.distance_to(projectile.target) <= PROJECTILE_MOLOTOV_SPEED) {
                 // On projectile finish
                 if (projectile.type == PROJECTILE_MOLOTOV) {
-                    match_set_cell_on_fire(state, projectile.target.to_ivec2() / TILE_SIZE, PROJECTILE_MOLOTOV_FIRE_SPREAD);
+                    match_set_cell_on_fire(state, projectile.target.to_ivec2() / TILE_SIZE, projectile.target.to_ivec2() / TILE_SIZE);
                     // Check that it's actually on fire before playing the sound
-                    // TODO? isolate the glass and fire begin sound, play the glass regardless of whether fire begins or not
                     if (match_is_cell_on_fire(state, projectile.target.to_ivec2() / TILE_SIZE)) {
                         match_event_play_sound(state, SOUND_MOLOTOV_IMPACT, projectile.target.to_ivec2());
                     }
@@ -602,18 +601,16 @@ void match_update(MatchState& state) {
             // Start animation finished, enter prolonged burn and spread more flames
             if (state.fires[fire_index].animation.name == ANIMATION_FIRE_START && !animation_is_playing(state.fires[fire_index].animation)) {
                 state.fires[fire_index].animation = animation_create(ANIMATION_FIRE_BURN);
-                if (state.fires[fire_index].spread != 0) {
-                    uint16_t fire_elevation = map_get_tile(state.map, state.fires[fire_index].cell).elevation;
-                    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                        ivec2 child_cell = state.fires[fire_index].cell + DIRECTION_IVEC2[direction];
-                        if (!map_is_cell_in_bounds(state.map, child_cell)) {
-                            continue;
-                        }
-                        if (map_get_tile(state.map, child_cell).elevation != fire_elevation && !map_is_tile_ramp(state.map, child_cell)) {
-                            continue;
-                        }
-                        match_set_cell_on_fire(state, child_cell, state.fires[fire_index].spread - 1);
+                uint16_t fire_elevation = map_get_tile(state.map, state.fires[fire_index].cell).elevation;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 child_cell = state.fires[fire_index].cell + DIRECTION_IVEC2[direction];
+                    if (!map_is_cell_in_bounds(state.map, child_cell)) {
+                        continue;
                     }
+                    if (map_get_tile(state.map, child_cell).elevation != fire_elevation && !map_is_tile_ramp(state.map, child_cell)) {
+                        continue;
+                    }
+                    match_set_cell_on_fire(state, child_cell, state.fires[fire_index].source);
                 }
             // Fire is in prolonged burn, count down time to live
             } else if (state.fires[fire_index].animation.name == ANIMATION_FIRE_BURN) {
@@ -2603,7 +2600,7 @@ bool match_is_cell_rect_on_fire(const MatchState& state, ivec2 cell, int cell_si
     return false;
 }
 
-void match_set_cell_on_fire(MatchState& state, ivec2 cell, uint32_t spread) {
+void match_set_cell_on_fire(MatchState& state, ivec2 cell, ivec2 source) {
     if (match_is_cell_on_fire(state, cell)) {
         return;
     }
@@ -2613,9 +2610,14 @@ void match_set_cell_on_fire(MatchState& state, ivec2 cell, uint32_t spread) {
     if (map_get_tile(state.map, cell).sprite == SPRITE_TILE_WATER) {
         return;
     }
+    if (ivec2::manhattan_distance(cell, source) > PROJECTILE_MOLOTOV_FIRE_SPREAD ||
+        (cell.x == source.x && std::abs(cell.y - source.y) >= PROJECTILE_MOLOTOV_FIRE_SPREAD) ||
+        (cell.y == source.y && std::abs(cell.x - source.x) >= PROJECTILE_MOLOTOV_FIRE_SPREAD)) {
+        return;
+    }
     state.fires.push_back((Fire) {
         .cell = cell,
-        .spread = spread,
+        .source = source,
         .time_to_live = FIRE_TTL,
         .animation = animation_create(ANIMATION_FIRE_START)
     });
