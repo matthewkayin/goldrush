@@ -90,6 +90,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.chat_cursor_visible = false;
     memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
     state.rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
+    state.building_fire_animation = animation_create(ANIMATION_FIRE_BURN);
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
@@ -924,6 +925,7 @@ void match_ui_update(MatchUiState& state) {
         animation_update(state.move_animation);
     }
     animation_update(state.rally_flag_animation);
+    animation_update(state.building_fire_animation);
     if (state.status_timer != 0) {
         state.status_timer--;
     }
@@ -1585,7 +1587,6 @@ void match_ui_render(const MatchUiState& state) {
         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
             continue;
         }
-
         if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
             continue;
         }
@@ -1664,7 +1665,26 @@ void match_ui_render(const MatchUiState& state) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
     }
 
-    // Fires above entities
+    // Building fires
+    for (const Entity& entity : state.match.entities) {
+        if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+            continue;
+        }
+        if (!entity_is_building(entity.type) || !entity_check_flag(entity, ENTITY_FLAG_ON_FIRE)) {
+            continue;
+        }
+        if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+
+        const EntityData& entity_data = entity_get_data(entity.type);
+        for (int x = entity.cell.x; x < entity.cell.x + entity_data.cell_size; x++) {
+            ivec2 fire_position = (ivec2(x, entity.cell.y + entity_data.cell_size - 1) * TILE_SIZE) - state.camera_offset;
+            render_sprite_frame(SPRITE_PARTICLE_FIRE, state.building_fire_animation.frame, fire_position, 0, 0);
+        }
+    }
+
+    // Fires above units
     for (const Fire& fire : state.match.fires) {
         if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, fire.cell, 1)) {
             continue;
@@ -2374,6 +2394,7 @@ void match_ui_render(const MatchUiState& state) {
                     debug_text_ptr += sprintf(debug_text_ptr, "MINER");
                     break;
             }
+            debug_text_ptr += sprintf(debug_text_ptr, " fire: %i", (int)match_is_cell_on_fire(state.match, mouse_cell));
             render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 12));
 
             debug_text_ptr = debug_text;

@@ -205,4 +205,5 @@ void match_fog_update(MatchState& state, uint8_t team, ivec2 cell, int cell_size
 // Fire
 
 bool match_is_cell_on_fire(const MatchState& state, ivec2 cell);
+bool match_is_cell_rect_on_fire(const MatchState& state, ivec2 cell, int cell_size);
 void match_set_cell_on_fire(MatchState& state, ivec2 cell, uint32_t spread);

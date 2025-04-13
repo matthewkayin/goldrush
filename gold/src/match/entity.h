@@ -13,8 +13,9 @@
 
 const uint32_t ENTITY_FLAG_HOLD_POSITION = 1;
 const uint32_t ENTITY_FLAG_DAMAGE_FLICKER = 2;
-const uint32_t ENTITY_FLAG_INVISIBLE = 4;
-const uint32_t ENTITY_FLAG_CHARGED = 8;
+const uint32_t ENTITY_FLAG_INVISIBLE = 1 << 2;
+const uint32_t ENTITY_FLAG_CHARGED = 1 << 3;
+const uint32_t ENTITY_FLAG_ON_FIRE = 1 << 4;
 
 const uint32_t ENTITY_CANNOT_GARRISON = 0;
 
@@ -138,6 +139,7 @@ struct Entity {
     uint32_t taking_damage_counter;
     uint32_t taking_damage_timer;
     uint32_t health_regen_timer;
+    uint32_t fire_damage_timer;
 };
 
 struct EntityDataUnit {

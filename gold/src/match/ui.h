@@ -95,6 +95,7 @@ struct MatchUiState {
 
     Animation rally_flag_animation;
     Animation move_animation;
+    Animation building_fire_animation;
     ivec2 move_animation_position;
     EntityId move_animation_entity_id;
 

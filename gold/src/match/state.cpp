@@ -27,6 +27,7 @@ static const int MINE_EXPLOSION_DAMAGE = 200;
 static const fixed PROJECTILE_MOLOTOV_SPEED = fixed::from_int(4);
 static const uint32_t PROJECTILE_MOLOTOV_FIRE_SPREAD = 3;
 static const uint32_t FIRE_TTL = 30 * 30;
+static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 15;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -610,9 +611,6 @@ void match_update(MatchState& state) {
                         if (map_get_tile(state.map, child_cell).elevation != fire_elevation && !map_is_tile_ramp(state.map, child_cell)) {
                             continue;
                         }
-                        if (match_is_cell_on_fire(state, child_cell)) {
-                            continue;
-                        }
                         match_set_cell_on_fire(state, child_cell, fire.spread - 1);
                     }
                 }
@@ -622,8 +620,8 @@ void match_update(MatchState& state) {
             }
             // Time to live is 0, extinguish fire
             if (fire.time_to_live == 0) {
-                state.fires.erase(state.fires.begin() + fire_index);
                 state.fire_cells[fire.cell.x + (fire.cell.y * state.map.width)] = 0;
+                state.fires.erase(state.fires.begin() + fire_index);
             } else {
                 fire_index++;
             }
@@ -703,6 +701,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.taking_damage_counter = 0;
     entity.taking_damage_timer = 0;
     entity.health_regen_timer = 0;
+    entity.fire_damage_timer = 0;
 
     EntityId id = state.entities.push_back(entity);
     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
@@ -779,10 +778,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
         match_event_play_sound(state, entity_data.death_sound, entity.position.to_ivec2());
 
-        // If it's a building, release garrisoned units
-        // If it's a unit, it will release them once its death animation is over
         if (!entity_is_unit(entity.type)) {
+            // If it's a building, release garrisoned units
+            // If it's a unit, it will release them once its death animation is over
             match_entity_release_garrisoned_units_on_death(state, entity);
+
+            // Also if it's a building, turn off the burning flag
+            entity_set_flag(entity, ENTITY_FLAG_ON_FIRE, false);
         }
     }
     // End if entity should die
@@ -1363,6 +1365,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         state.players[entity.player_id].gold--;
                         target.health_regen_timer = 0;
                     }
+                    if (target.mode == MODE_BUILDING_FINISHED && target.health > target_max_health / 4) {
+                        entity_set_flag(target, ENTITY_FLAG_ON_FIRE, false);
+                    }
                     if (target.health == target_max_health) {
                         if (target.mode == MODE_BUILDING_IN_PROGRESS) {
                             match_entity_building_finish(state, entity.target.id);
@@ -1593,6 +1598,32 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             default:
                 update_finished = true;
                 break;
+        }
+    }
+
+    // Check for fire
+    // If entity is moving, check for fire based on its previous cell
+    if (entity.type != ENTITY_GOLDMINE && entity.health != 0) {
+        ivec2 entity_fire_cell = entity.cell;
+        if (entity_is_unit(entity.type) && entity.mode == MODE_UNIT_MOVE) {
+            entity_fire_cell = entity.cell - DIRECTION_IVEC2[entity.direction];
+        }
+        if (entity_is_building(entity.type) && entity.mode == MODE_BUILDING_FINISHED && entity.health < entity_data.max_health / 4) {
+            entity_set_flag(entity, ENTITY_FLAG_ON_FIRE, true);
+        }
+        if (match_is_cell_rect_on_fire(state, entity_fire_cell, entity_data.cell_size) || entity_check_flag(entity, ENTITY_FLAG_ON_FIRE)) {
+            if (entity.fire_damage_timer != 0) {
+                entity.fire_damage_timer--;
+            }
+            if (entity.fire_damage_timer == 0) {
+                entity.health--;
+                entity.fire_damage_timer = ENTITY_FIRE_DAMAGE_COOLDOWN;
+            } 
+            if (entity_is_building(entity.type)) {
+                entity_set_flag(entity, ENTITY_FLAG_ON_FIRE, true);
+            }
+        } else {
+            entity.fire_damage_timer = 0;
         }
     }
 
@@ -2540,7 +2571,22 @@ bool match_is_cell_on_fire(const MatchState& state, ivec2 cell) {
     return state.fire_cells[cell.x + (cell.y * state.map.width)] == 1;
 }
 
+bool match_is_cell_rect_on_fire(const MatchState& state, ivec2 cell, int cell_size) {
+    for (int y = cell.y; y < cell.y + cell_size; y++) {
+        for (int x = cell.x; x < cell.x + cell_size; x++) {
+            if (state.fire_cells[x + (y * state.map.width)] == 1) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void match_set_cell_on_fire(MatchState& state, ivec2 cell, uint32_t spread) {
+    if (match_is_cell_on_fire(state, cell)) {
+        return;
+    }
     if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED) {
         return;
     }
