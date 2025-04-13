@@ -300,25 +300,22 @@ void match_ui_handle_input(MatchUiState& state) {
                         break;
                     }
                     case INPUT_HOTKEY_MOLOTOV: {
-                        bool has_enough_energy = false;
-                        for (EntityId id : state.selection) {
-                            if (state.match.entities.get_by_id(id).energy >= MOLOTOV_ENERGY_COST) {
-                                has_enough_energy = true;
-                                break;
-                            }
-                        }
-                        if (!has_enough_energy) {
+                        if (!match_ui_selection_has_enough_energy(state, state.selection, MOLOTOV_ENERGY_COST)) {
                             match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
-                            return;
+                        } else {
+                            state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
                         }
-                        state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
                         break;
                     }
                     default:
                         break;
                 }
             } else if (hotkey_info.type == HOTKEY_BUTTON_BUILD) {
-                if (state.match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
+                const EntityData& building_data = entity_get_data(hotkey_info.entity_type);
+                bool costs_energy = (building_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY;
+                if (costs_energy && !match_ui_selection_has_enough_energy(state, state.selection, building_data.gold_cost)) {
+                    match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
+                } else if (!costs_energy && state.match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
                     match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
                 } else {
                     state.mode = MATCH_UI_MODE_BUILDING_PLACE;
@@ -467,7 +464,10 @@ void match_ui_handle_input(MatchUiState& state) {
         // Check to make sure that all buildings can rally
         for (EntityId id : state.selection) {
             const Entity& entity = state.match.entities.get_by_id(id);
-            if (entity.mode == MODE_BUILDING_IN_PROGRESS || !entity_get_data(entity.type).building_data.can_rally) {
+            if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
+                return;
+            }
+            if ((entity_get_data(entity.type).building_data.options & BUILDING_CAN_RALLY) != BUILDING_CAN_RALLY) {
                 return;
             }
         }
@@ -1282,6 +1282,17 @@ MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, cons
     } else {
         return MATCH_UI_SELECTION_GOLD;
     }
+}
+
+bool match_ui_selection_has_enough_energy(const MatchUiState& state, const std::vector<EntityId>& selection, uint32_t cost) {
+    for (EntityId id : state.selection) {
+        if (state.match.entities.get_by_id(id).energy >= cost) {
+            return true;
+            break;
+        }
+    }
+
+    return false;
 }
 
 void match_ui_order_move(MatchUiState& state) {
@@ -2182,10 +2193,13 @@ void match_ui_render(const MatchUiState& state) {
                         case HOTKEY_BUTTON_TRAIN:
                         case HOTKEY_BUTTON_BUILD: {
                             const EntityData& entity_data = entity_get_data(hotkey_info.entity_type);
+                            bool costs_energy = entity_is_building(hotkey_info.entity_type) 
+                                                    ? (entity_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY
+                                                    : false;
                             tooltip_text_ptr += sprintf(tooltip_text, "%s %s", hotkey_info.type == HOTKEY_BUTTON_TRAIN ? "Hire" : "Build", entity_data.name);
-                            tooltip_gold_cost = entity_data.gold_cost;
+                            tooltip_gold_cost = costs_energy ? 0 : entity_data.gold_cost;
                             tooltip_population_cost = hotkey_info.type == HOTKEY_BUTTON_TRAIN ? entity_data.unit_data.population_cost : 0;
-                            tooltip_energy_cost = 0;
+                            tooltip_energy_cost = costs_energy ? entity_data.gold_cost : 0;
                             break;
                         }
                         case HOTKEY_BUTTON_RESEARCH: {

@@ -1048,6 +1048,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_BUILDING_LANDMINE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_mine.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
     { SPRITE_BUILDING_DESTROYED_BUNKER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

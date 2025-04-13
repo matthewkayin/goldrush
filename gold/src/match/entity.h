@@ -160,14 +160,18 @@ struct EntityDataBuilding {
     int builder_positions_x[3];
     int builder_positions_y[3];
     int builder_flip_h[3];
-    bool can_rally;
+    uint32_t options;
 };
+
+const uint32_t BUILDING_CAN_RALLY = 1;
+const uint32_t BUILDING_COSTS_ENERGY = 2;
 
 struct EntityData {
     const char* name;
     SpriteName sprite;
     SpriteName icon;
     SoundName death_sound;
+    CellLayer cell_layer;
     int cell_size;
 
     uint32_t gold_cost;
