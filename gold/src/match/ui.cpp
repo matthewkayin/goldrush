@@ -21,6 +21,12 @@ static const int CAMERA_SPEED = 16; // TODO: move to options
 static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
 static const Rect MINIMAP_RECT = (Rect) { .x = 4, .y = SCREEN_HEIGHT - 132, .w = 128, .h = 128 };
 static const int SOUND_LISTEN_MARGIN = 128;
+static const Rect SOUND_LISTEN_RECT = (Rect) {
+    .x = -SOUND_LISTEN_MARGIN,
+    .y = -SOUND_LISTEN_MARGIN,
+    .w = SCREEN_WIDTH + (SOUND_LISTEN_MARGIN * 2),
+    .h = SCREEN_HEIGHT + (SOUND_LISTEN_MARGIN * 2),
+};
 static const uint32_t SOUND_COOLDOWN_DURATION = 5;
 static const uint32_t UI_ALERT_DURATION = 90;
 static const uint32_t UI_ALERT_LINGER_DURATION = 60 * 20;
@@ -768,13 +774,7 @@ void match_ui_update(MatchUiState& state) {
                 if (state.sound_cooldown_timers[event.sound.sound] != 0) {
                     break;
                 }
-                Rect listen_rect = (Rect) {
-                    .x = state.camera_offset.x - SOUND_LISTEN_MARGIN,
-                    .y = state.camera_offset.y - SOUND_LISTEN_MARGIN,
-                    .w = SCREEN_WIDTH + (SOUND_LISTEN_MARGIN * 2),
-                    .h = SCREEN_HEIGHT + (SOUND_LISTEN_MARGIN * 2),
-                };
-                if (listen_rect.has_point(event.sound.position)) {
+                if (SOUND_LISTEN_RECT.has_point(event.sound.position - state.camera_offset)) {
                     sound_play(event.sound.sound);
                     state.sound_cooldown_timers[event.sound.sound] = SOUND_COOLDOWN_DURATION;
                 }
@@ -1048,6 +1048,58 @@ void match_ui_update(MatchUiState& state) {
             }
         }
         input_set_hotkey_group(hotkey_group);
+    }
+
+    // Play fire sound effects
+    bool is_fire_on_screen = false;
+    for (const Fire& fire : state.match.fires) {
+        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, fire.cell, 1)) {
+            continue;
+        }
+        if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
+            continue;
+        }
+        Rect fire_rect = (Rect) {
+            .x = (fire.cell.x * TILE_SIZE) - state.camera_offset.x,
+            .y = (fire.cell.y * TILE_SIZE) - state.camera_offset.y,
+            .w = TILE_SIZE,
+            .h = TILE_SIZE
+        };
+        if (SOUND_LISTEN_RECT.intersects(fire_rect)) {
+            is_fire_on_screen = true;
+            break;
+        }
+    }
+    if (!is_fire_on_screen) {
+        for (const Entity& entity : state.match.entities) {
+            if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+                continue;
+            }
+            if (!entity_is_building(entity.type) || !entity_check_flag(entity, ENTITY_FLAG_ON_FIRE)) {
+                continue;
+            }
+            if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                continue;
+            }
+
+            RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
+            const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
+            Rect render_rect = (Rect) {
+                .x = params.position.x, .y = params.position.y,
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            };
+
+            // Entity is on fire and on screen
+            if (SOUND_LISTEN_RECT.intersects(render_rect)) {
+                is_fire_on_screen = true;
+                break;
+            }
+        }
+    }
+    if (is_fire_on_screen && !sound_is_looping(SOUND_FIRE_BURN)) {
+        sound_begin_loop(SOUND_FIRE_BURN);
+    } else if (!is_fire_on_screen && sound_is_looping(SOUND_FIRE_BURN)) {
+        sound_end_loop(SOUND_FIRE_BURN);
     }
 }
 

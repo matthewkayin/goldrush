@@ -140,12 +140,19 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
     { SOUND_MOLOTOV_IMPACT, (SoundParams) {
         .path = "molotov_impact",
         .variants = 1
+    }},
+    { SOUND_FIRE_BURN, (SoundParams) {
+        .path = "fire_burn",
+        .variants = 1
     }}
 };
+
+static const int SOUND_IS_NOT_LOOPING = -1;
 
 struct SoundState {
     std::vector<Mix_Chunk*> sounds;
     int sound_index[SOUND_COUNT];
+    int sound_loop[SOUND_COUNT];
 };
 static SoundState state;
 
@@ -176,6 +183,8 @@ bool sound_init() {
 
             state.sounds.push_back(sound_variant);
         }
+
+        state.sound_loop[sound] = SOUND_IS_NOT_LOOPING;
     }
 
     log_info("Initialized sound.");
@@ -192,7 +201,30 @@ void sound_quit() {
     log_info("Quit sound.");
 }
 
-void sound_play(SoundName sound) {
+int sound_play(SoundName sound, int loops) {
     int variant = SOUND_PARAMS.at(sound).variants == 1 ? 0 : rand() % SOUND_PARAMS.at(sound).variants;
-    Mix_PlayChannel(-1, state.sounds[state.sound_index[sound] + variant], 0);
+    return Mix_PlayChannel(-1, state.sounds[state.sound_index[sound] + variant], loops);
+}
+
+bool sound_is_looping(SoundName sound) {
+    return state.sound_loop[sound] != SOUND_IS_NOT_LOOPING;
+}
+
+void sound_begin_loop(SoundName sound) {
+    int channel = sound_play(sound, SOUND_LOOPS_INDEFINITELY);
+    if (channel == -1) {
+        log_error("No channel available to loop sound %u");
+        return;
+    }
+    state.sound_loop[sound] = channel;
+}
+
+void sound_end_loop(SoundName sound) {
+    if (state.sound_loop[sound] == SOUND_IS_NOT_LOOPING) {
+        log_warn("Called sound_end_loop on a sound that is not looping.");
+        return;
+    }
+
+    Mix_HaltChannel(state.sound_loop[sound]);
+    state.sound_loop[sound] = SOUND_IS_NOT_LOOPING;
 }
