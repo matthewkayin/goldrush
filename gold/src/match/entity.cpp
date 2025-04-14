@@ -1,6 +1,7 @@
 #include "entity.h"
 
 #include "core/asserts.h"
+#include "upgrade.h"
 #include <unordered_map>
 
 static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
@@ -861,9 +862,7 @@ uint32_t building_queue_item_duration(const BuildingQueueItem& item) {
             return ENTITY_DATA.at(item.unit_type).train_duration * 60;
         }
         case BUILDING_QUEUE_ITEM_UPGRADE: {
-            return 0;
-            // TODO
-            // return UPGRADE_DATA.at(item.upgrade).research_duration * 60;
+            return upgrade_get_data(item.upgrade).research_duration * 60;
         }
     }
 }
@@ -874,9 +873,7 @@ uint32_t building_queue_item_cost(const BuildingQueueItem& item) {
             return ENTITY_DATA.at(item.unit_type).gold_cost;
         }
         case BUILDING_QUEUE_ITEM_UPGRADE: {
-            return 0;
-            // TODO
-            // return UPGRADE_DATA.at(item.upgrade).gold_cost;
+            return upgrade_get_data(item.upgrade).gold_cost;
         }
     }
 }

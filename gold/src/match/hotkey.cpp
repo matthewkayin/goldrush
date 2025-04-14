@@ -1,5 +1,6 @@
 #include "hotkey.h"
 
+#include "upgrade.h"
 #include <unordered_map>
 
 static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INFO = {
@@ -179,6 +180,14 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
         .type = HOTKEY_BUTTON_BUILD,
         .entity_type = ENTITY_LANDMINE,
         .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_UPGRADE,
+            .upgrade = UPGRADE_LANDMINES
+        }
+    }},
+    { INPUT_HOTKEY_RESEARCH_LANDMINES, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_RESEARCH,
+        .upgrade = UPGRADE_LANDMINES,
+        .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }
     }}
@@ -197,6 +206,6 @@ SpriteName hotkey_get_sprite(InputAction hotkey) {
         case HOTKEY_BUTTON_TRAIN:
             return entity_get_data(info.entity_type).icon;
         case HOTKEY_BUTTON_RESEARCH:
-            return SPRITE_BUTTON_ICON_CANCEL;
+            return upgrade_get_data(info.upgrade).icon;
     }
 }

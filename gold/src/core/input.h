@@ -44,6 +44,7 @@ enum InputAction {
     INPUT_HOTKEY_PYRO,
     INPUT_HOTKEY_MOLOTOV,
     INPUT_HOTKEY_LANDMINE,
+    INPUT_HOTKEY_RESEARCH_LANDMINES,
     INPUT_ACTION_COUNT
 };
 
@@ -63,6 +64,7 @@ const uint32_t INPUT_HOTKEY_GROUP_BUILD2 = 2 << 10;
 const uint32_t INPUT_HOTKEY_GROUP_SHERIFFS = 2 << 11;
 const uint32_t INPUT_HOTKEY_GROUP_COOP = 2 << 12;
 const uint32_t INPUT_HOTKEY_GROUP_WORKSHOP = 2 << 13;
+const uint32_t INPUT_HOTKEY_GROUP_RESEARCH_LANDMINES = 2 << 14;
 
 void input_init(SDL_Window* window);
 void input_poll_events();

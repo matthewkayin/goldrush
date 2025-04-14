@@ -228,6 +228,9 @@ void input_set_hotkey_group(uint32_t group) {
         state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
         state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
     }
+    if ((group & INPUT_HOTKEY_GROUP_RESEARCH_LANDMINES) == INPUT_HOTKEY_GROUP_RESEARCH_LANDMINES) {
+        state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
+    }
     if ((group & INPUT_HOTKEY_GROUP_PYRO) == INPUT_HOTKEY_GROUP_PYRO) {
         state.hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
         state.hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
@@ -272,25 +275,45 @@ int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey) {
 }
 
 void input_use_hotkey_mapping_default() {
+    // Unit
     state.hotkey_mapping[INPUT_HOTKEY_ATTACK] = SDLK_a;
     state.hotkey_mapping[INPUT_HOTKEY_STOP] = SDLK_s;
     state.hotkey_mapping[INPUT_HOTKEY_DEFEND] = SDLK_d;
+
+    // Miner
     state.hotkey_mapping[INPUT_HOTKEY_BUILD] = SDLK_b;
     state.hotkey_mapping[INPUT_HOTKEY_BUILD2] = SDLK_v;
     state.hotkey_mapping[INPUT_HOTKEY_REPAIR] = SDLK_r;
+
+    // Unload
     state.hotkey_mapping[INPUT_HOTKEY_UNLOAD] = SDLK_x;
+
+    // Esc
     state.hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
+
+    // Build 1
     state.hotkey_mapping[INPUT_HOTKEY_HALL] = SDLK_t;
     state.hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDLK_e;
     state.hotkey_mapping[INPUT_HOTKEY_SALOON] = SDLK_s;
     state.hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_b;
     state.hotkey_mapping[INPUT_HOTKEY_WORKSHOP] = SDLK_w;
+
+    // Build 2
     state.hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_s;
+
+    // Hall
     state.hotkey_mapping[INPUT_HOTKEY_MINER] = SDLK_e;
+
+    // Saloon
     state.hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_c;
     state.hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_b;
+
+    // Workshop
     state.hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_s;
     state.hotkey_mapping[INPUT_HOTKEY_PYRO] = SDLK_r;
+    state.hotkey_mapping[INPUT_HOTKEY_RESEARCH_LANDMINES] = SDLK_e;
+
+    // Pyro
     state.hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_v;
     state.hotkey_mapping[INPUT_HOTKEY_LANDMINE] = SDLK_e;
 }

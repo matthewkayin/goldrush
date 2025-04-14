@@ -35,6 +35,7 @@ struct HotkeyButtonInfo {
     union {
         HotkeyButtonActionInfo action;
         EntityType entity_type;
+        uint32_t upgrade;
     };
     HotkeyButtonRequirements requirements;
 };

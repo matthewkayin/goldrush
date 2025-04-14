@@ -4,6 +4,7 @@
 #include "render/render.h"
 #include "hotkey.h"
 #include "lcg.h"
+#include "upgrade.h"
 
 static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 50;
@@ -152,7 +153,7 @@ bool match_player_has_upgrade(const MatchState& state, uint8_t player_id, uint32
 }
 
 bool match_player_upgrade_is_available(const MatchState& state, uint8_t player_id, uint32_t upgrade) {
-    return ((state.players[player_id].upgrades | state.players[player_id].upgrades) & upgrade) == 0;
+    return ((state.players[player_id].upgrades | state.players[player_id].upgrades_in_progress) & upgrade) == 0;
 }
 
 void match_grant_player_upgrade(MatchState& state, uint8_t player_id, uint32_t upgrade) {
@@ -463,11 +464,9 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 
             // Check if the player has the war wagon upgrade
             // TODO
-            /*
             if (item.type == BUILDING_QUEUE_ITEM_UNIT && item.unit_type == ENTITY_WAGON && match_player_has_upgrade(state, building.player_id, UPGRADE_WAR_WAGON)) {
                 item.unit_type = ENTITY_WAR_WAGON;
             }
-            */
 
             // Mark upgrades as in-progress when we enqueue them
             if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
@@ -1594,8 +1593,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                         match_building_dequeue(state, entity);
                     } else if (entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UPGRADE) {
-                        /*
-                        TODO
                         match_grant_player_upgrade(state, entity.player_id, entity.queue[0].upgrade);
 
                         // Set all existing wagons to war wagons
@@ -1628,7 +1625,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         // Create alert
                         match_event_alert(state, MATCH_ALERT_TYPE_RESEARCH, entity.player_id, entity.cell, entity_data.cell_size);
 
-                        */
                         match_building_dequeue(state, entity);
                     }
                 } 

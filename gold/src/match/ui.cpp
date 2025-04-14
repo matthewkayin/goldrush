@@ -9,6 +9,7 @@
 #include "render/sprite.h"
 #include "render/render.h"
 #include "hotkey.h"
+#include "upgrade.h"
 #include <algorithm>
 
 static const uint32_t TURN_OFFSET = 2;
@@ -321,7 +322,7 @@ void match_ui_handle_input(MatchUiState& state) {
                     state.mode = MATCH_UI_MODE_BUILDING_PLACE;
                     state.building_type = hotkey_info.entity_type;
                 }
-            } else if (hotkey_info.type == HOTKEY_BUTTON_TRAIN) {
+            } else if (hotkey_info.type == HOTKEY_BUTTON_TRAIN || hotkey_info.type == HOTKEY_BUTTON_RESEARCH) {
                 // Decide which building to enqueue
                 uint32_t selected_building_index = state.match.entities.get_index_of(state.selection[0]);
                 for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
@@ -331,10 +332,15 @@ void match_ui_handle_input(MatchUiState& state) {
                 }
                 const Entity& building = state.match.entities[selected_building_index];
 
-                BuildingQueueItem item = (BuildingQueueItem) {
-                    .type = BUILDING_QUEUE_ITEM_UNIT,
-                    .unit_type = hotkey_info.entity_type
-                };
+                BuildingQueueItem item = hotkey_info.type == HOTKEY_BUTTON_TRAIN 
+                                            ? (BuildingQueueItem) {
+                                                .type = BUILDING_QUEUE_ITEM_UNIT,
+                                                .unit_type = hotkey_info.entity_type
+                                            }
+                                            : (BuildingQueueItem) {
+                                                .type = BUILDING_QUEUE_ITEM_UPGRADE,
+                                                .upgrade = hotkey_info.upgrade
+                                            };
 
                 if (building.queue.size() == BUILDING_QUEUE_MAX) {
                     match_ui_show_status(state, MATCH_UI_STATUS_BUILDING_QUEUE_FULL);
@@ -346,11 +352,13 @@ void match_ui_handle_input(MatchUiState& state) {
                         .building_enqueue = (MatchInputBuildingEnqueue) {
                             .building_id = state.match.entities.get_id_of(selected_building_index),
                             .item_type = (uint8_t)item.type,
-                            .item_subtype = (uint32_t)item.unit_type
+                            .item_subtype = item.type == BUILDING_QUEUE_ITEM_UNIT 
+                                                ? (uint32_t)item.unit_type
+                                                : item.upgrade
                         }
                     });
                 }
-            }
+            } 
 
             sound_play(SOUND_UI_CLICK);
             return;
@@ -894,10 +902,9 @@ void match_ui_update(MatchUiState& state) {
                     break;
                 }
 
-                // char message[128];
-                // TODO
-                // sprintf(message, "%s research complete.", UPGRADE_DATA.at(event.research_complete.upgrade).name);
-                // ui_show_status(state, message);
+                char message[128];
+                sprintf(message, "%s research complete.", upgrade_get_data(event.research_complete.upgrade).name);
+                match_ui_show_status(state, message);
                 break;
             }
         }
@@ -1046,6 +1053,9 @@ void match_ui_update(MatchUiState& state) {
                         }
                         case ENTITY_WORKSHOP: {
                             hotkey_group |= INPUT_HOTKEY_GROUP_WORKSHOP;
+                            if (match_player_upgrade_is_available(state.match, network_get_player_id(), UPGRADE_LANDMINES)) {
+                                hotkey_group |= INPUT_HOTKEY_GROUP_RESEARCH_LANDMINES;
+                            }
                             break;
                         }
                         case ENTITY_PYRO: {
@@ -1650,7 +1660,6 @@ void match_ui_render(const MatchUiState& state) {
             }
         }
     } // End for each elevation
-    log_trace("end elevation passes");
 
     // Fires
     for (const Fire& fire : state.match.fires) {
@@ -2207,8 +2216,9 @@ void match_ui_render(const MatchUiState& state) {
                             break;
                         }
                         case HOTKEY_BUTTON_RESEARCH: {
-                            tooltip_text_ptr += sprintf(tooltip_text, "Research fixme!");
-                            tooltip_gold_cost = 0;
+                            const UpgradeData& upgrade_data = upgrade_get_data(hotkey_info.upgrade);
+                            tooltip_text_ptr += sprintf(tooltip_text, "Research %s", upgrade_data.name);
+                            tooltip_gold_cost = upgrade_data.gold_cost;
                             tooltip_population_cost = 0;
                             tooltip_energy_cost = 0;
                             break;
@@ -2229,8 +2239,7 @@ void match_ui_render(const MatchUiState& state) {
                             break;
                         }
                         case HOTKEY_REQUIRES_UPGRADE: {
-                            // TODO
-                            sprintf(tooltip_text, "Requires Upgrade");
+                            sprintf(tooltip_text, "Requires %s", upgrade_get_data(hotkey_info.requirements.upgrade).name);
                             break;
                         }
                     }
@@ -2396,8 +2405,7 @@ void match_ui_render(const MatchUiState& state) {
                         break;
                     }
                     case BUILDING_QUEUE_ITEM_UPGRADE: {
-                        // TODO
-                        item_sprite = SPRITE_BUTTON_ICON_CANCEL;
+                        item_sprite = upgrade_get_data(building.queue[building_queue_index].upgrade).icon;
                         break;
                     }
                 }
