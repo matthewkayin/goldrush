@@ -1559,53 +1559,53 @@ void match_ui_render(const MatchUiState& state) {
             }  // End for each x
         } // End for each y
 
-        // Dead entities
-        for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
-            const Entity& entity = state.match.entities[entity_index];
-            if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
-                continue;
-            }
-            if (entity_get_elevation(entity, state.match.map) != elevation) {
-                continue;
-            }
-            
-            RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
-            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
-        }
-
-        // Select rings and healthbars
-        for (EntityId id : state.selection) {
-            const Entity& entity = state.match.entities.get_by_id(id);
-            const EntityData& entity_data = entity_get_data(entity.type);
-            Rect entity_rect = entity_get_rect(entity);
-            if (entity_get_elevation(entity, state.match.map) != elevation) {
-                continue;
+        // For each cell layer
+        for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
+            // Dead entities
+            for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
+                const Entity& entity = state.match.entities[entity_index];
+                const EntityData& entity_data = entity_get_data(entity.type);
+                if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
+                    continue;
+                }
+                if (entity_data.cell_layer != cell_layer || 
+                        entity_get_elevation(entity, state.match.map) != elevation) {
+                    continue;
+                }
+                
+                RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
+                render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
             }
 
-            // Render select ring
-            SpriteName select_ring_sprite = match_ui_get_entity_select_ring(entity.type, entity.type == ENTITY_GOLDMINE ||
-                                            (state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team));
-            ivec2 entity_center_position = entity_is_unit(entity.type) 
-                    ? entity.position.to_ivec2()
-                    : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
-            entity_center_position -= state.camera_offset;
-            render_sprite_frame(select_ring_sprite, ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
-
-            // Render healthbar
-            ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state.camera_offset;
-            if (entity_data.max_health != 0) {
-                match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
-                healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+            // Select rings and healthbars
+            for (EntityId id : state.selection) {
+                const Entity& entity = state.match.entities.get_by_id(id);
+                const EntityData& entity_data = entity_get_data(entity.type);
+                if (entity_data.cell_layer != cell_layer || 
+                        entity_get_elevation(entity, state.match.map) != elevation) {
+                    continue;
+                }
+                match_ui_render_entity_select_rings_and_healthbars(state, entity);
             }
 
-            // Render garrison bar
-            if (entity_data.garrison_capacity != 0) {
-                match_ui_render_healthbar(RENDER_GARRISON_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
-                healthbar_position.y += HEALTHBAR_HEIGHT + 1;
-            } 
-            // Render energy bar
-            if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0) {
-                match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.energy, (int)entity_data.unit_data.max_energy);
+            // Underground entities
+            if (cell_layer == CELL_LAYER_UNDERGROUND) {
+                for (const Entity& entity : state.match.entities) {
+                    const EntityData& entity_data = entity_get_data(entity.type);
+                    if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
+                            entity_get_elevation(entity, state.match.map) != elevation) {
+                        continue;
+                    }
+                    if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+                        continue;
+                    }
+                    if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                        continue;
+                    }
+
+                    RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
+                    render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+                }
             }
         }
 
@@ -1650,6 +1650,7 @@ void match_ui_render(const MatchUiState& state) {
             }
         }
     } // End for each elevation
+    log_trace("end elevation passes");
 
     // Fires
     for (const Fire& fire : state.match.fires) {
@@ -1665,7 +1666,10 @@ void match_ui_render(const MatchUiState& state) {
     // Entities
     for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
         const Entity& entity = state.match.entities[entity_index];
-        if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+        const EntityData& entity_data = entity_get_data(entity.type);
+        if (entity.mode == MODE_UNIT_DEATH_FADE || 
+                entity.mode == MODE_BUILDING_DESTROYED ||
+                entity_data.cell_layer != CELL_LAYER_GROUND) {
             continue;
         }
         if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
@@ -2775,7 +2779,7 @@ RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& stat
         .frame = entity_get_animation_frame(entity),
         .position = entity.position.to_ivec2() - state.camera_offset,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : state.match.players[entity.player_id].recolor_id
+        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state.match.players[entity.player_id].recolor_id
     };
     const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
     if (entity_is_unit(entity.type)) {
@@ -2800,6 +2804,37 @@ RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& stat
     }
 
     return params;
+}
+
+void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& state, const Entity& entity) {
+    const EntityData& entity_data = entity_get_data(entity.type);
+    Rect entity_rect = entity_get_rect(entity);
+
+    // Render select ring
+    SpriteName select_ring_sprite = match_ui_get_entity_select_ring(entity.type, entity.type == ENTITY_GOLDMINE ||
+                                    (state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team));
+    ivec2 entity_center_position = entity_is_unit(entity.type) 
+            ? entity.position.to_ivec2()
+            : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
+    entity_center_position -= state.camera_offset;
+    render_sprite_frame(select_ring_sprite, ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+
+    // Render healthbar
+    ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state.camera_offset;
+    if (entity_data.max_health != 0) {
+        match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
+        healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+    }
+
+    // Render garrison bar
+    if (entity_data.garrison_capacity != 0) {
+        match_ui_render_healthbar(RENDER_GARRISON_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
+        healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+    } 
+    // Render energy bar
+    if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0) {
+        match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.energy, (int)entity_data.unit_data.max_energy);
+    }
 }
 
 void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity, Rect icon_rect) {
