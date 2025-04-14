@@ -36,6 +36,9 @@ enum InputAction {
     INPUT_HOTKEY_SALOON,
     INPUT_HOTKEY_WORKSHOP,
     INPUT_HOTKEY_SMITH,
+    INPUT_HOTKEY_COOP,
+    INPUT_HOTKEY_BARRACKS,
+    INPUT_HOTKEY_SHERIFFS,
     INPUT_HOTKEY_BUNKER,
     INPUT_HOTKEY_MINER,
     INPUT_HOTKEY_COWBOY,
@@ -64,7 +67,6 @@ const uint32_t INPUT_HOTKEY_GROUP_BUILD2 = 2 << 10;
 const uint32_t INPUT_HOTKEY_GROUP_SHERIFFS = 2 << 11;
 const uint32_t INPUT_HOTKEY_GROUP_COOP = 2 << 12;
 const uint32_t INPUT_HOTKEY_GROUP_WORKSHOP = 2 << 13;
-const uint32_t INPUT_HOTKEY_GROUP_RESEARCH_LANDMINES = 2 << 14;
 
 void input_init(SDL_Window* window);
 void input_poll_events();
@@ -80,6 +82,7 @@ bool input_is_action_just_pressed(InputAction action);
 bool input_is_action_just_released(InputAction action);
 
 void input_set_hotkey_group(uint32_t group);
+void input_omit_hotkey_at_index(uint32_t index);
 InputAction input_get_hotkey(uint32_t index);
 int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey);
 void input_use_hotkey_mapping_default();

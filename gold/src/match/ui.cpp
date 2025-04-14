@@ -1053,9 +1053,6 @@ void match_ui_update(MatchUiState& state) {
                         }
                         case ENTITY_WORKSHOP: {
                             hotkey_group |= INPUT_HOTKEY_GROUP_WORKSHOP;
-                            if (match_player_upgrade_is_available(state.match, network_get_player_id(), UPGRADE_LANDMINES)) {
-                                hotkey_group |= INPUT_HOTKEY_GROUP_RESEARCH_LANDMINES;
-                            }
                             break;
                         }
                         case ENTITY_PYRO: {
@@ -1069,6 +1066,16 @@ void match_ui_update(MatchUiState& state) {
             }
         }
         input_set_hotkey_group(hotkey_group);
+        for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
+            InputAction hotkey = input_get_hotkey(hotkey_index);
+            if (hotkey == INPUT_HOTKEY_NONE) {
+                continue;
+            }
+            const HotkeyButtonInfo& info = hotkey_get_button_info(hotkey);
+            if (info.type == HOTKEY_BUTTON_RESEARCH && !match_player_upgrade_is_available(state.match, network_get_player_id(), info.upgrade)) {
+                input_omit_hotkey_at_index(hotkey_index);
+            }
+        }
     }
 
     // Play fire sound effects

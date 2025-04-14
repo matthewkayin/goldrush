@@ -214,6 +214,13 @@ void input_set_hotkey_group(uint32_t group) {
         state.hotkey_group[4] = INPUT_HOTKEY_WORKSHOP;
         state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
     }
+    if ((group & INPUT_HOTKEY_GROUP_BUILD2) == INPUT_HOTKEY_GROUP_BUILD2) {
+        state.hotkey_group[0] = INPUT_HOTKEY_SMITH;
+        state.hotkey_group[1] = INPUT_HOTKEY_COOP;
+        state.hotkey_group[2] = INPUT_HOTKEY_BARRACKS;
+        state.hotkey_group[3] = INPUT_HOTKEY_SHERIFFS;
+        state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+    }
     if ((group & INPUT_HOTKEY_GROUP_HALL) == INPUT_HOTKEY_GROUP_HALL) {
         state.hotkey_group[0] = INPUT_HOTKEY_MINER;
     }
@@ -227,14 +234,16 @@ void input_set_hotkey_group(uint32_t group) {
     if ((group & INPUT_HOTKEY_GROUP_WORKSHOP) == INPUT_HOTKEY_GROUP_WORKSHOP) {
         state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
         state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_RESEARCH_LANDMINES) == INPUT_HOTKEY_GROUP_RESEARCH_LANDMINES) {
         state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
     }
     if ((group & INPUT_HOTKEY_GROUP_PYRO) == INPUT_HOTKEY_GROUP_PYRO) {
         state.hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
         state.hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
     }
+}
+
+void input_omit_hotkey_at_index(uint32_t index) {
+    state.hotkey_group[index] = INPUT_HOTKEY_NONE;
 }
 
 InputAction input_get_hotkey(uint32_t index) {
@@ -300,6 +309,9 @@ void input_use_hotkey_mapping_default() {
 
     // Build 2
     state.hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_s;
+    state.hotkey_mapping[INPUT_HOTKEY_COOP] = SDLK_c;
+    state.hotkey_mapping[INPUT_HOTKEY_BARRACKS] = SDLK_b;
+    state.hotkey_mapping[INPUT_HOTKEY_SHERIFFS] = SDLK_e;
 
     // Hall
     state.hotkey_mapping[INPUT_HOTKEY_MINER] = SDLK_e;

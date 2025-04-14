@@ -125,20 +125,44 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .building = ENTITY_SALOON
         }
     }},
-    { INPUT_HOTKEY_SMITH, (HotkeyButtonInfo) {
-        .type = HOTKEY_BUTTON_BUILD,
-        .entity_type = ENTITY_SMITH,
-        .requirements = (HotkeyButtonRequirements) { 
-            .type = HOTKEY_REQUIRES_BUILDING,
-            .building = ENTITY_HALL
-        }
-    }},
     { INPUT_HOTKEY_BUNKER, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_BUILD,
         .entity_type = ENTITY_BUNKER,
         .requirements = (HotkeyButtonRequirements) { 
             .type = HOTKEY_REQUIRES_BUILDING,
             .building = ENTITY_SALOON
+        }
+    }},
+    { INPUT_HOTKEY_SMITH, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_BUILD,
+        .entity_type = ENTITY_SMITH,
+        .requirements = (HotkeyButtonRequirements) { 
+            .type = HOTKEY_REQUIRES_BUILDING,
+            .building = ENTITY_SALOON
+        }
+    }},
+    { INPUT_HOTKEY_COOP, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_BUILD,
+        .entity_type = ENTITY_COOP,
+        .requirements = (HotkeyButtonRequirements) { 
+            .type = HOTKEY_REQUIRES_BUILDING,
+            .building = ENTITY_SMITH
+        }
+    }},
+    { INPUT_HOTKEY_BARRACKS, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_BUILD,
+        .entity_type = ENTITY_BARRACKS,
+        .requirements = (HotkeyButtonRequirements) { 
+            .type = HOTKEY_REQUIRES_BUILDING,
+            .building = ENTITY_SMITH
+        }
+    }},
+    { INPUT_HOTKEY_SHERIFFS, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_BUILD,
+        .entity_type = ENTITY_SHERIFFS,
+        .requirements = (HotkeyButtonRequirements) { 
+            .type = HOTKEY_REQUIRES_BUILDING,
+            .building = ENTITY_SMITH
         }
     }},
     { INPUT_HOTKEY_MINER, (HotkeyButtonInfo) {

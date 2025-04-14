@@ -497,7 +497,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_COOP, (EntityData) {
         .name = "Chicken Coop",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_BUILDING_COOP,
         .icon = SPRITE_BUTTON_ICON_COOP,
         .death_sound = SOUND_BUILDING_DESTROY,
         .cell_layer = CELL_LAYER_GROUND,
@@ -549,7 +549,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_BARRACKS, (EntityData) {
         .name = "Barracks",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_BUILDING_BARRACKS,
         .icon = SPRITE_BUTTON_ICON_BARRACKS,
         .death_sound = SOUND_BUILDING_DESTROY,
         .cell_layer = CELL_LAYER_GROUND,
@@ -575,7 +575,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_SHERIFFS, (EntityData) {
         .name = "Sheriff's Office",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_BUILDING_SHERIFFS,
         .icon = SPRITE_BUTTON_ICON_SHERIFFS,
         .death_sound = SOUND_BUILDING_DESTROY,
         .cell_layer = CELL_LAYER_GROUND,
