@@ -27,7 +27,7 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
     { INPUT_HOTKEY_DEFEND, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_ACTION,
         .action = (HotkeyButtonActionInfo) {
-            .name = "Defend",
+            .name = "Hold Position",
             .sprite = SPRITE_BUTTON_ICON_DEFEND
         },
         .requirements = (HotkeyButtonRequirements) { 
@@ -200,6 +200,27 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .type = HOTKEY_REQUIRES_NONE
         }
     }},
+    { INPUT_HOTKEY_WAGON, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_WAGON,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_WAR_WAGON, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_WAR_WAGON,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_JOCKEY, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_JOCKEY,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
     { INPUT_HOTKEY_LANDMINE, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_BUILD,
         .entity_type = ENTITY_LANDMINE,
@@ -211,6 +232,13 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
     { INPUT_HOTKEY_RESEARCH_LANDMINES, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_RESEARCH,
         .upgrade = UPGRADE_LANDMINES,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_RESEARCH_WAGON_ARMOR, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_RESEARCH,
+        .upgrade = UPGRADE_WAR_WAGON,
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }
@@ -231,5 +259,16 @@ SpriteName hotkey_get_sprite(InputAction hotkey) {
             return entity_get_data(info.entity_type).icon;
         case HOTKEY_BUTTON_RESEARCH:
             return upgrade_get_data(info.upgrade).icon;
+    }
+}
+
+const char* hotkey_get_desc(InputAction hotkey) {
+    const HotkeyButtonInfo& info = HOTKEY_BUTTON_INFO.at(hotkey);
+    if (info.type == HOTKEY_BUTTON_RESEARCH) {
+        return upgrade_get_data(info.upgrade).desc;
+    }
+    switch (hotkey) {
+        default:
+            return "";
     }
 }

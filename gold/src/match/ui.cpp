@@ -1055,6 +1055,10 @@ void match_ui_update(MatchUiState& state) {
                             hotkey_group |= INPUT_HOTKEY_GROUP_WORKSHOP;
                             break;
                         }
+                        case ENTITY_COOP: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_COOP;
+                            break;
+                        }
                         case ENTITY_PYRO: {
                             hotkey_group |= INPUT_HOTKEY_GROUP_PYRO;
                             break;
@@ -1071,9 +1075,12 @@ void match_ui_update(MatchUiState& state) {
             if (hotkey == INPUT_HOTKEY_NONE) {
                 continue;
             }
+            if (hotkey == INPUT_HOTKEY_WAGON && match_player_has_upgrade(state.match, network_get_player_id(), UPGRADE_WAR_WAGON)) {
+                input_set_hotkey(hotkey_index, INPUT_HOTKEY_WAR_WAGON);
+            }
             const HotkeyButtonInfo& info = hotkey_get_button_info(hotkey);
             if (info.type == HOTKEY_BUTTON_RESEARCH && !match_player_upgrade_is_available(state.match, network_get_player_id(), info.upgrade)) {
-                input_omit_hotkey_at_index(hotkey_index);
+                input_set_hotkey(hotkey_index, INPUT_HOTKEY_NONE);
             }
         }
     }
@@ -2192,61 +2199,64 @@ void match_ui_render(const MatchUiState& state) {
 
                 // Get tooltip info
                 char tooltip_text[64];
+                char tooltip_desc[128];
                 uint32_t tooltip_gold_cost;
                 uint32_t tooltip_population_cost;
                 uint32_t tooltip_energy_cost;
-                if (match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey_hovered)) {
-                    char* tooltip_text_ptr = tooltip_text;
 
-                    switch (hotkey_info.type) {
-                        case HOTKEY_BUTTON_ACTION: {
-                            tooltip_text_ptr += sprintf(tooltip_text, "%s", hotkey_info.action.name);
-                            tooltip_gold_cost = 0;
-                            tooltip_population_cost = 0;
-                            if (hotkey_hovered == INPUT_HOTKEY_MOLOTOV) {
-                                tooltip_energy_cost = MOLOTOV_ENERGY_COST;
-                            } else {
-                                tooltip_energy_cost = 0;
-                            }
-                            break;
-                        }
-                        case HOTKEY_BUTTON_TRAIN:
-                        case HOTKEY_BUTTON_BUILD: {
-                            const EntityData& entity_data = entity_get_data(hotkey_info.entity_type);
-                            bool costs_energy = entity_is_building(hotkey_info.entity_type) 
-                                                    ? (entity_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY
-                                                    : false;
-                            tooltip_text_ptr += sprintf(tooltip_text, "%s %s", hotkey_info.type == HOTKEY_BUTTON_TRAIN ? "Hire" : "Build", entity_data.name);
-                            tooltip_gold_cost = costs_energy ? 0 : entity_data.gold_cost;
-                            tooltip_population_cost = hotkey_info.type == HOTKEY_BUTTON_TRAIN ? entity_data.unit_data.population_cost : 0;
-                            tooltip_energy_cost = costs_energy ? entity_data.gold_cost : 0;
-                            break;
-                        }
-                        case HOTKEY_BUTTON_RESEARCH: {
-                            const UpgradeData& upgrade_data = upgrade_get_data(hotkey_info.upgrade);
-                            tooltip_text_ptr += sprintf(tooltip_text, "Research %s", upgrade_data.name);
-                            tooltip_gold_cost = upgrade_data.gold_cost;
-                            tooltip_population_cost = 0;
+                char* tooltip_text_ptr = tooltip_text;
+                sprintf(tooltip_desc, "%s", hotkey_get_desc(hotkey_hovered));
+
+                switch (hotkey_info.type) {
+                    case HOTKEY_BUTTON_ACTION: {
+                        tooltip_text_ptr += sprintf(tooltip_text, "%s", hotkey_info.action.name);
+                        tooltip_gold_cost = 0;
+                        tooltip_population_cost = 0;
+                        if (hotkey_hovered == INPUT_HOTKEY_MOLOTOV) {
+                            tooltip_energy_cost = MOLOTOV_ENERGY_COST;
+                        } else {
                             tooltip_energy_cost = 0;
-                            break;
                         }
+                        break;
                     }
+                    case HOTKEY_BUTTON_TRAIN:
+                    case HOTKEY_BUTTON_BUILD: {
+                        const EntityData& entity_data = entity_get_data(hotkey_info.entity_type);
+                        bool costs_energy = entity_is_building(hotkey_info.entity_type) 
+                                                ? (entity_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY
+                                                : false;
+                        tooltip_text_ptr += sprintf(tooltip_text, "%s %s", hotkey_info.type == HOTKEY_BUTTON_TRAIN ? "Hire" : "Build", entity_data.name);
+                        tooltip_gold_cost = costs_energy ? 0 : entity_data.gold_cost;
+                        tooltip_population_cost = hotkey_info.type == HOTKEY_BUTTON_TRAIN ? entity_data.unit_data.population_cost : 0;
+                        tooltip_energy_cost = costs_energy ? entity_data.gold_cost : 0;
+                        break;
+                    }
+                    case HOTKEY_BUTTON_RESEARCH: {
+                        const UpgradeData& upgrade_data = upgrade_get_data(hotkey_info.upgrade);
+                        tooltip_text_ptr += sprintf(tooltip_text, "Research %s", upgrade_data.name);
+                        tooltip_gold_cost = upgrade_data.gold_cost;
+                        tooltip_population_cost = 0;
+                        tooltip_energy_cost = 0;
+                        break;
+                    }
+                }
 
-                    tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
-                    tooltip_text_ptr += input_sprintf_hotkey_str(tooltip_text_ptr, hotkey_hovered);
-                    tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
-                } else {
+                tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
+                tooltip_text_ptr += input_sprintf_hotkey_str(tooltip_text_ptr, hotkey_hovered);
+                tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
+
+                if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey_hovered)) {
                     switch (hotkey_info.requirements.type) {
                         case HOTKEY_REQUIRES_NONE: {
                             GOLD_ASSERT(false);
                             break;
                         }
                         case HOTKEY_REQUIRES_BUILDING: {
-                            sprintf(tooltip_text, "Requires %s", entity_get_data(hotkey_info.requirements.building).name);
+                            sprintf(tooltip_desc, "Requires %s", entity_get_data(hotkey_info.requirements.building).name);
                             break;
                         }
                         case HOTKEY_REQUIRES_UPGRADE: {
-                            sprintf(tooltip_text, "Requires %s", upgrade_get_data(hotkey_info.requirements.upgrade).name);
+                            sprintf(tooltip_desc, "Requires %s", upgrade_get_data(hotkey_info.requirements.upgrade).name);
                             break;
                         }
                     }
@@ -2256,10 +2266,20 @@ void match_ui_render(const MatchUiState& state) {
                 }
 
                 // Render the tooltip frame
+                bool tooltip_has_desc = strlen(tooltip_desc) != 0;
                 int tooltip_text_width = render_get_text_size(FONT_WESTERN8_OFFBLACK, tooltip_text).x;
+                if (tooltip_has_desc) {
+                    tooltip_text_width = std::max(tooltip_text_width, render_get_text_size(FONT_HACK_OFFBLACK, tooltip_desc).x);
+                }
                 int tooltip_min_width = 10 + tooltip_text_width;
                 int tooltip_cell_width = tooltip_min_width / 8;
-                int tooltip_cell_height = tooltip_gold_cost != 0 || tooltip_energy_cost != 0 ? 5 : 3;
+                int tooltip_cell_height = 3;
+                if (tooltip_gold_cost != 0 || tooltip_energy_cost != 0) {
+                    tooltip_cell_height += 2;
+                }
+                if (tooltip_has_desc) {
+                    tooltip_cell_height += 2;
+                }
                 if (tooltip_min_width % 8 != 0) {
                     tooltip_cell_width++;
                 }
@@ -2290,30 +2310,36 @@ void match_ui_render(const MatchUiState& state) {
                 }
 
                 // Render tooltip text
-                render_text(FONT_WESTERN8_OFFBLACK, tooltip_text, tooltip_top_left + ivec2(5, 5));
+                int tooltip_item_y = 5;
+                render_text(FONT_WESTERN8_OFFBLACK, tooltip_text, tooltip_top_left + ivec2(5, tooltip_item_y));
+                tooltip_item_y = 21;
+                if (tooltip_has_desc) {
+                    render_text(FONT_HACK_OFFBLACK, tooltip_desc, tooltip_top_left + ivec2(5, 5 + 16));
+                    tooltip_item_y = 35;
+                }
 
                 // Render gold icon and text
                 if (tooltip_gold_cost != 0) {
-                    render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5, 21), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5, tooltip_item_y), RENDER_SPRITE_NO_CULL, 0);
                     char gold_text[4];
                     sprintf(gold_text, "%u", tooltip_gold_cost);
-                    render_text(FONT_WESTERN8_OFFBLACK, gold_text, tooltip_top_left + ivec2(23, 21));
+                    render_text(FONT_WESTERN8_OFFBLACK, gold_text, tooltip_top_left + ivec2(23, tooltip_item_y));
                 }
 
                 // Render population icon and text
                 if (tooltip_population_cost != 0) {
-                    render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5 + 18 + 32, 19), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5 + 18 + 32, tooltip_item_y - 2), RENDER_SPRITE_NO_CULL, 0);
                     char population_text[4];
                     sprintf(population_text, "%u", tooltip_population_cost);
-                    render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + ivec2(5 + 18 + 32 + 22, 23));
+                    render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + ivec2(5 + 18 + 32 + 22, tooltip_item_y + 2));
                 }
 
                 // Render energy text
                 if (tooltip_energy_cost != 0) {
-                    render_sprite_frame(SPRITE_UI_ENERGY_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5, 21), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(SPRITE_UI_ENERGY_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5, tooltip_item_y), RENDER_SPRITE_NO_CULL, 0);
                     char energy_text[4];
                     sprintf(energy_text, "%u", tooltip_energy_cost);
-                    render_text(FONT_WESTERN8_OFFBLACK, energy_text, tooltip_top_left + ivec2(22, 21));
+                    render_text(FONT_WESTERN8_OFFBLACK, energy_text, tooltip_top_left + ivec2(22, tooltip_item_y));
                 }
             } 
         }

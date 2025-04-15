@@ -181,7 +181,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_JOCKEY, (EntityData) {
         .name = "Jockey",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_JOCKEY,
         .icon = SPRITE_BUTTON_ICON_JOCKEY,
         .death_sound = SOUND_DEATH_CHICKEN,
         .cell_layer = CELL_LAYER_GROUND,
@@ -205,7 +205,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_GUN,
             .damage = 8,
-            .attack_cooldown = 30,
+            .attack_cooldown = 60,
             .range_squared = 25,
             .min_range_squared = 1
         }

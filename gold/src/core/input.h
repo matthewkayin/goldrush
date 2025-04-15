@@ -45,9 +45,13 @@ enum InputAction {
     INPUT_HOTKEY_BANDIT,
     INPUT_HOTKEY_SAPPER,
     INPUT_HOTKEY_PYRO,
+    INPUT_HOTKEY_WAGON,
+    INPUT_HOTKEY_WAR_WAGON,
+    INPUT_HOTKEY_JOCKEY,
     INPUT_HOTKEY_MOLOTOV,
     INPUT_HOTKEY_LANDMINE,
     INPUT_HOTKEY_RESEARCH_LANDMINES,
+    INPUT_HOTKEY_RESEARCH_WAGON_ARMOR,
     INPUT_ACTION_COUNT
 };
 
@@ -82,7 +86,7 @@ bool input_is_action_just_pressed(InputAction action);
 bool input_is_action_just_released(InputAction action);
 
 void input_set_hotkey_group(uint32_t group);
-void input_omit_hotkey_at_index(uint32_t index);
+void input_set_hotkey(uint32_t index, InputAction value);
 InputAction input_get_hotkey(uint32_t index);
 int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey);
 void input_use_hotkey_mapping_default();

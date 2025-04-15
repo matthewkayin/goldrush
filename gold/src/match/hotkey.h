@@ -42,3 +42,4 @@ struct HotkeyButtonInfo {
 
 HotkeyButtonInfo hotkey_get_button_info(InputAction hotkey);
 SpriteName hotkey_get_sprite(InputAction hotkey);
+const char* hotkey_get_desc(InputAction hotkey);

@@ -236,14 +236,19 @@ void input_set_hotkey_group(uint32_t group) {
         state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
         state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
     }
+    if ((group & INPUT_HOTKEY_GROUP_COOP) == INPUT_HOTKEY_GROUP_COOP) {
+        state.hotkey_group[0] = INPUT_HOTKEY_JOCKEY;
+        state.hotkey_group[1] = INPUT_HOTKEY_WAGON;
+        state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
+    }
     if ((group & INPUT_HOTKEY_GROUP_PYRO) == INPUT_HOTKEY_GROUP_PYRO) {
         state.hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
         state.hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
     }
 }
 
-void input_omit_hotkey_at_index(uint32_t index) {
-    state.hotkey_group[index] = INPUT_HOTKEY_NONE;
+void input_set_hotkey(uint32_t index, InputAction value) {
+    state.hotkey_group[index] = value;
 }
 
 InputAction input_get_hotkey(uint32_t index) {
@@ -324,6 +329,12 @@ void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_s;
     state.hotkey_mapping[INPUT_HOTKEY_PYRO] = SDLK_r;
     state.hotkey_mapping[INPUT_HOTKEY_RESEARCH_LANDMINES] = SDLK_e;
+
+    // Coop
+    state.hotkey_mapping[INPUT_HOTKEY_WAGON] = SDLK_w;
+    state.hotkey_mapping[INPUT_HOTKEY_WAR_WAGON] = SDLK_w;
+    state.hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDLK_c;
+    state.hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDLK_a;
 
     // Pyro
     state.hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_v;
