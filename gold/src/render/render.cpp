@@ -7,8 +7,8 @@
 #define FONT_FIRST_CHAR 32 // space
 #define MINIMAP_TEXTURE_WIDTH 512
 #define MINIMAP_TEXTURE_HEIGHT 256
-#define ATLAS_WIDTH 1024
-#define ATLAS_HEIGHT 1024
+#define ATLAS_WIDTH 2048
+#define ATLAS_HEIGHT 2048
 
 #include "core/logger.h"
 #include "core/asserts.h"
@@ -138,6 +138,13 @@ bool render_init(SDL_Window* window) {
     gladLoadGLLoader(SDL_GL_GetProcAddress);
     if (glGenVertexArrays == NULL) {
         log_error("Error loading OpenGL.");
+        return false;
+    }
+
+    GLint max_texture_size;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
+    if (max_texture_size < ATLAS_WIDTH || max_texture_size < ATLAS_HEIGHT) {
+        log_error("Max texture size of %u is too small.", max_texture_size);
         return false;
     }
 

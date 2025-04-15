@@ -831,6 +831,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 // If unit is still idle, do nothing
                 if (entity.target.type == TARGET_NONE) {
                     // If soldier is idle, charge weapon
+                    if (entity.type == ENTITY_SOLDIER && !entity_check_flag(entity, ENTITY_FLAG_CHARGED)) {
+                        entity.mode = MODE_UNIT_SOLDIER_CHARGE;
+                    }
                     update_finished = true;
                     break;
                 }
@@ -1203,14 +1206,14 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             };
                             bool attack_with_bayonets = false;
                             if (Rect::euclidean_distance_squared_between(entity_rect, target_rect) < entity_data.unit_data.min_range_squared) {
-                                // if (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
-                                    // attack_with_bayonets = true;
-                                // } else {
+                                if (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
+                                    attack_with_bayonets = true;
+                                } else {
                                     entity.direction = enum_direction_to_rect(entity.cell, target.cell, target_data.cell_size);
                                     entity.mode = MODE_UNIT_IDLE;
                                     update_finished = true;
                                     break;
-                                // }
+                                }
                             }
 
                             if (entity.type == ENTITY_SOLDIER && !attack_with_bayonets && !entity_check_flag(entity, ENTITY_FLAG_CHARGED)) {
@@ -1482,7 +1485,10 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                 if (!animation_is_playing(entity.animation)) {
                     match_entity_attack_target(state, entity_id, state.entities.get_by_id(entity.target.id));
-                    match_event_play_sound(state, entity_data.unit_data.attack_sound, entity.position.to_ivec2());
+                    SoundName attack_sound = entity.type == ENTITY_SOLDIER && entity.mode == MODE_UNIT_ATTACK_WINDUP 
+                                                ? SOUND_SWORD
+                                                : entity_data.unit_data.attack_sound;
+                    match_event_play_sound(state, attack_sound, entity.position.to_ivec2());
                     if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
                         entity_set_flag(entity, ENTITY_FLAG_CHARGED, false);
                         entity.mode = MODE_UNIT_SOLDIER_CHARGE;
@@ -1495,6 +1501,15 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     if (entity.garrison_id != ID_NULL) {
                         entity.target = match_entity_target_nearest_enemy(state, entity);
                     }
+                }
+
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_SOLDIER_CHARGE: {
+                if (!animation_is_playing(entity.animation)) {
+                    entity_set_flag(entity, ENTITY_FLAG_CHARGED, true);
+                    entity.mode = MODE_UNIT_IDLE;
                 }
 
                 update_finished = true;
@@ -2207,8 +2222,6 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         accuracy /= 2;
     } 
 
-    // TODO: check for smoke clouds
-
     if (attacker.garrison_id != ID_NULL) {
         Entity& carrier = state.entities.get_by_id(attacker.garrison_id);
         int particle_index = lcg_rand() % 4;
@@ -2246,16 +2259,57 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         return;
     }
 
-    // TODO: cannon splash damage
+    ivec2 defender_center_position = entity_is_unit(defender.type)
+        ? defender.position.to_ivec2()
+        : (defender.cell * TILE_SIZE) + ((ivec2(defender_data.cell_size, defender_data.cell_size) * TILE_SIZE) / 2);
     if (attacker.type == ENTITY_CANNON) {
+        // Check which enemies we hit
+        int attacker_damage = attacker_data.unit_data.damage;
+        Rect full_damage_rect = (Rect) {
+            .x = defender_center_position.x - (TILE_SIZE / 2),
+            .y = defender_center_position.y - (TILE_SIZE / 2),
+            .w = TILE_SIZE, .h = TILE_SIZE
+        };
+        Rect splash_damage_rect = (Rect) {
+            .x = full_damage_rect.x - (TILE_SIZE / 2),
+            .y = full_damage_rect.y - (TILE_SIZE / 2),
+            .w = full_damage_rect.w + TILE_SIZE,
+            .h = full_damage_rect.h + TILE_SIZE,
+        };
+        for (Entity& entity : state.entities) {
+            if (entity.type == ENTITY_GOLDMINE || !entity_is_selectable(entity)) {
+                continue;
+            }
 
+            // To check if we've hit this enemy, first check the splash damage rect
+            // We have to check both, but since the splash rect is bigger, we know that 
+            // if they're outside of it, they will be outside of the full damage rect as well
+            Rect entity_rect = entity_get_rect(entity);
+            if (entity_rect.intersects(splash_damage_rect)) {
+                int damage = attacker_damage; 
+                // Half damage if they are only within splash damage range
+                if (entity_rect.intersects(full_damage_rect) != SDL_TRUE) {
+                    damage /= 2;
+                }
+                damage = std::max(1, damage - entity_get_data(entity.type).armor);
+
+                entity.health = std::max(0, entity.health - damage);
+                match_entity_on_attack(state, attacker_id, entity);
+            }
+        }
     } else {
         defender.health = std::max(0, defender.health - damage);
+        match_entity_on_attack(state, attacker_id, defender);
     }
 
     // Create particle effect
     if (attacker.type == ENTITY_CANNON) {
-
+        state.particles.push_back((Particle) {
+            .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
+            .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
+            .vframe = 0,
+            .position = defender_center_position
+        });
     } else if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_DETECTIVE || attacker.type == ENTITY_JOCKEY) {
         Rect defender_rect = entity_get_rect(defender);
 
@@ -2269,8 +2323,6 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
             .position = particle_position
         });
     }
-
-    match_entity_on_attack(state, attacker_id, defender);
 }
 
 void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& defender) {

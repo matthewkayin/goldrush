@@ -274,7 +274,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_SOLDIER, (EntityData) {
         .name = "Soldier",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_SOLDIER,
         .icon = SPRITE_BUTTON_ICON_SOLDIER,
         .death_sound = SOUND_DEATH,
         .cell_layer = CELL_LAYER_GROUND,
@@ -305,7 +305,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_CANNON, (EntityData) {
         .name = "Cannoneer",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_CANNON,
         .icon = SPRITE_BUTTON_ICON_CANNON,
         .death_sound = SOUND_DEATH,
         .cell_layer = CELL_LAYER_GROUND,
@@ -336,7 +336,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
     }},
     { ENTITY_DETECTIVE, (EntityData) {
         .name = "Detective",
-        .sprite = SPRITE_UNIT_MINER,
+        .sprite = SPRITE_UNIT_DETECTIVE,
         .icon = SPRITE_BUTTON_ICON_DETECTIVE,
         .death_sound = SOUND_DEATH,
         .cell_layer = CELL_LAYER_GROUND,
@@ -745,10 +745,28 @@ SpriteName entity_get_sprite(const Entity& entity) {
     if (entity.mode == MODE_UNIT_BUILD || entity.mode == MODE_UNIT_REPAIR) {
         return SPRITE_MINER_BUILDING;
     }
+    if (entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
+        return SPRITE_UNIT_DETECTIVE_INVISIBLE;
+    }
     return entity_data.sprite;
 }
 
 AnimationName entity_get_expected_animation(const Entity& entity) {
+    if (entity.type == ENTITY_CANNON) {
+        switch (entity.mode) {
+            case MODE_UNIT_MOVE:
+                return ANIMATION_UNIT_MOVE_CANNON;
+            case MODE_UNIT_ATTACK_WINDUP:
+                return ANIMATION_CANNON_ATTACK;
+            case MODE_UNIT_DEATH:
+                return ANIMATION_CANNON_DEATH;
+            case MODE_UNIT_DEATH_FADE:
+                return ANIMATION_CANNON_DEATH_FADE;
+            default:
+                return ANIMATION_UNIT_IDLE;
+        }
+    }
+
     switch (entity.mode) {
         case MODE_UNIT_MOVE:
             return ANIMATION_UNIT_MOVE;

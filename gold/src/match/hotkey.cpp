@@ -221,6 +221,28 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .type = HOTKEY_REQUIRES_NONE
         }
     }},
+    { INPUT_HOTKEY_SOLDIER, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_SOLDIER,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_CANNON, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_CANNON,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_DETECTIVE, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_TRAIN,
+        .entity_type = ENTITY_DETECTIVE,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_BUILDING,
+            .building = ENTITY_SHERIFFS
+        }
+    }},
     { INPUT_HOTKEY_LANDMINE, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_BUILD,
         .entity_type = ENTITY_LANDMINE,
@@ -239,6 +261,13 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
     { INPUT_HOTKEY_RESEARCH_WAGON_ARMOR, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_RESEARCH,
         .upgrade = UPGRADE_WAR_WAGON,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_RESEARCH_BAYONETS, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_RESEARCH,
+        .upgrade = UPGRADE_BAYONETS,
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }

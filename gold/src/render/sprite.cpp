@@ -992,6 +992,38 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
+    { SPRITE_UNIT_SOLDIER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_soldier.png",
+            .hframes = 26,
+            .vframes = 3 
+        }
+    }},
+    { SPRITE_UNIT_CANNON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_cannon.png",
+            .hframes = 21,
+            .vframes = 3 
+        }
+    }},
+    { SPRITE_UNIT_DETECTIVE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_spy.png",
+            .hframes = 15,
+            .vframes = 3 
+        }
+    }},
+    { SPRITE_UNIT_DETECTIVE_INVISIBLE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_spy.png",
+            .hframes = 15,
+            .vframes = 3 
+        }
+    }},
     { SPRITE_UNIT_BANDIT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {
@@ -1157,6 +1189,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .sheet = (SpriteParamsSheet) {
             .path = "particle_explosion.png",
             .hframes = 6,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_PARTICLE_CANNON_EXPLOSION, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "particle_cannon_explosion.png",
+            .hframes = 4,
             .vframes = 1
         }
     }},

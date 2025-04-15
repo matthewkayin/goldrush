@@ -227,6 +227,7 @@ void input_set_hotkey_group(uint32_t group) {
     if ((group & INPUT_HOTKEY_GROUP_SALOON) == INPUT_HOTKEY_GROUP_SALOON) {
         state.hotkey_group[0] = INPUT_HOTKEY_COWBOY;
         state.hotkey_group[1] = INPUT_HOTKEY_BANDIT;
+        state.hotkey_group[2] = INPUT_HOTKEY_DETECTIVE;
     } 
     if ((group & INPUT_HOTKEY_GROUP_UNLOAD) == INPUT_HOTKEY_GROUP_UNLOAD) {
         state.hotkey_group[3] = INPUT_HOTKEY_UNLOAD;
@@ -235,6 +236,11 @@ void input_set_hotkey_group(uint32_t group) {
         state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
         state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
         state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
+    }
+    if ((group & INPUT_HOTKEY_GROUP_BARRACKS) == INPUT_HOTKEY_GROUP_BARRACKS) {
+        state.hotkey_group[0] = INPUT_HOTKEY_SOLDIER;
+        state.hotkey_group[1] = INPUT_HOTKEY_CANNON;
+        state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_BAYONETS;
     }
     if ((group & INPUT_HOTKEY_GROUP_COOP) == INPUT_HOTKEY_GROUP_COOP) {
         state.hotkey_group[0] = INPUT_HOTKEY_JOCKEY;
@@ -324,6 +330,7 @@ void input_use_hotkey_mapping_default() {
     // Saloon
     state.hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_c;
     state.hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_b;
+    state.hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDLK_d;
 
     // Workshop
     state.hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_s;
@@ -335,6 +342,11 @@ void input_use_hotkey_mapping_default() {
     state.hotkey_mapping[INPUT_HOTKEY_WAR_WAGON] = SDLK_w;
     state.hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDLK_c;
     state.hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDLK_a;
+
+    // Barracks
+    state.hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDLK_s;
+    state.hotkey_mapping[INPUT_HOTKEY_CANNON] = SDLK_c;
+    state.hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDLK_b;
 
     // Pyro
     state.hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_v;

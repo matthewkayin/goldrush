@@ -1059,6 +1059,10 @@ void match_ui_update(MatchUiState& state) {
                             hotkey_group |= INPUT_HOTKEY_GROUP_COOP;
                             break;
                         }
+                        case ENTITY_BARRACKS: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_BARRACKS;
+                            break;
+                        }
                         case ENTITY_PYRO: {
                             hotkey_group |= INPUT_HOTKEY_GROUP_PYRO;
                             break;
