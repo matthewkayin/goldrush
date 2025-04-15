@@ -32,6 +32,7 @@ static const uint32_t FIRE_TTL = 30 * 30;
 static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 8;
 static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
+static const uint32_t FOG_REVEAL_DURATION = 60;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -629,6 +630,20 @@ void match_update(MatchState& state) {
                 state.fires.erase(state.fires.begin() + fire_index);
             } else {
                 fire_index++;
+            }
+        }
+    }
+
+    // Update fog reveals
+    {
+        uint32_t index = 0;
+        while (index < state.fog_reveals.size()) {
+            state.fog_reveals[index].timer--;
+            if (state.fog_reveals[index].timer == 0) {
+                match_fog_update(state, state.fog_reveals[index].team, state.fog_reveals[index].cell, state.fog_reveals[index].cell_size, state.fog_reveals[index].sight, false, false);
+                state.fog_reveals.erase(state.fog_reveals.begin() + index);
+            } else {
+                index++;
             }
         }
     }
@@ -2253,6 +2268,18 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     }
 
     // TODO: reveal cell on highground, even on misses
+    if (entity_get_elevation(attacker, state.map) > entity_get_elevation(defender, state.map) &&
+            !entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE)) {
+        FogReveal reveal = (FogReveal) {
+            .team = state.players[defender.player_id].team,
+            .cell = attacker.cell,
+            .cell_size = attacker_data.cell_size,
+            .sight = 3,
+            .timer = FOG_REVEAL_DURATION
+        };
+        match_fog_update(state, reveal.team, reveal.cell, reveal.cell_size, reveal.sight, false, true);
+        state.fog_reveals.push_back(reveal);
+    }
 
     bool attack_missed = accuracy < lcg_rand() % 100;
     if (attack_missed) {

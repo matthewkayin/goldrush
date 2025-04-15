@@ -140,6 +140,16 @@ struct Projectile {
     fvec2 target;
 };
 
+// Fog
+
+struct FogReveal {
+    uint32_t team;
+    ivec2 cell;
+    int cell_size;
+    int sight;
+    uint32_t timer;
+};
+
 struct MatchState {
     Map map;
     std::vector<int> fog[MAX_PLAYERS];
@@ -152,6 +162,7 @@ struct MatchState {
     std::vector<Projectile> projectiles;
     std::vector<Fire> fires;
     std::vector<int> fire_cells;
+    std::vector<FogReveal> fog_reveals;
     MatchPlayer players[MAX_PLAYERS];
     std::vector<MatchEvent> events;
 };
