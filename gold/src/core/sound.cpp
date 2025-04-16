@@ -144,6 +144,10 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
     { SOUND_FIRE_BURN, (SoundParams) {
         .path = "fire_burn",
         .variants = 1
+    }},
+    { SOUND_PISTOL_SILENCED, (SoundParams) {
+        .path = "silenced",
+        .variants = 3
     }}
 };
 
