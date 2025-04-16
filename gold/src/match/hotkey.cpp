@@ -94,6 +94,26 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .type = HOTKEY_REQUIRES_NONE
         }
     }},
+    { INPUT_HOTKEY_CAMO, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_ACTION,
+        .action = (HotkeyButtonActionInfo) {
+            .name = "Camouflage",
+            .sprite = SPRITE_BUTTON_ICON_CAMO
+        },
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_DECAMO, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_ACTION,
+        .action = (HotkeyButtonActionInfo) {
+            .name = "Remove Camouflage",
+            .sprite = SPRITE_BUTTON_ICON_DECAMO
+        },
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
     { INPUT_HOTKEY_HALL, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_BUILD,
         .entity_type = ENTITY_HALL,

@@ -824,6 +824,22 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_BUTTON_ICON_CAMO, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_camo.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_DECAMO, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_decamo.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
     { SPRITE_SELECT_RING_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

@@ -251,6 +251,9 @@ void input_set_hotkey_group(uint32_t group) {
         state.hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
         state.hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
     }
+    if ((group & INPUT_HOTKEY_GROUP_DETECTIVE) == INPUT_HOTKEY_GROUP_DETECTIVE) {
+        state.hotkey_group[3] = INPUT_HOTKEY_CAMO;
+    }
 }
 
 void input_set_hotkey(uint32_t index, InputAction value) {
@@ -351,4 +354,8 @@ void input_use_hotkey_mapping_default() {
     // Pyro
     state.hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_v;
     state.hotkey_mapping[INPUT_HOTKEY_LANDMINE] = SDLK_e;
+
+    // Detective
+    state.hotkey_mapping[INPUT_HOTKEY_CAMO] = SDLK_c;
+    state.hotkey_mapping[INPUT_HOTKEY_DECAMO] = SDLK_c;
 }

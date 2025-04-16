@@ -303,9 +303,22 @@ void match_ui_handle_input(MatchUiState& state) {
                     case INPUT_HOTKEY_MOLOTOV: {
                         if (!match_ui_selection_has_enough_energy(state, state.selection, MOLOTOV_ENERGY_COST)) {
                             match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
-                        } else {
-                            state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
+                            break;
                         }
+                        state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
+                        break;
+                    }
+                    case INPUT_HOTKEY_CAMO:
+                    case INPUT_HOTKEY_DECAMO: {
+                        if (!match_ui_selection_has_enough_energy(state, state.selection, CAMO_ENERGY_COST)) {
+                            match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
+                            break;
+                        }
+                        MatchInput input;
+                        input.type = hotkey == INPUT_HOTKEY_CAMO ? MATCH_INPUT_CAMO : MATCH_INPUT_DECAMO;
+                        input.camo.unit_count = (uint8_t)state.selection.size();
+                        memcpy(&input.camo.unit_ids, &state.selection[0], input.camo.unit_count * sizeof(EntityId));
+                        state.input_queue.push_back(input);
                         break;
                     }
                     default:
@@ -1023,7 +1036,9 @@ void match_ui_update(MatchUiState& state) {
             } else if (first_entity.player_id == network_get_player_id()) {
                 bool is_selection_uniform = true;
                 for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
-                    if (state.match.entities.get_by_id(state.selection[selection_index]).type != first_entity.type) {
+                    const Entity& entity = state.match.entities.get_by_id(state.selection[selection_index]);
+                    if (entity.type != first_entity.type || 
+                            entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) != entity_check_flag(first_entity, ENTITY_FLAG_INVISIBLE)) {
                         is_selection_uniform = false;
                         break;
                     }
@@ -1067,6 +1082,10 @@ void match_ui_update(MatchUiState& state) {
                             hotkey_group |= INPUT_HOTKEY_GROUP_PYRO;
                             break;
                         }
+                        case ENTITY_DETECTIVE: {
+                            hotkey_group |= INPUT_HOTKEY_GROUP_DETECTIVE;
+                            break;
+                        }
                         default:
                             break;
                     }
@@ -1085,6 +1104,9 @@ void match_ui_update(MatchUiState& state) {
             const HotkeyButtonInfo& info = hotkey_get_button_info(hotkey);
             if (info.type == HOTKEY_BUTTON_RESEARCH && !match_player_upgrade_is_available(state.match, network_get_player_id(), info.upgrade)) {
                 input_set_hotkey(hotkey_index, INPUT_HOTKEY_NONE);
+            }
+            if (hotkey == INPUT_HOTKEY_CAMO && entity_check_flag(state.match.entities.get_by_id(state.selection[0]), ENTITY_FLAG_INVISIBLE)) {
+                input_set_hotkey(hotkey_index, INPUT_HOTKEY_DECAMO);
             }
         }
     }
@@ -2218,6 +2240,8 @@ void match_ui_render(const MatchUiState& state) {
                         tooltip_population_cost = 0;
                         if (hotkey_hovered == INPUT_HOTKEY_MOLOTOV) {
                             tooltip_energy_cost = MOLOTOV_ENERGY_COST;
+                        } else if (hotkey_hovered == INPUT_HOTKEY_CAMO) {
+                            tooltip_energy_cost = CAMO_ENERGY_COST;
                         } else {
                             tooltip_energy_cost = 0;
                         }

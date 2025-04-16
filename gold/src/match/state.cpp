@@ -546,6 +546,26 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
             break;
         }
+        case MATCH_INPUT_CAMO:
+        case MATCH_INPUT_DECAMO: {
+            for (uint32_t id_index = 0; id_index < input.camo.unit_count; id_index++) {
+                uint32_t unit_index = state.entities.get_index_of(input.camo.unit_ids[id_index]);
+                if (unit_index == INDEX_INVALID || !entity_is_selectable(state.entities[unit_index])) {
+                    continue;
+                }
+
+                Entity& unit = state.entities[unit_index];
+                if (input.type == MATCH_INPUT_CAMO && unit.energy < CAMO_ENERGY_COST) {
+                    continue;
+                }
+                if (input.type == MATCH_INPUT_CAMO) {
+                    unit.energy -= CAMO_ENERGY_COST;
+                }
+                entity_set_flag(unit, ENTITY_FLAG_INVISIBLE, input.type == MATCH_INPUT_CAMO);
+                unit.energy_regen_timer = UNIT_ENERGY_REGEN_DURATION;
+            }
+            break;
+        }
     }
 }
 
@@ -839,7 +859,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 }
 
                 // If unit is idle, try to find a nearby target
-                if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && entity_data.unit_data.damage != 0) {
+                if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && 
+                        entity_data.unit_data.damage != 0 && 
+                        !(entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE))) {
                     entity.target = match_entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
                 }
 
@@ -1727,7 +1749,18 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
         }
     }
 
-    if (entity_is_unit(entity.type) && entity.energy < entity_data.unit_data.max_energy) {
+    if (entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
+        if (entity.energy_regen_timer != 0) {
+            entity.energy_regen_timer--;
+        }
+        if (entity.energy_regen_timer == 0) {
+            entity.energy_regen_timer = UNIT_ENERGY_REGEN_DURATION;
+            entity.energy--;
+            if (entity.energy == 0) {
+                entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, false);
+            }
+        }
+    } else if (entity_is_unit(entity.type) && entity.energy < entity_data.unit_data.max_energy) {
         if (entity.energy_regen_timer != 0) {
             entity.energy_regen_timer--;
         }
@@ -2375,6 +2408,7 @@ void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& def
     // Make defender attack back
     if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE &&
             defender.target.type == TARGET_NONE && defender_data.unit_data.damage != 0 &&
+            !(defender.type == ENTITY_DETECTIVE && entity_check_flag(defender, ENTITY_FLAG_INVISIBLE)) &&
             defender.player_id != attacker.player_id && match_is_entity_visible_to_player(state, attacker, defender.player_id)) {
         defender.target = (Target) {
             .type = TARGET_ATTACK_ENTITY,
