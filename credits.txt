@@ -115,8 +115,9 @@ Artninja, sangnamsa, 7lrs, and newlocknew
 https://freesound.org/people/Artninja/sounds/750822/
 
 R21-22-Cowboy Shouts at Cattle (modified)
+S20-35 Pistol shots; ping; silencer?
 craigsmith
-https://freesound.org/people/craigsmith/sounds/481757/
+https://freesound.org/people/craigsmith/
 
 Fire - Short - Swoosh Reverse 07 (modified)
 GregorQuendel
@@ -125,3 +126,7 @@ https://freesound.org/people/GregorQuendel/
 FIREBurn_Forest fire Artificial 1 Full EM (26lrs)
 newlocknew
 https://freesound.org/people/newlocknew/
+
+long wispy woosh1 (modified)
+newagesoup
+https://freesound.org/people/newagesoup/

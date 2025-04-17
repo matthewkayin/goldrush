@@ -80,7 +80,7 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
             ivec2 exit_cell = map_get_exit_cell(state.map, hall_data.cell_layer, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
+            match_create_entity(state, ENTITY_DETECTIVE, exit_cell, player_id);
 
             // Place scout
             {
@@ -562,6 +562,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                     unit.energy -= CAMO_ENERGY_COST;
                 }
                 entity_set_flag(unit, ENTITY_FLAG_INVISIBLE, input.type == MATCH_INPUT_CAMO);
+                match_event_play_sound(state, input.type == MATCH_INPUT_CAMO ? SOUND_CAMO_ON : SOUND_CAMO_OFF, unit.position.to_ivec2());
                 unit.energy_regen_timer = UNIT_ENERGY_REGEN_DURATION;
             }
             break;
@@ -1758,6 +1759,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             entity.energy--;
             if (entity.energy == 0) {
                 entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, false);
+                match_event_play_sound(state, SOUND_CAMO_OFF, entity.position.to_ivec2());
             }
         }
     } else if (entity_is_unit(entity.type) && entity.energy < entity_data.unit_data.max_energy) {
