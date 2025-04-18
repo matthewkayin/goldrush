@@ -136,6 +136,21 @@ void animation_init() {
         .frames = animation_frame_range(18, 20, 180),
         .loops = 1
     };
+    ANIMATION_DATA[ANIMATION_BALLOON_MOVE] = (AnimationData) {
+        .vframe = -1,
+        .frames = animation_frame_range(0, 1, 60),
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
+    ANIMATION_DATA[ANIMATION_BALLOON_DEATH_START] = (AnimationData) {
+        .vframe = -1,
+        .frames = { (AnimationFrame) { .hframe = 2, .duration = 4 } },
+        .loops = 1
+    };
+    ANIMATION_DATA[ANIMATION_BALLOON_DEATH] = (AnimationData) {
+        .vframe = -1,
+        .frames = animation_frame_range(3, 4, 8),
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
     ANIMATION_DATA[ANIMATION_RALLY_FLAG] = (AnimationData) {
         .vframe = 0,
         .frames = animation_frame_range(0, 5, 6),

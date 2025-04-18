@@ -2655,6 +2655,12 @@ void match_ui_render(const MatchUiState& state) {
                     case MODE_UNIT_PYRO_THROW:
                         debug_text_ptr += sprintf(debug_text_ptr, "PYRO THROW");
                         break;
+                    case MODE_UNIT_BALLOON_DEATH_START:
+                        debug_text_ptr += sprintf(debug_text_ptr, "BALLOON DEATH START");
+                        break;
+                    case MODE_UNIT_BALLOON_DEATH:
+                        debug_text_ptr += sprintf(debug_text_ptr, "BALLOON DEATH");
+                        break;
                     case MODE_BUILDING_IN_PROGRESS:
                         debug_text_ptr += sprintf(debug_text_ptr, "IN PROGRESS");
                         break;
@@ -2908,7 +2914,11 @@ RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& stat
             params.position.x -= sprite_info.frame_width / 2;
             params.position.y -= sprite_info.frame_height / 2;
             if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
-                params.position.y += ENTITY_SKY_POSITION_Y_OFFSET;
+                if (entity.mode == MODE_UNIT_BALLOON_DEATH) {
+                    params.position.y += ((int)entity.timer * ENTITY_SKY_POSITION_Y_OFFSET) / (int)ENTITY_BALLOON_DEATH_DURATION;
+                } else {
+                    params.position.y += ENTITY_SKY_POSITION_Y_OFFSET;
+                }
             }
             if (entity.direction > DIRECTION_SOUTH) {
                 params.options |= RENDER_SPRITE_FLIP_H;

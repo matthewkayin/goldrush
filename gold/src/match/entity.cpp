@@ -369,7 +369,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .name = "Balloon",
         .sprite = SPRITE_UNIT_BALLOON,
         .icon = SPRITE_BUTTON_ICON_BALLOON,
-        .death_sound = SOUND_DEATH,
+        .death_sound = SOUND_BALLOON_DEATH,
         .cell_layer = CELL_LAYER_SKY,
         .cell_size = 1,
         
@@ -787,7 +787,16 @@ SpriteName entity_get_sprite(const Entity& entity) {
 
 AnimationName entity_get_expected_animation(const Entity& entity) {
     if (entity.type == ENTITY_BALLOON) {
-        return ANIMATION_UNIT_IDLE;
+        switch (entity.mode) {
+            case MODE_UNIT_MOVE:
+                return ANIMATION_BALLOON_MOVE;
+            case MODE_UNIT_BALLOON_DEATH_START:
+                return ANIMATION_BALLOON_DEATH_START;
+            case MODE_UNIT_BALLOON_DEATH:
+                return ANIMATION_BALLOON_DEATH;
+            default: 
+                return ANIMATION_UNIT_IDLE;
+        }
     }
 
     if (entity.type == ENTITY_CANNON) {
@@ -838,9 +847,16 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
     if (entity_is_unit(entity.type)) {
         ivec2 frame = entity.animation.frame;
 
+        if (entity.type == ENTITY_BALLOON && entity.mode == MODE_UNIT_DEATH_FADE) {
+            // A bit hacky, this will just be an empty frame
+            return ivec2(2, 2);
+        }
+
         if (entity.mode == MODE_UNIT_BUILD) {
             frame.y = 2;
-        } else if (entity.animation.name == ANIMATION_UNIT_DEATH || entity.animation.name == ANIMATION_UNIT_DEATH_FADE || entity.animation.name == ANIMATION_CANNON_DEATH || entity.animation.name == ANIMATION_CANNON_DEATH_FADE) {
+        } else if (entity.animation.name == ANIMATION_UNIT_DEATH || entity.animation.name == ANIMATION_UNIT_DEATH_FADE || 
+                        entity.animation.name == ANIMATION_CANNON_DEATH || entity.animation.name == ANIMATION_CANNON_DEATH_FADE || 
+                        entity.animation.name == ANIMATION_BALLOON_DEATH_START || entity.animation.name == ANIMATION_BALLOON_DEATH) {
             frame.y = entity.direction == DIRECTION_NORTH ? 1 : 0;
         } else if (entity.direction == DIRECTION_NORTH) {
             frame.y = 1;
@@ -895,7 +911,7 @@ bool entity_should_die(const Entity& entity) {
     }
 
     if (entity_is_unit(entity.type)) {
-        if (entity.mode == MODE_UNIT_DEATH || entity.mode == MODE_UNIT_DEATH_FADE) {
+        if (entity.mode == MODE_UNIT_DEATH || entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_UNIT_BALLOON_DEATH_START || entity.mode == MODE_UNIT_BALLOON_DEATH) {
             return false;
         }
         if (entity.garrison_id != ID_NULL) {

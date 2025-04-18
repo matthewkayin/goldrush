@@ -798,7 +798,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     // Check if entity should die
     if (entity_should_die(entity)) {
         if (entity_is_unit(entity.type)) {
-            entity.mode = MODE_UNIT_DEATH;
+            entity.mode = entity.type == ENTITY_BALLOON ? MODE_UNIT_BALLOON_DEATH_START : MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
@@ -1233,6 +1233,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 break;
                             }
 
+                            // Don't attack sky units unless this unit is ranged
+                            if (target_data.cell_layer == CELL_LAYER_SKY && (entity_data.unit_data.range_squared == 1 || entity.type == ENTITY_CANNON)) {
+                                entity.mode = MODE_UNIT_IDLE;
+                                update_finished = true;
+                                break;
+                            }
+
                             // Check min range
                             Rect entity_rect = (Rect) {
                                 .x = entity.cell.x, .y = entity.cell.y,
@@ -1243,7 +1250,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 .w = target_data.cell_size, .h = target_data.cell_size
                             };
                             bool attack_with_bayonets = false;
-                            if (Rect::euclidean_distance_squared_between(entity_rect, target_rect) < entity_data.unit_data.min_range_squared) {
+                            if (Rect::euclidean_distance_squared_between(entity_rect, target_rect) < entity_data.unit_data.min_range_squared && target_data.cell_layer != CELL_LAYER_SKY) {
                                 if (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
                                     attack_with_bayonets = true;
                                 } else {
@@ -1573,6 +1580,34 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 update_finished = true;
                 break;
             }
+            case MODE_UNIT_BALLOON_DEATH_START: {
+                if (!animation_is_playing(entity.animation)) {
+                    entity.mode = MODE_UNIT_BALLOON_DEATH;
+                    entity.animation = animation_create(entity_get_expected_animation(entity));
+                    entity.timer = ENTITY_BALLOON_DEATH_DURATION;
+                }
+                update_finished = true;
+                break;
+            }
+            case MODE_UNIT_BALLOON_DEATH: {
+                entity.timer--;
+                if (entity.timer == 0) {
+                    map_set_cell_rect(state.map, entity_data.cell_layer, entity.cell, entity_data.cell_size, (Cell) {
+                        .type = CELL_EMPTY, .id = ID_NULL
+                    });
+                    match_entity_release_garrisoned_units_on_death(state, entity);
+                    state.particles.push_back((Particle) {
+                        .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
+                        .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
+                        .vframe = 0,
+                        .position = entity.position.to_ivec2()
+                    });
+                    match_event_play_sound(state, SOUND_EXPLOSION, entity.position.to_ivec2());
+                    entity.mode = MODE_UNIT_DEATH_FADE;
+                }
+                update_finished = true;
+                break;
+            }
             case MODE_MINE_ARM: {
                 entity.timer--;
                 if (entity.timer == 0) {
@@ -1700,7 +1735,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
     // Check for fire
     // If entity is moving, check for fire based on its previous cell
-    if (entity.type != ENTITY_GOLDMINE && entity.health != 0) {
+    if (entity.type != ENTITY_GOLDMINE && entity_data.cell_layer != CELL_LAYER_SKY && entity.health != 0) {
         ivec2 entity_fire_cell = entity.cell;
         if (entity_is_unit(entity.type) && entity.mode == MODE_UNIT_MOVE) {
             entity_fire_cell = entity.cell - DIRECTION_IVEC2[entity.direction];
