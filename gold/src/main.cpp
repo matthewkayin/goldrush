@@ -6,6 +6,7 @@
 #include "core/input.h"
 #include "core/network.h"
 #include "core/sound.h"
+#include "core/options.h"
 #include "math/gmath.h"
 #include "render/render.h"
 #include "menu/menu.h"
@@ -101,6 +102,7 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return -1;
     }
+    options_load();
     animation_init();
     input_init(window);
     srand(time(NULL));
@@ -252,6 +254,8 @@ int gold_main(int argc, char** argv) {
 
     TTF_Quit();
     SDL_Quit();
+
+    options_save();
 
     log_info("Application quit gracefully.");
 

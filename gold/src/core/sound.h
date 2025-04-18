@@ -45,6 +45,9 @@ enum SoundName {
 
 bool sound_init();
 void sound_quit();
+void sound_set_sfx_volume(int volume);
+void sound_set_mus_volume(int volume);
+
 int sound_play(SoundName sound, int loops = 0);
 bool sound_is_looping(SoundName sound);
 void sound_begin_loop(SoundName sound);

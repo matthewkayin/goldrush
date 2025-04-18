@@ -217,6 +217,14 @@ void sound_quit() {
     log_info("Quit sound.");
 }
 
+void sound_set_sfx_volume(int volume) {
+    Mix_Volume(-1, volume);
+}
+
+void sound_set_mus_volume(int volume) {
+
+}
+
 int sound_play(SoundName sound, int loops) {
     int variant = SOUND_PARAMS.at(sound).variants == 1 ? 0 : rand() % SOUND_PARAMS.at(sound).variants;
     return Mix_PlayChannel(-1, state.sounds[state.sound_index[sound] + variant], loops);

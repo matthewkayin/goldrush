@@ -204,6 +204,42 @@ void render_set_window_size(ivec2 window_size) {
     state.window_size = window_size;
 }
 
+void render_set_display(RenderDisplay display) {
+    SDL_DisplayMode display_mode;
+    SDL_GetCurrentDisplayMode(0, &display_mode);
+
+    // Set window to user's screen size
+    if (display != RENDER_DISPLAY_WINDOWED) {
+        render_set_window_size(ivec2(display_mode.w, display_mode.h));
+    }
+
+    // Set window display mode
+    uint32_t flags = 0;
+    if (display == RENDER_DISPLAY_FULLSCREEN) {
+        flags = SDL_WINDOW_FULLSCREEN;
+    } else if (display == RENDER_DISPLAY_BORDERLESS) {
+        flags = SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+    SDL_SetWindowFullscreen(state.window, flags);
+
+    // Center the window
+    if (display == RENDER_DISPLAY_WINDOWED) {
+        ivec2 window_size = ivec2(1280, 720);
+        render_set_window_size(window_size);
+        SDL_SetWindowPosition(state.window, (display_mode.w / 2) - (window_size.x / 2), (display_mode.h / 2) - (window_size.y / 2));
+    }
+}
+
+void render_set_vsync(RenderVsync vsync) {
+    int interval = vsync == RENDER_VSYNC_ADAPTIVE ? -1 : (int)vsync;
+    log_trace("Set swap interval %i", interval);
+    int result = SDL_GL_SetSwapInterval(interval);
+    if (result == -1) {
+        log_error("GL set swap interval failed. Defaulting to vsync on");
+        SDL_GL_SetSwapInterval(1);
+    }
+}
+
 void render_init_quad_vao() {
     float quad_vertices[] = {
         -1.0f, 1.0f, 0.0f, 1.0f,

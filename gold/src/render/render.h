@@ -8,6 +8,20 @@
 #define AUTOTILE_HFRAMES 8
 #define AUTOTILE_VFRAMES 6
 
+enum RenderDisplay {
+    RENDER_DISPLAY_WINDOWED,
+    RENDER_DISPLAY_FULLSCREEN,
+    RENDER_DISPLAY_BORDERLESS,
+    RENDER_DISPLAY_COUNT
+};
+
+enum RenderVsync {
+    RENDER_VSYNC_DISABLED,
+    RENDER_VSYNC_ENABLED,
+    RENDER_VSYNC_ADAPTIVE,
+    RENDER_VSYNC_COUNT
+};
+
 enum MinimapLayer {
     MINIMAP_LAYER_TILE,
     MINIMAP_LAYER_FOG
@@ -80,6 +94,8 @@ const uint32_t RENDER_SPRITE_CENTERED = 4;
 bool render_init(SDL_Window* window);
 void render_quit();
 void render_set_window_size(ivec2 window_size);
+void render_set_display(RenderDisplay display);
+void render_set_vsync(RenderVsync vsync);
 void render_sprite_batch();
 void render_prepare_frame();
 void render_present_frame();
