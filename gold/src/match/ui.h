@@ -134,3 +134,5 @@ void match_ui_render_target_build(const MatchUiState& state, const Target& targe
 RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& state, const Entity& entity);
 void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& state, const Entity& entity);
 void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity, Rect icon_rect);
+void match_ui_render_entity_move_animation(const MatchUiState& state, const Entity& entity);
+void match_ui_render_particle(const MatchUiState& state, const Particle& particle);

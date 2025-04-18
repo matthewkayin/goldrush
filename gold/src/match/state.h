@@ -123,6 +123,12 @@ struct Particle {
     ivec2 position;
 };
 
+enum ParticleLayer {
+    PARTICLE_LAYER_GROUND,
+    PARTICLE_LAYER_SKY,
+    PARTICLE_LAYER_COUNT
+};
+
 struct Fire {
     ivec2 cell;
     ivec2 source;
@@ -160,7 +166,7 @@ struct MatchState {
     bool is_fog_dirty;
 
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
-    std::vector<Particle> particles;
+    std::vector<Particle> particles[PARTICLE_LAYER_COUNT];
     std::vector<Projectile> projectiles;
     std::vector<Fire> fires;
     std::vector<int> fire_cells;

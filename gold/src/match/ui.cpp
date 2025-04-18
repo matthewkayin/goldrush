@@ -1362,6 +1362,7 @@ void match_ui_order_move(MatchUiState& state) {
     input.move.target_cell = move_target / TILE_SIZE;
     input.move.target_id = ID_NULL;
     EntityId remembered_entity_id = ID_NULL;
+    bool input_move_target_is_balloon = false;
 
     // Checks if clicked on entity
     uint8_t player_team = state.match.players[network_get_player_id()].team;
@@ -1392,11 +1393,14 @@ void match_ui_order_move(MatchUiState& state) {
 
             Rect entity_rect = entity_get_rect(state.match.entities[entity_index]);
             if (entity_rect.has_point(move_target)) {
-                input.move.target_id = state.match.entities.get_id_of(entity_index);
+                if (input.move.target_id == ID_NULL || 
+                        (state.match.entities[entity_index].type == ENTITY_BALLOON && !input_move_target_is_balloon)) {
+                    input.move.target_id = state.match.entities.get_id_of(entity_index);
+                    input_move_target_is_balloon = state.match.entities[entity_index].type == ENTITY_BALLOON;
+                }
                 if (fog_value == FOG_EXPLORED) {
                     remembered_entity_id = state.match.entities.get_id_of(entity_index);
                 }
-                break;
             }
         }
     }
@@ -1638,6 +1642,41 @@ void match_ui_render(const MatchUiState& state) {
                 match_ui_render_entity_select_rings_and_healthbars(state, entity);
             }
 
+            // Move animation
+            if (animation_is_playing(state.move_animation) &&
+                    map_get_tile(state.match.map, state.move_animation_position / TILE_SIZE).elevation == elevation) {
+                if (state.move_animation.name == ANIMATION_UI_MOVE_CELL && cell_layer == CELL_LAYER_GROUND) {
+                    RenderSpriteParams params = (RenderSpriteParams) {
+                        .sprite = SPRITE_UI_MOVE,
+                        .frame = state.move_animation.frame,
+                        .position = state.move_animation_position - state.camera_offset,
+                        .options = RENDER_SPRITE_CENTERED,
+                        .recolor_id = 0
+                    };
+                    ivec2 ui_move_cell = state.move_animation_position / TILE_SIZE;
+                    if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, ui_move_cell) > 0) {
+                        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+                    } else {
+                        above_fog_sprite_params.push_back(params);
+                    }
+                } else if (state.move_animation.frame.x % 2 == 0) {
+                    uint32_t entity_index = state.match.entities.get_index_of(state.move_animation_entity_id);
+                    if (entity_index != INDEX_INVALID) {
+                        const Entity& entity = state.match.entities[entity_index];
+                        if (entity_get_data(entity.type).cell_layer == cell_layer) {
+                            match_ui_render_entity_move_animation(state, entity);
+                        }
+                    } else if (cell_layer == CELL_LAYER_GROUND) {
+                        auto it = state.match.remembered_entities[state.match.players[network_get_player_id()].team].find(state.move_animation_entity_id);
+                        if (it != state.match.remembered_entities[state.match.players[network_get_player_id()].team].end()) {
+                            ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
+
+                            render_sprite_frame(match_ui_get_entity_select_ring(it->second.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+                        }
+                    }
+                }
+            }
+
             // Underground entities
             if (cell_layer == CELL_LAYER_UNDERGROUND) {
                 for (const Entity& entity : state.match.entities) {
@@ -1657,48 +1696,7 @@ void match_ui_render(const MatchUiState& state) {
                     render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
                 }
             }
-        }
-
-        // Move animation
-        if (animation_is_playing(state.move_animation) &&
-                map_get_tile(state.match.map, state.move_animation_position / TILE_SIZE).elevation == elevation) {
-            if (state.move_animation.name == ANIMATION_UI_MOVE_CELL) {
-                RenderSpriteParams params = (RenderSpriteParams) {
-                    .sprite = SPRITE_UI_MOVE,
-                    .frame = state.move_animation.frame,
-                    .position = state.move_animation_position - state.camera_offset,
-                    .options = RENDER_SPRITE_CENTERED,
-                    .recolor_id = 0
-                };
-                ivec2 ui_move_cell = state.move_animation_position / TILE_SIZE;
-                if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, ui_move_cell) > 0) {
-                    render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
-                } else {
-                    above_fog_sprite_params.push_back(params);
-                }
-            } else if (state.move_animation.frame.x % 2 == 0) {
-                // TODO: use mine select ring layer for landmines
-                uint32_t entity_index = state.match.entities.get_index_of(state.move_animation_entity_id);
-                if (entity_index != INDEX_INVALID) {
-                    const Entity& entity = state.match.entities[entity_index];
-
-                    Rect entity_rect = entity_get_rect(entity);
-                    ivec2 entity_center_position = entity_is_unit(entity.type) 
-                            ? entity.position.to_ivec2()
-                            : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
-                    entity_center_position -= state.camera_offset;
-
-                    render_sprite_frame(match_ui_get_entity_select_ring(entity.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
-                } else {
-                    auto it = state.match.remembered_entities[state.match.players[network_get_player_id()].team].find(state.move_animation_entity_id);
-                    if (it != state.match.remembered_entities[state.match.players[network_get_player_id()].team].end()) {
-                        ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
-
-                        render_sprite_frame(match_ui_get_entity_select_ring(it->second.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
-                    }
-                }
-            }
-        }
+        } // End for each cell layer
     } // End for each elevation
 
     // Fires
@@ -1799,6 +1797,14 @@ void match_ui_render(const MatchUiState& state) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
     }
 
+    // Balloon shadows
+    for (const Entity& entity : state.match.entities) {
+        if (entity.type == ENTITY_BALLOON && entity.mode != MODE_UNIT_DEATH_FADE &&
+                match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), entity.position.to_ivec2() + ivec2(-5, 3) - state.camera_offset, 0, 0);
+        }
+    }
+
     // Building fires
     for (const Entity& entity : state.match.entities) {
         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
@@ -1864,31 +1870,9 @@ void match_ui_render(const MatchUiState& state) {
         }
     }
 
-    // Particles
-    for (const Particle& particle : state.match.particles) {
-        // Check if particle can be seen by player
-        if (particle.animation.name == ANIMATION_PARTICLE_SMOKE) {
-            ivec2 particle_top_left_cell = (particle.position / TILE_SIZE) - ivec2((PARTICLE_SMOKE_CELL_SIZE - 1) / 2, (PARTICLE_SMOKE_CELL_SIZE - 1) / 2);
-            bool particle_is_revealed = false;
-            for (int y = particle_top_left_cell.y; y < particle_top_left_cell.y + PARTICLE_SMOKE_CELL_SIZE; y++) {
-                for (int x = particle_top_left_cell.x; x < particle_top_left_cell.x + PARTICLE_SMOKE_CELL_SIZE; x++) {
-                    if (map_is_cell_in_bounds(state.match.map, ivec2(x, y)) && match_get_fog(state.match, state.match.players[network_get_player_id()].team, ivec2(x, y)) > 0) {
-                        particle_is_revealed = true;
-                        break;
-                    }
-                }
-                if (particle_is_revealed) {
-                    break;
-                }
-            }
-            if (!particle_is_revealed) {
-                continue;
-            }
-        } else if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, particle.position / TILE_SIZE, 1)) {
-            continue;
-        }
-
-        render_sprite_frame(particle.sprite, ivec2(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED, 0);
+    // Ground particles
+    for (const Particle& particle : state.match.particles[PARTICLE_LAYER_GROUND]) {
+        match_ui_render_particle(state, particle);
     }
 
     // Projectiles
@@ -1956,6 +1940,19 @@ void match_ui_render(const MatchUiState& state) {
         match_ui_render_entity_select_rings_and_healthbars(state, entity);
     }
 
+    // Sky entity move animation
+    if (animation_is_playing(state.move_animation) && 
+            state.move_animation.name != ANIMATION_UI_MOVE_CELL &&
+            state.move_animation.frame.x % 2 == 0) {
+        uint32_t entity_index = state.match.entities.get_index_of(state.move_animation_entity_id);
+        if (entity_index != INDEX_INVALID) {
+            const Entity& entity = state.match.entities[entity_index];
+            if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
+                match_ui_render_entity_move_animation(state, entity);
+            }
+        }
+    }
+
     // Sky entities
     ysort_params.clear();
     for (const Entity& entity : state.match.entities) {
@@ -1985,6 +1982,21 @@ void match_ui_render(const MatchUiState& state) {
     match_ui_ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
     for (const RenderSpriteParams& params : ysort_params) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+        if (params.sprite == SPRITE_UNIT_BALLOON) {
+            if ((params.frame.x == 3 || params.frame.x == 4) && params.frame.y != 22) {
+                int steam_hframe = params.frame.x - 3;
+                uint32_t options = RENDER_SPRITE_NO_CULL;
+                if (params.frame.y == 1) {
+                    options |= RENDER_SPRITE_FLIP_H;
+                }
+                render_sprite_frame(SPRITE_UNIT_BALLOON_STEAM, ivec2(steam_hframe, 0), params.position, options, 0);
+            }
+        }
+    }
+
+    // Sky particles
+    for (const Particle& particle : state.match.particles[PARTICLE_LAYER_SKY]) {
+        match_ui_render_particle(state, particle);
     }
 
     // Fog of War
@@ -2977,4 +2989,43 @@ void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity
         healthbar_position -= ivec2(0, healthbar_size.y + 1);
     }
     match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
+}
+
+void match_ui_render_entity_move_animation(const MatchUiState& state, const Entity& entity) {
+    Rect entity_rect = entity_get_rect(entity);
+    ivec2 entity_center_position = entity_is_unit(entity.type) 
+            ? entity.position.to_ivec2()
+            : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
+    entity_center_position -= state.camera_offset;
+    if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
+        entity_center_position.y += ENTITY_SKY_POSITION_Y_OFFSET;
+    }
+
+    render_sprite_frame(match_ui_get_entity_select_ring(entity.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+}
+
+void match_ui_render_particle(const MatchUiState& state, const Particle& particle) {
+    // Check if particle can be seen by player
+    if (particle.animation.name == ANIMATION_PARTICLE_SMOKE) {
+        ivec2 particle_top_left_cell = (particle.position / TILE_SIZE) - ivec2((PARTICLE_SMOKE_CELL_SIZE - 1) / 2, (PARTICLE_SMOKE_CELL_SIZE - 1) / 2);
+        bool particle_is_revealed = false;
+        for (int y = particle_top_left_cell.y; y < particle_top_left_cell.y + PARTICLE_SMOKE_CELL_SIZE; y++) {
+            for (int x = particle_top_left_cell.x; x < particle_top_left_cell.x + PARTICLE_SMOKE_CELL_SIZE; x++) {
+                if (map_is_cell_in_bounds(state.match.map, ivec2(x, y)) && match_get_fog(state.match, state.match.players[network_get_player_id()].team, ivec2(x, y)) > 0) {
+                    particle_is_revealed = true;
+                    break;
+                }
+            }
+            if (particle_is_revealed) {
+                break;
+            }
+        }
+        if (!particle_is_revealed) {
+            return;
+        }
+    } else if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, particle.position / TILE_SIZE, 1)) {
+        return;
+    }
+
+    render_sprite_frame(particle.sprite, ivec2(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED, 0);
 }

@@ -319,7 +319,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .attack_priority = 2,
 
         .garrison_capacity = 0,
-        .garrison_size = 1,
+        .garrison_size = 2,
         .has_detection = false,
 
         .unit_data = (EntityDataUnit) {
@@ -381,7 +381,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .attack_priority = 1,
 
         .garrison_capacity = 0,
-        .garrison_size = 1,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
         .has_detection = true,
 
         .unit_data = (EntityDataUnit) {
@@ -715,8 +715,9 @@ Rect entity_get_rect(const Entity& entity) {
         rect.x -= rect.w / 2;
         rect.y -= rect.h / 2;
     }
-    if (entity_data.cell_layer == CELL_LAYER_SKY) {
-        rect.y += ENTITY_SKY_POSITION_Y_OFFSET;
+    if (entity.type == ENTITY_BALLOON) {
+        rect.y -= 32;
+        rect.h += 16;
     }
 
     return rect;

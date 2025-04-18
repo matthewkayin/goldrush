@@ -576,23 +576,23 @@ void match_update(MatchState& state) {
     }
 
     // Update particles
-    {
+    for (int particle_layer = 0; particle_layer < PARTICLE_LAYER_COUNT; particle_layer++) {
         uint32_t particle_index = 0;
-        while (particle_index < state.particles.size()) {
-            animation_update(state.particles[particle_index].animation);
+        while (particle_index < state.particles[particle_layer].size()) {
+            animation_update(state.particles[particle_layer][particle_index].animation);
 
             // On particle finish
-            if (!animation_is_playing(state.particles[particle_index].animation)) {
-                if (state.particles[particle_index].animation.name == ANIMATION_PARTICLE_SMOKE_START) {
-                    state.particles[particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE);
-                } else if (state.particles[particle_index].animation.name == ANIMATION_PARTICLE_SMOKE) {
-                    state.particles[particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE_END);
+            if (!animation_is_playing(state.particles[particle_layer][particle_index].animation)) {
+                if (state.particles[particle_layer][particle_index].animation.name == ANIMATION_PARTICLE_SMOKE_START) {
+                    state.particles[particle_layer][particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE);
+                } else if (state.particles[particle_layer][particle_index].animation.name == ANIMATION_PARTICLE_SMOKE) {
+                    state.particles[particle_layer][particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE_END);
                 }
             }
 
             // If particle finished and is not playing an animation, then remove it
-            if (!animation_is_playing(state.particles[particle_index].animation)) {
-                state.particles.erase(state.particles.begin() + particle_index);
+            if (!animation_is_playing(state.particles[particle_layer][particle_index].animation)) {
+                state.particles[particle_layer].erase(state.particles[particle_layer].begin() + particle_index);
             } else {
                 particle_index++;
             }
@@ -1596,7 +1596,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         .type = CELL_EMPTY, .id = ID_NULL
                     });
                     match_entity_release_garrisoned_units_on_death(state, entity);
-                    state.particles.push_back((Particle) {
+                    state.particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
                         .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
                         .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
                         .vframe = 0,
@@ -1938,6 +1938,10 @@ bool match_has_entity_reached_target(const MatchState& state, const Entity& enti
                 .w = target_size, .h = target_size
             };
 
+            if (entity.target.type != TARGET_ATTACK_ENTITY && (entity.type == ENTITY_BALLOON || target.type == ENTITY_BALLOON)) {
+                return entity.cell == match_get_entity_target_cell(state, entity);
+            }
+
             int entity_range_squared = entity_get_data(entity.type).unit_data.range_squared;
             return entity.target.type != TARGET_ATTACK_ENTITY || entity_range_squared == 1
                         ? entity_rect.is_adjacent_to(target_rect)
@@ -1981,6 +1985,15 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
             const Entity& target = state.entities.get_by_id(entity.target.id);
             int entity_cell_size = entity_get_data(entity.type).cell_size;
             int target_cell_size = entity_get_data(target.type).cell_size;
+            if (entity.type == ENTITY_BALLOON || target.type == ENTITY_BALLOON) {
+                switch (target_cell_size) {
+                    case 3:
+                    case 4:
+                        return target.cell + ivec2(1, 1);
+                    default:
+                        return target.cell;
+                }
+            }
             ivec2 ignore_cell = ivec2(-1, -1);
             if (target.type == ENTITY_GOLDMINE) {
                 Target hall_target = match_entity_target_nearest_hall(state, entity);
@@ -2329,7 +2342,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
             }
         }
 
-        state.particles.push_back((Particle) {
+        state.particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
             .sprite = SPRITE_PARTICLE_BUNKER_FIRE,
             .animation = animation_create(ANIMATION_PARTICLE_BUNKER_COWBOY),
             .vframe = 0,
@@ -2401,7 +2414,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
 
     // Create particle effect
     if (attacker.type == ENTITY_CANNON) {
-        state.particles.push_back((Particle) {
+        state.particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
             .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
             .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
             .vframe = 0,
@@ -2413,7 +2426,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         ivec2 particle_position = ivec2(
             defender_rect.x + (defender_rect.w / 4) + (lcg_rand() % (defender_rect.w / 2)),
             defender_rect.y + (defender_rect.h / 4) + (lcg_rand() % (defender_rect.h / 2)));
-        state.particles.push_back((Particle) {
+        state.particles[defender_data.cell_layer == CELL_LAYER_SKY ? PARTICLE_LAYER_SKY : PARTICLE_LAYER_GROUND].push_back((Particle) {
             .sprite = SPRITE_PARTICLE_SPARKS,
             .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
             .vframe = lcg_rand() % 3,
@@ -2583,7 +2596,7 @@ void match_entity_explode(MatchState& state, EntityId entity_id) {
     match_event_play_sound(state, SOUND_EXPLOSION, entity.position.to_ivec2());
 
     // Create particle
-    state.particles.push_back((Particle) {
+    state.particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
         .sprite = SPRITE_PARTICLE_EXPLOSION,
         .animation = animation_create(ANIMATION_PARTICLE_EXPLOSION),
         .vframe = 0,

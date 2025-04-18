@@ -1056,6 +1056,22 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
+    { SPRITE_UNIT_BALLOON_STEAM, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_balloon_steam.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UNIT_BALLOON_SHADOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_balloon_shadow.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
     { SPRITE_UNIT_BANDIT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {

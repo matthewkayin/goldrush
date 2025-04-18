@@ -138,7 +138,7 @@ void animation_init() {
     };
     ANIMATION_DATA[ANIMATION_BALLOON_MOVE] = (AnimationData) {
         .vframe = -1,
-        .frames = animation_frame_range(0, 1, 60),
+        .frames = animation_frame_range(0, 1, 30),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
     ANIMATION_DATA[ANIMATION_BALLOON_DEATH_START] = (AnimationData) {
