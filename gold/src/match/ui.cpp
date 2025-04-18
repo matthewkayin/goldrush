@@ -791,7 +791,7 @@ void match_ui_update(MatchUiState& state) {
 
     state.turn_timer--;
 
-    ui_begin();
+    ui_begin(UI_MAIN, true);
     match_ui_handle_input(state);
 
     // Match update
@@ -2705,7 +2705,7 @@ void match_ui_render(const MatchUiState& state) {
         }
     #endif
 
-    ui_render();
+    ui_render(UI_MAIN);
     render_sprite_batch();
 
     // MINIMAP

@@ -73,6 +73,7 @@ MenuState menu_init() {
     state.lobbylist_item_selected = MENU_ITEM_NONE;
 
     state.mode = MENU_MODE_MAIN;
+    state.options_menu.mode = OPTIONS_MENU_CLOSED;
     menu_set_mode(state, state.mode);
 
     return state;
@@ -156,17 +157,16 @@ void menu_update(MenuState& state) {
         }
     }
 
-    ui_begin();
+    ui_begin(UI_MAIN, state.mode != MENU_MODE_OPTIONS);
 
-    if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_USERNAME) {
-        // ui_element_position(ivec2(24, 24));
-        // ui_text(FONT_WESTERN32_OFFBLACK, "GOLD RUSH");
-    }
-
-    if (state.mode == MENU_MODE_MAIN) {
+    if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_OPTIONS) {
         ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
             if (ui_button("PLAY")) {
                 menu_set_mode(state, MENU_MODE_USERNAME);
+            }
+            if (ui_button("OPTIONS")) {
+                state.options_menu = options_menu_open();
+                menu_set_mode(state, MENU_MODE_OPTIONS);
             }
             if (ui_button("EXIT")) {
                 menu_set_mode(state, MENU_MODE_EXIT);
@@ -406,6 +406,13 @@ void menu_update(MenuState& state) {
         ui_end_container();
         // End lobby buttons
     } // End lobby
+
+    if (state.mode == MENU_MODE_OPTIONS) {
+        options_menu_update(state.options_menu);
+        if (state.options_menu.mode == OPTIONS_MENU_CLOSED) {
+            menu_set_mode(state, MENU_MODE_MAIN);
+        }
+    }
 }
 
 void menu_set_mode(MenuState& state, MenuMode mode) {
@@ -580,13 +587,13 @@ void menu_render(const MenuState& state) {
         render_sprite_frame(SPRITE_UI_TITLE, ivec2(0, 0), ivec2(24, 24), RENDER_SPRITE_NO_CULL, 0);
     }
 
-    ui_render();
-
     // Render version
     char version_text[32];
     sprintf(version_text, "Version %s", APP_VERSION);
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, version_text);
     render_text(FONT_WESTERN8_OFFBLACK, version_text, ivec2(4, SCREEN_HEIGHT - text_size.y - 4));
+
+    ui_render(UI_MAIN);
 
     // Status text
     if (state.status_timer != 0) {
@@ -600,6 +607,10 @@ void menu_render(const MenuState& state) {
         int rect_width = text_size.x + 32;
         render_ninepatch(SPRITE_UI_FRAME, (Rect) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 80, .w = rect_width, .h = 32 });
         render_text(FONT_HACK_GOLD, "Connecting...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 80 + 16 - (text_size.y / 2)));
+    }
+
+    if (state.mode == MENU_MODE_OPTIONS) {
+        options_menu_render(state.options_menu);
     }
 
     render_sprite_batch();

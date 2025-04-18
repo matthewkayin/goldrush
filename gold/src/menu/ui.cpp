@@ -61,9 +61,11 @@ struct UiState {
     uint32_t text_input_cursor_blink_timer;
     bool text_input_show_cursor;
     std::vector<UiContainer> container_stack;
-    std::vector<UiRender> render_queue[UI_Z_INDEX_COUNT]; 
+    std::vector<UiRender> render_queue[UI_COUNT][UI_Z_INDEX_COUNT]; 
     int dropdown_open;
     int dropdown_open_future;
+    uint32_t id;
+    bool input_enabled;
 };
 static UiState state;
 static bool initialized = false;
@@ -74,7 +76,7 @@ void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index)
 void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h = false);
 void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index);
 
-void ui_begin() {
+void ui_begin(uint32_t id, bool input_enabled) {
     if (!initialized) {
         state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
         state.text_input_show_cursor = false;
@@ -85,7 +87,7 @@ void ui_begin() {
 
     state.container_stack.clear();
     for (int z_index = 0; z_index < UI_Z_INDEX_COUNT; z_index++) {
-        state.render_queue[z_index].clear();
+        state.render_queue[id][z_index].clear();
     }
 
     // Update of timers and such can go here since ui_begin() is called every frame
@@ -95,6 +97,8 @@ void ui_begin() {
     }
 
     state.dropdown_open = state.dropdown_open_future;
+    state.input_enabled = input_enabled;
+    state.id = id;
 }
 
 void ui_element_position(ivec2 position) {
@@ -153,7 +157,7 @@ bool ui_button(const char* text) {
     };
     ui_update_container(ivec2(button_rect.w, button_rect.h));
 
-    bool hovered = button_rect.has_point(input_get_mouse_position());
+    bool hovered = state.input_enabled && button_rect.has_point(input_get_mouse_position());
 
     int frame_count = button_rect.w / 8;
     for (int frame = 0; frame < frame_count; frame++) {
@@ -188,13 +192,13 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
     int hframe = 0;
     if (disabled) {
         hframe = 2;
-    } else if (sprite_rect.has_point(input_get_mouse_position())) {
+    } else if (state.input_enabled && sprite_rect.has_point(input_get_mouse_position())) {
         hframe = 1;
     }
 
     ui_queue_sprite(sprite, ivec2(hframe, 0), origin, 0, flip_h);
 
-    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && !disabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && sprite_rect.has_point(input_get_mouse_position());
+    bool clicked = state.input_enabled && state.dropdown_open == UI_DROPDOWN_NONE && !disabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && sprite_rect.has_point(input_get_mouse_position());
     if (clicked) {
         sound_play(SOUND_UI_CLICK);
     }
@@ -233,7 +237,7 @@ bool ui_text_frame(const char* text, bool disabled) {
         .w = frame_count * sprite_info.frame_width, .h = sprite_info.frame_height
     };
     ui_update_container(ivec2(rect.w, rect.h));
-    bool hovered = !disabled && rect.has_point(input_get_mouse_position());
+    bool hovered = state.input_enabled && !disabled && rect.has_point(input_get_mouse_position());
 
     for (int frame = 0; frame < frame_count; frame++) {
         int hframe = 1;
@@ -309,7 +313,7 @@ bool ui_team_picker(char value, bool disabled) {
         .w = size.x, .h = size.y
     };
 
-    bool is_hovered = !disabled && rect.has_point(input_get_mouse_position());
+    bool is_hovered = state.input_enabled && !disabled && rect.has_point(input_get_mouse_position());
 
     ui_queue_sprite(SPRITE_UI_TEAM_PICKER, ivec2((int)is_hovered, 0), origin, 0);
     char text[2] = { value, '\0' };
@@ -333,7 +337,7 @@ bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, s
         .w = size.x, .h = size.y
     };
 
-    bool hovered = rect.has_point(input_get_mouse_position());
+    bool hovered = state.input_enabled && rect.has_point(input_get_mouse_position());
 
     int vframe = 0;
     if (disabled) {
@@ -364,7 +368,7 @@ bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, s
         }
 
         // If the user left clicked, close the dropdown
-        if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        if (state.input_enabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
             state.dropdown_open_future = UI_DROPDOWN_NONE;
             // If they happened to be selecting an item, update the value
             if (item_hovered != -1) {
@@ -382,9 +386,9 @@ bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, s
     return false;
 }
 
-void ui_render() {
+void ui_render(uint32_t id) {
     for (int z_index = 0; z_index < UI_Z_INDEX_COUNT; z_index++) {
-        for (const UiRender& render : state.render_queue[z_index]) {
+        for (const UiRender& render : state.render_queue[id][z_index]) {
             switch (render.type) {
                 case UI_RENDER_TEXT: {
                     render_text(render.text.font, render.text.text, render.text.position);
@@ -450,11 +454,11 @@ void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index)
     render.text.font = font;
     render.text.position = position;
     strcpy(render.text.text, text);
-    state.render_queue[z_index].push_back(render);
+    state.render_queue[state.id][z_index].push_back(render);
 }
 
 void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h) {
-    state.render_queue[z_index].push_back((UiRender) {
+    state.render_queue[state.id][z_index].push_back((UiRender) {
         .type = UI_RENDER_SPRITE,
         .sprite = (UiRenderSprite) {
             .sprite = sprite,
@@ -466,7 +470,7 @@ void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index
 }
 
 void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index) {
-    state.render_queue[z_index].push_back((UiRender) {
+    state.render_queue[state.id][z_index].push_back((UiRender) {
         .type = UI_RENDER_NINEPATCH,
         .ninepatch = (UiRenderNinepatch) {
             .sprite = sprite,

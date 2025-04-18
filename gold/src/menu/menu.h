@@ -3,6 +3,7 @@
 #include "core/animation.h"
 #include "core/network.h"
 #include "match_setting.h"
+#include "options.h"
 #include <vector>
 #include <string>
 
@@ -44,6 +45,8 @@ struct MenuState {
     uint32_t lobbylist_item_selected;
 
     std::vector<std::string> chat;
+
+    OptionsMenuState options_menu;
 };
 
 MenuState menu_init();
