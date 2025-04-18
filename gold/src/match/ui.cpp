@@ -839,7 +839,7 @@ void match_ui_update(MatchUiState& state) {
                         sound_play(SOUND_ALERT_BUILDING);
                         break;
                     case MATCH_ALERT_TYPE_UNIT:
-                        // sound_play(SOUND_ALERT_UNIT);
+                        sound_play(SOUND_ALERT_UNIT);
                         break;
                     case MATCH_ALERT_TYPE_RESEARCH:
                         sound_play(SOUND_ALERT_RESEARCH);
@@ -1946,6 +1946,47 @@ void match_ui_render(const MatchUiState& state) {
         render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[network_get_player_id()].recolor_id);
     }
 
+    // Sky entities select rings
+    for (EntityId entity_id : state.selection) {
+        const Entity& entity = state.match.entities.get_by_id(entity_id);
+        const EntityData& entity_data = entity_get_data(entity.type);
+        if (entity_data.cell_layer != CELL_LAYER_SKY) {
+            continue;
+        }
+        match_ui_render_entity_select_rings_and_healthbars(state, entity);
+    }
+
+    // Sky entities
+    ysort_params.clear();
+    for (const Entity& entity : state.match.entities) {
+        const EntityData& entity_data = entity_get_data(entity.type);
+        if (entity.mode == MODE_UNIT_DEATH_FADE || 
+                entity.mode == MODE_BUILDING_DESTROYED ||
+                entity_data.cell_layer != CELL_LAYER_SKY) {
+            continue;
+        }
+        if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+
+        RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
+        const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
+        Rect render_rect = (Rect) {
+            .x = params.position.x, .y = params.position.y,
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+        };
+        if (!render_rect.intersects(SCREEN_RECT)) {
+            continue;
+        }
+        params.options |= RENDER_SPRITE_NO_CULL;
+
+        ysort_params.push_back(params);
+    }
+    match_ui_ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+    for (const RenderSpriteParams& params : ysort_params) {
+        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+    }
+
     // Fog of War
     int player_team = state.match.players[network_get_player_id()].team;
     for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
@@ -2866,6 +2907,9 @@ RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& stat
         } else {
             params.position.x -= sprite_info.frame_width / 2;
             params.position.y -= sprite_info.frame_height / 2;
+            if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
+                params.position.y += ENTITY_SKY_POSITION_Y_OFFSET;
+            }
             if (entity.direction > DIRECTION_SOUTH) {
                 params.options |= RENDER_SPRITE_FLIP_H;
             }
@@ -2886,6 +2930,9 @@ void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& stat
             ? entity.position.to_ivec2()
             : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
     entity_center_position -= state.camera_offset;
+    if (entity_data.cell_layer == CELL_LAYER_SKY) {
+        entity_center_position.y += ENTITY_SKY_POSITION_Y_OFFSET;
+    }
     render_sprite_frame(select_ring_sprite, ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
 
     // Render healthbar

@@ -365,6 +365,37 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .min_range_squared = 1
         }
     }},
+    { ENTITY_BALLOON, (EntityData) {
+        .name = "Balloon",
+        .sprite = SPRITE_UNIT_BALLOON,
+        .icon = SPRITE_BUTTON_ICON_BALLOON,
+        .death_sound = SOUND_DEATH,
+        .cell_layer = CELL_LAYER_SKY,
+        .cell_size = 1,
+        
+        .gold_cost = 200,
+        .train_duration = 30,
+        .max_health = 120,
+        .sight = 11,
+        .armor = 0,
+        .attack_priority = 1,
+
+        .garrison_capacity = 0,
+        .garrison_size = 1,
+        .has_detection = true,
+
+        .unit_data = (EntityDataUnit) {
+            .population_cost = 1,
+            .speed = fixed::from_int_and_raw_decimal(0, 80),
+            .max_energy = 0,
+
+            .attack_sound = SOUND_PISTOL_SILENCED,
+            .damage = 0,
+            .attack_cooldown = 45,
+            .range_squared = 24,
+            .min_range_squared = 1
+        }
+    }},
     { ENTITY_HALL, (EntityData) {
         .name = "Town Hall",
         .sprite = SPRITE_BUILDING_HALL,
@@ -673,16 +704,19 @@ uint16_t entity_get_elevation(const Entity& entity, const Map& map) {
 }
 
 Rect entity_get_rect(const Entity& entity) {
-    int entity_cell_size = entity_get_data(entity.type).cell_size;
+    const EntityData& entity_data = entity_get_data(entity.type);
     Rect rect = (Rect) {
         .x = entity.position.x.integer_part(),
         .y = entity.position.y.integer_part(),
-        .w = entity_cell_size * TILE_SIZE,
-        .h = entity_cell_size * TILE_SIZE
+        .w = entity_data.cell_size * TILE_SIZE,
+        .h = entity_data.cell_size * TILE_SIZE
     };
     if (entity_is_unit(entity.type)) {
         rect.x -= rect.w / 2;
         rect.y -= rect.h / 2;
+    }
+    if (entity_data.cell_layer == CELL_LAYER_SKY) {
+        rect.y += ENTITY_SKY_POSITION_Y_OFFSET;
     }
 
     return rect;
@@ -752,6 +786,10 @@ SpriteName entity_get_sprite(const Entity& entity) {
 }
 
 AnimationName entity_get_expected_animation(const Entity& entity) {
+    if (entity.type == ENTITY_BALLOON) {
+        return ANIMATION_UNIT_IDLE;
+    }
+
     if (entity.type == ENTITY_CANNON) {
         switch (entity.mode) {
             case MODE_UNIT_MOVE:

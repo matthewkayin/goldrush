@@ -768,6 +768,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_BUTTON_ICON_BALLOON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_balloon.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
     { SPRITE_BUTTON_ICON_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
@@ -1038,6 +1046,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .path = "unit_spy.png",
             .hframes = 15,
             .vframes = 3 
+        }
+    }},
+    { SPRITE_UNIT_BALLOON, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .sheet = (SpriteParamsSheet) {
+            .path = "unit_balloon.png",
+            .hframes = 1,
+            .vframes = 3
         }
     }},
     { SPRITE_UNIT_BANDIT, (SpriteParams) {
