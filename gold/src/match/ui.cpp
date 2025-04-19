@@ -99,6 +99,10 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     state.rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
     state.building_fire_animation = animation_create(ANIMATION_FIRE_BURN);
 
+    for (int index = 0; index < HOTKEY_GROUP_SIZE; index++) {
+        state.hotkey_group[index] = INPUT_HOTKEY_NONE;
+    }
+
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
