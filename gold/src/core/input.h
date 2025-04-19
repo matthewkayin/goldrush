@@ -4,6 +4,8 @@
 #include <SDL2/SDL.h>
 #include <string>
 
+#define INPUT_KEY_NONE SDLK_UNKNOWN
+
 enum InputAction {
     INPUT_ACTION_LEFT_CLICK,
     INPUT_ACTION_RIGHT_CLICK,
@@ -54,31 +56,12 @@ enum InputAction {
     INPUT_HOTKEY_BALLOON,
     INPUT_HOTKEY_MOLOTOV,
     INPUT_HOTKEY_CAMO,
-    INPUT_HOTKEY_DECAMO,
     INPUT_HOTKEY_LANDMINE,
     INPUT_HOTKEY_RESEARCH_LANDMINES,
     INPUT_HOTKEY_RESEARCH_WAGON_ARMOR,
     INPUT_HOTKEY_RESEARCH_BAYONETS,
     INPUT_ACTION_COUNT
 };
-
-const uint32_t INPUT_HOTKEY_GROUP_EMPTY = 0;
-const uint32_t INPUT_HOTKEY_GROUP_UNIT = 1;
-const uint32_t INPUT_HOTKEY_GROUP_MINER = 2;
-const uint32_t INPUT_HOTKEY_GROUP_UNLOAD = 2 << 1;
-const uint32_t INPUT_HOTKEY_GROUP_CANCEL = 2 << 2;
-const uint32_t INPUT_HOTKEY_GROUP_EXPLODE = 2 << 3;
-const uint32_t INPUT_HOTKEY_GROUP_PYRO = 2 << 4;
-const uint32_t INPUT_HOTKEY_GROUP_HALL = 2 << 5;
-const uint32_t INPUT_HOTKEY_GROUP_SALOON = 2 << 6;
-const uint32_t INPUT_HOTKEY_GROUP_BARRACKS = 2 << 7;
-const uint32_t INPUT_HOTKEY_GROUP_SMITH = 2 << 8;
-const uint32_t INPUT_HOTKEY_GROUP_BUILD = 2 << 9;
-const uint32_t INPUT_HOTKEY_GROUP_BUILD2 = 2 << 10;
-const uint32_t INPUT_HOTKEY_GROUP_SHERIFFS = 2 << 11;
-const uint32_t INPUT_HOTKEY_GROUP_COOP = 2 << 12;
-const uint32_t INPUT_HOTKEY_GROUP_WORKSHOP = 2 << 13;
-const uint32_t INPUT_HOTKEY_GROUP_DETECTIVE = 2 << 14;
 
 void input_init(SDL_Window* window);
 void input_update_window_size();
@@ -95,7 +78,9 @@ bool input_is_action_just_pressed(InputAction action);
 bool input_is_action_just_released(InputAction action);
 
 int input_sprintf_sdl_key_str(char* str_ptr, SDL_Keycode key);
-int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey);
 SDL_Keycode input_get_hotkey_mapping(InputAction hotkey);
 void input_set_hotkey_mapping(InputAction hotkey, SDL_Keycode key);
-void input_use_hotkey_mapping_default();
+void input_set_hotkey_mapping_to_default(SDL_Keycode* hotkey_mapping);
+
+SDL_Keycode input_get_key_just_pressed();
+bool input_is_key_valid_hotkey_mapping(SDL_Keycode key);

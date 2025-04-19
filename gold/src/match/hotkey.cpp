@@ -95,20 +95,12 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
         }
     }},
     { INPUT_HOTKEY_CAMO, (HotkeyButtonInfo) {
-        .type = HOTKEY_BUTTON_ACTION,
-        .action = (HotkeyButtonActionInfo) {
-            .name = "Camouflage",
-            .sprite = SPRITE_BUTTON_ICON_CAMO
-        },
-        .requirements = (HotkeyButtonRequirements) {
-            .type = HOTKEY_REQUIRES_NONE
-        }
-    }},
-    { INPUT_HOTKEY_DECAMO, (HotkeyButtonInfo) {
-        .type = HOTKEY_BUTTON_ACTION,
-        .action = (HotkeyButtonActionInfo) {
-            .name = "Remove Camouflage",
-            .sprite = SPRITE_BUTTON_ICON_DECAMO
+        .type = HOTKEY_BUTTON_TOGGLED_ACTION,
+        .toggled_action = (HotkeyButtonToggledActionInfo) {
+            .activate_name = "Camouflage",
+            .activate_sprite = SPRITE_BUTTON_ICON_CAMO,
+            .deactivate_name = "Remove Camouflage",
+            .deactivate_sprite = SPRITE_BUTTON_ICON_DECAMO
         },
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
@@ -305,11 +297,13 @@ HotkeyButtonInfo hotkey_get_button_info(InputAction hotkey) {
     return HOTKEY_BUTTON_INFO.at(hotkey);
 }
 
-SpriteName hotkey_get_sprite(InputAction hotkey) {
+SpriteName hotkey_get_sprite(InputAction hotkey, bool show_toggled) {
     const HotkeyButtonInfo& info = HOTKEY_BUTTON_INFO.at(hotkey);
     switch (info.type) {
         case HOTKEY_BUTTON_ACTION:
             return info.action.sprite;
+        case HOTKEY_BUTTON_TOGGLED_ACTION:
+            return show_toggled ? info.toggled_action.deactivate_sprite : info.toggled_action.activate_sprite;
         case HOTKEY_BUTTON_BUILD:
         case HOTKEY_BUTTON_TRAIN:
             return entity_get_data(info.entity_type).icon;
@@ -327,4 +321,26 @@ const char* hotkey_get_desc(InputAction hotkey) {
         default:
             return "";
     }
+}
+
+int hotkey_sprintf_text(char* str, InputAction hotkey, bool show_toggled) {
+    int size = 0;
+    const HotkeyButtonInfo& info = HOTKEY_BUTTON_INFO.at(hotkey);
+    switch (info.type) {
+        case HOTKEY_BUTTON_ACTION:
+            size += sprintf(str, "%s", info.action.name);
+            break;
+        case HOTKEY_BUTTON_TOGGLED_ACTION:
+            size += sprintf(str, "%s", show_toggled ? info.toggled_action.deactivate_name : info.toggled_action.activate_name);
+            break;
+        case HOTKEY_BUTTON_BUILD:
+        case HOTKEY_BUTTON_TRAIN:
+            size += sprintf(str, "%s %s", info.type == HOTKEY_BUTTON_BUILD ? "Build" : "Hire", entity_get_data(info.entity_type).name);
+            break;
+        case HOTKEY_BUTTON_RESEARCH:
+            size += sprintf(str, "Research %s", upgrade_get_data(info.upgrade).name);
+            break;
+    }
+
+    return size;
 }

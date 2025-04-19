@@ -95,7 +95,11 @@ void options_load() {
             if (option == OPTION_COUNT) {
                 log_warn("Unrecognized option key %s with value %s", key.c_str(), value.c_str());
             }
-        } 
+        } else {
+            InputAction hotkey = (InputAction)std::stoi(key);
+            SDL_Keycode key = (SDL_Keycode)std::stoi(value);
+            input_set_hotkey_mapping(hotkey, key);
+        }
     }
 
     for (int option = 0; option < OPTION_COUNT; option++) {
@@ -115,6 +119,10 @@ void options_save() {
     }
 
     fprintf(options_file, "[hotkeys]\n");
+
+    for (int hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
+        fprintf(options_file, "%i=%i\n", hotkey, input_get_hotkey_mapping((InputAction)hotkey));
+    }
 
     fclose(options_file);
 }

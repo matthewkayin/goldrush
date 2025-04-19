@@ -11,11 +11,19 @@ enum OptionsMenuMode {
     OPTIONS_MENU_CLOSED
 };
 
+enum OptionsMenuSaveStatus {
+    OPTIONS_MENU_SAVE_STATUS_NONE,
+    OPTIONS_MENU_SAVE_STATUS_UNSAVED_CHANGES,
+    OPTIONS_MENU_SAVE_STATUS_SAVED,
+    OPTIONS_MENU_SAVE_STATUS_ERRORS,
+};
+
 struct OptionsMenuState {
     OptionsMenuMode mode;
     SDL_Keycode hotkey_pending_changes[INPUT_ACTION_COUNT];
     int hotkey_group_selected;
     int hotkey_index_selected;
+    OptionsMenuSaveStatus save_status;
 };
 
 OptionsMenuState options_menu_open();

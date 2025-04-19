@@ -19,6 +19,8 @@ struct InputState {
     size_t text_input_max_length;
 
     SDL_Keycode hotkey_mapping[INPUT_ACTION_COUNT];
+
+    SDL_Keycode key_just_pressed;
 };
 static InputState state;
 
@@ -29,7 +31,7 @@ void input_init(SDL_Window* window) {
     state.window = window;
     input_update_window_size();
     input_stop_text_input();
-    input_use_hotkey_mapping_default();
+    input_set_hotkey_mapping_to_default(state.hotkey_mapping);
 }
 
 void input_update_window_size() {
@@ -43,6 +45,7 @@ void input_update_window_size() {
 
 void input_poll_events() {
     memcpy(&state.previous, &state.current, sizeof(state.current));
+    state.key_just_pressed = INPUT_KEY_NONE;
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -92,6 +95,9 @@ void input_poll_events() {
             }
             case SDL_KEYDOWN:
             case SDL_KEYUP: {
+                if (event.type == SDL_KEYDOWN) {
+                    state.key_just_pressed = event.key.keysym.sym;
+                }
                 switch (event.key.keysym.sym) {
                     case SDLK_LSHIFT:
                     case SDLK_RSHIFT:
@@ -212,10 +218,6 @@ int input_sprintf_sdl_key_str(char* str_ptr, SDL_Keycode key) {
     }
 }
 
-int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey) {
-    return input_sprintf_sdl_key_str(str_ptr, state.hotkey_mapping[hotkey]);
-}
-
 SDL_Keycode input_get_hotkey_mapping(InputAction hotkey) {
     return state.hotkey_mapping[hotkey];
 }
@@ -224,66 +226,87 @@ void input_set_hotkey_mapping(InputAction hotkey, SDL_Keycode key) {
     state.hotkey_mapping[hotkey] = key;
 }
 
-void input_use_hotkey_mapping_default() {
+void input_set_hotkey_mapping_to_default(SDL_Keycode* hotkey_mapping) {
     // Unit
-    state.hotkey_mapping[INPUT_HOTKEY_ATTACK] = SDLK_a;
-    state.hotkey_mapping[INPUT_HOTKEY_STOP] = SDLK_s;
-    state.hotkey_mapping[INPUT_HOTKEY_DEFEND] = SDLK_d;
+    hotkey_mapping[INPUT_HOTKEY_ATTACK] = SDLK_a;
+    hotkey_mapping[INPUT_HOTKEY_STOP] = SDLK_s;
+    hotkey_mapping[INPUT_HOTKEY_DEFEND] = SDLK_d;
 
     // Miner
-    state.hotkey_mapping[INPUT_HOTKEY_BUILD] = SDLK_b;
-    state.hotkey_mapping[INPUT_HOTKEY_BUILD2] = SDLK_v;
-    state.hotkey_mapping[INPUT_HOTKEY_REPAIR] = SDLK_r;
+    hotkey_mapping[INPUT_HOTKEY_BUILD] = SDLK_b;
+    hotkey_mapping[INPUT_HOTKEY_BUILD2] = SDLK_v;
+    hotkey_mapping[INPUT_HOTKEY_REPAIR] = SDLK_r;
 
     // Unload
-    state.hotkey_mapping[INPUT_HOTKEY_UNLOAD] = SDLK_x;
+    hotkey_mapping[INPUT_HOTKEY_UNLOAD] = SDLK_x;
 
     // Esc
-    state.hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
+    hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
 
     // Build 1
-    state.hotkey_mapping[INPUT_HOTKEY_HALL] = SDLK_t;
-    state.hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDLK_e;
-    state.hotkey_mapping[INPUT_HOTKEY_SALOON] = SDLK_s;
-    state.hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_b;
-    state.hotkey_mapping[INPUT_HOTKEY_WORKSHOP] = SDLK_w;
+    hotkey_mapping[INPUT_HOTKEY_HALL] = SDLK_t;
+    hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDLK_e;
+    hotkey_mapping[INPUT_HOTKEY_SALOON] = SDLK_s;
+    hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_b;
+    hotkey_mapping[INPUT_HOTKEY_WORKSHOP] = SDLK_w;
 
     // Build 2
-    state.hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_s;
-    state.hotkey_mapping[INPUT_HOTKEY_COOP] = SDLK_c;
-    state.hotkey_mapping[INPUT_HOTKEY_BARRACKS] = SDLK_b;
-    state.hotkey_mapping[INPUT_HOTKEY_SHERIFFS] = SDLK_e;
+    hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_s;
+    hotkey_mapping[INPUT_HOTKEY_COOP] = SDLK_c;
+    hotkey_mapping[INPUT_HOTKEY_BARRACKS] = SDLK_b;
+    hotkey_mapping[INPUT_HOTKEY_SHERIFFS] = SDLK_e;
 
     // Hall
-    state.hotkey_mapping[INPUT_HOTKEY_MINER] = SDLK_e;
+    hotkey_mapping[INPUT_HOTKEY_MINER] = SDLK_e;
 
     // Saloon
-    state.hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_c;
-    state.hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_b;
-    state.hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDLK_d;
+    hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_c;
+    hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_b;
+    hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDLK_d;
 
     // Workshop
-    state.hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_s;
-    state.hotkey_mapping[INPUT_HOTKEY_PYRO] = SDLK_r;
-    state.hotkey_mapping[INPUT_HOTKEY_BALLOON] = SDLK_b;
-    state.hotkey_mapping[INPUT_HOTKEY_RESEARCH_LANDMINES] = SDLK_e;
+    hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_s;
+    hotkey_mapping[INPUT_HOTKEY_PYRO] = SDLK_r;
+    hotkey_mapping[INPUT_HOTKEY_BALLOON] = SDLK_b;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_LANDMINES] = SDLK_e;
 
     // Coop
-    state.hotkey_mapping[INPUT_HOTKEY_WAGON] = SDLK_w;
-    state.hotkey_mapping[INPUT_HOTKEY_WAR_WAGON] = SDLK_w;
-    state.hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDLK_c;
-    state.hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDLK_a;
+    hotkey_mapping[INPUT_HOTKEY_WAGON] = SDLK_w;
+    hotkey_mapping[INPUT_HOTKEY_WAR_WAGON] = SDLK_w;
+    hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDLK_c;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDLK_a;
 
     // Barracks
-    state.hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDLK_s;
-    state.hotkey_mapping[INPUT_HOTKEY_CANNON] = SDLK_c;
-    state.hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDLK_b;
+    hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDLK_s;
+    hotkey_mapping[INPUT_HOTKEY_CANNON] = SDLK_c;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDLK_b;
 
     // Pyro
-    state.hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_v;
-    state.hotkey_mapping[INPUT_HOTKEY_LANDMINE] = SDLK_e;
+    hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_v;
+    hotkey_mapping[INPUT_HOTKEY_LANDMINE] = SDLK_e;
 
     // Detective
-    state.hotkey_mapping[INPUT_HOTKEY_CAMO] = SDLK_c;
-    state.hotkey_mapping[INPUT_HOTKEY_DECAMO] = SDLK_c;
+    hotkey_mapping[INPUT_HOTKEY_CAMO] = SDLK_c;
+}
+
+SDL_Keycode input_get_key_just_pressed() {
+    return state.key_just_pressed;
+}
+
+bool input_is_key_valid_hotkey_mapping(SDL_Keycode key) {
+    return (
+        key == SDLK_ESCAPE ||
+        (key >= SDLK_a && key <= SDLK_z) ||
+        key == SDLK_LEFTBRACKET ||
+        key == SDLK_RIGHTBRACKET ||
+        key == SDLK_BACKSLASH ||
+        key == SDLK_BACKQUOTE ||
+        key == SDLK_MINUS ||
+        key == SDLK_EQUALS ||
+        key == SDLK_COMMA ||
+        key == SDLK_PERIOD ||
+        key == SDLK_SLASH ||
+        key == SDLK_SEMICOLON ||
+        key == SDLK_QUOTE
+    );
 }

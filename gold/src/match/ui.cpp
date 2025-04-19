@@ -223,7 +223,7 @@ void match_ui_handle_input(MatchUiState& state) {
         )) {
             const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
 
-            if (hotkey_info.type == HOTKEY_BUTTON_ACTION) {
+            if (hotkey_info.type == HOTKEY_BUTTON_ACTION || hotkey_info.type == HOTKEY_BUTTON_TOGGLED_ACTION) {
                 switch (hotkey) {
                     case INPUT_HOTKEY_ATTACK: {
                         state.mode = MATCH_UI_MODE_TARGET_ATTACK;
@@ -241,27 +241,7 @@ void match_ui_handle_input(MatchUiState& state) {
                         if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
                             state.mode = MATCH_UI_MODE_NONE;
                         } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE) {
-                            switch (state.building_type) {
-                                case ENTITY_HALL:
-                                case ENTITY_HOUSE:
-                                case ENTITY_SALOON:
-                                case ENTITY_SMITH:
-                                case ENTITY_BUNKER:
-                                    state.mode = MATCH_UI_MODE_BUILD;
-                                    break;
-                                case ENTITY_BARRACKS:
-                                case ENTITY_COOP:
-                                case ENTITY_SHERIFFS:
-                                    state.mode = MATCH_UI_MODE_BUILD2;
-                                    break;
-                                case ENTITY_LANDMINE:
-                                    state.mode = MATCH_UI_MODE_NONE;
-                                    break;
-                                default:
-                                    log_warn("Tried to cancel building place with unhandled type of %u", state.building_type);
-                                    state.mode = MATCH_UI_MODE_NONE;
-                                    break;
-                            }
+                            state.mode = MATCH_UI_MODE_NONE;
                         } else if (state.selection.size() == 1) { 
                             const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
                             if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
@@ -312,14 +292,14 @@ void match_ui_handle_input(MatchUiState& state) {
                         state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
                         break;
                     }
-                    case INPUT_HOTKEY_CAMO:
-                    case INPUT_HOTKEY_DECAMO: {
-                        if (!match_ui_selection_has_enough_energy(state, state.selection, CAMO_ENERGY_COST)) {
+                    case INPUT_HOTKEY_CAMO: {
+                        bool activate = !entity_check_flag(state.match.entities.get_by_id(state.selection[0]), ENTITY_FLAG_INVISIBLE);
+                        if (activate && !match_ui_selection_has_enough_energy(state, state.selection, CAMO_ENERGY_COST)) {
                             match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
                             break;
                         }
                         MatchInput input;
-                        input.type = hotkey == INPUT_HOTKEY_CAMO ? MATCH_INPUT_CAMO : MATCH_INPUT_DECAMO;
+                        input.type = activate ? MATCH_INPUT_CAMO : MATCH_INPUT_DECAMO;
                         input.camo.unit_count = (uint8_t)state.selection.size();
                         memcpy(&input.camo.unit_ids, &state.selection[0], input.camo.unit_count * sizeof(EntityId));
                         state.input_queue.push_back(input);
@@ -1116,9 +1096,7 @@ void match_ui_update(MatchUiState& state) {
                             break;
                         }
                         case ENTITY_DETECTIVE: {
-                            state.hotkey_group[3] = entity_check_flag(first_entity, ENTITY_FLAG_INVISIBLE) 
-                                                        ? INPUT_HOTKEY_DECAMO
-                                                        : INPUT_HOTKEY_CAMO;
+                            state.hotkey_group[3] = INPUT_HOTKEY_CAMO;
                             break;
                         }
                         default:
@@ -2278,7 +2256,7 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(hotkey_get_sprite(hotkey), ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(hotkey_get_sprite(hotkey, match_ui_should_render_hotkey_toggled(state, hotkey)), ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
     }
 
     // UI Tooltip
@@ -2303,6 +2281,8 @@ void match_ui_render(const MatchUiState& state) {
                 const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey_hovered);
                 const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
 
+                bool show_toggle = match_ui_should_render_hotkey_toggled(state, hotkey_hovered);
+
                 // Get tooltip info
                 char tooltip_text[64];
                 char tooltip_desc[128];
@@ -2310,12 +2290,17 @@ void match_ui_render(const MatchUiState& state) {
                 uint32_t tooltip_population_cost;
                 uint32_t tooltip_energy_cost;
 
-                char* tooltip_text_ptr = tooltip_text;
                 sprintf(tooltip_desc, "%s", hotkey_get_desc(hotkey_hovered));
 
+                char* tooltip_text_ptr = tooltip_text;
+                tooltip_text_ptr += hotkey_sprintf_text(tooltip_text_ptr, hotkey_hovered, show_toggle);
+                tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
+                tooltip_text_ptr += input_sprintf_sdl_key_str(tooltip_text_ptr, input_get_hotkey_mapping(hotkey_hovered));
+                tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
+
                 switch (hotkey_info.type) {
-                    case HOTKEY_BUTTON_ACTION: {
-                        tooltip_text_ptr += sprintf(tooltip_text, "%s", hotkey_info.action.name);
+                    case HOTKEY_BUTTON_ACTION:
+                    case HOTKEY_BUTTON_TOGGLED_ACTION: {
                         tooltip_gold_cost = 0;
                         tooltip_population_cost = 0;
                         if (hotkey_hovered == INPUT_HOTKEY_MOLOTOV) {
@@ -2333,7 +2318,6 @@ void match_ui_render(const MatchUiState& state) {
                         bool costs_energy = entity_is_building(hotkey_info.entity_type) 
                                                 ? (entity_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY
                                                 : false;
-                        tooltip_text_ptr += sprintf(tooltip_text, "%s %s", hotkey_info.type == HOTKEY_BUTTON_TRAIN ? "Hire" : "Build", entity_data.name);
                         tooltip_gold_cost = costs_energy ? 0 : entity_data.gold_cost;
                         tooltip_population_cost = hotkey_info.type == HOTKEY_BUTTON_TRAIN ? entity_data.unit_data.population_cost : 0;
                         tooltip_energy_cost = costs_energy ? entity_data.gold_cost : 0;
@@ -2341,17 +2325,12 @@ void match_ui_render(const MatchUiState& state) {
                     }
                     case HOTKEY_BUTTON_RESEARCH: {
                         const UpgradeData& upgrade_data = upgrade_get_data(hotkey_info.upgrade);
-                        tooltip_text_ptr += sprintf(tooltip_text, "Research %s", upgrade_data.name);
                         tooltip_gold_cost = upgrade_data.gold_cost;
                         tooltip_population_cost = 0;
                         tooltip_energy_cost = 0;
                         break;
                     }
                 }
-
-                tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
-                tooltip_text_ptr += input_sprintf_hotkey_str(tooltip_text_ptr, hotkey_hovered);
-                tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
 
                 if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey_hovered)) {
                     switch (hotkey_info.requirements.type) {
@@ -3055,4 +3034,18 @@ void match_ui_render_particle(const MatchUiState& state, const Particle& particl
     }
 
     render_sprite_frame(particle.sprite, ivec2(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED, 0);
+}
+
+bool match_ui_should_render_hotkey_toggled(const MatchUiState& state, InputAction hotkey) {
+    const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
+    if (hotkey_info.type != HOTKEY_BUTTON_TOGGLED_ACTION) {
+        return false;
+    }
+
+    const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
+    if (hotkey == INPUT_HOTKEY_CAMO && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
+        return true;
+    }
+
+    return false;
 }
