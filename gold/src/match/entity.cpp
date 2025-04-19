@@ -319,7 +319,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .attack_priority = 2,
 
         .garrison_capacity = 0,
-        .garrison_size = 2,
+        .garrison_size = ENTITY_CANNOT_GARRISON,
         .has_detection = false,
 
         .unit_data = (EntityDataUnit) {
