@@ -10,7 +10,7 @@ enum MatchSetting {
 
 struct MatchSettingData {
     const char* name;
-    const char** values;
+    const char* const* values;
     size_t value_count;
 };
 
@@ -27,5 +27,4 @@ enum MatchSettingMapSizeValue {
     MATCH_SETTING_MAP_SIZE_COUNT
 };
 
-
-MatchSettingData match_setting_data(MatchSetting setting);
+const MatchSettingData& match_setting_data(MatchSetting setting);

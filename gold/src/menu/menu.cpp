@@ -59,6 +59,8 @@ static const uint32_t STATUS_DURATION = 2 * 60;
 static const uint32_t CONNECTION_TIMEOUT = 5 * 60;
 static const uint32_t LOBBYLIST_PAGE_SIZE = 9;
 
+static const char* const PLAYER_COLOR_STRS[] = { "Blue", "Red", "Green", "Purple" };
+
 MenuState menu_init() {
     MenuState state;
 
@@ -304,8 +306,7 @@ void menu_update(MenuState& state) {
                     }
 
                     uint32_t player_color = player.recolor_id;
-                    const char* items[] = { "Blue", "Red", "Green", "Purple" };
-                    if (ui_dropdown(player_id, &player_color, items, MAX_PLAYERS, player_id != network_get_player_id())) {
+                    if (ui_dropdown(player_id, UI_DROPDOWN_MINI, &player_color, PLAYER_COLOR_STRS, MAX_PLAYERS, player_id != network_get_player_id())) {
                         network_set_player_color((uint8_t)player_color);
                     }
                 ui_end_container();
@@ -323,14 +324,14 @@ void menu_update(MenuState& state) {
             int dropdown_width = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI).frame_width;
             const int setting_name_element_size = MATCH_SETTINGS_RECT.w - 16 - dropdown_width;
             for (int index = 0; index < MATCH_SETTING_COUNT; index++) {
-                MatchSettingData setting_data = match_setting_data((MatchSetting)index);
+                const MatchSettingData& setting_data = match_setting_data((MatchSetting)index);
                 ui_begin_row(ivec2(0, 0), 0);
                     ui_element_size(ivec2(setting_name_element_size, 0));
                     ui_element_position(ivec2(0, 2));
                     ui_text(FONT_HACK_GOLD, setting_data.name);
 
                     uint32_t match_setting_value = network_get_match_setting(index);
-                    if (ui_dropdown(MAX_PLAYERS + index, &match_setting_value, setting_data.values, setting_data.value_count, !network_is_server())) {
+                    if (ui_dropdown(MAX_PLAYERS + index, UI_DROPDOWN_MINI, &match_setting_value, setting_data.values, setting_data.value_count, !network_is_server())) {
                         network_set_match_setting((uint8_t)index, (uint8_t)match_setting_value);
                     }
                 ui_end_container();

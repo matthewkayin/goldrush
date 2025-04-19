@@ -22,6 +22,11 @@ enum UiHotkeyButtonMode {
     UI_ICON_BUTTON_GRAYED_OUT
 };
 
+enum UiDropdownType {
+    UI_DROPDOWN,
+    UI_DROPDOWN_MINI
+};
+
 /**
  * Clears the UI render list. Should be called every frame
  * @param id ID of the UI to begin
@@ -137,11 +142,10 @@ bool ui_team_picker(char value, bool disabled);
  * @param dropdown_id Needed for state keeping, should be a unique ID per dropdown
  * @param selected_item Pointer to the index of the selected item. Will be modified when user changes the dropdown value.
  * @param items List of items to choose from
- * @param item_count Size of the items list
  * @param disabled If true, the dropdown will not be clickable.
  * @return True if the dropdown value was changed
  */
-bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, size_t item_count, bool disabled);
+bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const char* const* items, size_t item_count, bool disabled);
 
 /**
  * Renders everything in the UI's render list.

@@ -2,6 +2,7 @@
 
 #include "logger.h"
 #include "sound.h"
+#include "input.h"
 #include "render/render.h"
 #include <SDL2/SDL_mixer.h>
 #include <unordered_map>
@@ -52,6 +53,13 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .min_value = 1,
         .max_value = 31,
         .default_value = 16
+    }},
+    { OPTION_HOTKEYS, (OptionData) {
+        .name = "Hotkeys",
+        .type = OPTION_TYPE_DROPDOWN,
+        .min_value = 0,
+        .max_value = OPTION_HOTKEYS_COUNT,
+        .default_value = OPTION_HOTKEYS_DEFAULT
     }}
 };
 
@@ -118,18 +126,24 @@ void options_save() {
     fclose(options_file);
 }
 
-int option_get_value(OptionName name) {
+uint32_t option_get_value(OptionName name) {
     return options[name];
 }
 
-void option_set_value(OptionName name, int value) {
+void option_set_value(OptionName name, uint32_t value) {
+    if (options[name] == value) {
+        return;
+    }
+
     options[name] = value;
+    option_apply(name);
 }
 
 void option_apply(OptionName name) {
     switch (name) {
         case OPTION_DISPLAY:
             render_set_display((RenderDisplay)options[name]);
+            input_update_window_size();
             break;
         case OPTION_VSYNC:
             render_set_vsync((RenderVsync)options[name]);

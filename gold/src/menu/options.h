@@ -10,7 +10,6 @@ enum OptionsMenuMode {
 
 struct OptionsMenuState {
     OptionsMenuMode mode;
-    std::unordered_map<OptionName, int> pending_changes;
 };
 
 OptionsMenuState options_menu_open();

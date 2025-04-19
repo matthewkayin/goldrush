@@ -326,9 +326,10 @@ bool ui_team_picker(char value, bool disabled) {
     return clicked;
 }
 
-bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, size_t item_count, bool disabled) {
+bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const char* const* items, size_t item_count, bool disabled) {
     ivec2 origin = ui_get_container_origin();
-    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+    SpriteName sprite = type == UI_DROPDOWN ? SPRITE_UI_DROPDOWN : SPRITE_UI_DROPDOWN_MINI;
+    const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
     ivec2 size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
     ui_update_container(size);
 
@@ -347,8 +348,14 @@ bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, s
     } else if (state.dropdown_open == UI_DROPDOWN_NONE && hovered) {
         vframe = 1;
     }
-    ui_queue_sprite(SPRITE_UI_DROPDOWN_MINI, ivec2(0, vframe), origin, 0);
-    ui_queue_text(vframe == 1 ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, items[*selected_item], ivec2(origin.x + 5, origin.y + 2), 0);
+
+    FontName font = type == UI_DROPDOWN ? FONT_WESTERN8_OFFBLACK : FONT_HACK_OFFBLACK;
+    FontName hovered_font = type == UI_DROPDOWN ? FONT_WESTERN8_WHITE : FONT_HACK_WHITE; 
+
+    int text_yoffset = type == UI_DROPDOWN ? 3 : 2;
+
+    ui_queue_sprite(sprite, ivec2(0, vframe), origin, 0);
+    ui_queue_text(vframe == 1 ? hovered_font : font, items[*selected_item], ivec2(origin.x + 5, origin.y + text_yoffset), 0);
 
     if (state.dropdown_open == dropdown_id) {
         // Render all the dropdown items
@@ -359,8 +366,8 @@ bool ui_dropdown(int dropdown_id, uint32_t* selected_item, const char** items, s
                 .w = size.x, .h = size.y
             };
             bool item_is_hovered = item_rect.has_point(input_get_mouse_position());
-            ui_queue_sprite(SPRITE_UI_DROPDOWN_MINI, ivec2(0, 3 + (int)item_is_hovered), ivec2(item_rect.x, item_rect.y), 1);
-            ui_queue_text(item_is_hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, items[index], ivec2(item_rect.x + 5, item_rect.y + 2), 1);
+            ui_queue_sprite(sprite, ivec2(0, 3 + (int)item_is_hovered), ivec2(item_rect.x, item_rect.y), 1);
+            ui_queue_text(item_is_hovered ? hovered_font : font, items[index], ivec2(item_rect.x + 5, item_rect.y + text_yoffset), 1);
 
             if (item_is_hovered) {
                 item_hovered = index;

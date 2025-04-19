@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 enum OptionName {
     OPTION_DISPLAY,
     OPTION_VSYNC,
@@ -7,6 +9,7 @@ enum OptionName {
     OPTION_MUS_VOLUME,
     OPTION_UNIT_VOICES,
     OPTION_CAMERA_SPEED,
+    OPTION_HOTKEYS,
     OPTION_COUNT
 };
 
@@ -14,6 +17,13 @@ enum OptionValueUnitVoices {
     OPTION_UNIT_VOICES_OFF,
     OPTION_UNIT_VOICES_ON,
     OPTION_UNIT_VOICES_COUNT,
+};
+
+enum OptionValueHotkeys {
+    OPTION_HOTKEYS_DEFAULT,
+    OPTION_HOTKEYS_GRID,
+    OPTION_HOTKEYS_CUSTOM,
+    OPTION_HOTKEYS_COUNT
 };
 
 enum OptionType {
@@ -25,15 +35,15 @@ enum OptionType {
 struct OptionData {
     const char* name;
     OptionType type;
-    int min_value;
-    int max_value;
-    int default_value;
+    uint32_t min_value;
+    uint32_t max_value;
+    uint32_t default_value;
 };
 
 const OptionData& option_get_data(OptionName name);
 
 void options_load();
 void options_save();
-int option_get_value(OptionName name);
-void option_set_value(OptionName name, int value);
+uint32_t option_get_value(OptionName name);
+void option_set_value(OptionName name, uint32_t value);
 void option_apply(OptionName name);

@@ -75,10 +75,6 @@ void input_poll_events() {
         #endif
 
         switch (event.type) {
-            case SDL_WINDOWEVENT_RESIZED: {
-                input_update_window_size();
-                break;
-            }
             case SDL_MOUSEMOTION: {
                 state.mouse_position = ivec2(event.motion.x - state.screen_position.x, event.motion.y - state.screen_position.y);
                 state.mouse_position = ivec2((state.mouse_position.x * SCREEN_WIDTH) / state.window_size.x, (state.mouse_position.y * SCREEN_HEIGHT) / state.scaled_screen_y);

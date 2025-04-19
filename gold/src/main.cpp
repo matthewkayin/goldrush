@@ -102,9 +102,9 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return -1;
     }
-    options_load();
     animation_init();
     input_init(window);
+    options_load();
     srand(time(NULL));
 
     bool is_running = true;

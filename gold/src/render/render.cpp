@@ -232,7 +232,7 @@ void render_set_display(RenderDisplay display) {
 
 void render_set_vsync(RenderVsync vsync) {
     int interval = vsync == RENDER_VSYNC_ADAPTIVE ? -1 : (int)vsync;
-    log_trace("Set swap interval %i", interval);
+    log_info("Set swap interval %i", interval);
     int result = SDL_GL_SetSwapInterval(interval);
     if (result == -1) {
         log_error("GL set swap interval failed. Defaulting to vsync on");

@@ -81,6 +81,7 @@ const uint32_t INPUT_HOTKEY_GROUP_WORKSHOP = 2 << 13;
 const uint32_t INPUT_HOTKEY_GROUP_DETECTIVE = 2 << 14;
 
 void input_init(SDL_Window* window);
+void input_update_window_size();
 void input_poll_events();
 
 void input_start_text_input(std::string* str, size_t max_length);
