@@ -112,6 +112,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
     state.rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
     state.building_fire_animation = animation_create(ANIMATION_FIRE_BURN);
+    state.options_menu.mode = OPTIONS_MENU_CLOSED;
 
     for (int index = 0; index < HOTKEY_GROUP_SIZE; index++) {
         state.hotkey_group[index] = INPUT_HOTKEY_NONE;
@@ -185,8 +186,12 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
         }
         case NETWORK_EVENT_PLAYER_DISCONNECTED: {
             char message[128];
-            sprintf(message, "%s disconnected.", network_get_player(event.player_disconnected.player_id).name);
+            sprintf(message, "%s left the game.", network_get_player(event.player_disconnected.player_id).name);
             match_ui_add_chat_message(state, PLAYER_NONE, message);
+
+            if (!match_ui_is_opponent_in_match(state)) {
+                state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
+            }
             break;
         }
         default:
@@ -198,7 +203,6 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // This function returns after it handles a single input to avoid double input happening
 void match_ui_handle_input(MatchUiState& state) {
-
     // Begin chat
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active()) {
         state.chat_message = "";
@@ -745,6 +749,7 @@ void match_ui_update(MatchUiState& state) {
     if (!(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
             ((menu_button_rect.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) || input_is_action_just_pressed(INPUT_ACTION_MATCH_MENU))) {
         if (state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+            state.options_menu.mode = OPTIONS_MENU_CLOSED;
             state.mode = MATCH_UI_MODE_NONE;
         } else {
             state.mode = MATCH_UI_MODE_MENU;
@@ -757,40 +762,56 @@ void match_ui_update(MatchUiState& state) {
 
     // Menu
     // Alwyas call UI begin to make sure everything is cleared out from the main menu
-    ui_begin(UI_MAIN, true);
-    if (state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+    ui_begin(UI_MAIN, state.options_menu.mode == OPTIONS_MENU_CLOSED);
+    if (match_ui_is_in_menu(state.mode)) {
         ui_frame_rect(MENU_RECT);
 
-        const char* header_text = state.mode == MATCH_UI_MODE_MENU ? "Game Menu" : "Surrender?";
+        const char* header_text = match_ui_get_menu_header_text(state.mode);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
         ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 10);
         ui_element_position(text_pos);
         ui_text(FONT_WESTERN8_GOLD, header_text);
 
         ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32);
-        if (state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+        if (state.mode != MATCH_UI_MODE_MENU) {
             column_position.y += 11;
         }
         ui_begin_column(column_position, 5);
             ivec2 button_size = ui_button_size("LEAVE MATCH");
             if (state.mode == MATCH_UI_MODE_MENU) {
                 if (ui_button("LEAVE MATCH", button_size, true)) {
-                    state.mode = MATCH_UI_MODE_MENU_SURRENDER;
+                    state.mode = match_ui_is_opponent_in_match(state) 
+                                    ? MATCH_UI_MODE_MENU_SURRENDER
+                                    : MATCH_UI_MODE_LEAVE_MATCH;
                 }
                 if (ui_button("OPTIONS", button_size, true)) {
+                    state.options_menu = options_menu_open();
                 }
                 if (ui_button("BACK", button_size, true)) {
                     state.mode = MATCH_UI_MODE_NONE;
                 }
             } else if (state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
                 if (ui_button("YES", button_size, true)) {
+                    network_disconnect();
                     state.mode = MATCH_UI_MODE_LEAVE_MATCH;
                 }
                 if (ui_button("BACK", button_size, true)) {
                     state.mode = MATCH_UI_MODE_MENU;
                 }
+            } else if (state.mode == MATCH_UI_MODE_MATCH_OVER_VICTORY || state.mode == MATCH_UI_MODE_MATCH_OVER_DEFEAT) {
+                if (ui_button("CONTINUE", button_size, true)) {
+                    state.mode = MATCH_UI_MODE_NONE;
+                }
+                if (ui_button("EXIT", button_size, true)) {
+                    network_disconnect();
+                    state.mode = MATCH_UI_MODE_LEAVE_MATCH;
+                }
             }
         ui_end_container();
+
+        if (state.options_menu.mode != OPTIONS_MENU_CLOSED) {
+            options_menu_update(state.options_menu);
+        }
     }
 
     // Turn loop
@@ -853,7 +874,7 @@ void match_ui_update(MatchUiState& state) {
 
     state.turn_timer--;
 
-    if (!(state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER)) {
+    if (!match_ui_is_in_menu(state.mode)) {
         match_ui_handle_input(state);
     }
 
@@ -1642,6 +1663,41 @@ void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const cha
         state.chat.erase(state.chat.begin());
     }
     state.chat.push_back(chat_message);
+}
+
+bool match_ui_is_opponent_in_match(const MatchUiState& state) {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.match.players[network_get_player_id()].team == state.match.players[player_id].team) {
+            continue;
+        }
+        if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_NONE) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool match_ui_is_in_menu(MatchUiMode mode) {
+    return mode == MATCH_UI_MODE_MENU || 
+                mode == MATCH_UI_MODE_MENU_SURRENDER ||
+                mode == MATCH_UI_MODE_MATCH_OVER_VICTORY ||
+                mode == MATCH_UI_MODE_MATCH_OVER_DEFEAT;
+}
+
+const char* match_ui_get_menu_header_text(MatchUiMode mode) {
+    switch (mode) {
+        case MATCH_UI_MODE_MENU:
+            return "Game Menu";
+        case MATCH_UI_MODE_MENU_SURRENDER:
+            return "Surrender?";
+        case MATCH_UI_MODE_MATCH_OVER_VICTORY:
+            return "Victory!";
+        case MATCH_UI_MODE_MATCH_OVER_DEFEAT:
+            return "Defeat!";
+        default:
+            return "";
+    }
 }
 
 // RENDER
@@ -2918,6 +2974,11 @@ void match_ui_render(const MatchUiState& state) {
     };
     render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
+
+    if (state.options_menu.mode != OPTIONS_MENU_CLOSED) {
+        options_menu_render(state.options_menu);
+        render_sprite_batch();
+    }
 }
 
 // RENDER FUNCTIONS

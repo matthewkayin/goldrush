@@ -216,6 +216,10 @@ int gold_main(int argc, char** argv) {
                 }
                 case GAME_MODE_MATCH: {
                     match_ui_update(match_ui_state);
+                    if (match_ui_state.mode == MATCH_UI_MODE_LEAVE_MATCH) {
+                        menu_state = menu_init();
+                        game_mode = GAME_MODE_MENU;
+                    }
                     break;
                 }
             }
