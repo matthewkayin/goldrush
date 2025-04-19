@@ -27,6 +27,11 @@ enum UiDropdownType {
     UI_DROPDOWN_MINI
 };
 
+enum UiSliderDisplay {
+    UI_SLIDER_DISPLAY_RAW_VALUE,
+    UI_SLIDER_DISPLAY_PERCENT
+};
+
 /**
  * Clears the UI render list. Should be called every frame
  * @param id ID of the UI to begin
@@ -146,6 +151,17 @@ bool ui_team_picker(char value, bool disabled);
  * @return True if the dropdown value was changed
  */
 bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const char* const* items, size_t item_count, bool disabled);
+
+/**
+ * Creates a slider
+ * @param slider_id Needed for state keeping, should be a unique ID per slider
+ * @param value Pointer to the value. Will be modified when user changes the value.
+ * @param min The minimum value of the slider
+ * @param max The maximum value of the slider
+ * @param display Determines how the slider should render the value text
+ * @return True if the slider value has changed
+ */
+bool ui_slider(int slider_id, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display);
 
 /**
  * Renders everything in the UI's render list.

@@ -52,10 +52,6 @@ void options_menu_update(OptionsMenuState& state) {
         state.mode = OPTIONS_MENU_CLOSED;
     }
 
-    ui_element_position(SAVE_BUTTON_POSITION);
-    if (ui_button("SAVE")) {
-    }
-
     ui_begin_column(ivec2(OPTIONS_FRAME_RECT.x + 8, OPTIONS_FRAME_RECT.y + 16), 25);
         const SpriteInfo& dropdown_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
         for (uint32_t option = 0; option < OPTION_COUNT; option++) {
@@ -68,6 +64,12 @@ void options_menu_update(OptionsMenuState& state) {
                     ui_element_position(ivec2(OPTIONS_FRAME_RECT.w - 16 - dropdown_info.frame_width, 0));
                     uint32_t value = option_get_value((OptionName)option);
                     if (ui_dropdown((int)option, UI_DROPDOWN, &value, option_value_strings((OptionName)option), option_data.max_value, false)) {
+                        option_set_value((OptionName)option, value);
+                    }
+                } else if (option_data.type == OPTION_TYPE_PERCENT_SLIDER || option_data.type == OPTION_TYPE_SLIDER) {
+                    ui_element_position(ivec2(OPTIONS_FRAME_RECT.w - 16 - dropdown_info.frame_width, 0));
+                    uint32_t value = option_get_value((OptionName)option);
+                    if (ui_slider((int)option, &value, option_data.min_value, option_data.max_value, option_data.type == OPTION_TYPE_SLIDER ? UI_SLIDER_DISPLAY_RAW_VALUE : UI_SLIDER_DISPLAY_PERCENT)) {
                         option_set_value((OptionName)option, value);
                     }
                 }

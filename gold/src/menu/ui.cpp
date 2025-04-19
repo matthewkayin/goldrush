@@ -8,12 +8,14 @@
 #include <algorithm>
 
 static const uint32_t UI_TEXT_INPUT_BLINK_DURATION = 30;
-static const int UI_DROPDOWN_NONE = -1;
+static const int UI_ELEMENT_NONE = -1;
 
 enum UiRenderType {
     UI_RENDER_TEXT,
     UI_RENDER_SPRITE,
-    UI_RENDER_NINEPATCH
+    UI_RENDER_NINEPATCH,
+    UI_RENDER_FILL_RECT,
+    UI_RENDER_DRAW_RECT
 };
 
 struct UiRenderText {
@@ -34,12 +36,18 @@ struct UiRenderNinepatch {
     Rect rect;
 };
 
+struct UiRenderRect {
+    Rect rect;
+    RenderColor color;
+};
+
 struct UiRender {
     UiRenderType type;
     union {
         UiRenderText text;
         UiRenderSprite sprite;
         UiRenderNinepatch ninepatch;
+        UiRenderRect rect;
     };
 };
 
@@ -62,8 +70,8 @@ struct UiState {
     bool text_input_show_cursor;
     std::vector<UiContainer> container_stack;
     std::vector<UiRender> render_queue[UI_COUNT][UI_Z_INDEX_COUNT]; 
-    int dropdown_open;
-    int dropdown_open_future;
+    int element_selected;
+    int element_selected_future;
     uint32_t id;
     bool input_enabled;
 };
@@ -75,13 +83,15 @@ void ui_update_container(ivec2 size);
 void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index);
 void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h = false);
 void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index);
+void ui_queue_draw_rect(Rect rect, RenderColor color, int z_index);
+void ui_queue_fill_rect(Rect rect, RenderColor color, int z_index);
 
 void ui_begin(uint32_t id, bool input_enabled) {
     if (!initialized) {
         state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
         state.text_input_show_cursor = false;
-        state.dropdown_open = UI_DROPDOWN_NONE;
-        state.dropdown_open_future = UI_DROPDOWN_NONE;
+        state.element_selected = UI_ELEMENT_NONE;
+        state.element_selected_future = UI_ELEMENT_NONE;
         initialized = true;
     }
 
@@ -96,7 +106,7 @@ void ui_begin(uint32_t id, bool input_enabled) {
         state.text_input_show_cursor = !state.text_input_show_cursor;
     }
 
-    state.dropdown_open = state.dropdown_open_future;
+    state.element_selected = state.element_selected_future;
     state.input_enabled = input_enabled;
     state.id = id;
 }
@@ -157,7 +167,7 @@ bool ui_button(const char* text) {
     };
     ui_update_container(ivec2(button_rect.w, button_rect.h));
 
-    bool hovered = state.input_enabled && button_rect.has_point(input_get_mouse_position());
+    bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && button_rect.has_point(input_get_mouse_position());
 
     int frame_count = button_rect.w / 8;
     for (int frame = 0; frame < frame_count; frame++) {
@@ -173,7 +183,7 @@ bool ui_button(const char* text) {
 
     ui_queue_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, text, ivec2(button_rect.x + 5, button_rect.y + 3 - (int)hovered), 0);
 
-    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
+    bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
         sound_play(SOUND_UI_CLICK);
     }
@@ -198,7 +208,7 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
 
     ui_queue_sprite(sprite, ivec2(hframe, 0), origin, 0, flip_h);
 
-    bool clicked = state.input_enabled && state.dropdown_open == UI_DROPDOWN_NONE && !disabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && sprite_rect.has_point(input_get_mouse_position());
+    bool clicked = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && !disabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && sprite_rect.has_point(input_get_mouse_position());
     if (clicked) {
         sound_play(SOUND_UI_CLICK);
     }
@@ -237,7 +247,7 @@ bool ui_text_frame(const char* text, bool disabled) {
         .w = frame_count * sprite_info.frame_width, .h = sprite_info.frame_height
     };
     ui_update_container(ivec2(rect.w, rect.h));
-    bool hovered = state.input_enabled && !disabled && rect.has_point(input_get_mouse_position());
+    bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && !disabled && rect.has_point(input_get_mouse_position());
 
     for (int frame = 0; frame < frame_count; frame++) {
         int hframe = 1;
@@ -251,7 +261,7 @@ bool ui_text_frame(const char* text, bool disabled) {
 
     ui_queue_text(hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + (rect.w / 2) - (text_size.x / 2), rect.y + 1 -(int)hovered), 0);
 
-    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
+    bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
         sound_play(SOUND_UI_CLICK);
     }
@@ -313,13 +323,16 @@ bool ui_team_picker(char value, bool disabled) {
         .w = size.x, .h = size.y
     };
 
-    bool is_hovered = state.input_enabled && !disabled && rect.has_point(input_get_mouse_position());
+    bool is_hovered = state.input_enabled && 
+            state.element_selected == UI_ELEMENT_NONE && 
+            !disabled && 
+            rect.has_point(input_get_mouse_position());
 
     ui_queue_sprite(SPRITE_UI_TEAM_PICKER, ivec2((int)is_hovered, 0), origin, 0);
     char text[2] = { value, '\0' };
     ui_queue_text(is_hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + 5, rect.y + 2), 0);
 
-    bool clicked = state.dropdown_open == UI_DROPDOWN_NONE && is_hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
+    bool clicked = is_hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
         sound_play(SOUND_UI_CLICK);
     }
@@ -338,14 +351,14 @@ bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, 
         .w = size.x, .h = size.y
     };
 
-    bool hovered = state.input_enabled && rect.has_point(input_get_mouse_position());
+    bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && rect.has_point(input_get_mouse_position());
 
     int vframe = 0;
     if (disabled) {
         vframe = 3;
-    } else if (state.dropdown_open == dropdown_id) {
+    } else if (state.element_selected == dropdown_id) {
         vframe = 2;
-    } else if (state.dropdown_open == UI_DROPDOWN_NONE && hovered) {
+    } else if (hovered) {
         vframe = 1;
     }
 
@@ -357,7 +370,7 @@ bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, 
     ui_queue_sprite(sprite, ivec2(0, vframe), origin, 0);
     ui_queue_text(vframe == 1 ? hovered_font : font, items[*selected_item], ivec2(origin.x + 5, origin.y + text_yoffset), 0);
 
-    if (state.dropdown_open == dropdown_id) {
+    if (state.element_selected == dropdown_id) {
         // Render all the dropdown items
         int item_hovered = -1;
         for (int index = 0; index < item_count; index++) {
@@ -376,7 +389,7 @@ bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, 
 
         // If the user left clicked, close the dropdown
         if (state.input_enabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-            state.dropdown_open_future = UI_DROPDOWN_NONE;
+            state.element_selected_future = UI_ELEMENT_NONE;
             // If they happened to be selecting an item, update the value
             if (item_hovered != -1) {
                 *selected_item = item_hovered;
@@ -385,12 +398,92 @@ bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, 
             // Return true if the item was changed
             return item_hovered != -1;
         }
-    } else if (state.dropdown_open == UI_DROPDOWN_NONE && !disabled && hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-        state.dropdown_open_future = dropdown_id;
+    } else if (!disabled && hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        state.element_selected_future = dropdown_id;
         sound_play(SOUND_UI_CLICK);
     } 
 
     return false;
+}
+
+bool ui_slider(int slider_id, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display) {
+    static const int VALUE_STR_PADDING = 4;
+    static const int SLIDER_HEIGHT = 5;
+    static const int NOTCH_WIDTH = 5;
+    static const int NOTCH_HEIGHT = 14;
+
+    ivec2 origin = ui_get_container_origin();
+    uint32_t old_value = *value;
+
+    // Slider width will be based on the dropdown sprite's width
+    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
+    char option_value_str[8];
+    if (display == UI_SLIDER_DISPLAY_RAW_VALUE) {
+        sprintf(option_value_str, "%i", *value);
+    } else if (display == UI_SLIDER_DISPLAY_PERCENT) {
+        float percentage = (float)(*value) / (float)max;
+        sprintf(option_value_str, "%i%%", (int)(percentage * 100.0f));
+    }
+    ivec2 value_str_text_size = render_get_text_size(FONT_WESTERN8_GOLD, option_value_str);
+    ivec2 size = ivec2(dropdown_sprite_info.frame_width + VALUE_STR_PADDING + value_str_text_size.x, dropdown_sprite_info.frame_height);
+
+    ui_update_container(size);
+
+    ui_queue_text(FONT_WESTERN8_GOLD, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 3), 0);
+
+    Rect slider_rect = (Rect) {
+        .x = origin.x,
+        .y = origin.y + (dropdown_sprite_info.frame_height / 2) - (SLIDER_HEIGHT / 2),
+        .w = dropdown_sprite_info.frame_width,
+        .h = SLIDER_HEIGHT
+    };
+    Rect slider_subrect = (Rect) {
+        .x = slider_rect.x + 1, 
+        .y = slider_rect.y,
+        .w = ((slider_rect.w - 2) * ((int)*value - (int)min)) / (int)max,
+        .h = slider_rect.h
+    };
+    Rect notch_rect = (Rect) {
+        .x = slider_subrect.x + slider_subrect.w - (NOTCH_WIDTH / 2),
+        .y = slider_rect.y + (slider_rect.h / 2) - (NOTCH_HEIGHT / 2),
+        .w = NOTCH_WIDTH, .h = NOTCH_HEIGHT
+    };
+
+    ui_queue_fill_rect(slider_subrect, RENDER_COLOR_GOLD, 0);
+    ui_queue_draw_rect(slider_rect, RENDER_COLOR_OFFBLACK, 0);
+    ui_queue_fill_rect(notch_rect, RENDER_COLOR_GOLD, 0);
+    ui_queue_draw_rect(notch_rect, RENDER_COLOR_OFFBLACK, 0);
+
+    Rect input_rect = (Rect) {
+        .x = origin.x, .y = origin.y,
+        .w = dropdown_sprite_info.frame_width,
+        .h = dropdown_sprite_info.frame_height
+    };
+    bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE &&
+                        input_rect.has_point(input_get_mouse_position());
+
+    if (hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        state.element_selected = slider_id;
+        state.element_selected_future = slider_id;
+    }
+    
+    if (state.element_selected == slider_id) {
+        int mouse_x = input_get_mouse_position().x;
+        if (mouse_x < input_rect.x) {
+            mouse_x = input_rect.x;
+        } else if (mouse_x > input_rect.x + input_rect.w) {
+            mouse_x = input_rect.x + input_rect.w;
+        }
+        mouse_x -= input_rect.x;
+        *value = min + ((mouse_x * max) / input_rect.w);
+
+        if (input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
+            state.element_selected = UI_ELEMENT_NONE;
+            state.element_selected_future = UI_ELEMENT_NONE;
+        }
+    } 
+    
+    return *value != old_value;
 }
 
 void ui_render(uint32_t id) {
@@ -411,6 +504,14 @@ void ui_render(uint32_t id) {
                 }
                 case UI_RENDER_NINEPATCH: {
                     render_ninepatch(render.ninepatch.sprite, render.ninepatch.rect);
+                    break;
+                }
+                case UI_RENDER_DRAW_RECT: {
+                    render_draw_rect(render.rect.rect, render.rect.color);
+                    break;
+                }
+                case UI_RENDER_FILL_RECT: {
+                    render_fill_rect(render.rect.rect, render.rect.color);
                     break;
                 }
             }
@@ -482,6 +583,26 @@ void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index) {
         .ninepatch = (UiRenderNinepatch) {
             .sprite = sprite,
             .rect = rect
+        }
+    });
+}
+
+void ui_queue_draw_rect(Rect rect, RenderColor color, int z_index) {
+    state.render_queue[state.id][z_index].push_back((UiRender) {
+        .type = UI_RENDER_DRAW_RECT,
+        .rect = (UiRenderRect) {
+            .rect = rect,
+            .color = color
+        }
+    });
+}
+
+void ui_queue_fill_rect(Rect rect, RenderColor color, int z_index) {
+    state.render_queue[state.id][z_index].push_back((UiRender) {
+        .type = UI_RENDER_FILL_RECT,
+        .rect = (UiRenderRect) {
+            .rect = rect,
+            .color = color
         }
     });
 }
