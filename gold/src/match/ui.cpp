@@ -196,7 +196,7 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Hotkey click
     for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-        InputAction hotkey = input_get_hotkey(hotkey_index);
+        InputAction hotkey = state.hotkey_group[hotkey_index];
         if (hotkey == INPUT_HOTKEY_NONE) {
             continue;
         }
@@ -1022,17 +1022,28 @@ void match_ui_update(MatchUiState& state) {
 
     // Update UI buttons
     {
-        uint32_t hotkey_group = 0;
+        for (uint32_t index = 0; index < HOTKEY_GROUP_SIZE; index++) {
+            state.hotkey_group[index] = INPUT_HOTKEY_NONE;
+        }
         if (state.mode == MATCH_UI_MODE_BUILD) {
-            hotkey_group = INPUT_HOTKEY_GROUP_BUILD;
+            state.hotkey_group[0] = INPUT_HOTKEY_HALL;
+            state.hotkey_group[1] = INPUT_HOTKEY_HOUSE;
+            state.hotkey_group[2] = INPUT_HOTKEY_SALOON;
+            state.hotkey_group[3] = INPUT_HOTKEY_BUNKER;
+            state.hotkey_group[4] = INPUT_HOTKEY_WORKSHOP;
+            state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
         } else if (state.mode == MATCH_UI_MODE_BUILD2) {
-            hotkey_group = INPUT_HOTKEY_GROUP_BUILD2;
+            state.hotkey_group[0] = INPUT_HOTKEY_SMITH;
+            state.hotkey_group[1] = INPUT_HOTKEY_COOP;
+            state.hotkey_group[2] = INPUT_HOTKEY_BARRACKS;
+            state.hotkey_group[3] = INPUT_HOTKEY_SHERIFFS;
+            state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
         } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_targeting(state)) {
-            hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
+            state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
         } else if (!state.selection.empty()) {
             Entity& first_entity = state.match.entities.get_by_id(state.selection[0]);
             if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS) {
-                hotkey_group = INPUT_HOTKEY_GROUP_CANCEL;
+                state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
             } else if (first_entity.player_id == network_get_player_id()) {
                 bool is_selection_uniform = true;
                 for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
@@ -1046,44 +1057,64 @@ void match_ui_update(MatchUiState& state) {
 
                 if (is_selection_uniform) {
                     if (entity_is_unit(first_entity.type)) {
-                        hotkey_group |= INPUT_HOTKEY_GROUP_UNIT;
+                        state.hotkey_group[0] = INPUT_HOTKEY_ATTACK;
+                        state.hotkey_group[1] = INPUT_HOTKEY_STOP;
+                        state.hotkey_group[2] = INPUT_HOTKEY_DEFEND;
                     } else if (entity_is_building(first_entity.type) && !first_entity.queue.empty() && state.selection.size() == 1) {
-                        hotkey_group |= INPUT_HOTKEY_GROUP_CANCEL;
+                        state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
                     }
                     if (!first_entity.garrisoned_units.empty()) {
-                        hotkey_group |= INPUT_HOTKEY_GROUP_UNLOAD;
+                        state.hotkey_group[3] = INPUT_HOTKEY_UNLOAD;
                     }
                     switch (first_entity.type) {
                         case ENTITY_MINER: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_MINER;
+                            state.hotkey_group[3] = INPUT_HOTKEY_REPAIR;
+                            state.hotkey_group[4] = INPUT_HOTKEY_BUILD;
+                            state.hotkey_group[5] = INPUT_HOTKEY_BUILD2;
                             break;
                         }
                         case ENTITY_HALL: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_HALL;
+                            state.hotkey_group[0] = INPUT_HOTKEY_MINER;
                             break;
                         }
                         case ENTITY_SALOON: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_SALOON;
+                            state.hotkey_group[0] = INPUT_HOTKEY_COWBOY;
+                            state.hotkey_group[1] = INPUT_HOTKEY_BANDIT;
+                            state.hotkey_group[2] = INPUT_HOTKEY_DETECTIVE;
                             break;
                         }
                         case ENTITY_WORKSHOP: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_WORKSHOP;
+                            state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
+                            state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
+                            state.hotkey_group[2] = INPUT_HOTKEY_BALLOON;
+                            state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
                             break;
                         }
+                        case ENTITY_SMITH: {
+                            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
+                            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_BAYONETS;
+                        }
                         case ENTITY_COOP: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_COOP;
+                            state.hotkey_group[0] = INPUT_HOTKEY_JOCKEY;
+                            state.hotkey_group[1] = match_player_has_upgrade(state.match, network_get_player_id(), UPGRADE_WAR_WAGON)
+                                                        ? INPUT_HOTKEY_WAR_WAGON
+                                                        : INPUT_HOTKEY_WAGON;
                             break;
                         }
                         case ENTITY_BARRACKS: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_BARRACKS;
+                            state.hotkey_group[0] = INPUT_HOTKEY_SOLDIER;
+                            state.hotkey_group[1] = INPUT_HOTKEY_CANNON;
                             break;
                         }
                         case ENTITY_PYRO: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_PYRO;
+                            state.hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
+                            state.hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
                             break;
                         }
                         case ENTITY_DETECTIVE: {
-                            hotkey_group |= INPUT_HOTKEY_GROUP_DETECTIVE;
+                            state.hotkey_group[3] = entity_check_flag(first_entity, ENTITY_FLAG_INVISIBLE) 
+                                                        ? INPUT_HOTKEY_DECAMO
+                                                        : INPUT_HOTKEY_CAMO;
                             break;
                         }
                         default:
@@ -1092,21 +1123,13 @@ void match_ui_update(MatchUiState& state) {
                 }
             }
         }
-        input_set_hotkey_group(hotkey_group);
         for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-            InputAction hotkey = input_get_hotkey(hotkey_index);
-            if (hotkey == INPUT_HOTKEY_NONE) {
+            if (state.hotkey_group[hotkey_index] == INPUT_HOTKEY_NONE) {
                 continue;
             }
-            if (hotkey == INPUT_HOTKEY_WAGON && match_player_has_upgrade(state.match, network_get_player_id(), UPGRADE_WAR_WAGON)) {
-                input_set_hotkey(hotkey_index, INPUT_HOTKEY_WAR_WAGON);
-            }
-            const HotkeyButtonInfo& info = hotkey_get_button_info(hotkey);
+            const HotkeyButtonInfo& info = hotkey_get_button_info(state.hotkey_group[hotkey_index]);
             if (info.type == HOTKEY_BUTTON_RESEARCH && !match_player_upgrade_is_available(state.match, network_get_player_id(), info.upgrade)) {
-                input_set_hotkey(hotkey_index, INPUT_HOTKEY_NONE);
-            }
-            if (hotkey == INPUT_HOTKEY_CAMO && entity_check_flag(state.match.entities.get_by_id(state.selection[0]), ENTITY_FLAG_INVISIBLE)) {
-                input_set_hotkey(hotkey_index, INPUT_HOTKEY_DECAMO);
+                state.hotkey_group[hotkey_index] = INPUT_HOTKEY_NONE;
             }
         }
     }
@@ -2231,7 +2254,7 @@ void match_ui_render(const MatchUiState& state) {
     
     // Hotkeys
     for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-        InputAction hotkey = input_get_hotkey(hotkey_index);
+        InputAction hotkey = state.hotkey_group[hotkey_index];
         if (hotkey == INPUT_HOTKEY_NONE) {
             continue;
         }
@@ -2271,7 +2294,7 @@ void match_ui_render(const MatchUiState& state) {
 
         // If we are actually hovering a hotkey
         if (hotkey_hovered_index != HOTKEY_GROUP_SIZE) {
-            InputAction hotkey_hovered = input_get_hotkey(hotkey_hovered_index);
+            InputAction hotkey_hovered = state.hotkey_group[hotkey_hovered_index];
             if (hotkey_hovered != INPUT_HOTKEY_NONE) {
                 const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey_hovered);
                 const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);

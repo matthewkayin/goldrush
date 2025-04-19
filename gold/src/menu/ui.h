@@ -12,6 +12,7 @@
 #define UI_MAIN 0
 #define UI_OPTIONS 1
 #define UI_COUNT 2
+#define UI_ICON_BUTTON_EMPTY SPRITE_COUNT
 
 enum UiHotkeyButtonMode {
     // The button can be hovered and clicked
@@ -72,6 +73,13 @@ void ui_begin_column(ivec2 position, int spacing);
 void ui_end_container();
 
 /**
+ * Gets the size of a button
+ * @param text The text on the button
+ * @return The size of the button
+ */
+ivec2 ui_button_size(const char* text);
+
+/**
  * Creates a button
  * @param text The text on the button
  * @return True if the button has been clicked this frame
@@ -86,6 +94,14 @@ bool ui_button(const char* text);
  * @return True if the button has been clicked this frame
  */
 bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h);
+
+/**
+ * Create an icon button, which has an icon frame with an icon on top of it
+ * @param sprite The sprite to render on top of the button. Passing in UI_ICON_BUTTON_EMPTY will render the button without an icon
+ * @param selected If true, the button will appear brighter than normal
+ * @return True if the button was clicked this frame
+ */
+bool ui_icon_button(SpriteName sprite, bool selected);
 
 /**
  * Creates text

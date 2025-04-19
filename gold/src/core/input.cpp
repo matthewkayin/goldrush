@@ -18,7 +18,6 @@ struct InputState {
     std::string* text_input_str;
     size_t text_input_max_length;
 
-    InputAction hotkey_group[HOTKEY_GROUP_SIZE];
     SDL_Keycode hotkey_mapping[INPUT_ACTION_COUNT];
 };
 static InputState state;
@@ -31,9 +30,6 @@ void input_init(SDL_Window* window) {
     input_update_window_size();
     input_stop_text_input();
     input_use_hotkey_mapping_default();
-    for (uint32_t index = 0; index < HOTKEY_GROUP_SIZE; index++) {
-        state.hotkey_group[index] = INPUT_HOTKEY_NONE;
-    }
 }
 
 void input_update_window_size() {
@@ -184,85 +180,7 @@ bool input_is_action_just_released(InputAction action) {
     return state.previous[action] && !state.current[action];
 }
 
-void input_set_hotkey_group(uint32_t group) {
-    for (uint32_t index = 0; index < HOTKEY_GROUP_SIZE; index++) {
-        state.hotkey_group[index] = INPUT_HOTKEY_NONE;
-    }
-
-    if ((group & INPUT_HOTKEY_GROUP_UNIT) == INPUT_HOTKEY_GROUP_UNIT) {
-        state.hotkey_group[0] = INPUT_HOTKEY_ATTACK;
-        state.hotkey_group[1] = INPUT_HOTKEY_STOP;
-        state.hotkey_group[2] = INPUT_HOTKEY_DEFEND;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_MINER) == INPUT_HOTKEY_GROUP_MINER) {
-        state.hotkey_group[3] = INPUT_HOTKEY_REPAIR;
-        state.hotkey_group[4] = INPUT_HOTKEY_BUILD;
-        state.hotkey_group[5] = INPUT_HOTKEY_BUILD2;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_CANCEL) == INPUT_HOTKEY_GROUP_CANCEL) {
-        state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_BUILD) == INPUT_HOTKEY_GROUP_BUILD) {
-        state.hotkey_group[0] = INPUT_HOTKEY_HALL;
-        state.hotkey_group[1] = INPUT_HOTKEY_HOUSE;
-        state.hotkey_group[2] = INPUT_HOTKEY_SALOON;
-        state.hotkey_group[3] = INPUT_HOTKEY_BUNKER;
-        state.hotkey_group[4] = INPUT_HOTKEY_WORKSHOP;
-        state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_BUILD2) == INPUT_HOTKEY_GROUP_BUILD2) {
-        state.hotkey_group[0] = INPUT_HOTKEY_SMITH;
-        state.hotkey_group[1] = INPUT_HOTKEY_COOP;
-        state.hotkey_group[2] = INPUT_HOTKEY_BARRACKS;
-        state.hotkey_group[3] = INPUT_HOTKEY_SHERIFFS;
-        state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_HALL) == INPUT_HOTKEY_GROUP_HALL) {
-        state.hotkey_group[0] = INPUT_HOTKEY_MINER;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_SALOON) == INPUT_HOTKEY_GROUP_SALOON) {
-        state.hotkey_group[0] = INPUT_HOTKEY_COWBOY;
-        state.hotkey_group[1] = INPUT_HOTKEY_BANDIT;
-        state.hotkey_group[2] = INPUT_HOTKEY_DETECTIVE;
-    } 
-    if ((group & INPUT_HOTKEY_GROUP_UNLOAD) == INPUT_HOTKEY_GROUP_UNLOAD) {
-        state.hotkey_group[3] = INPUT_HOTKEY_UNLOAD;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_WORKSHOP) == INPUT_HOTKEY_GROUP_WORKSHOP) {
-        state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
-        state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
-        state.hotkey_group[2] = INPUT_HOTKEY_BALLOON;
-        state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_BARRACKS) == INPUT_HOTKEY_GROUP_BARRACKS) {
-        state.hotkey_group[0] = INPUT_HOTKEY_SOLDIER;
-        state.hotkey_group[1] = INPUT_HOTKEY_CANNON;
-        state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_BAYONETS;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_COOP) == INPUT_HOTKEY_GROUP_COOP) {
-        state.hotkey_group[0] = INPUT_HOTKEY_JOCKEY;
-        state.hotkey_group[1] = INPUT_HOTKEY_WAGON;
-        state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_PYRO) == INPUT_HOTKEY_GROUP_PYRO) {
-        state.hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
-        state.hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
-    }
-    if ((group & INPUT_HOTKEY_GROUP_DETECTIVE) == INPUT_HOTKEY_GROUP_DETECTIVE) {
-        state.hotkey_group[3] = INPUT_HOTKEY_CAMO;
-    }
-}
-
-void input_set_hotkey(uint32_t index, InputAction value) {
-    state.hotkey_group[index] = value;
-}
-
-InputAction input_get_hotkey(uint32_t index) {
-    return state.hotkey_group[index];
-}
-
-int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey) {
-    SDL_Keycode key = state.hotkey_mapping[hotkey];
+int input_sprintf_sdl_key_str(char* str_ptr, SDL_Keycode key) {
     if (key == SDLK_ESCAPE) {
         return sprintf(str_ptr, "ESC");
     } else if (key >= SDLK_a && key <= SDLK_z) {
@@ -292,6 +210,18 @@ int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey) {
     } else {
         return 0;
     }
+}
+
+int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey) {
+    return input_sprintf_sdl_key_str(str_ptr, state.hotkey_mapping[hotkey]);
+}
+
+SDL_Keycode input_get_hotkey_mapping(InputAction hotkey) {
+    return state.hotkey_mapping[hotkey];
+}
+
+void input_set_hotkey_mapping(InputAction hotkey, SDL_Keycode key) {
+    state.hotkey_mapping[hotkey] = key;
 }
 
 void input_use_hotkey_mapping_default() {

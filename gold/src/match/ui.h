@@ -81,6 +81,7 @@ struct MatchUiState {
     uint32_t control_group_double_tap_timer;
     std::vector<EntityId> control_groups[MATCH_UI_CONTROL_GROUP_COUNT];
     std::vector<EntityId> selection;
+    InputAction hotkey_group[HOTKEY_GROUP_SIZE];
 
     std::string status_message;
     uint32_t status_timer;

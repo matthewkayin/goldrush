@@ -9,7 +9,6 @@ enum OptionName {
     OPTION_MUS_VOLUME,
     OPTION_UNIT_VOICES,
     OPTION_CAMERA_SPEED,
-    OPTION_HOTKEYS,
     OPTION_COUNT
 };
 
@@ -17,13 +16,6 @@ enum OptionValueUnitVoices {
     OPTION_UNIT_VOICES_OFF,
     OPTION_UNIT_VOICES_ON,
     OPTION_UNIT_VOICES_COUNT,
-};
-
-enum OptionValueHotkeys {
-    OPTION_HOTKEYS_DEFAULT,
-    OPTION_HOTKEYS_GRID,
-    OPTION_HOTKEYS_CUSTOM,
-    OPTION_HOTKEYS_COUNT
 };
 
 enum OptionType {

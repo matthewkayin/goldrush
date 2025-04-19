@@ -94,8 +94,8 @@ bool input_is_action_pressed(InputAction action);
 bool input_is_action_just_pressed(InputAction action);
 bool input_is_action_just_released(InputAction action);
 
-void input_set_hotkey_group(uint32_t group);
-void input_set_hotkey(uint32_t index, InputAction value);
-InputAction input_get_hotkey(uint32_t index);
+int input_sprintf_sdl_key_str(char* str_ptr, SDL_Keycode key);
 int input_sprintf_hotkey_str(char* str_ptr, InputAction hotkey);
+SDL_Keycode input_get_hotkey_mapping(InputAction hotkey);
+void input_set_hotkey_mapping(InputAction hotkey, SDL_Keycode key);
 void input_use_hotkey_mapping_default();

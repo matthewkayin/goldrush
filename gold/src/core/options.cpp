@@ -53,13 +53,6 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .min_value = 1,
         .max_value = 31,
         .default_value = 16
-    }},
-    { OPTION_HOTKEYS, (OptionData) {
-        .name = "Hotkeys",
-        .type = OPTION_TYPE_DROPDOWN,
-        .min_value = 0,
-        .max_value = OPTION_HOTKEYS_COUNT,
-        .default_value = OPTION_HOTKEYS_DEFAULT
     }}
 };
 

@@ -153,17 +153,22 @@ void ui_end_container() {
     ui_update_container(container_size);
 }
 
-bool ui_button(const char* text) {
+ivec2 ui_button_size(const char* text) {
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
     if (text_size.x % 8 != 0) {
         text_size.x = ((text_size.x / 8) + 1) * 8;
     }
     text_size.x += 16;
 
+    return ivec2(text_size.x, 21);
+}
+
+bool ui_button(const char* text) {
     ivec2 origin = ui_get_container_origin();
+    ivec2 button_size = ui_button_size(text);
     Rect button_rect = (Rect) {
         .x = origin.x, .y = origin.y,
-        .w = text_size.x, .h = 21
+        .w = button_size.x, .h = button_size.y
     };
     ui_update_container(ivec2(button_rect.w, button_rect.h));
 
@@ -213,6 +218,37 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
         sound_play(SOUND_UI_CLICK);
     }
     return clicked;
+}
+
+bool ui_icon_button(SpriteName sprite, bool selected) {
+    const SpriteInfo& button_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+
+    ivec2 origin = ui_get_container_origin();
+    ui_update_container(ivec2(button_sprite_info.frame_width, button_sprite_info.frame_height));
+
+    Rect button_rect = (Rect) {
+        .x = origin.x, .y = origin.y,
+        .w = button_sprite_info.frame_width, .h = button_sprite_info.frame_height
+    };
+
+    bool hovered = state.input_enabled && sprite != UI_ICON_BUTTON_EMPTY &&
+                        button_rect.has_point(input_get_mouse_position());
+    int hframe = selected ? 0 : 2;
+    if (hovered) {
+        hframe = 1;
+    }
+
+    ui_queue_sprite(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
+    if (sprite != UI_ICON_BUTTON_EMPTY) {
+        ui_queue_sprite(sprite, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
+    }
+
+    bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
+    if (clicked) {
+        sound_play(SOUND_UI_CLICK);
+    }
+
+    return clicked; 
 }
 
 void ui_text(FontName font, const char* text) {
