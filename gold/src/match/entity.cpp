@@ -111,7 +111,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .max_energy = 0,
 
             .attack_sound = SOUND_SWORD,
-            .damage = 6,
+            .damage = 5,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1

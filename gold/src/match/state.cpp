@@ -6,8 +6,8 @@
 #include "lcg.h"
 #include "upgrade.h"
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
-static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 50;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
+static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
 static const uint32_t UNIT_HEALTH_REGEN_DELAY = 600;
@@ -79,8 +79,6 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
-            ivec2 exit_cell = map_get_exit_cell(state.map, hall_data.cell_layer, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_BALLOON, exit_cell, player_id);
 
             // Place scout
             {
