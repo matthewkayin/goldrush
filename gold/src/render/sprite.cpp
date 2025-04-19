@@ -1128,6 +1128,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_BUILDING_SMITH_ANIMATION, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "building_smith_animation.png",
+            .hframes = 9,
+            .vframes = 1
+        }
+    }},
     { SPRITE_BUILDING_WORKSHOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = (SpriteParamsSheet) {

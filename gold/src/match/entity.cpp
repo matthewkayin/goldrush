@@ -798,9 +798,7 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
             default: 
                 return ANIMATION_UNIT_IDLE;
         }
-    }
-
-    if (entity.type == ENTITY_CANNON) {
+    } else if (entity.type == ENTITY_CANNON) {
         switch (entity.mode) {
             case MODE_UNIT_MOVE:
                 return ANIMATION_UNIT_MOVE_CANNON;
@@ -812,6 +810,18 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
                 return ANIMATION_CANNON_DEATH_FADE;
             default:
                 return ANIMATION_UNIT_IDLE;
+        }
+    } else if (entity.type == ENTITY_SMITH) {
+        if (entity.queue.empty() && entity.animation.name != ANIMATION_UNIT_IDLE && entity.animation.name != ANIMATION_SMITH_END) {
+            return ANIMATION_SMITH_END;
+        } else if (entity.animation.name == ANIMATION_SMITH_END && !animation_is_playing(entity.animation)) {
+            return ANIMATION_UNIT_IDLE;
+        } else if (!entity.queue.empty() && entity.animation.name == ANIMATION_UNIT_IDLE) {
+            return ANIMATION_SMITH_BEGIN;
+        } else if (entity.animation.name == ANIMATION_SMITH_BEGIN && !animation_is_playing(entity.animation)) {
+            return ANIMATION_SMITH_LOOP;
+        } else {
+            return entity.animation.name;
         }
     }
 
@@ -885,7 +895,7 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
         if (entity.mode == MODE_MINE_PRIME) {
             return entity.animation.frame;
         }
-        if (entity.animation.name != ANIMATION_UNIT_IDLE) {
+        if (entity.animation.name != ANIMATION_UNIT_IDLE && entity.type != ENTITY_SMITH) {
             return entity.animation.frame;
         }
         // Building finished frame

@@ -1091,6 +1091,7 @@ void match_ui_update(MatchUiState& state) {
                         case ENTITY_SMITH: {
                             state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
                             state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_BAYONETS;
+                            break;
                         }
                         case ENTITY_COOP: {
                             state.hotkey_group[0] = INPUT_HOTKEY_JOCKEY;
@@ -1856,7 +1857,11 @@ void match_ui_render(const MatchUiState& state) {
 
     // Smith and workshop smoke animations
     for (const Entity& entity : state.match.entities) {
-        if (entity.animation.name == ANIMATION_WORKSHOP && match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+        if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            continue;
+        }
+        if (entity.animation.name == ANIMATION_WORKSHOP) {
+            // Haha this is awful
             int hframe = -1;
             switch (entity.animation.frame.x) {
                 case 5:
@@ -1886,6 +1891,8 @@ void match_ui_render(const MatchUiState& state) {
                 ivec2 steam_position = ivec2(building_rect.x, building_rect.y) + (ivec2(building_rect.w, building_rect.h) / 2) - state.camera_offset;
                 render_sprite_frame(SPRITE_WORKSHOP_STEAM, ivec2(hframe, 0), steam_position, RENDER_SPRITE_CENTERED, 0);
             }
+        } else if (entity.type == ENTITY_SMITH && entity.animation.name != ANIMATION_UNIT_IDLE) {
+            render_sprite_frame(SPRITE_BUILDING_SMITH_ANIMATION, entity.animation.frame, entity.position.to_ivec2() - ivec2(0, 16) - state.camera_offset, 0, 0);
         }
     }
 
