@@ -4,6 +4,7 @@
 #include "core/input.h"
 #include "core/logger.h"
 #include "core/cursor.h"
+#include "core/options.h"
 #include "menu/ui.h"
 #include "menu/match_setting.h"
 #include "render/sprite.h"
@@ -18,7 +19,6 @@ static const uint32_t TURN_DURATION = 4;
 static const uint32_t UI_STATUS_DURATION = 60;
 
 static const int MATCH_CAMERA_DRAG_MARGIN = 4;
-static const int CAMERA_SPEED = 16; // TODO: move to options
 static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
 static const Rect MINIMAP_RECT = (Rect) { .x = 4, .y = SCREEN_HEIGHT - 132, .w = 128, .h = 128 };
 static const int SOUND_LISTEN_MARGIN = 128;
@@ -76,6 +76,14 @@ static const uint32_t CHAT_MESSAGE_DURATION = 180;
 static const uint32_t CHAT_MAX_LINES = 8;
 static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
 static const int PARTICLE_SMOKE_CELL_SIZE = 7;
+
+static const uint32_t DISCONNECT_GRACE = 10;
+static const uint32_t DISCONNECT_FRAME_WIDTH = 200;
+static const Rect DISCONNECT_FRAME_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (DISCONNECT_FRAME_WIDTH / 2),
+    .y = 32,
+    .w = DISCONNECT_FRAME_WIDTH, .h = 200
+};
 
 // INIT
 
@@ -167,6 +175,12 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
         }
         case NETWORK_EVENT_CHAT: {
             match_ui_add_chat_message(state, event.chat.player_id, event.chat.message);
+            break;
+        }
+        case NETWORK_EVENT_PLAYER_DISCONNECTED: {
+            char message[128];
+            sprintf(message, "%s disconnected.", network_get_player(event.player_disconnected.player_id).name);
+            match_ui_add_chat_message(state, PLAYER_NONE, message);
             break;
         }
         default:
@@ -920,7 +934,7 @@ void match_ui_update(MatchUiState& state) {
         } else if (input_get_mouse_position().y > SCREEN_HEIGHT - MATCH_CAMERA_DRAG_MARGIN) {
             camera_drag_direction.y = 1;
         }
-        state.camera_offset += camera_drag_direction * CAMERA_SPEED;
+        state.camera_offset += camera_drag_direction * option_get_value(OPTION_CAMERA_SPEED);
         match_ui_clamp_camera(state);
     }
 
@@ -2586,6 +2600,22 @@ void match_ui_render(const MatchUiState& state) {
         sprintf(population_text, "%u/%u", match_get_player_population(state.match, network_get_player_id()), match_get_player_max_population(state.match, network_get_player_id()));
         render_text(FONT_WESTERN8_WHITE, population_text, ivec2(SCREEN_WIDTH - 88 + 22, 2));
         render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL, 0);
+    }
+
+    // UI Disconnect frame
+    if (state.disconnect_timer > DISCONNECT_GRACE) {
+        render_ninepatch(SPRITE_UI_FRAME, DISCONNECT_FRAME_RECT);
+        ivec2 text_size = render_get_text_size(FONT_HACK_GOLD, "Waiting for players...");
+        render_text(FONT_HACK_GOLD, "Waiting for players...", ivec2(DISCONNECT_FRAME_RECT.x + (DISCONNECT_FRAME_RECT.w / 2) - (text_size.x / 2), DISCONNECT_FRAME_RECT.y + 8));
+        int player_text_y = 32;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE || !(state.inputs[player_id].empty() || state.inputs[player_id][0].empty())) {
+                continue;
+            }
+
+            render_text(FONT_HACK_GOLD, network_get_player(player_id).name, ivec2(DISCONNECT_FRAME_RECT.x + 16, DISCONNECT_FRAME_RECT.y + player_text_y));
+            player_text_y += 16;
+        }
     }
 
     // Debug unit info
