@@ -78,11 +78,17 @@ static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
 static const int PARTICLE_SMOKE_CELL_SIZE = 7;
 
 static const uint32_t DISCONNECT_GRACE = 10;
-static const uint32_t DISCONNECT_FRAME_WIDTH = 200;
+static const int DISCONNECT_FRAME_WIDTH = 200;
 static const Rect DISCONNECT_FRAME_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (DISCONNECT_FRAME_WIDTH / 2),
-    .y = 32,
+    .x = (SCREEN_WIDTH / 2) - (DISCONNECT_FRAME_WIDTH / 2), .y = 32,
     .w = DISCONNECT_FRAME_WIDTH, .h = 200
+};
+
+static const ivec2 MENU_BUTTON_POSITION = ivec2(1, 1);
+static const int MENU_WIDTH = 150;
+static const Rect MENU_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (MENU_WIDTH / 2), .y = 64,
+    .w = MENU_WIDTH, .h = 125
 };
 
 // INIT
@@ -192,6 +198,7 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // This function returns after it handles a single input to avoid double input happening
 void match_ui_handle_input(MatchUiState& state) {
+
     // Begin chat
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active()) {
         state.chat_message = "";
@@ -729,6 +736,63 @@ void match_ui_update(MatchUiState& state) {
         log_info("Match started.");
     }
 
+    // Open menu
+    const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
+    Rect menu_button_rect = (Rect) {
+        .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
+        .w = menu_button_sprite_info.frame_width, .h = menu_button_sprite_info.frame_height 
+    };
+    if (!(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
+            ((menu_button_rect.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) || input_is_action_just_pressed(INPUT_ACTION_MATCH_MENU))) {
+        if (state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+            state.mode = MATCH_UI_MODE_NONE;
+        } else {
+            state.mode = MATCH_UI_MODE_MENU;
+            input_stop_text_input();
+        }
+        sound_play(SOUND_UI_CLICK);
+
+        return;
+    }
+
+    // Menu
+    // Alwyas call UI begin to make sure everything is cleared out from the main menu
+    ui_begin(UI_MAIN, true);
+    if (state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+        ui_frame_rect(MENU_RECT);
+
+        const char* header_text = state.mode == MATCH_UI_MODE_MENU ? "Game Menu" : "Surrender?";
+        ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
+        ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 10);
+        ui_element_position(text_pos);
+        ui_text(FONT_WESTERN8_GOLD, header_text);
+
+        ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32);
+        if (state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+            column_position.y += 11;
+        }
+        ui_begin_column(column_position, 5);
+            ivec2 button_size = ui_button_size("LEAVE MATCH");
+            if (state.mode == MATCH_UI_MODE_MENU) {
+                if (ui_button("LEAVE MATCH", button_size, true)) {
+                    state.mode = MATCH_UI_MODE_MENU_SURRENDER;
+                }
+                if (ui_button("OPTIONS", button_size, true)) {
+                }
+                if (ui_button("BACK", button_size, true)) {
+                    state.mode = MATCH_UI_MODE_NONE;
+                }
+            } else if (state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+                if (ui_button("YES", button_size, true)) {
+                    state.mode = MATCH_UI_MODE_LEAVE_MATCH;
+                }
+                if (ui_button("BACK", button_size, true)) {
+                    state.mode = MATCH_UI_MODE_MENU;
+                }
+            }
+        ui_end_container();
+    }
+
     // Turn loop
     if (state.turn_timer == 0) {
         bool all_inputs_received = true;
@@ -789,8 +853,9 @@ void match_ui_update(MatchUiState& state) {
 
     state.turn_timer--;
 
-    ui_begin(UI_MAIN, true);
-    match_ui_handle_input(state);
+    if (!(state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER)) {
+        match_ui_handle_input(state);
+    }
 
     // Match update
     match_update(state.match);
@@ -2607,6 +2672,18 @@ void match_ui_render(const MatchUiState& state) {
         sprintf(population_text, "%u/%u", match_get_player_population(state.match, network_get_player_id()), match_get_player_max_population(state.match, network_get_player_id()));
         render_text(FONT_WESTERN8_WHITE, population_text, ivec2(SCREEN_WIDTH - 88 + 22, 2));
         render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL, 0);
+    }
+
+    // Menu button icon
+    {
+        const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
+        Rect menu_button_rect = (Rect) {
+            .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
+            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+        };
+        bool hovered = state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER || (
+                            !(state.is_minimap_dragging || match_ui_is_selecting(state)) && menu_button_rect.has_point(input_get_mouse_position()));
+        render_sprite_frame(SPRITE_UI_BUTTON_BURGER, ivec2((int)hovered, 0), MENU_BUTTON_POSITION, RENDER_SPRITE_NO_CULL, 0);
     }
 
     // UI Disconnect frame

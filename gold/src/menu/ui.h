@@ -82,9 +82,11 @@ ivec2 ui_button_size(const char* text);
 /**
  * Creates a button
  * @param text The text on the button
+ * @param size If overriden, will be used as the size of the button, the text will go in the center
+ * @param center_horizontally If true, the button will be centered horizontally about its render position
  * @return True if the button has been clicked this frame
  */
-bool ui_button(const char* text);
+bool ui_button(const char* text, ivec2 size = ivec2(-1, -1), bool center_horizontally = false);
 
 /**
  * Create a sprite button

@@ -163,15 +163,18 @@ ivec2 ui_button_size(const char* text) {
     return ivec2(text_size.x, 21);
 }
 
-bool ui_button(const char* text) {
+bool ui_button(const char* text, ivec2 size, bool center_horizontally) {
     ivec2 origin = ui_get_container_origin();
-    ivec2 button_size = ui_button_size(text);
+    ivec2 button_size = size.x == -1 ? ui_button_size(text) : size;
     Rect button_rect = (Rect) {
         .x = origin.x, .y = origin.y,
         .w = button_size.x, .h = button_size.y
     };
     ui_update_container(ivec2(button_rect.w, button_rect.h));
 
+    if (center_horizontally) {
+        button_rect.x -= button_size.x / 2;
+    }
     bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && button_rect.has_point(input_get_mouse_position());
 
     int frame_count = button_rect.w / 8;
@@ -186,7 +189,12 @@ bool ui_button(const char* text) {
         ui_queue_sprite(SPRITE_UI_MENU_BUTTON, ivec2(hframe, (int)hovered), ivec2(button_rect.x + (frame * 8), button_rect.y - (int)hovered), 0);
     }
 
-    ui_queue_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, text, ivec2(button_rect.x + 5, button_rect.y + 3 - (int)hovered), 0);
+    ivec2 text_pos = ivec2(button_rect.x + 5, button_rect.y + 3 - (int)hovered);
+    if (center_horizontally) {
+        ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
+        text_pos.x = button_rect.x + (button_rect.w / 2) - (text_size.x / 2);
+    }
+    ui_queue_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, text, text_pos, 0);
 
     bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
