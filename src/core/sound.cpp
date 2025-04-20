@@ -1,22 +1,12 @@
 #include "sound.h"
 
-bool sound_init() { return true; }
-void sound_quit() {}
-void sound_set_sfx_volume(int volume) {}
-void sound_set_mus_volume(int volume) {}
-
-int sound_play(SoundName sound, int loops) { return 0; }
-bool sound_is_looping(SoundName sound) { return true; }
-void sound_begin_loop(SoundName sound) {}
-void sound_end_loop(SoundName sound) {}
-
-/*
-#include "defines.h"
 #include "core/logger.h"
-#include <SDL3/SDL_mixer.h>
-#include <vector>
+#include <SDL3/SDL.h>
 #include <unordered_map>
-#include <cstdlib>
+
+#define SOUND_STREAM_COUNT 2
+
+static const int SOUND_IS_NOT_LOOPING = -1;
 
 struct SoundParams {
     const char* path;
@@ -174,20 +164,31 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
     }}
 };
 
-static const int SOUND_IS_NOT_LOOPING = -1;
+struct SoundData {
+    uint8_t* buffer;
+    uint32_t length;
+};
 
 struct SoundState {
-    std::vector<Mix_Chunk*> sounds;
+    SDL_AudioStream* streams[SOUND_STREAM_COUNT];
+    std::vector<SoundData> sounds;
     int sound_index[SOUND_COUNT];
     int sound_loop[SOUND_COUNT];
 };
 static SoundState state;
 
 bool sound_init() {
-    // Init Mixer
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) < 0) {
-        log_error("SDL_mixer failed to initialize: %s", Mix_GetError());
-        return false;
+    SDL_AudioSpec desired_spec;
+    desired_spec.format = SDL_AUDIO_S16;
+    desired_spec.channels = 2;
+    desired_spec.freq = 44100;
+    for (int stream = 0; stream < SOUND_STREAM_COUNT; stream++) {
+        state.streams[stream] = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired_spec, NULL, NULL);
+        if (state.streams[stream] == NULL) {
+            log_error("Error opening audio stream: %s", SDL_GetError());
+            return false;
+        }
+        SDL_ResumeAudioStreamDevice(state.streams[stream]);
     }
 
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
@@ -202,10 +203,27 @@ bool sound_init() {
                 sprintf(sound_path, "%ssfx/%s%i.wav", RESOURCE_PATH, params.path, (variant + 1));
             }
 
-            Mix_Chunk* sound_variant = Mix_LoadWAV(sound_path);
-            if (sound_variant == NULL) {
-                log_error("Unable to load sound at path %s: %s", sound_path, Mix_GetError());
+            SoundData sound_variant;
+            SDL_AudioSpec sound_spec;
+            if (!SDL_LoadWAV(sound_path, &sound_spec, &sound_variant.buffer, &sound_variant.length)) {
+                log_error("Unable to load sound at path %s: %s", sound_path, SDL_GetError());
                 return false;
+            }
+
+            log_trace("Loaded sound %s with format %u channels %i freq %i", sound_path, sound_spec.format, sound_spec.channels, sound_spec.freq);
+            if (sound_spec.format != desired_spec.format || sound_spec.channels != desired_spec.channels || sound_spec.freq != desired_spec.freq) {
+                log_trace("Sound does not match desired format. Converting...");
+
+                uint8_t* converted_data;
+                int converted_length;
+                if (!SDL_ConvertAudioSamples(&sound_spec, sound_variant.buffer, sound_variant.length, &desired_spec, &converted_data, &converted_length)) {
+                    log_error("Failed to convert sound.");
+                    return false;
+                }
+                SDL_free(sound_variant.buffer);
+                sound_variant.buffer = converted_data;
+                sound_variant.length = converted_length;
+                log_trace("Converted sound to desired format.");
             }
 
             state.sounds.push_back(sound_variant);
@@ -220,13 +238,52 @@ bool sound_init() {
 }
 
 void sound_quit() {
-    for (Mix_Chunk* chunk : state.sounds) {
-        Mix_FreeChunk(chunk);
+    for (SoundData sound_data : state.sounds) {
+        SDL_free(sound_data.buffer);
+    }
+    for (int stream = 0; stream < SOUND_STREAM_COUNT; stream++) {
+        SDL_DestroyAudioStream(state.streams[stream]);
     }
 
-    Mix_Quit();
     log_info("Quit sound.");
 }
+
+void sound_set_sfx_volume(int volume) {}
+void sound_set_mus_volume(int volume) {}
+
+int sound_play(SoundName sound, int loops) { 
+    int available_stream = 0;
+    int min_data_available = SDL_GetAudioStreamAvailable(state.streams[0]);
+    for (int stream = 0; stream < SOUND_STREAM_COUNT; stream++) {
+        int stream_data_available = SDL_GetAudioStreamAvailable(state.streams[stream]);
+        if (stream_data_available < min_data_available) {
+            available_stream = stream;
+            min_data_available = stream_data_available;
+            break;
+        }
+    }
+
+    int variant = SOUND_PARAMS.at(sound).variants == 1 ? 0 : rand() % SOUND_PARAMS.at(sound).variants;
+    SoundData& sound_data = state.sounds[state.sound_index[sound] + variant];
+    SDL_ClearAudioStream(state.streams[available_stream]);
+    SDL_PutAudioStreamData(state.streams[available_stream], sound_data.buffer, sound_data.length);
+    return 0;
+}
+
+bool sound_is_looping(SoundName sound) { return true; }
+void sound_begin_loop(SoundName sound) {}
+void sound_end_loop(SoundName sound) {}
+
+/*
+#include "defines.h"
+#include "core/logger.h"
+#include <SDL3/SDL_mixer.h>
+#include <vector>
+#include <unordered_map>
+#include <cstdlib>
+
+
+
 
 void sound_set_sfx_volume(int volume) {
     Mix_Volume(-1, volume);

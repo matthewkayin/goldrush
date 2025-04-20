@@ -501,7 +501,7 @@ SDL_Surface* render_load_font(FontName name) {
     char path[128];
     sprintf(path, "%sfont/%s", RESOURCE_PATH, params.path);
 
-    log_info("Loading font %s size %u color %u,%u,%u", path, params.size, params.r, params.g, params.b);
+    log_trace("Loading font %s size %u color %u,%u,%u", path, params.size, params.r, params.g, params.b);
 
     // Open the font
     TTF_Font* ttf_font = TTF_OpenFont(path, params.size);
@@ -525,7 +525,6 @@ SDL_Surface* render_load_font(FontName name) {
             return NULL;
         }
 
-        log_trace("glyph %s size %i,%i", text, glyphs[glyph_index]->w, glyphs[glyph_index]->h);
         glyph_max_width = std::max(glyph_max_width, glyphs[glyph_index]->w);
         glyph_max_height = std::max(glyph_max_height, glyphs[glyph_index]->h);
     }
