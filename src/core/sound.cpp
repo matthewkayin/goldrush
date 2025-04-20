@@ -253,7 +253,13 @@ void sound_quit() {
     log_info("Quit sound.");
 }
 
-void sound_set_sfx_volume(int volume) {}
+void sound_set_sfx_volume(int volume) {
+    for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
+        SDL_SetAudioStreamGain(state.streams[stream], (float)volume / 100.0f);
+    }
+    SDL_SetAudioStreamGain(state.fire_stream, (float)volume / 100.0f);
+}
+
 void sound_set_mus_volume(int volume) {}
 
 void sound_update() {

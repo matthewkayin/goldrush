@@ -30,14 +30,14 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .type = OPTION_TYPE_PERCENT_SLIDER,
         .min_value = 0,
         .max_value = 100,
-        .default_value = 0
+        .default_value = 100
     }},
     { OPTION_MUS_VOLUME, (OptionData) {
         .name = "Music Volume",
         .type = OPTION_TYPE_PERCENT_SLIDER,
         .min_value = 0,
         .max_value = 100,
-        .default_value = 0
+        .default_value = 100
     }},
     { OPTION_UNIT_VOICES, (OptionData) {
         .name = "Unit Voices",
