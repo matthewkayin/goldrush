@@ -1,7 +1,5 @@
 #pragma once
 
-#define SOUND_LOOPS_INDEFINITELY -1
-
 enum SoundName {
     SOUND_UI_CLICK,
     SOUND_DEATH,
@@ -48,7 +46,8 @@ void sound_quit();
 void sound_set_sfx_volume(int volume);
 void sound_set_mus_volume(int volume);
 
-int sound_play(SoundName sound, int loops = 0);
-bool sound_is_looping(SoundName sound);
-void sound_begin_loop(SoundName sound);
-void sound_end_loop(SoundName sound);
+void sound_play(SoundName sound);
+void sound_update();
+bool sound_is_fire_loop_playing();
+void sound_begin_fire_loop();
+void sound_end_fire_loop();

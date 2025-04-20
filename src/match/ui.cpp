@@ -1263,10 +1263,10 @@ void match_ui_update(MatchUiState& state) {
             }
         }
     }
-    if (is_fire_on_screen && !sound_is_looping(SOUND_FIRE_BURN)) {
-        sound_begin_loop(SOUND_FIRE_BURN);
-    } else if (!is_fire_on_screen && sound_is_looping(SOUND_FIRE_BURN)) {
-        sound_end_loop(SOUND_FIRE_BURN);
+    if (is_fire_on_screen && !sound_is_fire_loop_playing()) {
+        sound_begin_fire_loop();
+    } else if (!is_fire_on_screen && sound_is_fire_loop_playing()) {
+        sound_end_fire_loop();
     }
 }
 

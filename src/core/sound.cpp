@@ -4,9 +4,7 @@
 #include <SDL3/SDL.h>
 #include <unordered_map>
 
-#define SOUND_STREAM_COUNT 2
-
-static const int SOUND_IS_NOT_LOOPING = -1;
+#define SFX_STREAM_COUNT 2
 
 struct SoundParams {
     const char* path;
@@ -170,10 +168,11 @@ struct SoundData {
 };
 
 struct SoundState {
-    SDL_AudioStream* streams[SOUND_STREAM_COUNT];
+    SDL_AudioStream* streams[SFX_STREAM_COUNT];
+    SDL_AudioStream* fire_stream;
     std::vector<SoundData> sounds;
     int sound_index[SOUND_COUNT];
-    int sound_loop[SOUND_COUNT];
+    bool is_fire_loop_playing;
 };
 static SoundState state;
 
@@ -182,7 +181,7 @@ bool sound_init() {
     desired_spec.format = SDL_AUDIO_S16;
     desired_spec.channels = 2;
     desired_spec.freq = 44100;
-    for (int stream = 0; stream < SOUND_STREAM_COUNT; stream++) {
+    for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
         state.streams[stream] = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired_spec, NULL, NULL);
         if (state.streams[stream] == NULL) {
             log_error("Error opening audio stream: %s", SDL_GetError());
@@ -190,6 +189,12 @@ bool sound_init() {
         }
         SDL_ResumeAudioStreamDevice(state.streams[stream]);
     }
+    state.fire_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired_spec, NULL, NULL);
+    if (state.fire_stream == NULL) {
+        log_error("Error opening fire audio stream: %s", SDL_GetError());
+        return false;
+    }
+    SDL_ResumeAudioStreamDevice(state.fire_stream);
 
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
         const SoundParams& params = SOUND_PARAMS.at((SoundName)sound);
@@ -228,10 +233,9 @@ bool sound_init() {
 
             state.sounds.push_back(sound_variant);
         }
-
-        state.sound_loop[sound] = SOUND_IS_NOT_LOOPING;
     }
 
+    state.is_fire_loop_playing = false;
     log_info("Initialized sound.");
 
     return true;
@@ -241,9 +245,10 @@ void sound_quit() {
     for (SoundData sound_data : state.sounds) {
         SDL_free(sound_data.buffer);
     }
-    for (int stream = 0; stream < SOUND_STREAM_COUNT; stream++) {
+    for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
         SDL_DestroyAudioStream(state.streams[stream]);
     }
+    SDL_DestroyAudioStream(state.fire_stream);
 
     log_info("Quit sound.");
 }
@@ -251,10 +256,19 @@ void sound_quit() {
 void sound_set_sfx_volume(int volume) {}
 void sound_set_mus_volume(int volume) {}
 
-int sound_play(SoundName sound, int loops) { 
+void sound_update() {
+    if (state.is_fire_loop_playing) {
+        SoundData& sound_fire = state.sounds[state.sound_index[SOUND_FIRE_BURN]];
+        if (SDL_GetAudioStreamAvailable(state.fire_stream) < sound_fire.length) {
+            SDL_PutAudioStreamData(state.fire_stream, sound_fire.buffer, sound_fire.length);
+        }
+    }
+}
+
+void sound_play(SoundName sound) { 
     int available_stream = 0;
     int min_data_available = SDL_GetAudioStreamAvailable(state.streams[0]);
-    for (int stream = 0; stream < SOUND_STREAM_COUNT; stream++) {
+    for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
         int stream_data_available = SDL_GetAudioStreamAvailable(state.streams[stream]);
         if (stream_data_available < min_data_available) {
             available_stream = stream;
@@ -267,57 +281,19 @@ int sound_play(SoundName sound, int loops) {
     SoundData& sound_data = state.sounds[state.sound_index[sound] + variant];
     SDL_ClearAudioStream(state.streams[available_stream]);
     SDL_PutAudioStreamData(state.streams[available_stream], sound_data.buffer, sound_data.length);
-    return 0;
 }
 
-bool sound_is_looping(SoundName sound) { return true; }
-void sound_begin_loop(SoundName sound) {}
-void sound_end_loop(SoundName sound) {}
-
-/*
-#include "defines.h"
-#include "core/logger.h"
-#include <SDL3/SDL_mixer.h>
-#include <vector>
-#include <unordered_map>
-#include <cstdlib>
-
-
-
-
-void sound_set_sfx_volume(int volume) {
-    Mix_Volume(-1, volume);
+bool sound_is_fire_loop_playing() {
+    return state.is_fire_loop_playing;
 }
 
-void sound_set_mus_volume(int volume) {
-
+void sound_begin_fire_loop() {
+    SoundData& sound_fire = state.sounds[state.sound_index[SOUND_FIRE_BURN]];
+    SDL_PutAudioStreamData(state.fire_stream, sound_fire.buffer, sound_fire.length);
+    state.is_fire_loop_playing = true;
 }
 
-int sound_play(SoundName sound, int loops) {
-    int variant = SOUND_PARAMS.at(sound).variants == 1 ? 0 : rand() % SOUND_PARAMS.at(sound).variants;
-    return Mix_PlayChannel(-1, state.sounds[state.sound_index[sound] + variant], loops);
+void sound_end_fire_loop() {
+    SDL_ClearAudioStream(state.fire_stream);
+    state.is_fire_loop_playing = false;
 }
-
-bool sound_is_looping(SoundName sound) {
-    return state.sound_loop[sound] != SOUND_IS_NOT_LOOPING;
-}
-
-void sound_begin_loop(SoundName sound) {
-    int channel = sound_play(sound, SOUND_LOOPS_INDEFINITELY);
-    if (channel == -1) {
-        log_error("No channel available to loop sound %u");
-        return;
-    }
-    state.sound_loop[sound] = channel;
-}
-
-void sound_end_loop(SoundName sound) {
-    if (state.sound_loop[sound] == SOUND_IS_NOT_LOOPING) {
-        log_warn("Called sound_end_loop on a sound that is not looping.");
-        return;
-    }
-
-    Mix_HaltChannel(state.sound_loop[sound]);
-    state.sound_loop[sound] = SOUND_IS_NOT_LOOPING;
-}
-    */
