@@ -4,10 +4,10 @@
             "type": "shell",
             "label": "Build Everything",
             "windows": {
-                "command": "${workspaceFolder}/build.bat"
+                "command": "make"
             },
             "osx": {
-                "command": "${workspaceFolder}/build.sh"
+                "command": "make"
             },
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -24,10 +24,10 @@
             "type": "shell",
             "label": "Clean Everything",
             "windows": {
-                "command": "${workspaceFolder}/build.bat clean"
+                "command": "make clean"
             },
             "osx": {
-                "command": "${workspaceFolder}/build.sh clean"
+                "command": "make clean"
             },
             "options": {
                 "cwd": "${workspaceFolder}"

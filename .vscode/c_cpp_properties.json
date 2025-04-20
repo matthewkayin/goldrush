@@ -3,10 +3,8 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/gold/src/**",
-                "${workspaceFolder}/gold/vendor/**",
-                "${workspaceFolder}/reporter/src/**",
-                "${workspaceFolder}/reporter/vendor/**"
+                "${workspaceFolder}/src/**",
+                "${workspaceFolder}/vendor/**"
             ],
             "defines": [
                 "UNICODE",
@@ -21,10 +19,8 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/gold/src/**",
-                "${workspaceFolder}/gold/vendor/**",
-                "${workspaceFolder}/reporter/src/**",
-                "${workspaceFolder}/reporter/vendor/**"
+                "${workspaceFolder}/src/**",
+                "${workspaceFolder}/vendor/**"
             ],
             "defines": [
                 "UNICODE",

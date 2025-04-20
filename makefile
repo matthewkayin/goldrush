@@ -4,14 +4,15 @@
 %:: s.%
 %:: SCCS/s.%
 
+ASSEMBLY := gold
 EXTENSION :=
 DIR := $(subst /,\,${CURDIR})
-LIB_DIR := $(ASSEMBLY)/lib
+LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
-INCLUDE_FLAGS := -I$(ASSEMBLY)/src -I$(ASSEMBLY)/vendor
+INCLUDE_FLAGS := -Isrc -Ivendor
 COMPILER_FLAGS := -std=c++17 -Wall -g -O0
-LINKER_FLAGS := -g -L$(LIB_DIR) $(ADDITIONAL_LFLAGS)
+LINKER_FLAGS := -g -L$(LIB_DIR) -lSDL3 -lSDL3_image -lSDL3_ttf
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 
 ifeq ($(OS),Windows_NT)
@@ -20,9 +21,12 @@ ifeq ($(OS),Windows_NT)
 
 # Make does not offer a recursive wildcard function, so here's one:
 	rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
-	SRC_FILES := $(call rwildcard,$(ASSEMBLY)/,*.cpp) # Get all .c files
-	DIRECTORIES := \$(ASSEMBLY)\src $(subst $(DIR),,$(shell dir $(ASSEMBLY)\src /S /AD /B | findstr /i src)) # Get all directories under src.
-	DIRECTORIES += \$(ASSEMBLY)\vendor $(subst $(DIR),,$(shell dir $(ASSEMBLY)\vendor /S /AD /B | findstr /i vendor)) # Get all directories under vendor.
+	SRC_FILES := $(call rwildcard,src/,*.cpp) # Get all .c files
+	SRC_FILES += $(call rwildcard,vendor/,*.cpp) # Get all .c files
+	DIRECTORIES := \src $(subst $(DIR),,$(shell dir src /S /AD /B | findstr /i src)) # Get all directories under src.
+	DIRECTORIES += \vendor $(subst $(DIR),,$(shell dir vendor /S /AD /B | findstr /i vendor)) # Get all directories under vendor.
+
+	LINKER_FLAGS += -luser32 -lws2_32 -lwinmm -lenet64
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
@@ -31,8 +35,12 @@ else
 		COMPILER_FLAGS += -Wno-deprecated-declarations
 	endif
 
-	SRC_FILES := $(shell find $(ASSEMBLY) -type f \( -name "*.cpp" -o -name "*.mm" \))
-	DIRECTORIES := $(shell find ${ASSEMBLY} -type d)
+	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))
+	SRC_FILES += $(shell find vendor -type f \( -name "*.cpp" -o -name "*.mm" \))
+	DIRECTORIES := $(shell find src -type d)
+	DIRECTORIES := $(shell find vendor -type d)
+
+	LINKER_FLAGS += -L/opt/homebrew/lib -lenet
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
