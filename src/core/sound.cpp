@@ -216,10 +216,7 @@ bool sound_init() {
                 return false;
             }
 
-            log_trace("Loaded sound %s with format %u channels %i freq %i", sound_path, sound_spec.format, sound_spec.channels, sound_spec.freq);
             if (sound_spec.format != desired_spec.format || sound_spec.channels != desired_spec.channels || sound_spec.freq != desired_spec.freq) {
-                log_trace("Sound does not match desired format. Converting...");
-
                 uint8_t* converted_data;
                 int converted_length;
                 if (!SDL_ConvertAudioSamples(&sound_spec, sound_variant.buffer, sound_variant.length, &desired_spec, &converted_data, &converted_length)) {
@@ -229,7 +226,6 @@ bool sound_init() {
                 SDL_free(sound_variant.buffer);
                 sound_variant.buffer = converted_data;
                 sound_variant.length = converted_length;
-                log_trace("Converted sound to desired format.");
             }
 
             state.sounds.push_back(sound_variant);

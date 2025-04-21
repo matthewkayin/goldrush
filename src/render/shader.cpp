@@ -42,7 +42,6 @@ bool shader_compile(uint32_t* id, GLenum type, const char* path_suffix) {
     }
 
     free(shader_source);
-    log_info("Shader %s compiled successfully.", path);
 
     return true;
 }
@@ -74,8 +73,6 @@ bool shader_load(uint32_t* id, const char* vertex_path, const char* fragment_pat
 
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
-
-    log_info("Shader linked successfully.");
 
     return true;
 }
