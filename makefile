@@ -26,6 +26,7 @@ ifeq ($(OS),Windows_NT)
 	DIRECTORIES := \src $(subst $(DIR),,$(shell dir src /S /AD /B | findstr /i src)) # Get all directories under src.
 	DIRECTORIES += \vendor $(subst $(DIR),,$(shell dir vendor /S /AD /B | findstr /i vendor)) # Get all directories under vendor.
 
+# ws2_32 and winmm are linked for enet
 	LINKER_FLAGS += -luser32 -lws2_32 -lwinmm -lenet64
 else
 	UNAME_S := $(shell uname -s)
@@ -38,7 +39,7 @@ else
 	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))
 	SRC_FILES += $(shell find vendor -type f \( -name "*.cpp" -o -name "*.mm" \))
 	DIRECTORIES := $(shell find src -type d)
-	DIRECTORIES := $(shell find vendor -type d)
+	DIRECTORIES += $(shell find vendor -type d)
 
 	LINKER_FLAGS += -L/opt/homebrew/lib -lenet
 endif

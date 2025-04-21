@@ -2,6 +2,7 @@
 
 #include "core/logger.h"
 #include <SDL3/SDL.h>
+#include <vector>
 #include <unordered_map>
 
 #define SFX_STREAM_COUNT 2
