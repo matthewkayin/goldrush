@@ -219,16 +219,17 @@ void render_update_screen_scale() {
 }
 
 void render_set_display(RenderDisplay display) {
+    SDL_DisplayID* display_id = SDL_GetDisplays(NULL);
+    const SDL_DisplayMode* display_mode = SDL_GetDesktopDisplayMode(display_id[0]);
+
     if (display == RENDER_DISPLAY_WINDOWED) {
         SDL_SetWindowFullscreen(state.window, false);
         SDL_SyncWindow(state.window);
         SDL_SetWindowSize(state.window, 1280, 720);
+        SDL_SetWindowPosition(state.window, (display_mode->w / 2) - (1280 / 2), (display_mode->h / 2) - (720 / 2));
         SDL_SyncWindow(state.window);
         render_update_screen_scale();
     } else {
-        SDL_DisplayID* display_id = SDL_GetDisplays(NULL);
-        const SDL_DisplayMode* display_mode = SDL_GetDesktopDisplayMode(display_id[0]);
-
         SDL_SetWindowSize(state.window, display_mode->w, display_mode->h);
         SDL_SyncWindow(state.window);
         render_update_screen_scale();
