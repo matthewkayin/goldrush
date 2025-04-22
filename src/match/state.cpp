@@ -53,14 +53,17 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
         match_create_goldmine(state, cell, MATCH_GOLDMINE_STARTING_GOLD);
     }
 
+    // Init fog and detection for each team
+    for (uint8_t team = 0; team < MAX_PLAYERS; team++) {
+        state.fog[team] = std::vector<int>(state.map.width * state.map.height, FOG_HIDDEN);
+        state.detection[team] = std::vector<int>(state.map.width * state.map.height, 0);
+    }
+
     // Init players
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         state.players[player_id].gold = MATCH_PLAYER_STARTING_GOLD;
         state.players[player_id].upgrades = 0;
         state.players[player_id].upgrades_in_progress = 0;
-
-        state.fog[player_id] = std::vector<int>(state.map.width * state.map.height, FOG_HIDDEN);
-        state.detection[player_id] = std::vector<int>(state.map.width * state.map.height, 0);
 
         if (state.players[player_id].active) {
             // Place town hall

@@ -1350,10 +1350,8 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
             selection.push_back(state.match.entities.get_id_of(index));
+            return selection;
         }
-    }
-    if (!selection.empty()) {
-        return selection;
     }
 
     // Select enemy buildings
@@ -1369,10 +1367,8 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
             selection.push_back(state.match.entities.get_id_of(index));
+            return selection;
         }
-    }
-    if (!selection.empty()) {
-        return selection;
     }
 
     // Select gold mines
@@ -1386,9 +1382,11 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
             selection.push_back(state.match.entities.get_id_of(index));
+            return selection;
         }
     }
 
+    // Returns an empty selection
     return selection;
 }
 
