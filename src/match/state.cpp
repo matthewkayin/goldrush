@@ -1400,9 +1400,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     int building_max_health = entity_get_data(building.type).max_health;
 
                     #ifdef GOLD_DEBUG_FAST_BUILD
-                        // building.health = std::min(building.health + 20, building_max_health);
+                        building.health = std::min(building.health + 20, building_max_health);
                     #else
-                        // building.health++;
+                        building.health++;
                     #endif
                     if (building.health == building_max_health) {
                         match_entity_building_finish(state, entity.target.id);

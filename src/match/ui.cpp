@@ -1126,28 +1126,33 @@ void match_ui_update(MatchUiState& state) {
             state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
         } else if (!state.selection.empty()) {
             Entity& first_entity = state.match.entities.get_by_id(state.selection[0]);
-            if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS) {
+            if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS && state.selection.size() == 1) {
                 state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
             } else if (first_entity.player_id == network_get_player_id()) {
                 bool is_selection_uniform = true;
+                bool has_garrisoned_units = !first_entity.garrisoned_units.empty();
                 for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
                     const Entity& entity = state.match.entities.get_by_id(state.selection[selection_index]);
+                    if (!entity.garrisoned_units.empty()) {
+                        has_garrisoned_units = true;
+                    }
                     if (entity.type != first_entity.type || 
                             entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) != entity_check_flag(first_entity, ENTITY_FLAG_INVISIBLE)) {
                         is_selection_uniform = false;
-                        break;
                     }
                 }
 
+                if (entity_is_unit(first_entity.type)) {
+                    state.hotkey_group[0] = INPUT_HOTKEY_ATTACK;
+                    state.hotkey_group[1] = INPUT_HOTKEY_STOP;
+                    state.hotkey_group[2] = INPUT_HOTKEY_DEFEND;
+                }
+                if (entity_is_building(first_entity.type) && !first_entity.queue.empty() && state.selection.size() == 1) {
+                    state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+                }
+
                 if (is_selection_uniform) {
-                    if (entity_is_unit(first_entity.type)) {
-                        state.hotkey_group[0] = INPUT_HOTKEY_ATTACK;
-                        state.hotkey_group[1] = INPUT_HOTKEY_STOP;
-                        state.hotkey_group[2] = INPUT_HOTKEY_DEFEND;
-                    } else if (entity_is_building(first_entity.type) && !first_entity.queue.empty() && state.selection.size() == 1) {
-                        state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
-                    }
-                    if (!first_entity.garrisoned_units.empty()) {
+                    if (has_garrisoned_units) {
                         state.hotkey_group[3] = INPUT_HOTKEY_UNLOAD;
                     }
                     switch (first_entity.type) {
