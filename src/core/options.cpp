@@ -16,7 +16,7 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .type = OPTION_TYPE_DROPDOWN,
         .min_value = 0,
         .max_value = RENDER_DISPLAY_COUNT,
-        .default_value = RENDER_DISPLAY_BORDERLESS
+        .default_value = RENDER_DISPLAY_FULLSCREEN
     }},
     { OPTION_VSYNC, (OptionData) {
         .name = "Vsync",
@@ -143,7 +143,7 @@ void option_apply(OptionName name) {
     switch (name) {
         case OPTION_DISPLAY:
             render_set_display((RenderDisplay)options[name]);
-            input_update_window_size();
+            input_update_screen_scale();
             break;
         case OPTION_VSYNC:
             render_set_vsync((RenderVsync)options[name]);

@@ -6,9 +6,8 @@
 
 struct InputState {
     SDL_Window* window;
-    ivec2 window_size;
-    ivec2 screen_position;
-    int scaled_screen_y;
+    ivec2 scaled_screen_size;
+    ivec2 scaled_screen_position;
 
     ivec2 mouse_position;
     bool current[INPUT_ACTION_COUNT];
@@ -24,23 +23,36 @@ struct InputState {
 };
 static InputState state;
 
-void input_update_window_size();
+void input_update_screen_scale();
 
 void input_init(SDL_Window* window) {
     memset(&state, 0, sizeof(state));
     state.window = window;
-    input_update_window_size();
+    input_update_screen_scale();
     input_stop_text_input();
     input_set_hotkey_mapping_to_default(state.hotkey_mapping);
 }
 
-void input_update_window_size() {
-    SDL_GetWindowSize(state.window, &state.window_size.x, &state.window_size.y);
-    float aspect = (float)state.window_size.x / (float)SCREEN_WIDTH;
-    float scaled_y = (float)SCREEN_HEIGHT * aspect;
-    float border_size = ((float)state.window_size.y - scaled_y) / 2.0;
-    state.scaled_screen_y = (int)scaled_y;
-    state.screen_position = ivec2(0, (int)border_size);
+void input_update_screen_scale() {
+    ivec2 window_size;
+    SDL_GetWindowSize(state.window, &window_size.x, &window_size.y);
+    float screen_aspect = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
+    float window_aspect = (float)window_size.x / (float)window_size.y;
+    if (screen_aspect >= window_aspect) {
+        // Letterbox
+        float ratio = (float)window_size.x / (float)SCREEN_WIDTH;
+        float scaled_height = (float)SCREEN_HEIGHT * ratio;
+        float border_size = ((float)window_size.y - scaled_height) / 2.0;
+        state.scaled_screen_size = ivec2((int)window_size.x, (int)scaled_height);
+        state.scaled_screen_position = ivec2(0, (int)border_size);
+    } else {
+        // Pillarbox
+        float ratio = (float)window_size.y / (float)SCREEN_HEIGHT;
+        float scaled_width = (float)SCREEN_WIDTH * ratio;
+        float border_size = ((float)window_size.x - scaled_width) / 2.0;
+        state.scaled_screen_size = ivec2((int)scaled_width, (int)window_size.y);
+        state.scaled_screen_position = ivec2((int)border_size, 0);
+    }
 }
 
 void input_poll_events() {
@@ -53,6 +65,11 @@ void input_poll_events() {
         if (event.type == SDL_EVENT_QUIT) {
             state.user_requests_exit = true;
             break;
+        }
+
+        if (event.type == SDL_EVENT_WINDOW_RESIZED || 
+                event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
+            input_update_screen_scale();
         }
 
         // Capture mouse
@@ -75,8 +92,8 @@ void input_poll_events() {
 
         switch (event.type) {
             case SDL_EVENT_MOUSE_MOTION: {
-                state.mouse_position = ivec2(event.motion.x - state.screen_position.x, event.motion.y - state.screen_position.y);
-                state.mouse_position = ivec2((state.mouse_position.x * SCREEN_WIDTH) / state.window_size.x, (state.mouse_position.y * SCREEN_HEIGHT) / state.scaled_screen_y);
+                state.mouse_position = ivec2(event.motion.x - state.scaled_screen_position.x, event.motion.y - state.scaled_screen_position.y);
+                state.mouse_position = ivec2((state.mouse_position.x * SCREEN_WIDTH) / state.scaled_screen_size.x, (state.mouse_position.y * SCREEN_HEIGHT) / state.scaled_screen_size.y);
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: 

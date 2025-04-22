@@ -11,7 +11,6 @@
 enum RenderDisplay {
     RENDER_DISPLAY_WINDOWED,
     RENDER_DISPLAY_FULLSCREEN,
-    RENDER_DISPLAY_BORDERLESS,
     RENDER_DISPLAY_COUNT
 };
 
@@ -93,7 +92,7 @@ const uint32_t RENDER_SPRITE_CENTERED = 4;
 
 bool render_init(SDL_Window* window);
 void render_quit();
-void render_set_window_size(ivec2 window_size);
+void render_update_screen_scale();
 void render_set_display(RenderDisplay display);
 void render_set_vsync(RenderVsync vsync);
 void render_sprite_batch();

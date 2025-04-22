@@ -86,7 +86,6 @@ struct LoadedSurface {
 struct RenderState {
     SDL_Window* window;
     SDL_GLContext context;
-    ivec2 window_size;
 
     GLuint screen_shader;
     GLuint screen_framebuffer;
@@ -165,10 +164,7 @@ bool render_init(SDL_Window* window) {
     float screen_size[2] = { (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
     glUniform2fv(glGetUniformLocation(state.screen_shader, "screen_size"), 1, screen_size);
 
-    ivec2 window_size;
-    SDL_GetWindowSize(state.window, &window_size.x, &window_size.y);
-    float window_size_float[2] = { (float)window_size.x, (float)window_size.y };
-    glUniform2fv(glGetUniformLocation(state.screen_shader, "window_size"), 1, window_size_float);
+    render_update_screen_scale();
 
     // Load sprite shader
     if (!shader_load(&state.sprite_shader, "sprite.vert.glsl", "sprite.frag.glsl")) {
@@ -197,36 +193,46 @@ bool render_init(SDL_Window* window) {
     return true;
 }
 
-void render_set_window_size(ivec2 window_size) {
-    SDL_SetWindowSize(state.window, window_size.x, window_size.y);
+void render_update_screen_scale() {
+    ivec2 window_size;
+    SDL_GetWindowSize(state.window, &window_size.x, &window_size.y);
+
+    float screen_scale[2];
+    float screen_aspect = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
+    float window_aspect = (float)window_size.x / (float)window_size.y;
+    if (screen_aspect >= window_aspect) {
+        // Letterbox
+        float ratio = (float)window_size.x / (float)SCREEN_WIDTH;
+        float scaled_height = (float)SCREEN_HEIGHT * ratio;
+        screen_scale[0] = 1.0f;
+        screen_scale[1] = scaled_height / (float)window_size.y;
+    } else {
+        // Pillarbox
+        float ratio = (float)window_size.y / (float)SCREEN_HEIGHT;
+        float scaled_width = (float)SCREEN_WIDTH * ratio;
+        screen_scale[0] = scaled_width / (float)window_size.x;
+        screen_scale[1] = 1.0f;
+    }
+
     glUseProgram(state.screen_shader);
-    glUniform2iv(glGetUniformLocation(state.screen_shader, "window_size"), 1, &window_size.x);
-    state.window_size = window_size;
+    glUniform2fv(glGetUniformLocation(state.screen_shader, "screen_scale"), 1, screen_scale);
 }
 
 void render_set_display(RenderDisplay display) {
-    // SDL_DisplayMode display_mode;
-    // SDL_GetCurrentDisplayMode(0, &display_mode);
-
-    // Set window to user's screen size
-    if (display != RENDER_DISPLAY_WINDOWED) {
-        // render_set_window_size(ivec2(display_mode.w, display_mode.h));
-    }
-
-    // Set window display mode
-    uint32_t flags = 0;
-    if (display == RENDER_DISPLAY_FULLSCREEN) {
-        flags = SDL_WINDOW_FULLSCREEN;
-    } else if (display == RENDER_DISPLAY_BORDERLESS) {
-        flags = SDL_WINDOW_BORDERLESS;
-    }
-    SDL_SetWindowFullscreen(state.window, flags);
-
-    // Center the window
     if (display == RENDER_DISPLAY_WINDOWED) {
-        ivec2 window_size = ivec2(1280, 720);
-        render_set_window_size(window_size);
-        // SDL_SetWindowPosition(state.window, (display_mode.w / 2) - (window_size.x / 2), (display_mode.h / 2) - (window_size.y / 2));
+        SDL_SetWindowFullscreen(state.window, false);
+        SDL_SyncWindow(state.window);
+        SDL_SetWindowSize(state.window, 1280, 720);
+        SDL_SyncWindow(state.window);
+        render_update_screen_scale();
+    } else {
+        SDL_DisplayID* display_id = SDL_GetDisplays(NULL);
+        const SDL_DisplayMode* display_mode = SDL_GetDesktopDisplayMode(display_id[0]);
+
+        SDL_SetWindowSize(state.window, display_mode->w, display_mode->h);
+        SDL_SyncWindow(state.window);
+        render_update_screen_scale();
+        SDL_SetWindowFullscreen(state.window, true);
     }
 }
 

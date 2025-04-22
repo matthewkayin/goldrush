@@ -65,7 +65,7 @@ enum InputAction {
 };
 
 void input_init(SDL_Window* window);
-void input_update_window_size();
+void input_update_screen_scale();
 void input_poll_events();
 
 void input_start_text_input(std::string* str, size_t max_length);
