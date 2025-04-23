@@ -931,7 +931,7 @@ ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
 
 // Returns the nearest cell around the rect relative to start_cell
 // If there are no free cells around the rect in a radius of 1, then this returns the start cell
-ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 start, int start_size, ivec2 rect_position, int rect_size, bool allow_blocked_cells, ivec2 ignore_cell) {
+ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 start, int start_size, ivec2 rect_position, int rect_size, bool gold_walk, ivec2 ignore_cell) {
     ivec2 nearest_cell;
     int nearest_cell_dist = -1;
 
@@ -952,7 +952,7 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 st
     ivec2 cell = cell_begin[index];
     while (index < 4) {
         if (map_is_cell_rect_in_bounds(map, cell, start_size) && cell != ignore_cell) {
-            if (!map_is_cell_rect_occupied(map, layer, cell, start_size, ivec2(-1, -1), allow_blocked_cells) && (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist)) {
+            if (!map_is_cell_rect_occupied(map, layer, cell, start_size, ivec2(-1, -1), gold_walk) && (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist)) {
                 nearest_cell = cell;
                 nearest_cell_dist = ivec2::manhattan_distance(start, cell);
             }
@@ -971,14 +971,14 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 st
     return nearest_cell_dist != -1 ? nearest_cell : start;
 }
 
-ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, bool allow_blocked_cells) {
+ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, bool gold_walk) {
     ivec2 exit_cell = ivec2(-1, -1);
     int exit_cell_dist = -1;
     for (int x = building_cell.x - unit_size; x < building_cell.x + building_size + unit_size; x++) {
         ivec2 cell = ivec2(x, building_cell.y - unit_size);
         int cell_dist = ivec2::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
-                !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), allow_blocked_cells) &&
+                !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), gold_walk) &&
                 (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -986,7 +986,7 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
         cell = ivec2(x, building_cell.y + building_size);
         cell_dist = ivec2::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
-                !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), allow_blocked_cells) &&
+                !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), gold_walk) &&
                 (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -996,7 +996,7 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
         ivec2 cell = ivec2(building_cell.x - unit_size, y);
         int cell_dist = ivec2::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
-                !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), allow_blocked_cells) &&
+                !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), gold_walk) &&
                 (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -1004,7 +1004,7 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
         cell = ivec2(building_cell.x + building_size, y);
         cell_dist = ivec2::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
-                !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), allow_blocked_cells) &&
+                !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), gold_walk) &&
                 (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;

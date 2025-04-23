@@ -1476,7 +1476,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     ivec2 rally_cell = hall_target.type == TARGET_NONE 
                                         ? (mine.cell + ivec2(1, mine_data.cell_size)) 
                                         : map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, mine.cell + ivec2(1, 1), 1, state.entities[hall_index].cell, hall_data.cell_size, true);
-                    ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, mine.cell, mine_data.cell_size, entity_data.cell_size, rally_cell, true);
+                    ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, mine.cell, mine_data.cell_size, entity_data.cell_size, rally_cell, false);
 
                     if (exit_cell.x == -1) {
                         match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_MINE_EXIT_BLOCKED);
