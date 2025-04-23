@@ -1709,7 +1709,7 @@ const char* match_ui_get_menu_header_text(MatchUiMode mode) {
 
 // RENDER
 
-void match_ui_render(const MatchUiState& state) {
+void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     std::vector<RenderSpriteParams> above_fog_sprite_params;
     std::vector<RenderSpriteParams> ysort_params;
 
@@ -2766,7 +2766,7 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // Debug unit info
-    #ifdef GOLD_DEBUG_UNIT_INFO
+    if (render_debug_info) {
         if (!match_ui_is_mouse_in_ui()) {
             ivec2 mouse_cell = (input_get_mouse_position() + state.camera_offset) / TILE_SIZE;
             Cell cell_value = map_get_cell(state.match.map, CELL_LAYER_GROUND, mouse_cell);
@@ -2806,10 +2806,18 @@ void match_ui_render(const MatchUiState& state) {
             debug_text_ptr += sprintf(debug_text_ptr, " fire: %i", (int)match_is_cell_on_fire(state.match, mouse_cell));
             render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 12));
 
+            if (cell_value.type == CELL_EMPTY) {
+                cell_value = map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, mouse_cell);
+            }
+            if (cell_value.type == CELL_EMPTY) {
+                cell_value = map_get_cell(state.match.map, CELL_LAYER_SKY, mouse_cell);
+            }
+
             debug_text_ptr = debug_text;
             if (cell_value.type == CELL_MINER || cell_value.type == CELL_UNIT || cell_value.type == CELL_BUILDING) {
                 const Entity& entity = state.match.entities.get_by_id(cell_value.id);
-                debug_text_ptr += sprintf(debug_text_ptr, "%u %s | Mode: ", cell_value.id, entity_get_data(entity.type).name);
+                const EntityData& entity_data = entity_get_data(entity.type);
+                debug_text_ptr += sprintf(debug_text_ptr, "%u %s | Mode: ", cell_value.id, entity_data.name);
                 switch (entity.mode) {
                     case MODE_UNIT_IDLE:
                         debug_text_ptr += sprintf(debug_text_ptr, "IDLE");
@@ -2882,11 +2890,41 @@ void match_ui_render(const MatchUiState& state) {
                 render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 24));
 
                 debug_text_ptr = debug_text;
-                debug_text_ptr += sprintf(debug_text_ptr, "Target: %u Reached? %i", entity.target.type, (int)match_has_entity_reached_target(state.match, entity));
+                debug_text_ptr += sprintf(debug_text_ptr, "player: %u team: %u is visible to player? %i", entity.player_id, state.match.players[entity.player_id].team, (int)match_is_entity_visible_to_player(state.match, entity, network_get_player_id()));
                 render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 36));
+
+                debug_text_ptr = debug_text;
+                debug_text_ptr += sprintf(debug_text_ptr, "layer: ");
+                switch (entity_data.cell_layer) {
+                    case CELL_LAYER_UNDERGROUND:
+                        debug_text_ptr += sprintf(debug_text_ptr, "underground");
+                        break;
+                    case CELL_LAYER_GROUND:
+                        debug_text_ptr += sprintf(debug_text_ptr, "ground");
+                        break;
+                    case CELL_LAYER_SKY:
+                        debug_text_ptr += sprintf(debug_text_ptr, "sky");
+                        break;
+                    default:
+                        debug_text_ptr += sprintf(debug_text_ptr, "unknown");
+                        break;
+                }
+                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 48));
+
+                const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
+                RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
+                Rect render_rect = (Rect) {
+                    .x = params.position.x, .y = params.position.y,
+                    .w = sprite_info.frame_width, .h = sprite_info.frame_height
+                };
+                bool sprite_intersects = render_rect.intersects(SCREEN_RECT);
+
+                debug_text_ptr = debug_text;
+                debug_text_ptr += sprintf(debug_text_ptr, "render rect on screen? %i", sprite_intersects);
+                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 60));
             }
         }
-    #endif
+    }
 
     ui_render(UI_MAIN);
     render_sprite_batch();

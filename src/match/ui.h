@@ -135,7 +135,7 @@ bool match_ui_is_opponent_in_match(const MatchUiState& state);
 bool match_ui_is_in_menu(MatchUiMode mode);
 const char* match_ui_get_menu_header_text(MatchUiMode mode);
 
-void match_ui_render(const MatchUiState& state);
+void match_ui_render(const MatchUiState& state, bool render_debug_info);
 
 SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking);
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);

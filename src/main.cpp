@@ -229,7 +229,7 @@ int gold_main(int argc, char** argv) {
                 break;
             }
             case GAME_MODE_MATCH: {
-                match_ui_render(match_ui_state);
+                match_ui_render(match_ui_state, render_debug_info);
                 break;
             }
         }
