@@ -801,6 +801,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
         if (entity_is_unit(entity.type)) {
             entity.mode = entity.type == ENTITY_BALLOON ? MODE_UNIT_BALLOON_DEATH_START : MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
+            entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, false);
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;

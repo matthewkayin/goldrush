@@ -814,6 +814,10 @@ void match_ui_update(MatchUiState& state) {
         }
     }
 
+    if (state.mode == MATCH_UI_MODE_LEAVE_MATCH) {
+        return;
+    }
+
     // Turn loop
     if (state.turn_timer == 0) {
         bool all_inputs_received = true;
