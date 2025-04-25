@@ -3,12 +3,13 @@
 #include "logger.h"
 #include "sound.h"
 #include "input.h"
+#include "platform.h"
 #include "render/render.h"
 #include <unordered_map>
 #include <fstream>
 #include <string>
 
-static const char* OPTIONS_FILE_PATH = "./options.ini";
+static const char* OPTIONS_FILE_NAME = "options.ini";
 
 static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
     { OPTION_DISPLAY, (OptionData) {
@@ -65,7 +66,9 @@ void options_load() {
         options[(OptionName)option] = OPTION_DATA.at((OptionName)option).default_value;
     }
 
-    std::ifstream options_file(OPTIONS_FILE_PATH);
+    char options_file_path[256];
+    platform_get_datafile_path(options_file_path, OPTIONS_FILE_NAME);
+    std::ifstream options_file(options_file_path);
     if (!options_file.is_open()) {
         log_info("No options file found.");
         return;
@@ -107,7 +110,9 @@ void options_load() {
 }
 
 void options_save() {
-    FILE* options_file = fopen(OPTIONS_FILE_PATH, "w");
+    char options_file_path[256];
+    platform_get_datafile_path(options_file_path, OPTIONS_FILE_NAME);
+    FILE* options_file = fopen(options_file_path, "w");
     if (options_file == NULL) {
         log_error("Could not open options file for writing.");
         return;

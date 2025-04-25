@@ -61,7 +61,7 @@ void platform_get_resource_path(char* buffer, const char* subpath) {
     #endif
 }
 
-void platform_get_logfile_path(char* buffer, const char* filename) {
+void platform_get_datafile_path(char* buffer, const char* filename) {
     sprintf("./%s", filename);
 }
 

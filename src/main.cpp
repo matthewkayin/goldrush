@@ -51,7 +51,7 @@ int gold_main(int argc, char** argv) {
     }
 
     char logfile_path[256];
-    platform_get_logfile_path(logfile_path, logfile_name);
+    platform_get_datafile_path(logfile_path, logfile_name);
     if(!logger_init(logfile_path)) {
         return -1;
     }

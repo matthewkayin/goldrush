@@ -223,6 +223,8 @@ void render_set_display(RenderDisplay display) {
     SDL_DisplayID* display_id = SDL_GetDisplays(NULL);
     const SDL_DisplayMode* display_mode = SDL_GetDesktopDisplayMode(display_id[0]);
 
+    SDL_SyncWindow(state.window);
+
     if (display == RENDER_DISPLAY_WINDOWED) {
         SDL_SetWindowFullscreen(state.window, false);
         SDL_SyncWindow(state.window);

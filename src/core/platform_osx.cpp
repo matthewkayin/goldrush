@@ -56,12 +56,12 @@ void platform_get_resource_path(char* buffer, const char* subpath) {
     #endif
 }
 
-void platform_get_logfile_path(char* buffer, const char* filename) {
+void platform_get_datafile_path(char* buffer, const char* filename) {
     #ifdef GOLD_DEBUG
         sprintf(buffer, "./%s", filename);
     #else
         char logfile_folder_path[128];
-        sprintf(logfile_folder_path, "%s/Library/Logs/goldrush", getenv("HOME"));
+        sprintf(logfile_folder_path, "%s/Library/Application Support/goldrush", getenv("HOME"));
         mkdir(logfile_folder_path, 0777);
         sprintf(buffer, "%s/%s", logfile_folder_path, filename);
     #endif
