@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <mach/mach_time.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <sys/stat.h>
 
 static mach_timebase_info_data_t clock_timebase;
 static uint64_t clock_start_time;
@@ -21,36 +22,49 @@ double platform_get_absolute_time() {
 }
 
 void platform_console_write(const char* message, int log_level) {
-    #ifdef GOLD_STD_OUT
-    static const char* TEXT_COLORS[4] = { 
-        "31", // ERROR
-        "33", // WARN
-        "32", // INFO
-        "0"  // TRACE
-    };
-    if (log_level == 0) {
-        fprintf(stderr, "\x1B[%sm%s", TEXT_COLORS[log_level], message);
-    } else {
-        printf("\x1B[%sm%s", TEXT_COLORS[log_level], message);
-    }
+    #ifdef GOLD_DEBUG
+        static const char* TEXT_COLORS[4] = { 
+            "31", // ERROR
+            "33", // WARN
+            "32", // INFO
+            "0"  // TRACE
+        };
+        if (log_level == 0) {
+            fprintf(stderr, "\x1B[%sm%s", TEXT_COLORS[log_level], message);
+        } else {
+            printf("\x1B[%sm%s", TEXT_COLORS[log_level], message);
+        }
     #endif
 }
 
-const char* platform_get_resource_path(char* buffer, const char* subpath) {
-    CFBundleRef main_bundle = CFBundleGetMainBundle();
-    CFStringEncoding url_encoding = CFStringGetSystemEncoding();
+void platform_get_resource_path(char* buffer, const char* subpath) {
+    #ifdef GOLD_DEBUG
+        sprintf(buffer, "../res/%s", subpath);
+    #else
+        CFBundleRef main_bundle = CFBundleGetMainBundle();
+        CFStringEncoding url_encoding = CFStringGetSystemEncoding();
 
-    CFStringRef subpath_str = CFStringCreateWithCString(NULL, subpath, url_encoding);
-    CFURLRef url = CFBundleCopyResourceURL(main_bundle, subpath_str, NULL, NULL);
-    CFStringRef url_str = CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle);
+        CFStringRef subpath_str = CFStringCreateWithCString(NULL, subpath, url_encoding);
+        CFURLRef url = CFBundleCopyResourceURL(main_bundle, subpath_str, NULL, NULL);
+        CFStringRef url_str = CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle);
 
-    strcpy(buffer, CFStringGetCStringPtr(url_str, url_encoding));
-    const char* path = CFStringGetCStringPtr(url_str, url_encoding);
+        strcpy(buffer, CFStringGetCStringPtr(url_str, url_encoding));
+        const char* path = CFStringGetCStringPtr(url_str, url_encoding);
 
-    CFRelease(subpath_str);
-    CFRelease(url_str);
+        CFRelease(subpath_str);
+        CFRelease(url_str);
+    #endif
+}
 
-    return path;
+void platform_get_logfile_path(char* buffer, const char* filename) {
+    #ifdef GOLD_DEBUG
+        sprintf(buffer, "./%s", filename);
+    #else
+        char logfile_folder_path[128];
+        sprintf(logfile_folder_path, "%s/Library/Logs/goldrush", getenv("HOME"));
+        mkdir(logfile_folder_path, 0777);
+        sprintf(buffer, "%s/%s", logfile_folder_path, filename);
+    #endif
 }
 
 #endif

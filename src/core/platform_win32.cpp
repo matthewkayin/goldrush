@@ -25,7 +25,7 @@ double platform_get_absolute_time() {
 }
 
 void platform_console_write(const char* message, int log_level) {
-    #ifdef GOLD_STD_OUT
+    #ifdef GOLD_DEBUG
     HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
     switch (log_level) {
         case 0:
@@ -51,6 +51,18 @@ void platform_console_write(const char* message, int log_level) {
     WriteConsoleA(GetStdHandle(log_level == 0 ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE), message, (DWORD)length, number_written, 0);
     SetConsoleTextAttribute(console_handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
     #endif
+}
+
+void platform_get_resource_path(char* buffer, const char* subpath) {
+    #ifdef GOLD_DEBUG
+        sprintf(buffer, "../res/%s", subpath);
+    #else
+        sprintf(buffer, "./res/%s", subpath);
+    #endif
+}
+
+void platform_get_logfile_path(char* buffer, const char* filename) {
+    sprintf("./%s", filename);
 }
 
 #endif
