@@ -1,6 +1,7 @@
 #include "sound.h"
 
 #include "core/logger.h"
+#include "core/platform.h"
 #include <SDL3/SDL.h>
 #include <vector>
 #include <unordered_map>
@@ -202,12 +203,15 @@ bool sound_init() {
         state.sound_index[sound] = state.sounds.size();
 
         for (int variant = 0; variant < params.variants; variant++) {
-            char sound_path[256];
+            char sound_subpath[128];
             if (params.variants == 1) {
-                sprintf(sound_path, "%ssfx/%s.wav", RESOURCE_PATH, params.path);
+                sprintf(sound_subpath, "sfx/%s.wav", params.path);
             } else {
-                sprintf(sound_path, "%ssfx/%s%i.wav", RESOURCE_PATH, params.path, (variant + 1));
+                sprintf(sound_subpath, "sfx/%s%i.wav", params.path, variant + 1);
             }
+
+            char sound_path[256];
+            platform_get_resource_path(sound_path, sound_subpath);
 
             SoundData sound_variant;
             SDL_AudioSpec sound_spec;

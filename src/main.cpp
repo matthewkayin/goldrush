@@ -18,6 +18,7 @@
 #include <cstring>
 #include <ctime>
 #include <cstdlib>
+#include <sys/stat.h>
 
 int gold_main(int argc, char** argv);
 
@@ -39,8 +40,11 @@ enum GameMode {
 };
 
 int gold_main(int argc, char** argv) {
+    char logfile_folder_path[128];
+    sprintf(logfile_folder_path, "%s/Library/Logs/goldrush", getenv("HOME"));
+    mkdir(logfile_folder_path, 0777);
     char logfile_path[128];
-    sprintf(logfile_path, "./logs.log");
+    sprintf(logfile_path, "%s/logs.log", logfile_folder_path);
 
     // Parse system arguments
     for (int argn = 1; argn < argc; argn++) {
@@ -53,6 +57,7 @@ int gold_main(int argc, char** argv) {
     if(!logger_init(logfile_path)) {
         return -1;
     }
+
     log_info("Initializing %s %s.", APP_NAME, APP_VERSION);
     #if defined(PLATFORM_WIN32)
         log_info("Detected platform WIN32.");

@@ -2,18 +2,21 @@
 
 #include "defines.h"
 #include "core/logger.h"
+#include "core/platform.h"
 #include <glad/glad.h>
 #include <cstdio>
 #include <cstdlib>
 
 bool shader_compile(uint32_t* id, GLenum type, const char* path_suffix) {
     // Read the shader file
-    char path[128];
-    sprintf(path, "%sshader/%s", RESOURCE_PATH, path_suffix);
+    char subpath[128];
+    sprintf(subpath, "shader/%s", path_suffix);
+    char path[256];
+    platform_get_resource_path(path, subpath);
 
     FILE* shader_file = fopen(path, "rb");
     if (!shader_file) {
-        log_error("Unable to open shader file at path %s.");
+        log_error("Unable to open shader file at path %s.", path);
         return false;
     }
 

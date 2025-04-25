@@ -41,7 +41,12 @@ else
 	DIRECTORIES := $(shell find src -type d)
 	DIRECTORIES += $(shell find vendor -type d)
 
-	LINKER_FLAGS += -L/opt/homebrew/lib -lenet
+# LINKER_FLAGS += -L/opt/homebrew/lib -lenet
+	LINKER_FLAGS := -g
+	LINKER_FLAGS += $(shell pkg-config --libs --static libenet)
+	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3)
+	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-image)
+	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-ttf)
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
@@ -52,6 +57,18 @@ all: scaffold compile link
 prep:
 ifeq ($(BUILD_PLATFORM),WIN32)
 	-@setlocal enableextensions enabledelayedexpansion && copy $(LIB_DIR) $(BUILD_DIR)
+endif
+
+.PHONY: osx-bundle
+osx-bundle:
+ifeq ($(BUILD_PLATFORM),OSX)
+	@mkdir -p $(BUILD_DIR)/"Gold Rush.app"
+	@mkdir -p $(BUILD_DIR)/"Gold Rush.app"/Contents
+	@mkdir -p $(BUILD_DIR)/"Gold Rush.app"/Contents/MacOS
+	@mkdir -p $(BUILD_DIR)/"Gold Rush.app"/Contents/Resources
+	@echo "APPLGoldRush" > $(BUILD_DIR)/"Gold Rush.app"/Contents/PkgInfo
+	@cp Info.plist $(BUILD_DIR)/"Gold Rush.app"/Info.plist
+	@cp $(BUILD_DIR)/$(ASSEMBLY) $(BUILD_DIR)/"Gold Rush.app"/Contents/MacOS/$(ASSEMBLY)
 endif
 
 .PHONY: scaffold
