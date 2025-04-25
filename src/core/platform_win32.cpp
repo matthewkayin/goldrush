@@ -62,7 +62,7 @@ void platform_get_resource_path(char* buffer, const char* subpath) {
 }
 
 void platform_get_datafile_path(char* buffer, const char* filename) {
-    sprintf("./%s", filename);
+    sprintf(buffer, "./%s", filename);
 }
 
 #endif
