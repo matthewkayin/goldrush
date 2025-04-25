@@ -62,13 +62,9 @@ endif
 .PHONY: osx-bundle
 osx-bundle:
 ifeq ($(BUILD_PLATFORM),OSX)
-	@mkdir -p $(BUILD_DIR)/"Gold Rush.app"
-	@mkdir -p $(BUILD_DIR)/"Gold Rush.app"/Contents
-	@mkdir -p $(BUILD_DIR)/"Gold Rush.app"/Contents/MacOS
-	@mkdir -p $(BUILD_DIR)/"Gold Rush.app"/Contents/Resources
-	@echo "APPLGoldRush" > $(BUILD_DIR)/"Gold Rush.app"/Contents/PkgInfo
-	@cp Info.plist $(BUILD_DIR)/"Gold Rush.app"/Info.plist
-	@cp $(BUILD_DIR)/$(ASSEMBLY) $(BUILD_DIR)/"Gold Rush.app"/Contents/MacOS/$(ASSEMBLY)
+	@./appify.sh -s $(BUILD_DIR)/gold -i icon.icns
+	@mv $(ASSEMBLY).app $(BUILD_DIR)/$(ASSEMBLY).app
+	@cp -a ./res/ $(BUILD_DIR)/$(ASSEMBLY).app/Contents/Resources/
 endif
 
 .PHONY: scaffold
@@ -104,6 +100,7 @@ ifeq ($(BUILD_PLATFORM),WIN32)
 	rmdir /s /q $(OBJ_DIR)
 else
 	@rm -rf $(BUILD_DIR)/$(ASSEMBLY)$(EXTENSION)
+	@rm -rf $(BUILD_DIR)/$(ASSEMBLY).app
 	@rm -rf $(OBJ_DIR)
 endif
 
