@@ -1775,6 +1775,9 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                         entity_get_elevation(entity, state.match.map) != elevation) {
                     continue;
                 }
+                if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                    continue;
+                }
                 
                 RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
                 render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
