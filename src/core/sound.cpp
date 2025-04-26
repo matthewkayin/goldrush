@@ -6,7 +6,7 @@
 #include <vector>
 #include <unordered_map>
 
-#define SFX_STREAM_COUNT 2
+#define SFX_STREAM_COUNT 4
 
 struct SoundParams {
     const char* path;
@@ -266,7 +266,7 @@ void sound_set_mus_volume(int volume) {}
 void sound_update() {
     if (state.is_fire_loop_playing) {
         SoundData& sound_fire = state.sounds[state.sound_index[SOUND_FIRE_BURN]];
-        if (SDL_GetAudioStreamAvailable(state.fire_stream) < sound_fire.length) {
+        if (SDL_GetAudioStreamQueued(state.fire_stream) < sound_fire.length) {
             SDL_PutAudioStreamData(state.fire_stream, sound_fire.buffer, sound_fire.length);
         }
     }
@@ -274,9 +274,9 @@ void sound_update() {
 
 void sound_play(SoundName sound) { 
     int available_stream = 0;
-    int min_data_available = SDL_GetAudioStreamAvailable(state.streams[0]);
+    int min_data_available = SDL_GetAudioStreamQueued(state.streams[0]);
     for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
-        int stream_data_available = SDL_GetAudioStreamAvailable(state.streams[stream]);
+        int stream_data_available = SDL_GetAudioStreamQueued(state.streams[stream]);
         if (stream_data_available < min_data_available) {
             available_stream = stream;
             min_data_available = stream_data_available;

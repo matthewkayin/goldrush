@@ -108,6 +108,10 @@ struct RenderState {
     GLuint font_vao;
     GLuint font_vbo;
     Font fonts[FONT_COUNT];
+
+    #ifdef GOLD_DEBUG
+        bool print_report;
+    #endif
 };
 static RenderState state;
 
@@ -191,6 +195,10 @@ bool render_init(SDL_Window* window) {
     log_info("Initialized renderer. Vendor: %s. Renderer: %s. Version: %s.", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
     SDL_GL_SetSwapInterval(1);
 
+    #ifdef GOLD_DEBUG
+        state.print_report = false;
+    #endif
+
     return true;
 }
 
@@ -248,6 +256,13 @@ void render_set_vsync(RenderVsync vsync) {
         log_error("GL set swap interval failed. Defaulting to vsync on");
         SDL_GL_SetSwapInterval(1);
     }
+}
+
+void render_request_report() {
+    #ifdef GOLD_DEBUG
+        state.print_report = true;
+        log_trace("--- begin render report ---");
+    #endif
 }
 
 void render_init_quad_vao() {
@@ -915,6 +930,13 @@ void render_present_frame() {
     glBindVertexArray(0);
 
     SDL_GL_SwapWindow(state.window);
+
+    #ifdef GOLD_DEBUG
+        if (state.print_report) {
+            state.print_report = false;
+            log_trace("--- end render report ---");
+        }
+    #endif
 }
 
 const SpriteInfo& render_get_sprite_info(SpriteName name) {
@@ -922,6 +944,12 @@ const SpriteInfo& render_get_sprite_info(SpriteName name) {
 }
 
 void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id) {
+    #ifdef GOLD_DEBUG
+        if (state.print_report) {
+            log_trace("render_sprite_frame(name = %u, frame = %vi, position = %vi, options = %u, recolor_id = %i)", name, &frame, &position, options, recolor_id);
+        }
+    #endif
+
     const SpriteInfo& sprite_info = render_get_sprite_info(name);
     GOLD_ASSERT(frame.x <= sprite_info.frame_width && frame.y <= sprite_info.frame_height);
 
@@ -941,6 +969,12 @@ void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t 
 }
 
 void render_ninepatch(SpriteName sprite, Rect rect) {
+    #ifdef GOLD_DEBUG
+        if (state.print_report) {
+            log_trace("render_ninepatch(sprite = %u, rect = %r)", sprite, &rect);
+        }
+    #endif
+
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
     GOLD_ASSERT(rect.w > sprite_info.frame_width * 2 && rect.h > sprite_info.frame_height * 2);
 
@@ -1015,6 +1049,12 @@ void render_ninepatch(SpriteName sprite, Rect rect) {
 }
 
 void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t options) {
+    #ifdef GOLD_DEBUG
+        if (state.print_report) {
+            log_trace("render_sprite(sprite = %u, src_rect = %r, dst_rect = %r, options = %u)", sprite, &src_rect, &dst_rect, options);
+        }
+    #endif
+
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
 
     src_rect.x += sprite_info.atlas_x;
@@ -1079,6 +1119,12 @@ void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t opt
 }
 
 void render_text(FontName name, const char* text, ivec2 position) {
+    #ifdef GOLD_DEBUG
+        if (state.print_report) {
+            log_trace("render_text(name = %u, text = %s, position = %vi)", name, text, &position);
+        }
+    #endif
+
     ivec2 glyph_position = position;
     size_t text_index = 0;
 
@@ -1151,6 +1197,12 @@ ivec2 render_get_text_size(FontName name, const char* text) {
 }
 
 void render_line(ivec2 start, ivec2 end, RenderColor color) {
+    #ifdef GOLD_DEBUG
+        if (state.print_report) {
+            log_trace("render_line(start = %vi, end = %vi, color = %u)", &start, &end, color);
+        }
+    #endif
+
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
     Rect src_rect = (Rect) {
         .x = sprite_info.frame_width * color,
@@ -1166,6 +1218,12 @@ void render_line(ivec2 start, ivec2 end, RenderColor color) {
 }
 
 void render_draw_rect(Rect rect, RenderColor color) {
+    #ifdef GOLD_DEBUG
+        if (state.print_report) {
+            log_trace("render_draw_rect(rect = %r, color = %u)", &rect, color);
+        }
+    #endif
+
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
     Rect src_rect = (Rect) {
         .x = sprite_info.frame_width * color,
@@ -1189,6 +1247,12 @@ void render_draw_rect(Rect rect, RenderColor color) {
 }
 
 void render_fill_rect(Rect rect, RenderColor color) {
+    #ifdef GOLD_DEBUG
+        if (state.print_report) {
+            log_trace("render_fill_rect(rect = %r, color = %u)", &rect, color);
+        }
+    #endif
+
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
     Rect src_rect = (Rect) {
         .x = sprite_info.frame_width * color,

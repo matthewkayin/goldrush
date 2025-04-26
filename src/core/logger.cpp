@@ -104,6 +104,11 @@ void logger_output(LogLevel log_level, const char* message, ...) {
                 }
                 break;
             }
+            case 'r': {
+                Rect* rect = va_arg(arg_ptr, Rect*);
+                out_ptr += sprintf(out_ptr, "<%i, %i, %i, %i>", rect->x, rect->y, rect->w, rect->h);
+                break;
+            }
         } // End switch message
         
         message++;
