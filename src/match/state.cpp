@@ -2761,9 +2761,13 @@ void match_fog_update(MatchState& state, uint8_t player_team, ivec2 cell, int ce
                     if (cell.type == CELL_BUILDING || cell.type == CELL_GOLDMINE) {
                         Entity& entity = state.entities.get_by_id(cell.id);
                         if (entity_is_selectable(entity)) {
+                            ivec2 frame = entity_get_animation_frame(entity);
+                            if (entity.type == ENTITY_GOLDMINE && frame.x == 1) {
+                                frame.x = 0;
+                            }
                             state.remembered_entities[player_team][cell.id] = (RememberedEntity) {
                                 .type = entity.type,
-                                .frame = entity_get_animation_frame(entity),
+                                .frame = frame,
                                 .cell = entity.cell,
                                 .cell_size = entity_get_data(entity.type).cell_size,
                                 .recolor_id = entity.mode == MODE_BUILDING_DESTROYED || entity.type == ENTITY_GOLDMINE ? 0 : state.players[entity.player_id].recolor_id
