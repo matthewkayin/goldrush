@@ -923,6 +923,7 @@ const SpriteInfo& render_get_sprite_info(SpriteName name) {
 
 void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id) {
     const SpriteInfo& sprite_info = render_get_sprite_info(name);
+    GOLD_ASSERT(frame.x <= sprite_info.frame_width && frame.y <= sprite_info.frame_height);
 
     Rect src_rect = (Rect) { 
         .x = frame.x * sprite_info.frame_width, 

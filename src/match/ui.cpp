@@ -867,6 +867,7 @@ void match_ui_update(MatchUiState& state) {
         size_t out_buffer_length = 1;
         for (const MatchInput& input : state.input_queue) {
             match_input_serialize(out_buffer, out_buffer_length, input);
+            GOLD_ASSERT(out_buffer_length <= NETWORK_INPUT_BUFFER_SIZE);
         }
         state.inputs[network_get_player_id()].push_back(state.input_queue);
         state.input_queue.clear();
