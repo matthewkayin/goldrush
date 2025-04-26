@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "core/logger.h"
 #include <cstring>
+#include <algorithm>
 
 struct InputState {
     SDL_Window* window;
