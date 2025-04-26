@@ -94,6 +94,8 @@ void input_poll_events() {
             case SDL_EVENT_MOUSE_MOTION: {
                 state.mouse_position = ivec2(event.motion.x - state.scaled_screen_position.x, event.motion.y - state.scaled_screen_position.y);
                 state.mouse_position = ivec2((state.mouse_position.x * SCREEN_WIDTH) / state.scaled_screen_size.x, (state.mouse_position.y * SCREEN_HEIGHT) / state.scaled_screen_size.y);
+                state.mouse_position.x = std::clamp(state.mouse_position.x, 0, SCREEN_WIDTH);
+                state.mouse_position.y = std::clamp(state.mouse_position.y, 0, SCREEN_HEIGHT);
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: 
