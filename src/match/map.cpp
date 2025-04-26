@@ -367,13 +367,6 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
 
     // Calculate unreachable cells
     {
-        // Assume any previously unreachable cells are now empty / reachable
-        for (int index = 0; index < map.width * map.height; index++) {
-            if (map.cells[CELL_LAYER_GROUND][index].type == CELL_UNREACHABLE) {
-                map.cells[CELL_LAYER_GROUND][index].type = CELL_EMPTY;
-            }
-        }
-
         // Determine map "islands"
         std::vector<int> map_tile_islands = std::vector<int>(map.width * map.height, -1);
         std::vector<int> island_size;
@@ -410,8 +403,8 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                 if (!map_is_cell_in_bounds(map, next)) {
                     continue;
                 }
-                EntityId cell_value = map.cells[CELL_LAYER_GROUND][next.x + (next.y * map.width)].id;
-                if (cell_value == CELL_BLOCKED) {
+                Cell cell_value = map.cells[CELL_LAYER_GROUND][next.x + (next.y * map.width)];
+                if (cell_value.type == CELL_BLOCKED) {
                     continue;
                 }
 

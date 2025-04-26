@@ -2155,6 +2155,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
     // Fog of War
     int player_team = state.match.players[network_get_player_id()].team;
+    /*
     for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
         for (int y = 0; y < max_visible_tiles.y; y++) {
             for (int x = 0; x < max_visible_tiles.x; x++) {
@@ -2207,6 +2208,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             }
         }
     }
+    */
 
     // Above fog params
     for (const RenderSpriteParams& params : above_fog_sprite_params) {
