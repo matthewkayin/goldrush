@@ -682,8 +682,8 @@ bool entity_is_selectable(const Entity& entity) {
     );
 }
 
-uint16_t entity_get_elevation(const Entity& entity, const Map& map) {
-    uint16_t elevation = map_get_tile(map, entity.cell).elevation;
+uint32_t entity_get_elevation(const Entity& entity, const Map& map) {
+    uint32_t elevation = map_get_tile(map, entity.cell).elevation;
     int entity_cell_size = entity_get_data(entity.type).cell_size;
     for (int y = entity.cell.y; y < entity.cell.y + entity_cell_size; y++) {
         for (int x = entity.cell.x; x < entity.cell.x + entity_cell_size; x++) {

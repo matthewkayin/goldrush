@@ -54,6 +54,7 @@ enum MatchUiMode {
     MATCH_UI_MODE_MENU_SURRENDER,
     MATCH_UI_MODE_MATCH_OVER_VICTORY,
     MATCH_UI_MODE_MATCH_OVER_DEFEAT,
+    MATCH_UI_MODE_REPLAY,
     MATCH_UI_MODE_LEAVE_MATCH
 };
 
@@ -109,9 +110,11 @@ struct MatchUiState {
 
     MatchState match;
     OptionsMenuState options_menu;
+    FILE* replay_file;
 };
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise);
+MatchUiState match_ui_init_from_replay(const char* replay_path);
 void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event);
 void match_ui_handle_input(MatchUiState& state);
 void match_ui_update(MatchUiState& state);
@@ -134,6 +137,7 @@ void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const cha
 bool match_ui_is_opponent_in_match(const MatchUiState& state);
 bool match_ui_is_in_menu(MatchUiMode mode);
 const char* match_ui_get_menu_header_text(MatchUiMode mode);
+void match_ui_leave_match(MatchUiState& state);
 
 void match_ui_render(const MatchUiState& state, bool render_debug_info);
 

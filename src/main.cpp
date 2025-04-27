@@ -117,6 +117,9 @@ int gold_main(int argc, char** argv) {
     MenuState menu_state = menu_init();
     MatchUiState match_ui_state;
 
+    match_ui_state = match_ui_init_from_replay("latest.rep");
+    game_mode = GAME_MODE_MATCH;
+
     while (is_running) {
         // TIMEKEEP
         double current_time = platform_get_absolute_time();

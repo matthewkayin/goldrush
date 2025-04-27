@@ -11,6 +11,7 @@
 #include "render/render.h"
 #include "hotkey.h"
 #include "upgrade.h"
+#include "replay.h"
 #include <algorithm>
 
 static const uint32_t TURN_OFFSET = 2;
@@ -93,10 +94,9 @@ static const Rect MENU_RECT = (Rect) {
 
 // INIT
 
-MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
+MatchUiState match_ui_base_init() {
     MatchUiState state;
 
-    state.mode = MATCH_UI_MODE_NOT_STARTED;
     state.camera_offset = ivec2(0, 0);
     state.select_origin = ivec2(-1, -1);
     state.is_minimap_dragging = false;
@@ -118,6 +118,13 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         state.hotkey_group[index] = INPUT_HOTKEY_NONE;
     }
 
+    return state;
+}
+
+MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
+    MatchUiState state = match_ui_base_init();
+    state.mode = MATCH_UI_MODE_NOT_STARTED;
+
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -135,6 +142,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
                                         : player_id;
         players[player_id].recolor_id = network_player.recolor_id;
     }
+    state.replay_file = replay_file_open(lcg_seed, noise, players);
     state.match = match_init(lcg_seed, noise, players);
 
     // Init input queues
@@ -150,7 +158,6 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
 
     // Init camera
     for (const Entity& entity : state.match.entities) {
-        // TODO choose the first Town Hall instead
         if (entity.type == ENTITY_MINER && entity.player_id == network_get_player_id()) {
             match_ui_center_camera_on_cell(state, entity.cell);
             break;
@@ -158,6 +165,25 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     }
 
     network_set_player_ready(true);
+
+    return state;
+}
+
+MatchUiState match_ui_init_from_replay(const char* replay_path) {
+    MatchUiState state = match_ui_base_init();
+    state.mode = MATCH_UI_MODE_REPLAY;
+
+    // Because we are not saving any replay data
+    state.replay_file = NULL;
+    replay_file_read(state.inputs, &state.match, replay_path);
+
+    // Init camera
+    for (const Entity& entity : state.match.entities) {
+        if (entity.type == ENTITY_MINER && entity.player_id == 0) {
+            match_ui_center_camera_on_cell(state, entity.cell);
+            break;
+        }
+    }
 
     return state;
 }
@@ -792,8 +818,7 @@ void match_ui_update(MatchUiState& state) {
                 }
             } else if (state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
                 if (ui_button("YES", button_size, true)) {
-                    network_disconnect();
-                    state.mode = MATCH_UI_MODE_LEAVE_MATCH;
+                    match_ui_leave_match(state);
                 }
                 if (ui_button("BACK", button_size, true)) {
                     state.mode = MATCH_UI_MODE_MENU;
@@ -803,8 +828,7 @@ void match_ui_update(MatchUiState& state) {
                     state.mode = MATCH_UI_MODE_NONE;
                 }
                 if (ui_button("EXIT", button_size, true)) {
-                    network_disconnect();
-                    state.mode = MATCH_UI_MODE_LEAVE_MATCH;
+                    match_ui_leave_match(state);
                 }
             }
         ui_end_container();
@@ -821,14 +845,16 @@ void match_ui_update(MatchUiState& state) {
     // Turn loop
     if (state.turn_timer == 0) {
         bool all_inputs_received = true;
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
-                continue;
-            }
+        if (state.mode != MATCH_UI_MODE_REPLAY) {
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
+                    continue;
+                }
 
-            if (state.inputs[player_id].empty() || state.inputs[player_id][0].empty()) {
-                all_inputs_received = false;
-                continue;
+                if (state.inputs[player_id].empty() || state.inputs[player_id][0].empty()) {
+                    all_inputs_received = false;
+                    continue;
+                }
             }
         }
 
@@ -846,8 +872,17 @@ void match_ui_update(MatchUiState& state) {
 
         // Handle input
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
-                continue;
+            if (state.mode == MATCH_UI_MODE_REPLAY) {
+                if (state.inputs[player_id].empty()) {
+                    continue;
+                }
+            } else {
+                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
+                    replay_file_write_inputs(state.replay_file, player_id, NULL);
+                    continue;
+                }
+
+                replay_file_write_inputs(state.replay_file, player_id, &state.inputs[player_id][0]);
             }
 
             for (const MatchInput& input : state.inputs[player_id][0]) {
@@ -856,24 +891,26 @@ void match_ui_update(MatchUiState& state) {
             state.inputs[player_id].erase(state.inputs[player_id].begin());
         }
 
-        // Flush input
-        // Always send at least one input per turn
-        if (state.input_queue.empty()) {
-            state.input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
-        }
+        if (state.mode != MATCH_UI_MODE_REPLAY) {
+            // Flush input
+            // Always send at least one input per turn
+            if (state.input_queue.empty()) {
+                state.input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
+            }
 
-        // Serialize the inputs
-        uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
-        size_t out_buffer_length = 1;
-        for (const MatchInput& input : state.input_queue) {
-            match_input_serialize(out_buffer, out_buffer_length, input);
-            GOLD_ASSERT(out_buffer_length <= NETWORK_INPUT_BUFFER_SIZE);
-        }
-        state.inputs[network_get_player_id()].push_back(state.input_queue);
-        state.input_queue.clear();
+            // Serialize the inputs
+            uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
+            size_t out_buffer_length = 1;
+            for (const MatchInput& input : state.input_queue) {
+                match_input_serialize(out_buffer, out_buffer_length, input);
+                GOLD_ASSERT(out_buffer_length <= NETWORK_INPUT_BUFFER_SIZE);
+            }
+            state.inputs[network_get_player_id()].push_back(state.input_queue);
+            state.input_queue.clear();
 
-        // Send inputs to other players
-        network_send_input(out_buffer, out_buffer_length);
+            // Send inputs to other players
+            network_send_input(out_buffer, out_buffer_length);
+        }
     } 
     // End if tick timer is 0
 
@@ -1706,6 +1743,12 @@ const char* match_ui_get_menu_header_text(MatchUiMode mode) {
         default:
             return "";
     }
+}
+
+void match_ui_leave_match(MatchUiState& state) {
+    network_disconnect();
+    state.mode = MATCH_UI_MODE_LEAVE_MATCH;
+    replay_file_close(state.replay_file);
 }
 
 // RENDER

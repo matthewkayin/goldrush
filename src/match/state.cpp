@@ -631,7 +631,7 @@ void match_update(MatchState& state) {
             // Start animation finished, enter prolonged burn and spread more flames
             if (state.fires[fire_index].animation.name == ANIMATION_FIRE_START && !animation_is_playing(state.fires[fire_index].animation)) {
                 state.fires[fire_index].animation = animation_create(ANIMATION_FIRE_BURN);
-                uint16_t fire_elevation = map_get_tile(state.map, state.fires[fire_index].cell).elevation;
+                uint32_t fire_elevation = map_get_tile(state.map, state.fires[fire_index].cell).elevation;
                 for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
                     ivec2 child_cell = state.fires[fire_index].cell + DIRECTION_IVEC2[direction];
                     if (!map_is_cell_in_bounds(state.map, child_cell)) {

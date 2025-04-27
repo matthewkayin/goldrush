@@ -37,7 +37,7 @@ struct MatchPlayer {
     bool active;
     char name[MAX_USERNAME_LENGTH + 1];
     uint32_t team;
-    int recolor_id;
+    int32_t recolor_id;
     uint32_t gold;
     uint32_t upgrades;
     uint32_t upgrades_in_progress;

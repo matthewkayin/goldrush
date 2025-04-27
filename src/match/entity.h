@@ -201,7 +201,7 @@ const EntityData& entity_get_data(EntityType type);
 bool entity_is_unit(EntityType type);
 bool entity_is_building(EntityType type);
 bool entity_is_selectable(const Entity& entity);
-uint16_t entity_get_elevation(const Entity& entity, const Map& map);
+uint32_t entity_get_elevation(const Entity& entity, const Map& map);
 Rect entity_get_rect(const Entity& entity);
 fvec2 entity_get_target_position(const Entity& entity);
 void entity_set_target(Entity& entity, Target target);

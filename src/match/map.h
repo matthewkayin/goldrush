@@ -9,7 +9,7 @@
 struct Tile {
     SpriteName sprite;
     ivec2 frame;
-    uint16_t elevation;
+    uint32_t elevation;
 };
 
 enum CellLayer {
@@ -37,6 +37,7 @@ enum CellType {
 struct Cell {
     CellType type;
     EntityId id;
+    uint8_t padding[2];
 };
 
 struct Map {
