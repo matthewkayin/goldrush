@@ -944,7 +944,14 @@ void match_ui_update(MatchUiState& state) {
     } // End if not replay_mode
 
     if (state.replay_mode) {
-        state.turn_counter++;
+        if (state.turn_counter < state.replay_tape.size() - 1) {
+            state.turn_counter++;
+            state.match = state.replay_tape[state.turn_counter];
+        }
+    }
+
+    if (state.replay_mode && input_is_action_just_pressed(INPUT_ACTION_NUM0)) {
+        state.turn_counter = 0;
         state.match = state.replay_tape[state.turn_counter];
     }
 
