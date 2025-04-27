@@ -7,8 +7,8 @@
 #define FONT_FIRST_CHAR 32 // space
 #define MINIMAP_TEXTURE_WIDTH 512
 #define MINIMAP_TEXTURE_HEIGHT 256
-#define ATLAS_WIDTH 2048
-#define ATLAS_HEIGHT 2048
+#define ATLAS_WIDTH 4096
+#define ATLAS_HEIGHT 4096
 
 #include "core/logger.h"
 #include "core/asserts.h"
@@ -29,7 +29,7 @@
 
 struct SpriteVertex {
     float position[2];
-    float tex_coord[3];
+    float tex_coord[2];
 };
 
 struct LineVertex {
@@ -97,7 +97,7 @@ struct RenderState {
     GLuint minimap_shader;
     GLuint sprite_vao;
     GLuint sprite_vbo;
-    uint32_t sprite_texture_array;
+    uint32_t sprite_texture;
     SpriteInfo sprite_info[SPRITE_COUNT];
     std::vector<SpriteVertex> sprite_vertices;
 
@@ -176,7 +176,7 @@ bool render_init(SDL_Window* window) {
         return false;
     }
     glUseProgram(state.sprite_shader);
-    glUniform1ui(glGetUniformLocation(state.sprite_shader, "sprite_texture_array"), 0);
+    glUniform1ui(glGetUniformLocation(state.sprite_shader, "sprite_texture"), 0);
     mat4 projection = mat4_ortho(0.0f, (float)SCREEN_WIDTH, 0.0f, (float)SCREEN_HEIGHT, 0.0f, 1.0f);
     glUniformMatrix4fv(glGetUniformLocation(state.sprite_shader, "projection"), 1, GL_FALSE, projection.data);
 
@@ -301,10 +301,10 @@ void render_init_sprite_vao() {
 
     // position
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     // tex coord
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -718,10 +718,9 @@ bool render_load_sprites() {
     uint32_t surface_stored_count = 0;
 
     // Place the surfaces inside packed texture atlases
-    std::vector<SDL_Surface*> atlas_surfaces;
+    SDL_Surface* atlas_surface = SDL_CreateSurface(ATLAS_WIDTH, ATLAS_HEIGHT, SDL_PIXELFORMAT_ABGR8888);
     while (surface_stored_count < FONT_COUNT + SPRITE_COUNT) {
         // Create the atlas surface
-        SDL_Surface* atlas_surface = SDL_CreateSurface(ATLAS_WIDTH, ATLAS_HEIGHT, SDL_PIXELFORMAT_ABGR8888);
         if (atlas_surface == NULL) {
             log_error("Error creating atlas surface: %s", SDL_GetError());
             return false;
@@ -761,14 +760,12 @@ bool render_load_sprites() {
             // Set sprite info for this surface
             if (surfaces[surface_index].type == LOADED_SURFACE_FONT) {
                 int font_name = surfaces[surface_index].name;
-                state.fonts[font_name].atlas = atlas_surfaces.size();
                 state.fonts[font_name].atlas_x = empty_spaces[space_index].x;
                 state.fonts[font_name].atlas_y = empty_spaces[space_index].y;
             } else {
                 int sprite_name = surfaces[surface_index].name;
                 const SpriteParams& params = render_get_sprite_params((SpriteName)sprite_name);
                 SpriteInfo sprite_info; 
-                sprite_info.atlas = atlas_surfaces.size();
                 sprite_info.atlas_x = empty_spaces[space_index].x;
                 sprite_info.atlas_y = empty_spaces[space_index].y;
                 if (params.strategy == SPRITE_IMPORT_TILE) {
@@ -845,19 +842,16 @@ bool render_load_sprites() {
         } // End for each surface
 
         render_flip_sdl_surface_vertically(atlas_surface);
-        atlas_surfaces.push_back(atlas_surface);
     }
 
-    glGenTextures(1, &state.sprite_texture_array);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, ATLAS_WIDTH, ATLAS_HEIGHT, atlas_surfaces.size(), 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glGenTextures(1, &state.sprite_texture);
+    glBindTexture(GL_TEXTURE_2D, state.sprite_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ATLAS_WIDTH, ATLAS_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, atlas_surface->pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ATLAS_WIDTH, ATLAS_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    for (int atlas = 0; atlas < atlas_surfaces.size(); atlas++) {
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, atlas, ATLAS_WIDTH, ATLAS_HEIGHT, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlas_surfaces[atlas]->pixels);
-        SDL_DestroySurface(atlas_surfaces[atlas]);
-    }
+    SDL_DestroySurface(atlas_surface);
 
     // Cleanup 
     for (int surface_index = 0; surface_index < FONT_COUNT + SPRITE_COUNT; surface_index++) {
@@ -866,7 +860,7 @@ bool render_load_sprites() {
     for (int tileset = 0; tileset < TILESET_COUNT; tileset++) {
         SDL_DestroySurface(tileset_surfaces[tileset]);
     }
-    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     return true;
 }
@@ -899,13 +893,13 @@ void render_sprite_batch() {
     // Render sprite batch
     glUseProgram(state.sprite_shader);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
+    glBindTexture(GL_TEXTURE_2D, state.sprite_texture);
 
     glDrawArrays(GL_TRIANGLES, 0, state.sprite_vertices.size());
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     state.sprite_vertices.clear();
 }
@@ -1091,30 +1085,29 @@ void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t opt
         tex_coord_right = temp;
     }
 
-    float atlas = (float)sprite_info.atlas;
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_top },
-        .tex_coord = { tex_coord_left, tex_coord_top, atlas }
+        .tex_coord = { tex_coord_left, tex_coord_top }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_bottom },
-        .tex_coord = { tex_coord_right, tex_coord_bottom, atlas }
+        .tex_coord = { tex_coord_right, tex_coord_bottom }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_bottom },
-        .tex_coord = { tex_coord_left, tex_coord_bottom, atlas }
+        .tex_coord = { tex_coord_left, tex_coord_bottom }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_top },
-        .tex_coord = { tex_coord_left, tex_coord_top, atlas }
+        .tex_coord = { tex_coord_left, tex_coord_top }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_top },
-        .tex_coord = { tex_coord_right, tex_coord_top, atlas }
+        .tex_coord = { tex_coord_right, tex_coord_top }
     });
     state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_bottom },
-        .tex_coord = { tex_coord_right, tex_coord_bottom, atlas }
+        .tex_coord = { tex_coord_right, tex_coord_bottom }
     });
 }
 
@@ -1148,30 +1141,29 @@ void render_text(FontName name, const char* text, ivec2 position) {
         float tex_coord_top = 1.0f - ((float)(state.fonts[name].atlas_y + (glyph_frame.y * state.fonts[name].glyph_height)) / (float)ATLAS_HEIGHT);
         float tex_coord_bottom = tex_coord_top - frame_size_y;
 
-        float font_atlas = (float)state.fonts[name].atlas;
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_left, tex_coord_top, font_atlas }
+            .tex_coord = { tex_coord_left, tex_coord_top }
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_right, tex_coord_bottom, font_atlas }
+            .tex_coord = { tex_coord_right, tex_coord_bottom }
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_bottom },
-            .tex_coord = { tex_coord_left, tex_coord_bottom, font_atlas }
+            .tex_coord = { tex_coord_left, tex_coord_bottom }
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_left, tex_coord_top, font_atlas }
+            .tex_coord = { tex_coord_left, tex_coord_top }
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_top },
-            .tex_coord = { tex_coord_right, tex_coord_top, font_atlas}
+            .tex_coord = { tex_coord_right, tex_coord_top}
         });
         state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_right, tex_coord_bottom, font_atlas }
+            .tex_coord = { tex_coord_right, tex_coord_bottom }
         });
 
         glyph_position.x += state.fonts[name].glyphs[glyph_index].advance;
@@ -1308,53 +1300,53 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
         // minimap tiles
         (SpriteVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_left, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_left, tex_coord_top }
         },
         (SpriteVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_right, tex_coord_bottom }
         },
         (SpriteVertex) {
             .position = { position_left, position_bottom },
-            .tex_coord = { tex_coord_left, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_left, tex_coord_bottom }
         },
         (SpriteVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_left, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_left, tex_coord_top }
         },
         (SpriteVertex) {
             .position = { position_right, position_top },
-            .tex_coord = { tex_coord_right, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_right, tex_coord_top }
         },
         (SpriteVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_right, tex_coord_bottom }
         },
 
         // minimap fog
         (SpriteVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_fog_left, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_fog_left, tex_coord_top }
         },
         (SpriteVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_fog_right, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_fog_right, tex_coord_bottom }
         },
         (SpriteVertex) {
             .position = { position_left, position_bottom },
-            .tex_coord = { tex_coord_fog_left, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_fog_left, tex_coord_bottom }
         },
         (SpriteVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_fog_left, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_fog_left, tex_coord_top }
         },
         (SpriteVertex) {
             .position = { position_right, position_top },
-            .tex_coord = { tex_coord_fog_right, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_fog_right, tex_coord_top }
         },
         (SpriteVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_fog_right, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_fog_right, tex_coord_bottom }
         }
     };
 

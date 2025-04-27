@@ -43,7 +43,6 @@ enum MinimapPixel {
 };
 
 struct SpriteInfo {
-    int atlas;
     int atlas_x;
     int atlas_y;
     int hframes;
