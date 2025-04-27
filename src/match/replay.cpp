@@ -96,11 +96,6 @@ bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchS
     fread(&noise.height, 1, sizeof(uint32_t), file);
     noise.map = (int8_t*)malloc(noise.width * noise.height * sizeof(int8_t));
     fread(noise.map, 1, noise.width * noise.height * sizeof(int8_t), file);
-    log_trace("--- noise map ---");
-    for (int offset = 0; offset < noise.width * noise.height; offset += noise.width) {
-        log_trace("%b", noise.map + offset, noise.width);
-    }
-    log_trace("--- end noise ---");
 
     // Players
     MatchPlayer players[MAX_PLAYERS];

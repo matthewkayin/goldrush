@@ -35,8 +35,60 @@ int main(int argc, char** argv) {
 
 enum GameMode {
     GAME_MODE_MENU,
-    GAME_MODE_MATCH
+    GAME_MODE_MATCH,
+    GAME_MODE_REPLAY,
+    GAME_MODE_LOADING
 };
+
+struct LoadMatchParams {
+    int32_t lcg_seed;
+    Noise noise;
+};
+
+struct LoadReplayParams {
+    const char* filename;
+};
+
+struct LoadParams {
+    GameMode mode;
+    union {
+        LoadMatchParams match;
+        LoadReplayParams replay;
+    };
+};
+
+struct GameState {
+    GameMode mode;
+    MatchUiState match;
+    MenuState menu;
+    LoadParams load_params;
+    SDL_Thread* loading_thread;
+    Animation loading_animation;
+};
+static GameState state;
+
+static int game_load_next_mode(void* ptr) {
+    if (state.load_params.mode == GAME_MODE_MENU) {
+        state.menu = menu_init();
+    } else if (state.load_params.mode == GAME_MODE_MATCH) {
+        state.match = match_ui_init(state.load_params.match.lcg_seed, state.load_params.match.noise);
+        free(state.load_params.match.noise.map);
+    } else if (state.load_params.mode == GAME_MODE_REPLAY) {
+        state.match = match_ui_init_from_replay(state.load_params.replay.filename);
+    }
+
+    return 0;
+}
+
+void game_set_mode(LoadParams params) {
+    state.load_params = params;
+    state.mode = GAME_MODE_LOADING;
+    state.loading_animation = animation_create(ANIMATION_UNIT_BUILD);
+    state.loading_thread = SDL_CreateThread(game_load_next_mode, "loading_thread", (void*)NULL);
+    if (!state.loading_thread) {
+        log_error("Error creating loading thread: %s", SDL_GetError());
+    }
+}
 
 int gold_main(int argc, char** argv) {
     char logfile_name[128];
@@ -113,12 +165,12 @@ int gold_main(int argc, char** argv) {
     uint32_t updates = 0;
     uint32_t ups = 0;
 
-    GameMode game_mode = GAME_MODE_MENU;
-    MenuState menu_state = menu_init();
-    MatchUiState match_ui_state;
-
-    match_ui_state = match_ui_init_from_replay("latest.rep");
-    game_mode = GAME_MODE_MATCH;
+    game_set_mode((LoadParams) {
+        .mode = GAME_MODE_REPLAY,
+        .replay = (LoadReplayParams) {
+            .filename = "latest.rep"
+        }
+    });
 
     while (is_running) {
         // TIMEKEEP
@@ -156,20 +208,28 @@ int gold_main(int argc, char** argv) {
             network_service();
             NetworkEvent event;
             while (network_poll_events(&event)) {
-                switch (game_mode) {
+                switch (state.mode) {
                     case GAME_MODE_MENU: {
                         if (event.type == NETWORK_EVENT_MATCH_LOAD) {
                             network_scanner_destroy();
-                            match_ui_state = match_ui_init(event.match_load.lcg_seed, event.match_load.noise);
-                            free(event.match_load.noise.map);
-                            game_mode = GAME_MODE_MATCH;
+                            game_set_mode((LoadParams) {
+                                .mode = GAME_MODE_MATCH,
+                                .match = (LoadMatchParams) {
+                                    .lcg_seed = event.match_load.lcg_seed,
+                                    .noise = event.match_load.noise
+                                }
+                            });
                         } else {
-                            menu_handle_network_event(menu_state, event);
+                            menu_handle_network_event(state.menu, event);
                         }
                         break;
                     }
-                    case GAME_MODE_MATCH: {
-                        match_ui_handle_network_event(match_ui_state, event);
+                    case GAME_MODE_MATCH: 
+                    case GAME_MODE_REPLAY: {
+                        match_ui_handle_network_event(state.match, event);
+                        break;
+                    }
+                    case GAME_MODE_LOADING: {
                         break;
                     }
                 }
@@ -181,13 +241,13 @@ int gold_main(int argc, char** argv) {
             update_accumulator -= UPDATE_TIME;
             updates++;
 
-            switch (game_mode) {
+            switch (state.mode) {
                 case GAME_MODE_MENU: {
-                    menu_update(menu_state);
-                    if (menu_state.mode == MENU_MODE_EXIT) {
+                    menu_update(state.menu);
+                    if (state.menu.mode == MENU_MODE_EXIT) {
                         is_running = false;
                         break;
-                    } else if (menu_state.mode == MENU_MODE_LOAD_MATCH) {
+                    } else if (state.menu.mode == MENU_MODE_LOAD_MATCH) {
                         network_scanner_destroy();
 
                         // This is when the host is beginning a match load
@@ -206,18 +266,33 @@ int gold_main(int argc, char** argv) {
 
                         network_begin_loading_match(lcg_seed, noise);
 
-                        match_ui_state = match_ui_init(lcg_seed, noise);
-                        free(noise.map);
-                        game_mode = GAME_MODE_MATCH;
+                        game_set_mode((LoadParams) {
+                            .mode = GAME_MODE_MATCH,
+                            .match = (LoadMatchParams) {
+                                .lcg_seed = lcg_seed,
+                                .noise = noise
+                            }
+                        });
                     }
                     break;
                 }
-                case GAME_MODE_MATCH: {
-                    match_ui_update(match_ui_state);
-                    if (match_ui_state.mode == MATCH_UI_MODE_LEAVE_MATCH) {
+                case GAME_MODE_MATCH:
+                case GAME_MODE_REPLAY: {
+                    match_ui_update(state.match);
+                    if (state.match.mode == MATCH_UI_MODE_LEAVE_MATCH) {
                         sound_end_fire_loop();
-                        menu_state = menu_init();
-                        game_mode = GAME_MODE_MENU;
+                        game_set_mode((LoadParams) {
+                            .mode = GAME_MODE_MENU
+                        });
+                    }
+                    break;
+                }
+                case GAME_MODE_LOADING: {
+                    animation_update(state.loading_animation);
+                    if (SDL_GetThreadState(state.loading_thread) == SDL_THREAD_COMPLETE) {
+                        // clean up the thread
+                        SDL_WaitThread(state.loading_thread, NULL);
+                        state.mode = state.load_params.mode;
                     }
                     break;
                 }
@@ -235,13 +310,34 @@ int gold_main(int argc, char** argv) {
 
         render_prepare_frame();
 
-        switch (game_mode) {
+        switch (state.mode) {
             case GAME_MODE_MENU: {
-                menu_render(menu_state);
+                menu_render(state.menu);
                 break;
             }
-            case GAME_MODE_MATCH: {
-                match_ui_render(match_ui_state, render_debug_info);
+            case GAME_MODE_MATCH: 
+            case GAME_MODE_REPLAY: {
+                match_ui_render(state.match, render_debug_info);
+                break;
+            }
+            case GAME_MODE_LOADING: {
+                const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_MINER_BUILDING);
+                Rect src_rect = (Rect) {
+                    .x = state.loading_animation.frame.x * sprite_info.frame_width,
+                    .y = sprite_info.frame_height * 2,
+                    .w = sprite_info.frame_width,
+                    .h = sprite_info.frame_height
+                };
+                Rect dst_rect = (Rect) {
+                    .x = (SCREEN_WIDTH / 2) - sprite_info.frame_width,
+                    .y = (SCREEN_HEIGHT / 2) - sprite_info.frame_height - 4,
+                    .w = sprite_info.frame_width * 2,
+                    .h = sprite_info.frame_height * 2
+                };
+                render_sprite(SPRITE_MINER_BUILDING, src_rect, dst_rect, 0);
+                ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, "Loading...");
+                render_text(FONT_HACK_WHITE, "Loading...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), (SCREEN_HEIGHT / 2) + sprite_info.frame_height + 4));
+                render_sprite_batch();
                 break;
             }
         }
