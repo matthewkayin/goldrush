@@ -54,7 +54,6 @@ enum MatchUiMode {
     MATCH_UI_MODE_MENU_SURRENDER,
     MATCH_UI_MODE_MATCH_OVER_VICTORY,
     MATCH_UI_MODE_MATCH_OVER_DEFEAT,
-    MATCH_UI_MODE_REPLAY,
     MATCH_UI_MODE_LEAVE_MATCH
 };
 
@@ -110,7 +109,11 @@ struct MatchUiState {
 
     MatchState match;
     OptionsMenuState options_menu;
+
+    bool replay_mode;
     FILE* replay_file;
+    bool replay_player_vision[MAX_PLAYERS];
+    std::vector<MatchState> replay_tape;
 };
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise);
@@ -138,6 +141,9 @@ bool match_ui_is_opponent_in_match(const MatchUiState& state);
 bool match_ui_is_in_menu(MatchUiMode mode);
 const char* match_ui_get_menu_header_text(MatchUiMode mode);
 void match_ui_leave_match(MatchUiState& state);
+bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity);
+bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size);
+int match_ui_get_fog(const MatchUiState& state, ivec2 cell);
 
 void match_ui_render(const MatchUiState& state, bool render_debug_info);
 

@@ -143,6 +143,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         players[player_id].recolor_id = network_player.recolor_id;
     }
     state.replay_file = replay_file_open(lcg_seed, noise, players);
+    state.replay_mode = false;
     state.match = match_init(lcg_seed, noise, players);
 
     // Init input queues
@@ -171,11 +172,41 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
 
 MatchUiState match_ui_init_from_replay(const char* replay_path) {
     MatchUiState state = match_ui_base_init();
-    state.mode = MATCH_UI_MODE_REPLAY;
-
+    state.mode = MATCH_UI_MODE_NONE;
+    state.replay_mode = true;
     // Because we are not saving any replay data
     state.replay_file = NULL;
+
     replay_file_read(state.inputs, &state.match, replay_path);
+    state.replay_tape.push_back(state.match);
+
+    bool all_inputs_read = false;
+    while (!all_inputs_read) {
+        if (state.turn_timer == 0) {
+            all_inputs_read = true;
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (state.inputs[player_id].empty()) {
+                    continue;
+                }
+
+                all_inputs_read = false;
+                for (const MatchInput& input : state.inputs[player_id][0]) {
+                    match_handle_input(state.match, input);
+                }
+                state.inputs[player_id].erase(state.inputs[player_id].begin());
+            }
+
+            state.turn_timer = TURN_DURATION;
+        } // End if turn timer == 0
+
+        state.turn_timer--;
+        match_update(state.match);
+        state.replay_tape.push_back(state.match);
+    }
+
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        state.replay_player_vision[player_id] = true;
+    }
 
     // Init camera
     for (const Entity& entity : state.match.entities) {
@@ -230,7 +261,7 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 // This function returns after it handles a single input to avoid double input happening
 void match_ui_handle_input(MatchUiState& state) {
     // Begin chat
-    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active()) {
+    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active() && !state.replay_mode) {
         state.chat_message = "";
         state.chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
         state.chat_cursor_visible = false;
@@ -240,7 +271,7 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // End chat
-    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active()) {
+    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active() && !state.replay_mode) {
         if (!state.chat_message.empty()) {
             network_send_chat(state.chat_message.c_str());
             match_ui_add_chat_message(state, network_get_player_id(), state.chat_message.c_str());
@@ -250,166 +281,168 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Hotkey click
-    for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-        InputAction hotkey = state.hotkey_group[hotkey_index];
-        if (hotkey == INPUT_HOTKEY_NONE) {
-            continue;
-        }
-        if (state.is_minimap_dragging || match_ui_is_selecting(state)) {
-            continue;
-        }
-        if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
-            continue;
-        }
+    if (!state.replay_mode) {
+        for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
+            InputAction hotkey = state.hotkey_group[hotkey_index];
+            if (hotkey == INPUT_HOTKEY_NONE) {
+                continue;
+            }
+            if (state.is_minimap_dragging || match_ui_is_selecting(state)) {
+                continue;
+            }
+            if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
+                continue;
+            }
 
-        const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
-        ivec2 hotkey_position = MATCH_UI_BUTTON_POSITIONS[hotkey_index];
-        Rect hotkey_rect = (Rect) {
-            .x = hotkey_position.x, .y = hotkey_position.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height
-        };
+            const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
+            ivec2 hotkey_position = MATCH_UI_BUTTON_POSITIONS[hotkey_index];
+            Rect hotkey_rect = (Rect) {
+                .x = hotkey_position.x, .y = hotkey_position.y,
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            };
 
-        if ((input_is_action_just_pressed(hotkey) && !input_is_text_input_active()) || (
-            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && hotkey_rect.has_point(input_get_mouse_position())
-        )) {
-            const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
+            if ((input_is_action_just_pressed(hotkey) && !input_is_text_input_active()) || (
+                input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && hotkey_rect.has_point(input_get_mouse_position())
+            )) {
+                const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
 
-            if (hotkey_info.type == HOTKEY_BUTTON_ACTION || hotkey_info.type == HOTKEY_BUTTON_TOGGLED_ACTION) {
-                switch (hotkey) {
-                    case INPUT_HOTKEY_ATTACK: {
-                        state.mode = MATCH_UI_MODE_TARGET_ATTACK;
-                        break;
-                    }
-                    case INPUT_HOTKEY_BUILD: {
-                        state.mode = MATCH_UI_MODE_BUILD;
-                        break;
-                    }
-                    case INPUT_HOTKEY_BUILD2: {
-                        state.mode = MATCH_UI_MODE_BUILD2;
-                        break;
-                    }
-                    case INPUT_HOTKEY_CANCEL: {
-                        if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
-                            state.mode = MATCH_UI_MODE_NONE;
-                        } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE) {
-                            state.mode = MATCH_UI_MODE_NONE;
-                        } else if (state.selection.size() == 1) { 
-                            const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
-                            if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
-                                state.input_queue.push_back((MatchInput) {
-                                    .type = MATCH_INPUT_BUILD_CANCEL,
-                                    .build_cancel = (MatchInputBuildCancel) {
-                                        .building_id = state.selection[0]
-                                    }
-                                });
-                            } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty()) {
-                                state.input_queue.push_back((MatchInput) {
-                                    .type = MATCH_INPUT_BUILDING_DEQUEUE,
-                                    .building_dequeue = (MatchInputBuildingDequeue) {
-                                        .building_id = state.selection[0],
-                                        .index = BUILDING_DEQUEUE_POP_FRONT
-                                    }
-                                });
-                            }
-                        } 
-                        break;
-                    }
-                    case INPUT_HOTKEY_STOP:
-                    case INPUT_HOTKEY_DEFEND: {
-                        MatchInput input;
-                        input.type = hotkey == INPUT_HOTKEY_STOP ? MATCH_INPUT_STOP : MATCH_INPUT_DEFEND;
-                        input.stop.entity_count = (uint8_t)state.selection.size();
-                        memcpy(&input.stop.entity_ids, &state.selection[0], input.stop.entity_count * sizeof(EntityId));
-                        state.input_queue.push_back(input);
-                        break;
-                    }
-                    case INPUT_HOTKEY_UNLOAD: {
-                        if (entity_is_unit(state.match.entities.get_by_id(state.selection[0]).type)) {
-                            state.mode = MATCH_UI_MODE_TARGET_UNLOAD;
-                        } else {
+                if (hotkey_info.type == HOTKEY_BUTTON_ACTION || hotkey_info.type == HOTKEY_BUTTON_TOGGLED_ACTION) {
+                    switch (hotkey) {
+                        case INPUT_HOTKEY_ATTACK: {
+                            state.mode = MATCH_UI_MODE_TARGET_ATTACK;
+                            break;
+                        }
+                        case INPUT_HOTKEY_BUILD: {
+                            state.mode = MATCH_UI_MODE_BUILD;
+                            break;
+                        }
+                        case INPUT_HOTKEY_BUILD2: {
+                            state.mode = MATCH_UI_MODE_BUILD2;
+                            break;
+                        }
+                        case INPUT_HOTKEY_CANCEL: {
+                            if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
+                                state.mode = MATCH_UI_MODE_NONE;
+                            } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE) {
+                                state.mode = MATCH_UI_MODE_NONE;
+                            } else if (state.selection.size() == 1) { 
+                                const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
+                                if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
+                                    state.input_queue.push_back((MatchInput) {
+                                        .type = MATCH_INPUT_BUILD_CANCEL,
+                                        .build_cancel = (MatchInputBuildCancel) {
+                                            .building_id = state.selection[0]
+                                        }
+                                    });
+                                } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty()) {
+                                    state.input_queue.push_back((MatchInput) {
+                                        .type = MATCH_INPUT_BUILDING_DEQUEUE,
+                                        .building_dequeue = (MatchInputBuildingDequeue) {
+                                            .building_id = state.selection[0],
+                                            .index = BUILDING_DEQUEUE_POP_FRONT
+                                        }
+                                    });
+                                }
+                            } 
+                            break;
+                        }
+                        case INPUT_HOTKEY_STOP:
+                        case INPUT_HOTKEY_DEFEND: {
                             MatchInput input;
-                            input.type = MATCH_INPUT_UNLOAD;
-                            input.unload.carrier_count = (uint8_t)state.selection.size();
-                            memcpy(&input.unload.carrier_ids, &state.selection[0], input.unload.carrier_count * sizeof(EntityId));
+                            input.type = hotkey == INPUT_HOTKEY_STOP ? MATCH_INPUT_STOP : MATCH_INPUT_DEFEND;
+                            input.stop.entity_count = (uint8_t)state.selection.size();
+                            memcpy(&input.stop.entity_ids, &state.selection[0], input.stop.entity_count * sizeof(EntityId));
                             state.input_queue.push_back(input);
-                        }
-                        break;
-                    }
-                    case INPUT_HOTKEY_MOLOTOV: {
-                        if (!match_ui_selection_has_enough_energy(state, state.selection, MOLOTOV_ENERGY_COST)) {
-                            match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
                             break;
                         }
-                        state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
-                        break;
-                    }
-                    case INPUT_HOTKEY_CAMO: {
-                        bool activate = !entity_check_flag(state.match.entities.get_by_id(state.selection[0]), ENTITY_FLAG_INVISIBLE);
-                        if (activate && !match_ui_selection_has_enough_energy(state, state.selection, CAMO_ENERGY_COST)) {
-                            match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
+                        case INPUT_HOTKEY_UNLOAD: {
+                            if (entity_is_unit(state.match.entities.get_by_id(state.selection[0]).type)) {
+                                state.mode = MATCH_UI_MODE_TARGET_UNLOAD;
+                            } else {
+                                MatchInput input;
+                                input.type = MATCH_INPUT_UNLOAD;
+                                input.unload.carrier_count = (uint8_t)state.selection.size();
+                                memcpy(&input.unload.carrier_ids, &state.selection[0], input.unload.carrier_count * sizeof(EntityId));
+                                state.input_queue.push_back(input);
+                            }
                             break;
                         }
-                        MatchInput input;
-                        input.type = activate ? MATCH_INPUT_CAMO : MATCH_INPUT_DECAMO;
-                        input.camo.unit_count = (uint8_t)state.selection.size();
-                        memcpy(&input.camo.unit_ids, &state.selection[0], input.camo.unit_count * sizeof(EntityId));
-                        state.input_queue.push_back(input);
-                        break;
-                    }
-                    default:
-                        break;
-                }
-            } else if (hotkey_info.type == HOTKEY_BUTTON_BUILD) {
-                const EntityData& building_data = entity_get_data(hotkey_info.entity_type);
-                bool costs_energy = (building_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY;
-                if (costs_energy && !match_ui_selection_has_enough_energy(state, state.selection, building_data.gold_cost)) {
-                    match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
-                } else if (!costs_energy && state.match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
-                    match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
-                } else {
-                    state.mode = MATCH_UI_MODE_BUILDING_PLACE;
-                    state.building_type = hotkey_info.entity_type;
-                }
-            } else if (hotkey_info.type == HOTKEY_BUTTON_TRAIN || hotkey_info.type == HOTKEY_BUTTON_RESEARCH) {
-                // Decide which building to enqueue
-                uint32_t selected_building_index = state.match.entities.get_index_of(state.selection[0]);
-                for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
-                    if (state.match.entities.get_by_id(state.selection[selection_index]).queue.size() < state.match.entities[selected_building_index].queue.size()) {
-                        selected_building_index = state.match.entities.get_index_of(state.selection[selection_index]);
-                    }
-                }
-                const Entity& building = state.match.entities[selected_building_index];
-
-                BuildingQueueItem item = hotkey_info.type == HOTKEY_BUTTON_TRAIN 
-                                            ? (BuildingQueueItem) {
-                                                .type = BUILDING_QUEUE_ITEM_UNIT,
-                                                .unit_type = hotkey_info.entity_type
-                                            }
-                                            : (BuildingQueueItem) {
-                                                .type = BUILDING_QUEUE_ITEM_UPGRADE,
-                                                .upgrade = hotkey_info.upgrade
-                                            };
-
-                if (building.queue.size() == BUILDING_QUEUE_MAX) {
-                    match_ui_show_status(state, MATCH_UI_STATUS_BUILDING_QUEUE_FULL);
-                } else if (state.match.players[network_get_player_id()].gold < building_queue_item_cost(item)) {
-                    match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
-                } else {
-                    state.input_queue.push_back((MatchInput) {
-                        .type = MATCH_INPUT_BUILDING_ENQUEUE,
-                        .building_enqueue = (MatchInputBuildingEnqueue) {
-                            .building_id = state.match.entities.get_id_of(selected_building_index),
-                            .item_type = (uint8_t)item.type,
-                            .item_subtype = item.type == BUILDING_QUEUE_ITEM_UNIT 
-                                                ? (uint32_t)item.unit_type
-                                                : item.upgrade
+                        case INPUT_HOTKEY_MOLOTOV: {
+                            if (!match_ui_selection_has_enough_energy(state, state.selection, MOLOTOV_ENERGY_COST)) {
+                                match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
+                                break;
+                            }
+                            state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
+                            break;
                         }
-                    });
-                }
-            } 
+                        case INPUT_HOTKEY_CAMO: {
+                            bool activate = !entity_check_flag(state.match.entities.get_by_id(state.selection[0]), ENTITY_FLAG_INVISIBLE);
+                            if (activate && !match_ui_selection_has_enough_energy(state, state.selection, CAMO_ENERGY_COST)) {
+                                match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
+                                break;
+                            }
+                            MatchInput input;
+                            input.type = activate ? MATCH_INPUT_CAMO : MATCH_INPUT_DECAMO;
+                            input.camo.unit_count = (uint8_t)state.selection.size();
+                            memcpy(&input.camo.unit_ids, &state.selection[0], input.camo.unit_count * sizeof(EntityId));
+                            state.input_queue.push_back(input);
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                } else if (hotkey_info.type == HOTKEY_BUTTON_BUILD) {
+                    const EntityData& building_data = entity_get_data(hotkey_info.entity_type);
+                    bool costs_energy = (building_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY;
+                    if (costs_energy && !match_ui_selection_has_enough_energy(state, state.selection, building_data.gold_cost)) {
+                        match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
+                    } else if (!costs_energy && state.match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
+                        match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
+                    } else {
+                        state.mode = MATCH_UI_MODE_BUILDING_PLACE;
+                        state.building_type = hotkey_info.entity_type;
+                    }
+                } else if (hotkey_info.type == HOTKEY_BUTTON_TRAIN || hotkey_info.type == HOTKEY_BUTTON_RESEARCH) {
+                    // Decide which building to enqueue
+                    uint32_t selected_building_index = state.match.entities.get_index_of(state.selection[0]);
+                    for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
+                        if (state.match.entities.get_by_id(state.selection[selection_index]).queue.size() < state.match.entities[selected_building_index].queue.size()) {
+                            selected_building_index = state.match.entities.get_index_of(state.selection[selection_index]);
+                        }
+                    }
+                    const Entity& building = state.match.entities[selected_building_index];
 
-            sound_play(SOUND_UI_CLICK);
-            return;
+                    BuildingQueueItem item = hotkey_info.type == HOTKEY_BUTTON_TRAIN 
+                                                ? (BuildingQueueItem) {
+                                                    .type = BUILDING_QUEUE_ITEM_UNIT,
+                                                    .unit_type = hotkey_info.entity_type
+                                                }
+                                                : (BuildingQueueItem) {
+                                                    .type = BUILDING_QUEUE_ITEM_UPGRADE,
+                                                    .upgrade = hotkey_info.upgrade
+                                                };
+
+                    if (building.queue.size() == BUILDING_QUEUE_MAX) {
+                        match_ui_show_status(state, MATCH_UI_STATUS_BUILDING_QUEUE_FULL);
+                    } else if (state.match.players[network_get_player_id()].gold < building_queue_item_cost(item)) {
+                        match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
+                    } else {
+                        state.input_queue.push_back((MatchInput) {
+                            .type = MATCH_INPUT_BUILDING_ENQUEUE,
+                            .building_enqueue = (MatchInputBuildingEnqueue) {
+                                .building_id = state.match.entities.get_id_of(selected_building_index),
+                                .item_type = (uint8_t)item.type,
+                                .item_subtype = item.type == BUILDING_QUEUE_ITEM_UNIT 
+                                                    ? (uint32_t)item.unit_type
+                                                    : item.upgrade
+                            }
+                        });
+                    }
+                } 
+
+                sound_play(SOUND_UI_CLICK);
+                return;
+            }
         }
     }
 
@@ -434,6 +467,7 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Building queue click
     if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+        !state.replay_mode &&
         !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
         const Entity& building = state.match.entities.get_by_id(state.selection[0]);
         const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
@@ -459,6 +493,7 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Garrisoned unit click
     if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+        !state.replay_mode &&
         !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
         const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
         if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
@@ -494,7 +529,7 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Order movement
-    {
+    if (!state.replay_mode) {
         // Check that the left or right mouse button is being pressed
         InputAction action_required = match_ui_is_targeting(state) ? INPUT_ACTION_LEFT_CLICK : INPUT_ACTION_RIGHT_CLICK;
         bool is_action_pressed = input_is_action_just_pressed(action_required);
@@ -515,6 +550,7 @@ void match_ui_handle_input(MatchUiState& state) {
     // Set building rally
     if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK) && 
             match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_BUILDINGS &&
+            !state.replay_mode &&
             !(state.is_minimap_dragging || match_ui_is_selecting(state) || match_ui_is_targeting(state)) &&
             (!match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
         // Check to make sure that all buildings can rally
@@ -673,7 +709,7 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Control group key press
-    {
+    if (!state.replay_mode) {
         uint32_t number_key_pressed;
         for (number_key_pressed = 0; number_key_pressed < 10; number_key_pressed++) {
             if (input_is_action_just_pressed((InputAction)(INPUT_ACTION_NUM0 + number_key_pressed))) {
@@ -843,9 +879,9 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Turn loop
-    if (state.turn_timer == 0) {
-        bool all_inputs_received = true;
-        if (state.mode != MATCH_UI_MODE_REPLAY) {
+    if (!state.replay_mode) {
+        if (state.turn_timer == 0) {
+            bool all_inputs_received = true;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
                     continue;
@@ -856,42 +892,34 @@ void match_ui_update(MatchUiState& state) {
                     continue;
                 }
             }
-        }
 
-        if (!all_inputs_received) {
-            state.disconnect_timer++;
-            return;
-        }
+            if (!all_inputs_received) {
+                state.disconnect_timer++;
+                return;
+            }
 
-        // Reset the disconnect timer if we recevied inputs
-        state.disconnect_timer = 0;
+            // Reset the disconnect timer if we recevied inputs
+            state.disconnect_timer = 0;
 
-        // All inputs received. Begin next turn
-        state.turn_timer = TURN_DURATION;
-        state.turn_counter++;
+            // All inputs received. Begin next turn
+            state.turn_timer = TURN_DURATION;
+            state.turn_counter++;
 
-        // Handle input
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state.mode == MATCH_UI_MODE_REPLAY) {
-                if (state.inputs[player_id].empty()) {
-                    continue;
-                }
-            } else {
+            // Handle input
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
                     replay_file_write_inputs(state.replay_file, player_id, NULL);
                     continue;
                 }
 
                 replay_file_write_inputs(state.replay_file, player_id, &state.inputs[player_id][0]);
+
+                for (const MatchInput& input : state.inputs[player_id][0]) {
+                    match_handle_input(state.match, input);
+                }
+                state.inputs[player_id].erase(state.inputs[player_id].begin());
             }
 
-            for (const MatchInput& input : state.inputs[player_id][0]) {
-                match_handle_input(state.match, input);
-            }
-            state.inputs[player_id].erase(state.inputs[player_id].begin());
-        }
-
-        if (state.mode != MATCH_UI_MODE_REPLAY) {
             // Flush input
             // Always send at least one input per turn
             if (state.input_queue.empty()) {
@@ -910,23 +938,27 @@ void match_ui_update(MatchUiState& state) {
 
             // Send inputs to other players
             network_send_input(out_buffer, out_buffer_length);
-        }
-    } 
-    // End if tick timer is 0
+        } // End if tick timer is 0
 
-    state.turn_timer--;
+        state.turn_timer--;
+    } // End if not replay_mode
+
+    if (state.replay_mode) {
+        state.turn_counter++;
+        state.match = state.replay_tape[state.turn_counter];
+    }
 
     if (!match_ui_is_in_menu(state.mode)) {
         match_ui_handle_input(state);
     }
 
     // Match update
-    match_update(state.match);
+    if (!state.replay_mode) {
+        match_update(state.match);
+    }
 
     // Match events
-    while (!state.match.events.empty()) {
-        MatchEvent event = state.match.events[0];
-        state.match.events.erase(state.match.events.begin());
+    for (const MatchEvent& event : state.match.events) {
         switch (event.type) {
             case MATCH_EVENT_SOUND: {
                 if (state.sound_cooldown_timers[event.sound.sound] != 0) {
@@ -940,6 +972,9 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_ALERT: {
+                if (state.replay_mode) {
+                    break;
+                }
                 if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && network_get_player(event.alert.player_id).team != network_get_player(network_get_player_id()).team) ||
                     (event.alert.type != MATCH_ALERT_TYPE_ATTACK && event.alert.player_id != network_get_player_id())) {
                     break;
@@ -1018,6 +1053,9 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_SELECTION_HANDOFF: {
+                if (state.replay_mode) {
+                    break;
+                }
                 if (event.selection_handoff.player_id != network_get_player_id()) {
                     break;
                 }
@@ -1031,12 +1069,18 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_STATUS: {
+                if (state.replay_mode) {
+                    break;
+                }
                 if (network_get_player_id() == event.status.player_id) {
                     match_ui_show_status(state, event.status.message);
                 }
                 break;
             }
             case MATCH_EVENT_RESEARCH_COMPLETE: {
+                if (state.replay_mode) {
+                    break;
+                }
                 if (event.research_complete.player_id != network_get_player_id()) {
                     break;
                 }
@@ -1047,6 +1091,10 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
         }
+    }
+
+    if (!state.replay_mode) {
+        state.match.events.clear();
     }
 
     // Camera drag
@@ -1132,7 +1180,7 @@ void match_ui_update(MatchUiState& state) {
         int selection_index = 0;
         while (selection_index < state.selection.size()) {
             Entity& selected_entity = state.match.entities.get_by_id(state.selection[selection_index]);
-            if (!entity_is_selectable(selected_entity) || !match_is_entity_visible_to_player(state.match, selected_entity, network_get_player_id())) {
+            if (!entity_is_selectable(selected_entity) || !match_ui_is_entity_visible(state, selected_entity)) {
                 state.selection.erase(state.selection.begin() + selection_index);
             } else {
                 selection_index++;
@@ -1147,7 +1195,7 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Update UI buttons
-    {
+    if (!state.replay_mode) {
         for (uint32_t index = 0; index < HOTKEY_GROUP_SIZE; index++) {
             state.hotkey_group[index] = INPUT_HOTKEY_NONE;
         }
@@ -1267,7 +1315,7 @@ void match_ui_update(MatchUiState& state) {
     // Play fire sound effects
     bool is_fire_on_screen = false;
     for (const Fire& fire : state.match.fires) {
-        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, fire.cell, 1)) {
+        if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
             continue;
         }
         if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
@@ -1292,7 +1340,7 @@ void match_ui_update(MatchUiState& state) {
             if (!entity_is_building(entity.type) || !entity_check_flag(entity, ENTITY_FLAG_ON_FIRE)) {
                 continue;
             }
-            if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+            if (!match_ui_is_entity_visible(state, entity)) {
                 continue;
             }
 
@@ -1351,7 +1399,8 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     // Select player units
     for (uint32_t index = 0; index < state.match.entities.size(); index++) {
         const Entity& entity = state.match.entities[index];
-        if (entity.player_id != network_get_player_id() ||
+        if ((!state.replay_mode && entity.player_id != network_get_player_id()) ||
+            (state.replay_mode && !match_ui_is_entity_visible(state, entity)) ||
                 !entity_is_unit(entity.type) ||
                 !entity_is_selectable(entity)) {
             continue;
@@ -1369,7 +1418,8 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     // Select player buildings
     for (uint32_t index = 0; index < state.match.entities.size(); index++) {
         const Entity& entity = state.match.entities[index];
-        if (entity.player_id != network_get_player_id() ||
+        if ((!state.replay_mode && entity.player_id != network_get_player_id()) ||
+            (state.replay_mode && !match_ui_is_entity_visible(state, entity)) ||
                 entity_is_unit(entity.type) ||
                 !entity_is_selectable(entity)) {
             continue;
@@ -1387,10 +1437,10 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     // Select enemy units
     for (uint32_t index = 0; index < state.match.entities.size(); index++) {
         const Entity& entity = state.match.entities[index];
-        if (entity.player_id == network_get_player_id() ||
+        if ((!state.replay_mode && entity.player_id == network_get_player_id()) ||
                 !entity_is_unit(entity.type) ||
                 !entity_is_selectable(entity) ||
-                !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                !match_ui_is_entity_visible(state, entity)) {
             continue;
         }
 
@@ -1404,10 +1454,10 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     // Select enemy buildings
     for (uint32_t index = 0; index < state.match.entities.size(); index++) {
         const Entity& entity = state.match.entities[index];
-        if (entity.player_id == network_get_player_id() ||
+        if ((!state.replay_mode && entity.player_id == network_get_player_id()) ||
                 entity_is_unit(entity.type) ||
                 !entity_is_selectable(entity) ||
-                !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                !match_ui_is_entity_visible(state, entity)) {
             continue;
         }
 
@@ -1422,7 +1472,7 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     for (uint32_t index = 0; index < state.match.entities.size(); index++) {
         const Entity& entity = state.match.entities[index];
         if (entity.type != ENTITY_GOLDMINE ||
-                !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                !match_ui_is_entity_visible(state, entity)) {
             continue;
         }
 
@@ -1751,6 +1801,58 @@ void match_ui_leave_match(MatchUiState& state) {
     replay_file_close(state.replay_file);
 }
 
+bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity) {
+    if (state.replay_mode) {
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (state.replay_player_vision[player_id] && match_is_entity_visible_to_player(state.match, entity, player_id)) {
+                return true;
+            }
+        }
+
+        return false;
+    } else {
+        return match_is_entity_visible_to_player(state.match, entity, network_get_player_id());
+    }
+}
+
+bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size) {
+    if (state.replay_mode) {
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (state.replay_player_vision[player_id] && match_is_cell_rect_revealed(state.match, state.match.players[player_id].team, cell, cell_size)) {
+                return true;
+            }
+        }
+
+        return false;
+    } else {
+        return match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, cell, cell_size);
+    }
+}
+
+int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
+    if (state.replay_mode) {
+        int fog_value = FOG_HIDDEN;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (state.replay_player_vision[player_id]) {
+                int player_fog_value = match_get_fog(state.match, state.match.players[player_id].team, cell);
+                // If at least one player has revealed fog, then return a revealed fog value
+                if (player_fog_value > 0) {
+                    return 1;
+                }
+
+                // If set the returned value to explored, but keep iterating in case we get a revealed value
+                if (player_fog_value == FOG_EXPLORED) {
+                    fog_value = FOG_EXPLORED;
+                }
+            }
+        }
+
+        return fog_value;
+    } else {
+        return match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell);
+    }
+}
+
 // RENDER
 
 void match_ui_render(const MatchUiState& state, bool render_debug_info) {
@@ -1818,7 +1920,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                         entity_get_elevation(entity, state.match.map) != elevation) {
                     continue;
                 }
-                if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                if (!match_ui_is_entity_visible(state, entity)) {
                     continue;
                 }
                 
@@ -1883,7 +1985,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                     if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
                         continue;
                     }
-                    if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                    if (!match_ui_is_entity_visible(state, entity)) {
                         continue;
                     }
 
@@ -1896,7 +1998,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
     // Fires
     for (const Fire& fire : state.match.fires) {
-        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, fire.cell, 1)) {
+        if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
             continue;
         }
         if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
@@ -1914,7 +2016,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 entity_data.cell_layer != CELL_LAYER_GROUND) {
             continue;
         }
-        if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+        if (!match_ui_is_entity_visible(state, entity)) {
             continue;
         }
 
@@ -1933,32 +2035,38 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     }
 
     // Remembered entities
-    for (auto it : state.match.remembered_entities[state.match.players[network_get_player_id()].team]) {
-        // Don't draw the remembered entity if we can see it, otherwise we will double draw them
-        if (match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, it.second.cell, it.second.cell_size)) {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if ((state.replay_mode && !state.replay_player_vision[player_id]) ||
+                (!state.replay_mode && player_id != network_get_player_id())) {
             continue;
         }
+        for (auto it : state.match.remembered_entities[state.match.players[player_id].team]) {
+            // Don't draw the remembered entity if we can see it, otherwise we will double draw them
+            if (match_ui_is_cell_rect_revealed(state, it.second.cell, it.second.cell_size)) {
+                continue;
+            }
 
-        const EntityData& entity_data = entity_get_data(it.second.type);
-        const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
+            const EntityData& entity_data = entity_get_data(it.second.type);
+            const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
 
-        RenderSpriteParams params = (RenderSpriteParams) {
-            .sprite = entity_data.sprite,
-            .frame = it.second.frame,
-            .position = (it.second.cell * TILE_SIZE) - state.camera_offset,
-            .options = RENDER_SPRITE_NO_CULL,
-            .recolor_id = it.second.recolor_id
-        };
+            RenderSpriteParams params = (RenderSpriteParams) {
+                .sprite = entity_data.sprite,
+                .frame = it.second.frame,
+                .position = (it.second.cell * TILE_SIZE) - state.camera_offset,
+                .options = RENDER_SPRITE_NO_CULL,
+                .recolor_id = it.second.recolor_id
+            };
 
-        Rect render_rect = (Rect) {
-            .x = params.position.x, .y = params.position.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height
-        };
-        if (!render_rect.intersects(SCREEN_RECT)) {
-            continue;
+            Rect render_rect = (Rect) {
+                .x = params.position.x, .y = params.position.y,
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            };
+            if (!render_rect.intersects(SCREEN_RECT)) {
+                continue;
+            }
+
+            ysort_params.push_back(params);
         }
-
-        ysort_params.push_back(params);
     }
 
     // Rally points
@@ -1995,7 +2103,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     // Balloon shadows
     for (const Entity& entity : state.match.entities) {
         if (entity.type == ENTITY_BALLOON && entity.mode != MODE_UNIT_DEATH_FADE &&
-                match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+                match_ui_is_entity_visible(state, entity)) {
             render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), entity.position.to_ivec2() + ivec2(-5, 3) - state.camera_offset, 0, 0);
         }
     }
@@ -2008,7 +2116,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         if (!entity_is_building(entity.type) || !entity_check_flag(entity, ENTITY_FLAG_ON_FIRE)) {
             continue;
         }
-        if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+        if (!match_ui_is_entity_visible(state, entity)) {
             continue;
         }
 
@@ -2021,7 +2129,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
     // Fires above units
     for (const Fire& fire : state.match.fires) {
-        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, fire.cell, 1)) {
+        if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
             continue;
         }
         if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_UNIT) {
@@ -2032,7 +2140,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
     // Smith and workshop smoke animations
     for (const Entity& entity : state.match.entities) {
-        if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+        if (!match_ui_is_entity_visible(state, entity)) {
             continue;
         }
         if (entity.animation.name == ANIMATION_WORKSHOP) {
@@ -2078,7 +2186,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
     // Projectiles
     for (const Projectile& projectile : state.match.projectiles) {
-        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, projectile.position.to_ivec2() / TILE_SIZE, 1)) {
+        if (!match_ui_is_cell_rect_revealed(state, projectile.position.to_ivec2() / TILE_SIZE, 1)) {
             continue;
         }
         uint32_t options = RENDER_SPRITE_CENTERED;
@@ -2096,7 +2204,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             continue;
         }
         // Make sure the player can see the goldmine
-        if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, entity.cell, entity_get_data(entity.type).cell_size)) {
+        if (!match_ui_is_cell_rect_revealed(state, entity.cell, entity_get_data(entity.type).cell_size)) {
             continue;
         }
         // Make sure the goldmine is actually on screen
@@ -2163,7 +2271,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 entity_data.cell_layer != CELL_LAYER_SKY) {
             continue;
         }
-        if (!match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+        if (!match_ui_is_entity_visible(state, entity)) {
             continue;
         }
 
@@ -2201,12 +2309,11 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     }
 
     // Fog of War
-    int player_team = state.match.players[network_get_player_id()].team;
     for (int fog_pass = 0; fog_pass < 2; fog_pass++) {
         for (int y = 0; y < max_visible_tiles.y; y++) {
             for (int x = 0; x < max_visible_tiles.x; x++) {
                 ivec2 fog_cell = base_coords + ivec2(x, y);
-                int fog = match_get_fog(state.match, player_team, fog_cell);
+                int fog = match_ui_get_fog(state, fog_cell);
                 if (fog > 0) {
                     continue;
                 }
@@ -2221,8 +2328,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                         neighbors += DIRECTION_MASK[direction];
                         continue;
                     }
-                    if ((fog_pass == 0 && match_get_fog(state.match, player_team, neighbor_cell) < 1) ||
-                        (fog_pass != 0 && match_get_fog(state.match, player_team, neighbor_cell) == FOG_HIDDEN)) {
+                    if ((fog_pass == 0 && match_ui_get_fog(state, neighbor_cell) < 1) ||
+                        (fog_pass != 0 && match_ui_get_fog(state, neighbor_cell) == FOG_HIDDEN)) {
                         neighbors += DIRECTION_MASK[direction];
                     }
                 }
@@ -2239,8 +2346,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                         neighbors += DIRECTION_MASK[direction];
                         continue;
                     }
-                    if ((fog_pass == 0 && match_get_fog(state.match, player_team, neighbor_cell) < 1) ||
-                        (fog_pass != 0 && match_get_fog(state.match, player_team, neighbor_cell) == FOG_HIDDEN)) {
+                    if ((fog_pass == 0 && match_ui_get_fog(state, neighbor_cell) < 1) ||
+                        (fog_pass != 0 && match_ui_get_fog(state, neighbor_cell) == FOG_HIDDEN)) {
                         neighbors += DIRECTION_MASK[direction];
                     }
                 }
@@ -2313,7 +2420,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     for (EntityId entity_id : state.selection) {
         const Entity& entity = state.match.entities.get_by_id(entity_id);
         // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
-        if (!entity_is_unit(entity.type) || entity.player_id != network_get_player_id()) {
+        if (!entity_is_unit(entity.type) || 
+                (!state.replay_mode && entity.player_id != network_get_player_id())) {
             break;
         }
 
@@ -2772,7 +2880,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     }
 
     // Resource counters
-    {
+    // TODO: show everyone's resources
+    if (!state.replay_mode) {
         char gold_text[8];
         sprintf(gold_text, "%u", state.match.players[network_get_player_id()].gold);
         render_text(FONT_WESTERN8_WHITE, gold_text, ivec2(SCREEN_WIDTH - 172 + 18, 2));
@@ -2935,40 +3044,6 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 }
 
                 render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 24));
-
-                debug_text_ptr = debug_text;
-                debug_text_ptr += sprintf(debug_text_ptr, "player: %u team: %u is visible to player? %i", entity.player_id, state.match.players[entity.player_id].team, (int)match_is_entity_visible_to_player(state.match, entity, network_get_player_id()));
-                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 36));
-
-                debug_text_ptr = debug_text;
-                debug_text_ptr += sprintf(debug_text_ptr, "layer: ");
-                switch (entity_data.cell_layer) {
-                    case CELL_LAYER_UNDERGROUND:
-                        debug_text_ptr += sprintf(debug_text_ptr, "underground");
-                        break;
-                    case CELL_LAYER_GROUND:
-                        debug_text_ptr += sprintf(debug_text_ptr, "ground");
-                        break;
-                    case CELL_LAYER_SKY:
-                        debug_text_ptr += sprintf(debug_text_ptr, "sky");
-                        break;
-                    default:
-                        debug_text_ptr += sprintf(debug_text_ptr, "unknown");
-                        break;
-                }
-                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 48));
-
-                const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
-                RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
-                Rect render_rect = (Rect) {
-                    .x = params.position.x, .y = params.position.y,
-                    .w = sprite_info.frame_width, .h = sprite_info.frame_height
-                };
-                bool sprite_intersects = render_rect.intersects(SCREEN_RECT);
-
-                debug_text_ptr = debug_text;
-                debug_text_ptr += sprintf(debug_text_ptr, "render rect on screen? %i", sprite_intersects);
-                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 60));
             }
         }
     }
@@ -2994,7 +3069,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     }
     // Minimap entities
     for (const Entity& entity : state.match.entities) {
-        if (!entity_is_selectable(entity) || !match_is_entity_visible_to_player(state.match, entity, network_get_player_id())) {
+        if (!entity_is_selectable(entity) || !match_ui_is_entity_visible(state, entity)) {
             continue;
         }
 
@@ -3014,18 +3089,24 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
     }
     // Minimap remembered entities
-    for (auto it : state.match.remembered_entities[state.match.players[network_get_player_id()].team]) {
-        Rect entity_rect = (Rect) {
-            .x = it.second.cell.x, .y = it.second.cell.y,
-            .w = it.second.cell_size, .h = it.second.cell_size
-        };
-        MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
-        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if ((state.replay_mode && !state.replay_player_vision[player_id]) ||
+                (!state.replay_mode && player_id != network_get_player_id())) {
+            continue;
+        }
+        for (auto it : state.match.remembered_entities[state.match.players[player_id].team]) {
+            Rect entity_rect = (Rect) {
+                .x = it.second.cell.x, .y = it.second.cell.y,
+                .w = it.second.cell_size, .h = it.second.cell_size
+            };
+            MinimapPixel pixel = it.second.type == ENTITY_GOLDMINE ? MINIMAP_PIXEL_GOLD : (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + it.second.recolor_id);
+            render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
+        }
     }
     // Minimap fog of war
     for (int y = 0; y < state.match.map.height; y++) {
         for (int x = 0; x < state.match.map.width; x++) {
-            int fog_value = match_get_fog(state.match, player_team, ivec2(x, y));
+            int fog_value = match_ui_get_fog(state, ivec2(x, y));
             MinimapPixel pixel;
             if (fog_value > 0) {
                 pixel = MINIMAP_PIXEL_TRANSPARENT;
@@ -3296,7 +3377,7 @@ void match_ui_render_particle(const MatchUiState& state, const Particle& particl
         if (!particle_is_revealed) {
             return;
         }
-    } else if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, particle.position / TILE_SIZE, 1)) {
+    } else if (!match_ui_is_cell_rect_revealed(state, particle.position / TILE_SIZE, 1)) {
         return;
     }
 
