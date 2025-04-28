@@ -438,3 +438,19 @@ inline ivec2 get_nearest_cell_in_rect(ivec2 start_cell, ivec2 rect_position, int
 
     return nearest_cell;
 }
+
+struct Time {
+    uint32_t hours;
+    uint32_t minutes;
+    uint32_t seconds;
+    static Time from_seconds(int s) {
+        Time time;
+        time.seconds = s;
+        time.minutes = time.seconds / 60;
+        time.seconds -= (time.minutes * 60);
+        time.hours = time.minutes / 60;
+        time.minutes -= (time.hours * 60);
+
+        return time;
+    }
+};

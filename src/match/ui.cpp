@@ -174,6 +174,7 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
     MatchUiState state = match_ui_base_init();
     state.mode = MATCH_UI_MODE_NONE;
     state.replay_mode = true;
+    state.replay_paused = false;
     // Because we are not saving any replay data
     state.replay_file = NULL;
 
@@ -875,18 +876,25 @@ void match_ui_update(MatchUiState& state) {
     } else if (state.replay_mode) {
         const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
         ui_element_position(ivec2(SCREEN_WIDTH - button_panel_sprite_info.frame_width + 8, SCREEN_HEIGHT - button_panel_sprite_info.frame_height + 28));
-        ui_slider(0, &state.turn_counter, 0, state.replay_tape.size() - 1, UI_SLIDER_DISPLAY_NO_VALUE);
+        if (ui_slider(0, &state.turn_counter, 0, state.replay_tape.size() - 1, UI_SLIDER_DISPLAY_NO_VALUE)) {
+            state.match = state.replay_tape[state.turn_counter];
+        }
 
-        int seconds_elapsed = state.turn_counter == 0 ? 0 : (int)((state.turn_counter - 1) * UPDATE_TIME);
-        int minutes_elapsed = seconds_elapsed / 60;
-        seconds_elapsed -= minutes_elapsed * 60;
-        int seconds_total = (int)((state.replay_tape.size() - 2) * UPDATE_TIME);
-        int minutes_total = (seconds_total / 60);
-        seconds_total -= minutes_total * 60;
-        char time_text[16];
-        sprintf(time_text, "%i:%02i/%i:%02i", minutes_elapsed, seconds_elapsed, minutes_total, seconds_total);
-        ui_element_position(ivec2(SCREEN_WIDTH - button_panel_sprite_info.frame_width + 8, SCREEN_HEIGHT - button_panel_sprite_info.frame_height + 28 + 21 + 2));
-        ui_text(FONT_HACK_WHITE, time_text);
+        ui_begin_row(ivec2(SCREEN_WIDTH - button_panel_sprite_info.frame_width + 8, SCREEN_HEIGHT - button_panel_sprite_info.frame_height + 28 + 21 + 2), 6);
+            if (ui_sprite_button(state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false)) {
+                state.replay_paused = !state.replay_paused;
+            }
+
+            // Time elapsed text
+            uint32_t seconds_elapsed = state.turn_counter == 0 ? 0 : (uint32_t)((state.turn_counter - 1) * UPDATE_TIME);
+            Time time_elapsed = Time::from_seconds(seconds_elapsed);
+            uint32_t seconds_total = (uint32_t)((state.replay_tape.size() - 2) * UPDATE_TIME);
+            Time time_total = Time::from_seconds(seconds_total);
+            char time_text[16];
+            ui_element_position(ivec2(0, 2));
+            sprintf(time_text, "%i:%02i:%02i/%i:%02i:%02i", time_elapsed.hours, time_elapsed.minutes, time_elapsed.seconds, time_total.hours, time_total.minutes, time_total.seconds);
+            ui_text(FONT_HACK_WHITE, time_text);
+        ui_end_container();
     }
 
     if (state.mode == MATCH_UI_MODE_LEAVE_MATCH) {
@@ -958,10 +966,11 @@ void match_ui_update(MatchUiState& state) {
         state.turn_timer--;
     } // End if not replay_mode
 
-    if (state.replay_mode) {
-        if (state.turn_counter < state.replay_tape.size() - 1) {
-            state.turn_counter++;
-            state.match = state.replay_tape[state.turn_counter];
+    if (state.replay_mode && !state.replay_paused && state.turn_counter < state.replay_tape.size() - 1) {
+        state.turn_counter++;
+        state.match = state.replay_tape[state.turn_counter];
+        if (state.turn_counter == state.replay_tape.size() - 1) {
+            state.replay_paused = true;
         }
     }
 

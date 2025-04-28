@@ -170,6 +170,11 @@ int gold_main(int argc, char** argv) {
             .filename = "latest.rep"
         }
     });
+    /*
+    game_set_mode((LoadParams) {
+        .mode = GAME_MODE_MENU
+    });
+    */
 
     while (is_running) {
         // TIMEKEEP
