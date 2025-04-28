@@ -357,20 +357,20 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_BUTTON_PANEL, (SpriteParams) {
+    { SPRITE_UI_WANTED_SIGN, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
-            .path = "ui_frame_buttons.png",
+            .path = "ui_wanted_sign.png",
             .hframes = 1,
             .vframes = 1
         }
     }},
-    { SPRITE_UI_BOTTOM_PANEL, (SpriteParams) {
+    { SPRITE_UI_FRAME_BOLTS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
-            .path = "ui_frame_bottom.png",
-            .hframes = 1,
-            .vframes = 1
+            .path = "ui_frame_bolts.png",
+            .hframes = 3,
+            .vframes = 3
         }
     }},
     { SPRITE_UI_FRAME, (SpriteParams) {

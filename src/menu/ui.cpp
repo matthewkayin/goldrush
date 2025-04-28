@@ -383,7 +383,7 @@ bool ui_team_picker(char value, bool disabled) {
     return clicked;
 }
 
-bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const char* const* items, size_t item_count, bool disabled) {
+bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled) {
     ivec2 origin = ui_get_container_origin();
     SpriteName sprite = type == UI_DROPDOWN ? SPRITE_UI_DROPDOWN : SPRITE_UI_DROPDOWN_MINI;
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
@@ -412,19 +412,35 @@ bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, 
     int text_yoffset = type == UI_DROPDOWN ? 3 : 2;
 
     ui_queue_sprite(sprite, ivec2(0, vframe), origin, 0);
-    ui_queue_text(vframe == 1 ? hovered_font : font, items[*selected_item], ivec2(origin.x + 5, origin.y + text_yoffset), 0);
+
+    char item_text[32];
+    if (type == UI_DROPDOWN_MINI) {
+        strncpy(item_text, items.at(*selected_item).c_str(), 9);
+        item_text[9] = '\0';
+    } else {
+        strcpy(item_text, items.at(*selected_item).c_str());
+    }
+    ui_queue_text(vframe == 1 ? hovered_font : font, item_text, ivec2(origin.x + 5, origin.y + text_yoffset), 0);
 
     if (state.element_selected == dropdown_id) {
         // Render all the dropdown items
         int item_hovered = -1;
-        for (int index = 0; index < item_count; index++) {
+        for (int index = 0; index < items.size(); index++) {
             Rect item_rect = (Rect) {
                 .x = origin.x, .y = origin.y + (size.y * (index + 1)),
                 .w = size.x, .h = size.y
             };
             bool item_is_hovered = item_rect.has_point(input_get_mouse_position());
+
             ui_queue_sprite(sprite, ivec2(0, 3 + (int)item_is_hovered), ivec2(item_rect.x, item_rect.y), 1);
-            ui_queue_text(item_is_hovered ? hovered_font : font, items[index], ivec2(item_rect.x + 5, item_rect.y + text_yoffset), 1);
+
+            if (type == UI_DROPDOWN_MINI) {
+                strncpy(item_text, items.at(index).c_str(), 12);
+                item_text[12] = '\0';
+            } else {
+                strcpy(item_text, items.at(index).c_str());
+            }
+            ui_queue_text(item_is_hovered ? hovered_font : font, item_text, ivec2(item_rect.x + 5, item_rect.y + text_yoffset), 1);
 
             if (item_is_hovered) {
                 item_hovered = index;

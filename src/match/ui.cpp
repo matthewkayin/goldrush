@@ -92,6 +92,22 @@ static const Rect MENU_RECT = (Rect) {
     .w = MENU_WIDTH, .h = 125
 };
 
+static const Rect BOTTOM_PANEL_RECT = (Rect) {
+    .x = 136, .y = SCREEN_HEIGHT - MATCH_UI_HEIGHT,
+    .w = 372, .h = MATCH_UI_HEIGHT
+};
+static const Rect BUTTON_PANEL_RECT = (Rect) {
+    .x = BOTTOM_PANEL_RECT.x + BOTTOM_PANEL_RECT.w,
+    .y = SCREEN_HEIGHT - 106,
+    .w = 132, .h = 106
+};
+static const Rect REPLAY_PANEL_RECT = (Rect) {
+    .x = BOTTOM_PANEL_RECT.x + BOTTOM_PANEL_RECT.w,
+    .y = SCREEN_HEIGHT - 116,
+    .w = 132, .h = 116
+};
+static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 31, BUTTON_PANEL_RECT.y + 9);
+
 // INIT
 
 MatchUiState match_ui_base_init() {
@@ -205,8 +221,16 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
         state.replay_tape.push_back(state.match);
     }
 
+    // Init replay fog picker
+    state.replay_fog_index = 0;
+    state.replay_fog_player_ids.push_back(PLAYER_NONE);
+    state.replay_fog_texts.push_back("Everyone");
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        state.replay_player_vision[player_id] = true;
+        if (!state.match.players[player_id].active) {
+            continue;
+        }
+        state.replay_fog_player_ids.push_back(player_id);
+        state.replay_fog_texts.push_back(state.match.players[player_id].name);
     }
 
     // Init camera
@@ -874,26 +898,35 @@ void match_ui_update(MatchUiState& state) {
             options_menu_update(state.options_menu);
         }
     } else if (state.replay_mode) {
-        const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
-        ui_element_position(ivec2(SCREEN_WIDTH - button_panel_sprite_info.frame_width + 8, SCREEN_HEIGHT - button_panel_sprite_info.frame_height + 28));
-        if (ui_slider(0, &state.turn_counter, 0, state.replay_tape.size() - 1, UI_SLIDER_DISPLAY_NO_VALUE)) {
-            state.match = state.replay_tape[state.turn_counter];
-        }
+        ui_begin_column(ivec2(BUTTON_PANEL_RECT.x + 8, BUTTON_PANEL_RECT.y + 4), 2);
+            ui_element_size(ivec2(0, 32));
+            ui_begin_row(ivec2(0, 0), 4);
+                ui_element_position(ivec2(0, 2));
+                ui_text(FONT_HACK_WHITE, "Fog:");
 
-        ui_begin_row(ivec2(SCREEN_WIDTH - button_panel_sprite_info.frame_width + 8, SCREEN_HEIGHT - button_panel_sprite_info.frame_height + 28 + 21 + 2), 6);
-            if (ui_sprite_button(state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false)) {
-                state.replay_paused = !state.replay_paused;
+                ui_element_position(ivec2(render_get_text_size(FONT_HACK_WHITE, "Fog:").x, 0));
+                ui_dropdown(1, UI_DROPDOWN_MINI, &state.replay_fog_index, state.replay_fog_texts, false);
+            ui_end_container();
+
+            if (ui_slider(0, &state.turn_counter, 0, state.replay_tape.size() - 1, UI_SLIDER_DISPLAY_NO_VALUE)) {
+                state.match = state.replay_tape[state.turn_counter];
             }
 
-            // Time elapsed text
-            uint32_t seconds_elapsed = state.turn_counter == 0 ? 0 : (uint32_t)((state.turn_counter - 1) * UPDATE_TIME);
-            Time time_elapsed = Time::from_seconds(seconds_elapsed);
-            uint32_t seconds_total = (uint32_t)((state.replay_tape.size() - 2) * UPDATE_TIME);
-            Time time_total = Time::from_seconds(seconds_total);
-            char time_text[16];
-            ui_element_position(ivec2(0, 2));
-            sprintf(time_text, "%i:%02i:%02i/%i:%02i:%02i", time_elapsed.hours, time_elapsed.minutes, time_elapsed.seconds, time_total.hours, time_total.minutes, time_total.seconds);
-            ui_text(FONT_HACK_WHITE, time_text);
+            ui_begin_row(ivec2(0, 0), 6);
+                if (ui_sprite_button(state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false)) {
+                    state.replay_paused = !state.replay_paused;
+                }
+
+                // Time elapsed text
+                uint32_t seconds_elapsed = state.turn_counter == 0 ? 0 : (uint32_t)((state.turn_counter - 1) * UPDATE_TIME);
+                Time time_elapsed = Time::from_seconds(seconds_elapsed);
+                uint32_t seconds_total = (uint32_t)((state.replay_tape.size() - 2) * UPDATE_TIME);
+                Time time_total = Time::from_seconds(seconds_total);
+                char time_text[16];
+                ui_element_position(ivec2(0, 2));
+                sprintf(time_text, "%i:%02i:%02i/%i:%02i:%02i", time_elapsed.hours, time_elapsed.minutes, time_elapsed.seconds, time_total.hours, time_total.minutes, time_total.seconds);
+                ui_text(FONT_HACK_WHITE, time_text);
+            ui_end_container();
         ui_end_container();
     }
 
@@ -1835,7 +1868,9 @@ void match_ui_leave_match(MatchUiState& state) {
 bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity) {
     if (state.replay_mode) {
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state.replay_player_vision[player_id] && match_is_entity_visible_to_player(state.match, entity, player_id)) {
+            if ((state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
+                    state.replay_fog_player_ids[state.replay_fog_index] == player_id) &&
+                    match_is_entity_visible_to_player(state.match, entity, player_id)) {
                 return true;
             }
         }
@@ -1849,7 +1884,9 @@ bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity)
 bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size) {
     if (state.replay_mode) {
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state.replay_player_vision[player_id] && match_is_cell_rect_revealed(state.match, state.match.players[player_id].team, cell, cell_size)) {
+            if ((state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
+                    state.replay_fog_player_ids[state.replay_fog_index] == player_id) &&
+                    match_is_cell_rect_revealed(state.match, state.match.players[player_id].team, cell, cell_size)) {
                 return true;
             }
         }
@@ -1864,7 +1901,8 @@ int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
     if (state.replay_mode) {
         int fog_value = FOG_HIDDEN;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state.replay_player_vision[player_id]) {
+            if (state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
+                    state.replay_fog_player_ids[state.replay_fog_index] == player_id) {
                 int player_fog_value = match_get_fog(state.match, state.match.players[player_id].team, cell);
                 // If at least one player has revealed fog, then return a revealed fog value
                 if (player_fog_value > 0) {
@@ -2067,10 +2105,15 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
     // Remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if ((state.replay_mode && !state.replay_player_vision[player_id]) ||
-                (!state.replay_mode && player_id != network_get_player_id())) {
+        if (state.replay_mode && 
+                (state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE || 
+                 state.replay_fog_player_ids[state.replay_fog_index] == player_id)) {
             continue;
         }
+        if (!state.replay_mode && player_id != network_get_player_id()) {
+            continue;
+        }
+
         for (auto it : state.match.remembered_entities[state.match.players[player_id].team]) {
             // Don't draw the remembered entity if we can see it, otherwise we will double draw them
             if (match_ui_is_cell_rect_revealed(state, it.second.cell, it.second.cell_size)) {
@@ -2504,12 +2547,14 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
     // UI frames
     const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
-    const SpriteInfo& bottom_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BOTTOM_PANEL);
-    const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
-    ivec2 ui_frame_bottom_position = ivec2(minimap_sprite_info.frame_width, SCREEN_HEIGHT - bottom_panel_sprite_info.frame_height);
     render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
-    render_sprite_frame(SPRITE_UI_BOTTOM_PANEL, ivec2(0, 0), ui_frame_bottom_position, 0, 0);
-    render_sprite_frame(SPRITE_UI_BUTTON_PANEL, ivec2(0, 0), ivec2(ui_frame_bottom_position.x + bottom_panel_sprite_info.frame_width, SCREEN_HEIGHT - button_panel_sprite_info.frame_height), 0, 0);
+    render_ninepatch(SPRITE_UI_FRAME_BOLTS, BOTTOM_PANEL_RECT);
+    if (state.replay_mode) {
+        render_ninepatch(SPRITE_UI_FRAME_BOLTS, REPLAY_PANEL_RECT);
+    } else {
+        render_ninepatch(SPRITE_UI_FRAME_BOLTS, BUTTON_PANEL_RECT);
+        render_sprite_frame(SPRITE_UI_WANTED_SIGN, ivec2(0, 0), WANTED_SIGN_POSITION, 0, 0);
+    }
 
     // UI Control groups
     for (uint32_t control_group_index = 0; control_group_index < MATCH_UI_CONTROL_GROUP_COUNT; control_group_index++) {
@@ -2551,7 +2596,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
         SpriteName button_icon = entity_get_data(most_common_entity_type).icon;
         const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_CONTROL_GROUP);
-        ivec2 render_pos = ui_frame_bottom_position + ivec2(2, 0) + ivec2((3 + sprite_info.frame_width) * control_group_index, -32);
+        ivec2 render_pos = ivec2(BOTTOM_PANEL_RECT.x, BOTTOM_PANEL_RECT.y) + ivec2(2, 0) + ivec2((3 + sprite_info.frame_width) * control_group_index, -32);
         render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0);
         render_sprite_frame(button_icon, ivec2(button_frame, 0), render_pos + ivec2(1, 0), RENDER_SPRITE_NO_CULL, 0);
         char control_group_number_text[4];
@@ -2614,7 +2659,6 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             InputAction hotkey_hovered = state.hotkey_group[hotkey_hovered_index];
             if (hotkey_hovered != INPUT_HOTKEY_NONE) {
                 const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey_hovered);
-                const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
 
                 bool show_toggle = match_ui_should_render_hotkey_toggled(state, hotkey_hovered);
 
@@ -2707,7 +2751,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 }
                 ivec2 tooltip_top_left = ivec2(
                     SCREEN_WIDTH - (tooltip_cell_width * 8) - 2,
-                    SCREEN_HEIGHT - button_panel_sprite_info.frame_height - (tooltip_cell_height * 8) - 2
+                    BUTTON_PANEL_RECT.y - (tooltip_cell_height * 8) - 2
                 );
                 for (int y = 0; y < tooltip_cell_height; y++) {
                     for (int x = 0; x < tooltip_cell_width; x++) {
@@ -2913,13 +2957,13 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     // Resource counters
     const SpriteInfo& population_icon_sprite_info = render_get_sprite_info(SPRITE_UI_HOUSE_ICON);
     const SpriteInfo& gold_icon_sprite_info = render_get_sprite_info(SPRITE_UI_GOLD_ICON);
+    int resource_base_y = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if ((!state.replay_mode && player_id != network_get_player_id()) || 
                 (state.replay_mode && !state.match.players[player_id].active)) {
             continue;
         }
 
-        int render_base_y = population_icon_sprite_info.frame_height * player_id;
         int render_x = SCREEN_WIDTH;
 
         // Rendering from right to left here
@@ -2928,27 +2972,29 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 2);
         char population_text[8];
         sprintf(population_text, "%u/%u", match_get_player_population(state.match, player_id), match_get_player_max_population(state.match, player_id));
-        render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, render_base_y + 3));
+        render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, resource_base_y + 3));
 
         // Population icon
         render_x -= (population_icon_sprite_info.frame_width + 2);
-        render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(render_x, render_base_y), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y), RENDER_SPRITE_NO_CULL, 0);
 
         // Gold text
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 2);
         char gold_text[8];
         sprintf(gold_text, "%u", state.match.players[player_id].gold);
-        render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, render_base_y + 3));
+        render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, resource_base_y + 3));
 
         // Gold icon
         render_x -= (gold_icon_sprite_info.frame_width + 2);
-        render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, render_base_y + 2), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y + 2), RENDER_SPRITE_NO_CULL, 0);
 
         // Player name
         if (state.replay_mode) {
             render_x -= (render_get_text_size(FONT_HACK_WHITE, state.match.players[player_id].name).x + 2);
-            render_text(FONT_HACK_WHITE, state.match.players[player_id].name, ivec2(render_x, render_base_y + 3));
+            render_text(FONT_HACK_WHITE, state.match.players[player_id].name, ivec2(render_x, resource_base_y + 3));
         }
+
+        resource_base_y += population_icon_sprite_info.frame_height;
     }
 
     // Menu button icon
@@ -3148,10 +3194,15 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     }
     // Minimap remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if ((state.replay_mode && !state.replay_player_vision[player_id]) ||
-                (!state.replay_mode && player_id != network_get_player_id())) {
+        if (state.replay_mode && 
+                (state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE || 
+                 state.replay_fog_player_ids[state.replay_fog_index] == player_id)) {
             continue;
         }
+        if (!state.replay_mode && player_id != network_get_player_id()) {
+            continue;
+        }
+
         for (auto it : state.match.remembered_entities[state.match.players[player_id].team]) {
             Rect entity_rect = (Rect) {
                 .x = it.second.cell.x, .y = it.second.cell.y,

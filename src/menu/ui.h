@@ -4,6 +4,7 @@
 #include "core/input.h"
 #include "render/sprite.h"
 #include "render/font.h"
+#include <vector>
 #include <string>
 #include "defines.h"
 
@@ -169,7 +170,7 @@ bool ui_team_picker(char value, bool disabled);
  * @param disabled If true, the dropdown will not be clickable.
  * @return True if the dropdown value was changed
  */
-bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const char* const* items, size_t item_count, bool disabled);
+bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
 
 /**
  * Creates a slider

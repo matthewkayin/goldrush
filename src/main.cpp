@@ -150,6 +150,7 @@ int gold_main(int argc, char** argv) {
         return -1;
     }
     animation_init();
+    match_setting_init();
     input_init(window);
     options_load();
     srand(time(NULL));

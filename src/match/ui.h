@@ -112,7 +112,9 @@ struct MatchUiState {
 
     bool replay_mode;
     FILE* replay_file;
-    bool replay_player_vision[MAX_PLAYERS];
+    uint32_t replay_fog_index;
+    std::vector<std::string> replay_fog_texts;
+    std::vector<uint8_t> replay_fog_player_ids;
     bool replay_paused;
     std::vector<MatchState> replay_tape;
 };

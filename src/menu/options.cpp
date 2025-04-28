@@ -17,21 +17,11 @@ static const Rect OPTIONS_FRAME_RECT = (Rect) {
 static const ivec2 BACK_BUTTON_POSITION = ivec2(OPTIONS_FRAME_RECT.x + 16, OPTIONS_FRAME_RECT.y + OPTIONS_FRAME_RECT.h - 21 - 8);
 static const ivec2 SAVE_BUTTON_POSITION = ivec2(OPTIONS_FRAME_RECT.x + OPTIONS_FRAME_RECT.w - 16 - 56, OPTIONS_FRAME_RECT.y + OPTIONS_FRAME_RECT.h - 21 - 8);
 
-static const char* const OPTION_DISPLAY_VALUES[] = { "Windowed", "Fullscreen", "Borderless" };
-static const char* const OPTION_VSYNC_VALUES[] = { "Disabled", "Enabled", "Adaptive" };
-static const char* const OPTION_UNIT_VOICES_VALUES[] = { "Off", "On" };
-const char* const* option_value_strings(OptionName option) {
-    switch (option) {
-        case OPTION_DISPLAY:
-            return OPTION_DISPLAY_VALUES;
-        case OPTION_VSYNC:
-            return OPTION_VSYNC_VALUES;
-        case OPTION_UNIT_VOICES:
-            return OPTION_UNIT_VOICES_VALUES;
-        default:
-            return {};
-    }
-}
+static const std::unordered_map<OptionName, std::vector<std::string>> OPTION_VALUE_STRINGS = {
+    { OPTION_DISPLAY, { "Windowed", "Fullscreen", "Borderless" }},
+    { OPTION_VSYNC, { "Disabled", "Enabled", "Adaptive" }},
+    { OPTION_UNIT_VOICES, { "Off", "On" }}
+};
 
 static const int HOTKEY_GROUP_NONE = -1;
 static const int HOTKEY_INDEX_NONE = -1;
@@ -197,7 +187,7 @@ void options_menu_update(OptionsMenuState& state) {
                     ui_element_position(ivec2(OPTIONS_FRAME_RECT.w - 16 - dropdown_info.frame_width, 0));
                     uint32_t value = option_get_value((OptionName)option);
                     if (option_data.type == OPTION_TYPE_DROPDOWN) {
-                        if (ui_dropdown((int)option, UI_DROPDOWN, &value, option_value_strings((OptionName)option), option_data.max_value, false)) {
+                        if (ui_dropdown((int)option, UI_DROPDOWN, &value, OPTION_VALUE_STRINGS.at((OptionName)option), false)) {
                             option_set_value((OptionName)option, value);
                         }
                     } else if (option_data.type == OPTION_TYPE_PERCENT_SLIDER || option_data.type == OPTION_TYPE_SLIDER) {

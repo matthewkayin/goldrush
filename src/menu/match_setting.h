@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <vector> 
+#include <string>
 
 enum MatchSetting {
     MATCH_SETTING_TEAMS,
@@ -10,7 +12,7 @@ enum MatchSetting {
 
 struct MatchSettingData {
     const char* name;
-    const char* const* values;
+    std::vector<std::string> values;
     size_t value_count;
 };
 
@@ -27,4 +29,5 @@ enum MatchSettingMapSizeValue {
     MATCH_SETTING_MAP_SIZE_COUNT
 };
 
+void match_setting_init();
 const MatchSettingData& match_setting_data(MatchSetting setting);
