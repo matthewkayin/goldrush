@@ -169,7 +169,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         }
 
         for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
-            state.inputs[player_id].push_back({ (MatchInput) { .type = MATCH_INPUT_NONE } });
+            state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
         }
     }
 
@@ -186,6 +186,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     return state;
 }
 
+#include "core/platform.h"
 MatchUiState match_ui_init_from_replay(const char* replay_path) {
     MatchUiState state = match_ui_base_init();
     state.mode = MATCH_UI_MODE_NONE;
@@ -195,6 +196,11 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
     state.replay_file = NULL;
 
     replay_file_read(state.inputs, &state.match, replay_path);
+    uint32_t max_input_count = 0;
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        max_input_count = std::max(max_input_count, (uint32_t)state.inputs[player_id].size());
+    }
+    state.replay_tape.reserve((max_input_count + 1) * 4);
     state.replay_tape.push_back(state.match);
 
     bool all_inputs_read = false;
@@ -207,10 +213,10 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
                 }
 
                 all_inputs_read = false;
-                for (const MatchInput& input : state.inputs[player_id][0]) {
+                for (const MatchInput& input : state.inputs[player_id].front()) {
                     match_handle_input(state.match, input);
                 }
-                state.inputs[player_id].erase(state.inputs[player_id].begin());
+                state.inputs[player_id].pop();
             }
 
             state.turn_timer = TURN_DURATION;
@@ -219,6 +225,7 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
         state.turn_timer--;
         match_update(state.match);
         state.replay_tape.push_back(state.match);
+        state.match.events.clear(); // To simulate match_ui_update handling events
     }
 
     // Init replay fog picker
@@ -259,7 +266,7 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
                 inputs.push_back(match_input_deserialize(in_buffer, in_buffer_head));
             }
 
-            state.inputs[event.input.player_id].push_back(inputs);
+            state.inputs[event.input.player_id].push(inputs);
             break;
         }
         case NETWORK_EVENT_CHAT: {
@@ -943,7 +950,7 @@ void match_ui_update(MatchUiState& state) {
                     continue;
                 }
 
-                if (state.inputs[player_id].empty() || state.inputs[player_id][0].empty()) {
+                if (state.inputs[player_id].empty() || state.inputs[player_id].front().empty()) {
                     all_inputs_received = false;
                     continue;
                 }
@@ -968,12 +975,12 @@ void match_ui_update(MatchUiState& state) {
                     continue;
                 }
 
-                replay_file_write_inputs(state.replay_file, player_id, &state.inputs[player_id][0]);
+                replay_file_write_inputs(state.replay_file, player_id, &state.inputs[player_id].front());
 
-                for (const MatchInput& input : state.inputs[player_id][0]) {
+                for (const MatchInput& input : state.inputs[player_id].front()) {
                     match_handle_input(state.match, input);
                 }
-                state.inputs[player_id].erase(state.inputs[player_id].begin());
+                state.inputs[player_id].pop();
             }
 
             // Flush input
@@ -989,7 +996,7 @@ void match_ui_update(MatchUiState& state) {
                 match_input_serialize(out_buffer, out_buffer_length, input);
                 GOLD_ASSERT(out_buffer_length <= NETWORK_INPUT_BUFFER_SIZE);
             }
-            state.inputs[network_get_player_id()].push_back(state.input_queue);
+            state.inputs[network_get_player_id()].push(state.input_queue);
             state.input_queue.clear();
 
             // Send inputs to other players
@@ -3016,7 +3023,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         render_text(FONT_HACK_GOLD, "Waiting for players...", ivec2(DISCONNECT_FRAME_RECT.x + (DISCONNECT_FRAME_RECT.w / 2) - (text_size.x / 2), DISCONNECT_FRAME_RECT.y + 8));
         int player_text_y = 32;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE || !(state.inputs[player_id].empty() || state.inputs[player_id][0].empty())) {
+            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE || !(state.inputs[player_id].empty() || state.inputs[player_id].front().empty())) {
                 continue;
             }
 

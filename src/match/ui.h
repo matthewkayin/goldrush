@@ -75,7 +75,7 @@ struct MatchUiState {
     uint32_t turn_timer;
     uint32_t turn_counter;
     uint32_t disconnect_timer;
-    std::vector<std::vector<MatchInput>> inputs[MAX_PLAYERS];
+    std::queue<std::vector<MatchInput>> inputs[MAX_PLAYERS];
     std::vector<MatchInput> input_queue;
 
     ivec2 camera_offset;

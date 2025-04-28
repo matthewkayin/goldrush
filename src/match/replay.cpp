@@ -71,7 +71,7 @@ void replay_file_write_inputs(FILE* file, uint8_t player_id, const std::vector<M
     fwrite(out_buffer, 1, out_buffer_length, file);
 }
 
-bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchState* state, const char* path) {
+bool replay_file_read(std::queue<std::vector<MatchInput>>* match_inputs, MatchState* state, const char* path) {
     char replay_file_path[256];
     platform_get_datafile_path(replay_file_path, path);
 
@@ -130,7 +130,7 @@ bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchS
                 inputs.push_back(match_input_deserialize(in_buffer, in_buffer_head));
             }
 
-            match_inputs[block_type].push_back(inputs);
+            match_inputs[block_type].push(inputs);
         } else {
             log_warn("Unhandled block type %u", block_type);
         }
