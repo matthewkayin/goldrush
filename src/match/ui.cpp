@@ -872,6 +872,21 @@ void match_ui_update(MatchUiState& state) {
         if (state.options_menu.mode != OPTIONS_MENU_CLOSED) {
             options_menu_update(state.options_menu);
         }
+    } else if (state.replay_mode) {
+        const SpriteInfo& button_panel_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PANEL);
+        ui_element_position(ivec2(SCREEN_WIDTH - button_panel_sprite_info.frame_width + 8, SCREEN_HEIGHT - button_panel_sprite_info.frame_height + 28));
+        ui_slider(0, &state.turn_counter, 0, state.replay_tape.size() - 1, UI_SLIDER_DISPLAY_NO_VALUE);
+
+        int seconds_elapsed = state.turn_counter == 0 ? 0 : (int)((state.turn_counter - 1) * UPDATE_TIME);
+        int minutes_elapsed = seconds_elapsed / 60;
+        seconds_elapsed -= minutes_elapsed * 60;
+        int seconds_total = (int)((state.replay_tape.size() - 2) * UPDATE_TIME);
+        int minutes_total = (seconds_total / 60);
+        seconds_total -= minutes_total * 60;
+        char time_text[16];
+        sprintf(time_text, "%i:%02i/%i:%02i", minutes_elapsed, seconds_elapsed, minutes_total, seconds_total);
+        ui_element_position(ivec2(SCREEN_WIDTH - button_panel_sprite_info.frame_width + 8, SCREEN_HEIGHT - button_panel_sprite_info.frame_height + 28 + 21 + 2));
+        ui_text(FONT_HACK_WHITE, time_text);
     }
 
     if (state.mode == MATCH_UI_MODE_LEAVE_MATCH) {
@@ -2887,17 +2902,44 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     }
 
     // Resource counters
-    // TODO: show everyone's resources
-    if (!state.replay_mode) {
-        char gold_text[8];
-        sprintf(gold_text, "%u", state.match.players[network_get_player_id()].gold);
-        render_text(FONT_WESTERN8_WHITE, gold_text, ivec2(SCREEN_WIDTH - 172 + 18, 2));
-        render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(SCREEN_WIDTH - 172, 2), RENDER_SPRITE_NO_CULL, 0);
+    const SpriteInfo& population_icon_sprite_info = render_get_sprite_info(SPRITE_UI_HOUSE_ICON);
+    const SpriteInfo& gold_icon_sprite_info = render_get_sprite_info(SPRITE_UI_GOLD_ICON);
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if ((!state.replay_mode && player_id != network_get_player_id()) || 
+                (state.replay_mode && !state.match.players[player_id].active)) {
+            continue;
+        }
 
+        int render_base_y = population_icon_sprite_info.frame_height * player_id;
+        int render_x = SCREEN_WIDTH;
+
+        // Rendering from right to left here
+
+        // Population text
+        render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 2);
         char population_text[8];
-        sprintf(population_text, "%u/%u", match_get_player_population(state.match, network_get_player_id()), match_get_player_max_population(state.match, network_get_player_id()));
-        render_text(FONT_WESTERN8_WHITE, population_text, ivec2(SCREEN_WIDTH - 88 + 22, 2));
-        render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(SCREEN_WIDTH - 88, 0), RENDER_SPRITE_NO_CULL, 0);
+        sprintf(population_text, "%u/%u", match_get_player_population(state.match, player_id), match_get_player_max_population(state.match, player_id));
+        render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, render_base_y + 3));
+
+        // Population icon
+        render_x -= (population_icon_sprite_info.frame_width + 2);
+        render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(render_x, render_base_y), RENDER_SPRITE_NO_CULL, 0);
+
+        // Gold text
+        render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 2);
+        char gold_text[8];
+        sprintf(gold_text, "%u", state.match.players[player_id].gold);
+        render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, render_base_y + 3));
+
+        // Gold icon
+        render_x -= (gold_icon_sprite_info.frame_width + 2);
+        render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, render_base_y + 2), RENDER_SPRITE_NO_CULL, 0);
+
+        // Player name
+        if (state.replay_mode) {
+            render_x -= (render_get_text_size(FONT_HACK_WHITE, state.match.players[player_id].name).x + 2);
+            render_text(FONT_HACK_WHITE, state.match.players[player_id].name, ivec2(render_x, render_base_y + 3));
+        }
     }
 
     // Menu button icon

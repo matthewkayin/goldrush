@@ -461,19 +461,22 @@ bool ui_slider(int slider_id, uint32_t* value, uint32_t min, uint32_t max, UiSli
 
     // Slider width will be based on the dropdown sprite's width
     const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
-    char option_value_str[8];
-    if (display == UI_SLIDER_DISPLAY_RAW_VALUE) {
-        sprintf(option_value_str, "%i", *value);
-    } else if (display == UI_SLIDER_DISPLAY_PERCENT) {
-        float percentage = (float)(*value) / (float)max;
-        sprintf(option_value_str, "%i%%", (int)(percentage * 100.0f));
+    ivec2 size = ivec2(dropdown_sprite_info.frame_width, dropdown_sprite_info.frame_height);
+    if (display != UI_SLIDER_DISPLAY_NO_VALUE) {
+        char option_value_str[8];
+        if (display == UI_SLIDER_DISPLAY_RAW_VALUE) {
+            sprintf(option_value_str, "%i", *value);
+        } else if (display == UI_SLIDER_DISPLAY_PERCENT) {
+            float percentage = (float)(*value) / (float)max;
+            sprintf(option_value_str, "%i%%", (int)(percentage * 100.0f));
+        }
+        ivec2 value_str_text_size = render_get_text_size(FONT_WESTERN8_GOLD, option_value_str);
+        size.x += VALUE_STR_PADDING + value_str_text_size.x;
+
+        ui_queue_text(FONT_WESTERN8_GOLD, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 3), 0);
     }
-    ivec2 value_str_text_size = render_get_text_size(FONT_WESTERN8_GOLD, option_value_str);
-    ivec2 size = ivec2(dropdown_sprite_info.frame_width + VALUE_STR_PADDING + value_str_text_size.x, dropdown_sprite_info.frame_height);
 
     ui_update_container(size);
-
-    ui_queue_text(FONT_WESTERN8_GOLD, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 3), 0);
 
     Rect slider_rect = (Rect) {
         .x = origin.x,

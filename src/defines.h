@@ -36,3 +36,5 @@ typedef uint16_t EntityId;
 const EntityId ID_MAX = 4096;
 const EntityId ID_NULL = ID_MAX + 1;
 const uint32_t INDEX_INVALID = 65535;
+
+const double UPDATE_TIME = 1.0 / 60;

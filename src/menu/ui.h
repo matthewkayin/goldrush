@@ -30,7 +30,8 @@ enum UiDropdownType {
 
 enum UiSliderDisplay {
     UI_SLIDER_DISPLAY_RAW_VALUE,
-    UI_SLIDER_DISPLAY_PERCENT
+    UI_SLIDER_DISPLAY_PERCENT,
+    UI_SLIDER_DISPLAY_NO_VALUE
 };
 
 /**
