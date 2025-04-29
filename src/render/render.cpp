@@ -12,7 +12,7 @@
 
 #include "core/logger.h"
 #include "core/asserts.h"
-#include "core/platform.h"
+#include "platform/platform.h"
 #include "math/gmath.h"
 #include "math/mat4.h"
 #include "render/sprite.h"

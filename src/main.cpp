@@ -1,5 +1,5 @@
 #include "defines.h"
-#include "core/platform.h"
+#include "platform/platform.h"
 #include "core/logger.h"
 #include "core/cursor.h"
 #include "core/animation.h"
@@ -46,7 +46,7 @@ struct LoadMatchParams {
 };
 
 struct LoadReplayParams {
-    const char* filename;
+    char filename[256];
 };
 
 struct LoadParams {
@@ -166,16 +166,8 @@ int gold_main(int argc, char** argv) {
     uint32_t ups = 0;
 
     game_set_mode((LoadParams) {
-        .mode = GAME_MODE_REPLAY,
-        .replay = (LoadReplayParams) {
-            .filename = "latest.rep"
-        }
-    });
-    /*
-    game_set_mode((LoadParams) {
         .mode = GAME_MODE_MENU
     });
-    */
 
     while (is_running) {
         // TIMEKEEP
@@ -278,6 +270,11 @@ int gold_main(int argc, char** argv) {
                                 .noise = noise
                             }
                         });
+                    } else if (state.menu.mode == MENU_MODE_LOAD_REPLAY) {
+                        LoadParams params;
+                        params.mode = GAME_MODE_REPLAY;
+                        platform_get_replay_path(params.replay.filename, platform_get_replay_file_name(state.menu.lobbylist_item_selected));
+                        game_set_mode(params);
                     }
                     break;
                 }

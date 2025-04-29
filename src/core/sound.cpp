@@ -1,7 +1,7 @@
 #include "sound.h"
 
 #include "core/logger.h"
-#include "core/platform.h"
+#include "platform/platform.h"
 #include <SDL3/SDL.h>
 #include <vector>
 #include <unordered_map>

@@ -70,6 +70,7 @@ struct UiState {
     bool text_input_show_cursor;
     std::vector<UiContainer> container_stack;
     std::vector<UiRender> render_queue[UI_COUNT][UI_Z_INDEX_COUNT]; 
+    int next_element_id;
     int element_selected;
     int element_selected_future;
     uint32_t id;
@@ -80,6 +81,7 @@ static bool initialized = false;
 
 ivec2 ui_get_container_origin();
 void ui_update_container(ivec2 size);
+int ui_get_next_element_id();
 void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index);
 void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h = false);
 void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index);
@@ -106,6 +108,7 @@ void ui_begin(uint32_t id, bool input_enabled) {
         state.text_input_show_cursor = !state.text_input_show_cursor;
     }
 
+    state.next_element_id = -1;
     state.element_selected = state.element_selected_future;
     state.input_enabled = input_enabled;
     state.id = id;
@@ -383,7 +386,8 @@ bool ui_team_picker(char value, bool disabled) {
     return clicked;
 }
 
-bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled) {
+bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled) {
+    int dropdown_id = ui_get_next_element_id();
     ivec2 origin = ui_get_container_origin();
     SpriteName sprite = type == UI_DROPDOWN ? SPRITE_UI_DROPDOWN : SPRITE_UI_DROPDOWN_MINI;
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
@@ -466,12 +470,13 @@ bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, 
     return false;
 }
 
-bool ui_slider(int slider_id, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display) {
+bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display) {
     static const int VALUE_STR_PADDING = 4;
     static const int SLIDER_HEIGHT = 5;
     static const int NOTCH_WIDTH = 5;
     static const int NOTCH_HEIGHT = 14;
 
+    int slider_id = ui_get_next_element_id();
     ivec2 origin = ui_get_container_origin();
     uint32_t old_value = *value;
 
@@ -617,6 +622,11 @@ void ui_update_container(ivec2 size) {
             }
         }
     }
+}
+
+int ui_get_next_element_id() {
+    state.next_element_id++;
+    return state.next_element_id;
 }
 
 void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index) {

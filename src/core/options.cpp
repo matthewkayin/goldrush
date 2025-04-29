@@ -3,7 +3,7 @@
 #include "logger.h"
 #include "sound.h"
 #include "input.h"
-#include "platform.h"
+#include "platform/platform.h"
 #include "render/render.h"
 #include <unordered_map>
 #include <fstream>

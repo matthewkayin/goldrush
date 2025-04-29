@@ -67,4 +67,11 @@ void platform_get_datafile_path(char* buffer, const char* filename) {
     #endif
 }
 
+void platform_get_replay_path(char* buffer, const char* filename) {
+    char replay_folder_path[256];
+    platform_get_datafile_path(buffer, "replays");
+    mkdir(replay_folder_path, 0777);
+    sprintf(buffer, "%s/%s", replay_folder_path, filename);
+}
+
 #endif

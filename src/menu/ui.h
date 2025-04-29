@@ -147,6 +147,7 @@ void ui_frame_rect(Rect rect);
 
 /**
  * Creates a text input
+ * @param element_id Needed for state keeping
  * @param prompt Text to be rendered at the beginning of the input
  * @param size The size of the text input element
  * @param value Pointer to the string that will be edited by the text input
@@ -170,7 +171,7 @@ bool ui_team_picker(char value, bool disabled);
  * @param disabled If true, the dropdown will not be clickable.
  * @return True if the dropdown value was changed
  */
-bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
+bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
 
 /**
  * Creates a slider
@@ -181,7 +182,7 @@ bool ui_dropdown(int dropdown_id, UiDropdownType type, uint32_t* selected_item, 
  * @param display Determines how the slider should render the value text
  * @return True if the slider value has changed
  */
-bool ui_slider(int slider_id, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display);
+bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display);
 
 /**
  * Renders everything in the UI's render list.

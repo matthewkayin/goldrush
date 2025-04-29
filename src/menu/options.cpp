@@ -187,11 +187,11 @@ void options_menu_update(OptionsMenuState& state) {
                     ui_element_position(ivec2(OPTIONS_FRAME_RECT.w - 16 - dropdown_info.frame_width, 0));
                     uint32_t value = option_get_value((OptionName)option);
                     if (option_data.type == OPTION_TYPE_DROPDOWN) {
-                        if (ui_dropdown((int)option, UI_DROPDOWN, &value, OPTION_VALUE_STRINGS.at((OptionName)option), false)) {
+                        if (ui_dropdown(UI_DROPDOWN, &value, OPTION_VALUE_STRINGS.at((OptionName)option), false)) {
                             option_set_value((OptionName)option, value);
                         }
                     } else if (option_data.type == OPTION_TYPE_PERCENT_SLIDER || option_data.type == OPTION_TYPE_SLIDER) {
-                        if (ui_slider((int)option, &value, option_data.min_value, option_data.max_value, option_data.type == OPTION_TYPE_SLIDER ? UI_SLIDER_DISPLAY_RAW_VALUE : UI_SLIDER_DISPLAY_PERCENT)) {
+                        if (ui_slider(&value, option_data.min_value, option_data.max_value, option_data.type == OPTION_TYPE_SLIDER ? UI_SLIDER_DISPLAY_RAW_VALUE : UI_SLIDER_DISPLAY_PERCENT)) {
                             option_set_value((OptionName)option, value);
                         }
                     }

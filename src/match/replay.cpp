@@ -1,13 +1,13 @@
 #include "replay.h"
 
-#include "core/platform.h"
+#include "platform/platform.h"
 #include "core/logger.h"
 
 static const uint8_t REPLAY_FILE_VERSION = 0;
 
 FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     char replay_file_path[256];
-    platform_get_datafile_path(replay_file_path, "latest.rep");
+    platform_get_replay_path(replay_file_path, "latest.rep");
 
     FILE* file = fopen(replay_file_path, "w");
     if (file == NULL) {

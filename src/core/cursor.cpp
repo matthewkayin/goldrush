@@ -3,7 +3,7 @@
 #include "defines.h"
 #include "asserts.h"
 #include "logger.h"
-#include "platform.h"
+#include "platform/platform.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <cstdio>

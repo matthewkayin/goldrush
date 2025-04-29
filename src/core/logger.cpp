@@ -1,7 +1,7 @@
 #include "logger.h"
 
 #include "asserts.h"
-#include "platform.h"
+#include "platform/platform.h"
 #include "math/gmath.h"
 #include <cstdio>
 #include <cstring>

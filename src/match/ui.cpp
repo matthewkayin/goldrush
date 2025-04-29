@@ -186,7 +186,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     return state;
 }
 
-#include "core/platform.h"
+#include "platform/platform.h"
 MatchUiState match_ui_init_from_replay(const char* replay_path) {
     MatchUiState state = match_ui_base_init();
     state.mode = MATCH_UI_MODE_NONE;
@@ -912,10 +912,10 @@ void match_ui_update(MatchUiState& state) {
                 ui_text(FONT_HACK_WHITE, "Fog:");
 
                 ui_element_position(ivec2(render_get_text_size(FONT_HACK_WHITE, "Fog:").x, 0));
-                ui_dropdown(1, UI_DROPDOWN_MINI, &state.replay_fog_index, state.replay_fog_texts, false);
+                ui_dropdown(UI_DROPDOWN_MINI, &state.replay_fog_index, state.replay_fog_texts, false);
             ui_end_container();
 
-            if (ui_slider(0, &state.turn_counter, 0, state.replay_tape.size() - 1, UI_SLIDER_DISPLAY_NO_VALUE)) {
+            if (ui_slider(&state.turn_counter, 0, state.replay_tape.size() - 1, UI_SLIDER_DISPLAY_NO_VALUE)) {
                 state.match = state.replay_tape[state.turn_counter];
             }
 

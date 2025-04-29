@@ -1,5 +1,6 @@
 #include "menu.h"
 
+#include "platform/platform.h"
 #include "core/input.h"
 #include "core/cursor.h"
 #include "core/logger.h"
@@ -166,6 +167,9 @@ void menu_update(MenuState& state) {
             if (ui_button("PLAY")) {
                 menu_set_mode(state, MENU_MODE_USERNAME);
             }
+            if (ui_button("REPLAYS")) {
+                menu_set_mode(state, MENU_MODE_REPLAYS);
+            }
             if (ui_button("OPTIONS")) {
                 state.options_menu = options_menu_open();
                 menu_set_mode(state, MENU_MODE_OPTIONS);
@@ -209,7 +213,7 @@ void menu_update(MenuState& state) {
             if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
                 state.lobbylist_page--;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count() - 1, false)) {
+            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(network_get_lobby_count()) - 1, false)) {
                 state.lobbylist_page++;
             }
         ui_end_container();
@@ -306,7 +310,7 @@ void menu_update(MenuState& state) {
                     }
 
                     uint32_t player_color = player.recolor_id;
-                    if (ui_dropdown(player_id, UI_DROPDOWN_MINI, &player_color, PLAYER_COLOR_STRS, player_id != network_get_player_id())) {
+                    if (ui_dropdown(UI_DROPDOWN_MINI, &player_color, PLAYER_COLOR_STRS, player_id != network_get_player_id())) {
                         network_set_player_color((uint8_t)player_color);
                     }
                 ui_end_container();
@@ -331,7 +335,7 @@ void menu_update(MenuState& state) {
                     ui_text(FONT_HACK_GOLD, setting_data.name);
 
                     uint32_t match_setting_value = network_get_match_setting(index);
-                    if (ui_dropdown(MAX_PLAYERS + index, UI_DROPDOWN_MINI, &match_setting_value, setting_data.values, !network_is_server())) {
+                    if (ui_dropdown(UI_DROPDOWN_MINI, &match_setting_value, setting_data.values, !network_is_server())) {
                         network_set_match_setting((uint8_t)index, (uint8_t)match_setting_value);
                     }
                 ui_end_container();
@@ -406,7 +410,59 @@ void menu_update(MenuState& state) {
             }
         ui_end_container();
         // End lobby buttons
-    } // End lobby
+    } else if (state.mode == MENU_MODE_REPLAYS) {
+        ui_frame_rect(LOBBYLIST_RECT);
+
+        if (platform_get_replay_file_count() == 0) {
+            int text_width = render_get_text_size(FONT_HACK_GOLD, "No replay files found.").x;
+            ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
+            ui_text(FONT_HACK_GOLD, "No replay files found.");
+        }
+
+        // Search and top buttons
+        ui_begin_row(ivec2(44, 4), 4);
+            ui_text_input("Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+            if (ui_sprite_button(SPRITE_UI_BUTTON_REFRESH, false, false)) {
+                platform_search_replays_folder(state.lobby_search_query.c_str());
+                state.lobbylist_page = 0;
+            }
+            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
+                state.lobbylist_page--;
+            }
+            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(platform_get_replay_file_count()) - 1, false)) {
+                state.lobbylist_page++;
+            }
+        ui_end_container();
+
+        // Replay list
+        size_t base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
+        for (size_t lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, platform_get_replay_file_count()); lobby_index++) {
+            char replay_text[128];
+            bool selected = lobby_index == state.lobbylist_item_selected;
+            sprintf(replay_text, "%s %s %s", selected ? "*" : " ", platform_get_replay_file_name(lobby_index), selected ? "*" : " ");
+
+            ivec2 text_frame_size = ui_text_frame_size(replay_text);
+            ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
+            if (ui_text_frame(replay_text, false)) {
+                state.lobbylist_item_selected = lobby_index;
+            }
+        }
+
+        // Replaylist button row
+        ui_begin_row(ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
+            if (ui_button("BACK")) {
+                menu_set_mode(state, MENU_MODE_MAIN);
+            }
+            if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
+                if (ui_button("WATCH")) {
+                    menu_set_mode(state, MENU_MODE_LOAD_REPLAY);
+                }
+                if (ui_button("RENAME")) {
+
+                }
+            }
+        ui_end_container();
+    } // End replaylist
 
     if (state.mode == MENU_MODE_OPTIONS) {
         options_menu_update(state.options_menu);
@@ -419,16 +475,16 @@ void menu_update(MenuState& state) {
 void menu_set_mode(MenuState& state, MenuMode mode) {
     state.status_timer = 0;
     state.lobbylist_page = 0;
-    state.lobbylist_item_selected = MENU_ITEM_NONE;
+    if (mode != MENU_MODE_LOAD_REPLAY) {
+        state.lobbylist_item_selected = MENU_ITEM_NONE;
+    }
 
     if (input_is_text_input_active()) {
         input_stop_text_input();
     }
 
     state.mode = mode;
-    if (mode == MENU_MODE_USERNAME) {
-        input_start_text_input(&state.username, MAX_USERNAME_LENGTH);
-    } else if (mode == MENU_MODE_LOBBYLIST) {
+    if (mode == MENU_MODE_LOBBYLIST) {
         if (!network_scanner_create()) {
             menu_set_mode(state, MENU_MODE_MAIN);
             menu_show_status(state, "Error occured while searching for LAN games.");
@@ -438,6 +494,9 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
         network_scanner_search(state.lobby_search_query.c_str());
     } else if (mode == MENU_MODE_CONNECTING) {
         state.connection_timeout = CONNECTION_TIMEOUT;
+    } else if (mode == MENU_MODE_REPLAYS) {
+        state.lobby_search_query = "";
+        platform_search_replays_folder(state.lobby_search_query.c_str());
     }
 }
 
@@ -491,11 +550,11 @@ void menu_add_chat_message(MenuState& state, const char* message) {
     }
 }
 
-size_t menu_get_lobbylist_page_count() {
-    if (network_get_lobby_count() == 0) {
+size_t menu_get_lobbylist_page_count(size_t count) {
+    if (count == 0) {
         return 1;
     }
-    return (network_get_lobby_count() / LOBBYLIST_PAGE_SIZE) + (int)(network_get_lobby_count() % LOBBYLIST_PAGE_SIZE != 0);
+    return (count / LOBBYLIST_PAGE_SIZE) + (int)(count % LOBBYLIST_PAGE_SIZE != 0);
 }
 
 const char* menu_get_player_status_string(NetworkPlayerStatus status) {

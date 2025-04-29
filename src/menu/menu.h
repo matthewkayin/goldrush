@@ -19,9 +19,11 @@ enum MenuMode {
     MENU_MODE_LOBBYLIST,
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
+    MENU_MODE_REPLAYS,
     MENU_MODE_EXIT,
     MENU_MODE_OPTIONS,
     MENU_MODE_LOAD_MATCH,
+    MENU_MODE_LOAD_REPLAY,
     MENU_MODE_COUNT
 };
 
@@ -56,7 +58,7 @@ void menu_update(MenuState& state);
 void menu_set_mode(MenuState& state, MenuMode mode);
 void menu_show_status(MenuState& state, const char* message);
 void menu_add_chat_message(MenuState& state, const char* message);
-size_t menu_get_lobbylist_page_count();
+size_t menu_get_lobbylist_page_count(size_t count);
 const char* menu_get_player_status_string(NetworkPlayerStatus status);
 
 void menu_render(const MenuState& state);

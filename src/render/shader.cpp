@@ -2,7 +2,7 @@
 
 #include "defines.h"
 #include "core/logger.h"
-#include "core/platform.h"
+#include "platform/platform.h"
 #include <glad/glad.h>
 #include <cstdio>
 #include <cstdlib>
