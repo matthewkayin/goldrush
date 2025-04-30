@@ -1,5 +1,6 @@
 #include "match/ui.h"
 
+#include "platform/platform.h"
 #include "core/network.h"
 #include "core/input.h"
 #include "core/logger.h"
@@ -130,6 +131,8 @@ MatchUiState match_ui_base_init() {
     state.building_fire_animation = animation_create(ANIMATION_FIRE_BURN);
     state.options_menu.mode = OPTIONS_MENU_CLOSED;
 
+    memset(state.displayed_gold_amounts, 0, sizeof(state.displayed_gold_amounts));
+
     for (int index = 0; index < HOTKEY_GROUP_SIZE; index++) {
         state.hotkey_group[index] = INPUT_HOTKEY_NONE;
     }
@@ -186,7 +189,6 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     return state;
 }
 
-#include "platform/platform.h"
 MatchUiState match_ui_init_from_replay(const char* replay_path) {
     MatchUiState state = match_ui_base_init();
     state.mode = MATCH_UI_MODE_NONE;
@@ -1222,6 +1224,19 @@ void match_ui_update(MatchUiState& state) {
         if (state.chat_cursor_blink_timer == 0) {
             state.chat_cursor_visible = !state.chat_cursor_visible;
             state.chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
+        }
+    }
+
+    // Update displayed gold amounts
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (!state.match.players[player_id].active) {
+            continue;
+        } 
+        int difference = std::min(2, std::abs((int)state.displayed_gold_amounts[player_id] - (int)state.match.players[player_id].gold));
+        if (state.displayed_gold_amounts[player_id] < state.match.players[player_id].gold) {
+            state.displayed_gold_amounts[player_id] += difference;
+        } else if (state.displayed_gold_amounts[player_id] > state.match.players[player_id].gold) {
+            state.displayed_gold_amounts[player_id] -= difference;
         }
     }
 
@@ -2989,7 +3004,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         // Gold text
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 2);
         char gold_text[8];
-        sprintf(gold_text, "%u", state.match.players[player_id].gold);
+        sprintf(gold_text, "%u", state.displayed_gold_amounts[player_id]);
         render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, resource_base_y + 3));
 
         // Gold icon

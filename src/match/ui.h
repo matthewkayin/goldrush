@@ -106,6 +106,8 @@ struct MatchUiState {
     Animation building_fire_animation;
     ivec2 move_animation_position;
     EntityId move_animation_entity_id;
+    
+    uint32_t displayed_gold_amounts[MAX_PLAYERS];
 
     MatchState match;
     OptionsMenuState options_menu;
