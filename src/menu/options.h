@@ -28,4 +28,3 @@ struct OptionsMenuState {
 
 OptionsMenuState options_menu_open();
 void options_menu_update(OptionsMenuState& state);
-void options_menu_render(const OptionsMenuState& state);

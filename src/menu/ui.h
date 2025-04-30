@@ -10,9 +10,6 @@
 
 #define UI_RENDER_TEXT_BUFFER_SIZE 128
 #define UI_Z_INDEX_COUNT 2
-#define UI_MAIN 0
-#define UI_OPTIONS 1
-#define UI_COUNT 2
 #define UI_ICON_BUTTON_EMPTY SPRITE_COUNT
 
 enum UiHotkeyButtonMode {
@@ -37,10 +34,15 @@ enum UiSliderDisplay {
 
 /**
  * Clears the UI render list. Should be called every frame
- * @param id ID of the UI to begin
- * @param input_enabled If false, all inputs will be disabled for this UI
  */
-void ui_begin(uint32_t id, bool input_enabled);
+void ui_begin();
+
+/**
+ * Enables or disables input
+ * Input is enabled by default each time you call ui_begin
+ * @param value The value to set input enabled to
+ */
+void ui_set_input_enabled(bool value);
 
 /**
  * Creates a one-off container. The next UI element will render at the specified position
@@ -146,6 +148,11 @@ void ui_frame(ivec2 size);
 void ui_frame_rect(Rect rect);
 
 /**
+ * Reners an offblack transparent rect across the entire screen
+ */
+void ui_screen_shade();
+
+/**
  * Creates a text input
  * @param element_id Needed for state keeping
  * @param prompt Text to be rendered at the beginning of the input
@@ -188,6 +195,5 @@ bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay disp
  * Renders everything in the UI's render list.
  * When a UI element is created it gets added to the render list.
  * Elements remain in the render list unless cleared by ui_begin().
- * @param id ID of the UI to render
  */
-void ui_render(uint32_t id);
+void ui_render();

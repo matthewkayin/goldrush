@@ -163,7 +163,8 @@ OptionsMenuState options_menu_open() {
 }
 
 void options_menu_update(OptionsMenuState& state) {
-    ui_begin(UI_OPTIONS, true);
+    ui_set_input_enabled(true);
+    ui_screen_shade();
     ui_frame_rect(OPTIONS_FRAME_RECT);
 
     ui_element_position(BACK_BUTTON_POSITION);
@@ -406,14 +407,4 @@ const char* options_menu_get_save_status_str(OptionsMenuSaveStatus status) {
         case OPTIONS_MENU_SAVE_STATUS_ERRORS:
             return "One or more hotkey groups has errors.";
     }
-}
-
-void options_menu_render(const OptionsMenuState& state) {
-    Rect SCREEN_RECT = (Rect) {
-        .x = 0, .y = 0,
-        .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT
-    };
-    render_fill_rect(SCREEN_RECT, RENDER_COLOR_OFFBLACK_TRANSPARENT);
-
-    ui_render(UI_OPTIONS);
 }

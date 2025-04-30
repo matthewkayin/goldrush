@@ -69,11 +69,12 @@ struct UiState {
     uint32_t text_input_cursor_blink_timer;
     bool text_input_show_cursor;
     std::vector<UiContainer> container_stack;
-    std::vector<UiRender> render_queue[UI_COUNT][UI_Z_INDEX_COUNT]; 
+    std::vector<UiRender> render_queue[UI_Z_INDEX_COUNT]; 
     int next_element_id;
     int element_selected;
     int element_selected_future;
-    uint32_t id;
+    int text_input_selected;
+    int next_text_input_id;
     bool input_enabled;
 };
 static UiState state;
@@ -82,13 +83,14 @@ static bool initialized = false;
 ivec2 ui_get_container_origin();
 void ui_update_container(ivec2 size);
 int ui_get_next_element_id();
+int ui_get_next_text_input_id();
 void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index);
 void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h = false);
 void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index);
 void ui_queue_draw_rect(Rect rect, RenderColor color, int z_index);
 void ui_queue_fill_rect(Rect rect, RenderColor color, int z_index);
 
-void ui_begin(uint32_t id, bool input_enabled) {
+void ui_begin() {
     if (!initialized) {
         state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
         state.text_input_show_cursor = false;
@@ -99,19 +101,18 @@ void ui_begin(uint32_t id, bool input_enabled) {
 
     state.container_stack.clear();
     for (int z_index = 0; z_index < UI_Z_INDEX_COUNT; z_index++) {
-        state.render_queue[id][z_index].clear();
+        state.render_queue[z_index].clear();
     }
 
     // Update of timers and such can go here since ui_begin() is called every frame
-    state.text_input_cursor_blink_timer--;
-    if (state.text_input_cursor_blink_timer == 0) {
-        state.text_input_show_cursor = !state.text_input_show_cursor;
-    }
-
     state.next_element_id = -1;
+    state.next_text_input_id = -1;
     state.element_selected = state.element_selected_future;
-    state.input_enabled = input_enabled;
-    state.id = id;
+    state.input_enabled = true;
+}
+
+void ui_set_input_enabled(bool value) {
+    state.input_enabled = value;
 }
 
 void ui_element_position(ivec2 position) {
@@ -330,7 +331,15 @@ void ui_frame_rect(Rect rect) {
     ui_frame(ivec2(rect.w, rect.h));
 }
 
+void ui_screen_shade() {
+    ui_queue_fill_rect((Rect) { 
+        .x = 0, .y = 0, 
+        .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT},
+    RENDER_COLOR_OFFBLACK_TRANSPARENT, 0);
+}
+
 void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t max_length) {
+    int id = ui_get_next_text_input_id();
     ivec2 origin = ui_get_container_origin();
     ui_update_container(size);
 
@@ -343,19 +352,30 @@ void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t ma
     ivec2 prompt_size = render_get_text_size(FONT_HACK_GOLD, prompt);
     ui_queue_text(FONT_HACK_GOLD, value->c_str(), ivec2(text_input_rect.x + prompt_size.x, text_input_rect.y + 6), 0);
 
-    if (state.text_input_show_cursor && input_is_text_input_active()) {
-        int value_text_width = render_get_text_size(FONT_HACK_GOLD, value->c_str()).x;
-        ivec2 cursor_pos = ivec2(text_input_rect.x + prompt_size.x + value_text_width - 2, text_input_rect.y + 5);
-        ui_queue_text(FONT_HACK_GOLD, "|", cursor_pos, 0);
+    if (input_is_text_input_active() && state.text_input_selected == id) {
+        if (!state.input_enabled) {
+            input_stop_text_input();
+        } else {
+            state.text_input_cursor_blink_timer--;
+            if (state.text_input_cursor_blink_timer == 0) {
+                state.text_input_show_cursor = !state.text_input_show_cursor;
+                state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
+            }
+            if (state.text_input_show_cursor) {
+                int value_text_width = render_get_text_size(FONT_HACK_GOLD, value->c_str()).x;
+                ivec2 cursor_pos = ivec2(text_input_rect.x + prompt_size.x + value_text_width - 2, text_input_rect.y + 5);
+                ui_queue_text(FONT_HACK_GOLD, "|", cursor_pos, 0);
+            }
+        }
     }
 
-    if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+    if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && state.input_enabled) {
         if (text_input_rect.has_point(input_get_mouse_position())) {
             sound_play(SOUND_UI_CLICK);
             input_start_text_input(value, max_length);
-        } else if (input_is_text_input_active()) {
-            input_stop_text_input();
-        }
+            state.text_input_selected = id;
+            state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
+        } 
     } 
 }
 
@@ -554,9 +574,9 @@ bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay disp
     return *value != old_value;
 }
 
-void ui_render(uint32_t id) {
+void ui_render() {
     for (int z_index = 0; z_index < UI_Z_INDEX_COUNT; z_index++) {
-        for (const UiRender& render : state.render_queue[id][z_index]) {
+        for (const UiRender& render : state.render_queue[z_index]) {
             switch (render.type) {
                 case UI_RENDER_TEXT: {
                     render_text(render.text.font, render.text.text, render.text.position);
@@ -629,17 +649,22 @@ int ui_get_next_element_id() {
     return state.next_element_id;
 }
 
+int ui_get_next_text_input_id() {
+    state.next_text_input_id++;
+    return state.next_text_input_id;
+}
+
 void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index) {
     UiRender render;
     render.type = UI_RENDER_TEXT;
     render.text.font = font;
     render.text.position = position;
     strcpy(render.text.text, text);
-    state.render_queue[state.id][z_index].push_back(render);
+    state.render_queue[z_index].push_back(render);
 }
 
 void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h) {
-    state.render_queue[state.id][z_index].push_back((UiRender) {
+    state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_SPRITE,
         .sprite = (UiRenderSprite) {
             .sprite = sprite,
@@ -651,7 +676,7 @@ void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index
 }
 
 void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index) {
-    state.render_queue[state.id][z_index].push_back((UiRender) {
+    state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_NINEPATCH,
         .ninepatch = (UiRenderNinepatch) {
             .sprite = sprite,
@@ -661,7 +686,7 @@ void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index) {
 }
 
 void ui_queue_draw_rect(Rect rect, RenderColor color, int z_index) {
-    state.render_queue[state.id][z_index].push_back((UiRender) {
+    state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_DRAW_RECT,
         .rect = (UiRenderRect) {
             .rect = rect,
@@ -671,7 +696,7 @@ void ui_queue_draw_rect(Rect rect, RenderColor color, int z_index) {
 }
 
 void ui_queue_fill_rect(Rect rect, RenderColor color, int z_index) {
-    state.render_queue[state.id][z_index].push_back((UiRender) {
+    state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_FILL_RECT,
         .rect = (UiRenderRect) {
             .rect = rect,

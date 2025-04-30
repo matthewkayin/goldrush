@@ -856,7 +856,8 @@ void match_ui_update(MatchUiState& state) {
 
     // Menu
     // Alwyas call UI begin to make sure everything is cleared out from the main menu
-    ui_begin(UI_MAIN, state.options_menu.mode == OPTIONS_MENU_CLOSED);
+    ui_begin();
+    ui_set_input_enabled(state.options_menu.mode == OPTIONS_MENU_CLOSED);
     if (match_ui_is_in_menu(state.mode)) {
         ui_frame_rect(MENU_RECT);
 
@@ -3159,7 +3160,6 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         }
     }
 
-    ui_render(UI_MAIN);
     render_sprite_batch();
 
     // MINIMAP
@@ -3264,10 +3264,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 
-    if (state.options_menu.mode != OPTIONS_MENU_CLOSED) {
-        options_menu_render(state.options_menu);
-        render_sprite_batch();
-    }
+    ui_render();
+    render_sprite_batch();
 }
 
 // RENDER FUNCTIONS

@@ -160,7 +160,8 @@ void menu_update(MenuState& state) {
         }
     }
 
-    ui_begin(UI_MAIN, state.mode != MENU_MODE_OPTIONS);
+    ui_begin();
+    ui_set_input_enabled(state.mode != MENU_MODE_OPTIONS && state.mode != MENU_MODE_REPLAY_RENAME);
 
     if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_OPTIONS) {
         ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
@@ -410,7 +411,7 @@ void menu_update(MenuState& state) {
             }
         ui_end_container();
         // End lobby buttons
-    } else if (state.mode == MENU_MODE_REPLAYS) {
+    } else if (state.mode == MENU_MODE_REPLAYS || state.mode == MENU_MODE_REPLAY_RENAME) {
         ui_frame_rect(LOBBYLIST_RECT);
 
         if (platform_get_replay_file_count() == 0) {
@@ -458,7 +459,8 @@ void menu_update(MenuState& state) {
                     menu_set_mode(state, MENU_MODE_LOAD_REPLAY);
                 }
                 if (ui_button("RENAME")) {
-
+                    state.mode = MENU_MODE_REPLAY_RENAME;
+                    state.replay_rename = std::string(platform_get_replay_file_name(state.lobbylist_item_selected));
                 }
             }
         ui_end_container();
@@ -469,6 +471,38 @@ void menu_update(MenuState& state) {
         if (state.options_menu.mode == OPTIONS_MENU_CLOSED) {
             menu_set_mode(state, MENU_MODE_MAIN);
         }
+    }
+
+    if (state.mode == MENU_MODE_REPLAY_RENAME) {
+        ui_set_input_enabled(true);
+        ui_screen_shade();
+        ui_begin_column(ivec2((SCREEN_WIDTH / 2) - 150, (SCREEN_HEIGHT / 2) - 64), 4);
+            ui_text_input("Rename: ", ivec2(300, 24), &state.replay_rename, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+
+            ui_begin_row(ivec2(0, 0), 4);
+                if (ui_button("BACK")) {
+                    state.mode = MENU_MODE_REPLAYS;
+                }
+                if (ui_button("OK")) {
+                    if (state.replay_rename.empty()) {
+                        menu_show_status(state, "Replay name cannot be empty.");
+                    } else {
+                        bool replay_rename_ends_in_rep = state.replay_rename.size() >= 5 &&
+                                    state.replay_rename.compare(state.replay_rename.size() - 4, 4, ".rep") == 0;
+                        if (!replay_rename_ends_in_rep) {
+                            state.replay_rename += ".rep";
+                        }
+                        char old_filename[256];
+                        platform_get_replay_path(old_filename, platform_get_replay_file_name(state.lobbylist_item_selected));
+                        char new_filename[256];
+                        platform_get_replay_path(new_filename, state.replay_rename.c_str());
+                        rename(old_filename, new_filename);
+                        platform_search_replays_folder(state.lobby_search_query.c_str());
+                        state.mode = MENU_MODE_REPLAYS;
+                    }
+                }
+            ui_end_container();
+        ui_end_container();
     }
 }
 
@@ -653,7 +687,7 @@ void menu_render(const MenuState& state) {
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, version_text);
     render_text(FONT_WESTERN8_OFFBLACK, version_text, ivec2(4, SCREEN_HEIGHT - text_size.y - 4));
 
-    ui_render(UI_MAIN);
+    ui_render();
 
     // Status text
     if (state.status_timer != 0) {
@@ -667,10 +701,6 @@ void menu_render(const MenuState& state) {
         int rect_width = text_size.x + 32;
         render_ninepatch(SPRITE_UI_FRAME, (Rect) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 80, .w = rect_width, .h = 32 });
         render_text(FONT_HACK_GOLD, "Connecting...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 80 + 16 - (text_size.y / 2)));
-    }
-
-    if (state.mode == MENU_MODE_OPTIONS) {
-        options_menu_render(state.options_menu);
     }
 
     render_sprite_batch();

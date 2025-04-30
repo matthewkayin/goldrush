@@ -20,6 +20,7 @@ enum MenuMode {
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
     MENU_MODE_REPLAYS,
+    MENU_MODE_REPLAY_RENAME,
     MENU_MODE_EXIT,
     MENU_MODE_OPTIONS,
     MENU_MODE_LOAD_MATCH,
@@ -40,6 +41,7 @@ struct MenuState {
     std::string username;
     std::string lobby_search_query;
     std::string chat_message;
+    std::string replay_rename;
     uint32_t status_timer;
     char status_text[128];
     uint32_t connection_timeout;
