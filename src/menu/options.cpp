@@ -288,7 +288,7 @@ void options_menu_update(OptionsMenuState& state) {
                         char* hotkey_text_ptr = hotkey_text;
                         InputAction hotkey = group.hotkeys[state.hotkey_index_selected];
 
-                        hotkey_text_ptr += hotkey_sprintf_text(hotkey_text_ptr, hotkey);
+                        hotkey_text_ptr += hotkey_get_name(hotkey_text_ptr, hotkey);
                         hotkey_text_ptr += sprintf(hotkey_text_ptr, " (");
                         hotkey_text_ptr += input_sprintf_sdl_key_str(hotkey_text_ptr, state.hotkey_pending_changes[hotkey]);
                         hotkey_text_ptr += sprintf(hotkey_text_ptr, ")");

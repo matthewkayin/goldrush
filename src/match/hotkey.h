@@ -52,4 +52,4 @@ struct HotkeyButtonInfo {
 HotkeyButtonInfo hotkey_get_button_info(InputAction hotkey);
 SpriteName hotkey_get_sprite(InputAction hotkey, bool show_toggled = false);
 const char* hotkey_get_desc(InputAction hotkey);
-int hotkey_sprintf_text(char* str, InputAction hotkey, bool show_toggled = false);
+int hotkey_get_name(char* str, InputAction hotkey, bool show_toggled = false);

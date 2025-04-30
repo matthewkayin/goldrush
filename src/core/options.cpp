@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "sound.h"
 #include "input.h"
+#include "match/hotkey.h"
 #include "platform/platform.h"
 #include "render/render.h"
 #include <unordered_map>
@@ -69,39 +70,52 @@ void options_load() {
     char options_file_path[256];
     platform_get_datafile_path(options_file_path, OPTIONS_FILE_NAME);
     std::ifstream options_file(options_file_path);
-    if (!options_file.is_open()) {
-        log_info("No options file found.");
-        return;
-    }
-
-    std::string line;
-    bool options_mode = true;
-    while (std::getline(options_file, line)) {
-        if (line == "[hotkeys]") {
-            options_mode = false;
-            continue;
+    if (options_file.is_open()) {
+        std::string hotkey_names[INPUT_ACTION_COUNT];
+        char hotkey_name_buffer[128];
+        for (int hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
+            hotkey_get_name(hotkey_name_buffer, (InputAction)hotkey);
+            hotkey_names[hotkey] = std::string(hotkey_name_buffer);
         }
 
-        size_t equals_index = line.find('=');
-        std::string key = line.substr(0, equals_index);
-        std::string value = line.substr(equals_index + 1);
+        std::string line;
+        bool options_mode = true;
+        while (std::getline(options_file, line)) {
+            if (line == "[hotkeys]") {
+                options_mode = false;
+                continue;
+            }
 
-        if (options_mode) {
-            int option;
-            for (option = 0; option < OPTION_COUNT; option++) {
-                if (key == std::string(OPTION_DATA.at((OptionName)option).name)) {
-                    options[(OptionName)option] = std::stoi(value);
-                    break;
+            size_t equals_index = line.find('=');
+            std::string key = line.substr(0, equals_index);
+            std::string value = line.substr(equals_index + 1);
+
+            if (options_mode) {
+                int option;
+                for (option = 0; option < OPTION_COUNT; option++) {
+                    if (key == std::string(OPTION_DATA.at((OptionName)option).name)) {
+                        options[(OptionName)option] = std::stoi(value);
+                        break;
+                    }
+                }
+                if (option == OPTION_COUNT) {
+                    log_warn("Unrecognized option key %s with value %s", key.c_str(), value.c_str());
+                }
+            } else {
+                int hotkey;
+                for (hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
+                    if (key == hotkey_names[hotkey]) {
+                        input_set_hotkey_mapping((InputAction)hotkey, (SDL_Keycode)std::stoi(value));
+                        break;
+                    }
+                }
+                if (hotkey == INPUT_ACTION_COUNT) {
+                    log_warn("Unrecognized hotkey mapping key %s with value %s", key.c_str(), value.c_str());
                 }
             }
-            if (option == OPTION_COUNT) {
-                log_warn("Unrecognized option key %s with value %s", key.c_str(), value.c_str());
-            }
-        } else {
-            InputAction hotkey = (InputAction)std::stoi(key);
-            SDL_Keycode key = (SDL_Keycode)std::stoi(value);
-            input_set_hotkey_mapping(hotkey, key);
         }
+    } else {
+        log_info("No options file found.");
     }
 
     for (int option = 0; option < OPTION_COUNT; option++) {
@@ -125,7 +139,9 @@ void options_save() {
     fprintf(options_file, "[hotkeys]\n");
 
     for (int hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
-        fprintf(options_file, "%i=%i\n", hotkey, input_get_hotkey_mapping((InputAction)hotkey));
+        char hotkey_name[128];
+        hotkey_get_name(hotkey_name, (InputAction)hotkey);
+        fprintf(options_file, "%s=%i\n", hotkey_name, input_get_hotkey_mapping((InputAction)hotkey));
     }
 
     fclose(options_file);

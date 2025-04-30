@@ -323,7 +323,7 @@ const char* hotkey_get_desc(InputAction hotkey) {
     }
 }
 
-int hotkey_sprintf_text(char* str, InputAction hotkey, bool show_toggled) {
+int hotkey_get_name(char* str, InputAction hotkey, bool show_toggled) {
     int size = 0;
     const HotkeyButtonInfo& info = HOTKEY_BUTTON_INFO.at(hotkey);
     switch (info.type) {

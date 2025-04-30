@@ -2680,7 +2680,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 sprintf(tooltip_desc, "%s", hotkey_get_desc(hotkey_hovered));
 
                 char* tooltip_text_ptr = tooltip_text;
-                tooltip_text_ptr += hotkey_sprintf_text(tooltip_text_ptr, hotkey_hovered, show_toggle);
+                tooltip_text_ptr += hotkey_get_name(tooltip_text_ptr, hotkey_hovered, show_toggle);
                 tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
                 tooltip_text_ptr += input_sprintf_sdl_key_str(tooltip_text_ptr, input_get_hotkey_mapping(hotkey_hovered));
                 tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
