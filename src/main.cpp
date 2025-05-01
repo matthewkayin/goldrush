@@ -12,6 +12,8 @@
 #include "menu/menu.h"
 #include "match/ui.h"
 #include "match/noise.h"
+#include "container/stack_alloc.h"
+#include "container/dynamic_array.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
@@ -115,6 +117,7 @@ int gold_main(int argc, char** argv) {
         log_info("Detected platform OSX.");
     #endif
     platform_clock_init();
+    stack_init();
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
@@ -364,8 +367,10 @@ int gold_main(int argc, char** argv) {
     SDL_Quit();
 
     options_save();
+    stack_quit();
 
     log_info("Application quit gracefully.");
+    logger_quit();
 
     return 0;
 }
