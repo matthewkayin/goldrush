@@ -25,11 +25,6 @@ FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players
     fwrite(&noise.width, 1, sizeof(uint32_t), file);
     fwrite(&noise.height, 1, sizeof(uint32_t), file);
     fwrite(noise.map, 1, noise.width * noise.height * sizeof(int8_t), file);
-    log_trace("--- noise map ---");
-    for (int offset = 0; offset < noise.width * noise.height; offset += noise.width) {
-        log_trace("%b", noise.map + offset, noise.width);
-    }
-    log_trace("--- end noise ---");
 
     // Players
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {

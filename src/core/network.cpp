@@ -680,6 +680,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             event.type = NETWORK_EVENT_INPUT;
             event.input.in_buffer_length = length;
             event.input.player_id = *player_id_ptr;
+            GOLD_ASSERT(length <= 1024);
             memcpy(event.input.in_buffer, data, length);
 
             state.event_queue.push(event);

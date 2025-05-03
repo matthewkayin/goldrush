@@ -1267,7 +1267,11 @@ void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pi
     if (layer == MINIMAP_LAYER_FOG) {
         position.x += MINIMAP_TEXTURE_WIDTH / 2;
     }
-    state.minimap_texture_pixels[position.x + (position.y * MINIMAP_TEXTURE_WIDTH)] = state.minimap_pixel_values[pixel];
+    int index = position.x + (position.y * MINIMAP_TEXTURE_WIDTH);
+    if (index < 0 || index >= MINIMAP_TEXTURE_WIDTH * MINIMAP_TEXTURE_HEIGHT) {
+        return;
+    }
+    state.minimap_texture_pixels[index] = state.minimap_pixel_values[pixel];
 }
 
 void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel) {
