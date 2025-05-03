@@ -2229,7 +2229,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
             continue;
         }
-        if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_UNIT) {
+        CellType fire_cell_type = map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type;
+        if (!(fire_cell_type == CELL_UNIT || fire_cell_type == CELL_MINER)) {
             continue;
         }
         render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);

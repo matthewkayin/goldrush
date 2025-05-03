@@ -771,7 +771,7 @@ bool map_is_cell_in_bounds(const Map& map, ivec2 cell) {
 }
 
 bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, int size) {
-    return !(cell.x < 0 || cell.y < 0 || cell.x + size >= map.width || cell.y + size >= map.height);
+    return !(cell.x < 0 || cell.y < 0 || cell.x + size > map.width || cell.y + size > map.height);
 }
 
 Tile map_get_tile(const Map& map, ivec2 cell) {

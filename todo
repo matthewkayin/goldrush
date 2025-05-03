@@ -1,5 +1,3 @@
 - probably shouldn't be able to burn bunkers
-- units can die from a molotov while they are garrisoned / inside a mine and it breaks things
-- fire does not render on top of miners correctly, possibly because it's checking for unit cell and not miner cell	
 - make the money counter go faster
 - when a gold mine collapses, miners should return their gold and then give up their target

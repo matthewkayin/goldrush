@@ -82,6 +82,8 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
+            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+            match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
 
             // Place scout
             {
@@ -1737,7 +1739,10 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
     // Check for fire
     // If entity is moving, check for fire based on its previous cell
-    if (entity.type != ENTITY_GOLDMINE && entity_data.cell_layer != CELL_LAYER_SKY && entity.health != 0) {
+    if (entity.type != ENTITY_GOLDMINE && 
+            entity_data.cell_layer != CELL_LAYER_SKY && 
+            entity.type != ENTITY_BUNKER &&
+            entity.health != 0 && entity.garrison_id == ID_NULL) {
         ivec2 entity_fire_cell = entity.cell;
         if (entity_is_unit(entity.type) && entity.mode == MODE_UNIT_MOVE) {
             entity_fire_cell = entity.cell - DIRECTION_IVEC2[entity.direction];
