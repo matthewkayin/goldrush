@@ -191,7 +191,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
 EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left);
 void match_entity_update(MatchState& state, uint32_t entity_index);
 bool match_is_entity_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);
-bool match_is_target_invalid(const MatchState& state, const Target& target);
+bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id);
 bool match_has_entity_reached_target(const MatchState& state, const Entity& entity);
 ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity);
 bool match_is_entity_mining(const MatchState& state, const Entity& entity);

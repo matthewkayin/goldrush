@@ -731,7 +731,9 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.energy = entity_is_unit(type) ? entity_data.unit_data.max_energy / 4 : 0;
     entity.target = (Target) { .type = TARGET_NONE };
     entity.pathfind_attempts = 0;
-    entity.timer = 0;
+    entity.timer = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
+                        ? 0
+                        : (entity_data.max_health - entity.health);
     entity.rally_point = ivec2(-1, -1);
 
     entity.animation = animation_create(ANIMATION_UNIT_IDLE);
@@ -799,6 +801,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     // Check if entity should die
     if (entity_should_die(entity)) {
         if (entity_is_unit(entity.type)) {
+            entity.gold_mine_id = ID_NULL;
             entity.mode = entity.type == ENTITY_BALLOON ? MODE_UNIT_BALLOON_DEATH_START : MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
             entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, false);
@@ -878,7 +881,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     break;
                 }
 
-                if (match_is_target_invalid(state, entity.target)) {
+                if (match_is_target_invalid(state, entity.target, entity.player_id)) {
                     entity.target = (Target) { .type = TARGET_NONE };
                     update_finished = true;
                     break;
@@ -1033,7 +1036,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 break;
                             }
                         }
-                        if (match_is_target_invalid(state, entity.target)) {
+                        if (match_is_target_invalid(state, entity.target, entity.player_id)) {
                             entity.mode = MODE_UNIT_IDLE;
                             entity.target = (Target) { .type = TARGET_NONE };
                             entity.path.clear();
@@ -1190,7 +1193,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         break;
                     }
                     case TARGET_BUILD_ASSIST: {
-                        if (match_is_target_invalid(state, entity.target)) {
+                        if (match_is_target_invalid(state, entity.target, entity.player_id)) {
                             entity.target = (Target) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                         }
@@ -1201,7 +1204,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 .type = TARGET_REPAIR,
                                 .id = builder.target.id,
                             };
-                            entity.mode = MODE_UNIT_REPAIR;
+                            entity.mode = MODE_UNIT_BUILD_ASSIST;
+                            log_trace("build assist pls");
                             entity.timer = UNIT_BUILD_TICK_DURATION;
                             entity.direction = enum_direction_to_rect(entity.cell, builder.target.build.building_cell, entity_get_data(builder.target.build.building_type).cell_size);
                         }
@@ -1210,7 +1214,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     case TARGET_REPAIR:
                     case TARGET_ENTITY:
                     case TARGET_ATTACK_ENTITY: {
-                        if (match_is_target_invalid(state, entity.target)) {
+                        if (match_is_target_invalid(state, entity.target, entity.player_id)) {
                             entity.target = (Target) {
                                 .type = TARGET_NONE
                             };
@@ -1373,7 +1377,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         if (entity_is_building(target.type) && entity.type == ENTITY_MINER && 
                                 state.players[entity.player_id].team == state.players[target.player_id].team &&
                                 entity_is_building(target.type) && target.health < target_data.max_health) {
-                            entity.mode = MODE_UNIT_REPAIR;
+                            entity.mode = target.mode == MODE_BUILDING_IN_PROGRESS ? MODE_UNIT_BUILD_ASSIST : MODE_UNIT_REPAIR;
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, target_data.cell_size);
                             entity.timer = UNIT_BUILD_TICK_DURATION;
                             break;
@@ -1404,14 +1408,15 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 if (entity.timer == 0) {
                     // Building tick
                     Entity& building = state.entities[building_index];
-                    int building_max_health = entity_get_data(building.type).max_health;
 
                     #ifdef GOLD_DEBUG_FAST_BUILD
                         building.health = std::min(building.health + 20, building_max_health);
+                        building.timer = std::max(building.timer - 20, 0);
                     #else
                         building.health++;
+                        building.timer--;
                     #endif
-                    if (building.health == building_max_health) {
+                    if (building.timer == 0) {
                         match_entity_building_finish(state, entity.target.id);
                     } else {
                         entity.timer = UNIT_BUILD_TICK_DURATION;
@@ -1421,9 +1426,10 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 update_finished = true;
                 break;
             }
+            case MODE_UNIT_BUILD_ASSIST: 
             case MODE_UNIT_REPAIR: {
                 // Stop repairing if the building is destroyed
-                if (match_is_target_invalid(state, entity.target)) {
+                if (match_is_target_invalid(state, entity.target, entity.player_id)) {
                     entity.target = (Target) {
                         .type = TARGET_NONE
                     };
@@ -1434,7 +1440,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                 Entity& target = state.entities.get_by_id(entity.target.id);
                 int target_max_health = entity_get_data(target.type).max_health;
-                if (target.health == target_max_health || state.players[entity.player_id].gold == 0) {
+                if ((entity.mode == MODE_UNIT_REPAIR && target.health == target_max_health) || 
+                        (entity.mode == MODE_UNIT_BUILD_ASSIST && target.mode == MODE_BUILDING_FINISHED) || 
+                        state.players[entity.player_id].gold == 0) {
                     entity.target = (Target) {
                         .type = TARGET_NONE
                     };
@@ -1446,6 +1454,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 entity.timer--;
                 if (entity.timer == 0) {
                     target.health++;
+                    if (entity.mode == MODE_UNIT_BUILD_ASSIST) {
+                        target.timer--;
+                    }
                     target.health_regen_timer++;
                     if (target.health_regen_timer == UNIT_REPAIR_RATE) {
                         state.players[entity.player_id].gold--;
@@ -1454,13 +1465,11 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     if (target.health > target_max_health / 4) {
                         entity_set_flag(target, ENTITY_FLAG_ON_FIRE, false);
                     }
-                    if (target.health == target_max_health) {
-                        if (target.mode == MODE_BUILDING_IN_PROGRESS) {
-                            match_entity_building_finish(state, entity.target.id);
-                        } else {
-                            entity.target = (Target) { .type = TARGET_NONE };
-                            entity.mode = MODE_UNIT_IDLE;
-                        }
+                    if (entity.mode == MODE_UNIT_BUILD_ASSIST && target.timer == 0) {
+                        match_entity_building_finish(state, entity.target.id);
+                    } else if (entity.mode == MODE_UNIT_REPAIR && target.health == target_max_health) {
+                        entity.target = (Target) { .type = TARGET_NONE };
+                        entity.mode = MODE_UNIT_IDLE;
                     } else {
                         entity.timer = UNIT_BUILD_TICK_DURATION;
                     }
@@ -1528,7 +1537,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             }
             case MODE_UNIT_ATTACK_WINDUP:
             case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP: {
-                if (match_is_target_invalid(state, entity.target)) {
+                if (match_is_target_invalid(state, entity.target, entity.player_id)) {
                     entity.target = (Target) {
                         .type = TARGET_NONE
                     };
@@ -1879,7 +1888,7 @@ bool match_is_entity_visible_to_player(const MatchState& state, const Entity& en
     return false;
 }
 
-bool match_is_target_invalid(const MatchState& state, const Target& target) {
+bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id) {
     if (!(target.type == TARGET_ENTITY || target.type == TARGET_ATTACK_ENTITY || target.type == TARGET_REPAIR || target.type == TARGET_BUILD_ASSIST)) {
         return false;
     }
@@ -1897,7 +1906,17 @@ bool match_is_target_invalid(const MatchState& state, const Target& target) {
         return state.entities[target_index].health == 0 || state.entities[target_index].target.type != TARGET_BUILD;
     }
 
-    return !entity_is_selectable(state.entities[target_index]);
+    if (!entity_is_selectable(state.entities[target_index])) {
+        return true;
+    }
+
+    if (target.type == TARGET_ATTACK_ENTITY && 
+            entity_check_flag(state.entities[target_index], ENTITY_FLAG_INVISIBLE) && 
+            !match_is_entity_visible_to_player(state, state.entities[target_index], player_id)) {
+        return true;
+    }
+
+    return false;
 }
 
 bool match_has_entity_reached_target(const MatchState& state, const Entity& entity) {
@@ -2109,7 +2128,7 @@ void match_entity_building_finish(MatchState& state, EntityId building_id) {
             if (entity.mode != MODE_UNIT_IDLE) {
                 match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_BUILDING_EXIT_BLOCKED);
             }
-        } else if (entity.mode == MODE_UNIT_REPAIR) {
+        } else if (entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD_ASSIST) {
             entity.mode = MODE_UNIT_IDLE;
         }
 

@@ -1318,14 +1318,28 @@ void match_ui_update(MatchUiState& state) {
             } else if (first_entity.player_id == network_get_player_id()) {
                 bool is_selection_uniform = true;
                 bool has_garrisoned_units = !first_entity.garrisoned_units.empty();
+                if (first_entity.mode == MODE_BUILDING_IN_PROGRESS) {
+                    is_selection_uniform = false;
+                }
                 for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
                     const Entity& entity = state.match.entities.get_by_id(state.selection[selection_index]);
                     if (!entity.garrisoned_units.empty()) {
                         has_garrisoned_units = true;
                     }
-                    if (entity.type != first_entity.type || 
-                            entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) != entity_check_flag(first_entity, ENTITY_FLAG_INVISIBLE)) {
+                    // If units are not the same type, selection is not uniform
+                    if (entity.type != first_entity.type) {
                         is_selection_uniform = false;
+                        continue;
+                    }
+                    // Check invisibility values, ensures that camo / decamo command is the same
+                    if (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) != entity_check_flag(first_entity, ENTITY_FLAG_INVISIBLE)) {
+                        is_selection_uniform = false;
+                        continue;
+                    }
+                    // Selection is not uniform for in-progress buildings, prevents showing unit train icons when one of the selected buildings is in-progress
+                    if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
+                        is_selection_uniform = false;
+                        continue;
                     }
                 }
 
@@ -2327,7 +2341,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         EntityId entity_id = state.match.entities.get_id_of(entity_index);
         uint32_t miner_count = 0;
         for (const Entity& miner : state.match.entities) {
-            if (miner.type == ENTITY_MINER && 
+            if (miner.type == ENTITY_MINER &&
                     miner.player_id == network_get_player_id() && 
                     miner.gold_mine_id == entity_id) {
                 miner_count++;
@@ -3136,6 +3150,9 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                         break;
                     case MODE_UNIT_DEATH_FADE:
                         debug_text_ptr += sprintf(debug_text_ptr, "DEATH FADE");
+                        break;
+                    case MODE_UNIT_BUILD_ASSIST:
+                        debug_text_ptr += sprintf(debug_text_ptr, "BUILD ASSIST");
                         break;
                     case MODE_UNIT_REPAIR:
                         debug_text_ptr += sprintf(debug_text_ptr, "REPAIR");

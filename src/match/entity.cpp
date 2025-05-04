@@ -777,7 +777,7 @@ SpriteName entity_get_sprite(const Entity& entity) {
                 return SPRITE_BUILDING_DESTROYED_2;
         }
     }
-    if (entity.mode == MODE_UNIT_BUILD || entity.mode == MODE_UNIT_REPAIR) {
+    if (entity.mode == MODE_UNIT_BUILD || entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD_ASSIST) {
         return SPRITE_MINER_BUILDING;
     }
     if (entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
@@ -829,6 +829,7 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
         case MODE_UNIT_MOVE:
             return ANIMATION_UNIT_MOVE;
         case MODE_UNIT_BUILD:
+        case MODE_UNIT_BUILD_ASSIST:
         case MODE_UNIT_REPAIR:
             return ANIMATION_UNIT_BUILD;
         case MODE_UNIT_ATTACK_WINDUP:
@@ -890,7 +891,8 @@ ivec2 entity_get_animation_frame(const Entity& entity) {
             return ivec2(0, 0);
         }
         if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
-            return ivec2((3 * entity.health) / ENTITY_DATA.at(entity.type).max_health, 0);
+            int max_health = ENTITY_DATA.at(entity.type).max_health;
+            return ivec2((3 * (max_health - entity.timer)) / max_health, 0);
         } 
         if (entity.mode == MODE_MINE_PRIME) {
             return entity.animation.frame;
