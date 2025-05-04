@@ -100,3 +100,4 @@ struct MatchInput {
 
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const MatchInput& input);
 MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_head);
+void match_input_print(char* out_ptr, const MatchInput& input);

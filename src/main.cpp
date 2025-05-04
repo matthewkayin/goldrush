@@ -227,6 +227,9 @@ int gold_main(int argc, char** argv) {
                         break;
                     }
                     case GAME_MODE_LOADING: {
+                        if (event.type == NETWORK_EVENT_INPUT) {
+                            log_warn("Received input event while loading.");
+                        }
                         break;
                     }
                 }

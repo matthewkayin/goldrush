@@ -184,8 +184,6 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         }
     }
 
-    network_set_player_ready(true);
-
     return state;
 }
 
@@ -825,6 +823,10 @@ void match_ui_handle_input(MatchUiState& state) {
 
 void match_ui_update(MatchUiState& state) {
     if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
+        if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
+            network_set_player_ready(true);
+        }
+
         // Check that all players are ready
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NOT_READY) {
@@ -990,7 +992,7 @@ void match_ui_update(MatchUiState& state) {
             // Always send at least one input per turn
             if (state.input_queue.empty()) {
                 state.input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
-            }
+            } 
 
             // Serialize the inputs
             uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
