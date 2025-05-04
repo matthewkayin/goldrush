@@ -9,6 +9,7 @@
 #include "render/font.h"
 #include "render/render.h"
 #include "menu/ui.h"
+#include "../util.h"
 
 static const int WAGON_X_DEFAULT = 380;
 static const int WAGON_X_LOBBY = 480;
@@ -487,9 +488,7 @@ void menu_update(MenuState& state) {
                     if (state.replay_rename.empty()) {
                         menu_show_status(state, "Replay name cannot be empty.");
                     } else {
-                        bool replay_rename_ends_in_rep = state.replay_rename.size() >= 5 &&
-                                    state.replay_rename.compare(state.replay_rename.size() - 4, 4, ".rep") == 0;
-                        if (!replay_rename_ends_in_rep) {
+                        if (!filename_ends_in_rep(state.replay_rename)) {
                             state.replay_rename += ".rep";
                         }
                         char old_filename[256];

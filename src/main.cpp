@@ -273,7 +273,7 @@ int gold_main(int argc, char** argv) {
                     } else if (state.menu.mode == MENU_MODE_LOAD_REPLAY) {
                         LoadParams params;
                         params.mode = GAME_MODE_REPLAY;
-                        platform_get_replay_path(params.replay.filename, platform_get_replay_file_name(state.menu.lobbylist_item_selected));
+                        strcpy(params.replay.filename, platform_get_replay_file_name(state.menu.lobbylist_item_selected));
                         game_set_mode(params);
                     }
                     break;

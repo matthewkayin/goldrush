@@ -68,7 +68,7 @@ void replay_file_write_inputs(FILE* file, uint8_t player_id, const std::vector<M
 
 bool replay_file_read(std::queue<std::vector<MatchInput>>* match_inputs, MatchState* state, const char* path) {
     char replay_file_path[256];
-    platform_get_datafile_path(replay_file_path, path);
+    platform_get_replay_path(replay_file_path, path);
 
     FILE* file = fopen(replay_file_path, "r");
     if (file == NULL) {

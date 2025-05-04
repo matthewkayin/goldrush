@@ -243,13 +243,13 @@ bool sound_init() {
 }
 
 void sound_quit() {
-    for (SoundData sound_data : state.sounds) {
-        SDL_free(sound_data.buffer);
-    }
     for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
         SDL_DestroyAudioStream(state.streams[stream]);
     }
     SDL_DestroyAudioStream(state.fire_stream);
+    for (SoundData sound_data : state.sounds) {
+        SDL_free(sound_data.buffer);
+    }
 
     log_info("Quit sound.");
 }

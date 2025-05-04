@@ -10,6 +10,7 @@
 #include <direct.h>
 #include <vector>
 #include <string>
+#include "../util.h"
 
 struct PlatformState {
     double clock_frequency;
@@ -93,6 +94,10 @@ void platform_search_replays_folder(const char* search_query) {
 
     do {
         std::string filename = std::string(find_data.cFileName);
+        if (!filename_ends_in_rep(filename)) {
+            continue;
+        }
+
         // always put the latest replay first in the list
         if (filename == "latest.rep") {
             state.replay_files.insert(state.replay_files.begin(), filename);

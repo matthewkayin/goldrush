@@ -6,18 +6,26 @@
 #include <mach/mach_time.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <vector>
+#include <string>
+#include "../util.h"
 
-static mach_timebase_info_data_t clock_timebase;
-static uint64_t clock_start_time;
+struct PlatformState {
+    mach_timebase_info_data_t clock_timebase;
+    uint64_t clock_start_time;
+    std::vector<std::string> replay_files;
+};
+static PlatformState state;
 
 void platform_clock_init() {
-    mach_timebase_info(&clock_timebase);
-    clock_start_time = mach_absolute_time();
+    mach_timebase_info(&state.clock_timebase);
+    state.clock_start_time = mach_absolute_time();
 }
 
 double platform_get_absolute_time() {
     uint64_t mach_absolute = mach_absolute_time();
-    uint64_t nanos = (double)((mach_absolute - clock_start_time) * (uint64_t)clock_timebase.numer) / (double)clock_timebase.denom;
+    uint64_t nanos = (double)((mach_absolute - state.clock_start_time) * (uint64_t)state.clock_timebase.numer) / (double)state.clock_timebase.denom;
     return nanos / 1.0e9;
 }
 
@@ -69,9 +77,48 @@ void platform_get_datafile_path(char* buffer, const char* filename) {
 
 void platform_get_replay_path(char* buffer, const char* filename) {
     char replay_folder_path[256];
-    platform_get_datafile_path(buffer, "replays");
+    platform_get_datafile_path(replay_folder_path, "replays");
     mkdir(replay_folder_path, 0777);
     sprintf(buffer, "%s/%s", replay_folder_path, filename);
+}
+
+void platform_search_replays_folder(const char* search_query) {
+    state.replay_files.clear();
+
+    char replay_folder_path[256];
+    platform_get_datafile_path(replay_folder_path, "replays");
+
+    DIR* directory = opendir(replay_folder_path);
+    if (directory == NULL) {
+        return;
+    }
+
+    int cwd = open(".", O_RDONLY);
+    chdir(replay_folder_path);
+
+    dirent* entry;
+    while ((entry = readdir(directory)) != NULL) {
+        std::string filename = std::string(entry->d_name);
+        if (!filename_ends_in_rep(filename)) {
+            continue;
+        }
+        if (strstr(filename.c_str(), search_query) == NULL) {
+            continue;
+        }
+        state.replay_files.push_back(filename);
+    }
+
+    fchdir(cwd);
+    close(cwd);
+    closedir(directory);
+}
+
+const char* platform_get_replay_file_name(size_t index) {
+    return state.replay_files[index].c_str();
+}
+
+size_t platform_get_replay_file_count() {
+    return state.replay_files.size();
 }
 
 #endif
