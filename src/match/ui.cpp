@@ -1234,11 +1234,19 @@ void match_ui_update(MatchUiState& state) {
         if (!state.match.players[player_id].active) {
             continue;
         } 
-        int difference = std::min(2, std::abs((int)state.displayed_gold_amounts[player_id] - (int)state.match.players[player_id].gold));
+        int difference = std::abs((int)state.displayed_gold_amounts[player_id] - (int)state.match.players[player_id].gold);
+        int step = 1;
+        if (difference > 100) {
+            step = 10;
+        } else if (difference > 10) {
+            step = 5;
+        } else if (difference > 1) {
+            step = 2;
+        }
         if (state.displayed_gold_amounts[player_id] < state.match.players[player_id].gold) {
-            state.displayed_gold_amounts[player_id] += difference;
+            state.displayed_gold_amounts[player_id] += step;
         } else if (state.displayed_gold_amounts[player_id] > state.match.players[player_id].gold) {
-            state.displayed_gold_amounts[player_id] -= difference;
+            state.displayed_gold_amounts[player_id] -= step;
         }
     }
 

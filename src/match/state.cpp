@@ -82,8 +82,6 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
-            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
 
             // Place scout
             {
@@ -891,6 +889,12 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     const Entity& target = state.entities.get_by_id(entity.target.id);
                     if (target.type == ENTITY_GOLDMINE && target.gold_held != 0) {
                         entity.gold_mine_id = entity.target.id;
+                    }
+                }
+                if (entity.gold_mine_id != ID_NULL) {
+                    const Entity& mine = state.entities.get_by_id(entity.gold_mine_id);
+                    if (mine.gold_held == 0) {
+                        entity.gold_mine_id = ID_NULL;
                     }
                 }
 
@@ -2023,7 +2027,7 @@ bool match_is_entity_mining(const MatchState& state, const Entity& entity) {
 
     const Entity& target = state.entities.get_by_id(entity.target.id);
     return (target.type == ENTITY_GOLDMINE && target.gold_held > 0) ||
-           (target.type == ENTITY_HALL && target.mode == MODE_BUILDING_FINISHED && 
+           (target.type == ENTITY_HALL && target.mode == MODE_BUILDING_FINISHED && entity.gold_mine_id != ID_NULL &&
                 entity.player_id == target.player_id && entity.gold_held > 0);
 }
 
