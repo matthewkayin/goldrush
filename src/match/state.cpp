@@ -682,6 +682,8 @@ void match_update(MatchState& state) {
                     const EntityData& entity_data = entity_get_data(state.entities[entity_index].type);
                     match_fog_update(state, state.players[state.entities[entity_index].player_id].team, state.entities[entity_index].cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, false);
                 }
+                const EntityData& entity_data = entity_get_data(state.entities[entity_index].type);
+                log_trace("Removing entity %s ID %u player id %u", entity_data.name, state.entities.get_id_of(entity_index), state.entities[entity_index].player_id);
                 state.entities.remove_at(entity_index);
             } else {
                 entity_index++;
@@ -762,6 +764,8 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
         .id = id
     });
     match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, true);
+
+    log_trace("Created entity %s ID %u player %u cell %vi", entity_data.name, id, player_id, &cell);
 
     return id;
 }

@@ -984,6 +984,12 @@ void match_ui_update(MatchUiState& state) {
 
                 for (const MatchInput& input : state.inputs[player_id].front()) {
                     match_handle_input(state.match, input);
+                    if (input.type != MATCH_INPUT_NONE) {
+                        char debug_buffer[512];
+                        char* out_ptr = debug_buffer;
+                        out_ptr += sprintf(out_ptr, "TURN %u PLAYER %u ", state.turn_counter, player_id);
+                        match_input_print(out_ptr, input);
+                    }
                 }
                 state.inputs[player_id].pop();
             }
