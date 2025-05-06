@@ -5,8 +5,9 @@
 #include "hotkey.h"
 #include "lcg.h"
 #include "upgrade.h"
+#include <algorithm>
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
@@ -33,6 +34,7 @@ static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 8;
 static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
+static const uint32_t MATCH_MAX_POPULATION = 100;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -147,7 +149,7 @@ uint32_t match_get_player_max_population(const MatchState& state, uint8_t player
         }
     }
 
-    return max_population;
+    return std::min(max_population, MATCH_MAX_POPULATION);
 }
 
 bool match_player_has_upgrade(const MatchState& state, uint8_t player_id, uint32_t upgrade) {
@@ -1414,8 +1416,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     Entity& building = state.entities[building_index];
 
                     #ifdef GOLD_DEBUG_FAST_BUILD
+                        int building_max_health = entity_get_data(building.type).max_health;
                         building.health = std::min(building.health + 20, building_max_health);
-                        building.timer = std::max(building.timer - 20, 0);
+                        building.timer = building.timer >= 20 ? building.timer - 20 : 0; 
                     #else
                         building.health++;
                         building.timer--;

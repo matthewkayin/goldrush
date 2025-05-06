@@ -989,6 +989,7 @@ void match_ui_update(MatchUiState& state) {
                         char* out_ptr = debug_buffer;
                         out_ptr += sprintf(out_ptr, "TURN %u PLAYER %u ", state.turn_counter, player_id);
                         match_input_print(out_ptr, input);
+                        log_trace(debug_buffer);
                     }
                 }
                 state.inputs[player_id].pop();
@@ -1044,6 +1045,9 @@ void match_ui_update(MatchUiState& state) {
         switch (event.type) {
             case MATCH_EVENT_SOUND: {
                 if (state.sound_cooldown_timers[event.sound.sound] != 0) {
+                    break;
+                }
+                if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, event.sound.position / TILE_SIZE, 1)) {
                     break;
                 }
                 if (SOUND_LISTEN_RECT.has_point(event.sound.position - state.camera_offset)) {
