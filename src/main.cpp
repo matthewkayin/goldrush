@@ -194,6 +194,9 @@ int gold_main(int argc, char** argv) {
         if (update_accumulator >= UPDATE_TIME) {
             input_poll_events();
             if (input_user_requests_exit()) {
+                if (network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_SERVER) {
+                    network_disconnect();
+                }
                 is_running = false;
                 break;
             }
