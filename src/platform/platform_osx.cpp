@@ -12,22 +12,9 @@
 #include "../util.h"
 
 struct PlatformState {
-    mach_timebase_info_data_t clock_timebase;
-    uint64_t clock_start_time;
     std::vector<std::string> replay_files;
 };
 static PlatformState state;
-
-void platform_clock_init() {
-    mach_timebase_info(&state.clock_timebase);
-    state.clock_start_time = mach_absolute_time();
-}
-
-double platform_get_absolute_time() {
-    uint64_t mach_absolute = mach_absolute_time();
-    uint64_t nanos = (double)((mach_absolute - state.clock_start_time) * (uint64_t)state.clock_timebase.numer) / (double)state.clock_timebase.denom;
-    return nanos / 1.0e9;
-}
 
 void platform_console_write(const char* message, int log_level) {
     #ifdef GOLD_DEBUG

@@ -114,7 +114,6 @@ int gold_main(int argc, char** argv) {
     #elif defined(PLATFORM_OSX)
         log_info("Detected platform OSX.");
     #endif
-    platform_clock_init();
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         log_error("SDL failed to initialize: %s", SDL_GetError());
@@ -157,9 +156,10 @@ int gold_main(int argc, char** argv) {
 
     bool is_running = true;
     bool render_debug_info = false;
-    double last_time = platform_get_absolute_time();
-    double last_second = last_time;
-    double update_accumulator = 0;
+    const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
+    uint64_t last_time = SDL_GetTicksNS();
+    uint64_t last_second = last_time;
+    uint64_t update_accumulator = 0;
     uint32_t frames = 0;
     uint32_t fps = 0;
     uint32_t updates = 0;
@@ -171,16 +171,16 @@ int gold_main(int argc, char** argv) {
 
     while (is_running) {
         // TIMEKEEP
-        double current_time = platform_get_absolute_time();
+        uint64_t current_time = SDL_GetTicksNS();
         update_accumulator += current_time - last_time;
         last_time = current_time;
 
-        if (current_time - last_second >= 1.0) {
+        if (current_time - last_second >= SDL_NS_PER_SECOND) {
             fps = frames;
             frames = 0;
             ups = updates;
             updates = 0;
-            last_second += 1.0;
+            last_second += SDL_NS_PER_SECOND;
 
             #ifdef GOLD_DEBUG
                 if (ups != 60) {
@@ -191,7 +191,7 @@ int gold_main(int argc, char** argv) {
         frames++;
 
         // INPUT
-        if (update_accumulator >= UPDATE_TIME) {
+        if (update_accumulator >= UPDATE_DURATION) {
             input_poll_events();
             if (input_user_requests_exit()) {
                 if (network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_SERVER) {
@@ -240,8 +240,8 @@ int gold_main(int argc, char** argv) {
         }
 
         // UPDATE
-        while (update_accumulator >= UPDATE_TIME) {
-            update_accumulator -= UPDATE_TIME;
+        while (update_accumulator >= UPDATE_DURATION) {
+            update_accumulator -= UPDATE_DURATION;
             updates++;
 
             switch (state.mode) {

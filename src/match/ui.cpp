@@ -109,6 +109,8 @@ static const Rect REPLAY_PANEL_RECT = (Rect) {
 };
 static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 31, BUTTON_PANEL_RECT.y + 9);
 
+static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
+
 // INIT
 
 MatchUiState match_ui_base_init() {
@@ -930,9 +932,9 @@ void match_ui_update(MatchUiState& state) {
                 }
 
                 // Time elapsed text
-                uint32_t seconds_elapsed = state.turn_counter == 0 ? 0 : (uint32_t)((state.turn_counter - 1) * UPDATE_TIME);
+                uint32_t seconds_elapsed = state.turn_counter == 0 ? 0 : (uint32_t)((state.turn_counter - 1) * UPDATE_DURATION);
                 Time time_elapsed = Time::from_seconds(seconds_elapsed);
-                uint32_t seconds_total = (uint32_t)((state.replay_tape.size() - 2) * UPDATE_TIME);
+                uint32_t seconds_total = (uint32_t)((state.replay_tape.size() - 2) * UPDATE_DURATION);
                 Time time_total = Time::from_seconds(seconds_total);
                 char time_text[16];
                 ui_element_position(ivec2(0, 2));
