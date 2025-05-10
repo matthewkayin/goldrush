@@ -3075,7 +3075,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         // Player name
         if (state.replay_mode) {
             render_x -= (render_get_text_size(FONT_HACK_WHITE, state.match.players[player_id].name).x + 2);
-            render_text(FONT_HACK_WHITE, state.match.players[player_id].name, ivec2(render_x, resource_base_y + 3));
+            render_text((FontName)(FONT_HACK_PLAYER0 + state.match.players[player_id].recolor_id), state.match.players[player_id].name, ivec2(render_x, resource_base_y + 3));
         }
 
         resource_base_y += population_icon_sprite_info.frame_height;
@@ -3493,8 +3493,10 @@ void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& stat
     Rect entity_rect = entity_get_rect(entity);
 
     // Render select ring
-    SpriteName select_ring_sprite = match_ui_get_entity_select_ring(entity.type, entity.type == ENTITY_GOLDMINE ||
-                                    (state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team));
+    bool use_red_select_ring = state.replay_mode || entity.type == ENTITY_GOLDMINE 
+                                    ? false 
+                                    : state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team;
+    SpriteName select_ring_sprite = match_ui_get_entity_select_ring(entity.type, use_red_select_ring);
     ivec2 entity_center_position = entity_is_unit(entity.type) 
             ? entity.position.to_ivec2()
             : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 

@@ -121,7 +121,6 @@ bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchS
                 // There was no input from this user this turn
                 // So just pass an empty input
                 inputs.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
-                match_inputs[block_type].push_back(inputs);
             } else {
                 // Read the rest of the block
                 uint8_t in_buffer[NETWORK_INPUT_BUFFER_SIZE];
