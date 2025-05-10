@@ -66,7 +66,7 @@ void replay_file_write_inputs(FILE* file, uint8_t player_id, const std::vector<M
     fwrite(out_buffer, 1, out_buffer_length, file);
 }
 
-bool replay_file_read(std::queue<std::vector<MatchInput>>* match_inputs, MatchState* state, const char* path) {
+bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchState* state, const char* path) {
     char replay_file_path[256];
     platform_get_replay_path(replay_file_path, path);
 
@@ -114,18 +114,26 @@ bool replay_file_read(std::queue<std::vector<MatchInput>>* match_inputs, MatchSt
         size_t block_length;
         fread(&block_length, 1, sizeof(size_t), file);
 
-        uint8_t in_buffer[NETWORK_INPUT_BUFFER_SIZE];
-        fread(in_buffer, 1, block_length, file);
-
         if (block_type < MAX_PLAYERS) {
-            // Deserialize input
             std::vector<MatchInput> inputs;
-            size_t in_buffer_head = 0;
-            while (in_buffer_head < block_length) {
-                inputs.push_back(match_input_deserialize(in_buffer, in_buffer_head));
+
+            if (block_length == 0) {
+                // There was no input from this user this turn
+                // So just pass an empty input
+                inputs.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
+                match_inputs[block_type].push_back(inputs);
+            } else {
+                // Read the rest of the block
+                uint8_t in_buffer[NETWORK_INPUT_BUFFER_SIZE];
+                fread(in_buffer, 1, block_length, file);
+                // Deserialize input
+                size_t in_buffer_head = 0;
+                while (in_buffer_head < block_length) {
+                    inputs.push_back(match_input_deserialize(in_buffer, in_buffer_head));
+                }
             }
 
-            match_inputs[block_type].push(inputs);
+            match_inputs[block_type].push_back(inputs);
         } else {
             log_warn("Unhandled block type %u", block_type);
         }

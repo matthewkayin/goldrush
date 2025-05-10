@@ -110,6 +110,7 @@ static const Rect REPLAY_PANEL_RECT = (Rect) {
 static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 31, BUTTON_PANEL_RECT.y + 9);
 
 static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
+static const uint32_t REPLAY_CHECKPOINT_FREQ = 32;
 
 // INIT
 
@@ -197,38 +198,33 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
     // Because we are not saving any replay data
     state.replay_file = NULL;
 
-    replay_file_read(state.inputs, &state.match, replay_path);
-    uint32_t max_input_count = 0;
+    replay_file_read(state.replay_inputs, &state.match, replay_path);
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        max_input_count = std::max(max_input_count, (uint32_t)state.inputs[player_id].size());
+        log_trace("player %u input count %u", player_id, state.replay_inputs[player_id].size());
     }
-    state.replay_tape.reserve((max_input_count + 1) * 4);
-    state.replay_tape.push_back(state.match);
+    state.replay_checkpoints.reserve(((match_ui_replay_end_of_tape(state) + 1) / REPLAY_CHECKPOINT_FREQ) + 1);
+    state.replay_checkpoints.push_back(state.match);
 
-    bool all_inputs_read = false;
-    while (!all_inputs_read) {
-        if (state.turn_timer == 0) {
-            all_inputs_read = true;
+    while (state.turn_counter < match_ui_replay_end_of_tape(state)) {
+        if (state.turn_counter % TURN_DURATION == 0) {
+            uint32_t input_index = state.turn_counter / TURN_DURATION;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (state.inputs[player_id].empty()) {
-                    continue;
-                }
-
-                all_inputs_read = false;
-                for (const MatchInput& input : state.inputs[player_id].front()) {
+                for (const MatchInput& input : state.replay_inputs[player_id][input_index]) {
                     match_handle_input(state.match, input);
                 }
-                state.inputs[player_id].pop();
             }
+        }
 
-            state.turn_timer = TURN_DURATION;
-        } // End if turn timer == 0
-
-        state.turn_timer--;
         match_update(state.match);
-        state.replay_tape.push_back(state.match);
-        state.match.events.clear(); // To simulate match_ui_update handling events
+        state.match.events.clear();
+        state.turn_counter++;
+
+        if (state.turn_counter % REPLAY_CHECKPOINT_FREQ == 0) {
+            state.replay_checkpoints.push_back(state.match);
+        }
     }
+
+    match_ui_replay_scrub(state, 0);
 
     // Init replay fog picker
     state.replay_fog_index = 0;
@@ -922,8 +918,10 @@ void match_ui_update(MatchUiState& state) {
                 ui_dropdown(UI_DROPDOWN_MINI, &state.replay_fog_index, state.replay_fog_texts, false);
             ui_end_container();
 
-            if (ui_slider(&state.turn_counter, 0, state.replay_tape.size() - 1, UI_SLIDER_DISPLAY_NO_VALUE)) {
-                state.match = state.replay_tape[state.turn_counter];
+            uint32_t position = state.turn_counter;
+            if (ui_slider(&position, 0, match_ui_replay_end_of_tape(state), UI_SLIDER_DISPLAY_NO_VALUE)) {
+                state.selection.clear();
+                match_ui_replay_scrub(state, position);
             }
 
             ui_begin_row(ivec2(0, 0), 6);
@@ -934,7 +932,7 @@ void match_ui_update(MatchUiState& state) {
                 // Time elapsed text
                 uint32_t seconds_elapsed = state.turn_counter == 0 ? 0 : (uint32_t)((state.turn_counter - 1) * UPDATE_DURATION);
                 Time time_elapsed = Time::from_seconds(seconds_elapsed);
-                uint32_t seconds_total = (uint32_t)((state.replay_tape.size() - 2) * UPDATE_DURATION);
+                uint32_t seconds_total = (uint32_t)((match_ui_replay_end_of_tape(state) - 1) * UPDATE_DURATION);
                 Time time_total = Time::from_seconds(seconds_total);
                 char time_text[16];
                 ui_element_position(ivec2(0, 2));
@@ -1020,17 +1018,11 @@ void match_ui_update(MatchUiState& state) {
         state.turn_timer--;
     } // End if not replay_mode
 
-    if (state.replay_mode && !state.replay_paused && state.turn_counter < state.replay_tape.size() - 1) {
-        state.turn_counter++;
-        state.match = state.replay_tape[state.turn_counter];
-        if (state.turn_counter == state.replay_tape.size() - 1) {
+    if (state.replay_mode && !state.replay_paused && state.turn_counter < match_ui_replay_end_of_tape(state)) {
+        match_ui_replay_scrub(state, state.turn_counter + 1);
+        if (state.turn_counter == match_ui_replay_end_of_tape(state)) {
             state.replay_paused = true;
         }
-    }
-
-    if (state.replay_mode && input_is_action_just_pressed(INPUT_ACTION_NUM0)) {
-        state.turn_counter = 0;
-        state.match = state.replay_tape[state.turn_counter];
     }
 
     if (!match_ui_is_in_menu(state.mode)) {
@@ -1979,6 +1971,38 @@ int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
     } else {
         return match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell);
     }
+}
+
+void match_ui_replay_scrub(MatchUiState& state, uint32_t position) {
+    if (state.turn_counter == position) {
+        return;
+    }
+
+    if (position < state.turn_counter || (position > state.turn_counter && position - state.turn_counter > REPLAY_CHECKPOINT_FREQ)) {
+        uint32_t nearest_checkpoint = position / REPLAY_CHECKPOINT_FREQ;
+        state.match = state.replay_checkpoints[nearest_checkpoint];
+        state.turn_counter = nearest_checkpoint * REPLAY_CHECKPOINT_FREQ;
+    }
+
+    while (state.turn_counter < position) {
+        if (state.turn_counter % TURN_DURATION == 0) {
+            uint32_t input_index = state.turn_counter / TURN_DURATION;
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                for (const MatchInput& input : state.replay_inputs[player_id][input_index]) {
+                    match_handle_input(state.match, input);
+                }
+            }
+        }
+
+        match_update(state.match);
+        state.match.events.clear();
+
+        state.turn_counter++;
+    }
+}
+
+size_t match_ui_replay_end_of_tape(const MatchUiState& state) {
+    return (state.replay_inputs[0].size() * 4) - 1;
 }
 
 // RENDER

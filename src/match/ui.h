@@ -118,7 +118,8 @@ struct MatchUiState {
     std::vector<std::string> replay_fog_texts;
     std::vector<uint8_t> replay_fog_player_ids;
     bool replay_paused;
-    std::vector<MatchState> replay_tape;
+    std::vector<MatchState> replay_checkpoints;
+    std::vector<std::vector<MatchInput>> replay_inputs[MAX_PLAYERS];
 };
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise);
@@ -149,6 +150,9 @@ void match_ui_leave_match(MatchUiState& state);
 bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity);
 bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size);
 int match_ui_get_fog(const MatchUiState& state, ivec2 cell);
+
+void match_ui_replay_scrub(MatchUiState& state, uint32_t position);
+size_t match_ui_replay_end_of_tape(const MatchUiState& state);
 
 void match_ui_render(const MatchUiState& state, bool render_debug_info);
 

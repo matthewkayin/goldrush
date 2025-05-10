@@ -47,7 +47,7 @@ struct Map {
     std::vector<Cell> cells[CELL_LAYER_COUNT];
 };
 
-void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
+void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
 
 uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
 

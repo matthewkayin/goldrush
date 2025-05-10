@@ -39,13 +39,13 @@ static const uint32_t MATCH_MAX_POPULATION = 100;
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
     #ifdef GOLD_RAND_SEED
-        lcg_seed = GOLD_RAND_SEED;
+        state.lcg_seed = GOLD_RAND_SEED;
     #endif
-    lcg_srand(lcg_seed);
+    state.lcg_seed = lcg_seed;
     log_info("Set random seed to %i", lcg_seed);
     std::vector<ivec2> player_spawns;
     std::vector<ivec2> goldmine_cells;
-    map_init(state.map, noise, player_spawns, goldmine_cells);
+    map_init(state.map, noise, &state.lcg_seed, player_spawns, goldmine_cells);
     memcpy(state.players, players, sizeof(state.players));
 
     state.fire_cells = std::vector<int>(state.map.width * state.map.height, 0);
@@ -2359,7 +2359,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
 
     if (attacker.garrison_id != ID_NULL) {
         Entity& carrier = state.entities.get_by_id(attacker.garrison_id);
-        int particle_index = lcg_rand() % 4;
+        int particle_index = lcg_rand(&state.lcg_seed) % 4;
         ivec2 particle_position;
         if (carrier.type == ENTITY_BUNKER) {
             particle_position = (carrier.cell * TILE_SIZE) + BUNKER_PARTICLE_OFFSETS[particle_index];
@@ -2401,7 +2401,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         state.fog_reveals.push_back(reveal);
     }
 
-    bool attack_missed = accuracy < lcg_rand() % 100;
+    bool attack_missed = accuracy < lcg_rand(&state.lcg_seed) % 100;
     if (attack_missed) {
         return;
     }
@@ -2461,12 +2461,12 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         Rect defender_rect = entity_get_rect(defender);
 
         ivec2 particle_position = ivec2(
-            defender_rect.x + (defender_rect.w / 4) + (lcg_rand() % (defender_rect.w / 2)),
-            defender_rect.y + (defender_rect.h / 4) + (lcg_rand() % (defender_rect.h / 2)));
+            defender_rect.x + (defender_rect.w / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.w / 2)),
+            defender_rect.y + (defender_rect.h / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.h / 2)));
         state.particles[defender_data.cell_layer == CELL_LAYER_SKY ? PARTICLE_LAYER_SKY : PARTICLE_LAYER_GROUND].push_back((Particle) {
             .sprite = SPRITE_PARTICLE_SPARKS,
             .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
-            .vframe = lcg_rand() % 3,
+            .vframe = lcg_rand(&state.lcg_seed) % 3,
             .position = particle_position
         });
     }

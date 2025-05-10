@@ -18,9 +18,9 @@ struct PoissonDiskParams {
 
 SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
-std::vector<ivec2> map_poisson_disk(const Map& map, PoissonDiskParams& params);
+std::vector<ivec2> map_poisson_disk(const Map& map, int32_t* lcg_seed, PoissonDiskParams& params);
 
-void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
+void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.width = noise.width;
     map.height = noise.height;
     log_info("Generating map. Size: %ux%u", map.width, map.height);
@@ -161,7 +161,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
 
                     // Regular sand tile 
                     if (neighbors == 0) {
-                        int new_index = lcg_rand() % 7;
+                        int new_index = lcg_rand(lcg_seed) % 7;
                         if (new_index < 4 && index % 3 == 0) {
                             map.tiles[index].sprite = new_index == 1 ? SPRITE_TILE_SAND3 : SPRITE_TILE_SAND2;
                         } else {
@@ -523,7 +523,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
                 log_error("Unable to find valid spawn point for spawn direction %i", spawn_direction);
                 spawn_point = start;
             }
-            int spawn_index = lcg_rand() % MAX_PLAYERS;
+            int spawn_index = lcg_rand(lcg_seed) % MAX_PLAYERS;
             while (player_spawns[spawn_index].x != -1) {
                 spawn_index = (spawn_index + 1) % MAX_PLAYERS;
             }
@@ -555,7 +555,7 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
             }
         }
 
-        std::vector<ivec2> goldmine_results = map_poisson_disk(map, params);
+        std::vector<ivec2> goldmine_results = map_poisson_disk(map, lcg_seed, params);
         goldmine_cells.insert(goldmine_cells.end(), goldmine_results.begin(), goldmine_results.end());
         for (ivec2 goldmine_cell : goldmine_cells) {
             params.avoid_values[goldmine_cell.x + (goldmine_cell.y * map.width)] = 4;
@@ -568,9 +568,9 @@ void map_init(Map& map, Noise& noise, std::vector<ivec2>& player_spawns, std::ve
         params.disk_radius = 16;
         params.allow_unreachable_cells = true;
         params.margin = ivec2(0, 0);
-        std::vector<ivec2> decoration_cells = map_poisson_disk(map, params);
+        std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
         for (ivec2 cell : decoration_cells) {
-            map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)].type = (CellType)(CELL_DECORATION_1 + (lcg_rand() % 5));
+            map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)].type = (CellType)(CELL_DECORATION_1 + (lcg_rand(lcg_seed) % 5));
         }
     }
 }
@@ -696,14 +696,14 @@ bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params,
     return true;
 }
 
-std::vector<ivec2> map_poisson_disk(const Map& map, PoissonDiskParams& params) {
+std::vector<ivec2> map_poisson_disk(const Map& map, int32_t* lcg_seed, PoissonDiskParams& params) {
     std::vector<ivec2> sample;
     std::vector<ivec2> frontier;
 
     ivec2 first;
     do {
-        first.x = 1 + (lcg_rand() % (map.width - 2));
-        first.y = 1 + (lcg_rand() % (map.height - 2));
+        first.x = 1 + (lcg_rand(lcg_seed) % (map.width - 2));
+        first.y = 1 + (lcg_rand(lcg_seed) % (map.height - 2));
     } while (!map_is_poisson_point_valid(map, params, first));
 
     frontier.push_back(first);
@@ -743,7 +743,7 @@ std::vector<ivec2> map_poisson_disk(const Map& map, PoissonDiskParams& params) {
     }
 
     while (!frontier.empty()) {
-        int next_index = lcg_rand() % frontier.size();
+        int next_index = lcg_rand(lcg_seed) % frontier.size();
         ivec2 next = frontier[next_index];
 
         int child_attempts = 0;
@@ -751,7 +751,7 @@ std::vector<ivec2> map_poisson_disk(const Map& map, PoissonDiskParams& params) {
         ivec2 child;
         while (!child_is_valid && child_attempts < 30) {
             child_attempts++;
-            child = next + circle_offset_points[lcg_rand() % circle_offset_points.size()];
+            child = next + circle_offset_points[lcg_rand(lcg_seed) % circle_offset_points.size()];
             child_is_valid = map_is_poisson_point_valid(map, params, child);
         }
         if (child_is_valid) {

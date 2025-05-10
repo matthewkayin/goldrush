@@ -1,4 +1,5 @@
 #pragma once
 
-void lcg_srand(int seed);
-int lcg_rand();
+#include <cstdint>
+
+int32_t lcg_rand(int32_t* seed);

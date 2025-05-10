@@ -159,6 +159,7 @@ struct FogReveal {
 };
 
 struct MatchState {
+    int32_t lcg_seed;
     Map map;
     std::vector<int> fog[MAX_PLAYERS];
     std::vector<int> detection[MAX_PLAYERS];
