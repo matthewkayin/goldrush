@@ -60,8 +60,8 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             break;
         }
         case MATCH_INPUT_BUILD_CANCEL: {
-            memcpy(out_buffer + out_buffer_length, &input.build_cancel.building_id, sizeof(uint8_t));
-            out_buffer_length += sizeof(uint8_t);
+            memcpy(out_buffer + out_buffer_length, &input.build_cancel.building_id, sizeof(EntityId));
+            out_buffer_length += sizeof(EntityId);
             break;
         }
         case MATCH_INPUT_BUILDING_ENQUEUE: {
@@ -177,8 +177,8 @@ MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_h
             break;
         }
         case MATCH_INPUT_BUILD_CANCEL: {
-            memcpy(&input.build_cancel.building_id, in_buffer + in_buffer_head, sizeof(uint8_t));
-            in_buffer_head += sizeof(uint8_t);
+            memcpy(&input.build_cancel.building_id, in_buffer + in_buffer_head, sizeof(EntityId));
+            in_buffer_head += sizeof(EntityId);
             break;
         }
         case MATCH_INPUT_BUILDING_ENQUEUE: {
