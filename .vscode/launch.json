@@ -24,8 +24,8 @@
             "args": [
                 "--logfile",
                 "player1.log",
-                "--resolution",
-                "1280x720"
+                "--replay-file",
+                "player1.rep"
             ],
             "cwd": "${workspaceFolder}/bin",
             "windows": {
@@ -41,8 +41,8 @@
             "args": [
                 "--logfile",
                 "player2.log",
-                "--resolution",
-                "1280x720"
+                "--replay-file",
+                "player2.rep"
             ],
             "cwd": "${workspaceFolder}/bin",
             "windows": {

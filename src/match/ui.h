@@ -151,6 +151,7 @@ bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity)
 bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size);
 int match_ui_get_fog(const MatchUiState& state, ivec2 cell);
 
+void match_ui_replay_begin_turn(MatchUiState& state);
 void match_ui_replay_scrub(MatchUiState& state, uint32_t position);
 size_t match_ui_replay_end_of_tape(const MatchUiState& state);
 

@@ -206,15 +206,7 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
     state.replay_checkpoints.push_back(state.match);
 
     while (state.turn_counter < match_ui_replay_end_of_tape(state)) {
-        if (state.turn_counter % TURN_DURATION == 0) {
-            uint32_t input_index = state.turn_counter / TURN_DURATION;
-            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                for (const MatchInput& input : state.replay_inputs[player_id][input_index]) {
-                    match_handle_input(state.match, input);
-                }
-            }
-        }
-
+        match_ui_replay_begin_turn(state);
         match_update(state.match);
         state.match.events.clear();
         state.turn_counter++;
@@ -1019,7 +1011,8 @@ void match_ui_update(MatchUiState& state) {
     } // End if not replay_mode
 
     if (state.replay_mode && !state.replay_paused && state.turn_counter < match_ui_replay_end_of_tape(state)) {
-        match_ui_replay_scrub(state, state.turn_counter + 1);
+        match_ui_replay_begin_turn(state);
+        state.turn_counter++;
         if (state.turn_counter == match_ui_replay_end_of_tape(state)) {
             state.replay_paused = true;
         }
@@ -1030,7 +1023,7 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Match update
-    if (!state.replay_mode) {
+    if (!state.replay_mode || !state.replay_paused) {
         match_update(state.match);
     }
 
@@ -1172,10 +1165,7 @@ void match_ui_update(MatchUiState& state) {
             }
         }
     }
-
-    if (!state.replay_mode) {
-        state.match.events.clear();
-    }
+    state.match.events.clear();
 
     // Camera drag
     if (!match_ui_is_selecting(state)) {
@@ -1973,6 +1963,17 @@ int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
     }
 }
 
+void match_ui_replay_begin_turn(MatchUiState& state) {
+    if (state.turn_counter % TURN_DURATION == 0) {
+        uint32_t input_index = state.turn_counter / TURN_DURATION;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            for (const MatchInput& input : state.replay_inputs[player_id][input_index]) {
+                match_handle_input(state.match, input);
+            }
+        }
+    }
+}
+
 void match_ui_replay_scrub(MatchUiState& state, uint32_t position) {
     if (state.turn_counter == position) {
         return;
@@ -1985,18 +1986,9 @@ void match_ui_replay_scrub(MatchUiState& state, uint32_t position) {
     }
 
     while (state.turn_counter < position) {
-        if (state.turn_counter % TURN_DURATION == 0) {
-            uint32_t input_index = state.turn_counter / TURN_DURATION;
-            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                for (const MatchInput& input : state.replay_inputs[player_id][input_index]) {
-                    match_handle_input(state.match, input);
-                }
-            }
-        }
-
+        match_ui_replay_begin_turn(state);
         match_update(state.match);
         state.match.events.clear();
-
         state.turn_counter++;
     }
 }

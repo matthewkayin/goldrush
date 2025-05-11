@@ -5,11 +5,26 @@
 
 static const uint8_t REPLAY_FILE_VERSION = 0;
 
+#ifdef GOLD_DEBUG
+    static char arg_replay_file[128];
+    static bool use_arg_replay_file = false;
+
+    void replay_debug_set_file_name(char* argv) {
+        strcpy(arg_replay_file, argv);
+        use_arg_replay_file = true;
+    }
+#endif
+
 FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     char replay_file_path[256];
     platform_get_replay_path(replay_file_path, "latest.rep");
+    #ifdef GOLD_DEBUG
+        if (use_arg_replay_file) {
+            platform_get_replay_path(replay_file_path, arg_replay_file);
+        }
+    #endif
 
-    FILE* file = fopen(replay_file_path, "w");
+    FILE* file = fopen(replay_file_path, "wb");
     if (file == NULL) {
         log_error("Could not open replay file for writing with path %s.", replay_file_path);
         return NULL;
@@ -70,7 +85,7 @@ bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchS
     char replay_file_path[256];
     platform_get_replay_path(replay_file_path, path);
 
-    FILE* file = fopen(replay_file_path, "r");
+    FILE* file = fopen(replay_file_path, "rb");
     if (file == NULL) {
         log_error("Could not open replay file for reading with path %s.", replay_file_path);
         return false;
@@ -104,11 +119,14 @@ bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchS
     // Init state
     *state = match_init(lcg_seed, noise, players);
 
-    while (!feof(file)) {
+    while (true) {
         // The first byte tells us the type of the next block
         // For types 0-3, this is a set of turn inputs from the player_id 0-3
         uint8_t block_type;
-        fread(&block_type, 1, sizeof(uint8_t), file);
+        size_t bytes_read = fread(&block_type, 1, sizeof(uint8_t), file);
+        if (bytes_read == 0) {
+            break;
+        }
 
         // The next type tells us the length of the next block
         size_t block_length;

@@ -12,6 +12,7 @@
 #include "menu/menu.h"
 #include "match/ui.h"
 #include "match/noise.h"
+#include "match/replay.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
@@ -95,12 +96,18 @@ int gold_main(int argc, char** argv) {
     sprintf(logfile_name, "logs.log");
 
     // Parse system arguments
+    #ifdef GOLD_DEBUG
     for (int argn = 1; argn < argc; argn++) {
         if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
             argn++;
             strcpy(logfile_name, argv[argn]);
         }
+        if (strcmp(argv[argn], "--replay-file") == 0 && argn + 1 < argc) {
+            argn++;
+            replay_debug_set_file_name(argv[argn]);
+        }
     }
+    #endif
 
     char logfile_path[256];
     platform_get_datafile_path(logfile_path, logfile_name);
