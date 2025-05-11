@@ -16,7 +16,7 @@
 #define APP_NAME "GOLD RUSH"
 #define APP_VERSION "0.6.4"
 
-// #define GOLD_DEBUG
+#define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
 // #define GOLD_RAND_SEED 1745619349
 // #define GOLD_DEBUG_FAST_BUILD

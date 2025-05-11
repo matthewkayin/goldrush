@@ -63,6 +63,27 @@ static const uint32_t LOBBYLIST_PAGE_SIZE = 9;
 
 static const std::vector<std::string> PLAYER_COLOR_STRS = { "Blue", "Red", "Green", "Purple" };
 
+SDL_EnumerationResult menu_on_replay_file_found(void* state_ptr, const char* dirname, const char* filename) {
+    MenuState* state = (MenuState*)state_ptr;
+    if (strstr(filename, ".rep") == NULL) {
+        return SDL_ENUM_CONTINUE;
+    }
+    if (strstr(filename, state->lobby_search_query.c_str()) == NULL) {
+        return SDL_ENUM_CONTINUE;
+    }
+
+    state->replay_filenames.push_back(std::string(filename));
+
+    return SDL_ENUM_CONTINUE;
+}
+
+void menu_search_replays_folder(MenuState& state) {
+    state.replay_filenames.clear();
+    char replay_folder_path[256];
+    filesystem_get_data_path(replay_folder_path, "replays");
+    SDL_EnumerateDirectory(replay_folder_path, menu_on_replay_file_found, (void*)&state);
+}
+
 MenuState menu_init() {
     MenuState state;
 
@@ -415,7 +436,7 @@ void menu_update(MenuState& state) {
     } else if (state.mode == MENU_MODE_REPLAYS || state.mode == MENU_MODE_REPLAY_RENAME) {
         ui_frame_rect(LOBBYLIST_RECT);
 
-        if (platform_get_replay_file_count() == 0) {
+        if (state.replay_filenames.empty()) {
             int text_width = render_get_text_size(FONT_HACK_GOLD, "No replay files found.").x;
             ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
             ui_text(FONT_HACK_GOLD, "No replay files found.");
@@ -425,23 +446,23 @@ void menu_update(MenuState& state) {
         ui_begin_row(ivec2(44, 4), 4);
             ui_text_input("Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
             if (ui_sprite_button(SPRITE_UI_BUTTON_REFRESH, false, false)) {
-                platform_search_replays_folder(state.lobby_search_query.c_str());
+                menu_search_replays_folder(state);
                 state.lobbylist_page = 0;
             }
             if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
                 state.lobbylist_page--;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(platform_get_replay_file_count()) - 1, false)) {
+            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(state.replay_filenames.size()) - 1, false)) {
                 state.lobbylist_page++;
             }
         ui_end_container();
 
         // Replay list
         size_t base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
-        for (size_t lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, platform_get_replay_file_count()); lobby_index++) {
+        for (size_t lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, state.replay_filenames.size()); lobby_index++) {
             char replay_text[128];
             bool selected = lobby_index == state.lobbylist_item_selected;
-            sprintf(replay_text, "%s %s %s", selected ? "*" : " ", platform_get_replay_file_name(lobby_index), selected ? "*" : " ");
+            sprintf(replay_text, "%s %s %s", selected ? "*" : " ", state.replay_filenames[lobby_index].c_str(), selected ? "*" : " ");
 
             ivec2 text_frame_size = ui_text_frame_size(replay_text);
             ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
@@ -461,7 +482,7 @@ void menu_update(MenuState& state) {
                 }
                 if (ui_button("RENAME")) {
                     state.mode = MENU_MODE_REPLAY_RENAME;
-                    state.replay_rename = std::string(platform_get_replay_file_name(state.lobbylist_item_selected));
+                    state.replay_rename = state.replay_filenames[state.lobbylist_item_selected];
                 }
             }
         ui_end_container();
@@ -492,11 +513,11 @@ void menu_update(MenuState& state) {
                             state.replay_rename += ".rep";
                         }
                         char old_filename[256];
-                        filesystem_get_replay_path(old_filename, platform_get_replay_file_name(state.lobbylist_item_selected));
+                        filesystem_get_replay_path(old_filename, state.replay_filenames[state.lobbylist_item_selected].c_str());
                         char new_filename[256];
                         filesystem_get_replay_path(new_filename, state.replay_rename.c_str());
                         rename(old_filename, new_filename);
-                        platform_search_replays_folder(state.lobby_search_query.c_str());
+                        menu_search_replays_folder(state);
                         state.mode = MENU_MODE_REPLAYS;
                     }
                 }
@@ -529,7 +550,7 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
         state.connection_timeout = CONNECTION_TIMEOUT;
     } else if (mode == MENU_MODE_REPLAYS) {
         state.lobby_search_query = "";
-        platform_search_replays_folder(state.lobby_search_query.c_str());
+        menu_search_replays_folder(state);
     }
 }
 

@@ -118,19 +118,19 @@ int gold_main(int argc, char** argv) {
         return -1;
     }
 
-    log_info("Initializing %s %s.", APP_NAME, APP_VERSION);
-    #if defined(PLATFORM_WIN32)
-        log_info("Detected platform WIN32.");
-    #elif defined(PLATFORM_OSX)
-        log_info("Detected platform OSX.");
-    #endif
-
     filesystem_create_data_folder("logs");
     filesystem_create_data_folder("replays");
 
     if(!logger_init(logfile_path)) {
         return -1;
     }
+
+    log_info("Initializing %s %s.", APP_NAME, APP_VERSION);
+    #if defined(PLATFORM_WIN32)
+        log_info("Detected platform WIN32.");
+    #elif defined(PLATFORM_OSX)
+        log_info("Detected platform OSX.");
+    #endif
 
     uint32_t window_flags = SDL_WINDOW_OPENGL;
     ivec2 window_size = ivec2(1280, 720);
@@ -285,7 +285,7 @@ int gold_main(int argc, char** argv) {
                     } else if (state.menu.mode == MENU_MODE_LOAD_REPLAY) {
                         LoadParams params;
                         params.mode = GAME_MODE_REPLAY;
-                        strcpy(params.replay.filename, platform_get_replay_file_name(state.menu.lobbylist_item_selected));
+                        strcpy(params.replay.filename, state.menu.replay_filenames[state.menu.lobbylist_item_selected].c_str());
                         game_set_mode(params);
                     }
                     break;

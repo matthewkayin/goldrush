@@ -49,6 +49,7 @@ struct MenuState {
     uint32_t lobbylist_item_selected;
 
     std::vector<std::string> chat;
+    std::vector<std::string> replay_filenames;
 
     OptionsMenuState options_menu;
 };
