@@ -1,7 +1,7 @@
 #include "sound.h"
 
 #include "core/logger.h"
-#include "platform/platform.h"
+#include "core/filesystem.h"
 #include <SDL3/SDL.h>
 #include <vector>
 #include <unordered_map>
@@ -211,7 +211,7 @@ bool sound_init() {
             }
 
             char sound_path[256];
-            platform_get_resource_path(sound_path, sound_subpath);
+            filesystem_get_resource_path(sound_path, sound_subpath);
 
             SoundData sound_variant;
             SDL_AudioSpec sound_spec;

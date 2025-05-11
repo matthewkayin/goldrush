@@ -2,7 +2,7 @@
 
 #include "defines.h"
 #include "core/logger.h"
-#include "platform/platform.h"
+#include "core/filesystem.h"
 #include <glad/glad.h>
 #include <cstdio>
 #include <cstdlib>
@@ -12,7 +12,7 @@ bool shader_compile(uint32_t* id, GLenum type, const char* path_suffix) {
     char subpath[128];
     sprintf(subpath, "shader/%s", path_suffix);
     char path[256];
-    platform_get_resource_path(path, subpath);
+    filesystem_get_resource_path(path, subpath);
 
     FILE* shader_file = fopen(path, "rb");
     if (!shader_file) {

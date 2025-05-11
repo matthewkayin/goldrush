@@ -1,6 +1,6 @@
 #include "replay.h"
 
-#include "platform/platform.h"
+#include "core/filesystem.h"
 #include "core/logger.h"
 
 static const uint8_t REPLAY_FILE_VERSION = 0;
@@ -17,10 +17,10 @@ static const uint8_t REPLAY_FILE_VERSION = 0;
 
 FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     char replay_file_path[256];
-    platform_get_replay_path(replay_file_path, "latest.rep");
+    filesystem_get_replay_path(replay_file_path, "latest.rep");
     #ifdef GOLD_DEBUG
         if (use_arg_replay_file) {
-            platform_get_replay_path(replay_file_path, arg_replay_file);
+            filesystem_get_replay_path(replay_file_path, arg_replay_file);
         }
     #endif
 
@@ -83,7 +83,7 @@ void replay_file_write_inputs(FILE* file, uint8_t player_id, const std::vector<M
 
 bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchState* state, const char* path) {
     char replay_file_path[256];
-    platform_get_replay_path(replay_file_path, path);
+    filesystem_get_replay_path(replay_file_path, path);
 
     FILE* file = fopen(replay_file_path, "rb");
     if (file == NULL) {

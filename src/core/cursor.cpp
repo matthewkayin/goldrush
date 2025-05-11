@@ -3,7 +3,7 @@
 #include "defines.h"
 #include "asserts.h"
 #include "logger.h"
-#include "platform/platform.h"
+#include "filesystem.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <cstdio>
@@ -36,7 +36,7 @@ bool cursor_init() {
         const CursorParams params = CURSOR_PARAMS.at((CursorName)cursor);
 
         char path[256];
-        platform_get_resource_path(path, params.path);
+        filesystem_get_resource_path(path, params.path);
 
         SDL_Surface* cursor_surface = IMG_Load(path);
         if (cursor_surface == NULL) {

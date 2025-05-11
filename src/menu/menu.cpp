@@ -1,6 +1,6 @@
 #include "menu.h"
 
-#include "platform/platform.h"
+#include "core/filesystem.h"
 #include "core/input.h"
 #include "core/cursor.h"
 #include "core/logger.h"
@@ -492,9 +492,9 @@ void menu_update(MenuState& state) {
                             state.replay_rename += ".rep";
                         }
                         char old_filename[256];
-                        platform_get_replay_path(old_filename, platform_get_replay_file_name(state.lobbylist_item_selected));
+                        filesystem_get_replay_path(old_filename, platform_get_replay_file_name(state.lobbylist_item_selected));
                         char new_filename[256];
-                        platform_get_replay_path(new_filename, state.replay_rename.c_str());
+                        filesystem_get_replay_path(new_filename, state.replay_rename.c_str());
                         rename(old_filename, new_filename);
                         platform_search_replays_folder(state.lobby_search_query.c_str());
                         state.mode = MENU_MODE_REPLAYS;

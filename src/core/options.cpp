@@ -4,7 +4,7 @@
 #include "sound.h"
 #include "input.h"
 #include "match/hotkey.h"
-#include "platform/platform.h"
+#include "core/filesystem.h"
 #include "render/render.h"
 #include <unordered_map>
 #include <fstream>
@@ -68,7 +68,7 @@ void options_load() {
     }
 
     char options_file_path[256];
-    platform_get_datafile_path(options_file_path, OPTIONS_FILE_NAME);
+    filesystem_get_data_path(options_file_path, OPTIONS_FILE_NAME);
     std::ifstream options_file(options_file_path);
     if (options_file.is_open()) {
         std::string hotkey_names[INPUT_ACTION_COUNT];
@@ -125,7 +125,7 @@ void options_load() {
 
 void options_save() {
     char options_file_path[256];
-    platform_get_datafile_path(options_file_path, OPTIONS_FILE_NAME);
+    filesystem_get_data_path(options_file_path, OPTIONS_FILE_NAME);
     FILE* options_file = fopen(options_file_path, "w");
     if (options_file == NULL) {
         log_error("Could not open options file for writing.");

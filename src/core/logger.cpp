@@ -1,7 +1,7 @@
 #include "logger.h"
 
 #include "asserts.h"
-#include "platform/platform.h"
+#include "core/filesystem.h"
 #include "math/gmath.h"
 #include <cstdio>
 #include <cstring>
@@ -9,7 +9,9 @@
 
 static FILE* logfile;
 
-bool logger_init(const char* logfile_path) {
+bool logger_init(const char* logfile_subpath) {
+    char logfile_path[256];
+    filesystem_get_data_path(logfile_path, logfile_subpath);
     logfile = fopen(logfile_path, "w");
     if (logfile == NULL) {
         log_error("Unable to open log file for writing.");
@@ -119,10 +121,6 @@ void logger_output(LogLevel log_level, const char* message, ...) {
     char log_message[MESSAGE_LENGTH];
     const char* LOG_LEVEL_PREFIXES[4] = { "ERROR", "WARN", "INFO", "TRACE" };
     sprintf(log_message, "[%s]: %s\n", LOG_LEVEL_PREFIXES[log_level], out_message);
-
-#   ifdef GOLD_DEBUG
-        // platform_console_write(log_message, log_level);
-#   endif
 
     fprintf(logfile, "%s", log_message);
     fflush(logfile);

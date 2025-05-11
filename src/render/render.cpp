@@ -12,7 +12,7 @@
 
 #include "core/logger.h"
 #include "core/asserts.h"
-#include "platform/platform.h"
+#include "core/filesystem.h"
 #include "math/gmath.h"
 #include "math/mat4.h"
 #include "render/sprite.h"
@@ -526,7 +526,7 @@ SDL_Surface* render_load_font(FontName name) {
     char font_subpath[128];
     sprintf(font_subpath, "font/%s", params.path);
     char path[256];
-    platform_get_resource_path(path, font_subpath);
+    filesystem_get_resource_path(path, font_subpath);
 
     // Open the font
     TTF_Font* ttf_font = TTF_OpenFont(path, params.size);
@@ -648,7 +648,7 @@ bool render_load_sprites() {
         char tileset_subpath[128];
         sprintf(tileset_subpath, "sprite/%s", params.path);
         char tileset_path[256];
-        platform_get_resource_path(tileset_path, tileset_subpath);
+        filesystem_get_resource_path(tileset_path, tileset_subpath);
 
         tileset_surfaces[tileset] = IMG_Load(tileset_path);
         if (tileset_surfaces[tileset] == NULL) {
@@ -690,7 +690,7 @@ bool render_load_sprites() {
             char sprite_subpath[128];
             sprintf(sprite_subpath, "sprite/%s", params.sheet.path);
             char sprite_path[256];
-            platform_get_resource_path(sprite_path, sprite_subpath);
+            filesystem_get_resource_path(sprite_path, sprite_subpath);
 
             SDL_Surface* sprite_surface = IMG_Load(sprite_path);
             if (sprite_surface == NULL) {

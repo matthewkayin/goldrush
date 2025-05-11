@@ -1,5 +1,5 @@
 #include "defines.h"
-#include "platform/platform.h"
+#include "core/filesystem.h"
 #include "core/logger.h"
 #include "core/cursor.h"
 #include "core/animation.h"
@@ -92,15 +92,15 @@ void game_set_mode(LoadParams params) {
 }
 
 int gold_main(int argc, char** argv) {
-    char logfile_name[128];
-    sprintf(logfile_name, "logs.log");
+    char logfile_path[128];
+    sprintf(logfile_path, "logs/latest.log");
 
     // Parse system arguments
     #ifdef GOLD_DEBUG
     for (int argn = 1; argn < argc; argn++) {
         if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
             argn++;
-            strcpy(logfile_name, argv[argn]);
+            strcpy(logfile_path, argv[argn]);
         }
         if (strcmp(argv[argn], "--replay-file") == 0 && argn + 1 < argc) {
             argn++;
@@ -109,9 +109,12 @@ int gold_main(int argc, char** argv) {
     }
     #endif
 
-    char logfile_path[256];
-    platform_get_datafile_path(logfile_path, logfile_name);
-    if(!logger_init(logfile_path)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+        return -1;
+    }
+
+    // Init TTF
+    if (!TTF_Init()) {
         return -1;
     }
 
@@ -122,16 +125,10 @@ int gold_main(int argc, char** argv) {
         log_info("Detected platform OSX.");
     #endif
 
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-        log_error("SDL failed to initialize: %s", SDL_GetError());
-        logger_quit();
-        return -1;
-    }
+    filesystem_create_data_folder("logs");
+    filesystem_create_data_folder("replays");
 
-    // Init TTF
-    if (!TTF_Init()) {
-        log_error("SDL_ttf failed to initialize: %s", SDL_GetError());
-        logger_quit();
+    if(!logger_init(logfile_path)) {
         return -1;
     }
 
@@ -160,6 +157,8 @@ int gold_main(int argc, char** argv) {
     input_init(window);
     options_load();
     srand(time(NULL));
+
+    log_info("base path %s", SDL_GetBasePath());
 
     bool is_running = true;
     bool render_debug_info = false;
