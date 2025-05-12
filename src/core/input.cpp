@@ -125,6 +125,8 @@ void input_poll_events() {
                         break;
                     case SDLK_LCTRL:
                     case SDLK_RCTRL:
+                    case SDLK_LGUI:
+                    case SDLK_RGUI:
                         state.current[INPUT_ACTION_CTRL] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
                     case SDLK_SPACE:
