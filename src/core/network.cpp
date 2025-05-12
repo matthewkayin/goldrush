@@ -212,6 +212,7 @@ bool network_host_create() {
 bool network_server_create(const char* username) {
     if (!network_host_create()) {
         log_error("Could not create enet host.");
+        state.status = NETWORK_STATUS_OFFLINE;
         return false;
     }
 
@@ -249,6 +250,7 @@ bool network_client_create(const char* username, const char* server_ip, uint16_t
     log_info("Connecting to %s:%u", server_ip, server_port);
     if (!network_host_create()) {
         log_error("Could not create enet host.");
+        state.status = NETWORK_STATUS_OFFLINE;
         return false;
     }
 

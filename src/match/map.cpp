@@ -6,8 +6,8 @@
 #include "lcg.h"
 #include <unordered_map>
 
-static const int MAP_PLAYER_SPAWN_SIZE = 11;
-static const int MAP_PLAYER_SPAWN_MARGIN = 11;
+static const int MAP_PLAYER_SPAWN_SIZE = 13;
+static const int MAP_PLAYER_SPAWN_MARGIN = 13;
 
 struct PoissonDiskParams {
     std::vector<int> avoid_values;
@@ -542,10 +542,12 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
     {
         // Place a gold mine on each player's spawn
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            GOLD_ASSERT(player_spawns[player_id].x != -1);
+
             ivec2 mine_cell = player_spawns[player_id];
             goldmine_cells.push_back(mine_cell);
             params.avoid_values[mine_cell.x + (mine_cell.y * map.width)] = params.disk_radius;
-            GOLD_ASSERT(player_spawns[player_id].x != -1);
+
         }
 
         // Generate the avoid values
@@ -565,6 +567,16 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
 
     // Generate decorations
     {
+        // Place avoid values on each town hall cell
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            ivec2 town_hall_cell = map_get_player_town_hall_cell(map, player_spawns[player_id]);
+            for (int y = town_hall_cell.y; y < town_hall_cell.y + 4; y++) {
+                for (int x = town_hall_cell.x; x < town_hall_cell.x + 4; x++) {
+                    params.avoid_values[x + (y * map.width)] = 1;
+                }
+            }
+        }
+
         params.disk_radius = 16;
         params.allow_unreachable_cells = true;
         params.margin = ivec2(0, 0);

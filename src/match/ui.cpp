@@ -869,9 +869,11 @@ void match_ui_update(MatchUiState& state) {
             ivec2 button_size = ui_button_size("LEAVE MATCH");
             if (state.mode == MATCH_UI_MODE_MENU) {
                 if (ui_button("LEAVE MATCH", button_size, true)) {
-                    state.mode = match_ui_is_opponent_in_match(state) 
-                                    ? MATCH_UI_MODE_MENU_SURRENDER
-                                    : MATCH_UI_MODE_LEAVE_MATCH;
+                    if (match_ui_is_opponent_in_match(state)) {
+                        state.mode = MATCH_UI_MODE_MENU_SURRENDER;
+                    } else {
+                        match_ui_leave_match(state);
+                    }
                 }
                 if (ui_button("OPTIONS", button_size, true)) {
                     state.options_menu = options_menu_open();
