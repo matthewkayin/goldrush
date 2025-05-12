@@ -3508,7 +3508,8 @@ void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& stat
     }
 
     // Render garrison bar
-    if (entity_data.garrison_capacity != 0) {
+    if (entity_data.garrison_capacity != 0 && (entity.type == ENTITY_GOLDMINE || state.replay_mode || 
+            state.match.players[entity.player_id].team == state.match.players[network_get_player_id()].team)) {
         match_ui_render_healthbar(RENDER_GARRISON_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
         healthbar_position.y += HEALTHBAR_HEIGHT + 1;
     } 
