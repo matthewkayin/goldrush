@@ -19,8 +19,7 @@ static const ivec2 SAVE_BUTTON_POSITION = ivec2(OPTIONS_FRAME_RECT.x + OPTIONS_F
 
 static const std::unordered_map<OptionName, std::vector<std::string>> OPTION_VALUE_STRINGS = {
     { OPTION_DISPLAY, { "Windowed", "Fullscreen", "Borderless" }},
-    { OPTION_VSYNC, { "Disabled", "Enabled", "Adaptive" }},
-    { OPTION_UNIT_VOICES, { "Off", "On" }}
+    { OPTION_VSYNC, { "Disabled", "Enabled", "Adaptive" }}
 };
 
 static const int HOTKEY_GROUP_NONE = -1;

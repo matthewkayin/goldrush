@@ -7,15 +7,8 @@ enum OptionName {
     OPTION_VSYNC,
     OPTION_SFX_VOLUME,
     OPTION_MUS_VOLUME,
-    OPTION_UNIT_VOICES,
     OPTION_CAMERA_SPEED,
     OPTION_COUNT
-};
-
-enum OptionValueUnitVoices {
-    OPTION_UNIT_VOICES_OFF,
-    OPTION_UNIT_VOICES_ON,
-    OPTION_UNIT_VOICES_COUNT,
 };
 
 enum OptionType {

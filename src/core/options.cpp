@@ -41,13 +41,6 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .max_value = 100,
         .default_value = 100
     }},
-    { OPTION_UNIT_VOICES, (OptionData) {
-        .name = "Unit Voices",
-        .type = OPTION_TYPE_DROPDOWN,
-        .min_value = 0,
-        .max_value = OPTION_UNIT_VOICES_COUNT,
-        .default_value = OPTION_UNIT_VOICES_ON
-    }},
     { OPTION_CAMERA_SPEED, (OptionData) {
         .name = "Camera Speed",
         .type = OPTION_TYPE_SLIDER,
