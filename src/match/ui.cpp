@@ -1366,7 +1366,6 @@ void match_ui_update(MatchUiState& state) {
                         case ENTITY_SALOON: {
                             state.hotkey_group[0] = INPUT_HOTKEY_COWBOY;
                             state.hotkey_group[1] = INPUT_HOTKEY_BANDIT;
-                            state.hotkey_group[2] = INPUT_HOTKEY_DETECTIVE;
                             break;
                         }
                         case ENTITY_WORKSHOP: {
@@ -1391,6 +1390,12 @@ void match_ui_update(MatchUiState& state) {
                         case ENTITY_BARRACKS: {
                             state.hotkey_group[0] = INPUT_HOTKEY_SOLDIER;
                             state.hotkey_group[1] = INPUT_HOTKEY_CANNON;
+                            break;
+                        }
+                        case ENTITY_SHERIFFS: {
+                            state.hotkey_group[0] = INPUT_HOTKEY_DETECTIVE;
+                            state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_PRIVATE_EYE;
+                            state.hotkey_group[4] = INPUT_HOTKEY_RESEARCH_STAKEOUT;
                             break;
                         }
                         case ENTITY_PYRO: {
@@ -2937,16 +2942,17 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2);
             render_text(FONT_HACK_WHITE, health_text, health_text_position);
 
-            if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0)  {
+            uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
+            if (entity_is_unit(entity.type) && entity_max_energy != 0)  {
                 healthbar_position += ivec2(0, healthbar_size.y + 2);
-                match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_data.unit_data.max_energy);
-                sprintf(health_text, "%i/%i", entity.energy, entity_data.unit_data.max_energy);
+                match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
+                sprintf(health_text, "%i/%i", entity.energy, entity_max_energy);
                 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
                 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2);
                 render_text(FONT_HACK_WHITE, health_text, health_text_position);
             }
 
-            if (entity_data.has_detection) {
+            if (match_entity_has_detection(state.match, entity)) {
                 render_text(FONT_WESTERN8_GOLD, "Has Detection", SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 33));
             }
         }
@@ -3514,8 +3520,9 @@ void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& stat
         healthbar_position.y += HEALTHBAR_HEIGHT + 1;
     } 
     // Render energy bar
-    if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0) {
-        match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.energy, (int)entity_data.unit_data.max_energy);
+    uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
+    if (entity_is_unit(entity.type) && entity_max_energy != 0) {
+        match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.energy, (int)entity_max_energy);
     }
 }
 
@@ -3528,8 +3535,9 @@ void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity
     render_sprite_frame(entity_data.icon, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
     ivec2 healthbar_position = ivec2(icon_rect.x + 1, icon_rect.y + 27 - (int)icon_hovered);
     ivec2 healthbar_size = ivec2(30, 4);
-    if (entity_is_unit(entity.type) && entity_data.unit_data.max_energy != 0) {
-        match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_data.unit_data.max_energy);
+    uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
+    if (entity_is_unit(entity.type) && entity_max_energy != 0) {
+        match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
         healthbar_position -= ivec2(0, healthbar_size.y + 1);
     }
     match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);

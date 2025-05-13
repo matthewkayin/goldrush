@@ -290,6 +290,20 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }
+    }},
+    { INPUT_HOTKEY_RESEARCH_PRIVATE_EYE, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_RESEARCH,
+        .upgrade = UPGRADE_PRIVATE_EYE,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_RESEARCH_STAKEOUT, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_RESEARCH,
+        .upgrade = UPGRADE_STAKEOUT,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
     }}
 };
 

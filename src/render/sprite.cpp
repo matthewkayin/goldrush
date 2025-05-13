@@ -864,6 +864,22 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_BUTTON_ICON_PRIVATE_EYE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_private_eye.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_STAKEOUT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_stakeout.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
     { SPRITE_SELECT_RING_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

@@ -290,7 +290,6 @@ void input_set_hotkey_mapping_to_default(SDL_Keycode* hotkey_mapping) {
     // Saloon
     hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_C;
     hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_B;
-    hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDLK_D;
 
     // Workshop
     hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_S;
@@ -308,6 +307,11 @@ void input_set_hotkey_mapping_to_default(SDL_Keycode* hotkey_mapping) {
     hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDLK_S;
     hotkey_mapping[INPUT_HOTKEY_CANNON] = SDLK_C;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDLK_B;
+
+    // Sheriff's Office
+    hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDLK_D;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_PRIVATE_EYE] = SDLK_E;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_STAKEOUT] = SDLK_S;
 
     // Pyro
     hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_V;

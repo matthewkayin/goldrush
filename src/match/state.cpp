@@ -35,6 +35,7 @@ static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
 static const uint32_t MATCH_MAX_POPULATION = 100;
+static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -428,7 +429,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                         .type = CELL_UNIT,
                         .id = state.entities.get_id_of(entity_index)
                     });
-                    match_fog_update(state, state.players[builder.player_id].team, builder.cell, builder_data.cell_size, builder_data.sight, builder_data.has_detection, builder_data.cell_layer, true);
+                    match_fog_update(state, state.players[builder.player_id].team, builder.cell, builder_data.cell_size, builder_data.sight, match_entity_has_detection(state, builder), builder_data.cell_layer, true);
                     break;
                 }
             }
@@ -682,7 +683,7 @@ void match_update(MatchState& state) {
                 // Remove this entity's fog but only if they are not gold and not garrisoned
                 if (state.entities[entity_index].player_id != PLAYER_NONE && state.entities[entity_index].garrison_id == ID_NULL) {
                     const EntityData& entity_data = entity_get_data(state.entities[entity_index].type);
-                    match_fog_update(state, state.players[state.entities[entity_index].player_id].team, state.entities[entity_index].cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, false);
+                    match_fog_update(state, state.players[state.entities[entity_index].player_id].team, state.entities[entity_index].cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, state.entities[entity_index]), entity_data.cell_layer, false);
                 }
                 const EntityData& entity_data = entity_get_data(state.entities[entity_index].type);
                 log_trace("Removing entity %s ID %u player id %u", entity_data.name, state.entities.get_id_of(entity_index), state.entities[entity_index].player_id);
@@ -732,7 +733,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.health = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
                         ? entity_data.max_health
                         : (entity_data.max_health / 10);
-    entity.energy = entity_is_unit(type) ? entity_data.unit_data.max_energy / 4 : 0;
+    entity.energy = entity_is_unit(type) ? match_entity_get_max_energy(state, entity) / 4 : 0;
     entity.target = (Target) { .type = TARGET_NONE };
     entity.pathfind_attempts = 0;
     entity.timer = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
@@ -765,7 +766,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
         .type = entity_is_unit(type) ? CELL_UNIT : CELL_BUILDING,
         .id = id
     });
-    match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, true);
+    match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, true);
 
     log_trace("Created entity %s ID %u player %u cell %vi", entity_data.name, id, player_id, &cell);
 
@@ -1002,13 +1003,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 .id = ID_NULL
                             });
                         }
-                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, false);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, false);
                         entity.cell = entity.path[0];
                         map_set_cell_rect(state.map, entity_data.cell_layer, entity.cell, entity_data.cell_size, (Cell) {
                             .type = match_is_entity_mining(state, entity) ? CELL_MINER : CELL_UNIT,
                             .id = entity_id
                         });
-                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, true);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, true);
                         entity.path.erase(entity.path.begin());
                     }
 
@@ -1181,7 +1182,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
                                 .type = CELL_EMPTY, .id = ID_NULL
                             });
-                            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, false);
+                            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, false);
                             entity.target.id = match_create_entity(state, entity.target.build.building_type, entity.target.build.building_cell, entity.player_id);
                             entity.mode = MODE_UNIT_BUILD;
                             entity.timer = UNIT_BUILD_TICK_DURATION;
@@ -1372,7 +1373,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
                                 .type = CELL_EMPTY, .id = ID_NULL
                             });
-                            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, false);
+                            match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, false);
                             match_event_play_sound(state, SOUND_GARRISON_IN, target.position.to_ivec2());
                             update_finished = true;
                             break;
@@ -1516,7 +1517,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         if (entity.target.type == TARGET_NONE) {
                             entity.gold_mine_id = ID_NULL;
                         }
-                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, false);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, false);
                         entity.cell = exit_cell;
                         ivec2 exit_from_cell = get_nearest_cell_in_rect(exit_cell, mine.cell, mine_data.cell_size);
                         entity.direction = enum_from_ivec2_direction(exit_cell - exit_from_cell);
@@ -1528,7 +1529,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                         : CELL_UNIT,
                             .id = entity_id
                         });
-                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, true);
+                        match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, true);
 
                         if (mine.garrisoned_units.empty() && mine.gold_held == 0) {
                             mine.mode = MODE_GOLDMINE_COLLAPSED;
@@ -1823,7 +1824,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 match_event_play_sound(state, SOUND_CAMO_OFF, entity.position.to_ivec2());
             }
         }
-    } else if (entity_is_unit(entity.type) && entity.energy < entity_data.unit_data.max_energy) {
+    } else if (entity_is_unit(entity.type) && entity.energy < match_entity_get_max_energy(state, entity)) {
         if (entity.energy_regen_timer != 0) {
             entity.energy_regen_timer--;
         }
@@ -2107,7 +2108,7 @@ void match_entity_stop_building(MatchState& state, EntityId entity_id) {
     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
         .type = CELL_UNIT, .id = entity_id
     });
-    match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, entity_data.has_detection, entity_data.cell_layer, true); 
+    match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, true); 
 }
 
 void match_entity_building_finish(MatchState& state, EntityId building_id) {
@@ -2513,7 +2514,7 @@ void match_entity_unload_unit(MatchState& state, Entity& carrier, EntityId garri
             map_set_cell_rect(state.map, CELL_LAYER_GROUND, garrisoned_unit.cell, garrisoned_unit_data.cell_size, (Cell) {
                 .type = CELL_UNIT, .id = carrier.garrisoned_units[index]
             });
-            match_fog_update(state, state.players[garrisoned_unit.player_id].team, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, garrisoned_unit_data.has_detection, garrisoned_unit_data.cell_layer, true);
+            match_fog_update(state, state.players[garrisoned_unit.player_id].team, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, match_entity_has_detection(state, garrisoned_unit), garrisoned_unit_data.cell_layer, true);
             garrisoned_unit.mode = MODE_UNIT_IDLE;
             garrisoned_unit.target = (Target) { .type = TARGET_NONE };
             garrisoned_unit.garrison_id = ID_NULL;
@@ -2547,7 +2548,7 @@ void match_entity_release_garrisoned_units_on_death(MatchState& state, Entity& e
                     map_set_cell_rect(state.map, CELL_LAYER_GROUND, garrisoned_unit.cell, garrisoned_unit_data.cell_size, (Cell) {
                         .type = CELL_UNIT, .id = garrisoned_unit_id
                     });
-                    match_fog_update(state, state.players[garrisoned_unit.player_id].team, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, garrisoned_unit_data.has_detection, garrisoned_unit_data.cell_layer, true);
+                    match_fog_update(state, state.players[garrisoned_unit.player_id].team, garrisoned_unit.cell, garrisoned_unit_data.cell_size, garrisoned_unit_data.sight, match_entity_has_detection(state, garrisoned_unit), garrisoned_unit_data.cell_layer, true);
                     unit_is_placed = true;
                     break;
                 }
@@ -2617,6 +2618,25 @@ void match_entity_explode(MatchState& state, EntityId entity_id) {
         .vframe = 0,
         .position = entity.type == ENTITY_SAPPER ? entity.position.to_ivec2() : cell_center(entity.cell).to_ivec2()
     });
+}
+
+uint32_t match_entity_get_max_energy(const MatchState& state, const Entity& entity) {
+    if (!entity_is_unit(entity.type)) {
+        return 0;
+    }
+
+    uint32_t max_energy = entity_get_data(entity.type).unit_data.max_energy;
+    if (entity.type == ENTITY_DETECTIVE && match_player_has_upgrade(state, entity.player_id, UPGRADE_STAKEOUT)) {
+        max_energy += STAKEOUT_ENERGY_BONUS;
+    }
+    return max_energy;
+}
+
+bool match_entity_has_detection(const MatchState& state, const Entity& entity) {
+    if (entity.type == ENTITY_DETECTIVE && match_player_has_upgrade(state, entity.player_id, UPGRADE_PRIVATE_EYE)) {
+        return true;
+    }
+    return entity_get_data(entity.type).has_detection;
 }
 
 // EVENTS

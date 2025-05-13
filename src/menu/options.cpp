@@ -38,6 +38,7 @@ enum HotkeyGroupName {
     HOTKEY_GROUP_SMITH,
     HOTKEY_GROUP_BARRACKS,
     HOTKEY_GROUP_COOP,
+    HOTKEY_GROUP_SHERIFFS,
     HOTKEY_GROUP_COUNT
 };
 
@@ -108,7 +109,7 @@ static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
         .name = "Saloon",
         .icon = SPRITE_BUTTON_ICON_SALOON,
         .hotkeys = { 
-            INPUT_HOTKEY_COWBOY, INPUT_HOTKEY_BANDIT, INPUT_HOTKEY_DETECTIVE,
+            INPUT_HOTKEY_COWBOY, INPUT_HOTKEY_BANDIT, INPUT_HOTKEY_NONE,
             INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
         }
     }},
@@ -142,6 +143,14 @@ static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
         .hotkeys = { 
             INPUT_HOTKEY_JOCKEY, INPUT_HOTKEY_WAGON, INPUT_HOTKEY_NONE,
             INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
+        }
+    }},
+    { HOTKEY_GROUP_SHERIFFS, (HotkeyGroup) {
+        .name = "Sheriff's Office",
+        .icon = SPRITE_BUTTON_ICON_SHERIFFS,
+        .hotkeys = { 
+            INPUT_HOTKEY_DETECTIVE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE,
+            INPUT_HOTKEY_RESEARCH_PRIVATE_EYE, INPUT_HOTKEY_RESEARCH_STAKEOUT, INPUT_HOTKEY_NONE
         }
     }}
 };

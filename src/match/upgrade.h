@@ -6,6 +6,8 @@
 const uint32_t UPGRADE_WAR_WAGON = 1;
 const uint32_t UPGRADE_LANDMINES = 2;
 const uint32_t UPGRADE_BAYONETS = 1 << 2;
+const uint32_t UPGRADE_PRIVATE_EYE = 1 << 3;
+const uint32_t UPGRADE_STAKEOUT = 1 << 4;
 
 struct UpgradeData {
     const char* name;
