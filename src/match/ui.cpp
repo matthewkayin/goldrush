@@ -63,11 +63,12 @@ static const Rect UI_BUILDING_QUEUE_PROGRESS_BAR_RECT = (Rect) {
     .y = 284 + 24,
     .w = 104, .h = 6
 };
+static const ivec2 MATCH_UI_GARRISON_ICON_TOP_LEFT = ivec2(350, 284 + 18);
 static const ivec2 MATCH_UI_GARRISON_ICON_POSITIONS[4] = {
-    BUILDING_QUEUE_TOP_LEFT,
-    BUILDING_QUEUE_TOP_LEFT + ivec2(36, 0),
-    BUILDING_QUEUE_TOP_LEFT + ivec2(36 * 2, 0),
-    BUILDING_QUEUE_TOP_LEFT + ivec2(36 * 3, 0)
+    MATCH_UI_GARRISON_ICON_TOP_LEFT,
+    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(36, 0),
+    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(36 * 2, 0),
+    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(36 * 3, 0)
 };
 
 static const int HEALTHBAR_HEIGHT = 4;
@@ -2902,6 +2903,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
         // Entity name
         const SpriteInfo& frame_sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
+        const ivec2 NAME_POSITION = SELECTION_LIST_TOP_LEFT + ivec2(-8, 0);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, entity_data.name);
         int frame_count = (text_size.x / frame_sprite_info.frame_width) + 1;
         if (text_size.x % frame_sprite_info.frame_width != 0) {
@@ -2914,25 +2916,26 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             } else if (frame == frame_count - 1) {
                 hframe = 2;
             }
-            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), SELECTION_LIST_TOP_LEFT + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), NAME_POSITION + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
         }
         ivec2 frame_size = ivec2(frame_count * frame_sprite_info.frame_width, frame_sprite_info.frame_height);
-        render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, SELECTION_LIST_TOP_LEFT + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
+        render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, NAME_POSITION + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
 
         // Entity icon
-        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(entity_data.icon, ivec2(0, 0), SELECTION_LIST_TOP_LEFT+ ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), NAME_POSITION + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(entity_data.icon, ivec2(0, 0), NAME_POSITION + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
 
         if (entity.type == ENTITY_GOLDMINE) {
             if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
-                render_text(FONT_WESTERN8_GOLD, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 33));
+                render_text(FONT_HACK_WHITE, "Collapsed!", NAME_POSITION + ivec2(36, 18 + 2));
             } else {
-                char gold_left_str[17];
-                sprintf(gold_left_str, "Gold Left: %u", entity.gold_held);
-                render_text(FONT_WESTERN8_GOLD, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 33));
+                char gold_left_str[8];
+                sprintf(gold_left_str, "%u", entity.gold_held);
+                render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), NAME_POSITION + ivec2(36, 18 + 2), RENDER_SPRITE_NO_CULL, 0);
+                render_text(FONT_HACK_WHITE, gold_left_str, NAME_POSITION + ivec2(36 + render_get_sprite_info(SPRITE_UI_GOLD_ICON).frame_width + 2, 18 + 4));
             }
         } else {
-            ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(34, 18 + 2);
+            ivec2 healthbar_position = NAME_POSITION + ivec2(34, 18 + 2);
             ivec2 healthbar_size = ivec2(64, 12);
             match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 
@@ -2952,8 +2955,51 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 render_text(FONT_HACK_WHITE, health_text, health_text_position);
             }
 
+            const ivec2 stat_top_left = NAME_POSITION + ivec2(34, 18) + ivec2(healthbar_size.x + 4, 0);
+            char stat_text[8];
+            const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_ATTACK).frame_width;
+            const int STAT_TEXT_PADDING = 2;
+            const ivec2 STAT_OFFSET = ivec2(48, 14);
+
+            // Attack
+            if (entity_is_unit(entity.type)) {
+                ivec2 stat_position = stat_top_left;
+                render_sprite_frame(SPRITE_UI_STAT_ICON_ATTACK, ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
+
+                sprintf(stat_text, "%i", entity_data.unit_data.damage);
+                render_text(FONT_HACK_WHITE, stat_text, stat_position + ivec2(STAT_ICON_SIZE + STAT_TEXT_PADDING, 1));
+            }
+
+            // Defense
+            {
+                ivec2 stat_position = entity_is_unit(entity.type) ? stat_top_left + ivec2(STAT_OFFSET.x, 0) : stat_top_left;
+                render_sprite_frame(SPRITE_UI_STAT_ICON_DEFENSE, ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
+
+                sprintf(stat_text, "%i", entity_data.armor);
+                render_text(FONT_HACK_WHITE, stat_text, stat_position + ivec2(STAT_ICON_SIZE + STAT_TEXT_PADDING, 1));
+            }
+
+            // Accuracy
+            if (entity_is_unit(entity.type)) {
+                ivec2 stat_position = stat_top_left + ivec2(0, STAT_OFFSET.y);
+                render_sprite_frame(SPRITE_UI_STAT_ICON_ACCURACY, ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
+
+                sprintf(stat_text, "100%%");
+                render_text(FONT_HACK_WHITE, stat_text, stat_position + ivec2(STAT_ICON_SIZE + STAT_TEXT_PADDING, 1));
+            }
+
+            // Evasion
+            if (entity_is_unit(entity.type)) {
+                ivec2 stat_position = stat_top_left + STAT_OFFSET;
+                render_sprite_frame(SPRITE_UI_STAT_ICON_EVASION, ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
+
+                sprintf(stat_text, "0%%");
+                render_text(FONT_HACK_WHITE, stat_text, stat_position + ivec2(STAT_ICON_SIZE + STAT_TEXT_PADDING, 1));
+            }
+
             if (match_entity_has_detection(state.match, entity)) {
-                render_text(FONT_WESTERN8_GOLD, "Has Detection", SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 33));
+                ivec2 stat_position = stat_top_left + ivec2(0, STAT_OFFSET.y * 2);
+                render_sprite_frame(SPRITE_UI_STAT_ICON_DETECTION, ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
             }
         }
     } else {
