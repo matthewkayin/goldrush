@@ -1211,7 +1211,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 .id = builder.target.id,
                             };
                             entity.mode = MODE_UNIT_BUILD_ASSIST;
-                            log_trace("build assist pls");
                             entity.timer = UNIT_BUILD_TICK_DURATION;
                             entity.direction = enum_direction_to_rect(entity.cell, builder.target.build.building_cell, entity_get_data(builder.target.build.building_type).cell_size);
                         }
@@ -2190,44 +2189,23 @@ bool match_is_building_supply_blocked(const MatchState& state, const Entity& bui
 }
 
 Target match_entity_target_nearest_gold_mine(const MatchState& state, const Entity& entity) {
-    int entity_size = entity_get_data(entity.type).cell_size;
-    int goldmine_size = entity_get_data(ENTITY_GOLDMINE).cell_size;
-    Rect entity_rect = (Rect) { 
-        .x = entity.cell.x, .y = entity.cell.y, 
-        .w = entity_size, .h = entity_size
-    };
-    uint32_t nearest_index = INDEX_INVALID;
-    ivec2 nearest_cell = ivec2(-1, -1);
-    int nearest_dist = -1;
-
-    for (uint32_t gold_index = 0; gold_index < state.entities.size(); gold_index++) {
-        const Entity& gold = state.entities[gold_index];
-
-        if (gold.type != ENTITY_GOLDMINE || gold.gold_held == 0 || match_get_fog(state, state.players[entity.player_id].team, gold.cell) == FOG_HIDDEN) {
-            continue;
-        }
-
-        Rect gold_mine_rect = (Rect) { 
-            .x = gold.cell.x, .y = gold.cell.y, 
-            .w = goldmine_size, .h = goldmine_size
-        };
-        int gold_mine_dist = Rect::euclidean_distance_squared_between(entity_rect, gold_mine_rect);
-        if (nearest_index == INDEX_INVALID || gold_mine_dist < nearest_dist) {
-            nearest_index = gold_index;
-            nearest_dist = gold_mine_dist;
+    for (int y = entity.cell.y - 16; y < entity.cell.y + 16; y++) {
+        for (int x = entity.cell.x - 16; x < entity.cell.x + 16; x++) {
+            ivec2 cell = ivec2(x, y);
+            if (!map_is_cell_in_bounds(state.map, cell)) {
+                continue;
+            }
+            Cell value = map_get_cell(state.map, CELL_LAYER_GROUND, cell);
+            if (value.type == CELL_GOLDMINE && state.entities.get_by_id(value.id).gold_held != 0) {
+                return (Target) {
+                    .type = TARGET_ENTITY,
+                    .id = value.id
+                };
+            }
         }
     }
 
-    if (nearest_index == INDEX_INVALID) {
-        return (Target) {
-            .type = TARGET_NONE
-        };
-    }
-
-    return (Target) {
-        .type = TARGET_ENTITY,
-        .id = state.entities.get_id_of(nearest_index)
-    };
+    return (Target) { .type = TARGET_NONE };
 }
 
 Target match_entity_target_nearest_hall(const MatchState& state, const Entity& entity) {
