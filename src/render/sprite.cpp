@@ -576,14 +576,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_STAT_ICON_EVASION, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_stat_evasion.png",
-            .hframes = 1,
-            .vframes = 1
-        }
-    }},
     { SPRITE_UI_STAT_ICON_DETECTION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

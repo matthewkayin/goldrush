@@ -168,3 +168,4 @@ void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity
 void match_ui_render_entity_move_animation(const MatchUiState& state, const Entity& entity);
 void match_ui_render_particle(const MatchUiState& state, const Particle& particle);
 bool match_ui_should_render_hotkey_toggled(const MatchUiState& state, InputAction hotkey);
+const char* match_ui_render_get_stat_tooltip(SpriteName sprite);

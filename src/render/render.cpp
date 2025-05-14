@@ -584,7 +584,7 @@ SDL_Surface* render_load_font(FontName name) {
         int bearing_y;
         TTF_GetGlyphMetrics(ttf_font, FONT_FIRST_CHAR + glyph_index, &font.glyphs[glyph_index].bearing_x, NULL, NULL, &bearing_y, &font.glyphs[glyph_index].advance);
         font.glyphs[glyph_index].bearing_y = glyph_max_height - bearing_y;
-        if (params.ignore_bearing) {
+        if (params.strategy == FONT_IMPORT_IGNORE_BEARING) {
             font.glyphs[glyph_index].bearing_x = 0;
             font.glyphs[glyph_index].bearing_y = 0;
         }

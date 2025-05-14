@@ -16,16 +16,23 @@ enum FontName {
     FONT_WESTERN8_RED,
     FONT_M3X6_OFFBLACK,
     FONT_M3X6_DARKBLACK,
+    FONT_M3X6_WHITE,
     FONT_COUNT
 };
 
+enum FontImportStrategy {
+    FONT_IMPORT_DEFAULT,
+    FONT_IMPORT_IGNORE_BEARING,
+    FONT_IMPORT_NUMERIC_ONLY
+};
+
 struct FontParams {
+    FontImportStrategy strategy;
     const char* path;
     int size;
     uint8_t r;
     uint8_t g;
     uint8_t b;
-    bool ignore_bearing;
 };
 
 const FontParams& resource_get_font_params(FontName name);
