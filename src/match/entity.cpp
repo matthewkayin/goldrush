@@ -300,7 +300,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .damage = 15,
             .attack_cooldown = 30,
             .range_squared = 49,
-            .min_range_squared = 4 
+            .min_range_squared = 4
         }
     }},
     { ENTITY_CANNON, (EntityData) {
