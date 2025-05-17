@@ -877,6 +877,7 @@ void render_quit() {
 }
 
 void render_prepare_frame() {
+    log_trace("prep frame");
     glBindFramebuffer(GL_FRAMEBUFFER, state.screen_framebuffer);
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     glEnable(GL_BLEND);

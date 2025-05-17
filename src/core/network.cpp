@@ -240,6 +240,12 @@ bool network_server_create(const char* username) {
     strncpy(state.players[0].name, username, MAX_USERNAME_LENGTH + 1);
     sprintf(state.lobby_name, "%s's Game", username);
 
+    // TODO: remove
+    state.players[1].status = NETWORK_PLAYER_STATUS_BOT;
+    state.players[1].team = 1;
+    state.players[1].recolor_id = 1;
+    sprintf(state.players[1].name, "Bot");
+
     memset(state.match_settings, 0, sizeof(state.match_settings));
 
     log_info("Created server.");
@@ -655,7 +661,7 @@ void network_handle_message(uint8_t* data, size_t length, uint16_t incoming_peer
             }
 
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
+                if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE && state.players[player_id].status != NETWORK_PLAYER_STATUS_BOT) {
                     state.players[player_id].status = NETWORK_PLAYER_STATUS_NOT_READY;
                 }
             }
@@ -790,7 +796,7 @@ void network_set_player_team(uint8_t team) {
 void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
     // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
+        if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE && state.players[player_id].status != NETWORK_PLAYER_STATUS_BOT) {
             state.players[player_id].status = NETWORK_PLAYER_STATUS_NOT_READY;
         }
     }

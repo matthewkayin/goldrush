@@ -146,7 +146,8 @@ MatchUiState match_ui_base_init() {
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     MatchUiState state = match_ui_base_init();
-    state.mode = MATCH_UI_MODE_NOT_STARTED;
+    state.match_started = false;
+    state.mode = MATCH_UI_MODE_NONE;
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
@@ -175,7 +176,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
             continue;
         }
 
-        for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
+        for (uint8_t i = 0; i < TURN_OFFSET; i++) {
             state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
         }
     }
@@ -194,6 +195,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
 MatchUiState match_ui_init_from_replay(const char* replay_path) {
     MatchUiState state = match_ui_base_init();
     state.mode = MATCH_UI_MODE_NONE;
+    state.match_started = true;
     state.replay_mode = true;
     state.replay_paused = false;
     // Because we are not saving any replay data
@@ -813,22 +815,6 @@ void match_ui_handle_input(MatchUiState& state) {
 }
 
 void match_ui_update(MatchUiState& state) {
-    if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
-        if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
-            network_set_player_ready(true);
-        }
-
-        // Check that all players are ready
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NOT_READY) {
-                return;
-            }
-        }
-        // If we reached here, then all players are ready
-        state.mode = MATCH_UI_MODE_NONE;
-        log_info("Match started.");
-    }
-
     // Open menu
     const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
     Rect menu_button_rect = (Rect) {
@@ -937,6 +923,22 @@ void match_ui_update(MatchUiState& state) {
         ui_end_container();
     }
 
+    if (!state.match_started) {
+        if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
+            network_set_player_ready(true);
+        }
+
+        // Check that all players are ready
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NOT_READY) {
+                return;
+            }
+        }
+        // If we reached here, then all players are ready
+        state.match_started = true;
+        log_info("Match started.");
+    }
+
     if (state.mode == MATCH_UI_MODE_LEAVE_MATCH) {
         return;
     }
@@ -944,6 +946,27 @@ void match_ui_update(MatchUiState& state) {
     // Turn loop
     if (!state.replay_mode) {
         if (state.turn_timer == 0) {
+            // Bot inputs
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
+                    continue;
+                }
+                if (!state.inputs[player_id].empty()) {
+                    continue;
+                }
+
+                MatchInput bot_input = match_bot_compute_turn_input(player_id, state.match);
+                std::vector<MatchInput> bot_inputs;
+                bot_inputs.push_back(bot_input);
+                state.inputs[player_id].push(bot_inputs);
+
+                for (int index = 0; index < TURN_OFFSET - 1; index++) {
+                    std::vector<MatchInput> empty_inputs;
+                    empty_inputs.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
+                    state.inputs[player_id].push(empty_inputs);
+                }
+            }
+
             bool all_inputs_received = true;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
@@ -977,6 +1000,7 @@ void match_ui_update(MatchUiState& state) {
 
                 replay_file_write_inputs(state.replay_file, player_id, &state.inputs[player_id].front());
 
+                log_trace("input count %u", state.inputs[player_id].size());
                 for (const MatchInput& input : state.inputs[player_id].front()) {
                     match_handle_input(state.match, input);
                     if (input.type != MATCH_INPUT_NONE) {
@@ -1026,7 +1050,7 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Match update
-    if (!state.replay_mode || !state.replay_paused) {
+    if (!state.replay_paused) {
         match_update(state.match);
     }
 
@@ -1037,7 +1061,7 @@ void match_ui_update(MatchUiState& state) {
                 if (state.sound_cooldown_timers[event.sound.sound] != 0) {
                     break;
                 }
-                if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, event.sound.position / TILE_SIZE, 1)) {
+                if (!match_ui_is_cell_rect_revealed(state, event.sound.position / TILE_SIZE, 1)) {
                     break;
                 }
                 if (SOUND_LISTEN_RECT.has_point(event.sound.position - state.camera_offset)) {
@@ -1780,10 +1804,6 @@ void match_ui_order_move(MatchUiState& state) {
         state.move_animation_entity_id = input.move.target_id;
     }
 
-    // Play ack sound
-    // TODO: only play this if unit voices are on
-    // sound_play(input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_ENTITY ? SOUND_UNIT_HAW : SOUND_UNIT_OK);
-
     // Reset UI mode if targeting
     if (match_ui_is_targeting(state) && !input_is_action_pressed(INPUT_ACTION_SHIFT)) {
         state.mode = MATCH_UI_MODE_NONE;
@@ -1926,7 +1946,9 @@ bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity)
 
         return false;
     } else {
-        return match_is_entity_visible_to_player(state.match, entity, network_get_player_id());
+        // TODO: remove
+        return entity.garrison_id == ID_NULL;
+        // return match_is_entity_visible_to_player(state.match, entity, network_get_player_id());
     }
 }
 
@@ -2375,14 +2397,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
         // Count how many miners are mining from this mine
         EntityId entity_id = state.match.entities.get_id_of(entity_index);
-        uint32_t miner_count = 0;
-        for (const Entity& miner : state.match.entities) {
-            if (miner.type == ENTITY_MINER &&
-                    miner.player_id == network_get_player_id() && 
-                    miner.gold_mine_id == entity_id) {
-                miner_count++;
-            }
-        }
+        uint32_t miner_count = match_get_miners_on_goldmine(state.match, entity_id, network_get_player_id());
         if (miner_count == 0) {
             continue;
         }
@@ -2972,7 +2987,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     if (state.selection.size() == 1) {
         const Entity& building = state.match.entities.get_by_id(state.selection[0]);
         if (entity_is_building(building.type) && 
-                building.player_id == network_get_player_id() &&
+                (state.replay_mode || building.player_id == network_get_player_id()) &&
                 !building.queue.empty()) {
             // Render building queue icon buttons
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
@@ -3018,7 +3033,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     // UI Garrisoned units
     if (state.selection.size() == 1) {
         const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
-        if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
+        if (carrier.type == ENTITY_GOLDMINE || state.replay_mode || carrier.player_id == network_get_player_id()) {
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             int index = 0;
             for (EntityId entity_id : carrier.garrisoned_units) {
@@ -3045,10 +3060,16 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     const SpriteInfo& gold_icon_sprite_info = render_get_sprite_info(SPRITE_UI_GOLD_ICON);
     int resource_base_y = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        // TODO: remove
+        if (!state.match.players[player_id].active) {
+            continue;
+        }
+        /*
         if ((!state.replay_mode && player_id != network_get_player_id()) || 
                 (state.replay_mode && !state.match.players[player_id].active)) {
             continue;
         }
+        */
 
         int render_x = SCREEN_WIDTH;
 

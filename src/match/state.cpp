@@ -34,7 +34,6 @@ static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 8;
 static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
-static const uint32_t MATCH_MAX_POPULATION = 100;
 static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
@@ -85,8 +84,6 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
-            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
 
             // Place scout
             {
@@ -2368,7 +2365,6 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         });
     }
 
-    // TODO: reveal cell on highground, even on misses
     if (entity_get_elevation(attacker, state.map) > entity_get_elevation(defender, state.map) &&
             !entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE)) {
         FogReveal reveal = (FogReveal) {
@@ -2639,6 +2635,19 @@ bool match_entity_has_detection(const MatchState& state, const Entity& entity) {
         return true;
     }
     return entity_get_data(entity.type).has_detection;
+}
+
+uint32_t match_get_miners_on_goldmine(const MatchState& state, EntityId goldmine_id, uint8_t player_id) {
+    uint32_t miner_count = 0;
+    for (const Entity& miner : state.entities) {
+        if (miner.type == ENTITY_MINER &&
+                miner.player_id == player_id && 
+                miner.gold_mine_id == goldmine_id) {
+            miner_count++;
+        }
+    }
+
+    return miner_count;
 }
 
 // EVENTS

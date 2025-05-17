@@ -25,6 +25,7 @@
 
 #define MATCH_MAX_ENTITIES (400 * MAX_PLAYERS)
 #define MATCH_ENTITY_UNLOAD_ALL ID_NULL
+#define MATCH_MAX_POPULATION 100U
 
 #define MOLOTOV_ENERGY_COST 60
 #define CAMO_ENERGY_COST 20
@@ -213,6 +214,7 @@ void match_entity_release_garrisoned_units_on_death(MatchState& state, Entity& e
 void match_entity_explode(MatchState& state, EntityId entity_id);
 uint32_t match_entity_get_max_energy(const MatchState& state, const Entity& entity);
 bool match_entity_has_detection(const MatchState& state, const Entity& entity);
+uint32_t match_get_miners_on_goldmine(const MatchState& state, EntityId goldmine_id, uint8_t player_id);
 
 // Event
 

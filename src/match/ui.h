@@ -8,6 +8,7 @@
 #include "match/input.h"
 #include "render/render.h"
 #include "menu/options.h"
+#include "bot.h"
 #include <string>
 
 #define MATCH_UI_HEIGHT 88
@@ -40,7 +41,6 @@ enum MatchUiSelectionType {
 };
 
 enum MatchUiMode {
-    MATCH_UI_MODE_NOT_STARTED,
     MATCH_UI_MODE_NONE,
     MATCH_UI_MODE_BUILD,
     MATCH_UI_MODE_BUILD2,
@@ -71,6 +71,7 @@ struct ChatMessage {
 };
 
 struct MatchUiState {
+    bool match_started;
     MatchUiMode mode;
     uint32_t turn_timer;
     uint32_t turn_counter;
