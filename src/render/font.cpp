@@ -80,12 +80,6 @@ static const std::unordered_map<FontName, FontParams> FONT_PARAMS = {
         .path = "m3x6.ttf", 
         .size = 16,
         .r = 16, .g = 15, .b = 18,
-    }},
-    { FONT_M3X6_WHITE, (FontParams) { 
-        .strategy = FONT_IMPORT_NUMERIC_ONLY,
-        .path = "m3x6.ttf", 
-        .size = 16,
-        .r = 255, .g = 255, .b = 255,
     }}
 };
 
