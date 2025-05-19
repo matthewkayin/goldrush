@@ -86,7 +86,11 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
             ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
+            match_create_entity(state, ENTITY_COWBOY, exit_cell, player_id);
+            exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+            match_create_entity(state, ENTITY_COWBOY, exit_cell, player_id);
+            exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+            match_create_entity(state, ENTITY_COWBOY, exit_cell, player_id);
 
             // Place scout
             {
@@ -1556,10 +1560,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                 if (!animation_is_playing(entity.animation)) {
                     match_entity_attack_target(state, entity_id, state.entities.get_by_id(entity.target.id));
-                    SoundName attack_sound = entity.type == ENTITY_SOLDIER && entity.mode == MODE_UNIT_ATTACK_WINDUP 
-                                                ? SOUND_SWORD
-                                                : entity_data.unit_data.attack_sound;
-                    match_event_play_sound(state, attack_sound, entity.position.to_ivec2());
                     if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
                         entity_set_flag(entity, ENTITY_FLAG_CHARGED, false);
                         entity.mode = MODE_UNIT_SOLDIER_CHARGE;
@@ -2325,19 +2325,17 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
 
     // Calculate damage
     bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;
-    int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
-    int damage = std::max(1, attacker_damage - defender_data.armor);
 
     // Calculate accuracy
     int accuracy = 100;
     if (defender.type == ENTITY_LANDMINE && defender.mode == MODE_MINE_PRIME) {
         accuracy = 0;
-        damage = 0;
     }
     if (entity_get_elevation(attacker, state.map) < entity_get_elevation(defender, state.map)) {
         accuracy /= 2;
     } 
 
+    // Bunker particle
     if (attacker.garrison_id != ID_NULL) {
         Entity& carrier = state.entities.get_by_id(attacker.garrison_id);
         int particle_index = lcg_rand(&state.lcg_seed) % 4;
@@ -2368,7 +2366,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         });
     }
 
-    // TODO: reveal cell on highground, even on misses
+    // Fog reveal
     if (entity_get_elevation(attacker, state.map) > entity_get_elevation(defender, state.map) &&
             !entity_check_flag(attacker, ENTITY_FLAG_INVISIBLE)) {
         FogReveal reveal = (FogReveal) {
@@ -2383,19 +2381,67 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     }
 
     bool attack_missed = accuracy < lcg_rand(&state.lcg_seed) % 100;
-    if (attack_missed) {
+    attack_missed = true;
+    bool attack_is_melee = attack_with_bayonets || attacker_data.unit_data.range_squared == 1;
+    if (attack_missed && attack_is_melee) {
         return;
     }
 
-    ivec2 defender_center_position = entity_is_unit(defender.type)
-        ? defender.position.to_ivec2()
-        : (defender.cell * TILE_SIZE) + ((ivec2(defender_data.cell_size, defender_data.cell_size) * TILE_SIZE) / 2);
+    // Hit position will be the location of the particle
+    // It will also determine who the attack hits if the attack misses
+    Rect defender_rect = entity_get_rect(defender);
+    ivec2 hit_position;
+    if (attack_missed) {
+        // Chooses a hit position for the particle in a donut
+        int hit_x = lcg_rand(&state.lcg_seed) % (TILE_SIZE * 2);
+        int hit_y = lcg_rand(&state.lcg_seed) % (TILE_SIZE * 2);
+        if (hit_x >= TILE_SIZE) {
+            hit_x += TILE_SIZE;
+        }
+        if (hit_y >= TILE_SIZE) {
+            hit_y += TILE_SIZE;
+        }
+
+        hit_position = ivec2(defender_rect.x - TILE_SIZE + hit_x, defender_rect.y - TILE_SIZE + hit_y);
+    } else {
+        hit_position = ivec2(
+            defender_rect.x + (defender_rect.w / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.w / 2)),
+            defender_rect.y + (defender_rect.h / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.h / 2)));
+    }
+
+    // Play sound
+    if (attack_missed && attacker.type != ENTITY_CANNON) {
+        match_event_play_sound(state, SOUND_RICOCHET, hit_position);
+    } else {
+        SoundName attack_sound = attack_with_bayonets
+                                    ? SOUND_SWORD
+                                    : attacker_data.unit_data.attack_sound;
+        match_event_play_sound(state, attack_sound, hit_position);
+    }
+
+    // Create particle effect
+    if (attacker.type == ENTITY_CANNON) {
+        state.particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
+            .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
+            .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
+            .vframe = 0,
+            .position = hit_position
+        });
+    } else if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_DETECTIVE || attacker.type == ENTITY_JOCKEY) {
+        state.particles[defender_data.cell_layer == CELL_LAYER_SKY ? PARTICLE_LAYER_SKY : PARTICLE_LAYER_GROUND].push_back((Particle) {
+            .sprite = SPRITE_PARTICLE_SPARKS,
+            .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
+            .vframe = lcg_rand(&state.lcg_seed) % 3,
+            .position = hit_position
+        });
+    }
+
     if (attacker.type == ENTITY_CANNON) {
         // Check which enemies we hit
         int attacker_damage = attacker_data.unit_data.damage;
         Rect full_damage_rect = (Rect) {
-            .x = defender_center_position.x - (TILE_SIZE / 2),
-            .y = defender_center_position.y - (TILE_SIZE / 2),
+            .x = hit_position.x - (TILE_SIZE / 2),
+            .y = hit_position.y - (TILE_SIZE / 2),
             .w = TILE_SIZE, .h = TILE_SIZE
         };
         Rect splash_damage_rect = (Rect) {
@@ -2426,30 +2472,31 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
             }
         }
     } else {
-        defender.health = std::max(0, defender.health - damage);
-        match_entity_on_attack(state, attacker_id, defender);
-    }
+        uint32_t target_index;
+        if (!attack_is_melee && attack_missed) {
+            for (target_index = 0; target_index < state.entities.size(); target_index++) {
+                const Entity& target = state.entities[target_index];
+                if (target.type == ENTITY_GOLDMINE || 
+                        state.players[target.player_id].team == state.players[attacker.player_id].team ||
+                        !entity_is_selectable(target)) {
+                    continue;
+                }
 
-    // Create particle effect
-    if (attacker.type == ENTITY_CANNON) {
-        state.particles[PARTICLE_LAYER_GROUND].push_back((Particle) {
-            .sprite = SPRITE_PARTICLE_CANNON_EXPLOSION,
-            .animation = animation_create(ANIMATION_PARTICLE_CANNON_EXPLOSION),
-            .vframe = 0,
-            .position = defender_center_position
-        });
-    } else if (attacker.type == ENTITY_COWBOY || (attacker.type == ENTITY_SOLDIER && !attack_with_bayonets) || attacker.type == ENTITY_DETECTIVE || attacker.type == ENTITY_JOCKEY) {
-        Rect defender_rect = entity_get_rect(defender);
+                Rect target_rect = entity_get_rect(target);
+                if (target_rect.has_point(hit_position)) {
+                    break;
+                }
+            }
+        }
 
-        ivec2 particle_position = ivec2(
-            defender_rect.x + (defender_rect.w / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.w / 2)),
-            defender_rect.y + (defender_rect.h / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.h / 2)));
-        state.particles[defender_data.cell_layer == CELL_LAYER_SKY ? PARTICLE_LAYER_SKY : PARTICLE_LAYER_GROUND].push_back((Particle) {
-            .sprite = SPRITE_PARTICLE_SPARKS,
-            .animation = animation_create(ANIMATION_PARTICLE_SPARKS),
-            .vframe = lcg_rand(&state.lcg_seed) % 3,
-            .position = particle_position
-        });
+        if (attack_is_melee || target_index != state.entities.size()) {
+            Entity& target = !attack_is_melee && attack_missed ? state.entities[target_index] : defender;
+
+            int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
+            int damage = std::max(1, attacker_damage - entity_get_data(target.type).armor);
+            target.health = std::max(0, target.health - damage);
+            match_entity_on_attack(state, attacker_id, target);
+        }
     }
 }
 

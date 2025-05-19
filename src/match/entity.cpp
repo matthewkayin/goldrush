@@ -50,6 +50,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 3,
+            .accuracy = 100,
             .attack_cooldown = 22,
             .range_squared = 1,
             .min_range_squared = 1
@@ -81,6 +82,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_GUN,
             .damage = 8,
+            .accuracy = 80,
             .attack_cooldown = 40,
             .range_squared = 25,
             .min_range_squared = 1
@@ -112,6 +114,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_SWORD,
             .damage = 5,
+            .accuracy = 100,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1
@@ -143,6 +146,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 0,
+            .accuracy = 0,
             .attack_cooldown = 0,
             .range_squared = 1,
             .min_range_squared = 1
@@ -174,6 +178,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 0,
+            .accuracy = 0,
             .attack_cooldown = 0,
             .range_squared = 1,
             .min_range_squared = 1
@@ -205,6 +210,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_GUN,
             .damage = 8,
+            .accuracy = 75,
             .attack_cooldown = 60,
             .range_squared = 25,
             .min_range_squared = 1
@@ -236,6 +242,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 200,
+            .accuracy = 0,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1
@@ -267,6 +274,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_PICKAXE,
             .damage = 0,
+            .accuracy = 0,
             .attack_cooldown = 15,
             .range_squared = 1,
             .min_range_squared = 1
@@ -298,6 +306,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_MUSKET,
             .damage = 15,
+            .accuracy = 90,
             .attack_cooldown = 30,
             .range_squared = 49,
             .min_range_squared = 4
@@ -329,6 +338,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_CANNON,
             .damage = 20,
+            .accuracy = 70,
             .attack_cooldown = 60,
             .range_squared = 49,
             .min_range_squared = 9 
@@ -360,6 +370,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_PISTOL_SILENCED,
             .damage = 10,
+            .accuracy = 80,
             .attack_cooldown = 45,
             .range_squared = 24,
             .min_range_squared = 1
@@ -391,6 +402,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
             .attack_sound = SOUND_PISTOL_SILENCED,
             .damage = 0,
+            .accuracy = 0,
             .attack_cooldown = 45,
             .range_squared = 1,
             .min_range_squared = 1

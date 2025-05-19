@@ -2960,7 +2960,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             int stat_count = 0;
 
             // Attack
-            if (entity_is_unit(entity.type)) {
+            if (entity_is_unit(entity.type) && entity_data.unit_data.damage != 0) {
                 sprintf(stat_texts[stat_count], "%i", entity_data.unit_data.damage);
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_ATTACK;
                 stat_count++;
@@ -2981,6 +2981,12 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_DEFENSE;
                 stat_count++;
             }
+            // Accuracy
+            if (entity_is_unit(entity.type) && entity_data.unit_data.accuracy != 0) {
+                sprintf(stat_texts[stat_count], "%i%%", entity_data.unit_data.accuracy);
+                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_ACCURACY;
+                stat_count++;
+            }
             // Detection
             if (match_entity_has_detection(state.match, entity)) {
                 memset(stat_texts[stat_count], 0, sizeof(stat_texts[stat_count]));
@@ -2988,14 +2994,15 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 stat_count++;
             }
 
-            const ivec2 STAT_TOP_LEFT = NAME_POSITION + ivec2(36, stat_count == 3 ? 16 : 19); 
+            const ivec2 STAT_TOP_LEFT = NAME_POSITION + ivec2(36, 19); 
             const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_ATTACK).frame_width;
             const int STAT_TEXT_PADDING = 2;
-            const int STAT_OFFSET = stat_count == 3 ? 12 : 16;
+            const ivec2 STAT_OFFSET = ivec2(36, 16);
             const ivec2 stat_positions[] = {
                 STAT_TOP_LEFT, 
-                STAT_TOP_LEFT + ivec2(0, STAT_OFFSET),
-                STAT_TOP_LEFT + ivec2(0, STAT_OFFSET * 2),
+                STAT_TOP_LEFT + ivec2(0, STAT_OFFSET.y),
+                STAT_TOP_LEFT + ivec2(STAT_OFFSET.x, 0), 
+                STAT_TOP_LEFT + ivec2(STAT_OFFSET.x, STAT_OFFSET.y),
             };
 
             for (int stat_index = 0; stat_index < stat_count; stat_index++) {

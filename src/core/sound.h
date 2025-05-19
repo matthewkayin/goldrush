@@ -38,6 +38,7 @@ enum SoundName {
     SOUND_CAMO_ON,
     SOUND_CAMO_OFF,
     SOUND_BALLOON_DEATH,
+    SOUND_RICOCHET,
     SOUND_COUNT
 };
 
