@@ -2327,7 +2327,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;
 
     // Calculate accuracy
-    int accuracy = 100;
+    int accuracy = attacker_data.unit_data.accuracy;
     if (defender.type == ENTITY_LANDMINE && defender.mode == MODE_MINE_PRIME) {
         accuracy = 0;
     }
@@ -2381,7 +2381,6 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     }
 
     bool attack_missed = accuracy < lcg_rand(&state.lcg_seed) % 100;
-    attack_missed = true;
     bool attack_is_melee = attack_with_bayonets || attacker_data.unit_data.range_squared == 1;
     if (attack_missed && attack_is_melee) {
         return;
@@ -2412,12 +2411,11 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     // Play sound
     if (attack_missed && attacker.type != ENTITY_CANNON) {
         match_event_play_sound(state, SOUND_RICOCHET, hit_position);
-    } else {
-        SoundName attack_sound = attack_with_bayonets
-                                    ? SOUND_SWORD
-                                    : attacker_data.unit_data.attack_sound;
-        match_event_play_sound(state, attack_sound, hit_position);
-    }
+    } 
+    SoundName attack_sound = attack_with_bayonets
+                                ? SOUND_SWORD
+                                : attacker_data.unit_data.attack_sound;
+    match_event_play_sound(state, attack_sound, hit_position);
 
     // Create particle effect
     if (attacker.type == ENTITY_CANNON) {
