@@ -159,6 +159,7 @@ struct EntityDataUnit {
     SoundName attack_sound;
     int damage;
     int accuracy;
+    int evasion;
     int attack_cooldown;
     int range_squared;
     int min_range_squared;

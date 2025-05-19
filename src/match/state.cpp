@@ -88,9 +88,9 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
             ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
             match_create_entity(state, ENTITY_COWBOY, exit_cell, player_id);
             exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_COWBOY, exit_cell, player_id);
+            match_create_entity(state, ENTITY_BANDIT, exit_cell, player_id);
             exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_COWBOY, exit_cell, player_id);
+            match_create_entity(state, ENTITY_BANDIT, exit_cell, player_id);
 
             // Place scout
             {
@@ -2328,6 +2328,9 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
 
     // Calculate accuracy
     int accuracy = attacker_data.unit_data.accuracy;
+    if (defender.mode == MODE_UNIT_MOVE) {
+        accuracy -= defender_data.unit_data.evasion;
+    }
     if (defender.type == ENTITY_LANDMINE && defender.mode == MODE_MINE_PRIME) {
         accuracy = 0;
     }
