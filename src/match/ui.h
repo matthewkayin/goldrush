@@ -45,6 +45,8 @@ enum MatchUiMode {
     MATCH_UI_MODE_BUILD,
     MATCH_UI_MODE_BUILD2,
     MATCH_UI_MODE_BUILDING_PLACE,
+    MATCH_UI_MODE_UPGRADE_ARMOR,
+    MATCH_UI_MODE_UPGRADE_GUNS,
     MATCH_UI_MODE_TARGET_ATTACK,
     MATCH_UI_MODE_TARGET_UNLOAD,
     MATCH_UI_MODE_TARGET_REPAIR,
@@ -132,6 +134,7 @@ void match_ui_clamp_camera(MatchUiState& state);
 void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell);
 bool match_ui_is_mouse_in_ui();
 bool match_ui_is_targeting(const MatchUiState& state);
+bool match_ui_is_in_submenu(const MatchUiState& state);
 bool match_ui_is_selecting(const MatchUiState& state);
 std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect rect);
 void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selection);

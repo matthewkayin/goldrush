@@ -576,6 +576,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_UI_STAT_ICON_EVASION, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_stat_evasion.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
     { SPRITE_UI_STAT_ICON_DETECTION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
@@ -912,10 +920,34 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_DEFENSE, (SpriteParams) {
+    { SPRITE_BUTTON_ICON_UPGRADE_ARMOR, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
-            .path = "ui_button_icon_defense.png",
+            .path = "ui_button_icon_upgrade_armor.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_UPGRADE_GUNS, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_upgrade_guns.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_LIGHT_ARMOR, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_light_armor.png",
+            .hframes = 3,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_BUTTON_ICON_HEAVY_ARMOR, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_button_icon_heavy_armor.png",
             .hframes = 3,
             .vframes = 1
         }

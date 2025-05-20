@@ -303,9 +303,14 @@ void input_set_hotkey_mapping_to_default(SDL_Keycode* hotkey_mapping) {
     hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDLK_C;
 
     // Smith
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDLK_A;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDLK_W;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDLK_B;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_DEFENSE] = SDLK_V;
+    hotkey_mapping[INPUT_HOTKEY_UPGRADE_ARMOR] = SDLK_A;
+    hotkey_mapping[INPUT_HOTKEY_UPGRADE_GUNS] = SDLK_G;
+
+    // Upgrade Armor
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_LIGHT_ARMOR] = SDLK_V;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR] = SDLK_C;
 
     // Barracks
     hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDLK_S;

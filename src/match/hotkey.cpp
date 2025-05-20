@@ -305,9 +305,36 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .type = HOTKEY_REQUIRES_NONE
         }
     }},
-    { INPUT_HOTKEY_RESEARCH_DEFENSE, (HotkeyButtonInfo) {
+    { INPUT_HOTKEY_UPGRADE_ARMOR, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_ACTION,
+        .action = (HotkeyButtonActionInfo) {
+            .name = "Choose Armor Upgrade",
+            .sprite = SPRITE_BUTTON_ICON_UPGRADE_ARMOR
+        },
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_UPGRADE_GUNS, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_ACTION,
+        .action = (HotkeyButtonActionInfo) {
+            .name = "Choose Gun Upgrade",
+            .sprite = SPRITE_BUTTON_ICON_UPGRADE_GUNS
+        },
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_RESEARCH_LIGHT_ARMOR, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_RESEARCH,
-        .upgrade = UPGRADE_DEFENSE,
+        .upgrade = UPGRADE_LIGHT_ARMOR,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_RESEARCH,
+        .upgrade = UPGRADE_HEAVY_ARMOR,
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }

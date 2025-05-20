@@ -38,10 +38,17 @@ static const std::unordered_map<uint32_t, UpgradeData> UPGRADE_DATA = {
         .gold_cost = 250,
         .research_duration = 60
     }},
-    { UPGRADE_DEFENSE, (UpgradeData) {
-        .name = "Leather Vests",
+    { UPGRADE_LIGHT_ARMOR, (UpgradeData) {
+        .name = "Light Vests",
+        .desc = "Grants units +10% evasion",
+        .icon = SPRITE_BUTTON_ICON_LIGHT_ARMOR,
+        .gold_cost = 250,
+        .research_duration = 60
+    }},
+    { UPGRADE_HEAVY_ARMOR, (UpgradeData) {
+        .name = "Overcoats",
         .desc = "Grants units +1 defense",
-        .icon = SPRITE_BUTTON_ICON_DEFENSE,
+        .icon = SPRITE_BUTTON_ICON_HEAVY_ARMOR,
         .gold_cost = 250,
         .research_duration = 60
     }}

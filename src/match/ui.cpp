@@ -343,8 +343,16 @@ void match_ui_handle_input(MatchUiState& state) {
                             state.mode = MATCH_UI_MODE_BUILD2;
                             break;
                         }
+                        case INPUT_HOTKEY_UPGRADE_ARMOR: {
+                            state.mode = MATCH_UI_MODE_UPGRADE_ARMOR;
+                            break;
+                        }
+                        case INPUT_HOTKEY_UPGRADE_GUNS: {
+                            state.mode = MATCH_UI_MODE_UPGRADE_GUNS;
+                            break;
+                        }
                         case INPUT_HOTKEY_CANCEL: {
-                            if (state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || match_ui_is_targeting(state)) {
+                            if (match_ui_is_in_submenu(state) || match_ui_is_targeting(state)) {
                                 state.mode = MATCH_UI_MODE_NONE;
                             } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE) {
                                 state.mode = MATCH_UI_MODE_NONE;
@@ -444,12 +452,15 @@ void match_ui_handle_input(MatchUiState& state) {
                                                     .type = BUILDING_QUEUE_ITEM_UPGRADE,
                                                     .upgrade = hotkey_info.upgrade
                                                 };
-
+                    
                     if (building.queue.size() == BUILDING_QUEUE_MAX) {
                         match_ui_show_status(state, MATCH_UI_STATUS_BUILDING_QUEUE_FULL);
                     } else if (state.match.players[network_get_player_id()].gold < building_queue_item_cost(item)) {
                         match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
                     } else {
+                        if (match_ui_is_in_submenu(state)) {
+                            state.mode = MATCH_UI_MODE_NONE;
+                        }
                         state.input_queue.push_back((MatchInput) {
                             .type = MATCH_INPUT_BUILDING_ENQUEUE,
                             .building_enqueue = (MatchInputBuildingEnqueue) {
@@ -664,7 +675,7 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Begin selecting
     if (!match_ui_is_mouse_in_ui() && 
-            (state.mode == MATCH_UI_MODE_NONE || state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2) &&
+            (state.mode == MATCH_UI_MODE_NONE || match_ui_is_in_submenu(state)) &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         state.select_origin = input_get_mouse_position() + state.camera_offset;
         return;
@@ -1284,7 +1295,11 @@ void match_ui_update(MatchUiState& state) {
 
     // Update cursor
     cursor_set(match_ui_is_targeting(state) && (!match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position())) ? CURSOR_TARGET : CURSOR_DEFAULT);
-    if ((match_ui_is_targeting(state) || state.mode == MATCH_UI_MODE_BUILDING_PLACE || state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2) && state.selection.empty()) {
+    if ((match_ui_is_targeting(state) || state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_in_submenu(state)) && state.selection.empty()) {
+        state.mode = MATCH_UI_MODE_NONE;
+    }
+
+    if (state.mode == MATCH_UI_MODE_UPGRADE_ARMOR && !match_player_upgrade_is_available(state.match, network_get_player_id(), UPGRADE_LIGHT_ARMOR | UPGRADE_HEAVY_ARMOR)) {
         state.mode = MATCH_UI_MODE_NONE;
     }
 
@@ -1305,6 +1320,12 @@ void match_ui_update(MatchUiState& state) {
             state.hotkey_group[1] = INPUT_HOTKEY_COOP;
             state.hotkey_group[2] = INPUT_HOTKEY_BARRACKS;
             state.hotkey_group[3] = INPUT_HOTKEY_SHERIFFS;
+            state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+        } else if (state.mode == MATCH_UI_MODE_UPGRADE_ARMOR) {
+            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_LIGHT_ARMOR;
+            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR;
+            state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+        } else if (state.mode == MATCH_UI_MODE_UPGRADE_GUNS) {
             state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
         } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_targeting(state)) {
             state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
@@ -1377,9 +1398,12 @@ void match_ui_update(MatchUiState& state) {
                             break;
                         }
                         case ENTITY_SMITH: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_DEFENSE;
-                            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_BAYONETS;
-                            state.hotkey_group[2] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
+                            if (match_player_upgrade_is_available(state.match, network_get_player_id(), UPGRADE_LIGHT_ARMOR | UPGRADE_HEAVY_ARMOR)) {
+                                state.hotkey_group[0] = INPUT_HOTKEY_UPGRADE_ARMOR;
+                            }
+                            state.hotkey_group[1] = INPUT_HOTKEY_UPGRADE_GUNS;
+                            state.hotkey_group[2] = INPUT_HOTKEY_RESEARCH_BAYONETS;
+                            state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
                             break;
                         }
                         case ENTITY_COOP: {
@@ -1501,6 +1525,10 @@ bool match_ui_is_mouse_in_ui() {
 
 bool match_ui_is_targeting(const MatchUiState& state) {
     return state.mode >= MATCH_UI_MODE_TARGET_ATTACK && state.mode < MATCH_UI_MODE_CHAT;
+}
+
+bool match_ui_is_in_submenu(const MatchUiState& state) {
+    return state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2 || state.mode == MATCH_UI_MODE_UPGRADE_ARMOR || state.mode == MATCH_UI_MODE_UPGRADE_GUNS;
 }
 
 bool match_ui_is_selecting(const MatchUiState& state) {
@@ -2955,29 +2983,23 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 render_text(FONT_HACK_WHITE, health_text, health_text_position);
             }
 
-            char stat_texts[8][4];
-            SpriteName stat_icons[4];
+            char stat_texts[8][5];
+            SpriteName stat_icons[5];
+            bool stat_is_upgraded[5];
             int stat_count = 0;
 
             // Attack
             if (entity_is_unit(entity.type) && entity_data.unit_data.damage != 0) {
                 sprintf(stat_texts[stat_count], "%i", entity_data.unit_data.damage);
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_ATTACK;
+                stat_is_upgraded[stat_count] = false;
                 stat_count++;
             }
             // Defense
             if (entity.mode != MODE_BUILDING_IN_PROGRESS) {
-                int armor = entity_data.armor;
-                int armor_bonus = match_entity_get_armor(state.match, entity) - entity_data.armor;
-                if (entity.type == ENTITY_WAR_WAGON) {
-                    armor = entity_get_data(ENTITY_WAGON).armor;
-                    armor_bonus = entity_data.armor - armor;
-                }
-                if (armor_bonus == 0) {
-                    sprintf(stat_texts[stat_count], "%i", armor);
-                } else {
-                    sprintf(stat_texts[stat_count], "%i+%i", armor, armor_bonus);
-                }
+                int armor = match_entity_get_armor(state.match, entity);
+                stat_is_upgraded[stat_count] = entity.type == ENTITY_WAR_WAGON || armor != entity_data.armor;
+                sprintf(stat_texts[stat_count], "%i", armor);
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_DEFENSE;
                 stat_count++;
             }
@@ -2985,23 +3007,33 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             if (entity_is_unit(entity.type) && entity_data.unit_data.accuracy != 0) {
                 sprintf(stat_texts[stat_count], "%i%%", entity_data.unit_data.accuracy);
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_ACCURACY;
+                stat_is_upgraded[stat_count] = false;
+                stat_count++;
+            }
+            // Evasion
+            if (entity_is_unit(entity.type)) {
+                int evasion = match_entity_get_evasion(state.match, entity);
+                sprintf(stat_texts[stat_count], "%i%%", evasion);
+                stat_is_upgraded[stat_count] = evasion != entity_data.unit_data.evasion;
+                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_EVASION;
                 stat_count++;
             }
             // Detection
             if (match_entity_has_detection(state.match, entity)) {
                 memset(stat_texts[stat_count], 0, sizeof(stat_texts[stat_count]));
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_DETECTION;
+                stat_is_upgraded[stat_count] = false;
                 stat_count++;
             }
 
             ivec2 stat_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 34); 
-            ivec2 stat_positions[4];
+            ivec2 stat_positions[5];
             const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_ATTACK).frame_width;
             const int STAT_TEXT_PADDING = 2;
 
             for (int stat_index = 0; stat_index < stat_count; stat_index++) {
                 render_sprite_frame(stat_icons[stat_index], ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
-                render_text(FONT_HACK_WHITE, stat_texts[stat_index], stat_position + ivec2(STAT_ICON_SIZE + STAT_TEXT_PADDING, 0));
+                render_text(stat_is_upgraded[stat_index] ? FONT_HACK_GOLD : FONT_HACK_WHITE, stat_texts[stat_index], stat_position + ivec2(STAT_ICON_SIZE + STAT_TEXT_PADDING, 0));
                 stat_positions[stat_index] = stat_position;
                 stat_position.x += STAT_ICON_SIZE + STAT_TEXT_PADDING + render_get_text_size(FONT_HACK_WHITE, stat_texts[stat_index]).x + 8;
             }
@@ -3700,6 +3732,8 @@ const char* match_ui_render_get_stat_tooltip(SpriteName sprite) {
             return "Defense";
         case SPRITE_UI_STAT_ICON_ACCURACY:
             return "Accuracy";
+        case SPRITE_UI_STAT_ICON_EVASION:
+            return "Evasion";
         case SPRITE_UI_STAT_ICON_DETECTION:
             return "Detection";
         default:

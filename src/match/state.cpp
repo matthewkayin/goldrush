@@ -470,8 +470,12 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
 
             // Reject this enqueue if the upgrade is already being researched
-            if (item.type == BUILDING_QUEUE_ITEM_UPGRADE && !match_player_upgrade_is_available(state, building.player_id, item.upgrade)) {
-                return;
+            if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
+                if ((item.upgrade == UPGRADE_LIGHT_ARMOR || item.upgrade == UPGRADE_HEAVY_ARMOR) && !match_player_upgrade_is_available(state, building.player_id, UPGRADE_LIGHT_ARMOR | UPGRADE_HEAVY_ARMOR)) {
+                    return;
+                } else if (item.type == BUILDING_QUEUE_ITEM_UPGRADE && !match_player_upgrade_is_available(state, building.player_id, item.upgrade)) {
+                    return;
+                }
             }
 
             // Check if the player has the war wagon upgrade
@@ -2330,7 +2334,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     // Calculate accuracy
     int accuracy = attacker_data.unit_data.accuracy;
     if (defender.mode == MODE_UNIT_MOVE) {
-        accuracy -= defender_data.unit_data.evasion;
+        accuracy -= match_entity_get_evasion(state, defender); 
     }
     if (defender.type == ENTITY_LANDMINE && defender.mode == MODE_MINE_PRIME) {
         accuracy = 0;
@@ -2671,10 +2675,22 @@ bool match_entity_has_detection(const MatchState& state, const Entity& entity) {
 
 int match_entity_get_armor(const MatchState& state, const Entity& entity) {
     int armor = entity_get_data(entity.type).armor;
-    if (entity_is_unit(entity.type) && match_player_has_upgrade(state, entity.player_id, UPGRADE_DEFENSE)) {
+    if (entity_is_unit(entity.type) && match_player_has_upgrade(state, entity.player_id, UPGRADE_HEAVY_ARMOR)) {
         armor += 1;
     }
     return armor;
+}
+
+int match_entity_get_evasion(const MatchState& state, const Entity& entity) {
+    if (!entity_is_unit(entity.type)) {
+        return 0;
+    }
+
+    int evasion = entity_get_data(entity.type).unit_data.evasion;
+    if (match_player_has_upgrade(state, entity.player_id, UPGRADE_LIGHT_ARMOR)) {
+        evasion += 10;
+    }
+    return evasion;
 }
 
 // EVENTS
