@@ -213,6 +213,7 @@ void match_entity_release_garrisoned_units_on_death(MatchState& state, Entity& e
 void match_entity_explode(MatchState& state, EntityId entity_id);
 uint32_t match_entity_get_max_energy(const MatchState& state, const Entity& entity);
 bool match_entity_has_detection(const MatchState& state, const Entity& entity);
+int match_entity_get_armor(const MatchState& state, const Entity& entity);
 
 // Event
 

@@ -7,7 +7,7 @@
 #include "upgrade.h"
 #include <algorithm>
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
@@ -90,7 +90,8 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
             exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
             match_create_entity(state, ENTITY_BANDIT, exit_cell, player_id);
             exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_BANDIT, exit_cell, player_id);
+            match_create_entity(state, ENTITY_DETECTIVE, exit_cell, player_id);
+            match_grant_player_upgrade(state, player_id, UPGRADE_PRIVATE_EYE);
 
             // Place scout
             {
@@ -2472,32 +2473,11 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
                 match_entity_on_attack(state, attacker_id, entity);
             }
         }
-    } else {
-        uint32_t target_index;
-        if (!attack_is_melee && attack_missed) {
-            for (target_index = 0; target_index < state.entities.size(); target_index++) {
-                const Entity& target = state.entities[target_index];
-                if (target.type == ENTITY_GOLDMINE || 
-                        state.players[target.player_id].team == state.players[attacker.player_id].team ||
-                        !entity_is_selectable(target)) {
-                    continue;
-                }
-
-                Rect target_rect = entity_get_rect(target);
-                if (target_rect.has_point(hit_position)) {
-                    break;
-                }
-            }
-        }
-
-        if (attack_is_melee || target_index != state.entities.size()) {
-            Entity& target = !attack_is_melee && attack_missed ? state.entities[target_index] : defender;
-
-            int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
-            int damage = std::max(1, attacker_damage - entity_get_data(target.type).armor);
-            target.health = std::max(0, target.health - damage);
-            match_entity_on_attack(state, attacker_id, target);
-        }
+    } else if (!attack_missed) {
+        int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
+        int damage = std::max(1, attacker_damage - match_entity_get_armor(state, defender));
+        defender.health = std::max(0, defender.health - damage);
+        match_entity_on_attack(state, attacker_id, defender);
     }
 }
 
@@ -2687,6 +2667,14 @@ bool match_entity_has_detection(const MatchState& state, const Entity& entity) {
         return true;
     }
     return entity_get_data(entity.type).has_detection;
+}
+
+int match_entity_get_armor(const MatchState& state, const Entity& entity) {
+    int armor = entity_get_data(entity.type).armor;
+    if (entity_is_unit(entity.type) && match_player_has_upgrade(state, entity.player_id, UPGRADE_DEFENSE)) {
+        armor += 1;
+    }
+    return armor;
 }
 
 // EVENTS

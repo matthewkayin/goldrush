@@ -301,12 +301,15 @@ void input_set_hotkey_mapping_to_default(SDL_Keycode* hotkey_mapping) {
     hotkey_mapping[INPUT_HOTKEY_WAGON] = SDLK_W;
     hotkey_mapping[INPUT_HOTKEY_WAR_WAGON] = SDLK_W;
     hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDLK_C;
+
+    // Smith
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDLK_A;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDLK_B;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_DEFENSE] = SDLK_V;
 
     // Barracks
     hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDLK_S;
     hotkey_mapping[INPUT_HOTKEY_CANNON] = SDLK_C;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDLK_B;
 
     // Sheriff's Office
     hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDLK_D;
