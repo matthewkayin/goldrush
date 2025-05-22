@@ -1302,6 +1302,9 @@ void match_ui_update(MatchUiState& state) {
     if (state.mode == MATCH_UI_MODE_UPGRADE_ARMOR && !match_player_upgrade_is_available(state.match, network_get_player_id(), UPGRADE_LIGHT_ARMOR | UPGRADE_HEAVY_ARMOR)) {
         state.mode = MATCH_UI_MODE_NONE;
     }
+    if (state.mode == MATCH_UI_MODE_UPGRADE_GUNS && !match_player_upgrade_is_available(state.match, network_get_player_id(), UPGRADE_BLACK_POWDER | UPGRADE_IRON_SIGHTS)) {
+        state.mode = MATCH_UI_MODE_NONE;
+    }
 
     // Update UI buttons
     if (!state.replay_mode) {
@@ -1326,6 +1329,8 @@ void match_ui_update(MatchUiState& state) {
             state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR;
             state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
         } else if (state.mode == MATCH_UI_MODE_UPGRADE_GUNS) {
+            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_BLACK_POWDER;
+            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_IRON_SIGHTS;
             state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
         } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_targeting(state)) {
             state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
@@ -1401,7 +1406,9 @@ void match_ui_update(MatchUiState& state) {
                             if (match_player_upgrade_is_available(state.match, network_get_player_id(), UPGRADE_LIGHT_ARMOR | UPGRADE_HEAVY_ARMOR)) {
                                 state.hotkey_group[0] = INPUT_HOTKEY_UPGRADE_ARMOR;
                             }
-                            state.hotkey_group[1] = INPUT_HOTKEY_UPGRADE_GUNS;
+                            if (match_player_upgrade_is_available(state.match, network_get_player_id(), UPGRADE_BLACK_POWDER | UPGRADE_IRON_SIGHTS)) {
+                                state.hotkey_group[1] = INPUT_HOTKEY_UPGRADE_GUNS;
+                            }
                             state.hotkey_group[2] = INPUT_HOTKEY_RESEARCH_BAYONETS;
                             state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
                             break;
@@ -2990,9 +2997,10 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
             // Attack
             if (entity_is_unit(entity.type) && entity_data.unit_data.damage != 0) {
-                sprintf(stat_texts[stat_count], "%i", entity_data.unit_data.damage);
+                int attack = match_entity_get_damage(state.match, entity);
+                sprintf(stat_texts[stat_count], "%i", attack);
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_ATTACK;
-                stat_is_upgraded[stat_count] = false;
+                stat_is_upgraded[stat_count] = attack != entity_data.unit_data.damage;
                 stat_count++;
             }
             // Defense
@@ -3005,9 +3013,10 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             }
             // Accuracy
             if (entity_is_unit(entity.type) && entity_data.unit_data.accuracy != 0) {
-                sprintf(stat_texts[stat_count], "%i%%", entity_data.unit_data.accuracy);
+                int accuracy = match_entity_get_accuracy(state.match, entity);
+                sprintf(stat_texts[stat_count], "%i%%", accuracy);
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_ACCURACY;
-                stat_is_upgraded[stat_count] = false;
+                stat_is_upgraded[stat_count] = accuracy != entity_data.unit_data.accuracy;
                 stat_count++;
             }
             // Evasion

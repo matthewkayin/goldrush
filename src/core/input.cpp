@@ -312,6 +312,10 @@ void input_set_hotkey_mapping_to_default(SDL_Keycode* hotkey_mapping) {
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_LIGHT_ARMOR] = SDLK_V;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR] = SDLK_C;
 
+    // Upgrade Guns
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BLACK_POWDER] = SDLK_B;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_IRON_SIGHTS] = SDLK_S;
+
     // Barracks
     hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDLK_S;
     hotkey_mapping[INPUT_HOTKEY_CANNON] = SDLK_C;

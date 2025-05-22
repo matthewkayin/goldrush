@@ -471,9 +471,14 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 
             // Reject this enqueue if the upgrade is already being researched
             if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
-                if ((item.upgrade == UPGRADE_LIGHT_ARMOR || item.upgrade == UPGRADE_HEAVY_ARMOR) && !match_player_upgrade_is_available(state, building.player_id, UPGRADE_LIGHT_ARMOR | UPGRADE_HEAVY_ARMOR)) {
+                if ((item.upgrade == UPGRADE_LIGHT_ARMOR || item.upgrade == UPGRADE_HEAVY_ARMOR) && 
+                        !match_player_upgrade_is_available(state, building.player_id, UPGRADE_LIGHT_ARMOR | UPGRADE_HEAVY_ARMOR)) {
                     return;
-                } else if (item.type == BUILDING_QUEUE_ITEM_UPGRADE && !match_player_upgrade_is_available(state, building.player_id, item.upgrade)) {
+                } else if ((item.upgrade == UPGRADE_BLACK_POWDER || item.upgrade == UPGRADE_IRON_SIGHTS) && 
+                        !match_player_upgrade_is_available(state, building.player_id, UPGRADE_BLACK_POWDER | UPGRADE_IRON_SIGHTS)) {
+                    return;
+                } else if (item.type == BUILDING_QUEUE_ITEM_UPGRADE && 
+                        !match_player_upgrade_is_available(state, building.player_id, item.upgrade)) {
                     return;
                 }
             }
@@ -2332,7 +2337,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;
 
     // Calculate accuracy
-    int accuracy = attacker_data.unit_data.accuracy;
+    int accuracy = match_entity_get_accuracy(state, attacker);
     if (defender.mode == MODE_UNIT_MOVE) {
         accuracy -= match_entity_get_evasion(state, defender); 
     }
@@ -2444,7 +2449,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
 
     if (attacker.type == ENTITY_CANNON) {
         // Check which enemies we hit
-        int attacker_damage = attacker_data.unit_data.damage;
+        int attacker_damage = match_entity_get_damage(state, attacker);
         Rect full_damage_rect = (Rect) {
             .x = hit_position.x - (TILE_SIZE / 2),
             .y = hit_position.y - (TILE_SIZE / 2),
@@ -2478,7 +2483,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
             }
         }
     } else if (!attack_missed) {
-        int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
+        int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : match_entity_get_damage(state, attacker);
         int damage = std::max(1, attacker_damage - match_entity_get_armor(state, defender));
         defender.health = std::max(0, defender.health - damage);
         match_entity_on_attack(state, attacker_id, defender);
@@ -2673,12 +2678,40 @@ bool match_entity_has_detection(const MatchState& state, const Entity& entity) {
     return entity_get_data(entity.type).has_detection;
 }
 
+int match_entity_get_damage(const MatchState& state, const Entity& entity) {
+    if (!entity_is_unit(entity.type)) {
+        return 0;
+    }
+
+    const EntityData& entity_data = entity_get_data(entity.type);
+    int damage = entity_data.unit_data.damage;
+    if (entity.type != ENTITY_CANNON && entity_data.unit_data.range_squared != 1 && damage != 0 && match_player_has_upgrade(state, entity.player_id, UPGRADE_BLACK_POWDER)) {
+        damage += 1;
+    }
+
+    return damage;
+}
+
 int match_entity_get_armor(const MatchState& state, const Entity& entity) {
     int armor = entity_get_data(entity.type).armor;
     if (entity_is_unit(entity.type) && match_player_has_upgrade(state, entity.player_id, UPGRADE_HEAVY_ARMOR)) {
         armor += 1;
     }
     return armor;
+}
+
+int match_entity_get_accuracy(const MatchState& state, const Entity& entity) {
+    if (!entity_is_unit(entity.type)) {
+        return 0;
+    }
+
+    const EntityData& entity_data = entity_get_data(entity.type);
+    int accuracy = entity_data.unit_data.accuracy;
+    if (entity.type != ENTITY_CANNON && entity_data.unit_data.range_squared != 1 && accuracy != 0 && match_player_has_upgrade(state, entity.player_id, UPGRADE_IRON_SIGHTS)) {
+        accuracy += 10;
+    }
+
+    return accuracy;
 }
 
 int match_entity_get_evasion(const MatchState& state, const Entity& entity) {
