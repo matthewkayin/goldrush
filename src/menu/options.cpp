@@ -6,7 +6,7 @@
 #include "ui.h"
 #include <unordered_map>
 
-static const int OPTIONS_MENU_WIDTH = 350;
+static const int OPTIONS_MENU_WIDTH = 364;
 static const int OPTIONS_MENU_HEIGHT = 300;
 static const Rect OPTIONS_FRAME_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (OPTIONS_MENU_WIDTH / 2),
@@ -39,6 +39,8 @@ enum HotkeyGroupName {
     HOTKEY_GROUP_BARRACKS,
     HOTKEY_GROUP_COOP,
     HOTKEY_GROUP_SHERIFFS,
+    HOTKEY_GROUP_ARMOR_UPGRADES,
+    HOTKEY_GROUP_GUN_UPGRADES,
     HOTKEY_GROUP_COUNT
 };
 
@@ -152,6 +154,22 @@ static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
             INPUT_HOTKEY_DETECTIVE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE,
             INPUT_HOTKEY_RESEARCH_PRIVATE_EYE, INPUT_HOTKEY_RESEARCH_STAKEOUT, INPUT_HOTKEY_NONE
         }
+    }},
+    { HOTKEY_GROUP_ARMOR_UPGRADES, (HotkeyGroup) {
+        .name = "Armor Upgrades",
+        .icon = SPRITE_BUTTON_ICON_UPGRADE_ARMOR,
+        .hotkeys = { 
+            INPUT_HOTKEY_RESEARCH_LIGHT_ARMOR, INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR, INPUT_HOTKEY_NONE,
+            INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
+        }
+    }},
+    { HOTKEY_GROUP_GUN_UPGRADES, (HotkeyGroup) {
+        .name = "Gun Upgrades",
+        .icon = SPRITE_BUTTON_ICON_UPGRADE_GUNS,
+        .hotkeys = { 
+            INPUT_HOTKEY_RESEARCH_BLACK_POWDER, INPUT_HOTKEY_RESEARCH_IRON_SIGHTS, INPUT_HOTKEY_NONE,
+            INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
+        }
     }}
 };
 
@@ -226,7 +244,7 @@ void options_menu_update(OptionsMenuState& state) {
             ui_end_container();
         ui_end_container();
     } else if (state.mode == OPTIONS_MENU_HOTKEYS) {
-        ui_begin_row(ivec2(OPTIONS_FRAME_RECT.x + 16, OPTIONS_FRAME_RECT.y + 16), 8);
+        ui_begin_row(ivec2(OPTIONS_FRAME_RECT.x + 16, OPTIONS_FRAME_RECT.y + 16), -4);
             ui_begin_column(ivec2(0, 0), 4);
                 ui_text(FONT_HACK_GOLD, "Hotkey Groups:");
                 int hotkey_group = 0;
