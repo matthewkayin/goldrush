@@ -2996,11 +2996,21 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             int stat_count = 0;
 
             // Attack
-            if (entity_is_unit(entity.type) && entity_data.unit_data.damage != 0) {
+            if (entity_is_unit(entity.type) && entity_data.unit_data.damage != 0 && entity_data.unit_data.range_squared != 1) {
                 int attack = match_entity_get_damage(state.match, entity);
                 sprintf(stat_texts[stat_count], "%i", attack);
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_ATTACK;
                 stat_is_upgraded[stat_count] = attack != entity_data.unit_data.damage;
+                stat_count++;
+            }
+            // Melee Attack
+            if (entity_is_unit(entity.type) && entity_data.unit_data.damage != 0 && 
+                    (entity_data.unit_data.range_squared == 1 || 
+                    (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state.match, entity.player_id, UPGRADE_BAYONETS)))) {
+                int attack = entity.type == ENTITY_SOLDIER ? SOLDIER_BAYONET_DAMAGE : match_entity_get_damage(state.match, entity);
+                sprintf(stat_texts[stat_count], "%i", attack);
+                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_MELEE_ATTACK;
+                stat_is_upgraded[stat_count] = false;
                 stat_count++;
             }
             // Defense

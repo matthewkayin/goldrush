@@ -7,7 +7,7 @@
 #include "upgrade.h"
 #include <algorithm>
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
@@ -21,7 +21,6 @@ static const int UNIT_BLOCKED_DURATION = 30;
 static const int MOLOTOV_RANGE_SQUARED = 49;
 static const uint32_t BUILDING_FADE_DURATION = 300;
 static const uint32_t ENTITY_BUNKER_FIRE_OFFSET = 10;
-static const int SOLDIER_BAYONET_DAMAGE = 5;
 static const ivec2 BUNKER_PARTICLE_OFFSETS[4] = { ivec2(3, 23), ivec2(11, 26), ivec2(20, 25), ivec2(28, 23) };
 static const ivec2 WAR_WAGON_DOWN_PARTICLE_OFFSETS[4] = { ivec2(14, 6), ivec2(17, 8), ivec2(21, 6), ivec2(24, 8) };
 static const ivec2 WAR_WAGON_UP_PARTICLE_OFFSETS[4] = { ivec2(16, 20), ivec2(18, 22), ivec2(21, 20), ivec2(23, 22) };
@@ -85,13 +84,6 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
-            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_COWBOY, exit_cell, player_id);
-            exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_BANDIT, exit_cell, player_id);
-            exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_DETECTIVE, exit_cell, player_id);
-            match_grant_player_upgrade(state, player_id, UPGRADE_PRIVATE_EYE);
 
             // Place scout
             {
@@ -2337,7 +2329,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;
 
     // Calculate accuracy
-    int accuracy = match_entity_get_accuracy(state, attacker);
+    int accuracy = attack_with_bayonets ? 100 : match_entity_get_accuracy(state, attacker);
     if (defender.mode == MODE_UNIT_MOVE) {
         accuracy -= match_entity_get_evasion(state, defender); 
     }

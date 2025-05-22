@@ -560,6 +560,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_UI_STAT_ICON_MELEE_ATTACK, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_stat_melee_attack.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
     { SPRITE_UI_STAT_ICON_DEFENSE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {

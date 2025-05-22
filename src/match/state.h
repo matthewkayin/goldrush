@@ -33,6 +33,8 @@
 const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;
 
+const int SOLDIER_BAYONET_DAMAGE = 5;
+
 struct MatchPlayer {
     bool active;
     char name[MAX_USERNAME_LENGTH + 1];
