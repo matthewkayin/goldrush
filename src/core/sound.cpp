@@ -5,6 +5,8 @@
 #include <SDL3/SDL.h>
 #include <vector>
 #include <unordered_map>
+#include <cstdlib>
+#include <cstdio>
 
 #define SFX_STREAM_COUNT 4
 

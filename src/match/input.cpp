@@ -2,6 +2,7 @@
 
 #include "core/logger.h"
 #include <cstring>
+#include <cstdio>
 
 void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const MatchInput& input) {
     out_buffer[out_buffer_length] = input.type;

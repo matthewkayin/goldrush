@@ -6,6 +6,7 @@
 #include <enet/enet.h>
 #include <queue>
 #include <vector>
+#include <cstring>
 
 struct NetworkState {
     NetworkStatus status;
