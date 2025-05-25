@@ -33,7 +33,6 @@ static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 8;
 static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
-static const uint32_t MATCH_MAX_POPULATION = 100;
 static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {

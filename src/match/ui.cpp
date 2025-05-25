@@ -3126,8 +3126,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     if (state.selection.size() == 1) {
         const Entity& building = state.match.entities.get_by_id(state.selection[0]);
         if (entity_is_building(building.type) && 
-                building.player_id == network_get_player_id() &&
-                !building.queue.empty()) {
+                !building.queue.empty() &&
+                (state.replay_mode || building.player_id == network_get_player_id())) {
             // Render building queue icon buttons
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
