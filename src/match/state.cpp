@@ -185,6 +185,16 @@ bool match_does_player_meet_hotkey_requirements(const MatchState& state, uint8_t
     }
 }
 
+uint32_t match_get_miners_on_gold(const MatchState& state, EntityId goldmine_id, uint8_t player_id) {
+    uint32_t miner_count = 0;
+    for (const Entity& miner : state.entities) {
+        if (miner.type == ENTITY_MINER && miner.player_id == player_id && miner.gold_mine_id == goldmine_id) {
+            miner_count++;
+        }
+    }
+    return miner_count;
+}
+
 void match_handle_input(MatchState& state, const MatchInput& input) {
     switch (input.type) {
         case MATCH_INPUT_NONE:

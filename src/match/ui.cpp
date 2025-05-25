@@ -13,6 +13,7 @@
 #include "hotkey.h"
 #include "upgrade.h"
 #include "replay.h"
+#include "bot.h"
 #include <algorithm>
 
 static const uint32_t TURN_OFFSET = 2;
@@ -175,7 +176,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
             continue;
         }
 
-        for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
+        for (uint8_t i = 0; i < TURN_OFFSET; i++) {
             state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
         }
     }
@@ -955,6 +956,21 @@ void match_ui_update(MatchUiState& state) {
     // Turn loop
     if (!state.replay_mode) {
         if (state.turn_timer == 0) {
+            // Bot input
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
+                    continue;
+                }
+
+                if (state.inputs[player_id].empty()) {
+                    state.inputs[player_id].push({ match_bot_get_turn_input(state.match, player_id) });
+                    // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied whenever its deciding the next one
+                    for (int index = 0; index < TURN_OFFSET - 1; index++) {
+                        state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
+                    }
+                }
+            }
+
             bool all_inputs_received = true;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
@@ -2411,14 +2427,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
         // Count how many miners are mining from this mine
         EntityId entity_id = state.match.entities.get_id_of(entity_index);
-        uint32_t miner_count = 0;
-        for (const Entity& miner : state.match.entities) {
-            if (miner.type == ENTITY_MINER &&
-                    miner.player_id == network_get_player_id() && 
-                    miner.gold_mine_id == entity_id) {
-                miner_count++;
-            }
-        }
+        uint32_t miner_count = match_get_miners_on_gold(state.match, entity_id, network_get_player_id());
         if (miner_count == 0) {
             continue;
         }
@@ -2429,7 +2438,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         const SpriteInfo& miner_icon_info = render_get_sprite_info(SPRITE_UI_MINER_ICON);
         text_size.x += miner_icon_info.frame_width;
         ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 6);
-        render_text(miner_count > 8 ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2(miner_icon_info.frame_width + 2, 0));
+        render_text(miner_count > MATCH_MAX_MINERS_ON_GOLD ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2(miner_icon_info.frame_width + 2, 0));
         render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[network_get_player_id()].recolor_id);
     }
 
