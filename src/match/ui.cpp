@@ -878,33 +878,33 @@ void match_ui_update(MatchUiState& state) {
             column_position.y += 11;
         }
         ui_begin_column(column_position, 5);
-            ivec2 button_size = ui_button_size("LEAVE MATCH");
+            ivec2 button_size = ui_button_size("Leave Match");
             if (state.mode == MATCH_UI_MODE_MENU) {
-                if (ui_button("LEAVE MATCH", button_size, true)) {
+                if (ui_button("Leave Match", button_size, true)) {
                     if (match_ui_is_opponent_in_match(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER;
                     } else {
                         match_ui_leave_match(state);
                     }
                 }
-                if (ui_button("OPTIONS", button_size, true)) {
+                if (ui_button("Options", button_size, true)) {
                     state.options_menu = options_menu_open();
                 }
-                if (ui_button("BACK", button_size, true)) {
+                if (ui_button("Back", button_size, true)) {
                     state.mode = MATCH_UI_MODE_NONE;
                 }
             } else if (state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
-                if (ui_button("YES", button_size, true)) {
+                if (ui_button("Yes", button_size, true)) {
                     match_ui_leave_match(state);
                 }
-                if (ui_button("BACK", button_size, true)) {
+                if (ui_button("Back", button_size, true)) {
                     state.mode = MATCH_UI_MODE_MENU;
                 }
             } else if (state.mode == MATCH_UI_MODE_MATCH_OVER_VICTORY || state.mode == MATCH_UI_MODE_MATCH_OVER_DEFEAT) {
-                if (ui_button("CONTINUE", button_size, true)) {
+                if (ui_button("Continue", button_size, true)) {
                     state.mode = MATCH_UI_MODE_NONE;
                 }
-                if (ui_button("EXIT", button_size, true)) {
+                if (ui_button("Exit", button_size, true)) {
                     match_ui_leave_match(state);
                 }
             }

@@ -10,6 +10,7 @@
 #include "render/render.h"
 #include "menu/ui.h"
 #include "../util.h"
+#include <steam/steam_api.h>
 
 static const int WAGON_X_DEFAULT = 380;
 static const int WAGON_X_LOBBY = 480;
@@ -96,6 +97,7 @@ MenuState menu_init() {
     state.connection_timeout = 0;
     state.lobbylist_page = 0;
     state.lobbylist_item_selected = MENU_ITEM_NONE;
+    state.username = std::string(SteamFriends()->GetPersonaName());
 
     state.mode = MENU_MODE_MAIN;
     state.options_menu.mode = OPTIONS_MENU_CLOSED;
@@ -107,12 +109,12 @@ MenuState menu_init() {
 void menu_handle_network_event(MenuState& state, NetworkEvent event) {
     switch (event.type) {
         case NETWORK_EVENT_CONNECTION_FAILED: {
-            menu_set_mode(state, MENU_MODE_LOBBYLIST);
+            menu_set_mode(state, MENU_MODE_LAN_LOBBYLIST);
             menu_show_status(state, "Connection failed.");
             break;
         }
         case NETWORK_EVENT_INVALID_VERSION: {
-            menu_set_mode(state, MENU_MODE_LOBBYLIST);
+            menu_set_mode(state, MENU_MODE_LAN_LOBBYLIST);
             menu_show_status(state, "Game version does not match server.");
             break;
         }
@@ -129,7 +131,7 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
         case NETWORK_EVENT_PLAYER_DISCONNECTED: {
             if (event.player_disconnected.player_id == 0) {
                 network_disconnect();
-                menu_set_mode(state, MENU_MODE_LOBBYLIST);
+                menu_set_mode(state, MENU_MODE_LAN_LOBBYLIST);
                 menu_show_status(state, "The host closed the lobby.");
             } else {
                 char message[128];
@@ -177,7 +179,7 @@ void menu_update(MenuState& state) {
         state.connection_timeout--;
         if (state.connection_timeout == 0) {
             network_disconnect();
-            menu_set_mode(state, MENU_MODE_LOBBYLIST);
+            menu_set_mode(state, MENU_MODE_LAN_LOBBYLIST);
             menu_show_status(state, "Connection timed out.");
         }
     }
@@ -187,18 +189,48 @@ void menu_update(MenuState& state) {
 
     if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_OPTIONS) {
         ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
-            if (ui_button("PLAY")) {
-                menu_set_mode(state, MENU_MODE_USERNAME);
+            if (ui_button("Single Player")) {
+                menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
             }
-            if (ui_button("REPLAYS")) {
-                menu_set_mode(state, MENU_MODE_REPLAYS);
+            if (ui_button("Multiplayer")) {
+                menu_set_mode(state, MENU_MODE_MULTIPLAYER);
             }
-            if (ui_button("OPTIONS")) {
+            if (ui_button("Options")) {
                 state.options_menu = options_menu_open();
                 menu_set_mode(state, MENU_MODE_OPTIONS);
             }
-            if (ui_button("EXIT")) {
+            if (ui_button("Credits")) {
+            }
+            if (ui_button("Exit")) {
                 menu_set_mode(state, MENU_MODE_EXIT);
+            }
+        ui_end_container();
+    } else if (state.mode == MENU_MODE_SINGLEPLAYER) {
+        ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
+            if (ui_button("Campaign")) {
+                menu_show_status(state, "Coming soon!");
+            }
+            if (ui_button("Skirmish")) {
+                menu_show_status(state, "Coming soon!");
+            }
+            if (ui_button("Replays")) {
+                menu_set_mode(state, MENU_MODE_REPLAYS);
+            }
+            if (ui_button("Back")) {
+                menu_set_mode(state, MENU_MODE_MAIN);
+            }
+        ui_end_container();
+    } else if (state.mode == MENU_MODE_MULTIPLAYER) {
+        ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
+            #ifdef GOLD_STEAM
+                if (ui_button("Online")) {
+                }
+            #endif
+            if (ui_button("Local Network")) {
+                menu_set_mode(state, MENU_MODE_LAN_LOBBYLIST);
+            }
+            if (ui_button("Back")) {
+                menu_set_mode(state, MENU_MODE_MAIN);
             }
         ui_end_container();
     } else if (state.mode == MENU_MODE_USERNAME) {
@@ -206,18 +238,18 @@ void menu_update(MenuState& state) {
         ui_text_input("Username: ", ivec2(256, 24), &state.username, MAX_USERNAME_LENGTH);
 
         ui_begin_row(ivec2(BUTTON_X, BUTTON_Y + 29), 4);
-            if (ui_button("BACK")) {
+            if (ui_button("Back")) {
                 menu_set_mode(state, MENU_MODE_MAIN);
             }
             if (ui_button("OK")) {
                 if (state.username.length() == 0) {
                     menu_show_status(state, "Please enter a username.");
                 } else {
-                    menu_set_mode(state, MENU_MODE_LOBBYLIST);
+                    menu_set_mode(state, MENU_MODE_LAN_LOBBYLIST);
                 }
             }
         ui_end_container();
-    } else if (state.mode == MENU_MODE_LOBBYLIST) {
+    } else if (state.mode == MENU_MODE_LAN_LOBBYLIST) {
         ui_frame_rect(LOBBYLIST_RECT);
 
         if (network_get_lobby_count() == 0) {
@@ -258,10 +290,10 @@ void menu_update(MenuState& state) {
 
         // Lobbylist button row
         ui_begin_row(ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
-            if (ui_button("BACK")) {
-                menu_set_mode(state, MENU_MODE_USERNAME);
+            if (ui_button("Back")) {
+                menu_set_mode(state, MENU_MODE_MULTIPLAYER);
             }
-            if (ui_button("HOST")) {
+            if (ui_button("Host")) {
                 if (!network_server_create(state.username.c_str())) {
                     menu_show_status(state, "Could not create server.");
                 } else {
@@ -269,7 +301,7 @@ void menu_update(MenuState& state) {
                 }
             }
             if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
-                if (ui_button("JOIN")) {
+                if (ui_button("Join")) {
                     const NetworkLobby& lobby = network_get_lobby(state.lobbylist_item_selected);
                     if (!network_client_create(state.username.c_str(), lobby.ip, lobby.port)) {
                         menu_show_status(state, "Could not create client.");
@@ -390,12 +422,12 @@ void menu_update(MenuState& state) {
 
         // Lobby buttons
         ui_begin_row(ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12, MATCH_SETTINGS_RECT.y + MATCH_SETTINGS_RECT.h + 4), 4);
-            if (ui_button("BACK")) {
+            if (ui_button("Back")) {
                 network_disconnect();
-                menu_set_mode(state, MENU_MODE_LOBBYLIST);
+                menu_set_mode(state, MENU_MODE_LAN_LOBBYLIST);
             }
             if (network_is_server()) {
-                if (ui_button("START")) {
+                if (ui_button("Start")) {
                     // Make sure all players are ready
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                         if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NOT_READY) {
@@ -425,7 +457,7 @@ void menu_update(MenuState& state) {
                     menu_set_mode(state, MENU_MODE_LOAD_MATCH);
                 }
             } else {
-                if (ui_button("READY")) {
+                if (ui_button("Ready")) {
                     // Toggle player ready status
                     bool is_ready = network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_READY;
                     network_set_player_ready(!is_ready);
@@ -473,14 +505,14 @@ void menu_update(MenuState& state) {
 
         // Replaylist button row
         ui_begin_row(ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
-            if (ui_button("BACK")) {
-                menu_set_mode(state, MENU_MODE_MAIN);
+            if (ui_button("Back")) {
+                menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
             }
             if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
-                if (ui_button("WATCH")) {
+                if (ui_button("Watch")) {
                     menu_set_mode(state, MENU_MODE_LOAD_REPLAY);
                 }
-                if (ui_button("RENAME")) {
+                if (ui_button("Rename")) {
                     state.mode = MENU_MODE_REPLAY_RENAME;
                     state.replay_rename = state.replay_filenames[state.lobbylist_item_selected];
                 }
@@ -502,7 +534,7 @@ void menu_update(MenuState& state) {
             ui_text_input("Rename: ", ivec2(300, 24), &state.replay_rename, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
 
             ui_begin_row(ivec2(0, 0), 4);
-                if (ui_button("BACK")) {
+                if (ui_button("Back")) {
                     state.mode = MENU_MODE_REPLAYS;
                 }
                 if (ui_button("OK")) {
@@ -538,7 +570,7 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
     }
 
     state.mode = mode;
-    if (mode == MENU_MODE_LOBBYLIST) {
+    if (mode == MENU_MODE_LAN_LOBBYLIST) {
         if (!network_scanner_create()) {
             menu_set_mode(state, MENU_MODE_MAIN);
             menu_show_status(state, "Error occured while searching for LAN games.");
@@ -697,7 +729,10 @@ void menu_render(const MenuState& state) {
     }
 
     // Render title
-    if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_USERNAME) {
+    if (state.mode == MENU_MODE_MAIN || 
+            state.mode == MENU_MODE_USERNAME || 
+            state.mode == MENU_MODE_SINGLEPLAYER || 
+            state.mode == MENU_MODE_MULTIPLAYER) {
         render_sprite_frame(SPRITE_UI_TITLE, ivec2(0, 0), ivec2(24, 24), RENDER_SPRITE_NO_CULL, 0);
     }
 

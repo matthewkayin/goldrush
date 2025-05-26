@@ -194,7 +194,7 @@ void options_menu_update(OptionsMenuState& state) {
     ui_frame_rect(OPTIONS_FRAME_RECT);
 
     ui_element_position(BACK_BUTTON_POSITION);
-    if (ui_button("BACK")) {
+    if (ui_button("Back")) {
         if (state.mode == OPTIONS_MENU_OPEN) {
             state.mode = OPTIONS_MENU_CLOSED;
         } else if (state.mode == OPTIONS_MENU_HOTKEYS) {
@@ -267,13 +267,13 @@ void options_menu_update(OptionsMenuState& state) {
 
                 ui_text(FONT_HACK_GOLD, "Use Preset:");
                 ui_begin_row(ivec2(0, 0), 4);
-                if (ui_button("DEFAULT")) {
+                if (ui_button("Default")) {
                     input_set_hotkey_mapping_to_default(state.hotkey_pending_changes);
                     state.save_status = options_menu_has_unsaved_hotkey_changes(state)
                                             ? OPTIONS_MENU_SAVE_STATUS_UNSAVED_CHANGES
                                             : OPTIONS_MENU_SAVE_STATUS_NONE;
                 }
-                if (ui_button("GRID")) {
+                if (ui_button("Grid")) {
                     options_menu_set_hotkey_mapping_to_grid(state.hotkey_pending_changes);
                     state.save_status = options_menu_has_unsaved_hotkey_changes(state)
                                             ? OPTIONS_MENU_SAVE_STATUS_UNSAVED_CHANGES
@@ -344,7 +344,7 @@ void options_menu_update(OptionsMenuState& state) {
             ui_text(FONT_HACK_WHITE, status_text);
         }
         ui_element_position(SAVE_BUTTON_POSITION);
-        if (ui_button("SAVE")) {
+        if (ui_button("Save")) {
             if (options_menu_are_all_hotkey_groups_valid(state)) {
                 options_menu_save_hotkey_changes(state);
                 state.save_status = OPTIONS_MENU_SAVE_STATUS_SAVED;
