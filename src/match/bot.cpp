@@ -2,6 +2,12 @@
 
 #include "core/logger.h"
 
+struct BotGoal {
+    EntityType entity_type;
+    uint32_t entity_count;
+};
+
+bool match_bot_should_build_house(const MatchState& state, uint8_t bot_player_id);
 MatchInput match_bot_get_build_house_input(const MatchState& state, uint8_t bot_player_id);
 
 EntityId match_bot_pull_worker_off_gold(const MatchState& state, uint8_t bot_player_id, EntityId goldmine_id);
@@ -9,9 +15,12 @@ EntityId match_bot_get_nearest_idle_worker(const MatchState& state, uint8_t bot_
 EntityId match_bot_find_builder(const MatchState& state, uint8_t bot_player_id, uint32_t near_hall_index);
 uint32_t match_bot_find_hall_index_with_least_nearby_houses(const MatchState& state, uint8_t bot_player_id);
 ivec2 match_bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
-uint32_t match_bot_get_gold(const MatchState& state, uint8_t bot_player_id);
+uint32_t match_bot_get_effective_gold(const MatchState& state, uint8_t bot_player_id);
+EntityId match_bot_get_idle_scout(const MatchState& state, uint8_t bot_player_id);
 
 MatchInput match_bot_get_turn_input(const MatchState& state, uint8_t bot_player_id) {
+    uint32_t bot_effective_gold = match_bot_get_effective_gold(state, bot_player_id);
+
     // Saturate bases
     for (uint32_t hall_index = 0; hall_index < state.entities.size(); hall_index++) {
         const Entity& hall = state.entities[hall_index];
@@ -69,7 +78,7 @@ MatchInput match_bot_get_turn_input(const MatchState& state, uint8_t bot_player_
 
             // If we're still here, then there were no idle workers
             // So we'll create one out of the town hall
-            if (match_bot_get_gold(state, bot_player_id) >= entity_get_data(ENTITY_MINER).gold_cost && hall.queue.empty()) {
+            if (bot_effective_gold >= entity_get_data(ENTITY_MINER).gold_cost && hall.queue.empty()) {
                 return (MatchInput) {
                     .type = MATCH_INPUT_BUILDING_ENQUEUE,
                     .building_enqueue = (MatchInputBuildingEnqueue) {
@@ -93,36 +102,61 @@ MatchInput match_bot_get_turn_input(const MatchState& state, uint8_t bot_player_
     }
 
     // Build houses
-    {
-        // Count in-progress houses and units
-        uint32_t houses_in_progress = 0;
-        uint32_t units_in_progress = 0;
-        for (const Entity& entity : state.entities) {
-            if (entity.player_id != bot_player_id) {
-                continue;
-            }
-            // This will count up both miners who are en-route to build and miners who are actively building
-            if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD && 
-                    (entity.target.build.building_type == ENTITY_HOUSE || entity.target.build.building_type == ENTITY_HALL)) {
-                houses_in_progress++;
-            } else if (entity_is_building(entity.type) && !entity.queue.empty() && entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT) {
-                units_in_progress += entity_get_data(entity.queue.front().unit_type).unit_data.population_cost;
-            }
-        }
-        uint32_t future_max_population = match_get_player_max_population(state, bot_player_id) + (10 * houses_in_progress);
-        uint32_t future_population = match_get_player_population(state, bot_player_id) + units_in_progress;
-
-        if (future_max_population < MATCH_MAX_POPULATION && 
-                (int)future_max_population - (int)future_population <= 1 &&
-                match_bot_get_gold(state, bot_player_id) >= entity_get_data(ENTITY_HOUSE).gold_cost) {
+    if (match_bot_should_build_house(state, bot_player_id)) {
+        if (bot_effective_gold >= entity_get_data(ENTITY_HOUSE).gold_cost) {
             MatchInput build_house_input = match_bot_get_build_house_input(state, bot_player_id);
             if (build_house_input.type != MATCH_INPUT_NONE) {
                 return build_house_input;
+            } 
+        } else {
+            bot_effective_gold = 0;
+        }
+    }
+
+    // Scout
+    EntityId scout_id = match_bot_get_idle_scout(state, bot_player_id);
+    if (scout_id != ID_NULL) {
+        for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
+            const Entity& goldmine = state.entities[goldmine_index];
+            if (goldmine.type != ENTITY_GOLDMINE) {
+                continue;
+            }
+            if (!match_is_cell_rect_explored(state, state.players[bot_player_id].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
+                MatchInput scout_input;
+                scout_input.type = MATCH_INPUT_MOVE_ENTITY;
+                scout_input.move.shift_command = 0;
+                scout_input.move.target_cell = ivec2(0, 0);
+                scout_input.move.target_id = state.entities.get_id_of(goldmine_index);
+                scout_input.move.entity_count = 1;
+                scout_input.move.entity_ids[0] = scout_id;
+                return scout_input;
             }
         }
     }
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
+}
+
+bool match_bot_should_build_house(const MatchState& state, uint8_t bot_player_id) {
+    // Count in-progress houses and units
+    uint32_t houses_in_progress = 0;
+    uint32_t units_in_progress = 0;
+    for (const Entity& entity : state.entities) {
+        if (entity.player_id != bot_player_id) {
+            continue;
+        }
+        // This will count up both miners who are en-route to build and miners who are actively building
+        if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD && 
+                (entity.target.build.building_type == ENTITY_HOUSE || entity.target.build.building_type == ENTITY_HALL)) {
+            houses_in_progress++;
+        } else if (entity_is_building(entity.type) && !entity.queue.empty() && entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT) {
+            units_in_progress += entity_get_data(entity.queue.front().unit_type).unit_data.population_cost;
+        }
+    }
+    uint32_t future_max_population = match_get_player_max_population(state, bot_player_id) + (10 * houses_in_progress);
+    uint32_t future_population = match_get_player_population(state, bot_player_id) + units_in_progress;
+
+    return future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1;
 }
 
 MatchInput match_bot_get_build_house_input(const MatchState& state, uint8_t bot_player_id) {
@@ -317,7 +351,7 @@ ivec2 match_bot_find_building_location(const MatchState& state, uint8_t bot_play
     return ivec2(-1, -1);
 }
 
-uint32_t match_bot_get_gold(const MatchState& state, uint8_t bot_player_id) {
+uint32_t match_bot_get_effective_gold(const MatchState& state, uint8_t bot_player_id) {
     uint32_t gold = state.players[bot_player_id].gold;
     for (const Entity& entity : state.entities) {
         if (entity.player_id == bot_player_id && 
@@ -328,4 +362,15 @@ uint32_t match_bot_get_gold(const MatchState& state, uint8_t bot_player_id) {
     }
 
     return gold;
+}
+
+EntityId match_bot_get_idle_scout(const MatchState& state, uint8_t bot_player_id) {
+    for (uint32_t scout_index = 0; scout_index < state.entities.size(); scout_index++) {
+        const Entity& scout = state.entities[scout_index];
+        if (scout.player_id == bot_player_id && scout.type == ENTITY_WAGON && scout.mode == MODE_UNIT_IDLE) {
+            return state.entities.get_id_of(scout_index);
+        }
+    }
+
+    return ID_NULL;
 }
