@@ -19,6 +19,9 @@
 #include <cstring>
 #include <ctime>
 #include <cstdlib>
+#ifdef GOLD_STEAM
+    #include <steam/steam_api.h>
+#endif
 
 int gold_main(int argc, char** argv);
 
@@ -92,6 +95,21 @@ void game_set_mode(LoadParams params) {
 }
 
 int gold_main(int argc, char** argv) {
+    #ifdef GOLD_STEAM_DEBUG
+        FILE* steam_appid_file = fopen("steam_appid.txt", "w");
+        if (steam_appid_file == NULL) {
+            return -1;
+        }
+        fprintf(steam_appid_file, "%u", GOLD_STEAM_APP_ID);
+        fclose(steam_appid_file);
+    #endif
+
+    #ifdef GOLD_STEAM
+        if (SteamAPI_RestartAppIfNecessary(GOLD_STEAM_APP_ID)) {
+            return 1;
+        }
+    #endif
+
     char logfile_path[128];
     sprintf(logfile_path, "logs/latest.log");
 
@@ -130,6 +148,13 @@ int gold_main(int argc, char** argv) {
         log_info("Detected platform WIN32.");
     #elif defined(PLATFORM_OSX)
         log_info("Detected platform OSX.");
+    #endif
+
+    #ifdef GOLD_STEAM
+        if (!SteamAPI_Init()) {
+            log_error("Error initializing Steam API.");
+            return -1;
+        }
     #endif
 
     uint32_t window_flags = SDL_WINDOW_OPENGL;
@@ -371,6 +396,10 @@ int gold_main(int argc, char** argv) {
     render_quit();
 
     SDL_DestroyWindow(window);
+
+    #ifdef GOLD_STEAM
+        SteamAPI_Shutdown();
+    #endif
 
     TTF_Quit();
     SDL_Quit();
