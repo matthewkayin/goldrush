@@ -10,6 +10,7 @@
 #include "render/render.h"
 #include "menu/ui.h"
 #include "../util.h"
+#include "network/steam.h"
 #include <steam/steam_api.h>
 
 static const int WAGON_X_DEFAULT = 380;
@@ -222,10 +223,9 @@ void menu_update(MenuState& state) {
         ui_end_container();
     } else if (state.mode == MENU_MODE_MULTIPLAYER) {
         ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
-            #ifdef GOLD_STEAM
-                if (ui_button("Online")) {
-                }
-            #endif
+            if (ui_button("Online")) {
+                menu_set_mode(state, MENU_MODE_STEAM_LOBBYLIST);
+            }
             if (ui_button("Local Network")) {
                 menu_set_mode(state, MENU_MODE_LAN_LOBBYLIST);
             }
@@ -249,10 +249,10 @@ void menu_update(MenuState& state) {
                 }
             }
         ui_end_container();
-    } else if (state.mode == MENU_MODE_LAN_LOBBYLIST) {
+    } else if (state.mode == MENU_MODE_LAN_LOBBYLIST || state.mode == MENU_MODE_STEAM_LOBBYLIST) {
         ui_frame_rect(LOBBYLIST_RECT);
 
-        if (network_get_lobby_count() == 0) {
+        if ((state.mode == MENU_MODE_LAN_LOBBYLIST ? network_get_lobby_count() : network_steam_get_lobby_count()) == 0) {
             int text_width = render_get_text_size(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...").x;
             ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
             ui_text(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...");
@@ -262,24 +262,33 @@ void menu_update(MenuState& state) {
         ui_begin_row(ivec2(44, 4), 4);
             ui_text_input("Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
             if (ui_sprite_button(SPRITE_UI_BUTTON_REFRESH, false, false)) {
-                network_scanner_search(state.lobby_search_query.c_str());
+                if (state.mode == MENU_MODE_LAN_LOBBYLIST) {
+                    network_scanner_search(state.lobby_search_query.c_str());
+                } else {
+                    network_steam_search_lobbies(state.lobby_search_query.c_str());
+                }
                 state.lobbylist_page = 0;
             }
             if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
                 state.lobbylist_page--;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(network_get_lobby_count()) - 1, false)) {
+            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(state.mode == MENU_MODE_LAN_LOBBYLIST ? network_get_lobby_count() : network_steam_get_lobby_count()) - 1, false)) {
                 state.lobbylist_page++;
             }
         ui_end_container();
 
         // Lobby list
         int base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
-        for (int lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, (uint32_t)network_get_lobby_count()); lobby_index++) {
+        for (int lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, (uint32_t)(state.mode == MENU_MODE_LAN_LOBBYLIST ? network_get_lobby_count() : network_steam_get_lobby_count())); lobby_index++) {
             char lobby_text[128];
             bool selected = lobby_index == state.lobbylist_item_selected;
-            const NetworkLobby& lobby = network_get_lobby(lobby_index);
-            sprintf(lobby_text, "%s %s (%u/%u) %s", selected ? "*" : " ", lobby.name, lobby.player_count, MAX_PLAYERS, selected ? "*" : " ");
+            if (state.mode == MENU_MODE_LAN_LOBBYLIST) {
+                const NetworkLobby& lobby = network_get_lobby(lobby_index);
+                sprintf(lobby_text, "%s %s (%u/%u) %s", selected ? "*" : " ", lobby.name, lobby.player_count, MAX_PLAYERS, selected ? "*" : " ");
+            } else {
+                const NetworkSteamLobby& lobby = network_steam_get_lobby(lobby_index);
+                sprintf(lobby_text, "%s %s (%u/%u) %s", selected ? "*" : " ", lobby.name, lobby.player_count, MAX_PLAYERS, selected ? "*" : " ");
+            }
 
             ivec2 text_frame_size = ui_text_frame_size(lobby_text);
             ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
@@ -294,18 +303,28 @@ void menu_update(MenuState& state) {
                 menu_set_mode(state, MENU_MODE_MULTIPLAYER);
             }
             if (ui_button("Host")) {
-                if (!network_server_create(state.username.c_str())) {
-                    menu_show_status(state, "Could not create server.");
+                if (state.mode == MENU_MODE_LAN_LOBBYLIST) {
+                    if (!network_server_create(state.username.c_str())) {
+                        menu_show_status(state, "Could not create server.");
+                    } else {
+                        menu_set_mode(state, MENU_MODE_LOBBY);
+                    }
                 } else {
+                    network_steam_create_lobby("Test");
                     menu_set_mode(state, MENU_MODE_LOBBY);
                 }
             }
             if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
                 if (ui_button("Join")) {
-                    const NetworkLobby& lobby = network_get_lobby(state.lobbylist_item_selected);
-                    if (!network_client_create(state.username.c_str(), lobby.ip, lobby.port)) {
-                        menu_show_status(state, "Could not create client.");
+                    if (state.mode == MENU_MODE_LAN_LOBBYLIST) {
+                        const NetworkLobby& lobby = network_get_lobby(state.lobbylist_item_selected);
+                        if (!network_client_create(state.username.c_str(), lobby.ip, lobby.port)) {
+                            menu_show_status(state, "Could not create client.");
+                        } else {
+                            menu_set_mode(state, MENU_MODE_CONNECTING);
+                        }
                     } else {
+                        network_steam_join_lobby(state.lobbylist_item_selected);
                         menu_set_mode(state, MENU_MODE_CONNECTING);
                     }
                 }
@@ -578,6 +597,9 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
         }
         state.lobby_search_query = "";
         network_scanner_search(state.lobby_search_query.c_str());
+    } else if (mode == MENU_MODE_STEAM_LOBBYLIST) {
+        state.lobby_search_query = "";
+        network_steam_search_lobbies(state.lobby_search_query.c_str());
     } else if (mode == MENU_MODE_CONNECTING) {
         state.connection_timeout = CONNECTION_TIMEOUT;
     } else if (mode == MENU_MODE_REPLAYS) {
