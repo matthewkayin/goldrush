@@ -17,6 +17,8 @@ bool network_init() {
     }
     network_steam_init();
     state.backend = NETWORK_BACKEND_NONE;
+
+    return true;
 }
 
 void network_quit() {
@@ -40,7 +42,14 @@ void network_service() {
         network_steam_service();
     }
 }
-void network_disconnect();
+
+void network_disconnect() {
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_disconnect();
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        network_steam_disconnect();
+    }
+}
 
 void network_search_lobbies(const char* query) {
     if (state.backend == NETWORK_BACKEND_LAN) {
@@ -98,6 +107,94 @@ bool network_is_host() {
     return network_get_status() == NETWORK_STATUS_HOST;
 }
 
-const NetworkPlayer& network_get_player(uint8_t player_id);
-uint8_t network_get_player_id();
-const char* network_get_lobby_name();
+const NetworkPlayer& network_get_player(uint8_t player_id) {
+    GOLD_ASSERT(state.backend != NETWORK_BACKEND_NONE);
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        return network_lan_get_player(player_id);
+    } else {
+        return network_steam_get_player(player_id);
+    }
+}
+
+uint8_t network_get_player_id() {
+    GOLD_ASSERT(state.backend != NETWORK_BACKEND_NONE);
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        return network_lan_get_player_id();
+    } else {
+        return network_steam_get_player_id();
+    }
+}
+
+const char* network_get_lobby_name() {
+    GOLD_ASSERT(state.backend != NETWORK_BACKEND_NONE);
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        return network_lan_get_lobby_name();
+    } else {
+        return network_steam_get_lobby_name();
+    }
+}
+
+void network_send_chat(const char* message) {
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_send_chat(message);
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        network_steam_send_chat(message);
+    }
+}
+
+void network_set_player_ready(bool ready) {
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_set_player_ready(ready);
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        network_steam_set_player_ready(ready);
+    }
+}
+
+void network_set_player_color(uint8_t color) {
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_set_player_color(color);
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        network_steam_set_player_color(color);
+    }
+}
+
+void network_set_match_setting(uint8_t setting, uint8_t value) {
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_set_match_setting(setting, value);
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        network_steam_set_match_setting(setting, value);
+    }
+}
+
+uint8_t network_get_match_setting(uint8_t setting) {
+    GOLD_ASSERT(state.backend != NETWORK_BACKEND_NONE);
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        return network_lan_get_match_setting(setting);
+    } else {
+        return network_steam_get_match_setting(setting);
+    }
+}
+
+void network_set_player_team(uint8_t team) {
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_set_player_team(team);
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        network_steam_set_player_team(team);
+    }
+}
+
+void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_begin_loading_match(lcg_seed, noise);
+    } else {
+        network_steam_begin_loading_match(lcg_seed, noise);
+    }
+}
+
+void network_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_send_input(out_buffer, out_buffer_length);
+    } else {
+        network_steam_send_input(out_buffer, out_buffer_length);
+    }
+}

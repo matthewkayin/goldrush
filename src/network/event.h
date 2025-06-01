@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "common.h"
 #include "match/noise.h"
 
 enum NetworkEventType {

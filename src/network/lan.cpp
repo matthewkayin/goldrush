@@ -121,6 +121,8 @@ bool network_lan_init() {
     state.scanner = ENET_SOCKET_NULL;
 
     log_info("Initialized network enet.");
+
+    return true;
 }
 
 void network_lan_quit() {
@@ -404,6 +406,99 @@ uint8_t network_lan_get_player_id() {
 const char* network_lan_get_lobby_name() {
     return state.lobby_name;
 }
+
+void network_lan_send_chat(const char* message) {
+    NetworkMessageChat out_message;
+    strcpy(out_message.message, message);
+
+    ENetPacket* packet = enet_packet_create(&out_message, sizeof(out_message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_lan_set_player_ready(bool ready) {
+    state.players[state.player_id].status = ready ? NETWORK_PLAYER_STATUS_READY : NETWORK_PLAYER_STATUS_NOT_READY;
+
+    uint8_t message = ready ? NETWORK_MESSAGE_SET_READY : NETWORK_MESSAGE_SET_NOT_READY;
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_lan_set_player_color(uint8_t color) {
+    NetworkMessageSetColor message;
+    message.recolor_id = color;
+
+    state.players[state.player_id].recolor_id = color;
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_lan_set_match_setting(uint8_t setting, uint8_t value) {
+    NetworkMessageSetMatchSetting message;
+    message.setting = setting;
+    message.value = value;
+    state.match_settings[setting] = value;
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+uint8_t network_lan_get_match_setting(uint8_t setting) {
+    return state.match_settings[setting];
+}
+
+void network_lan_set_player_team(uint8_t team) {
+    state.players[state.player_id].team = team;
+    NetworkMessageSetTeam message;
+    message.team = team;
+
+    ENetPacket* packet = enet_packet_create(&message, sizeof(message), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+void network_lan_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
+    network_lan_scanner_destroy();
+
+    // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
+            state.players[player_id].status = NETWORK_PLAYER_STATUS_NOT_READY;
+        }
+    }
+
+    state.status = NETWORK_STATUS_CONNECTED;
+
+    // Build message
+    // Message size is 1 byte for type, 4 bytes for LCG seed, 8 bytes for map width / height, and the rest of the bytes are the generated noise values
+    size_t message_size = 1 + 4 + 8 + (noise.width * noise.height * sizeof(int8_t));
+    uint8_t* message = (uint8_t*)malloc(message_size);
+    message[0] = NETWORK_MESSAGE_LOAD_MATCH;
+    memcpy(message + 1, &lcg_seed, sizeof(int32_t));
+    memcpy(message + 5, &noise.width, sizeof(uint32_t));
+    memcpy(message + 9, &noise.height, sizeof(uint32_t));
+    memcpy(message + 13, &noise.map[0], noise.width * noise.height * sizeof(int8_t));
+
+    // Send the packet
+    ENetPacket* packet = enet_packet_create(message, message_size, ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+
+    free(message);
+}
+
+void network_lan_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
+    out_buffer[0] = NETWORK_MESSAGE_INPUT;
+    ENetPacket* packet = enet_packet_create(out_buffer, out_buffer_length, ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(state.host, 0, packet);
+    enet_host_flush(state.host);
+}
+
+// INTERNAL
 
 bool network_lan_scanner_create() {
     state.scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
@@ -706,6 +801,8 @@ void network_lan_handle_message(uint8_t* data, size_t length, uint16_t incoming_
             if (state.status != NETWORK_STATUS_CONNECTED) {
                 return;
             }
+
+            network_lan_scanner_destroy();
 
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {

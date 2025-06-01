@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/animation.h"
-#include "core/network.h"
+#include "network/event.h"
 #include "match_setting.h"
 #include "options.h"
 #include <vector>
@@ -18,8 +18,7 @@ enum MenuMode {
     MENU_MODE_SINGLEPLAYER,
     MENU_MODE_MULTIPLAYER,
     MENU_MODE_USERNAME,
-    MENU_MODE_LAN_LOBBYLIST,
-    MENU_MODE_STEAM_LOBBYLIST,
+    MENU_MODE_LOBBYLIST,
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
     MENU_MODE_REPLAYS,

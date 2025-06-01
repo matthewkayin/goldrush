@@ -2,7 +2,7 @@
 
 #include "defines.h"
 #include "math/gmath.h"
-#include "core/network.h"
+#include "network/event.h"
 #include "noise.h"
 #include "match/state.h"
 #include "match/input.h"

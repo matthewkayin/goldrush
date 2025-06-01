@@ -4,7 +4,8 @@
 #include "core/cursor.h"
 #include "core/animation.h"
 #include "core/input.h"
-#include "core/network.h"
+#include "network/network.h"
+#include "network/event.h"
 #include "core/sound.h"
 #include "core/options.h"
 #include "math/gmath.h"
@@ -213,7 +214,7 @@ int gold_main(int argc, char** argv) {
         if (update_accumulator >= UPDATE_DURATION) {
             input_poll_events();
             if (input_user_requests_exit()) {
-                if (network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_SERVER) {
+                if (network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_HOST) {
                     network_disconnect();
                 }
                 is_running = false;
@@ -231,7 +232,6 @@ int gold_main(int argc, char** argv) {
                 switch (state.mode) {
                     case GAME_MODE_MENU: {
                         if (event.type == NETWORK_EVENT_MATCH_LOAD) {
-                            network_scanner_destroy();
                             game_set_mode((LoadParams) {
                                 .mode = GAME_MODE_MATCH,
                                 .match = (LoadMatchParams) {
@@ -271,8 +271,6 @@ int gold_main(int argc, char** argv) {
                         is_running = false;
                         break;
                     } else if (state.menu.mode == MENU_MODE_LOAD_MATCH) {
-                        network_scanner_destroy();
-
                         // This is when the host is beginning a match load
                         // Set LCG seed
                         #ifdef GOLD_RAND_SEED

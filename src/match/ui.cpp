@@ -1,7 +1,7 @@
 #include "match/ui.h"
 
 #include "core/filesystem.h"
-#include "core/network.h"
+#include "network/network.h"
 #include "core/input.h"
 #include "core/logger.h"
 #include "core/cursor.h"
