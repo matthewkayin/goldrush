@@ -1,11 +1,15 @@
 #include "steam.h"
 
 #include "core/logger.h"
+#include "core/asserts.h"
 #include "event.h"
 #include <steam/steam_api.h>
 #include <vector>
 
 static const char* LOBBY_PROPERTY_NAME = "name";
+static const char* PLAYER_PROPERTY_STATUS = "status";
+static const char* PLAYER_PROPERTY_RECOLOR_ID = "recolor_id";
+static const char* PLAYER_PROPERTY_TEAM = "team";
 
 struct NetworkSteamLobbyInternal {
     CSteamID id;
@@ -14,11 +18,20 @@ struct NetworkSteamLobbyInternal {
 
 struct NetworkSteamState {
     NetworkStatus status;
+
+    uint8_t player_id;
+    NetworkPlayer players[MAX_PLAYERS];
+
     char lobby_search_query[NETWORK_LOBBY_NAME_BUFFER_SIZE];
     std::vector<NetworkSteamLobbyInternal> lobbies;
-    NetworkSteamLobbyInternal internal_lobby;
+
+    CSteamID lobby_id;
+    char lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
 };
 static NetworkSteamState state;
+
+void network_steam_set_player_status(NetworkPlayerStatus status);
+void network_steam_cache_player_info();
 
 void network_steam_init() {
     SteamAPI_ManualDispatch_Init();
@@ -62,11 +75,18 @@ void network_steam_service() {
                     break;
                 }
 
-                log_info("Created lobby.");
-
-                state.internal_lobby.id = lobby_created->m_ulSteamIDLobby;
-                SteamMatchmaking()->SetLobbyData(state.internal_lobby.id, LOBBY_PROPERTY_NAME, state.internal_lobby.lobby.name);
+                state.lobby_id = lobby_created->m_ulSteamIDLobby;
                 state.status = NETWORK_STATUS_HOST;
+
+                SteamMatchmaking()->SetLobbyData(state.lobby_id, LOBBY_PROPERTY_NAME, state.lobby_name);
+                network_steam_set_player_status(NETWORK_PLAYER_STATUS_HOST);
+                network_steam_set_player_color(0);
+                network_steam_set_player_team(0);
+
+                network_push_event((NetworkEvent) {
+                    .type = NETWORK_EVENT_LOBBY_CREATED
+                });
+                log_info("Created steam lobby.");
 
                 break;
             }
@@ -82,12 +102,59 @@ void network_steam_service() {
                     break;
                 }
 
-                log_info("Joined lobby.");
+                if (state.status == NETWORK_STATUS_HOST) {
+                    break;
+                }
 
-                // TODO: server will experience this callback so don't do anything if we are the server
-                state.internal_lobby.id = lobby_entered->m_ulSteamIDLobby;
-                strncpy(state.internal_lobby.lobby.name, SteamMatchmaking()->GetLobbyData(state.internal_lobby.id, LOBBY_PROPERTY_NAME), NETWORK_LOBBY_NAME_BUFFER_SIZE);
-                state.internal_lobby.lobby.player_count = SteamMatchmaking()->GetNumLobbyMembers(state.internal_lobby.id);
+                state.lobby_id = lobby_entered->m_ulSteamIDLobby;
+                strncpy(state.lobby_name, SteamMatchmaking()->GetLobbyData(state.lobby_id, LOBBY_PROPERTY_NAME), NETWORK_LOBBY_NAME_BUFFER_SIZE);
+                state.status = NETWORK_STATUS_CONNECTED;
+
+                network_steam_cache_player_info();
+
+                uint8_t next_recolor_id;
+                for (next_recolor_id = 0; next_recolor_id < MAX_PLAYERS; next_recolor_id++) {
+                    bool is_color_in_use = false;
+                    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                        if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE && 
+                                state.players[player_id].recolor_id == next_recolor_id) {
+                            is_color_in_use = true;
+                            break;
+                        }
+                    }
+                    if (!is_color_in_use) {
+                        break;
+                    }
+                }
+
+                // TODO
+                uint8_t incoming_player_team = network_steam_get_player_id();
+
+                network_steam_set_player_status(NETWORK_PLAYER_STATUS_NOT_READY);
+                network_steam_set_player_color(next_recolor_id);
+                network_steam_set_player_team(incoming_player_team);
+
+                network_push_event((NetworkEvent) {
+                    .type = NETWORK_EVENT_LOBBY_JOIN_SUCCESS
+                });
+                log_info("Joined steam lobby.");
+
+                break;
+            }
+            case LobbyDataUpdate_t::k_iCallback: {
+                LobbyDataUpdate_t* lobby_data_update = (LobbyDataUpdate_t*)callback.m_pubParam;
+
+                if (!lobby_data_update->m_bSuccess) {
+                    log_warn("Lobby data unable to update.");
+                    break;
+                }
+
+                // We only care about updates from our own lobby
+                if (lobby_data_update->m_ulSteamIDLobby != state.lobby_id.ConvertToUint64()) {
+                    break;
+                }
+
+                network_steam_cache_player_info();
 
                 break;
             }
@@ -97,7 +164,7 @@ void network_steam_service() {
 }
 
 void network_steam_disconnect() {
-
+    state.lobby_id.Clear();
 }
 
 void network_steam_search_lobbies(const char* query) {
@@ -117,15 +184,12 @@ const NetworkLobby& network_steam_get_lobby(uint32_t index) {
 void network_steam_create_lobby(const char* lobby_name) {
     SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, MAX_PLAYERS);
     state.status = NETWORK_STATUS_CONNECTING;
-    strncpy(state.internal_lobby.lobby.name, lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
-    state.internal_lobby.lobby.player_count = 1;
-    log_info("requested lobby creation");
+    strncpy(state.lobby_name, lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
 }
 
 void network_steam_join_lobby(uint32_t index) {
     SteamMatchmaking()->JoinLobby(state.lobbies[index].id);
     state.status = NETWORK_STATUS_CONNECTING;
-    log_info("requested lobby join");
 }
 
 NetworkStatus network_steam_get_status() {
@@ -133,19 +197,23 @@ NetworkStatus network_steam_get_status() {
 }
 
 const NetworkPlayer& network_steam_get_player(uint8_t player_id) {
-    // TODO
-    static NetworkPlayer player;
-    return player;
+    return state.players[player_id];
 }
 
 uint8_t network_steam_get_player_id() {
-    // TODO
+    if (state.lobby_id.IsValid()) {
+        for (uint8_t player_id = 0; player_id < SteamMatchmaking()->GetNumLobbyMembers(state.lobby_id); player_id++) {
+            if (SteamMatchmaking()->GetLobbyMemberByIndex(state.lobby_id, player_id) == SteamUser()->GetSteamID()) {
+                return player_id;
+            }
+        }
+        GOLD_ASSERT(false);
+    }
     return 0;
 }
 
 const char* network_steam_get_lobby_name() {
-    // TODO
-    return "";
+    return state.lobby_name;
 }
 
 void network_steam_send_chat(const char* message) {
@@ -153,11 +221,12 @@ void network_steam_send_chat(const char* message) {
 }
 
 void network_steam_set_player_ready(bool ready) {
-    // TODO
+    network_steam_set_player_status(ready ? NETWORK_PLAYER_STATUS_READY : NETWORK_PLAYER_STATUS_NOT_READY);
 }
 
 void network_steam_set_player_color(uint8_t color) {
-    // TODO
+    uint8_t buffer[2] = { color, '\0' };
+    SteamMatchmaking()->SetLobbyMemberData(state.lobby_id, PLAYER_PROPERTY_RECOLOR_ID, (const char*)buffer);
 }
 
 void network_steam_set_match_setting(uint8_t setting, uint8_t value) {
@@ -170,7 +239,8 @@ uint8_t network_steam_get_match_setting(uint8_t setting) {
 }
 
 void network_steam_set_player_team(uint8_t team) {
-    // TODO
+    uint8_t buffer[2] = { team, '\0' };
+    SteamMatchmaking()->SetLobbyMemberData(state.lobby_id, PLAYER_PROPERTY_TEAM, (const char*)buffer);
 }
 
 void network_steam_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
@@ -179,4 +249,26 @@ void network_steam_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
 
 void network_steam_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
     // TODO
+}
+
+// INTERNAL
+
+void network_steam_set_player_status(NetworkPlayerStatus status) {
+    uint8_t buffer[2] = { (uint8_t)status, '\0' };
+    SteamMatchmaking()->SetLobbyMemberData(state.lobby_id, PLAYER_PROPERTY_STATUS, (const char*)buffer);
+}
+
+void network_steam_cache_player_info() {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (player_id >= SteamMatchmaking()->GetNumLobbyMembers(state.lobby_id)) {
+            state.players[player_id].status = NETWORK_PLAYER_STATUS_NONE;
+            continue;
+        }
+
+        CSteamID steam_id = SteamMatchmaking()->GetLobbyMemberByIndex(state.lobby_id, player_id);
+        strncpy(state.players[player_id].name, SteamFriends()->GetFriendPersonaName(steam_id), NETWORK_PLAYER_NAME_BUFFER_SIZE);
+        state.players[player_id].status = (uint8_t)(SteamMatchmaking()->GetLobbyMemberData(state.lobby_id, steam_id, PLAYER_PROPERTY_STATUS)[0]);
+        state.players[player_id].recolor_id = (uint8_t)(SteamMatchmaking()->GetLobbyMemberData(state.lobby_id, steam_id, PLAYER_PROPERTY_RECOLOR_ID)[0]);
+        state.players[player_id].team = (uint8_t)(SteamMatchmaking()->GetLobbyMemberData(state.lobby_id, steam_id, PLAYER_PROPERTY_TEAM)[0]);
+    }
 }
