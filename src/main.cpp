@@ -5,7 +5,6 @@
 #include "core/animation.h"
 #include "core/input.h"
 #include "network/network.h"
-#include "network/event.h"
 #include "core/sound.h"
 #include "core/options.h"
 #include "math/gmath.h"
@@ -14,7 +13,7 @@
 #include "match/ui.h"
 #include "match/noise.h"
 #include "match/replay.h"
-#include "network/steam.h"
+#include "network/network.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
@@ -143,7 +142,6 @@ int gold_main(int argc, char** argv) {
         log_error("Error initializing Steam API.");
         return -1;
     }
-    network_steam_init();
     log_info("Initialized Steam API");
 
     uint32_t window_flags = SDL_WINDOW_OPENGL;
@@ -226,7 +224,6 @@ int gold_main(int argc, char** argv) {
             }
 
             network_service();
-            network_steam_service();
             NetworkEvent event;
             while (network_poll_events(&event)) {
                 switch (state.mode) {

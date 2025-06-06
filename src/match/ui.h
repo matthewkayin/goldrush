@@ -2,12 +2,12 @@
 
 #include "defines.h"
 #include "math/gmath.h"
-#include "network/event.h"
 #include "noise.h"
 #include "match/state.h"
 #include "match/input.h"
 #include "render/render.h"
 #include "menu/options.h"
+#include "network/network.h"
 #include <string>
 
 #define MATCH_UI_HEIGHT 88

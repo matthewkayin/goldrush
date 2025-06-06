@@ -1,5 +1,6 @@
 #include "replay.h"
 
+#include "network/types.h"
 #include "core/filesystem.h"
 #include "core/logger.h"
 

@@ -1,7 +1,7 @@
 #pragma once
 
+#include "network/network.h"
 #include "core/animation.h"
-#include "network/event.h"
 #include "match_setting.h"
 #include "options.h"
 #include <vector>
