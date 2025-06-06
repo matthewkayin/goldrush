@@ -8,6 +8,7 @@ void NetworkSteamLobby::open(const char* name, NetworkConnectionInfo connection_
     SteamAPICall_t api_call = SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, 2);
     call_result_lobby_created.Set(api_call, this, &NetworkSteamLobby::on_lobby_created);
     status = NETWORK_LOBBY_OPENING;
+    log_trace("opening lobby");
 }
 
 void NetworkSteamLobby::close() {
@@ -26,6 +27,8 @@ void NetworkSteamLobby::set_player_count(uint8_t player_count) {
 }
 
 void NetworkSteamLobby::on_lobby_created(LobbyCreated_t* lobby_created, bool io_failure) {
+    log_trace("steam on lobby created");
+
     if (lobby_created->m_eResult != k_EResultOK) {
         log_error("Error creating steam lobby.");
         status = NETWORK_LOBBY_ERROR;

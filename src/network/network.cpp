@@ -33,7 +33,6 @@ bool network_lobby_create();
 void network_handle_message(uint16_t peer_id, uint8_t* data, size_t length);
 
 bool network_init() {
-    SteamAPI_ManualDispatch_Init();
     SteamNetworkingUtils()->InitRelayNetworkAccess();
 
     if (enet_initialize() != 0) {
@@ -79,6 +78,9 @@ uint8_t network_get_player_id() {
 }
 
 void network_service() {
+    if (state.backend == NETWORK_BACKEND_STEAM) {
+        SteamAPI_RunCallbacks();
+    }
     if (state.lobby_scanner != NULL) {
         state.lobby_scanner->service();
     }
@@ -381,7 +383,6 @@ void network_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
 // INTERNAL
 
 bool network_host_create() {
-    log_trace("network_host_create()");
     if (state.backend == NETWORK_BACKEND_LAN) {
         state.host = new NetworkLanHost();
     } else {
