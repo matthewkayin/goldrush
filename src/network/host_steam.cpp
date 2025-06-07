@@ -22,6 +22,7 @@ bool NetworkSteamHost::connect(NetworkConnectionInfo connection_info) {
     identity.SetSteamID64(connection_info.steam.id);
     HSteamNetConnection connection = SteamNetworkingSockets()->ConnectP2P(identity, 0, 0, NULL);
     SteamNetworkingSockets()->SetConnectionPollGroup(connection, poll_group);
+    log_trace("Connecting to host with steam id %u", connection_info.steam.id);
 
     return true;
 }
@@ -127,8 +128,10 @@ void NetworkSteamHost::service() {
 }
 
 void NetworkSteamHost::on_connection_status_changed(SteamNetConnectionStatusChangedCallback_t* callback) {
+    log_trace("Steam on_connection_status_changed %u -> %u", callback->m_eOldState, callback->m_info.m_eState);
     // Connection
     if (callback->m_info.m_eState == k_ESteamNetworkingConnectionState_Connected) {
+        log_trace("Connected");
         // New connection has reached out to this host
         if (callback->m_eOldState == k_ESteamNetworkingConnectionState_None) {
             if (peer_count == MAX_PLAYERS - 1) {
@@ -158,6 +161,7 @@ void NetworkSteamHost::on_connection_status_changed(SteamNetConnectionStatusChan
             callback->m_eOldState == k_ESteamNetworkingConnectionState_Connecting) &&
             (callback->m_info.m_eState == k_ESteamNetworkingConnectionState_ClosedByPeer || 
              callback->m_info.m_eState == k_ESteamNetworkingConnectionState_ProblemDetectedLocally)) {
+        log_trace("Disconnected");
         uint16_t peer_id;
         for (peer_id = 0; peer_id < peer_count; peer_id++) {
             if (callback->m_hConn == peers[peer_id]) {

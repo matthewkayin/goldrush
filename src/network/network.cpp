@@ -50,6 +50,12 @@ bool network_init() {
 }
 
 void network_quit() {
+    if (state.status != NETWORK_STATUS_OFFLINE) {
+        network_disconnect();
+        if (state.host != NULL) {
+            delete state.host;
+        }
+    }
     enet_deinitialize();
 }
 
