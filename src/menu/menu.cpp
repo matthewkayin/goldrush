@@ -583,6 +583,8 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
     } else if (mode == MENU_MODE_REPLAYS) {
         state.lobby_search_query = "";
         menu_search_replays_folder(state);
+    } else if (mode == MENU_MODE_LOBBY) {
+        state.chat.clear();
     }
 }
 
