@@ -23,6 +23,8 @@ bool NetworkSteamHost::connect(NetworkConnectionInfo connection_info) {
     identity.ParseString(connection_info.steam.identity_str);
     HSteamNetConnection connection = SteamNetworkingSockets()->ConnectP2P(identity, 0, 0, NULL);
     SteamNetworkingSockets()->SetConnectionPollGroup(connection, poll_group);
+    peers[peer_count] = connection;
+    peer_count++;
 
     return true;
 }
@@ -131,39 +133,60 @@ void NetworkSteamHost::service() {
 
 void NetworkSteamHost::on_connection_status_changed(SteamNetConnectionStatusChangedCallback_t* callback) {
     log_trace("Steam on_connection_status_changed %u -> %u", callback->m_eOldState, callback->m_info.m_eState);
-    // Connection
-    if (callback->m_info.m_eState == k_ESteamNetworkingConnectionState_Connected) {
-        log_trace("Connected");
-        // New connection has reached out to this host
-        if (callback->m_eOldState == k_ESteamNetworkingConnectionState_None) {
-            if (peer_count == MAX_PLAYERS - 1) {
-                SteamNetworkingSockets()->CloseConnection(callback->m_hConn, 0, "", false);
+
+    // On host connecting
+    if (callback->m_eOldState == k_ESteamNetworkingConnectionState_None && 
+            callback->m_info.m_eState == k_ESteamNetworkingConnectionState_Connecting) {
+        // If we already have this connection in our peers list, it means we reached out to them
+        // So there is nothing for us to do here
+        for (uint16_t peer_id = 0; peer_id < peer_count; peer_id++) {
+            if (peers[peer_id] == callback->m_hConn) {
                 return;
             }
-
-            SteamNetworkingSockets()->AcceptConnection(callback->m_hConn);
         }
 
-        // Otherwise it is a connection we initiated which has been accepted by the remote host
-        // Either way, add the peer to the peer list and send a connected event
+        // Otherwise, they reached out to us. 
+        // Do we have enough space in the peer list to accept them?
+        // If we don't, it should mean that we're the host and the lobby is full.
+        if (peer_count == MAX_PLAYERS - 1) {
+            SteamNetworkingSockets()->CloseConnection(callback->m_hConn, 0, "", false);
+            return;
+        }
+
+        // If we do, accept the connection
         peers[peer_count] = callback->m_hConn;
         SteamNetworkingSockets()->SetConnectionPollGroup(peers[peer_count], poll_group);
+        peer_count++;
+        return;
+    }
+
+    // Connection
+    if (callback->m_info.m_eState == k_ESteamNetworkingConnectionState_Connected) {
+        // Determine incoming peer id
+        uint16_t peer_id;
+        for (peer_id = 0; peer_id < peer_count; peer_id++) {
+            if (peers[peer_id] == callback->m_hConn) {
+                break;
+            }
+        }
+
+        if (peer_id == peer_count) {
+            log_warn("Received connection event from a host that is not in the peer list.");
+            return;
+        }
+
         events.push((NetworkHostEvent) {
             .type = NETWORK_HOST_EVENT_CONNECTED,
             .connected = (NetworkHostEventConnected) {
-                .peer_id = peer_count
+                .peer_id = peer_id
             }
         });
-
-        peer_count++;
+        return;
     }
 
     // Connection has been rejected or closed by the remote host
-    if ((callback->m_eOldState == k_ESteamNetworkingConnectionState_Connecting ||
-            callback->m_eOldState == k_ESteamNetworkingConnectionState_Connecting) &&
-            (callback->m_info.m_eState == k_ESteamNetworkingConnectionState_ClosedByPeer || 
-             callback->m_info.m_eState == k_ESteamNetworkingConnectionState_ProblemDetectedLocally)) {
-        log_trace("Disconnected");
+    if (callback->m_info.m_eState == k_ESteamNetworkingConnectionState_ClosedByPeer || 
+            callback->m_info.m_eState == k_ESteamNetworkingConnectionState_ProblemDetectedLocally) {
         uint16_t peer_id;
         for (peer_id = 0; peer_id < peer_count; peer_id++) {
             if (callback->m_hConn == peers[peer_id]) {
