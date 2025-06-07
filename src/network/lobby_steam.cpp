@@ -7,6 +7,7 @@ void NetworkSteamLobby::open(const char* name, NetworkConnectionInfo connection_
     lobby_player_count = 1;
     SteamAPICall_t api_call = SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, 2);
     call_result_lobby_created.Set(api_call, this, &NetworkSteamLobby::on_lobby_created);
+    this->connection_info = connection_info;
     status = NETWORK_LOBBY_OPENING;
 }
 
@@ -34,13 +35,7 @@ void NetworkSteamLobby::on_lobby_created(LobbyCreated_t* lobby_created, bool io_
 
     lobby_id = lobby_created->m_ulSteamIDLobby;
     SteamMatchmaking()->SetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME, lobby_name);
-
-    // Set lobby connection info
-    char host_steam_id[16];
-    uint64_t steam_id = SteamUser()->GetSteamID().ConvertToUint64();
-    memcpy(host_steam_id, &steam_id, sizeof(uint64_t));
-    host_steam_id[sizeof(uint64_t)] = '\0';
-    SteamMatchmaking()->SetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_STEAM_ID, host_steam_id);
+    SteamMatchmaking()->SetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY, connection_info.steam.identity_str);
 
     set_player_count(lobby_player_count);
     status = NETWORK_LOBBY_OPEN;

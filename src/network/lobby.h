@@ -49,6 +49,7 @@ private:
     char lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
     uint8_t lobby_player_count;
     CSteamID lobby_id;
+    NetworkConnectionInfo connection_info;
     CCallResult<NetworkSteamLobby, LobbyCreated_t> call_result_lobby_created;
     void on_lobby_created(LobbyCreated_t* lobby_created, bool io_failure);
 };

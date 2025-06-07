@@ -113,8 +113,8 @@ void NetworkSteamLobbyScanner::on_lobby_matchlist(LobbyMatchList_t* lobby_matchl
         NetworkMatchlistEntry entry;
         strncpy(entry.name, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME), NETWORK_LOBBY_NAME_BUFFER_SIZE);
         memcpy(&entry.player_count, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT), sizeof(uint8_t));
-        memcpy(&entry.connection_info.steam.id, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_STEAM_ID), sizeof(uint64_t));
-        log_trace("Found lobby %s host steam id %u", entry.name, entry.connection_info.steam.id);
+        strncpy(entry.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(entry.connection_info.steam.identity_str));
+        log_trace("Found lobby %s host steam identity %s", entry.name, entry.connection_info.steam.identity_str);
 
         if (strlen(lobby_name_query) == 0 || strstr(lobby_name_query, entry.name) != NULL) {
             matchlist.push_back(entry);

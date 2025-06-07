@@ -18,18 +18,20 @@ bool NetworkSteamHost::was_create_successful() const {
 }
 
 bool NetworkSteamHost::connect(NetworkConnectionInfo connection_info) {
+    log_trace("Connecting to host with steam identity %s", connection_info.steam.identity_str);
     SteamNetworkingIdentity identity;
-    identity.SetSteamID64(connection_info.steam.id);
+    identity.ParseString(connection_info.steam.identity_str);
     HSteamNetConnection connection = SteamNetworkingSockets()->ConnectP2P(identity, 0, 0, NULL);
     SteamNetworkingSockets()->SetConnectionPollGroup(connection, poll_group);
-    log_trace("Connecting to host with steam id %u", connection_info.steam.id);
 
     return true;
 }
 
 NetworkConnectionInfo NetworkSteamHost::get_connection_info() const {
     NetworkConnectionInfo connection_info;
-    connection_info.steam.id = SteamUser()->GetSteamID().ConvertToUint64();
+    SteamNetworkingIdentity identity;
+    SteamNetworkingSockets()->GetIdentity(&identity);
+    identity.ToString(connection_info.steam.identity_str, sizeof(connection_info.steam.identity_str));
     return connection_info;
 }
 
@@ -75,7 +77,7 @@ size_t NetworkSteamHost::buffer_peer_connection_info(uint16_t peer_id, void* buf
 
 NetworkConnectionInfo NetworkSteamHost::parse_connection_info(void* buffer) {
     NetworkConnectionInfo connection_info;
-    memcpy(&connection_info.steam.id, buffer, sizeof(uint64_t));
+    strncpy(connection_info.steam.identity_str, (char*)buffer, sizeof(connection_info.steam.identity_str));
     return connection_info;
 }
 

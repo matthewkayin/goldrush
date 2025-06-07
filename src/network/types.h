@@ -3,6 +3,7 @@
 #include "match/noise.h"
 #include "menu/match_setting.h"
 #include <cstdint>
+#include <steam/steam_api.h>
 
 #define NETWORK_INPUT_BUFFER_SIZE 1024
 #define NETWORK_LOBBY_NAME_BUFFER_SIZE 40
@@ -14,7 +15,7 @@
 #define NETWORK_BASE_PORT 6530
 
 #define NETWORK_STEAM_LOBBY_PROPERTY_NAME "name"
-#define NETWORK_STEAM_LOBBY_PROPERTY_HOST_STEAM_ID "host_steam_id"
+#define NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY "host_identity"
 #define NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT "player_count"
 
 enum NetworkBackend {
@@ -36,7 +37,7 @@ struct NetworkConnectionInfoLan {
 };
 
 struct NetworkConnectionInfoSteam {
-    uint64_t id;
+    char identity_str[SteamNetworkingIdentity::k_cchMaxString];
 };
 
 union NetworkConnectionInfo {
