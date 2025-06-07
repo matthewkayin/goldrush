@@ -203,9 +203,10 @@ void network_service() {
                         strncpy(lobby.name, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME), NETWORK_LOBBY_NAME_BUFFER_SIZE);
                         memcpy(&lobby.player_count, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT), sizeof(uint8_t));
                         strncpy(lobby.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(lobby.connection_info.steam.identity_str));
-                        log_trace("Found lobby %s host steam identity %s", lobby.name, lobby.connection_info.steam.identity_str);
+                        log_trace("Found lobby %s host steam identity %s lobby query %s", lobby.name, lobby.connection_info.steam.identity_str, state.lobby_name_query);
 
                         if (strlen(state.lobby_name_query) == 0 || strstr(state.lobby_name_query, lobby.name) != NULL) {
+                            log_trace("added lobby.");
                             state.lobbies.push_back(lobby);
                         }
                     }
@@ -233,6 +234,11 @@ void network_service() {
                         .type = NETWORK_EVENT_LOBBY_CONNECTED
                     });
                     state.status = NETWORK_STATUS_HOST;
+                    break;
+                }
+                case SteamNetConnectionStatusChangedCallback_t::k_iCallback: {
+                    SteamNetConnectionStatusChangedCallback_t* connection_status_changed = (SteamNetConnectionStatusChangedCallback_t*)callback.m_pubParam;
+                    network_host_steam_on_connection_status_changed(state.host, connection_status_changed);
                     break;
                 }
                 default:
