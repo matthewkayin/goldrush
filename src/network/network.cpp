@@ -119,6 +119,8 @@ void network_service() {
 
                         state.host->send(event.connected.peer_id, &message, sizeof(message));
                         state.host->flush();
+                    } else if (state.status == NETWORK_STATUS_HOST) {
+                        state.lobby->set_player_count(state.host->get_peer_count() + 1);
                     }
                     break;
                 } // End case CONNECTED
@@ -348,6 +350,10 @@ void network_set_player_team(uint8_t team) {
 }
 
 void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
+    state.lobby->close();
+    delete state.lobby;
+    state.lobby = NULL;
+
     // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {

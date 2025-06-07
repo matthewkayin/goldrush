@@ -91,8 +91,9 @@ bool NetworkSteamLobbyScanner::was_create_successful() const {
 }
 
 void NetworkSteamLobbyScanner::search(const char* query) {
+    strncpy(lobby_name_query, query, NETWORK_LOBBY_NAME_BUFFER_SIZE);
     matchlist.clear();
-    SteamMatchmaking()->AddRequestLobbyListStringFilter(NETWORK_STEAM_LOBBY_PROPERTY_NAME, query, k_ELobbyComparisonEqual);
+
     SteamAPICall_t api_call = SteamMatchmaking()->RequestLobbyList();
     call_result_lobby_matchlist.Set(api_call, this, &NetworkSteamLobbyScanner::on_lobby_matchlist);
 }
@@ -114,5 +115,9 @@ void NetworkSteamLobbyScanner::on_lobby_matchlist(LobbyMatchList_t* lobby_matchl
         memcpy(&entry.player_count, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT), sizeof(uint8_t));
         entry.connection_info.steam.id = SteamMatchmaking()->GetLobbyOwner(lobby_id).ConvertToUint64();
         matchlist.push_back(entry);
+
+        if (strlen(lobby_name_query) == 0 || strstr(lobby_name_query, entry.name) != NULL) {
+            matchlist.push_back(entry);
+        }
     }
 }

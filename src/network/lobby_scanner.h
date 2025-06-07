@@ -16,6 +16,7 @@ public:
     const NetworkMatchlistEntry& get_matchlist_entry(size_t index) const;
 protected:
     std::vector<NetworkMatchlistEntry> matchlist;
+    char lobby_name_query[NETWORK_LOBBY_NAME_BUFFER_SIZE];
 };
 
 class NetworkLanLobbyScanner : public NetworkLobbyScanner {
@@ -27,7 +28,6 @@ public:
     void service() override;
 private:
     ENetSocket scanner;
-    char lobby_name_query[NETWORK_LOBBY_NAME_BUFFER_SIZE];
 };
 
 class NetworkSteamLobbyScanner : public NetworkLobbyScanner {
