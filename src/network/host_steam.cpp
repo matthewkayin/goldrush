@@ -65,6 +65,7 @@ void NetworkSteamHost::disconnect_peer(uint16_t peer_id, bool gently) {
     SteamNetworkingSockets()->CloseConnection(peers[peer_id], 0, "", false);
     peers[peer_id] = peers[peer_count - 1];
     peer_count--;
+    log_trace("Disconnected peer. peer count %u", peer_count);
 }
 
 size_t NetworkSteamHost::buffer_peer_connection_info(uint16_t peer_id, void* buffer) {
@@ -141,6 +142,7 @@ void NetworkSteamHost::on_connection_status_changed(SteamNetConnectionStatusChan
         // So there is nothing for us to do here
         for (uint16_t peer_id = 0; peer_id < peer_count; peer_id++) {
             if (peers[peer_id] == callback->m_hConn) {
+                log_trace("Peer is already recognized. Doing nothing.");
                 return;
             }
         }
@@ -148,13 +150,17 @@ void NetworkSteamHost::on_connection_status_changed(SteamNetConnectionStatusChan
         // Otherwise, they reached out to us. 
         // Do we have enough space in the peer list to accept them?
         // If we don't, it should mean that we're the host and the lobby is full.
+        // TODO: replace this logic with a check on network_get_player_count() so that we can account for bots taking up lobby space
         if (peer_count == MAX_PLAYERS - 1) {
+            log_trace("Peer count is full. Rejecting.");
             SteamNetworkingSockets()->CloseConnection(callback->m_hConn, 0, "", false);
             return;
         }
 
         // If we do, accept the connection
+        log_trace("Accepted connection.");
         peers[peer_count] = callback->m_hConn;
+        SteamNetworkingSockets()->AcceptConnection(peers[peer_count]);
         SteamNetworkingSockets()->SetConnectionPollGroup(peers[peer_count], poll_group);
         peer_count++;
         return;

@@ -21,6 +21,9 @@ void NetworkSteamLobby::service() {
 }
 
 void NetworkSteamLobby::set_player_count(uint8_t player_count) {
+    if (lobby_player_count == player_count) {
+        return;
+    }
     lobby_player_count = player_count;
     char buffer[2] = { (char)player_count, '\0' };
     SteamMatchmaking()->SetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT, buffer);

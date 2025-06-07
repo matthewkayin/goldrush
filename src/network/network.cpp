@@ -83,6 +83,17 @@ uint8_t network_get_player_id() {
     return state.player_id;
 }
 
+uint8_t network_get_player_count() {
+    uint8_t player_count = 0;
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
+            player_count++;
+        }
+    }
+
+    return player_count;
+}
+
 void network_service() {
     if (state.backend == NETWORK_BACKEND_STEAM) {
         SteamAPI_RunCallbacks();
@@ -98,6 +109,10 @@ void network_service() {
             state.status = NETWORK_STATUS_HOST;
         }
         if (state.lobby->get_status() == NETWORK_LOBBY_OPEN) {
+            // It is safe to call this every time because the steam lobby will
+            // Cache the value and will not re-update through steam until it changes
+            // Calling this every time ensures the value stays updated
+            state.lobby->set_player_count(network_get_player_count());
             state.lobby->service();
         } 
     }
@@ -149,8 +164,6 @@ void network_service() {
                         break;
                     }
 
-                    log_info("Player %u disconnected.", event.disconnected.player_id);
-
                     state.players[event.disconnected.player_id].status = NETWORK_PLAYER_STATUS_NONE;
                     state.events.push((NetworkEvent) {
                         .type = NETWORK_EVENT_PLAYER_DISCONNECTED,
@@ -158,6 +171,7 @@ void network_service() {
                             .player_id = event.disconnected.player_id
                         }
                     });
+                    log_info("Player %u disconnected.", event.disconnected.player_id);
                     break;
                 } // End case DISCONNECTED
                 case NETWORK_HOST_EVENT_RECEIVED: {

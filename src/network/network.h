@@ -11,6 +11,7 @@ NetworkStatus network_get_status();
 bool network_is_host();
 const NetworkPlayer& network_get_player(uint8_t player_id);
 uint8_t network_get_player_id();
+uint8_t network_get_player_count();
 
 void network_service();
 bool network_poll_events(NetworkEvent* event);
