@@ -133,7 +133,7 @@ void NetworkSteamHost::service() {
 }
 
 void NetworkSteamHost::on_connection_status_changed(SteamNetConnectionStatusChangedCallback_t* callback) {
-    log_trace("Steam on_connection_status_changed %u -> %u", callback->m_eOldState, callback->m_info.m_eState);
+    log_trace("Steam on_connection_status_changed connection %u status %u -> %u", callback->m_hConn, callback->m_eOldState, callback->m_info.m_eState);
 
     // On host connecting
     if (callback->m_eOldState == k_ESteamNetworkingConnectionState_None && 

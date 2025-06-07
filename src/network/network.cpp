@@ -224,12 +224,16 @@ void network_disconnect() {
         }
         state.host->flush();
 
-        if (state.status == NETWORK_STATUS_HOST || state.status == NETWORK_STATUS_CONNECTING || state.status == NETWORK_STATUS_DISCONNECTING || connected_peers == 0) {
+        if (state.status == NETWORK_STATUS_HOST || 
+                state.status == NETWORK_STATUS_CONNECTING || 
+                state.status == NETWORK_STATUS_DISCONNECTING || 
+                state.backend == NETWORK_BACKEND_STEAM || 
+                connected_peers == 0) {
             delete state.host;
             state.host = NULL;
             state.status = NETWORK_STATUS_OFFLINE;
         } else if (state.status == NETWORK_STATUS_CONNECTED) {
-            log_info("Client attempting gently disconnect...");
+            log_info("Client attempting gentle disconnect...");
             state.status = NETWORK_STATUS_DISCONNECTING;
         }
     }
