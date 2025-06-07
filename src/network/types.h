@@ -45,7 +45,7 @@ union NetworkConnectionInfo {
     NetworkConnectionInfoSteam steam;
 };
 
-struct NetworkMatchlistEntry {
+struct NetworkLobby {
     char name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
     uint8_t player_count;
     NetworkConnectionInfo connection_info;

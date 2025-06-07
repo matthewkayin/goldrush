@@ -18,8 +18,8 @@ bool network_poll_events(NetworkEvent* event);
 void network_disconnect();
 
 void network_search_lobbies(const char* query);
-size_t network_get_matchlist_size();
-const NetworkMatchlistEntry& network_get_matchlist_entry(size_t index);
+size_t network_get_lobby_count();
+const NetworkLobby& network_get_lobby(size_t index);
 void network_open_lobby(const char* lobby_name);
 void network_join_lobby(size_t index);
 const char* network_get_lobby_name();

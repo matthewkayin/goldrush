@@ -263,7 +263,7 @@ void menu_update(MenuState& state) {
     } else if (state.mode == MENU_MODE_LOBBYLIST) {
         ui_frame_rect(LOBBYLIST_RECT);
 
-        if (network_get_matchlist_size() == 0) {
+        if (network_get_lobby_count() == 0) {
             int text_width = render_get_text_size(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...").x;
             ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
             ui_text(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...");
@@ -280,17 +280,17 @@ void menu_update(MenuState& state) {
             if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
                 state.lobbylist_page--;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(network_get_matchlist_size()) - 1, false)) {
+            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(network_get_lobby_count()) - 1, false)) {
                 state.lobbylist_page++;
             }
         ui_end_container();
 
         // Lobby list
         int base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
-        for (int lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, (uint32_t)network_get_matchlist_size()); lobby_index++) {
+        for (int lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, (uint32_t)network_get_lobby_count()); lobby_index++) {
             char lobby_text[128];
             bool selected = lobby_index == state.lobbylist_item_selected;
-            const NetworkMatchlistEntry& lobby = network_get_matchlist_entry(lobby_index);
+            const NetworkLobby& lobby = network_get_lobby(lobby_index);
             sprintf(lobby_text, "%s %s (%u/%u) %s", selected ? "*" : " ", lobby.name, lobby.player_count, MAX_PLAYERS, selected ? "*" : " ");
 
             ivec2 text_frame_size = ui_text_frame_size(lobby_text);

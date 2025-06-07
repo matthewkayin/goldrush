@@ -1,39 +1,84 @@
 #include "network.h"
 
-#include "lobby_scanner.h"
-#include "lobby.h"
 #include "host.h"
 #include "core/logger.h"
 #include "core/asserts.h"
 #include <enet/enet.h>
 #include <steam/steam_api.h>
 #include <queue>
+#include <vector>
 
 struct NetworkState {
     NetworkBackend backend;
     NetworkStatus status;
 
     NetworkHost* host;
-    NetworkLobbyScanner* lobby_scanner;
-    NetworkLobby* lobby;
+    ENetSocket lan_scanner;
+    CSteamID steam_lobby_id;
+    uint8_t steam_lobby_player_count;
 
     NetworkPlayer players[MAX_PLAYERS];
     uint8_t player_id;
     uint8_t match_settings[MATCH_SETTING_COUNT];
 
     std::queue<NetworkEvent> events;
+    std::vector<NetworkLobby> lobbies;
 
     char username[NETWORK_PLAYER_NAME_BUFFER_SIZE];
     char lobby_name[NETWORK_LOBBY_NAME_BUFFER_SIZE];
+    char lobby_name_query[NETWORK_LOBBY_NAME_BUFFER_SIZE];
 };
 static NetworkState state;
 
-bool network_host_create();
-bool network_lobby_create();
+bool network_lan_scanner_create() {
+    state.lan_scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (state.lan_scanner == ENET_SOCKET_NULL) {
+        log_error("Failed to create scanner socket.");
+        return false;
+    }
+    enet_socket_set_option(state.lan_scanner, ENET_SOCKOPT_BROADCAST, 1);
+
+    return true;
+}
+
+bool network_lan_listener_create() {
+    state.lan_scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (state.lan_scanner == ENET_SOCKET_NULL) {
+        log_error("Failed to create listener socket.");
+        return false;
+    }
+    enet_socket_set_option(state.lan_scanner, ENET_SOCKOPT_REUSEADDR, 1);
+
+    ENetAddress scanner_address;
+    scanner_address.host = ENET_HOST_ANY;
+    scanner_address.port = NETWORK_SCANNER_PORT;
+    if (enet_socket_bind(state.lan_scanner, &scanner_address) != 0) {
+        log_error("Failed to bind listener socket.");
+        return false;
+    }
+
+    return true;
+}
+
+void network_lan_scanner_destroy() {
+    if (state.lan_scanner != ENET_SOCKET_NULL) {
+        enet_socket_shutdown(state.lan_scanner, ENET_SOCKET_SHUTDOWN_READ_WRITE);
+        enet_socket_destroy(state.lan_scanner);
+        state.lan_scanner = ENET_SOCKET_NULL;
+    }
+}
+
+void network_steam_update_lobby_player_count() {
+    state.steam_lobby_player_count = network_get_player_count();
+    char buffer[2] = { (char)state.steam_lobby_player_count, '\0' };
+    SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT, buffer);
+}
+
 void network_handle_message(uint16_t peer_id, uint8_t* data, size_t length);
 
 bool network_init() {
     SteamNetworkingUtils()->InitRelayNetworkAccess();
+    SteamAPI_ManualDispatch_Init();
 
     if (enet_initialize() != 0) {
         log_error("Error initializing enet.");
@@ -43,8 +88,7 @@ bool network_init() {
     strncpy(state.username, SteamFriends()->GetPersonaName(), NETWORK_PLAYER_NAME_BUFFER_SIZE);
 
     state.host = NULL;
-    state.lobby_scanner = NULL;
-    state.lobby = NULL;
+    state.lan_scanner = ENET_SOCKET_NULL;
 
     return true;
 }
@@ -53,13 +97,16 @@ void network_quit() {
     if (state.status != NETWORK_STATUS_OFFLINE) {
         network_disconnect();
         if (state.host != NULL) {
-            delete state.host;
+            network_host_destroy(state.host);
         }
     }
     enet_deinitialize();
 }
 
 void network_set_backend(NetworkBackend backend) {
+    if (state.status != NETWORK_STATUS_OFFLINE) {
+        log_warn("Called network_set_backend() when not offline yet.");
+    }
     state.backend = backend;
 }
 
@@ -95,31 +142,111 @@ uint8_t network_get_player_count() {
 }
 
 void network_service() {
+    if (state.backend == NETWORK_BACKEND_LAN && state.lan_scanner != ENET_SOCKET_NULL) {
+        ENetSocketSet set;
+        ENET_SOCKETSET_EMPTY(set);
+        ENET_SOCKETSET_ADD(set, state.lan_scanner);
+        while (enet_socketset_select(state.lan_scanner, &set, NULL, 0) > 0) {
+            ENetAddress receive_address;
+            ENetBuffer receive_buffer;
+            char buffer[128]; 
+            receive_buffer.data = &buffer;
+            receive_buffer.dataLength = sizeof(buffer);
+            if (enet_socket_receive(state.lan_scanner, &receive_address, &receive_buffer, 1) <= 0) {
+                continue;
+            }
+
+            if (state.status == NETWORK_STATUS_HOST) {
+                // Tell the client about this lobby
+                NetworkLanLobbyInfo lobby_info;
+                strncpy(lobby_info.name, state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
+                lobby_info.port = state.host->lan.host->address.port;
+                lobby_info.player_count = network_get_player_count();
+                log_trace("sending lobby info. name %s player count %u port %u", lobby_info.name, lobby_info.player_count, lobby_info.port);
+
+                ENetBuffer response_buffer;
+                response_buffer.data = &lobby_info;
+                response_buffer.dataLength = sizeof(NetworkLanLobbyInfo);
+                enet_socket_send(state.lan_scanner, &receive_address, &response_buffer, 1);
+            } else {
+                // Server told us about a lobby
+                NetworkLanLobbyInfo lobby_info;
+                memcpy(&lobby_info, buffer, sizeof(NetworkLanLobbyInfo));
+                NetworkLobby lobby;
+                memcpy(&lobby.name, lobby_info.name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
+                lobby.player_count = lobby_info.player_count;
+                lobby.connection_info.lan.port = lobby_info.port;
+                enet_address_get_host_ip(&receive_address, lobby.connection_info.lan.ip, NETWORK_IP_BUFFER_SIZE);
+                if (strlen(state.lobby_name_query) == 0 || strstr(lobby.name, state.lobby_name_query) != NULL) {
+                    state.lobbies.push_back(lobby);
+                }
+            }
+        } // End while socket select
+    } // End if lan scanner is not null
+
     if (state.backend == NETWORK_BACKEND_STEAM) {
-        SteamAPI_RunCallbacks();
-    }
-    if (state.lobby_scanner != NULL) {
-        state.lobby_scanner->service();
-    }
-    if (state.lobby != NULL) {
-        if (state.status == NETWORK_STATUS_CONNECTING && state.lobby->get_status() == NETWORK_LOBBY_OPEN) {
-            state.events.push((NetworkEvent) {
-                .type = NETWORK_EVENT_LOBBY_CONNECTED
-            });
-            state.status = NETWORK_STATUS_HOST;
+        if (state.status == NETWORK_STATUS_HOST && state.steam_lobby_player_count != network_get_player_count()) {
+            network_steam_update_lobby_player_count();
         }
-        if (state.lobby->get_status() == NETWORK_LOBBY_OPEN) {
-            // It is safe to call this every time because the steam lobby will
-            // Cache the value and will not re-update through steam until it changes
-            // Calling this every time ensures the value stays updated
-            state.lobby->set_player_count(network_get_player_count());
-            state.lobby->service();
-        } 
-    }
+
+        HSteamPipe steam_pipe = SteamAPI_GetHSteamPipe();
+        SteamAPI_ManualDispatch_RunFrame(steam_pipe);
+        CallbackMsg_t callback;
+        while (SteamAPI_ManualDispatch_GetNextCallback(steam_pipe, &callback)) {
+            switch (callback.m_iCallback) {
+                case LobbyMatchList_t::k_iCallback: {
+                    LobbyMatchList_t* lobby_matchlist = (LobbyMatchList_t*)callback.m_pubParam;
+
+                    for (uint32_t lobby_index = 0; lobby_index < lobby_matchlist->m_nLobbiesMatching; lobby_index++) {
+                        CSteamID lobby_id = SteamMatchmaking()->GetLobbyByIndex(lobby_index);
+                        NetworkLobby lobby;
+                        strncpy(lobby.name, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME), NETWORK_LOBBY_NAME_BUFFER_SIZE);
+                        memcpy(&lobby.player_count, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT), sizeof(uint8_t));
+                        strncpy(lobby.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(lobby.connection_info.steam.identity_str));
+                        log_trace("Found lobby %s host steam identity %s", lobby.name, lobby.connection_info.steam.identity_str);
+
+                        if (strlen(state.lobby_name_query) == 0 || strstr(state.lobby_name_query, lobby.name) != NULL) {
+                            state.lobbies.push_back(lobby);
+                        }
+                    }
+                    break;
+                }
+                case LobbyCreated_t::k_iCallback: {
+                    LobbyCreated_t* lobby_created = (LobbyCreated_t*)callback.m_pubParam;
+
+                    if (lobby_created->m_eResult != k_EResultOK) {
+                        state.status = NETWORK_STATUS_OFFLINE;
+                        state.events.push((NetworkEvent) {
+                            .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
+                        });
+                        break;
+                    }
+
+                    state.steam_lobby_id = lobby_created->m_ulSteamIDLobby;
+                    SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME, state.lobby_name);
+                    NetworkConnectionInfo connection_info = network_host_get_connection_info(state.host);
+                    SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY, connection_info.steam.identity_str);
+
+                    network_steam_update_lobby_player_count();
+
+                    state.events.push((NetworkEvent) {
+                        .type = NETWORK_EVENT_LOBBY_CONNECTED
+                    });
+                    state.status = NETWORK_STATUS_HOST;
+                    break;
+                }
+                default:
+                    break;
+            } // End switch steam callback type
+
+            SteamAPI_ManualDispatch_FreeLastCallback(steam_pipe);
+        } // End while steam getnextcallback
+    } // End if backend is steam
+
     if (state.host != NULL) {
-        state.host->service();
+        network_host_service(state.host);
         NetworkHostEvent event;
-        while (state.host != NULL && state.status != NETWORK_STATUS_OFFLINE && state.host->poll_events(&event)) {
+        while (state.host != NULL && network_host_poll_events(state.host, &event)) {
             switch (event.type) {
                 case NETWORK_HOST_EVENT_CONNECTED: {
                     if (state.status == NETWORK_STATUS_CONNECTING) {
@@ -129,8 +256,8 @@ void network_service() {
                         strncpy(message.username, state.username, NETWORK_PLAYER_NAME_BUFFER_SIZE);
                         strncpy(message.app_version, APP_VERSION, sizeof(APP_VERSION));
 
-                        state.host->send(event.connected.peer_id, &message, sizeof(message));
-                        state.host->flush();
+                        network_host_send(state.host, event.connected.peer_id, &message, sizeof(message));
+                        network_host_flush(state.host);
                     } else if (state.status != NETWORK_STATUS_HOST) {
                         // Client greets client
                         log_info("New client joined. Sending greeting...");
@@ -138,11 +265,9 @@ void network_service() {
                         message.player_id = state.player_id;
                         memcpy(&message.player, &state.players[state.player_id], sizeof(NetworkPlayer));
 
-                        state.host->send(event.connected.peer_id, &message, sizeof(message));
-                        state.host->flush();
-                    } else if (state.status == NETWORK_STATUS_HOST) {
-                        state.lobby->set_player_count(state.host->get_peer_count() + 1);
-                    }
+                        network_host_send(state.host, event.connected.peer_id, &message, sizeof(message));
+                        network_host_flush(state.host);
+                    } 
                     break;
                 } // End case CONNECTED
                 case NETWORK_HOST_EVENT_DISCONNECTED: {
@@ -153,7 +278,7 @@ void network_service() {
                     }
 
                     if (state.status == NETWORK_STATUS_DISCONNECTING || state.status == NETWORK_STATUS_CONNECTING) {
-                        delete state.host;
+                        network_host_destroy(state.host);
                         state.host = NULL;
                         state.status = NETWORK_STATUS_OFFLINE;
                         break;
@@ -199,37 +324,34 @@ bool network_poll_events(NetworkEvent* event) {
 }
 
 void network_disconnect() {
-    if (state.lobby_scanner != NULL) {
-        delete state.lobby_scanner;
-        state.lobby_scanner = NULL;
-    }
-
-    if (state.lobby != NULL) {
-        state.lobby->close();
-        delete state.lobby;
-        state.lobby = NULL;
-    }
-
     if (state.status == NETWORK_STATUS_OFFLINE) {
         log_warn("network_disconnect() called while offline.");
         return;
     }
+
+    if (state.backend == NETWORK_BACKEND_LAN && state.lan_scanner != ENET_SOCKET_NULL) {
+        network_lan_scanner_destroy();
+    }
+    if (state.backend == NETWORK_BACKEND_STEAM && state.status == NETWORK_STATUS_HOST) {
+        SteamMatchmaking()->LeaveLobby(state.steam_lobby_id);
+    }
+
     if (state.host != NULL) {
         uint16_t connected_peers = 0;
-        for (uint16_t peer_id = 0; peer_id < state.host->get_peer_count(); peer_id++) {
-            if (state.host->is_peer_connected(peer_id)) {
+        for (uint16_t peer_id = 0; peer_id < network_host_get_peer_count(state.host); peer_id++) {
+            if (network_host_is_peer_connected(state.host, peer_id)) {
                 connected_peers++;
-                state.host->disconnect_peer(peer_id, state.status == NETWORK_STATUS_HOST || state.status == NETWORK_STATUS_CONNECTED);
+                network_host_disconnect_peer(state.host, peer_id, state.status == NETWORK_STATUS_HOST || state.status == NETWORK_STATUS_CONNECTED);
             }
         }
-        state.host->flush();
+        network_host_flush(state.host);
 
         if (state.status == NETWORK_STATUS_HOST || 
                 state.status == NETWORK_STATUS_CONNECTING || 
                 state.status == NETWORK_STATUS_DISCONNECTING || 
                 state.backend == NETWORK_BACKEND_STEAM || 
                 connected_peers == 0) {
-            delete state.host;
+            network_host_destroy(state.host);
             state.host = NULL;
             state.status = NETWORK_STATUS_OFFLINE;
         } else if (state.status == NETWORK_STATUS_CONNECTED) {
@@ -242,27 +364,43 @@ void network_disconnect() {
 // Lobbies
 
 void network_search_lobbies(const char* query) {
-    if (state.lobby_scanner == NULL) {
-        if (state.backend == NETWORK_BACKEND_LAN) {
-            state.lobby_scanner = new NetworkLanLobbyScanner();
-        } else {
-            state.lobby_scanner = new NetworkSteamLobbyScanner();
+    strncpy(state.lobby_name_query, query, NETWORK_LOBBY_NAME_BUFFER_SIZE);
+    state.lobbies.clear();
+
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        if (state.lan_scanner == ENET_SOCKET_NULL) {
+            if (!network_lan_scanner_create()) {
+                return;
+            }
         }
+
+        ENetAddress scan_address;
+        scan_address.host = ENET_HOST_BROADCAST;
+        scan_address.port = NETWORK_SCANNER_PORT;
+
+        char buffer = 3;
+        ENetBuffer send_buffer;
+        send_buffer.data = &buffer;
+        send_buffer.dataLength = 1;
+        if (enet_socket_send(state.lan_scanner, &scan_address, &send_buffer, 1) != 1) {
+            log_error("Failed to scan for LAN servers.");
+        }
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        SteamMatchmaking()->RequestLobbyList();
     }
-
-    state.lobby_scanner->search(query);
 }
 
-size_t network_get_matchlist_size() {
-    return state.lobby_scanner->get_matchlist_size();
+size_t network_get_lobby_count() {
+    return state.lobbies.size();
 }
 
-const NetworkMatchlistEntry& network_get_matchlist_entry(size_t index) {
-    return state.lobby_scanner->get_matchlist_entry(index);
+const NetworkLobby& network_get_lobby(size_t index) {
+    return state.lobbies[index];
 }
 
 void network_open_lobby(const char* lobby_name) {
-    if (!network_host_create()) {
+    state.host = network_host_create(state.backend);
+    if (state.host == NULL) {
         state.events.push((NetworkEvent) {
             .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
         });
@@ -270,31 +408,42 @@ void network_open_lobby(const char* lobby_name) {
         return;
     }
 
-    if (!network_lobby_create()) {
-        delete state.host;
-        state.host = NULL;
-        return;
-    }
-    state.lobby->open(lobby_name, state.host->get_connection_info());
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_scanner_destroy();
+        if (!network_lan_listener_create()) {
+            network_host_destroy(state.host);
+            state.events.push((NetworkEvent) {
+                .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
+            });
+            state.status = NETWORK_STATUS_OFFLINE;
+            return;
+        }
 
-    delete state.lobby_scanner;
-    state.lobby_scanner = NULL;
+        state.events.push((NetworkEvent) {
+            .type = NETWORK_EVENT_LOBBY_CONNECTED
+        });
+        state.status = NETWORK_STATUS_HOST;
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, 2);
+        state.status = NETWORK_STATUS_CONNECTING;
+    }
 
     strncpy(state.lobby_name, lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
+
+    memset(state.players, 0, sizeof(state.players));
+    memset(state.match_settings, 0, sizeof(state.match_settings));
 
     state.player_id = 0;
     strncpy(state.players[0].name, state.username, NETWORK_PLAYER_NAME_BUFFER_SIZE);
     state.players[0].status = NETWORK_PLAYER_STATUS_HOST;
     state.players[0].team = 0;
 
-    memset(state.match_settings, 0, sizeof(state.match_settings));
-    state.status = NETWORK_STATUS_CONNECTING;
-
     log_info("Created server.");
 }
 
 void network_join_lobby(size_t index) {
-    if (!network_host_create()) {
+    state.host = network_host_create(state.backend);
+    if (state.host == NULL) {
         state.events.push((NetworkEvent) {
             .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
         });
@@ -302,19 +451,18 @@ void network_join_lobby(size_t index) {
         return;
     }
 
-    NetworkConnectionInfo connection_info = state.lobby_scanner->get_matchlist_entry(index).connection_info;
-    if (!state.host->connect(connection_info)) {
+    NetworkConnectionInfo connection_info = state.lobbies[index].connection_info;
+    if (!network_host_connect(state.host, connection_info)) {
+        network_host_destroy(state.host);
         state.events.push((NetworkEvent) {
             .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
         });
-        delete state.host;
-        state.host = NULL;
-        state.status = NETWORK_STATUS_OFFLINE;
         return;
     }
 
-    delete state.lobby_scanner;
-    state.lobby_scanner = NULL;
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_scanner_destroy();
+    }
 
     memset(state.players, 0, sizeof(state.players));
     state.status = NETWORK_STATUS_CONNECTING;
@@ -328,16 +476,16 @@ void network_send_chat(const char* message) {
     NetworkMessageChat out_message;
     strcpy(out_message.message, message);
 
-    state.host->broadcast(&out_message, sizeof(out_message));
-    state.host->flush();
+    network_host_broadcast(state.host, &out_message, sizeof(out_message));
+    network_host_flush(state.host);
 }
 
 void network_set_player_ready(bool ready) {
     state.players[state.player_id].status = ready ? NETWORK_PLAYER_STATUS_READY : NETWORK_PLAYER_STATUS_NOT_READY;
 
     uint8_t message = ready ? NETWORK_MESSAGE_SET_READY : NETWORK_MESSAGE_SET_NOT_READY;
-    state.host->broadcast(&message, sizeof(message));
-    state.host->flush();
+    network_host_broadcast(state.host, &message, sizeof(message));
+    network_host_flush(state.host);
 }
 
 void network_set_player_color(uint8_t color) {
@@ -346,8 +494,8 @@ void network_set_player_color(uint8_t color) {
 
     state.players[state.player_id].recolor_id = color;
 
-    state.host->broadcast(&message, sizeof(message));
-    state.host->flush();
+    network_host_broadcast(state.host, &message, sizeof(message));
+    network_host_flush(state.host);
 }
 
 void network_set_match_setting(uint8_t setting, uint8_t value) {
@@ -356,8 +504,8 @@ void network_set_match_setting(uint8_t setting, uint8_t value) {
     message.value = value;
     state.match_settings[setting] = value;
 
-    state.host->broadcast(&message, sizeof(message));
-    state.host->flush();
+    network_host_broadcast(state.host, &message, sizeof(message));
+    network_host_flush(state.host);
 }
 
 uint8_t network_get_match_setting(uint8_t setting) {
@@ -369,14 +517,16 @@ void network_set_player_team(uint8_t team) {
     NetworkMessageSetTeam message;
     message.team = team;
 
-    state.host->broadcast(&message, sizeof(message));
-    state.host->flush();
+    network_host_broadcast(state.host, &message, sizeof(message));
+    network_host_flush(state.host);
 }
 
 void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
-    state.lobby->close();
-    delete state.lobby;
-    state.lobby = NULL;
+    if (state.backend == NETWORK_BACKEND_LAN) {
+        network_lan_scanner_destroy();
+    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+        SteamMatchmaking()->LeaveLobby(state.steam_lobby_id);
+    }
 
     // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -398,52 +548,19 @@ void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
     memcpy(message + 13, &noise.map[0], noise.width * noise.height * sizeof(int8_t));
 
     // Send the packet
-    state.host->broadcast(message, message_size);
-    state.host->flush();
+    network_host_broadcast(state.host, message, message_size);
+    network_host_flush(state.host);
 
     free(message);
 }
 
 void network_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
     out_buffer[0] = NETWORK_MESSAGE_INPUT;
-    state.host->broadcast(out_buffer, out_buffer_length);
-    state.host->flush();
+    network_host_broadcast(state.host, out_buffer, out_buffer_length);
+    network_host_flush(state.host);
 }
 
 // INTERNAL
-
-bool network_host_create() {
-    if (state.backend == NETWORK_BACKEND_LAN) {
-        state.host = new NetworkLanHost();
-    } else {
-        state.host = new NetworkSteamHost();
-    }
-    if (!state.host->was_create_successful()) {
-        delete state.host;
-        return false;
-    }
-
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        state.players[player_id].status = NETWORK_PLAYER_STATUS_NONE;
-    }
-
-    return true;
-}
-
-bool network_lobby_create() {
-    if (state.backend == NETWORK_BACKEND_LAN) {
-        state.lobby = new NetworkLanLobby();
-    } else {
-        state.lobby = new NetworkSteamLobby();
-    }
-    if (state.lobby->get_status() == NETWORK_LOBBY_ERROR) {
-        delete state.lobby;
-        state.lobby = NULL;
-        return false;
-    }
-
-    return true;
-}
 
 void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t length) {
     uint8_t message_type = data[0];
@@ -460,8 +577,8 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 log_info("Client tried to connect while server is no longer in lobby. Rejecting...");
 
                 uint8_t message = NETWORK_MESSAGE_GAME_ALREADY_STARTED;
-                state.host->send(incoming_peer_id, &message, sizeof(message));
-                state.host->flush();
+                network_host_send(state.host, incoming_peer_id, &message, sizeof(message));
+                network_host_flush(state.host);
 
                 return;
             }
@@ -471,8 +588,8 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 log_info("Client app version mismatch. Rejecting client...");
 
                 uint8_t message = NETWORK_MESSAGE_INVALID_VERSION;
-                state.host->send(incoming_peer_id, &message, sizeof(message));
-                state.host->flush();
+                network_host_send(state.host, incoming_peer_id, &message, sizeof(message));
+                network_host_flush(state.host);
 
                 return;
             }
@@ -527,7 +644,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             state.players[incoming_player_id].team = team1_count <= team2_count ? 0 : 1;
 
             // Setup incoming player / peer mapping
-            state.host->set_peer_player_id(incoming_peer_id, incoming_player_id);
+            network_host_set_peer_player_id(state.host, incoming_peer_id, incoming_player_id);
 
             // Send the welcome packet
             NetworkMessageWelcome response;
@@ -540,24 +657,24 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             strncpy(response.lobby_name, state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
             memcpy(response.match_settings, state.match_settings, sizeof(state.match_settings));
 
-            state.host->send(incoming_peer_id, &response, sizeof(response));
+            network_host_send(state.host, incoming_peer_id, &response, sizeof(response));
             log_trace("Sent welcome packet to player %u", incoming_player_id);
 
             // Build new player message
             uint8_t new_player_message[NETWORK_IP_BUFFER_SIZE + 4];
             new_player_message[0] = NETWORK_MESSAGE_NEW_PLAYER;
             size_t new_player_message_size = 1;
-            new_player_message_size += state.host->buffer_peer_connection_info(incoming_peer_id, new_player_message + new_player_message_size);
+            new_player_message_size = network_host_buffer_peer_connection_info(state.host, incoming_peer_id, new_player_message + new_player_message_size);
 
             // Tell the other players about this new one
-            for (uint16_t peer_id = 0; peer_id < state.host->get_peer_count(); peer_id++) {
+            for (uint16_t peer_id = 0; peer_id < network_host_get_peer_count(state.host); peer_id++) {
                 if (peer_id == incoming_peer_id) {
                     continue;
                 }
 
-                state.host->send(peer_id, new_player_message, new_player_message_size);
+                network_host_send(state.host, peer_id, new_player_message, new_player_message_size);
             }
-            state.host->flush();
+            network_host_flush(state.host);
 
             state.events.push((NetworkEvent) {
                 .type = NETWORK_EVENT_PLAYER_CONNECTED,
@@ -593,7 +710,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             strncpy(state.players[0].name, incoming_message.server_username, MAX_USERNAME_LENGTH + 1);
             state.players[0].recolor_id = incoming_message.server_recolor_id;
             state.players[0].team = incoming_message.server_team;
-            state.host->set_peer_player_id(incoming_peer_id, 0);
+            network_host_set_peer_player_id(state.host, incoming_peer_id, 0);
 
             // Get lobby name and settings
             strncpy(state.lobby_name, incoming_message.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
@@ -609,8 +726,8 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 return;
             }
 
-            NetworkConnectionInfo connection_info = state.host->parse_connection_info(data + 1);
-            if (!state.host->connect(connection_info)) {
+            NetworkConnectionInfo connection_info = network_parse_connection_info(state.backend, data + 1); 
+            if (!network_host_connect(state.host, connection_info)) {
                 log_error("Unable to connect to new player.");
                 return;
             }
@@ -626,7 +743,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             memcpy(&incoming_message, data, sizeof(incoming_message));
 
             memcpy(&state.players[incoming_message.player_id], &incoming_message.player, sizeof(NetworkPlayer));
-            state.host->set_peer_player_id(incoming_peer_id, incoming_message.player_id);
+            network_host_set_peer_player_id(state.host, incoming_peer_id, incoming_message.player_id);
             break;
         }
         case NETWORK_MESSAGE_SET_READY:
@@ -635,7 +752,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 return;
             }
 
-            uint8_t player_id = state.host->get_peer_player_id(incoming_peer_id); 
+            uint8_t player_id = network_host_get_peer_player_id(state.host, incoming_peer_id); 
             state.players[player_id].status = message_type == NETWORK_MESSAGE_SET_READY ? NETWORK_PLAYER_STATUS_READY : NETWORK_PLAYER_STATUS_NOT_READY;
             break;
         }
@@ -644,7 +761,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 return;
             }
 
-            uint8_t player_id = state.host->get_peer_player_id(incoming_peer_id); 
+            uint8_t player_id = network_host_get_peer_player_id(state.host, incoming_peer_id); 
             state.players[player_id].recolor_id = data[1];
             break;
         }
@@ -653,7 +770,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 return;
             }
 
-            uint8_t player_id = state.host->get_peer_player_id(incoming_peer_id); 
+            uint8_t player_id = network_host_get_peer_player_id(state.host, incoming_peer_id); 
             state.players[player_id].team = data[1];
 
             break;
@@ -665,7 +782,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
 
             NetworkEvent event;
             event.type = NETWORK_EVENT_CHAT;
-            event.chat.player_id = state.host->get_peer_player_id(incoming_peer_id);
+            event.chat.player_id = network_host_get_peer_player_id(state.host, incoming_peer_id);
             strncpy(event.chat.message, (char*)(data + 1), NETWORK_CHAT_BUFFER_SIZE);
             state.events.push(event);
 
@@ -682,6 +799,10 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
         case NETWORK_MESSAGE_LOAD_MATCH: {
             if (state.status != NETWORK_STATUS_CONNECTED) {
                 return;
+            }
+
+            if (state.backend == NETWORK_BACKEND_LAN) {
+                network_lan_scanner_destroy();
             }
 
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -709,7 +830,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             NetworkEvent event;
             event.type = NETWORK_EVENT_INPUT;
             event.input.in_buffer_length = length;
-            event.input.player_id = state.host->get_peer_player_id(incoming_peer_id);
+            event.input.player_id = network_host_get_peer_player_id(state.host, incoming_peer_id);
             GOLD_ASSERT(length <= 1024);
             memcpy(event.input.in_buffer, data, length);
 
