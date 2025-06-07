@@ -15,7 +15,7 @@
 #include "replay.h"
 #include <algorithm>
 
-static const uint32_t TURN_OFFSET = 2;
+static const uint32_t TURN_OFFSET = 4;
 static const uint32_t TURN_DURATION = 4;
 
 static const uint32_t UI_STATUS_DURATION = 60;

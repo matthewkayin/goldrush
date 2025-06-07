@@ -4,7 +4,7 @@
 
 void NetworkSteamLobby::open(const char* name, NetworkConnectionInfo connection_info) {
     strncpy(lobby_name, name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
-    lobby_player_count = 1;
+    lobby_player_count = 0;
     SteamAPICall_t api_call = SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, 2);
     call_result_lobby_created.Set(api_call, this, &NetworkSteamLobby::on_lobby_created);
     this->connection_info = connection_info;

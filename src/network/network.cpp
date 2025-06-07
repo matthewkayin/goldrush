@@ -422,6 +422,11 @@ bool network_host_create() {
         delete state.host;
         return false;
     }
+
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        state.players[player_id].status = NETWORK_PLAYER_STATUS_NONE;
+    }
+
     return true;
 }
 
