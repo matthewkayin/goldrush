@@ -43,6 +43,10 @@ enum GameMode {
     GAME_MODE_LOADING
 };
 
+struct LoadMenuParams {
+    uint64_t steam_invite_id;
+};
+
 struct LoadMatchParams {
     int32_t lcg_seed;
     Noise noise;
@@ -55,6 +59,7 @@ struct LoadReplayParams {
 struct LoadParams {
     GameMode mode;
     union {
+        LoadMenuParams menu;
         LoadMatchParams match;
         LoadReplayParams replay;
     };
@@ -73,6 +78,10 @@ static GameState state;
 static int game_load_next_mode(void* ptr) {
     if (state.load_params.mode == GAME_MODE_MENU) {
         state.menu = menu_init();
+        if (state.load_params.menu.steam_invite_id != 0) {
+            network_set_backend(NETWORK_BACKEND_STEAM);
+            network_steam_accept_invite(state.load_params.menu.steam_invite_id);
+        }
     } else if (state.load_params.mode == GAME_MODE_MATCH) {
         state.match = match_ui_init(state.load_params.match.lcg_seed, state.load_params.match.noise);
         free(state.load_params.match.noise.map);
@@ -100,9 +109,9 @@ int gold_main(int argc, char** argv) {
 
     char logfile_path[128];
     sprintf(logfile_path, "logs/latest.log");
+    uint64_t steam_invite_id = 0;
 
     // Parse system arguments
-    #ifdef GOLD_DEBUG
     for (int argn = 1; argn < argc; argn++) {
         if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
             argn++;
@@ -112,8 +121,11 @@ int gold_main(int argc, char** argv) {
             argn++;
             replay_debug_set_file_name(argv[argn]);
         }
+        if (strcmp(argv[argn], "+connect_lobby") == 0 && argn + 1 < argc) {
+            argn++;
+            steam_invite_id = std::stoull(argv[argn]);
+        }
     }
-    #endif
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         return -1;
@@ -184,7 +196,10 @@ int gold_main(int argc, char** argv) {
     uint32_t ups = 0;
 
     game_set_mode((LoadParams) {
-        .mode = GAME_MODE_MENU
+        .mode = GAME_MODE_MENU,
+        .menu = (LoadMenuParams) {
+            .steam_invite_id = steam_invite_id
+        }
     });
 
     while (is_running) {
@@ -305,7 +320,10 @@ int gold_main(int argc, char** argv) {
                     if (state.match.mode == MATCH_UI_MODE_LEAVE_MATCH) {
                         sound_end_fire_loop();
                         game_set_mode((LoadParams) {
-                            .mode = GAME_MODE_MENU
+                            .mode = GAME_MODE_MENU,
+                            .menu = (LoadMenuParams) {
+                                .steam_invite_id = 0
+                            }
                         });
                     }
                     break;

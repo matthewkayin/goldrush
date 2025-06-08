@@ -15,6 +15,7 @@ struct NetworkState {
     NetworkHost* host;
     ENetSocket lan_scanner;
     CSteamID steam_lobby_id;
+    CSteamID steam_invite_lobby_id;
     uint8_t steam_lobby_player_count;
 
     NetworkPlayer players[MAX_PLAYERS];
@@ -89,6 +90,7 @@ bool network_init() {
 
     state.host = NULL;
     state.lan_scanner = ENET_SOCKET_NULL;
+    state.steam_invite_lobby_id.Clear();
 
     return true;
 }
@@ -184,70 +186,110 @@ void network_service() {
         } // End while socket select
     } // End if lan scanner is not null
 
-    if (state.backend == NETWORK_BACKEND_STEAM) {
-        if (state.status == NETWORK_STATUS_HOST && state.steam_lobby_player_count != network_get_player_count()) {
-            network_steam_update_lobby_player_count();
-        }
+    if (state.backend == NETWORK_BACKEND_STEAM && state.status == NETWORK_STATUS_HOST && state.steam_lobby_player_count != network_get_player_count()) {
+        network_steam_update_lobby_player_count();
+    }
 
-        HSteamPipe steam_pipe = SteamAPI_GetHSteamPipe();
-        SteamAPI_ManualDispatch_RunFrame(steam_pipe);
-        CallbackMsg_t callback;
-        while (SteamAPI_ManualDispatch_GetNextCallback(steam_pipe, &callback)) {
-            switch (callback.m_iCallback) {
-                case LobbyMatchList_t::k_iCallback: {
-                    LobbyMatchList_t* lobby_matchlist = (LobbyMatchList_t*)callback.m_pubParam;
-
-                    for (uint32_t lobby_index = 0; lobby_index < lobby_matchlist->m_nLobbiesMatching; lobby_index++) {
-                        CSteamID lobby_id = SteamMatchmaking()->GetLobbyByIndex(lobby_index);
-                        NetworkLobby lobby;
-                        strncpy(lobby.name, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME), NETWORK_LOBBY_NAME_BUFFER_SIZE);
-                        memcpy(&lobby.player_count, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT), sizeof(uint8_t));
-                        strncpy(lobby.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(lobby.connection_info.steam.identity_str));
-                        log_trace("Found lobby %s host steam identity %s lobby query %s", lobby.name, lobby.connection_info.steam.identity_str, state.lobby_name_query);
-
-                        if (strlen(state.lobby_name_query) == 0 || strstr(lobby.name, state.lobby_name_query) != NULL) {
-                            log_trace("added lobby.");
-                            state.lobbies.push_back(lobby);
-                        }
-                    }
+    HSteamPipe steam_pipe = SteamAPI_GetHSteamPipe();
+    SteamAPI_ManualDispatch_RunFrame(steam_pipe);
+    CallbackMsg_t callback;
+    while (SteamAPI_ManualDispatch_GetNextCallback(steam_pipe, &callback)) {
+        switch (callback.m_iCallback) {
+            case LobbyMatchList_t::k_iCallback: {
+                if (state.backend != NETWORK_BACKEND_STEAM) {
                     break;
                 }
-                case LobbyCreated_t::k_iCallback: {
-                    LobbyCreated_t* lobby_created = (LobbyCreated_t*)callback.m_pubParam;
 
-                    if (lobby_created->m_eResult != k_EResultOK) {
-                        state.status = NETWORK_STATUS_OFFLINE;
-                        state.events.push((NetworkEvent) {
-                            .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
-                        });
-                        break;
+                LobbyMatchList_t* lobby_matchlist = (LobbyMatchList_t*)callback.m_pubParam;
+
+                for (uint32_t lobby_index = 0; lobby_index < lobby_matchlist->m_nLobbiesMatching; lobby_index++) {
+                    CSteamID lobby_id = SteamMatchmaking()->GetLobbyByIndex(lobby_index);
+                    NetworkLobby lobby;
+                    strncpy(lobby.name, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME), NETWORK_LOBBY_NAME_BUFFER_SIZE);
+                    memcpy(&lobby.player_count, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT), sizeof(uint8_t));
+                    strncpy(lobby.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(lobby.connection_info.steam.identity_str));
+                    log_trace("Found lobby %s host steam identity %s lobby query %s", lobby.name, lobby.connection_info.steam.identity_str, state.lobby_name_query);
+
+                    if (strlen(state.lobby_name_query) == 0 || strstr(lobby.name, state.lobby_name_query) != NULL) {
+                        log_trace("added lobby.");
+                        state.lobbies.push_back(lobby);
                     }
+                }
+                break;
+            }
+            case LobbyCreated_t::k_iCallback: {
+                if (state.backend != NETWORK_BACKEND_STEAM) {
+                    break;
+                }
 
-                    state.steam_lobby_id = lobby_created->m_ulSteamIDLobby;
-                    SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME, state.lobby_name);
-                    NetworkConnectionInfo connection_info = network_host_get_connection_info(state.host);
-                    SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY, connection_info.steam.identity_str);
+                LobbyCreated_t* lobby_created = (LobbyCreated_t*)callback.m_pubParam;
 
-                    network_steam_update_lobby_player_count();
-
+                if (lobby_created->m_eResult != k_EResultOK) {
+                    state.status = NETWORK_STATUS_OFFLINE;
                     state.events.push((NetworkEvent) {
-                        .type = NETWORK_EVENT_LOBBY_CONNECTED
+                        .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
                     });
-                    state.status = NETWORK_STATUS_HOST;
                     break;
                 }
-                case SteamNetConnectionStatusChangedCallback_t::k_iCallback: {
-                    SteamNetConnectionStatusChangedCallback_t* connection_status_changed = (SteamNetConnectionStatusChangedCallback_t*)callback.m_pubParam;
-                    network_host_steam_on_connection_status_changed(state.host, connection_status_changed);
-                    break;
-                }
-                default:
-                    break;
-            } // End switch steam callback type
 
-            SteamAPI_ManualDispatch_FreeLastCallback(steam_pipe);
-        } // End while steam getnextcallback
-    } // End if backend is steam
+                state.steam_lobby_id = lobby_created->m_ulSteamIDLobby;
+                SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME, state.lobby_name);
+                NetworkConnectionInfo connection_info = network_host_get_connection_info(state.host);
+                SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY, connection_info.steam.identity_str);
+
+                network_steam_update_lobby_player_count();
+
+                state.events.push((NetworkEvent) {
+                    .type = NETWORK_EVENT_LOBBY_CONNECTED
+                });
+                state.status = NETWORK_STATUS_HOST;
+                break;
+            }
+            case SteamNetConnectionStatusChangedCallback_t::k_iCallback: {
+                if (state.backend != NETWORK_BACKEND_STEAM) {
+                    break;
+                }
+
+                SteamNetConnectionStatusChangedCallback_t* connection_status_changed = (SteamNetConnectionStatusChangedCallback_t*)callback.m_pubParam;
+                network_host_steam_on_connection_status_changed(state.host, connection_status_changed);
+                break;
+            }
+            case GameLobbyJoinRequested_t::k_iCallback: {
+                if (state.status != NETWORK_STATUS_OFFLINE) {
+                    break;
+                }
+
+                GameLobbyJoinRequested_t* join_requested = (GameLobbyJoinRequested_t*)callback.m_pubParam;
+                network_steam_accept_invite(join_requested->m_steamIDLobby);
+                break;
+            }
+            case LobbyDataUpdate_t::k_iCallback: {
+                if (state.status != NETWORK_STATUS_OFFLINE || !state.steam_invite_lobby_id.IsValid()) {
+                    break;
+                }
+
+                LobbyDataUpdate_t* lobby_data_update = (LobbyDataUpdate_t*)callback.m_pubParam;
+                if (!lobby_data_update->m_bSuccess) {
+                    break;
+                }
+                if (lobby_data_update->m_ulSteamIDLobby != state.steam_invite_lobby_id.ConvertToUint64()) {
+                    break;
+                }
+
+                NetworkEvent event;
+                event.type = NETWORK_EVENT_STEAM_INVITE;
+                strncpy(event.steam_invite.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(state.steam_invite_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(event.steam_invite.connection_info.steam.identity_str));
+                state.events.push(event);
+                state.steam_invite_lobby_id.Clear();
+
+                break;
+            }
+            default:
+                break;
+        } // End switch steam callback type
+
+        SteamAPI_ManualDispatch_FreeLastCallback(steam_pipe);
+    } // End while steam getnextcallback
 
     if (state.host != NULL) {
         network_host_service(state.host);
@@ -447,7 +489,7 @@ void network_open_lobby(const char* lobby_name) {
     log_info("Created server.");
 }
 
-void network_join_lobby(size_t index) {
+void network_join_lobby(NetworkConnectionInfo connection_info) {
     state.host = network_host_create(state.backend);
     if (state.host == NULL) {
         state.events.push((NetworkEvent) {
@@ -457,7 +499,6 @@ void network_join_lobby(size_t index) {
         return;
     }
 
-    NetworkConnectionInfo connection_info = state.lobbies[index].connection_info;
     if (!network_host_connect(state.host, connection_info)) {
         network_host_destroy(state.host);
         state.events.push((NetworkEvent) {
@@ -472,6 +513,11 @@ void network_join_lobby(size_t index) {
 
     memset(state.players, 0, sizeof(state.players));
     state.status = NETWORK_STATUS_CONNECTING;
+}
+
+void network_steam_accept_invite(CSteamID lobby_id) {
+    state.steam_invite_lobby_id = lobby_id;
+    SteamMatchmaking()->RequestLobbyData(state.steam_invite_lobby_id);
 }
 
 const char* network_get_lobby_name() {

@@ -81,7 +81,8 @@ enum NetworkEventType {
     NETWORK_EVENT_PLAYER_CONNECTED,
     NETWORK_EVENT_CHAT,
     NETWORK_EVENT_MATCH_LOAD,
-    NETWORK_EVENT_INPUT
+    NETWORK_EVENT_INPUT,
+    NETWORK_EVENT_STEAM_INVITE
 };
 
 struct NetworkEventPlayerDisconnected {
@@ -108,6 +109,10 @@ struct NetworkEventInput {
     uint8_t player_id;
 };
 
+struct NetworkEventSteamInvite {
+    NetworkConnectionInfo connection_info;
+};
+
 struct NetworkEvent {
     NetworkEventType type;
     union {
@@ -116,6 +121,7 @@ struct NetworkEvent {
         NetworkEventChat chat;
         NetworkEventMatchLoad match_load;
         NetworkEventInput input;
+        NetworkEventSteamInvite steam_invite;
     };
 };
 

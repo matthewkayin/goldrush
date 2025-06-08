@@ -147,6 +147,18 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             network_send_chat(message);
             return;
         }
+        case NETWORK_EVENT_STEAM_INVITE: {
+            if (state.mode == MENU_MODE_LOBBY) {
+                log_info("Ignoring steam invite because we're in a lobby already.");
+                return;
+            }
+
+            network_disconnect();
+            network_set_backend(NETWORK_BACKEND_STEAM);
+            network_join_lobby(event.steam_invite.connection_info);
+            menu_set_mode(state, MENU_MODE_CONNECTING);
+            return;
+        }
         default:
             return;
     }
@@ -311,7 +323,7 @@ void menu_update(MenuState& state) {
             }
             if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
                 if (ui_button("Join")) {
-                    network_join_lobby(state.lobbylist_item_selected);
+                    network_join_lobby(network_get_lobby(state.lobbylist_item_selected).connection_info);
                     menu_set_mode(state, MENU_MODE_CONNECTING);
                 }
             }
