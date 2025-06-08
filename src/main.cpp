@@ -93,6 +93,7 @@ static int game_load_next_mode(void* ptr) {
 }
 
 void game_set_mode(LoadParams params) {
+    input_stop_text_input();
     state.load_params = params;
     state.mode = GAME_MODE_LOADING;
     state.loading_animation = animation_create(ANIMATION_UNIT_BUILD);

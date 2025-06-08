@@ -824,6 +824,7 @@ void match_ui_handle_input(MatchUiState& state) {
 }
 
 void match_ui_update(MatchUiState& state) {
+    ui_begin();
     if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
         if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
             network_set_player_ready(true);
@@ -862,7 +863,6 @@ void match_ui_update(MatchUiState& state) {
 
     // Menu
     // Always call UI begin to make sure everything is cleared out from the main menu
-    ui_begin();
     ui_set_input_enabled(state.options_menu.mode == OPTIONS_MENU_CLOSED);
     if (match_ui_is_in_menu(state.mode)) {
         ui_frame_rect(MENU_RECT);

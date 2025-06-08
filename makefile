@@ -46,6 +46,7 @@ else
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-image)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-ttf)
+	LINKER_FLAGS += -Llib/osx -lsteam_api 
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
