@@ -205,7 +205,7 @@ void network_service() {
                         strncpy(lobby.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(lobby.connection_info.steam.identity_str));
                         log_trace("Found lobby %s host steam identity %s lobby query %s", lobby.name, lobby.connection_info.steam.identity_str, state.lobby_name_query);
 
-                        if (strlen(state.lobby_name_query) == 0 || strstr(state.lobby_name_query, lobby.name) != NULL) {
+                        if (strlen(state.lobby_name_query) == 0 || strstr(lobby.name, state.lobby_name_query) != NULL) {
                             log_trace("added lobby.");
                             state.lobbies.push_back(lobby);
                         }
