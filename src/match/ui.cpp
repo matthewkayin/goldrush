@@ -1048,7 +1048,7 @@ void match_ui_update(MatchUiState& state) {
                 if (state.sound_cooldown_timers[event.sound.sound] != 0) {
                     break;
                 }
-                if (!match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, event.sound.position / TILE_SIZE, 1)) {
+                if (!match_ui_is_cell_rect_revealed(state, event.sound.position / TILE_SIZE, 1)) {
                     break;
                 }
                 if (SOUND_LISTEN_RECT.has_point(event.sound.position - state.camera_offset)) {

@@ -2386,6 +2386,9 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
     }
 
     bool attack_missed = accuracy < lcg_rand(&state.lcg_seed) % 100;
+    if (attack_missed) {
+        log_trace("Entity %s ID %u missed", attacker_data.name, attacker_id);
+    }
     bool attack_is_melee = attack_with_bayonets || attacker_data.unit_data.range_squared == 1;
     if (attack_missed && attack_is_melee) {
         return;
