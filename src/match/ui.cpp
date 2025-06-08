@@ -861,7 +861,7 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Menu
-    // Alwyas call UI begin to make sure everything is cleared out from the main menu
+    // Always call UI begin to make sure everything is cleared out from the main menu
     ui_begin();
     ui_set_input_enabled(state.options_menu.mode == OPTIONS_MENU_CLOSED);
     if (match_ui_is_in_menu(state.mode)) {
