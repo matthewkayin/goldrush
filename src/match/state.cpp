@@ -813,6 +813,19 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     Entity& entity = state.entities[entity_index];
     const EntityData& entity_data = entity_get_data(entity.type);
 
+    log_trace("DESYNC match_entity_update index %u name %s player %u health %i energy %u mode %u target type %u flags %u garrison id %u is selectable? %i should die? %i", 
+        entity_index, 
+        entity_data.name, 
+        entity.player_id, 
+        entity.health, 
+        entity.energy,
+        entity.mode, 
+        entity.target.type, 
+        entity.flags,
+        entity.garrison_id,
+        (int)entity_is_selectable(entity), 
+        (int)entity_should_die(entity));
+
     // Check if entity should die
     if (entity_should_die(entity)) {
         if (entity_is_unit(entity.type)) {
@@ -1561,7 +1574,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 }
 
                 if (!animation_is_playing(entity.animation)) {
-                    match_entity_attack_target(state, entity_id, state.entities.get_by_id(entity.target.id));
+                    match_entity_attack_target(state, entity_id);
                     if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
                         entity_set_flag(entity, ENTITY_FLAG_CHARGED, false);
                         entity.mode = MODE_UNIT_SOLDIER_CHARGE;
@@ -2320,10 +2333,13 @@ Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& 
     };
 }
 
-void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity& defender) {
+void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
     const Entity& attacker = state.entities.get_by_id(attacker_id);
+    Entity& defender = state.entities.get_by_id(attacker.target.id);
     const EntityData& attacker_data = entity_get_data(attacker.type);
     const EntityData& defender_data = entity_get_data(defender.type);
+
+    log_trace("DESYNC match_entity_attack_target attacker ID %u name %s player %u defender ID %u name %s player %u", attacker_id, attacker_data.name, attacker.player_id, attacker.target.id, defender_data.name, defender.player_id);
 
     // Calculate damage
     bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;
@@ -2385,11 +2401,10 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         state.fog_reveals.push_back(reveal);
     }
 
-    bool attack_missed = accuracy < lcg_rand(&state.lcg_seed) % 100;
-    if (attack_missed) {
-        log_trace("Entity %s ID %u missed", attacker_data.name, attacker_id);
-    }
+    int32_t accuracy_roll = lcg_rand(&state.lcg_seed) % 100;
+    bool attack_missed = accuracy < accuracy_roll;
     bool attack_is_melee = attack_with_bayonets || attacker_data.unit_data.range_squared == 1;
+    log_trace("DESYNC bayonets? %i attack missed? %i attack is melee? %i accuracy %i accuracy roll %i", (int)attack_with_bayonets, (int)attack_missed, (int)attack_is_melee, accuracy, accuracy_roll);
     if (attack_missed && attack_is_melee) {
         return;
     }
@@ -2415,6 +2430,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
             defender_rect.x + (defender_rect.w / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.w / 2)),
             defender_rect.y + (defender_rect.h / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.h / 2)));
     }
+    log_trace("DESYNC attack hit_position %vi", &hit_position);
 
     // Play sound
     if (attack_missed && attacker.type != ENTITY_CANNON) {
@@ -2456,7 +2472,9 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
             .w = full_damage_rect.w + TILE_SIZE,
             .h = full_damage_rect.h + TILE_SIZE,
         };
-        for (Entity& entity : state.entities) {
+        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+            Entity& entity = state.entities[entity_index];
+
             if (entity.type == ENTITY_GOLDMINE || !entity_is_selectable(entity)) {
                 continue;
             }
@@ -2474,6 +2492,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
                 damage = std::max(1, damage - entity_get_data(entity.type).armor);
 
                 entity.health = std::max(0, entity.health - damage);
+                log_trace("DESYNC cannon hit entity index %u ID %u damage %i health %i", entity_index, state.entities.get_id_of(entity_index), damage, entity.health);
                 match_entity_on_attack(state, attacker_id, entity);
             }
         }
@@ -2481,6 +2500,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity&
         int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : match_entity_get_damage(state, attacker);
         int damage = std::max(1, attacker_damage - match_entity_get_armor(state, defender));
         defender.health = std::max(0, defender.health - damage);
+        log_trace("DESYNC attacker hit defender damage %i health %i", damage, defender.health);
         match_entity_on_attack(state, attacker_id, defender);
     }
 }
@@ -2514,6 +2534,7 @@ void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& def
             .type = TARGET_ATTACK_ENTITY,
             .id = attacker_id
         };
+        log_trace("DESYNC match_entity_on_attacker defender target is now %u", defender.target.id);
     }
 }
 

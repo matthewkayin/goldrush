@@ -208,7 +208,7 @@ bool match_is_building_supply_blocked(const MatchState& state, const Entity& bui
 Target match_entity_target_nearest_gold_mine(const MatchState& state, const Entity& entity);
 Target match_entity_target_nearest_hall(const MatchState& state, const Entity& entity);
 Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& entity);
-void match_entity_attack_target(MatchState& state, EntityId attacker_id, Entity& defender);
+void match_entity_attack_target(MatchState& state, EntityId attacker_id);
 void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& defender);
 uint32_t match_get_entity_garrisoned_occupancy(const MatchState& state, const Entity& entity);
 void match_entity_unload_unit(MatchState& state, Entity& carrier, EntityId garrisoned_unit_id);
