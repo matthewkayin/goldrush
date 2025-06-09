@@ -187,6 +187,7 @@ void match_grant_player_upgrade(MatchState& state, uint8_t player_id, uint32_t u
 bool match_does_player_meet_hotkey_requirements(const MatchState& state, uint8_t player_id, InputAction hotkey);
 void match_handle_input(MatchState& state, const MatchInput& input);
 void match_update(MatchState& state);
+uint32_t match_checksum(const MatchState& state);
 
 // Entity
 

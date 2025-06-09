@@ -1,5 +1,6 @@
 #include "replay.h"
 
+#include "util.h"
 #include "network/types.h"
 #include "core/filesystem.h"
 #include "core/logger.h"
@@ -18,7 +19,10 @@ static const uint8_t REPLAY_FILE_VERSION = 0;
 
 FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     char replay_file_path[256];
-    filesystem_get_replay_path(replay_file_path, "latest.rep");
+    char* replay_file_ptr = replay_file_path;
+    replay_file_ptr += sprintf(replay_file_ptr, "replays/");
+    replay_file_ptr += sprintf_timestamp(replay_file_ptr);
+    replay_file_ptr += sprintf(replay_file_ptr, ".rep");
     #ifdef GOLD_DEBUG
         if (use_arg_replay_file) {
             filesystem_get_replay_path(replay_file_path, arg_replay_file);

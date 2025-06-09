@@ -1,4 +1,5 @@
 #include "defines.h"
+#include "util.h"
 #include "core/filesystem.h"
 #include "core/logger.h"
 #include "core/cursor.h"
@@ -109,7 +110,10 @@ int gold_main(int argc, char** argv) {
     }
 
     char logfile_path[128];
-    sprintf(logfile_path, "logs/latest.log");
+    char* logfile_ptr = logfile_path;
+    logfile_ptr += sprintf(logfile_ptr, "logs/");
+    logfile_ptr += sprintf_timestamp(logfile_ptr);
+    logfile_ptr += sprintf(logfile_ptr, ".log");
     uint64_t steam_invite_id = 0;
 
     // Parse system arguments
