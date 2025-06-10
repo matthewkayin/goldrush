@@ -20,7 +20,7 @@ enum OptionsMenuSaveStatus {
 
 struct OptionsMenuState {
     OptionsMenuMode mode;
-    SDL_Keycode hotkey_pending_changes[INPUT_ACTION_COUNT];
+    SDL_Scancode hotkey_pending_changes[INPUT_ACTION_COUNT];
     int hotkey_group_selected;
     int hotkey_index_selected;
     OptionsMenuSaveStatus save_status;

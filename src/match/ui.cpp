@@ -746,12 +746,12 @@ void match_ui_handle_input(MatchUiState& state) {
     if (!state.replay_mode) {
         uint32_t number_key_pressed;
         for (number_key_pressed = 0; number_key_pressed < 10; number_key_pressed++) {
-            if (input_is_action_just_pressed((InputAction)(INPUT_ACTION_NUM0 + number_key_pressed))) {
+            if (input_is_action_just_pressed((InputAction)(INPUT_ACTION_NUM1 + number_key_pressed))) {
                 break;
             }
         }
         if (number_key_pressed != 10) {
-            uint32_t control_group_index = number_key_pressed == 0 ? 9 : (number_key_pressed - 1);
+            uint32_t control_group_index = number_key_pressed;
             // Set control group
             if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
                 if (state.selection.empty() || state.match.entities.get_by_id(state.selection[0]).player_id != network_get_player_id()) {
@@ -2794,7 +2794,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 char* tooltip_text_ptr = tooltip_text;
                 tooltip_text_ptr += hotkey_get_name(tooltip_text_ptr, hotkey_hovered, show_toggle);
                 tooltip_text_ptr += sprintf(tooltip_text_ptr, " (");
-                tooltip_text_ptr += input_sprintf_sdl_key_str(tooltip_text_ptr, input_get_hotkey_mapping(hotkey_hovered));
+                tooltip_text_ptr += input_sprintf_sdl_scancode_str(tooltip_text_ptr, input_get_hotkey_mapping(hotkey_hovered));
                 tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
 
                 switch (hotkey_info.type) {

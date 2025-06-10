@@ -18,9 +18,9 @@ struct InputState {
     std::string* text_input_str;
     size_t text_input_max_length;
 
-    SDL_Keycode hotkey_mapping[INPUT_ACTION_COUNT];
+    SDL_Scancode hotkey_mapping[INPUT_ACTION_COUNT];
 
-    SDL_Keycode key_just_pressed;
+    SDL_Scancode key_just_pressed;
 };
 static InputState state;
 
@@ -85,7 +85,7 @@ void input_poll_events() {
         }
 
         #ifdef GOLD_DEBUG
-            if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_TAB) {
+            if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_TAB) {
                 SDL_SetWindowMouseGrab(state.window, false);
                 break;
             }
@@ -116,47 +116,47 @@ void input_poll_events() {
             case SDL_EVENT_KEY_DOWN:
             case SDL_EVENT_KEY_UP: {
                 if (event.type == SDL_EVENT_KEY_DOWN) {
-                    state.key_just_pressed = event.key.key;
+                    state.key_just_pressed = event.key.scancode;
                 }
-                switch (event.key.key) {
-                    case SDLK_LSHIFT:
-                    case SDLK_RSHIFT:
+                switch (event.key.scancode) {
+                    case SDL_SCANCODE_LSHIFT:
+                    case SDL_SCANCODE_RSHIFT:
                         state.current[INPUT_ACTION_SHIFT] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDLK_LCTRL:
-                    case SDLK_RCTRL:
-                    case SDLK_LGUI:
-                    case SDLK_RGUI:
+                    case SDL_SCANCODE_LCTRL:
+                    case SDL_SCANCODE_RCTRL:
+                    case SDL_SCANCODE_LGUI:
+                    case SDL_SCANCODE_RGUI:
                         state.current[INPUT_ACTION_CTRL] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDLK_SPACE:
+                    case SDL_SCANCODE_SPACE:
                         state.current[INPUT_ACTION_SPACE] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDLK_F3:
+                    case SDL_SCANCODE_F3:
                         state.current[INPUT_ACTION_F3] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDLK_F4:
+                    case SDL_SCANCODE_F4:
                         state.current[INPUT_ACTION_F4] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDLK_F10:
+                    case SDL_SCANCODE_F10:
                         state.current[INPUT_ACTION_MATCH_MENU] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDLK_RETURN: 
+                    case SDL_SCANCODE_RETURN: 
                         state.current[INPUT_ACTION_ENTER] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDLK_BACKSPACE: {
+                    case SDL_SCANCODE_BACKSPACE: {
                         if (event.type == SDL_EVENT_KEY_DOWN && SDL_TextInputActive(state.window) && state.text_input_str->length() > 0) {
                             state.text_input_str->pop_back();
                         }
                         break;
                     }
                     default: {
-                        if (event.key.key >= SDLK_0 && event.key.key <= SDLK_9) {
-                            int key_index = event.key.key - SDLK_0;
-                            state.current[INPUT_ACTION_NUM0 + key_index] = event.type == SDL_EVENT_KEY_DOWN;
+                        if (event.key.scancode >= SDL_SCANCODE_1 && event.key.scancode <= SDL_SCANCODE_0) {
+                            int key_index = event.key.scancode - SDL_SCANCODE_1;
+                            state.current[INPUT_ACTION_NUM1 + key_index] = event.type == SDL_EVENT_KEY_DOWN;
                         } else {
                             for (uint32_t hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
-                                if (event.key.key == state.hotkey_mapping[hotkey]) {
+                                if (event.key.scancode == state.hotkey_mapping[hotkey]) {
                                     state.current[hotkey] = event.type == SDL_EVENT_KEY_DOWN;
                                 }
                             }
@@ -214,143 +214,114 @@ bool input_is_action_just_released(InputAction action) {
     return state.previous[action] && !state.current[action];
 }
 
-int input_sprintf_sdl_key_str(char* str_ptr, SDL_Keycode key) {
-    if (key == SDLK_ESCAPE) {
+int input_sprintf_sdl_scancode_str(char* str_ptr, SDL_Scancode scancode) {
+    if (scancode == SDL_SCANCODE_ESCAPE) {
         return sprintf(str_ptr, "ESC");
-    } else if (key >= SDLK_A && key <= SDLK_Z) {
-        return sprintf(str_ptr, "%c", (char)(key - 32));
-    } else if (key == SDLK_LEFTBRACKET) {
-        return sprintf(str_ptr, "[");
-    } else if (key == SDLK_RIGHTBRACKET) {
-        return sprintf(str_ptr, "]");
-    } else if (key == SDLK_BACKSLASH) {
-        return sprintf(str_ptr, "\\");
-    } else if (key == SDLK_GRAVE) {
-        return sprintf(str_ptr, "`");
-    } else if (key == SDLK_MINUS) {
-        return sprintf(str_ptr, "-");
-    } else if (key == SDLK_EQUALS) {
-        return sprintf(str_ptr, "=");
-    } else if (key == SDLK_COMMA) {
-        return sprintf(str_ptr, ",");
-    } else if (key == SDLK_PERIOD) {
-        return sprintf(str_ptr, ".");
-    } else if (key == SDLK_SLASH) {
-        return sprintf(str_ptr, "/");
-    } else if (key == SDLK_SEMICOLON) {
-        return sprintf(str_ptr, ";");
-    } else if (key == SDLK_APOSTROPHE) {
-        return sprintf(str_ptr, "'");
-    } else {
-        return 0;
     }
+    if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z) {
+        uint8_t letter_index = scancode - SDL_SCANCODE_A;
+        return sprintf(str_ptr, "%c", (char)((uint8_t)'A' + letter_index));
+    }
+    if (scancode >= SDL_SCANCODE_MINUS && scancode <= SDL_SCANCODE_SLASH) {
+        static const char* scancode_chars = "-=[]\\\\;'`,./";
+        return sprintf(str_ptr, "%c", scancode_chars[scancode - SDL_SCANCODE_MINUS]);
+    }
+    return 0;
 }
 
-SDL_Keycode input_get_hotkey_mapping(InputAction hotkey) {
+SDL_Scancode input_get_hotkey_mapping(InputAction hotkey) {
     return state.hotkey_mapping[hotkey];
 }
 
-void input_set_hotkey_mapping(InputAction hotkey, SDL_Keycode key) {
+void input_set_hotkey_mapping(InputAction hotkey, SDL_Scancode key) {
     state.hotkey_mapping[hotkey] = key;
 }
 
-void input_set_hotkey_mapping_to_default(SDL_Keycode* hotkey_mapping) {
+void input_set_hotkey_mapping_to_default(SDL_Scancode* hotkey_mapping) {
     // Unit
-    hotkey_mapping[INPUT_HOTKEY_ATTACK] = SDLK_A;
-    hotkey_mapping[INPUT_HOTKEY_STOP] = SDLK_S;
-    hotkey_mapping[INPUT_HOTKEY_DEFEND] = SDLK_D;
+    hotkey_mapping[INPUT_HOTKEY_ATTACK] = SDL_SCANCODE_A;
+    hotkey_mapping[INPUT_HOTKEY_STOP] = SDL_SCANCODE_S;
+    hotkey_mapping[INPUT_HOTKEY_DEFEND] = SDL_SCANCODE_D;
 
     // Miner
-    hotkey_mapping[INPUT_HOTKEY_BUILD] = SDLK_B;
-    hotkey_mapping[INPUT_HOTKEY_BUILD2] = SDLK_V;
-    hotkey_mapping[INPUT_HOTKEY_REPAIR] = SDLK_R;
+    hotkey_mapping[INPUT_HOTKEY_BUILD] = SDL_SCANCODE_B;
+    hotkey_mapping[INPUT_HOTKEY_BUILD2] = SDL_SCANCODE_V;
+    hotkey_mapping[INPUT_HOTKEY_REPAIR] = SDL_SCANCODE_R;
 
     // Unload
-    hotkey_mapping[INPUT_HOTKEY_UNLOAD] = SDLK_X;
+    hotkey_mapping[INPUT_HOTKEY_UNLOAD] = SDL_SCANCODE_X;
 
     // Esc
-    hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
+    hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDL_SCANCODE_ESCAPE;
 
     // Build 1
-    hotkey_mapping[INPUT_HOTKEY_HALL] = SDLK_T;
-    hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDLK_E;
-    hotkey_mapping[INPUT_HOTKEY_SALOON] = SDLK_S;
-    hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDLK_B;
-    hotkey_mapping[INPUT_HOTKEY_WORKSHOP] = SDLK_W;
+    hotkey_mapping[INPUT_HOTKEY_HALL] = SDL_SCANCODE_T;
+    hotkey_mapping[INPUT_HOTKEY_HOUSE] = SDL_SCANCODE_E;
+    hotkey_mapping[INPUT_HOTKEY_SALOON] = SDL_SCANCODE_S;
+    hotkey_mapping[INPUT_HOTKEY_BUNKER] = SDL_SCANCODE_B;
+    hotkey_mapping[INPUT_HOTKEY_WORKSHOP] = SDL_SCANCODE_W;
 
     // Build 2
-    hotkey_mapping[INPUT_HOTKEY_SMITH] = SDLK_S;
-    hotkey_mapping[INPUT_HOTKEY_COOP] = SDLK_C;
-    hotkey_mapping[INPUT_HOTKEY_BARRACKS] = SDLK_B;
-    hotkey_mapping[INPUT_HOTKEY_SHERIFFS] = SDLK_E;
+    hotkey_mapping[INPUT_HOTKEY_SMITH] = SDL_SCANCODE_S;
+    hotkey_mapping[INPUT_HOTKEY_COOP] = SDL_SCANCODE_C;
+    hotkey_mapping[INPUT_HOTKEY_BARRACKS] = SDL_SCANCODE_B;
+    hotkey_mapping[INPUT_HOTKEY_SHERIFFS] = SDL_SCANCODE_E;
 
     // Hall
-    hotkey_mapping[INPUT_HOTKEY_MINER] = SDLK_E;
+    hotkey_mapping[INPUT_HOTKEY_MINER] = SDL_SCANCODE_E;
 
     // Saloon
-    hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDLK_C;
-    hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDLK_B;
+    hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDL_SCANCODE_C;
+    hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDL_SCANCODE_B;
 
     // Workshop
-    hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDLK_S;
-    hotkey_mapping[INPUT_HOTKEY_PYRO] = SDLK_R;
-    hotkey_mapping[INPUT_HOTKEY_BALLOON] = SDLK_B;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_LANDMINES] = SDLK_E;
+    hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDL_SCANCODE_S;
+    hotkey_mapping[INPUT_HOTKEY_PYRO] = SDL_SCANCODE_R;
+    hotkey_mapping[INPUT_HOTKEY_BALLOON] = SDL_SCANCODE_B;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_LANDMINES] = SDL_SCANCODE_E;
 
     // Coop
-    hotkey_mapping[INPUT_HOTKEY_WAGON] = SDLK_W;
-    hotkey_mapping[INPUT_HOTKEY_WAR_WAGON] = SDLK_W;
-    hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDLK_C;
+    hotkey_mapping[INPUT_HOTKEY_WAGON] = SDL_SCANCODE_W;
+    hotkey_mapping[INPUT_HOTKEY_WAR_WAGON] = SDL_SCANCODE_W;
+    hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDL_SCANCODE_C;
 
     // Smith
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDLK_W;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDLK_B;
-    hotkey_mapping[INPUT_HOTKEY_UPGRADE_ARMOR] = SDLK_A;
-    hotkey_mapping[INPUT_HOTKEY_UPGRADE_GUNS] = SDLK_G;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDL_SCANCODE_W;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDL_SCANCODE_B;
+    hotkey_mapping[INPUT_HOTKEY_UPGRADE_ARMOR] = SDL_SCANCODE_A;
+    hotkey_mapping[INPUT_HOTKEY_UPGRADE_GUNS] = SDL_SCANCODE_G;
 
     // Upgrade Armor
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_LIGHT_ARMOR] = SDLK_V;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR] = SDLK_C;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_LIGHT_ARMOR] = SDL_SCANCODE_V;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR] = SDL_SCANCODE_C;
 
     // Upgrade Guns
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BLACK_POWDER] = SDLK_B;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_IRON_SIGHTS] = SDLK_S;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BLACK_POWDER] = SDL_SCANCODE_B;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_IRON_SIGHTS] = SDL_SCANCODE_S;
 
     // Barracks
-    hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDLK_S;
-    hotkey_mapping[INPUT_HOTKEY_CANNON] = SDLK_C;
+    hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDL_SCANCODE_S;
+    hotkey_mapping[INPUT_HOTKEY_CANNON] = SDL_SCANCODE_C;
 
     // Sheriff's Office
-    hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDLK_D;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_PRIVATE_EYE] = SDLK_E;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_STAKEOUT] = SDLK_S;
+    hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDL_SCANCODE_D;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_PRIVATE_EYE] = SDL_SCANCODE_E;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_STAKEOUT] = SDL_SCANCODE_S;
 
     // Pyro
-    hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDLK_V;
-    hotkey_mapping[INPUT_HOTKEY_LANDMINE] = SDLK_E;
+    hotkey_mapping[INPUT_HOTKEY_MOLOTOV] = SDL_SCANCODE_V;
+    hotkey_mapping[INPUT_HOTKEY_LANDMINE] = SDL_SCANCODE_E;
 
     // Detective
-    hotkey_mapping[INPUT_HOTKEY_CAMO] = SDLK_C;
+    hotkey_mapping[INPUT_HOTKEY_CAMO] = SDL_SCANCODE_C;
 }
 
-SDL_Keycode input_get_key_just_pressed() {
+SDL_Scancode input_get_key_just_pressed() {
     return state.key_just_pressed;
 }
 
-bool input_is_key_valid_hotkey_mapping(SDL_Keycode key) {
-    return (
-        key == SDLK_ESCAPE ||
-        (key >= SDLK_A && key <= SDLK_Z) ||
-        key == SDLK_LEFTBRACKET ||
-        key == SDLK_RIGHTBRACKET ||
-        key == SDLK_BACKSLASH ||
-        key == SDLK_GRAVE ||
-        key == SDLK_MINUS ||
-        key == SDLK_EQUALS ||
-        key == SDLK_COMMA ||
-        key == SDLK_PERIOD ||
-        key == SDLK_SLASH ||
-        key == SDLK_SEMICOLON ||
-        key == SDLK_APOSTROPHE
-    );
+bool input_is_key_valid_hotkey_mapping(SDL_Scancode key) {
+    return key == SDL_SCANCODE_ESCAPE ||
+                (key >= SDL_SCANCODE_A && key <= SDL_SCANCODE_Z) ||
+                (key >= SDL_SCANCODE_MINUS && key <= SDL_SCANCODE_SLASH);
 }

@@ -177,7 +177,7 @@ bool options_menu_is_hotkey_group_valid(const OptionsMenuState& state, HotkeyGro
 bool options_menu_are_all_hotkey_groups_valid(const OptionsMenuState& state);
 bool options_menu_has_unsaved_hotkey_changes(const OptionsMenuState& state);
 void options_menu_save_hotkey_changes(OptionsMenuState& state);
-void options_menu_set_hotkey_mapping_to_grid(SDL_Keycode* hotkey_mapping);
+void options_menu_set_hotkey_mapping_to_grid(SDL_Scancode* hotkey_mapping);
 const char* options_menu_get_save_status_str(OptionsMenuSaveStatus status);
 
 OptionsMenuState options_menu_open() {
@@ -316,7 +316,7 @@ void options_menu_update(OptionsMenuState& state) {
 
                         hotkey_text_ptr += hotkey_get_name(hotkey_text_ptr, hotkey);
                         hotkey_text_ptr += sprintf(hotkey_text_ptr, " (");
-                        hotkey_text_ptr += input_sprintf_sdl_key_str(hotkey_text_ptr, state.hotkey_pending_changes[hotkey]);
+                        hotkey_text_ptr += input_sprintf_sdl_scancode_str(hotkey_text_ptr, state.hotkey_pending_changes[hotkey]);
                         hotkey_text_ptr += sprintf(hotkey_text_ptr, ")");
                         ui_text(FONT_HACK_GOLD,  hotkey_text);
                         ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, "Press any key to");
@@ -324,7 +324,7 @@ void options_menu_update(OptionsMenuState& state) {
                         ui_text(FONT_HACK_WHITE, "Press any key to");
                         ui_text(FONT_HACK_WHITE, "change this hotkey.");
 
-                        SDL_Keycode key_just_pressed = input_get_key_just_pressed();
+                        SDL_Scancode key_just_pressed = input_get_key_just_pressed();
                         if (input_is_key_valid_hotkey_mapping(key_just_pressed)) {
                             state.hotkey_pending_changes[hotkey] = key_just_pressed;
                             state.save_status = options_menu_has_unsaved_hotkey_changes(state)
@@ -401,10 +401,10 @@ void options_menu_save_hotkey_changes(OptionsMenuState& state) {
     }
 }
 
-void options_menu_set_hotkey_mapping_to_grid(SDL_Keycode* hotkey_mapping) {
-    static const SDL_Keycode keys[HOTKEY_GROUP_SIZE] = {
-        SDLK_Q, SDLK_W, SDLK_E,
-        SDLK_A, SDLK_S, SDLK_D
+void options_menu_set_hotkey_mapping_to_grid(SDL_Scancode* hotkey_mapping) {
+    static const SDL_Scancode keys[HOTKEY_GROUP_SIZE] = {
+        SDL_SCANCODE_Q, SDL_SCANCODE_W, SDL_SCANCODE_E,
+        SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D
     };
 
     for (int group_index = 0; group_index < HOTKEY_GROUP_COUNT; group_index++) {
@@ -419,7 +419,7 @@ void options_menu_set_hotkey_mapping_to_grid(SDL_Keycode* hotkey_mapping) {
         }
     }
 
-    hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDLK_ESCAPE;
+    hotkey_mapping[INPUT_HOTKEY_CANCEL] = SDL_SCANCODE_ESCAPE;
 }
 
 const char* options_menu_get_save_status_str(OptionsMenuSaveStatus status) {

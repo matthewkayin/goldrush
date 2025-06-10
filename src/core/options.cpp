@@ -98,7 +98,7 @@ void options_load() {
                 int hotkey;
                 for (hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
                     if (key == hotkey_names[hotkey]) {
-                        input_set_hotkey_mapping((InputAction)hotkey, (SDL_Keycode)std::stoi(value));
+                        input_set_hotkey_mapping((InputAction)hotkey, (SDL_Scancode)std::stoi(value));
                         break;
                     }
                 }
