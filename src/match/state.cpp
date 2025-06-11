@@ -7,7 +7,7 @@
 #include "upgrade.h"
 #include <algorithm>
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
 static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
 static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
@@ -84,6 +84,9 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
+                ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+                match_grant_player_upgrade(state, 0, UPGRADE_PRIVATE_EYE);
+                match_create_entity(state, ENTITY_DETECTIVE, exit_cell, player_id);
 
             // Place scout
             {
@@ -462,17 +465,8 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
 
             // Reject this enqueue if the upgrade is already being researched
-            if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
-                if ((item.upgrade == UPGRADE_LIGHT_ARMOR || item.upgrade == UPGRADE_HEAVY_ARMOR) && 
-                        !match_player_upgrade_is_available(state, building.player_id, UPGRADE_LIGHT_ARMOR | UPGRADE_HEAVY_ARMOR)) {
-                    return;
-                } else if ((item.upgrade == UPGRADE_BLACK_POWDER || item.upgrade == UPGRADE_IRON_SIGHTS) && 
-                        !match_player_upgrade_is_available(state, building.player_id, UPGRADE_BLACK_POWDER | UPGRADE_IRON_SIGHTS)) {
-                    return;
-                } else if (item.type == BUILDING_QUEUE_ITEM_UPGRADE && 
-                        !match_player_upgrade_is_available(state, building.player_id, item.upgrade)) {
-                    return;
-                }
+            if (item.type == BUILDING_QUEUE_ITEM_UPGRADE && !match_player_upgrade_is_available(state, building.player_id, item.upgrade)) {
+                return;
             }
 
             // Check if the player has the war wagon upgrade
@@ -823,19 +817,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     EntityId entity_id = state.entities.get_id_of(entity_index);
     Entity& entity = state.entities[entity_index];
     const EntityData& entity_data = entity_get_data(entity.type);
-
-    log_trace("DESYNC match_entity_update index %u name %s player %u health %i energy %u mode %u target type %u flags %u garrison id %u is selectable? %i should die? %i", 
-        entity_index, 
-        entity_data.name, 
-        entity.player_id, 
-        entity.health, 
-        entity.energy,
-        entity.mode, 
-        entity.target.type, 
-        entity.flags,
-        entity.garrison_id,
-        (int)entity_is_selectable(entity), 
-        (int)entity_should_die(entity));
 
     // Check if entity should die
     if (entity_should_die(entity)) {
@@ -2711,7 +2692,9 @@ int match_entity_get_damage(const MatchState& state, const Entity& entity) {
 
     const EntityData& entity_data = entity_get_data(entity.type);
     int damage = entity_data.unit_data.damage;
-    if (entity.type != ENTITY_CANNON && entity_data.unit_data.range_squared != 1 && damage != 0 && match_player_has_upgrade(state, entity.player_id, UPGRADE_BLACK_POWDER)) {
+    if (entity.type != ENTITY_CANNON && 
+            entity_data.unit_data.range_squared != 1 && damage != 0 && 
+            match_player_has_upgrade(state, entity.player_id, UPGRADE_BLACK_POWDER)) {
         damage += 1;
     }
 
@@ -2720,7 +2703,7 @@ int match_entity_get_damage(const MatchState& state, const Entity& entity) {
 
 int match_entity_get_armor(const MatchState& state, const Entity& entity) {
     int armor = entity_get_data(entity.type).armor;
-    if (entity_is_unit(entity.type) && match_player_has_upgrade(state, entity.player_id, UPGRADE_HEAVY_ARMOR)) {
+    if (entity_is_unit(entity.type) && match_player_has_upgrade(state, entity.player_id, UPGRADE_ARMOR)) {
         armor += 1;
     }
     return armor;
@@ -2731,13 +2714,7 @@ int match_entity_get_accuracy(const MatchState& state, const Entity& entity) {
         return 0;
     }
 
-    const EntityData& entity_data = entity_get_data(entity.type);
-    int accuracy = entity_data.unit_data.accuracy;
-    if (entity.type != ENTITY_CANNON && entity_data.unit_data.range_squared != 1 && accuracy != 0 && match_player_has_upgrade(state, entity.player_id, UPGRADE_IRON_SIGHTS)) {
-        accuracy += 10;
-    }
-
-    return accuracy;
+    return entity_get_data(entity.type).unit_data.accuracy;
 }
 
 int match_entity_get_evasion(const MatchState& state, const Entity& entity) {
@@ -2745,11 +2722,7 @@ int match_entity_get_evasion(const MatchState& state, const Entity& entity) {
         return 0;
     }
 
-    int evasion = entity_get_data(entity.type).unit_data.evasion;
-    if (match_player_has_upgrade(state, entity.player_id, UPGRADE_LIGHT_ARMOR)) {
-        evasion += 10;
-    }
-    return evasion;
+    return entity_get_data(entity.type).unit_data.evasion;
 }
 
 // EVENTS

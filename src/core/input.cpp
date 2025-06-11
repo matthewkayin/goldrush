@@ -288,16 +288,8 @@ void input_set_hotkey_mapping_to_default(SDL_Scancode* hotkey_mapping) {
     // Smith
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDL_SCANCODE_W;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDL_SCANCODE_B;
-    hotkey_mapping[INPUT_HOTKEY_UPGRADE_ARMOR] = SDL_SCANCODE_A;
-    hotkey_mapping[INPUT_HOTKEY_UPGRADE_GUNS] = SDL_SCANCODE_G;
-
-    // Upgrade Armor
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_LIGHT_ARMOR] = SDL_SCANCODE_V;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_HEAVY_ARMOR] = SDL_SCANCODE_C;
-
-    // Upgrade Guns
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BLACK_POWDER] = SDL_SCANCODE_B;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_IRON_SIGHTS] = SDL_SCANCODE_S;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_ARMOR] = SDL_SCANCODE_V;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_BLACK_POWDER] = SDL_SCANCODE_A;
 
     // Barracks
     hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDL_SCANCODE_S;
