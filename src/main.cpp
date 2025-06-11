@@ -330,6 +330,9 @@ int gold_main(int argc, char** argv) {
                                 .steam_invite_id = 0
                             }
                         });
+                    } else if (state.match.mode == MATCH_UI_MODE_EXIT_PROGRAM) {
+                        sound_end_fire_loop();
+                        is_running = false;
                     }
                     break;
                 }

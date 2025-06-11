@@ -52,9 +52,11 @@ enum MatchUiMode {
     MATCH_UI_MODE_CHAT,
     MATCH_UI_MODE_MENU,
     MATCH_UI_MODE_MENU_SURRENDER,
+    MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP,
     MATCH_UI_MODE_MATCH_OVER_VICTORY,
     MATCH_UI_MODE_MATCH_OVER_DEFEAT,
-    MATCH_UI_MODE_LEAVE_MATCH
+    MATCH_UI_MODE_LEAVE_MATCH,
+    MATCH_UI_MODE_EXIT_PROGRAM
 };
 
 struct Alert {
@@ -147,7 +149,7 @@ void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const cha
 bool match_ui_is_opponent_in_match(const MatchUiState& state);
 bool match_ui_is_in_menu(MatchUiMode mode);
 const char* match_ui_get_menu_header_text(MatchUiMode mode);
-void match_ui_leave_match(MatchUiState& state);
+void match_ui_leave_match(MatchUiState& state, bool exit_program);
 bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity);
 bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size);
 int match_ui_get_fog(const MatchUiState& state, ivec2 cell);

@@ -92,7 +92,7 @@ static const ivec2 MENU_BUTTON_POSITION = ivec2(1, 1);
 static const int MENU_WIDTH = 150;
 static const Rect MENU_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (MENU_WIDTH / 2), .y = 64,
-    .w = MENU_WIDTH, .h = 125
+    .w = MENU_WIDTH, .h = 144
 };
 
 static const Rect BOTTOM_PANEL_RECT = (Rect) {
@@ -871,13 +871,20 @@ void match_ui_update(MatchUiState& state) {
             column_position.y += 11;
         }
         ui_begin_column(column_position, 5);
-            ivec2 button_size = ui_button_size("Leave Match");
+            ivec2 button_size = ui_button_size("Return to Menu");
             if (state.mode == MATCH_UI_MODE_MENU) {
                 if (ui_button("Leave Match", button_size, true)) {
                     if (match_ui_is_opponent_in_match(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER;
                     } else {
-                        match_ui_leave_match(state);
+                        match_ui_leave_match(state, false);
+                    }
+                }
+                if (ui_button("Exit Program", button_size, true)) {
+                    if (match_ui_is_opponent_in_match(state)) {
+                        state.mode = MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP;
+                    } else {
+                        match_ui_leave_match(state, true);
                     }
                 }
                 if (ui_button("Options", button_size, true)) {
@@ -886,19 +893,22 @@ void match_ui_update(MatchUiState& state) {
                 if (ui_button("Back", button_size, true)) {
                     state.mode = MATCH_UI_MODE_NONE;
                 }
-            } else if (state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+            } else if (state.mode == MATCH_UI_MODE_MENU_SURRENDER || state.mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP) {
                 if (ui_button("Yes", button_size, true)) {
-                    match_ui_leave_match(state);
+                    match_ui_leave_match(state, state.mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP);
                 }
                 if (ui_button("Back", button_size, true)) {
                     state.mode = MATCH_UI_MODE_MENU;
                 }
             } else if (state.mode == MATCH_UI_MODE_MATCH_OVER_VICTORY || state.mode == MATCH_UI_MODE_MATCH_OVER_DEFEAT) {
-                if (ui_button("Continue", button_size, true)) {
+                if (ui_button("Keep Playing", button_size, true)) {
                     state.mode = MATCH_UI_MODE_NONE;
                 }
-                if (ui_button("Exit", button_size, true)) {
-                    match_ui_leave_match(state);
+                if (ui_button("Return to Menu", button_size, true)) {
+                    match_ui_leave_match(state, false);
+                }
+                if (ui_button("Exit Program", button_size, true)) {
+                    match_ui_leave_match(state, true);
                 }
             }
         ui_end_container();
@@ -941,7 +951,7 @@ void match_ui_update(MatchUiState& state) {
         ui_end_container();
     }
 
-    if (state.mode == MATCH_UI_MODE_LEAVE_MATCH) {
+    if (state.mode == MATCH_UI_MODE_LEAVE_MATCH || state.mode == MATCH_UI_MODE_EXIT_PROGRAM) {
         return;
     }
 
@@ -1893,6 +1903,7 @@ bool match_ui_is_opponent_in_match(const MatchUiState& state) {
 bool match_ui_is_in_menu(MatchUiMode mode) {
     return mode == MATCH_UI_MODE_MENU || 
                 mode == MATCH_UI_MODE_MENU_SURRENDER ||
+                mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP ||
                 mode == MATCH_UI_MODE_MATCH_OVER_VICTORY ||
                 mode == MATCH_UI_MODE_MATCH_OVER_DEFEAT;
 }
@@ -1902,6 +1913,7 @@ const char* match_ui_get_menu_header_text(MatchUiMode mode) {
         case MATCH_UI_MODE_MENU:
             return "Game Menu";
         case MATCH_UI_MODE_MENU_SURRENDER:
+        case MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP:
             return "Surrender?";
         case MATCH_UI_MODE_MATCH_OVER_VICTORY:
             return "Victory!";
@@ -1912,9 +1924,9 @@ const char* match_ui_get_menu_header_text(MatchUiMode mode) {
     }
 }
 
-void match_ui_leave_match(MatchUiState& state) {
+void match_ui_leave_match(MatchUiState& state, bool exit_program) {
     network_disconnect();
-    state.mode = MATCH_UI_MODE_LEAVE_MATCH;
+    state.mode = exit_program ? MATCH_UI_MODE_EXIT_PROGRAM : MATCH_UI_MODE_LEAVE_MATCH;
     replay_file_close(state.replay_file);
 }
 
