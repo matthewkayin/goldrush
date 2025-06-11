@@ -25,11 +25,33 @@
 
 int gold_main(int argc, char** argv);
 
-#if defined PLATFORM_WIN32 && !defined GOLD_DEBUG
+#if defined PLATFORM_WIN32 
 #include <windows.h>
+#define MAX_ARGS 16
 
 int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE h_prev_instance, LPSTR lp_cmd_line, int n_cmd_show) {
-    return gold_main(0, NULL);
+    char arg_buffer[MAX_ARGS][256];
+    char* argv[MAX_ARGS];
+    int argv_index = 0;
+    int argc = 0;
+
+    char* command_line = GetCommandLineA();
+    int command_line_index = 0;
+    while (command_line[command_line_index] != '\0') {
+        arg_buffer[argc][argv_index] = command_line[command_line_index];
+        command_line_index++;
+        argv_index++;
+
+        if (command_line[command_line_index] == ' ') {
+            command_line_index++;
+            arg_buffer[argc][argv_index] = '\0';
+            argv[argc] = arg_buffer[argc];
+            argc++;
+            argv_index = 0;
+        }
+    }
+
+    return gold_main(argc, argv);
 }
 #else
 int main(int argc, char** argv) {
