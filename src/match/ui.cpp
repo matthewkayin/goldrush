@@ -50,7 +50,6 @@ static const ivec2 MATCH_UI_BUTTON_POSITIONS[HOTKEY_GROUP_SIZE] = {
     ivec2(MATCH_UI_BUTTON_X + (2 * MATCH_UI_BUTTON_PADDING_X), MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y)
 };
 static const ivec2 SELECTION_LIST_TOP_LEFT = ivec2(164, 284);
-static const ivec2 NAME_POSITION = ivec2(164, 282);
 static const ivec2 BUILDING_QUEUE_TOP_LEFT = ivec2(320, 284);
 static const ivec2 UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     BUILDING_QUEUE_TOP_LEFT,
@@ -64,7 +63,7 @@ static const Rect UI_BUILDING_QUEUE_PROGRESS_BAR_RECT = (Rect) {
     .y = 284 + 24,
     .w = 104, .h = 6
 };
-static const ivec2 MATCH_UI_GARRISON_ICON_TOP_LEFT = ivec2(320, 282 + 14);
+static const ivec2 MATCH_UI_GARRISON_ICON_TOP_LEFT = ivec2(320, 284 + 18);
 static const ivec2 MATCH_UI_GARRISON_ICON_POSITIONS[4] = {
     MATCH_UI_GARRISON_ICON_TOP_LEFT,
     MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(36, 0),
@@ -2931,97 +2930,61 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             } else if (frame == frame_count - 1) {
                 hframe = 2;
             }
-            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), NAME_POSITION + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), SELECTION_LIST_TOP_LEFT + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
         }
         ivec2 frame_size = ivec2(frame_count * frame_sprite_info.frame_width, frame_sprite_info.frame_height);
-        render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, NAME_POSITION + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
+        render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, SELECTION_LIST_TOP_LEFT + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
 
         // Entity icon
-        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), NAME_POSITION + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(entity_data.icon, ivec2(0, 0), NAME_POSITION + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(entity_data.icon, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
 
         if (entity.type == ENTITY_GOLDMINE) {
             if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
-                render_text(FONT_HACK_WHITE, "Collapsed!", NAME_POSITION + ivec2(36, 20));
+                render_text(FONT_HACK_WHITE, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(36, 20));
             } else {
                 char gold_left_str[8];
                 sprintf(gold_left_str, "%u", entity.gold_held);
-                render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), NAME_POSITION + ivec2(36, 20), RENDER_SPRITE_NO_CULL, 0);
-                render_text(FONT_HACK_WHITE, gold_left_str, NAME_POSITION + ivec2(36 + render_get_sprite_info(SPRITE_UI_GOLD_ICON).frame_width + 2, 20 + 1));
+                render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(36, 20), RENDER_SPRITE_NO_CULL, 0);
+                render_text(FONT_HACK_WHITE, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(36 + render_get_sprite_info(SPRITE_UI_GOLD_ICON).frame_width + 2, 20 + 1));
             }
         } else {
-            ivec2 healthbar_position = NAME_POSITION + ivec2(0, 18 + 34);
-            ivec2 healthbar_size = ivec2(64, 10);
+            ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(34, 18 + 2);
+            ivec2 healthbar_size = ivec2(64, 12);
             match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 
             char health_text[16];
             sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
-            ivec2 health_text_size = render_get_text_size(FONT_M3X6_WHITE, health_text);
-            ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2) + ivec2(0, -9);
-            render_text(FONT_M3X6_WHITE, health_text, health_text_position);
+            ivec2 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
+            ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
+            render_text(FONT_HACK_WHITE, health_text, health_text_position);
 
             uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
             if (entity_is_unit(entity.type) && entity_max_energy != 0)  {
                 healthbar_position += ivec2(0, healthbar_size.y + 1);
                 match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
                 sprintf(health_text, "%i/%i", entity.energy, entity_max_energy);
-                health_text_size = render_get_text_size(FONT_M3X6_WHITE, health_text);
-                health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2) + ivec2(0, -9);
-                render_text(FONT_M3X6_WHITE, health_text, health_text_position);
+                health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
+                health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
+                render_text(FONT_HACK_WHITE, health_text, health_text_position);
             }
 
-            char stat_texts[4][8];
             SpriteName stat_icons[4];
             int stat_count = 0;
 
-            // Attack
-            if (entity_is_unit(entity.type) && entity_data.unit_data.damage != 0 && entity_data.unit_data.range_squared != 1) {
-                int attack_base = entity_data.unit_data.damage;
-                int attack_bonus = match_entity_get_damage(state.match, entity) - attack_base;
-                if (attack_bonus == 0) {
-                    sprintf(stat_texts[stat_count], "%i", attack_base);
-                } else {
-                    sprintf(stat_texts[stat_count], "%i+%i", attack_base, attack_bonus);
-                }
-                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_ATTACK;
-                stat_count++;
-            }
-            // Melee Attack
-            if (entity_is_unit(entity.type) && entity_data.unit_data.damage != 0 && 
-                    (entity_data.unit_data.range_squared == 1 || 
-                    (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state.match, entity.player_id, UPGRADE_BAYONETS)))) {
-                int attack_base = entity.type == ENTITY_SOLDIER ? SOLDIER_BAYONET_DAMAGE : match_entity_get_damage(state.match, entity);
-                sprintf(stat_texts[stat_count], "%i", attack_base);
-                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_MELEE_ATTACK;
-                stat_count++;
-            }
-            // Defense
-            if (entity.mode != MODE_BUILDING_IN_PROGRESS) {
-                int armor_base = entity_data.armor;
-                int armor_bonus = match_entity_get_armor(state.match, entity) - armor_base;
-                if (armor_bonus == 0) {
-                    sprintf(stat_texts[stat_count], "%i", armor_base);
-                } else {
-                    sprintf(stat_texts[stat_count], "%i+%i", armor_base, armor_bonus);
-                }
-                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_DEFENSE;
-                stat_count++;
-            }
             // Detection
             if (match_entity_has_detection(state.match, entity)) {
-                memset(stat_texts[stat_count], 0, sizeof(stat_texts[stat_count]));
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_DETECTION;
                 stat_count++;
             }
 
-            ivec2 stat_position = NAME_POSITION + ivec2(33, stat_count > 2 ? 16 : 18); 
-            ivec2 stat_positions[4];
-            const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_ATTACK).frame_width;
-            int STAT_TEXT_PADDING = stat_count > 2 ? 0 : 4;
+            ivec2 stat_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 34); 
+            ivec2 stat_positions[2];
+            const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_DETECTION).frame_width;
+            int STAT_TEXT_PADDING = 2;
 
             for (int stat_index = 0; stat_index < stat_count; stat_index++) {
                 render_sprite_frame(stat_icons[stat_index], ivec2(0, 0), stat_position, RENDER_SPRITE_NO_CULL, 0);
-                render_text(FONT_HACK_WHITE, stat_texts[stat_index], stat_position + ivec2(STAT_ICON_SIZE + STAT_TEXT_PADDING, 0));
                 stat_positions[stat_index] = stat_position;
                 stat_position.y += STAT_ICON_SIZE + STAT_TEXT_PADDING; 
             }

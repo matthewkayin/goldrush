@@ -84,6 +84,8 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
+            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+            match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
 
             // Place scout
             {
@@ -2334,9 +2336,9 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
     bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;
 
     // Calculate accuracy
-    int accuracy = attack_with_bayonets ? 100 : match_entity_get_accuracy(state, attacker);
+    int accuracy = attack_with_bayonets ? 100 : attacker_data.unit_data.accuracy;
     if (defender.mode == MODE_UNIT_MOVE) {
-        accuracy -= match_entity_get_evasion(state, defender); 
+        accuracy -= defender_data.unit_data.evasion;
     }
     if (defender.type == ENTITY_LANDMINE && defender.mode == MODE_MINE_PRIME) {
         accuracy = 0;
@@ -2448,7 +2450,6 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
 
     if (attacker.type == ENTITY_CANNON) {
         // Check which enemies we hit
-        int attacker_damage = match_entity_get_damage(state, attacker);
         Rect full_damage_rect = (Rect) {
             .x = hit_position.x - (TILE_SIZE / 2),
             .y = hit_position.y - (TILE_SIZE / 2),
@@ -2472,7 +2473,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
             // if they're outside of it, they will be outside of the full damage rect as well
             Rect entity_rect = entity_get_rect(entity);
             if (entity_rect.intersects(splash_damage_rect)) {
-                int damage = attacker_damage; 
+                int damage = attacker_data.unit_data.damage; 
                 // Half damage if they are only within splash damage range
                 if (!entity_rect.intersects(full_damage_rect)) {
                     damage /= 2;
@@ -2485,8 +2486,8 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
             }
         }
     } else if (!attack_missed) {
-        int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : match_entity_get_damage(state, attacker);
-        int damage = std::max(1, attacker_damage - match_entity_get_armor(state, defender));
+        int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
+        int damage = std::max(1, attacker_damage - defender_data.armor);
         defender.health = std::max(0, defender.health - damage);
         log_trace("DESYNC attacker hit defender damage %i health %i", damage, defender.health);
         match_entity_on_attack(state, attacker_id, defender);
@@ -2680,46 +2681,6 @@ bool match_entity_has_detection(const MatchState& state, const Entity& entity) {
         return true;
     }
     return entity_get_data(entity.type).has_detection;
-}
-
-int match_entity_get_damage(const MatchState& state, const Entity& entity) {
-    if (!entity_is_unit(entity.type)) {
-        return 0;
-    }
-
-    const EntityData& entity_data = entity_get_data(entity.type);
-    int damage = entity_data.unit_data.damage;
-    if (entity.type != ENTITY_CANNON && 
-            entity_data.unit_data.range_squared != 1 && damage != 0 && 
-            match_player_has_upgrade(state, entity.player_id, UPGRADE_BLACK_POWDER)) {
-        damage += 1;
-    }
-
-    return damage;
-}
-
-int match_entity_get_armor(const MatchState& state, const Entity& entity) {
-    int armor = entity_get_data(entity.type).armor;
-    if (entity_is_unit(entity.type) && match_player_has_upgrade(state, entity.player_id, UPGRADE_ARMOR)) {
-        armor += 1;
-    }
-    return armor;
-}
-
-int match_entity_get_accuracy(const MatchState& state, const Entity& entity) {
-    if (!entity_is_unit(entity.type)) {
-        return 0;
-    }
-
-    return entity_get_data(entity.type).unit_data.accuracy;
-}
-
-int match_entity_get_evasion(const MatchState& state, const Entity& entity) {
-    if (!entity_is_unit(entity.type)) {
-        return 0;
-    }
-
-    return entity_get_data(entity.type).unit_data.evasion;
 }
 
 // EVENTS
