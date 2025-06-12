@@ -9,9 +9,6 @@
 
 static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
-static const uint32_t MATCH_TAKING_DAMAGE_FLICKER_DURATION = 10;
-static const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
-static const uint32_t UNIT_HEALTH_REGEN_DELAY = 600;
 static const uint32_t UNIT_ENERGY_REGEN_DURATION = 64;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_REPAIR_RATE = 4;
@@ -35,6 +32,7 @@ static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
 static const uint32_t MATCH_MAX_POPULATION = 100;
 static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
+static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -84,8 +82,6 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
-            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
-            match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
 
             // Place scout
             {
@@ -754,6 +750,9 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.health_regen_timer = 0;
     entity.fire_damage_timer = 0;
     entity.energy_regen_timer = 0;
+    entity.bleed_timer = 0;
+    entity.bleed_damage_timer = 0;
+    entity.bleed_animation = animation_create(ANIMATION_PARTICLE_BLEED);
 
     if (entity.type == ENTITY_LANDMINE) {
         entity.timer = MINE_ARM_DURATION;
@@ -802,6 +801,9 @@ EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left
     entity.health_regen_timer = 0;
     entity.fire_damage_timer = 0;
     entity.energy_regen_timer = 0;
+    entity.bleed_timer = 0;
+    entity.bleed_damage_timer = 0;
+    entity.bleed_animation = animation_create(ANIMATION_PARTICLE_BLEED);
 
     EntityId id = state.entities.push_back(entity);
     map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_get_data(entity.type).cell_size, (Cell) {
@@ -823,6 +825,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             entity.gold_mine_id = ID_NULL;
             entity.mode = entity.type == ENTITY_BALLOON ? MODE_UNIT_BALLOON_DEATH_START : MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
+            entity.bleed_timer = 0;
+            entity.bleed_damage_timer = 0;
             entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, false);
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
@@ -865,6 +869,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
     bool update_finished = false;
     fixed movement_left = entity_is_unit(entity.type) ? entity_data.unit_data.speed : fixed::from_raw(0);
+    if (entity.bleed_timer != 0) {
+        movement_left = movement_left * BLEED_SPEED_PERCENTAGE;
+    }
     while (!update_finished) {
         switch (entity.mode) {
             case MODE_UNIT_IDLE: {
@@ -1785,6 +1792,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             if (entity.fire_damage_timer == 0) {
                 entity.health--;
                 entity.fire_damage_timer = ENTITY_FIRE_DAMAGE_COOLDOWN;
+                entity_on_damage_taken(entity);
             } 
             if (entity_is_building(entity.type)) {
                 entity_set_flag(entity, ENTITY_FLAG_ON_FIRE, true);
@@ -1804,7 +1812,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
         if (entity.taking_damage_timer == 0) {
             entity.taking_damage_counter--;
             entity_set_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER, entity.taking_damage_counter == 0 ? false : !entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER));
-            entity.taking_damage_timer = entity.taking_damage_counter == 0 ? 0 : MATCH_TAKING_DAMAGE_FLICKER_DURATION;
+            entity.taking_damage_timer = entity.taking_damage_counter == 0 ? 0 : UNIT_TAKING_DAMAGE_FLICKER_DURATION;
         } 
     }
     if (entity.health == entity_data.max_health) {
@@ -1839,6 +1847,22 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
         if (entity.energy_regen_timer == 0) {
             entity.energy_regen_timer = UNIT_ENERGY_REGEN_DURATION;
             entity.energy++;
+        }
+    }
+
+    // Bleed
+    if (entity.bleed_timer != 0 && entity.health != 0) {
+        entity.bleed_timer--;
+        if (entity.bleed_timer != 0) {
+            animation_update(entity.bleed_animation);
+            if (entity.bleed_damage_timer != 0) {
+                entity.bleed_damage_timer--;
+            }
+            if (entity.bleed_damage_timer == 0) {
+                entity.health--;
+                entity.bleed_damage_timer = BLEED_DAMAGE_RATE;
+                entity_on_damage_taken(entity);
+            }
         }
     }
 
@@ -2489,7 +2513,10 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
         int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
         int damage = std::max(1, attacker_damage - defender_data.armor);
         defender.health = std::max(0, defender.health - damage);
-        log_trace("DESYNC attacker hit defender damage %i health %i", damage, defender.health);
+        if (attacker.type == ENTITY_BANDIT && match_player_has_upgrade(state, attacker.player_id, UPGRADE_SERRATED_KNIVES) && entity_is_unit(defender.type)) {
+            defender.bleed_timer = BLEED_DURATION;
+        }
+        log_trace("DESYNC attacker hit defender damage %i health %i bleed timer %u", damage, defender.health, defender.bleed_timer);
         match_entity_on_attack(state, attacker_id, defender);
     }
 }
@@ -2504,15 +2531,8 @@ void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& def
             match_event_alert(state, MATCH_ALERT_TYPE_ATTACK, defender.player_id, defender.cell, defender_data.cell_size);
         }
     }
-    defender.taking_damage_counter = 3;
-    if (defender.taking_damage_timer == 0) {
-        defender.taking_damage_timer = MATCH_TAKING_DAMAGE_FLICKER_DURATION;
-    }
 
-    // Health regen timer
-    if (entity_is_unit(defender.type)) {
-        defender.health_regen_timer = UNIT_HEALTH_REGEN_DURATION + UNIT_HEALTH_REGEN_DELAY;
-    }
+    entity_on_damage_taken(defender);
 
     // Make defender attack back
     if (entity_is_unit(defender.type) && defender.mode == MODE_UNIT_IDLE &&

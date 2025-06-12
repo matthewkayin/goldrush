@@ -191,6 +191,11 @@ void animation_init() {
         .frames = animation_frame_range(5, 7, 4),
         .loops = 1
     };
+    ANIMATION_DATA[ANIMATION_PARTICLE_BLEED] = (AnimationData) {
+        .vframe = 0,
+        .frames = animation_frame_range(0, 3, 8),
+        .loops = ANIMATION_LOOPS_INDEFINITELY
+    };
     ANIMATION_DATA[ANIMATION_SMITH_BEGIN] = (AnimationData) {
         .vframe = 0,
         .frames = animation_frame_range(0, 3, 8),

@@ -305,9 +305,9 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
             .type = HOTKEY_REQUIRES_NONE
         }
     }},
-    { INPUT_HOTKEY_RESEARCH_ARMOR, (HotkeyButtonInfo) {
+    { INPUT_HOTKEY_RESEARCH_SERRATED_KNIVES, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_RESEARCH,
-        .upgrade = UPGRADE_ARMOR,
+        .upgrade = UPGRADE_SERRATED_KNIVES,
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }

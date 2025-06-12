@@ -34,6 +34,8 @@ const int FOG_HIDDEN = -1;
 const int FOG_EXPLORED = 0;
 
 const int SOLDIER_BAYONET_DAMAGE = 5;
+const uint32_t BLEED_DAMAGE_RATE = 30;
+const uint32_t BLEED_DURATION = 60 * 5;
 
 struct MatchPlayer {
     bool active;

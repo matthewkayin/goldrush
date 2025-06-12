@@ -963,6 +963,18 @@ bool entity_should_die(const Entity& entity) {
     return false;
 }
 
+void entity_on_damage_taken(Entity& entity) {
+    entity.taking_damage_counter = 3;
+    if (entity.taking_damage_timer == 0) {
+        entity.taking_damage_timer = UNIT_TAKING_DAMAGE_FLICKER_DURATION;
+    }
+
+    // Health regen timer
+    if (entity_is_unit(entity.type)) {
+        entity.health_regen_timer = UNIT_HEALTH_REGEN_DURATION + UNIT_HEALTH_REGEN_DELAY;
+    }
+}
+
 // Building queue items
 
 uint32_t building_queue_item_duration(const BuildingQueueItem& item) {

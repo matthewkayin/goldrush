@@ -21,6 +21,9 @@ const uint32_t ENTITY_CANNOT_GARRISON = 0;
 
 const int ENTITY_SKY_POSITION_Y_OFFSET = -16;
 const uint32_t ENTITY_BALLOON_DEATH_DURATION = 50;
+const uint32_t UNIT_TAKING_DAMAGE_FLICKER_DURATION = 10;
+const uint32_t UNIT_HEALTH_REGEN_DURATION = 64;
+const uint32_t UNIT_HEALTH_REGEN_DELAY = 600;
 
 enum EntityType {
     ENTITY_GOLDMINE,
@@ -149,6 +152,9 @@ struct Entity {
     uint32_t health_regen_timer;
     uint32_t fire_damage_timer;
     uint32_t energy_regen_timer;
+    uint32_t bleed_timer;
+    uint32_t bleed_damage_timer;
+    Animation bleed_animation;
 };
 
 struct EntityDataUnit {
@@ -215,6 +221,7 @@ AnimationName entity_get_expected_animation(const Entity& entity);
 ivec2 entity_get_animation_frame(const Entity& entity);
 Rect entity_goldmine_get_block_building_rect(ivec2 cell);
 bool entity_should_die(const Entity& entity);
+void entity_on_damage_taken(Entity& entity);
 
 // Building queue items
 

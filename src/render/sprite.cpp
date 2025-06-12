@@ -552,50 +552,18 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_UI_STAT_ICON_ATTACK, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_stat_attack.png",
-            .hframes = 1,
-            .vframes = 1
-        }
-    }},
-    { SPRITE_UI_STAT_ICON_MELEE_ATTACK, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_stat_melee_attack.png",
-            .hframes = 1,
-            .vframes = 1
-        }
-    }},
-    { SPRITE_UI_STAT_ICON_DEFENSE, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_stat_defense.png",
-            .hframes = 1,
-            .vframes = 1
-        }
-    }},
-    { SPRITE_UI_STAT_ICON_ACCURACY, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_stat_accuracy.png",
-            .hframes = 1,
-            .vframes = 1
-        }
-    }},
-    { SPRITE_UI_STAT_ICON_EVASION, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_stat_evasion.png",
-            .hframes = 1,
-            .vframes = 1
-        }
-    }},
     { SPRITE_UI_STAT_ICON_DETECTION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "ui_stat_detection.png",
+            .hframes = 1,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_STAT_ICON_BLEED, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "ui_stat_bleed.png",
             .hframes = 1,
             .vframes = 1
         }
@@ -928,34 +896,10 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_UPGRADE_ARMOR, (SpriteParams) {
+    { SPRITE_BUTTON_ICON_SERRATED_KNIVES, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
-            .path = "ui_button_icon_upgrade_armor.png",
-            .hframes = 3,
-            .vframes = 1
-        }
-    }},
-    { SPRITE_BUTTON_ICON_UPGRADE_GUNS, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_button_icon_upgrade_guns.png",
-            .hframes = 3,
-            .vframes = 1
-        }
-    }},
-    { SPRITE_BUTTON_ICON_LIGHT_ARMOR, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_button_icon_light_armor.png",
-            .hframes = 3,
-            .vframes = 1
-        }
-    }},
-    { SPRITE_BUTTON_ICON_HEAVY_ARMOR, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_button_icon_heavy_armor.png",
+            .path = "ui_button_icon_serrated_knives.png",
             .hframes = 3,
             .vframes = 1
         }
@@ -964,14 +908,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "ui_button_icon_black_powder.png",
-            .hframes = 3,
-            .vframes = 1
-        }
-    }},
-    { SPRITE_BUTTON_ICON_IRON_SIGHTS, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_DEFAULT,
-        .sheet = (SpriteParamsSheet) {
-            .path = "ui_button_icon_iron_sights.png",
             .hframes = 3,
             .vframes = 1
         }
@@ -1388,6 +1324,14 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
             .path = "particle_fire.png",
+            .hframes = 4,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_PARTICLE_BLEED, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = (SpriteParamsSheet) {
+            .path = "particle_bleed.png",
             .hframes = 4,
             .vframes = 1
         }

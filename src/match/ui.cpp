@@ -1391,7 +1391,7 @@ void match_ui_update(MatchUiState& state) {
                         }
                         case ENTITY_SMITH: {
                             state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_BLACK_POWDER;
-                            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_ARMOR;
+                            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_SERRATED_KNIVES;
                             state.hotkey_group[2] = INPUT_HOTKEY_RESEARCH_BAYONETS;
                             state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
                             break;
@@ -2193,6 +2193,26 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
             .x = params.position.x, .y = params.position.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
         };
+
+        if (entity.bleed_timer != 0) {
+            const SpriteInfo& bleed_sprite_info = render_get_sprite_info(SPRITE_PARTICLE_BLEED);
+            RenderSpriteParams bleed_params = (RenderSpriteParams) {
+                .sprite = SPRITE_PARTICLE_BLEED,
+                .frame = entity.bleed_animation.frame,
+                .position = ivec2(render_rect.x + (render_rect.w / 2) - (bleed_sprite_info.frame_width / 2), 
+                                  render_rect.y + (render_rect.h / 2) - (bleed_sprite_info.frame_height / 2)),
+                .options = RENDER_SPRITE_NO_CULL,
+                .recolor_id = 0
+            };
+            Rect bleed_render_rect = (Rect) {
+                .x = bleed_params.position.x, .y = bleed_params.position.y,
+                .w = bleed_sprite_info.frame_width, .h = bleed_sprite_info.frame_height
+            };
+            if (bleed_render_rect.intersects(SCREEN_RECT)) {
+                ysort_params.push_back(bleed_params);
+            }
+        }
+
         if (!render_rect.intersects(SCREEN_RECT)) {
             continue;
         }
@@ -2978,6 +2998,12 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
                 stat_count++;
             }
 
+            // Bleeding
+            if (entity.bleed_timer != 0) {
+                stat_icons[stat_count] = SPRITE_UI_STAT_ICON_BLEED;
+                stat_count++;
+            }
+
             ivec2 stat_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 34); 
             ivec2 stat_positions[2];
             const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_DETECTION).frame_width;
@@ -3677,18 +3703,10 @@ bool match_ui_should_render_hotkey_toggled(const MatchUiState& state, InputActio
 
 const char* match_ui_render_get_stat_tooltip(SpriteName sprite) {
     switch (sprite) {
-        case SPRITE_UI_STAT_ICON_ATTACK:
-            return "Ranged Damage";
-        case SPRITE_UI_STAT_ICON_MELEE_ATTACK:
-            return "Melee Damage";
-        case SPRITE_UI_STAT_ICON_DEFENSE:
-            return "Armor";
-        case SPRITE_UI_STAT_ICON_ACCURACY:
-            return "Accuracy";
-        case SPRITE_UI_STAT_ICON_EVASION:
-            return "Evasion";
         case SPRITE_UI_STAT_ICON_DETECTION:
             return "Detection";
+        case SPRITE_UI_STAT_ICON_BLEED:
+            return "Bleeding";
         default:
             log_warn("Unhandled stat tooltip icon of %u", sprite);
             return "";
