@@ -683,6 +683,20 @@ void match_update(MatchState& state) {
                     const EntityData& entity_data = entity_get_data(state.entities[entity_index].type);
                     match_fog_update(state, state.players[state.entities[entity_index].player_id].team, state.entities[entity_index].cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, state.entities[entity_index]), entity_data.cell_layer, false);
                 }
+                // Remove this entity from garrisoned list if they are garrisoned
+                if (state.entities[entity_index].garrison_id != ID_NULL) {
+                    Entity& carrier = state.entities.get_by_id(state.entities[entity_index].garrison_id);
+                    EntityId entity_id = state.entities.get_id_of(entity_index);
+                    uint32_t garrison_index;
+                    for (garrison_index = 0; garrison_index < carrier.garrisoned_units.size(); garrison_index++) {
+                        if (carrier.garrisoned_units[garrison_index] == entity_id) {
+                            break;
+                        }
+                    }
+                    GOLD_ASSERT(garrison_index != carrier.garrisoned_units.size());
+                    carrier.garrisoned_units.erase(carrier.garrisoned_units.begin() + garrison_index);
+                    state.entities[entity_index].garrison_id=  ID_NULL;
+                }
                 const EntityData& entity_data = entity_get_data(state.entities[entity_index].type);
                 log_trace("Removing entity %s ID %u player id %u", entity_data.name, state.entities.get_id_of(entity_index), state.entities[entity_index].player_id);
                 state.entities.remove_at(entity_index);
