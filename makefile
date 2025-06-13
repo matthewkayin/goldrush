@@ -13,6 +13,7 @@ INCLUDE_FLAGS := -Isrc -Ivendor
 COMPILER_FLAGS := -std=c++17 -Wall -g -O0
 LINKER_FLAGS := -g 
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
+RC_FILES := 
 
 ifeq ($(OS),Windows_NT)
 	BUILD_PLATFORM := win64
@@ -23,6 +24,7 @@ ifeq ($(OS),Windows_NT)
 	rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 	SRC_FILES := $(call rwildcard,src/,*.cpp) # Get all .c files
 	SRC_FILES += $(call rwildcard,vendor/,*.cpp) # Get all .c files
+	RC_FILES := src/win_icon.rc
 	DIRECTORIES := \src $(subst $(DIR),,$(shell dir src /S /AD /B | findstr /i src)) # Get all directories under src.
 	DIRECTORIES += \vendor $(subst $(DIR),,$(shell dir vendor /S /AD /B | findstr /i vendor)) # Get all directories under vendor.
 
@@ -50,6 +52,9 @@ else
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
+ifeq ($(BUILD_PLATFORM),win64)
+	OBJ_FILES += $(RC_FILES:%=$(OBJ_DIR)/%.res)
+endif
 
 all: scaffold compile link
 
@@ -108,9 +113,7 @@ $(OBJ_DIR)/%.cpp.o: %.cpp # compile .c to .c.o object
 	@echo   $<...
 	@clang++ $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
 
-# compile .m to .o object only for macos
-ifeq ($(BUILD_PLATFORM),osx)
-$(OBJ_DIR)/%.mm.o: %.mm
-	@echo   $<...
-	@clang $< $(COMPILER_FLAGS) -c -o $@ $(DEFINES) $(INCLUDE_FLAGS)
+ifeq ($(BUILD_PLATFORM),win64)
+$(OBJ_DIR)/%.rc.res: %.rc # Windows resource scripts
+	@rc -fo $@ $^
 endif

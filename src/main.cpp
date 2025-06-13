@@ -187,6 +187,18 @@ int gold_main(int argc, char** argv) {
     ivec2 window_size = ivec2(1280, 720);
     SDL_Window* window = SDL_CreateWindow(APP_NAME, window_size.x, window_size.y, window_flags);
 
+    // Load window icon
+    char icon_path[256];
+    filesystem_get_resource_path(icon_path, "icon.png");
+    SDL_Surface* icon_surface = IMG_Load(icon_path);
+    if (icon_surface == NULL) {
+        log_error("Could not load icon surface. %s", SDL_GetError());
+        logger_quit();
+        return 1;
+    }
+    SDL_SetWindowIcon(window, icon_surface);
+    SDL_DestroySurface(icon_surface);
+
     if (!render_init(window)) {
         logger_quit();
         return -1;
@@ -208,8 +220,6 @@ int gold_main(int argc, char** argv) {
     input_init(window);
     options_load();
     srand(time(NULL));
-
-    log_info("base path %s", SDL_GetBasePath());
 
     bool is_running = true;
     bool render_debug_info = false;
