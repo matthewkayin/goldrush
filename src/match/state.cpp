@@ -681,7 +681,8 @@ void match_update(MatchState& state) {
                 // Remove this entity's fog but only if they are not gold and not garrisoned
                 if (state.entities[entity_index].player_id != PLAYER_NONE && state.entities[entity_index].garrison_id == ID_NULL) {
                     const EntityData& entity_data = entity_get_data(state.entities[entity_index].type);
-                    match_fog_update(state, state.players[state.entities[entity_index].player_id].team, state.entities[entity_index].cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, state.entities[entity_index]), entity_data.cell_layer, false);
+                    // Decrementing non-detection fog only because entities should clear their detection when they begin death
+                    match_fog_update(state, state.players[state.entities[entity_index].player_id].team, state.entities[entity_index].cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, false);
                 }
                 // Remove this entity from garrisoned list if they are garrisoned
                 if (state.entities[entity_index].garrison_id != ID_NULL) {
@@ -845,6 +846,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             entity.bleed_timer = 0;
             entity.bleed_damage_timer = 0;
             entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, false);
+
+            if (match_entity_has_detection(state, entity) && entity.garrison_id == ID_NULL) {
+                // Remove this units detection
+                match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, true, entity_data.cell_layer, false);
+                // Then re-increment fog with non-detection so that we can still see death fade
+                match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, false, entity_data.cell_layer, true);
+            }
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;
