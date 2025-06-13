@@ -1150,10 +1150,13 @@ void match_ui_update(MatchUiState& state) {
                 }
 
                 if (state.selection.size() == 1 && state.selection[0] == event.selection_handoff.to_deselect) {
-                    std::vector<EntityId> new_selection;
-                    new_selection.push_back(event.selection_handoff.to_select);
-                    match_ui_set_selection(state, new_selection);
-                    state.mode = MATCH_UI_MODE_NONE;
+                    if (match_ui_is_in_menu(state.mode)) {
+                        state.selection.clear();
+                    } else {
+                        std::vector<EntityId> new_selection;
+                        new_selection.push_back(event.selection_handoff.to_select);
+                        match_ui_set_selection(state, new_selection);
+                    }
                 }
                 break;
             }
@@ -1390,7 +1393,7 @@ void match_ui_update(MatchUiState& state) {
                             break;
                         }
                         case ENTITY_SMITH: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_BLACK_POWDER;
+                            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_FAN_HAMMER;
                             state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_SERRATED_KNIVES;
                             state.hotkey_group[2] = INPUT_HOTKEY_RESEARCH_BAYONETS;
                             state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
@@ -3211,136 +3214,6 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
             render_text(FONT_HACK_GOLD, network_get_player(player_id).name, ivec2(DISCONNECT_FRAME_RECT.x + 16, DISCONNECT_FRAME_RECT.y + player_text_y));
             player_text_y += 16;
-        }
-    }
-
-    // Debug unit info
-    if (render_debug_info) {
-        if (!match_ui_is_mouse_in_ui()) {
-            ivec2 mouse_cell = (input_get_mouse_position() + state.camera_offset) / TILE_SIZE;
-            Cell cell_value = map_get_cell(state.match.map, CELL_LAYER_GROUND, mouse_cell);
-            char debug_text[128];
-            char* debug_text_ptr = debug_text;
-            debug_text_ptr += sprintf(debug_text, "%i,%i ", mouse_cell.x, mouse_cell.y);
-            switch (cell_value.type) {
-                case CELL_EMPTY:
-                    debug_text_ptr += sprintf(debug_text_ptr, "EMPTY");
-                    break;
-                case CELL_BLOCKED:
-                    debug_text_ptr += sprintf(debug_text_ptr, "BLOCKED");
-                    break;
-                case CELL_UNREACHABLE:
-                    debug_text_ptr += sprintf(debug_text_ptr, "UNREACHABLE");
-                    break;
-                case CELL_DECORATION_1:
-                case CELL_DECORATION_2:
-                case CELL_DECORATION_3:
-                case CELL_DECORATION_4:
-                case CELL_DECORATION_5:
-                    debug_text_ptr += sprintf(debug_text_ptr, "DECORATION");
-                    break;
-                case CELL_UNIT:
-                    debug_text_ptr += sprintf(debug_text_ptr, "UNIT");
-                    break;
-                case CELL_BUILDING:
-                    debug_text_ptr += sprintf(debug_text_ptr, "BUILDING");
-                    break;
-                case CELL_GOLDMINE:
-                    debug_text_ptr += sprintf(debug_text_ptr, "GOLDMINE");
-                    break;
-                case CELL_MINER:
-                    debug_text_ptr += sprintf(debug_text_ptr, "MINER");
-                    break;
-            }
-            debug_text_ptr += sprintf(debug_text_ptr, " fire: %i", (int)match_is_cell_on_fire(state.match, mouse_cell));
-            render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 12));
-
-            if (cell_value.type == CELL_EMPTY) {
-                cell_value = map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, mouse_cell);
-            }
-            if (cell_value.type == CELL_EMPTY) {
-                cell_value = map_get_cell(state.match.map, CELL_LAYER_SKY, mouse_cell);
-            }
-
-            debug_text_ptr = debug_text;
-            if (cell_value.type == CELL_MINER || cell_value.type == CELL_UNIT || cell_value.type == CELL_BUILDING) {
-                const Entity& entity = state.match.entities.get_by_id(cell_value.id);
-                const EntityData& entity_data = entity_get_data(entity.type);
-                debug_text_ptr += sprintf(debug_text_ptr, "%u %s | Mode: ", cell_value.id, entity_data.name);
-                switch (entity.mode) {
-                    case MODE_UNIT_IDLE:
-                        debug_text_ptr += sprintf(debug_text_ptr, "IDLE");
-                        break;
-                    case MODE_UNIT_MOVE:
-                        debug_text_ptr += sprintf(debug_text_ptr, "MOVE");
-                        break;
-                    case MODE_UNIT_BLOCKED:
-                        debug_text_ptr += sprintf(debug_text_ptr, "BLOCKED");
-                        break;
-                    case MODE_UNIT_MOVE_FINISHED:
-                        debug_text_ptr += sprintf(debug_text_ptr, "MOVE FINISHED");
-                        break;
-                    case MODE_UNIT_IN_MINE:
-                        debug_text_ptr += sprintf(debug_text_ptr, "IN_MINE");
-                        break;
-                    case MODE_UNIT_ATTACK_WINDUP:
-                        debug_text_ptr += sprintf(debug_text_ptr, "ATTACKING");
-                        break;
-                    case MODE_UNIT_DEATH:
-                        debug_text_ptr += sprintf(debug_text_ptr, "DEATH");
-                        break;
-                    case MODE_UNIT_DEATH_FADE:
-                        debug_text_ptr += sprintf(debug_text_ptr, "DEATH FADE");
-                        break;
-                    case MODE_UNIT_BUILD_ASSIST:
-                        debug_text_ptr += sprintf(debug_text_ptr, "BUILD ASSIST");
-                        break;
-                    case MODE_UNIT_REPAIR:
-                        debug_text_ptr += sprintf(debug_text_ptr, "REPAIR");
-                        break;
-                    case MODE_UNIT_BUILD:
-                        debug_text_ptr += sprintf(debug_text_ptr, "BUILD");
-                        break;
-                    case MODE_UNIT_SOLDIER_CHARGE:
-                        debug_text_ptr += sprintf(debug_text_ptr, "CHARGE");
-                        break;
-                    case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP:
-                        debug_text_ptr += sprintf(debug_text_ptr, "SOLDIER ATTACKING");
-                        break;
-                    case MODE_UNIT_PYRO_THROW:
-                        debug_text_ptr += sprintf(debug_text_ptr, "PYRO THROW");
-                        break;
-                    case MODE_UNIT_BALLOON_DEATH_START:
-                        debug_text_ptr += sprintf(debug_text_ptr, "BALLOON DEATH START");
-                        break;
-                    case MODE_UNIT_BALLOON_DEATH:
-                        debug_text_ptr += sprintf(debug_text_ptr, "BALLOON DEATH");
-                        break;
-                    case MODE_BUILDING_IN_PROGRESS:
-                        debug_text_ptr += sprintf(debug_text_ptr, "IN PROGRESS");
-                        break;
-                    case MODE_BUILDING_FINISHED:
-                        debug_text_ptr += sprintf(debug_text_ptr, "FINISHED");
-                        break;
-                    case MODE_BUILDING_DESTROYED:
-                        debug_text_ptr += sprintf(debug_text_ptr, "DESTROYED");
-                        break;
-                    case MODE_MINE_ARM:
-                        debug_text_ptr += sprintf(debug_text_ptr, "ARM");
-                        break;
-                    case MODE_MINE_PRIME:
-                        debug_text_ptr += sprintf(debug_text_ptr, "PRIME");
-                        break;
-                    case MODE_GOLDMINE:
-                        debug_text_ptr += sprintf(debug_text_ptr, "GOLDMINE");
-                        break;
-                    case MODE_GOLDMINE_COLLAPSED:
-                        debug_text_ptr += sprintf(debug_text_ptr, "COLLAPSED");
-                        break;
-                }
-
-                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, 24));
-            }
         }
     }
 
