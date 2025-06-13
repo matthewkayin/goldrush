@@ -904,10 +904,10 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BLACK_POWDER, (SpriteParams) {
+    { SPRITE_BUTTON_ICON_FAN_HAMMER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = (SpriteParamsSheet) {
-            .path = "ui_button_icon_black_powder.png",
+            .path = "ui_button_icon_fan_hammer.png",
             .hframes = 3,
             .vframes = 1
         }

@@ -33,6 +33,7 @@ static const uint32_t FOG_REVEAL_DURATION = 60;
 static const uint32_t MATCH_MAX_POPULATION = 100;
 static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
+static const uint32_t COWBOY_FAN_HAMMER_RESET_DURATION = 60 * 5;
 
 MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -750,6 +751,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.health_regen_timer = 0;
     entity.fire_damage_timer = 0;
     entity.energy_regen_timer = 0;
+    entity.fan_hammer_timer = 0;
     entity.bleed_timer = 0;
     entity.bleed_damage_timer = 0;
     entity.bleed_animation = animation_create(ANIMATION_PARTICLE_BLEED);
@@ -801,6 +803,7 @@ EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left
     entity.health_regen_timer = 0;
     entity.fire_damage_timer = 0;
     entity.energy_regen_timer = 0;
+    entity.fan_hammer_timer = 0;
     entity.bleed_timer = 0;
     entity.bleed_damage_timer = 0;
     entity.bleed_animation = animation_create(ANIMATION_PARTICLE_BLEED);
@@ -1318,9 +1321,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                             // Begin attack windup
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, target_data.cell_size);
-                            entity.mode = entity.type == ENTITY_SOLDIER && !attack_with_bayonets
-                                            ? MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP
-                                            : MODE_UNIT_ATTACK_WINDUP;
+                            if (entity.type == ENTITY_COWBOY && entity.fan_hammer_timer == 0 && match_player_has_upgrade(state, entity.player_id, UPGRADE_FAN_HAMMER)) {
+                                entity.mode = MODE_COWBOY_FAN_HAMMER;
+                            } else if (entity.type == ENTITY_SOLDIER && !attack_with_bayonets) {
+                                entity.mode = MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP;
+                            } else {
+                                entity.mode = MODE_UNIT_ATTACK_WINDUP;
+                            }
                             update_finished = true;
                             break;
                         }
@@ -1590,6 +1597,24 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 update_finished = true;
                 break;
             }
+            case MODE_COWBOY_FAN_HAMMER: {
+                if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                    entity.target = (Target) {
+                        .type = TARGET_NONE
+                    };
+                    entity.mode = MODE_UNIT_IDLE;
+                    break;
+                }
+
+                if (!animation_is_playing(entity.animation)) {
+                    entity.mode = MODE_UNIT_IDLE;
+                    entity.cooldown_timer = entity_data.unit_data.attack_cooldown;
+                    entity.fan_hammer_timer = COWBOY_FAN_HAMMER_RESET_DURATION;
+                }
+
+                update_finished = true;
+                break;
+            }
             case MODE_UNIT_SOLDIER_CHARGE: {
                 if (!animation_is_playing(entity.animation)) {
                     entity_set_flag(entity, ENTITY_FLAG_CHARGED, true);
@@ -1806,6 +1831,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     if (entity.cooldown_timer != 0) {
         entity.cooldown_timer--;
     }
+    if (entity.fan_hammer_timer != 0) {
+        entity.fan_hammer_timer--;
+    }
 
     if (entity.taking_damage_counter != 0) {
         entity.taking_damage_timer--;
@@ -1886,6 +1914,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             }
         } else if (entity.mode == MODE_MINE_PRIME) {
             match_event_play_sound(state, SOUND_MINE_PRIME, entity.position.to_ivec2());
+        } else if (entity.mode == MODE_COWBOY_FAN_HAMMER && entity.animation.frame.x == 6) {
+            match_entity_attack_target(state, entity_id);
         }
     }
 }
@@ -2349,12 +2379,17 @@ Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& 
 }
 
 void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
-    const Entity& attacker = state.entities.get_by_id(attacker_id);
+    Entity& attacker = state.entities.get_by_id(attacker_id);
     Entity& defender = state.entities.get_by_id(attacker.target.id);
     const EntityData& attacker_data = entity_get_data(attacker.type);
     const EntityData& defender_data = entity_get_data(defender.type);
 
     log_trace("DESYNC match_entity_attack_target attacker ID %u name %s player %u defender ID %u name %s player %u", attacker_id, attacker_data.name, attacker.player_id, attacker.target.id, defender_data.name, defender.player_id);
+
+    // Reset fan hammer cooldown, should happen regardless of hit or miss
+    if (attacker.type == ENTITY_COWBOY) {
+        attacker.fan_hammer_timer = COWBOY_FAN_HAMMER_RESET_DURATION;
+    }
 
     // Calculate damage
     bool attack_with_bayonets = attacker.type == ENTITY_SOLDIER && attacker.mode == MODE_UNIT_ATTACK_WINDUP;

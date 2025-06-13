@@ -69,6 +69,19 @@ void animation_init() {
         .frames = animation_frame_range(5, 7, 8),
         .loops = 1
     };
+    ANIMATION_DATA[ANIMATION_COWBOY_FAN_HAMMER] = (AnimationData) {
+        .vframe = -1,
+        .frames = {
+            (AnimationFrame) { .hframe = 5, .duration = 4 },
+            (AnimationFrame) { .hframe = 6, .duration = 4 },
+            (AnimationFrame) { .hframe = 7, .duration = 4 },
+            (AnimationFrame) { .hframe = 6, .duration = 4 },
+            (AnimationFrame) { .hframe = 7, .duration = 4 },
+            (AnimationFrame) { .hframe = 6, .duration = 4 },
+            (AnimationFrame) { .hframe = 7, .duration = 4 }
+        },
+        .loops = 1
+    };
     ANIMATION_DATA[ANIMATION_SOLDIER_RANGED_ATTACK] = (AnimationData) {
         .vframe = -1,
         .frames = {

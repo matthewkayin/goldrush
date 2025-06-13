@@ -9,7 +9,7 @@ const uint32_t UPGRADE_BAYONETS = 1 << 2;
 const uint32_t UPGRADE_PRIVATE_EYE = 1 << 3;
 const uint32_t UPGRADE_STAKEOUT = 1 << 4;
 const uint32_t UPGRADE_SERRATED_KNIVES = 1 << 5;
-const uint32_t UPGRADE_BLACK_POWDER = 1 << 6;
+const uint32_t UPGRADE_FAN_HAMMER = 1 << 6;
 
 struct UpgradeData {
     const char* name;
