@@ -446,7 +446,7 @@ const NetworkLobby& network_get_lobby(size_t index) {
     return state.lobbies[index];
 }
 
-void network_open_lobby(const char* lobby_name) {
+void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
     state.host = network_host_create(state.backend);
     if (state.host == NULL) {
         state.events.push((NetworkEvent) {
@@ -472,7 +472,7 @@ void network_open_lobby(const char* lobby_name) {
         });
         state.status = NETWORK_STATUS_HOST;
     } else if (state.backend == NETWORK_BACKEND_STEAM) {
-        SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, 2);
+        SteamMatchmaking()->CreateLobby(privacy == NETWORK_LOBBY_PRIVACY_PUBLIC ? k_ELobbyTypePublic : k_ELobbyTypeFriendsOnly, 2);
         state.status = NETWORK_STATUS_CONNECTING;
     }
 

@@ -7,7 +7,7 @@
 #include "upgrade.h"
 #include <algorithm>
 
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
+static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
 static const uint32_t UNIT_ENERGY_REGEN_DURATION = 64;
 static const uint32_t UNIT_BUILD_TICK_DURATION = 6;

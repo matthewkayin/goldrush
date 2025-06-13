@@ -17,7 +17,7 @@ enum MenuMode {
     MENU_MODE_MAIN,
     MENU_MODE_SINGLEPLAYER,
     MENU_MODE_MULTIPLAYER,
-    MENU_MODE_USERNAME,
+    MENU_MODE_CREATE_LOBBY,
     MENU_MODE_LOBBYLIST,
     MENU_MODE_CONNECTING,
     MENU_MODE_LOBBY,
@@ -40,7 +40,7 @@ struct MenuState {
     int parallax_timer;
     int parallax_cactus_offset;
 
-    std::string username;
+    std::string lobby_name;
     std::string lobby_search_query;
     std::string chat_message;
     std::string replay_rename;
@@ -49,6 +49,7 @@ struct MenuState {
     uint32_t connection_timeout;
     uint32_t lobbylist_page;
     uint32_t lobbylist_item_selected;
+    uint32_t lobby_privacy;
 
     std::vector<std::string> chat;
     std::vector<std::string> replay_filenames;

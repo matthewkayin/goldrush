@@ -20,7 +20,7 @@ void network_disconnect();
 void network_search_lobbies(const char* query);
 size_t network_get_lobby_count();
 const NetworkLobby& network_get_lobby(size_t index);
-void network_open_lobby(const char* lobby_name);
+void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy);
 void network_join_lobby(NetworkConnectionInfo connection_info);
 void network_steam_accept_invite(CSteamID lobby_id);
 const char* network_get_lobby_name();

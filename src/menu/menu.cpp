@@ -50,6 +50,12 @@ static const Rect MATCH_SETTINGS_RECT = (Rect) {
     .w = 172,
     .h = PLAYERLIST_RECT.h
 };
+static const Rect LOBBY_CREATE_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (364 / 2),
+    .y = 64,
+    .w = 300,
+    .h = 128
+};
 
 static const int PLAYERLIST_COLUMN_X = PLAYERLIST_RECT.x + 16;
 static const int PLAYERLIST_COLUMN_Y = PLAYERLIST_RECT.y + 22;
@@ -63,6 +69,7 @@ static const uint32_t CONNECTION_TIMEOUT = 5 * 60;
 static const uint32_t LOBBYLIST_PAGE_SIZE = 9;
 
 static const std::vector<std::string> PLAYER_COLOR_STRS = { "Blue", "Red", "Green", "Purple" };
+static const std::vector<std::string> LOBBY_TYPE_STRS = { "Public", "Invite Only" };
 
 SDL_EnumerationResult menu_on_replay_file_found(void* state_ptr, const char* dirname, const char* filename) {
     MenuState* state = (MenuState*)state_ptr;
@@ -97,7 +104,8 @@ MenuState menu_init() {
     state.connection_timeout = 0;
     state.lobbylist_page = 0;
     state.lobbylist_item_selected = MENU_ITEM_NONE;
-    state.username = std::string(SteamFriends()->GetPersonaName());
+    state.lobby_name = std::string(SteamFriends()->GetPersonaName()) + "'s Game";
+    state.lobby_privacy = NETWORK_LOBBY_PRIVACY_PUBLIC;
 
     state.mode = MENU_MODE_MAIN;
     state.options_menu.mode = OPTIONS_MENU_CLOSED;
@@ -120,6 +128,9 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
         }
         case NETWORK_EVENT_LOBBY_CONNECTED: {
             menu_set_mode(state, MENU_MODE_LOBBY);
+            if (network_is_host() && network_get_backend() == NETWORK_BACKEND_STEAM) {
+                menu_add_chat_message(state, "You have created a lobby. You can invite your friends using the Steam overlay (SHIFT+TAB).");
+            }
             break;
         }
         case NETWORK_EVENT_CHAT: {
@@ -256,22 +267,42 @@ void menu_update(MenuState& state) {
                 menu_set_mode(state, MENU_MODE_MAIN);
             }
         ui_end_container();
-    } else if (state.mode == MENU_MODE_USERNAME) {
-        ui_element_position(ivec2(BUTTON_X - 4, BUTTON_Y));
-        ui_text_input("Username: ", ivec2(256, 24), &state.username, MAX_USERNAME_LENGTH);
+    } else if (state.mode == MENU_MODE_CREATE_LOBBY) {
+        ui_frame_rect(LOBBY_CREATE_RECT);
+        ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Create Lobby");
 
-        ui_begin_row(ivec2(BUTTON_X, BUTTON_Y + 29), 4);
-            if (ui_button("Back")) {
-                menu_set_mode(state, MENU_MODE_MAIN);
-            }
-            if (ui_button("OK")) {
-                if (state.username.length() == 0) {
-                    menu_show_status(state, "Please enter a username.");
-                } else {
-                    menu_set_mode(state, MENU_MODE_LOBBYLIST);
-                }
+        ui_element_position(ivec2(LOBBY_CREATE_RECT.x + (LOBBY_CREATE_RECT.w / 2) - (header_text_size.x / 2), LOBBY_CREATE_RECT.y + 6));
+        ui_text(FONT_HACK_GOLD, "Create Lobby");
+
+        ui_begin_column(ivec2(LOBBY_CREATE_RECT.x + 8, LOBBY_CREATE_RECT.y + 26), 6);
+            ui_text_input("Name: ", ivec2(284, 24), &state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+            if (network_get_backend() == NETWORK_BACKEND_STEAM) {
+                const SpriteInfo& dropdown_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
+
+                ui_begin_row(ivec2(0, 0), 0);
+                    ui_element_position(ivec2(0, 3));
+                    ui_text(FONT_WESTERN8_GOLD, "Privacy:");
+
+                    ui_element_position(ivec2(LOBBY_CREATE_RECT.w - 16 - dropdown_info.frame_width, 0));
+                    ui_dropdown(UI_DROPDOWN, &state.lobby_privacy, LOBBY_TYPE_STRS, false);
+                ui_end_container();
             }
         ui_end_container();
+
+        ui_element_position(ivec2(LOBBY_CREATE_RECT.x + 16, LOBBY_CREATE_RECT.y + LOBBY_CREATE_RECT.h - 21 - 8));
+        if (ui_button("Back")) {
+            menu_set_mode(state, MENU_MODE_LOBBYLIST);
+        }
+        ivec2 create_button_size = ui_button_size("Create");
+        ui_element_position(ivec2(LOBBY_CREATE_RECT.x + LOBBY_CREATE_RECT.w - 16 - create_button_size.x, LOBBY_CREATE_RECT.y + LOBBY_CREATE_RECT.h - 21 - 8));
+        if (ui_button("Create")) {
+            if (state.lobby_name.length() == 0) {
+                menu_show_status(state, "Please enter a lobby name.");
+            } else {
+                network_open_lobby(state.lobby_name.c_str(), (NetworkLobbyPrivacy)state.lobby_privacy);
+                menu_set_mode(state, MENU_MODE_CONNECTING);
+            }
+        }
     } else if (state.mode == MENU_MODE_LOBBYLIST) {
         ui_frame_rect(LOBBYLIST_RECT);
 
@@ -318,8 +349,7 @@ void menu_update(MenuState& state) {
                 menu_set_mode(state, MENU_MODE_MULTIPLAYER);
             }
             if (ui_button("Host")) {
-                network_open_lobby(state.username.c_str());
-                menu_set_mode(state, MENU_MODE_CONNECTING);
+                menu_set_mode(state, MENU_MODE_CREATE_LOBBY);
             }
             if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
                 if (ui_button("Join")) {
@@ -597,7 +627,7 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
         menu_search_replays_folder(state);
     } else if (mode == MENU_MODE_LOBBY) {
         state.chat.clear();
-    }
+    } 
 }
 
 void menu_show_status(MenuState& state, const char* message) {
@@ -744,7 +774,6 @@ void menu_render(const MenuState& state) {
 
     // Render title
     if (state.mode == MENU_MODE_MAIN || 
-            state.mode == MENU_MODE_USERNAME || 
             state.mode == MENU_MODE_SINGLEPLAYER || 
             state.mode == MENU_MODE_MULTIPLAYER) {
         render_sprite_frame(SPRITE_UI_TITLE, ivec2(0, 0), ivec2(24, 24), RENDER_SPRITE_NO_CULL, 0);
