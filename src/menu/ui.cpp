@@ -267,7 +267,7 @@ void ui_screen_shade(UI& state) {
     RENDER_COLOR_OFFBLACK_TRANSPARENT, 0);
 }
 
-void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length) {
+void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length, bool word_wrap) {
     int id = ui_get_next_text_input_id(state);
     ivec2 origin = ui_get_container_origin(state);
     ui_update_container(state, size);
@@ -279,7 +279,61 @@ void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value
     ui_queue_ninepatch(state, SPRITE_UI_FRAME_SMALL, text_input_rect, 0);
     ui_queue_text(state, FONT_HACK_GOLD, prompt, ivec2(text_input_rect.x + 5, text_input_rect.y + 6), 0);
     ivec2 prompt_size = render_get_text_size(FONT_HACK_GOLD, prompt);
-    ui_queue_text(state, FONT_HACK_GOLD, value->c_str(), ivec2(text_input_rect.x + prompt_size.x, text_input_rect.y + 6), 0);
+    ivec2 text_pos = ivec2(text_input_rect.x + prompt_size.x, text_input_rect.y + 6);
+
+    if (word_wrap) {
+        std::string text = *value;
+        while (!text.empty()) {
+            size_t space_index = text.find(' ');
+            std::string word; 
+            if (space_index == std::string::npos) {
+                word = text;
+                text.clear();
+            } else {
+                word = text.substr(0, space_index + 1);
+                text = text.substr(space_index + 1);
+            }
+
+            ivec2 word_size = render_get_text_size(FONT_HACK_GOLD, word.c_str());
+            bool word_breaks_line = text_pos.x + word_size.x > text_input_rect.x + text_input_rect.w - 5;
+            if (word_breaks_line && word.length() > 16) {
+                while (!word.empty()) {
+                    std::string word_part;
+                    int word_part_width = 0;
+                    while (!word.empty() && text_pos.x + word_part_width <= text_input_rect.x + text_input_rect.w - 5) {
+                        word_part.push_back(word[0]);
+                        word.erase(word.begin());
+                        word_part_width = render_get_text_size(FONT_HACK_GOLD, word_part.c_str()).x;
+                    }
+                    bool word_part_reaches_end_of_line = false;
+                    if (!word_part.empty() && text_pos.x + word_part_width > text_input_rect.x + text_input_rect.w - 5) {
+                        word.insert(0, 1, word_part[word_part.size() - 1]);
+                        word_part.pop_back();
+                        word_part_reaches_end_of_line = true;
+                    }
+                    word_part_width = render_get_text_size(FONT_HACK_GOLD, word_part.c_str()).x;
+                    ui_queue_text(state, FONT_HACK_GOLD, word_part.c_str(), text_pos, 0);
+                    if (word_part_reaches_end_of_line) {
+                        text_pos.x = text_input_rect.x + 5;
+                        text_pos.y += prompt_size.y + 4;
+                    } else {
+                        text_pos.x += word_part_width;
+                    }
+                }
+            } else {
+                if (word_breaks_line) {
+                    text_pos.x = text_input_rect.x + 5;
+                    text_pos.y += prompt_size.y + 4;
+                }
+
+                ui_queue_text(state, FONT_HACK_GOLD, word.c_str(), text_pos, 0);
+                text_pos.x += word_size.x;
+            }
+        }
+    } else {
+        ui_queue_text(state, FONT_HACK_GOLD, value->c_str(), text_pos, 0);
+        text_pos.x += render_get_text_size(FONT_HACK_GOLD, value->c_str()).x;
+    }
 
     if (input_is_text_input_active() && state.text_input_selected == id) {
         if (!state.input_enabled) {
@@ -291,8 +345,7 @@ void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value
                 state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
             }
             if (state.text_input_show_cursor) {
-                int value_text_width = render_get_text_size(FONT_HACK_GOLD, value->c_str()).x;
-                ivec2 cursor_pos = ivec2(text_input_rect.x + prompt_size.x + value_text_width - 2, text_input_rect.y + 5);
+                ivec2 cursor_pos = ivec2(text_pos.x - 2, text_pos.y);
                 ui_queue_text(state, FONT_HACK_GOLD, "|", cursor_pos, 0);
             }
         }

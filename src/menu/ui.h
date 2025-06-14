@@ -223,8 +223,9 @@ void ui_screen_shade(UI& state);
  * @param size The size of the text input element
  * @param value Pointer to the string that will be edited by the text input
  * @param max_length Text entered by the input will not exceed this length
+ * @param word_wrap Enables word wrap
  */
-void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length);
+void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length, bool word_wrap = false);
 
 /**
  * Creates a team picker

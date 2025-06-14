@@ -59,15 +59,33 @@ enum FeedbackMode {
     FEEDBACK_OPEN
 };
 
+enum FeedbackType {
+    FEEDBACK_TYPE_FEEDBACK,
+    FEEDBACK_TYPE_BUG
+};
+static const std::vector<std::string> FEEDBACK_TYPE_STRS = { "Feedback", "Bug" };
+
 static const Rect WELCOME_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (336 / 2),
     .y = (SCREEN_HEIGHT / 2) - 72,
     .w = 336, .h = 112
 };
 
+static const Rect FEEDBACK_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (364 / 2),
+    .y = 64,
+    .w = 364, .h = 192
+};
+
+static const size_t FEEDBACK_NAME_MAX = 42;
+static const size_t FEEDBACK_DESC_MAX = 268;
+
 struct FeedbackState {
     FeedbackMode mode;
     UI ui;
+    uint32_t feedback_type;
+    std::string feedback_name;
+    std::string feedback_desc;
 };
 static FeedbackState state;
 
@@ -77,9 +95,8 @@ void feedback_init() {
         SetUnhandledExceptionFilter(feedback_on_crash);
     #endif
 
-    state.mode = FEEDBACK_CLOSED;
     state.ui = ui_init();
-
+    state.feedback_type = FEEDBACK_TYPE_BUG;
     state.mode = FEEDBACK_WELCOME;
 }
 
@@ -121,6 +138,28 @@ void feedback_update() {
             if (ui_button(state.ui, "Ok", ivec2(-1, -1), true)) {
                 state.mode = FEEDBACK_CLOSED;
             }
+        ui_end_container(state.ui);
+    } else if (state.mode == FEEDBACK_OPEN) {
+        ui_frame_rect(state.ui, FEEDBACK_RECT);
+
+        const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+
+        ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Submit Feedback");
+        ui_element_position(state.ui, ivec2(FEEDBACK_RECT.x + (FEEDBACK_RECT.w / 2) - (header_text_size.x / 2), FEEDBACK_RECT.y + 6));
+        ui_text(state.ui, FONT_HACK_GOLD, "Submit Feedback");
+
+        ui_begin_column(state.ui, ivec2(FEEDBACK_RECT.x + 8, FEEDBACK_RECT.y + 26), 4);
+            ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
+            ui_begin_row(state.ui, ivec2(0, 0), 0);
+                ui_element_position(state.ui, ivec2(0, 2));
+                ui_text(state.ui, FONT_HACK_GOLD, "What type of feedback is this?");
+
+                ui_element_position(state.ui, ivec2(FEEDBACK_RECT.w - 16 - dropdown_sprite_info.frame_width, 0));
+                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.feedback_type, FEEDBACK_TYPE_STRS, false);
+            ui_end_container(state.ui);
+
+            ui_text_input(state.ui, "Feedback Name: ", ivec2(FEEDBACK_RECT.w - 16, 24), &state.feedback_name, FEEDBACK_NAME_MAX);
+            ui_text_input(state.ui, "Description: ", ivec2(FEEDBACK_RECT.w - 16, 92), &state.feedback_desc, FEEDBACK_DESC_MAX, true);
         ui_end_container(state.ui);
     }
 }
