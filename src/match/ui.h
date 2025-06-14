@@ -7,6 +7,7 @@
 #include "match/input.h"
 #include "render/render.h"
 #include "menu/options.h"
+#include "menu/ui.h"
 #include "network/network.h"
 #include <string>
 
@@ -113,6 +114,7 @@ struct MatchUiState {
 
     MatchState match;
     OptionsMenuState options_menu;
+    UI ui;
 
     bool replay_mode;
     FILE* replay_file;

@@ -1294,8 +1294,6 @@ void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel)
 }
 
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
-    GOLD_ASSERT(size.x <= MINIMAP_TEXTURE_WIDTH / 2 && size.y <= MINIMAP_TEXTURE_HEIGHT);
-
     float position_left = (float)position.x;
     float position_right = (float)(position.x + dst_size.x);
     float position_top = (float)(SCREEN_HEIGHT - position.y);

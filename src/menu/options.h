@@ -2,6 +2,7 @@
 
 #include "core/options.h"
 #include "core/input.h"
+#include "ui.h"
 #include <unordered_map>
 #include <SDL3/SDL.h>
 
@@ -27,4 +28,4 @@ struct OptionsMenuState {
 };
 
 OptionsMenuState options_menu_open();
-void options_menu_update(OptionsMenuState& state);
+void options_menu_update(OptionsMenuState& state, UI& ui);

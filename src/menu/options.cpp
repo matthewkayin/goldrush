@@ -3,7 +3,7 @@
 #include "core/logger.h"
 #include "render/render.h"
 #include "match/hotkey.h" 
-#include "ui.h"
+#include "feedback/feedback.h" 
 #include <unordered_map>
 
 static const int OPTIONS_MENU_WIDTH = 364;
@@ -170,13 +170,13 @@ OptionsMenuState options_menu_open() {
     return state;
 }
 
-void options_menu_update(OptionsMenuState& state) {
-    ui_set_input_enabled(true);
-    ui_screen_shade();
-    ui_frame_rect(OPTIONS_FRAME_RECT);
+void options_menu_update(OptionsMenuState& state, UI& ui) {
+    ui.input_enabled = !feedback_is_open();
+    ui_screen_shade(ui);
+    ui_frame_rect(ui, OPTIONS_FRAME_RECT);
 
-    ui_element_position(BACK_BUTTON_POSITION);
-    if (ui_button("Back")) {
+    ui_element_position(ui, BACK_BUTTON_POSITION);
+    if (ui_button(ui, "Back")) {
         if (state.mode == OPTIONS_MENU_OPEN) {
             state.mode = OPTIONS_MENU_CLOSED;
         } else if (state.mode == OPTIONS_MENU_HOTKEYS) {
@@ -185,36 +185,36 @@ void options_menu_update(OptionsMenuState& state) {
     }
 
     if (state.mode == OPTIONS_MENU_OPEN) {
-        ui_begin_column(ivec2(OPTIONS_FRAME_RECT.x + 8, OPTIONS_FRAME_RECT.y + 16), 25);
+        ui_begin_column(ui, ivec2(OPTIONS_FRAME_RECT.x + 8, OPTIONS_FRAME_RECT.y + 16), 25);
             const SpriteInfo& dropdown_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
             for (uint32_t option = 0; option < OPTION_COUNT; option++) {
                 const OptionData& option_data = option_get_data((OptionName)option);
-                ui_begin_row(ivec2(0, 0), 0);
-                    ui_element_position(ivec2(0, 3));
-                    ui_text(FONT_WESTERN8_GOLD, option_data.name);
+                ui_begin_row(ui, ivec2(0, 0), 0);
+                    ui_element_position(ui, ivec2(0, 3));
+                    ui_text(ui, FONT_WESTERN8_GOLD, option_data.name);
 
-                    ui_element_position(ivec2(OPTIONS_FRAME_RECT.w - 16 - dropdown_info.frame_width, 0));
+                    ui_element_position(ui, ivec2(OPTIONS_FRAME_RECT.w - 16 - dropdown_info.frame_width, 0));
                     uint32_t value = option_get_value((OptionName)option);
                     if (option_data.type == OPTION_TYPE_DROPDOWN) {
-                        if (ui_dropdown(UI_DROPDOWN, &value, OPTION_VALUE_STRINGS.at((OptionName)option), false)) {
+                        if (ui_dropdown(ui, UI_DROPDOWN, &value, OPTION_VALUE_STRINGS.at((OptionName)option), false)) {
                             option_set_value((OptionName)option, value);
                         }
                     } else if (option_data.type == OPTION_TYPE_PERCENT_SLIDER || option_data.type == OPTION_TYPE_SLIDER) {
-                        if (ui_slider(&value, option_data.min_value, option_data.max_value, option_data.type == OPTION_TYPE_SLIDER ? UI_SLIDER_DISPLAY_RAW_VALUE : UI_SLIDER_DISPLAY_PERCENT)) {
+                        if (ui_slider(ui, &value, option_data.min_value, option_data.max_value, option_data.type == OPTION_TYPE_SLIDER ? UI_SLIDER_DISPLAY_RAW_VALUE : UI_SLIDER_DISPLAY_PERCENT)) {
                             option_set_value((OptionName)option, value);
                         }
                     }
-                ui_end_container();
+                ui_end_container(ui);
             }
 
             // Hotkeys row
-            ui_begin_row(ivec2(0, 0), 0);
-                ui_element_position(ivec2(0, 3));
-                ui_text(FONT_WESTERN8_GOLD, "Hotkeys");
+            ui_begin_row(ui, ivec2(0, 0), 0);
+                ui_element_position(ui, ivec2(0, 3));
+                ui_text(ui, FONT_WESTERN8_GOLD, "Hotkeys");
 
                 ivec2 edit_button_size = ui_button_size("Edit");
-                ui_element_position(ivec2(OPTIONS_FRAME_RECT.w - 16 - edit_button_size.x, 0));
-                if (ui_button("Edit")) {
+                ui_element_position(ui, ivec2(OPTIONS_FRAME_RECT.w - 16 - edit_button_size.x, 0));
+                if (ui_button(ui, "Edit")) {
                     state.mode = OPTIONS_MENU_HOTKEYS;
                     for (int input = INPUT_HOTKEY_NONE; input < INPUT_ACTION_COUNT; input++) {
                         state.hotkey_pending_changes[input] = input_get_hotkey_mapping((InputAction)input);
@@ -223,18 +223,18 @@ void options_menu_update(OptionsMenuState& state) {
                         state.save_status = OPTIONS_MENU_SAVE_STATUS_NONE;
                     }
                 }
-            ui_end_container();
-        ui_end_container();
+            ui_end_container(ui);
+        ui_end_container(ui);
     } else if (state.mode == OPTIONS_MENU_HOTKEYS) {
-        ui_begin_row(ivec2(OPTIONS_FRAME_RECT.x + 16, OPTIONS_FRAME_RECT.y + 16), -4);
-            ui_begin_column(ivec2(0, 0), 4);
-                ui_text(FONT_HACK_GOLD, "Hotkey Groups:");
+        ui_begin_row(ui, ivec2(OPTIONS_FRAME_RECT.x + 16, OPTIONS_FRAME_RECT.y + 16), -4);
+            ui_begin_column(ui, ivec2(0, 0), 4);
+                ui_text(ui, FONT_HACK_GOLD, "Hotkey Groups:");
                 int hotkey_group = 0;
                 while (hotkey_group < HOTKEY_GROUP_COUNT) {
-                    ui_begin_row(ivec2(0, 0), 4);
+                    ui_begin_row(ui, ivec2(0, 0), 4);
                     for (int column = 0; column < 3; column++) {
                         const HotkeyGroup& group = HOTKEY_GROUPS.at((HotkeyGroupName)hotkey_group);
-                        if (ui_icon_button(group.icon, hotkey_group == state.hotkey_group_selected)) {
+                        if (ui_icon_button(ui, group.icon, hotkey_group == state.hotkey_group_selected)) {
                             state.hotkey_group_selected = hotkey_group;
                             state.hotkey_index_selected = HOTKEY_INDEX_NONE;
                         }
@@ -244,51 +244,51 @@ void options_menu_update(OptionsMenuState& state) {
                             break;
                         }
                     }
-                    ui_end_container();
+                    ui_end_container(ui);
                 }
 
-                ui_text(FONT_HACK_GOLD, "Use Preset:");
-                ui_begin_row(ivec2(0, 0), 4);
-                if (ui_button("Default")) {
+                ui_text(ui, FONT_HACK_GOLD, "Use Preset:");
+                ui_begin_row(ui, ivec2(0, 0), 4);
+                if (ui_button(ui, "Default")) {
                     input_set_hotkey_mapping_to_default(state.hotkey_pending_changes);
                     state.save_status = options_menu_has_unsaved_hotkey_changes(state)
                                             ? OPTIONS_MENU_SAVE_STATUS_UNSAVED_CHANGES
                                             : OPTIONS_MENU_SAVE_STATUS_NONE;
                 }
-                if (ui_button("Grid")) {
+                if (ui_button(ui, "Grid")) {
                     options_menu_set_hotkey_mapping_to_grid(state.hotkey_pending_changes);
                     state.save_status = options_menu_has_unsaved_hotkey_changes(state)
                                             ? OPTIONS_MENU_SAVE_STATUS_UNSAVED_CHANGES
                                             : OPTIONS_MENU_SAVE_STATUS_NONE;
                 }
-                ui_end_container();
-            ui_end_container();
+                ui_end_container(ui);
+            ui_end_container(ui);
             if (state.hotkey_group_selected != HOTKEY_GROUP_NONE) {
                 const HotkeyGroup& group = HOTKEY_GROUPS.at((HotkeyGroupName)state.hotkey_group_selected);
-                ui_element_size(ivec2(36 * 3, 0));
-                ui_begin_column(ivec2(0, 0), 4);
-                    ui_text(FONT_HACK_GOLD, group.name);
+                ui_element_size(ui, ivec2(36 * 3, 0));
+                ui_begin_column(ui, ivec2(0, 0), 4);
+                    ui_text(ui, FONT_HACK_GOLD, group.name);
 
                     // Hotkey rows
                     for (int hotkey_row = 0; hotkey_row < 2; hotkey_row++) {
-                        ui_begin_row(ivec2(0, 0), 4);
+                        ui_begin_row(ui, ivec2(0, 0), 4);
                             for (int hotkey_index = (hotkey_row * 3); hotkey_index < (hotkey_row * 3) + 3; hotkey_index++) {
                                 SpriteName icon_button_sprite = group.hotkeys[hotkey_index] == INPUT_HOTKEY_NONE
                                                                     ? UI_ICON_BUTTON_EMPTY
                                                                     : hotkey_get_sprite(group.hotkeys[hotkey_index]);
-                                if (ui_icon_button(icon_button_sprite, hotkey_index == state.hotkey_index_selected)) {
+                                if (ui_icon_button(ui, icon_button_sprite, hotkey_index == state.hotkey_index_selected)) {
                                     // ui_icon_button will not return true if the button is empty, so we don't need to handle that case here
                                     state.hotkey_index_selected = hotkey_index;
                                 }
                             }
-                        ui_end_container();
+                        ui_end_container(ui);
                     }
 
                     if (!options_menu_is_hotkey_group_valid(state, (HotkeyGroupName)state.hotkey_group_selected)) {
-                        ui_begin_column(ivec2(0, 0), 0);
-                            ui_text(FONT_HACK_WHITE, "Error: multiple actions in this");
-                            ui_text(FONT_HACK_WHITE, "group are mapped to the same key.");
-                        ui_end_container();
+                        ui_begin_column(ui, ivec2(0, 0), 0);
+                            ui_text(ui, FONT_HACK_WHITE, "Error: multiple actions in this");
+                            ui_text(ui, FONT_HACK_WHITE, "group are mapped to the same key.");
+                        ui_end_container(ui);
                     }
 
                     if (state.hotkey_index_selected != HOTKEY_INDEX_NONE) {
@@ -300,11 +300,11 @@ void options_menu_update(OptionsMenuState& state) {
                         hotkey_text_ptr += sprintf(hotkey_text_ptr, " (");
                         hotkey_text_ptr += input_sprintf_sdl_scancode_str(hotkey_text_ptr, state.hotkey_pending_changes[hotkey]);
                         hotkey_text_ptr += sprintf(hotkey_text_ptr, ")");
-                        ui_text(FONT_HACK_GOLD,  hotkey_text);
+                        ui_text(ui, FONT_HACK_GOLD,  hotkey_text);
                         ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, "Press any key to");
-                        ui_element_size(ivec2(text_size.x, text_size.y - 4));
-                        ui_text(FONT_HACK_WHITE, "Press any key to");
-                        ui_text(FONT_HACK_WHITE, "change this hotkey.");
+                        ui_element_size(ui, ivec2(text_size.x, text_size.y - 4));
+                        ui_text(ui, FONT_HACK_WHITE, "Press any key to");
+                        ui_text(ui, FONT_HACK_WHITE, "change this hotkey.");
 
                         SDL_Scancode key_just_pressed = input_get_key_just_pressed();
                         if (input_is_key_valid_hotkey_mapping(key_just_pressed)) {
@@ -314,19 +314,19 @@ void options_menu_update(OptionsMenuState& state) {
                                                     : OPTIONS_MENU_SAVE_STATUS_NONE;
                         }
                     }
-                ui_end_container();
+                ui_end_container(ui);
             } // End if selected hotkey group != none
-        ui_end_container();
+        ui_end_container(ui);
 
         if (state.save_status != OPTIONS_MENU_SAVE_STATUS_NONE) {
             const char* status_text = options_menu_get_save_status_str(state.save_status);
             ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, status_text);
             ivec2 text_pos = ivec2(OPTIONS_FRAME_RECT.x + OPTIONS_FRAME_RECT.w - 16 - text_size.x, SAVE_BUTTON_POSITION.y - 4 - text_size.y);
-            ui_element_position(text_pos);
-            ui_text(FONT_HACK_WHITE, status_text);
+            ui_element_position(ui, text_pos);
+            ui_text(ui, FONT_HACK_WHITE, status_text);
         }
-        ui_element_position(SAVE_BUTTON_POSITION);
-        if (ui_button("Save")) {
+        ui_element_position(ui, SAVE_BUTTON_POSITION);
+        if (ui_button(ui, "Save")) {
             if (options_menu_are_all_hotkey_groups_valid(state)) {
                 options_menu_save_hotkey_changes(state);
                 state.save_status = OPTIONS_MENU_SAVE_STATUS_SAVED;

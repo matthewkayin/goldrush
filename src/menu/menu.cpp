@@ -10,6 +10,7 @@
 #include "render/render.h"
 #include "menu/ui.h"
 #include "../util.h"
+#include "feedback/feedback.h"
 #include <steam/steam_api.h>
 
 static const int WAGON_X_DEFAULT = 380;
@@ -109,6 +110,7 @@ MenuState menu_init() {
 
     state.mode = MENU_MODE_MAIN;
     state.options_menu.mode = OPTIONS_MENU_CLOSED;
+    state.ui = ui_init();
     menu_set_mode(state, state.mode);
 
     return state;
@@ -207,45 +209,45 @@ void menu_update(MenuState& state) {
         }
     }
 
-    ui_begin();
-    ui_set_input_enabled(state.mode != MENU_MODE_OPTIONS && state.mode != MENU_MODE_REPLAY_RENAME);
+    ui_begin(state.ui);
+    state.ui.input_enabled = state.mode != MENU_MODE_OPTIONS && state.mode != MENU_MODE_REPLAY_RENAME && !feedback_is_open();
 
     if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_OPTIONS) {
-        ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
-            if (ui_button("Single Player")) {
+        ui_begin_column(state.ui, ivec2(BUTTON_X, BUTTON_Y), 4);
+            if (ui_button(state.ui, "Single Player")) {
                 menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
             }
-            if (ui_button("Multiplayer")) {
+            if (ui_button(state.ui, "Multiplayer")) {
                 menu_set_mode(state, MENU_MODE_MULTIPLAYER);
             }
-            if (ui_button("Options")) {
+            if (ui_button(state.ui, "Options")) {
                 state.options_menu = options_menu_open();
                 menu_set_mode(state, MENU_MODE_OPTIONS);
             }
-            if (ui_button("Credits")) {
+            if (ui_button(state.ui, "Credits")) {
             }
-            if (ui_button("Exit")) {
+            if (ui_button(state.ui, "Exit")) {
                 menu_set_mode(state, MENU_MODE_EXIT);
             }
-        ui_end_container();
+        ui_end_container(state.ui);
     } else if (state.mode == MENU_MODE_SINGLEPLAYER) {
-        ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
-            if (ui_button("Campaign")) {
+        ui_begin_column(state.ui, ivec2(BUTTON_X, BUTTON_Y), 4);
+            if (ui_button(state.ui, "Campaign")) {
                 menu_show_status(state, "Coming soon!");
             }
-            if (ui_button("Skirmish")) {
+            if (ui_button(state.ui, "Skirmish")) {
                 menu_show_status(state, "Coming soon!");
             }
-            if (ui_button("Replays")) {
+            if (ui_button(state.ui, "Replays")) {
                 menu_set_mode(state, MENU_MODE_REPLAYS);
             }
-            if (ui_button("Back")) {
+            if (ui_button(state.ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_MAIN);
             }
-        ui_end_container();
+        ui_end_container(state.ui);
     } else if (state.mode == MENU_MODE_MULTIPLAYER) {
-        ui_begin_column(ivec2(BUTTON_X, BUTTON_Y), 4);
-            if (ui_button("Online")) {
+        ui_begin_column(state.ui, ivec2(BUTTON_X, BUTTON_Y), 4);
+            if (ui_button(state.ui, "Online")) {
                 if (network_get_status() != NETWORK_STATUS_OFFLINE) {
                     menu_show_status(state, "Error setting up connection. Please try again.");
                     network_disconnect();
@@ -254,7 +256,7 @@ void menu_update(MenuState& state) {
                     menu_set_mode(state, MENU_MODE_LOBBYLIST);
                 }
             }
-            if (ui_button("Local Network")) {
+            if (ui_button(state.ui, "Local Network")) {
                 if (network_get_status() != NETWORK_STATUS_OFFLINE) {
                     menu_show_status(state, "Error setting up connection. Please try again.");
                     network_disconnect();
@@ -263,39 +265,39 @@ void menu_update(MenuState& state) {
                     menu_set_mode(state, MENU_MODE_LOBBYLIST);
                 }
             }
-            if (ui_button("Back")) {
+            if (ui_button(state.ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_MAIN);
             }
-        ui_end_container();
+        ui_end_container(state.ui);
     } else if (state.mode == MENU_MODE_CREATE_LOBBY) {
-        ui_frame_rect(LOBBY_CREATE_RECT);
+        ui_frame_rect(state.ui, LOBBY_CREATE_RECT);
         ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Create Lobby");
 
-        ui_element_position(ivec2(LOBBY_CREATE_RECT.x + (LOBBY_CREATE_RECT.w / 2) - (header_text_size.x / 2), LOBBY_CREATE_RECT.y + 6));
-        ui_text(FONT_HACK_GOLD, "Create Lobby");
+        ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.x + (LOBBY_CREATE_RECT.w / 2) - (header_text_size.x / 2), LOBBY_CREATE_RECT.y + 6));
+        ui_text(state.ui, FONT_HACK_GOLD, "Create Lobby");
 
-        ui_begin_column(ivec2(LOBBY_CREATE_RECT.x + 8, LOBBY_CREATE_RECT.y + 26), 6);
-            ui_text_input("Name: ", ivec2(284, 24), &state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        ui_begin_column(state.ui, ivec2(LOBBY_CREATE_RECT.x + 8, LOBBY_CREATE_RECT.y + 26), 6);
+            ui_text_input(state.ui, "Name: ", ivec2(284, 24), &state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
             if (network_get_backend() == NETWORK_BACKEND_STEAM) {
                 const SpriteInfo& dropdown_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
 
-                ui_begin_row(ivec2(0, 0), 0);
-                    ui_element_position(ivec2(0, 3));
-                    ui_text(FONT_WESTERN8_GOLD, "Privacy:");
+                ui_begin_row(state.ui, ivec2(0, 0), 0);
+                    ui_element_position(state.ui, ivec2(0, 3));
+                    ui_text(state.ui, FONT_WESTERN8_GOLD, "Privacy:");
 
-                    ui_element_position(ivec2(LOBBY_CREATE_RECT.w - 16 - dropdown_info.frame_width, 0));
-                    ui_dropdown(UI_DROPDOWN, &state.lobby_privacy, LOBBY_TYPE_STRS, false);
-                ui_end_container();
+                    ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.w - 16 - dropdown_info.frame_width, 0));
+                    ui_dropdown(state.ui, UI_DROPDOWN, &state.lobby_privacy, LOBBY_TYPE_STRS, false);
+                ui_end_container(state.ui);
             }
-        ui_end_container();
+        ui_end_container(state.ui);
 
-        ui_element_position(ivec2(LOBBY_CREATE_RECT.x + 16, LOBBY_CREATE_RECT.y + LOBBY_CREATE_RECT.h - 21 - 8));
-        if (ui_button("Back")) {
+        ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.x + 16, LOBBY_CREATE_RECT.y + LOBBY_CREATE_RECT.h - 21 - 8));
+        if (ui_button(state.ui, "Back")) {
             menu_set_mode(state, MENU_MODE_LOBBYLIST);
         }
         ivec2 create_button_size = ui_button_size("Create");
-        ui_element_position(ivec2(LOBBY_CREATE_RECT.x + LOBBY_CREATE_RECT.w - 16 - create_button_size.x, LOBBY_CREATE_RECT.y + LOBBY_CREATE_RECT.h - 21 - 8));
-        if (ui_button("Create")) {
+        ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.x + LOBBY_CREATE_RECT.w - 16 - create_button_size.x, LOBBY_CREATE_RECT.y + LOBBY_CREATE_RECT.h - 21 - 8));
+        if (ui_button(state.ui, "Create")) {
             if (state.lobby_name.length() == 0) {
                 menu_show_status(state, "Please enter a lobby name.");
             } else {
@@ -304,29 +306,29 @@ void menu_update(MenuState& state) {
             }
         }
     } else if (state.mode == MENU_MODE_LOBBYLIST) {
-        ui_frame_rect(LOBBYLIST_RECT);
+        ui_frame_rect(state.ui, LOBBYLIST_RECT);
 
         if (network_get_lobby_count() == 0) {
             int text_width = render_get_text_size(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...").x;
-            ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
-            ui_text(FONT_HACK_GOLD, "Seems there's no lobbies in these parts...");
+            ui_element_position(state.ui, ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
+            ui_text(state.ui, FONT_HACK_GOLD, "Seems there's no lobbies in these parts...");
         }
 
         // Lobby list search and top buttons
-        ui_begin_row(ivec2(44, 4), 4);
-            ui_text_input("Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
-            if (ui_sprite_button(SPRITE_UI_BUTTON_REFRESH, false, false)) {
+        ui_begin_row(state.ui, ivec2(44, 4), 4);
+            ui_text_input(state.ui, "Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+            if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_REFRESH, false, false)) {
                 network_search_lobbies(state.lobby_search_query.c_str());
                 state.lobbylist_page = 0;
                 state.lobbylist_item_selected = -1;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
+            if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
                 state.lobbylist_page--;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(network_get_lobby_count()) - 1, false)) {
+            if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(network_get_lobby_count()) - 1, false)) {
                 state.lobbylist_page++;
             }
-        ui_end_container();
+        ui_end_container(state.ui);
 
         // Lobby list
         int base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
@@ -337,50 +339,50 @@ void menu_update(MenuState& state) {
             sprintf(lobby_text, "%s %s (%u/%u) %s", selected ? "*" : " ", lobby.name, lobby.player_count, MAX_PLAYERS, selected ? "*" : " ");
 
             ivec2 text_frame_size = ui_text_frame_size(lobby_text);
-            ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
-            if (ui_text_frame(lobby_text, false)) {
+            ui_element_position(state.ui, ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
+            if (ui_text_frame(state.ui, lobby_text, false)) {
                 state.lobbylist_item_selected = lobby_index;
             }
         }
 
         // Lobbylist button row
-        ui_begin_row(ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
-            if (ui_button("Back")) {
+        ui_begin_row(state.ui, ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
+            if (ui_button(state.ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_MULTIPLAYER);
             }
-            if (ui_button("Host")) {
+            if (ui_button(state.ui, "Host")) {
                 menu_set_mode(state, MENU_MODE_CREATE_LOBBY);
             }
             if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
-                if (ui_button("Join")) {
+                if (ui_button(state.ui, "Join")) {
                     network_join_lobby(network_get_lobby(state.lobbylist_item_selected).connection_info);
                     menu_set_mode(state, MENU_MODE_CONNECTING);
                 }
             }
-        ui_end_container();
+        ui_end_container(state.ui);
     // End lobbylist
     } else if (state.mode == MENU_MODE_LOBBY) {
         // Playerlist
-        ui_frame_rect(PLAYERLIST_RECT);
+        ui_frame_rect(state.ui, PLAYERLIST_RECT);
         ivec2 lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name());
-        ui_element_position(ivec2(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y + 6));
-        ui_text(FONT_HACK_GOLD, network_get_lobby_name());
+        ui_element_position(state.ui, ivec2(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y + 6));
+        ui_text(state.ui, FONT_HACK_GOLD, network_get_lobby_name());
 
-        ui_begin_column(ivec2(PLAYERLIST_COLUMN_X, PLAYERLIST_COLUMN_Y), 0);
+        ui_begin_column(state.ui, ivec2(PLAYERLIST_COLUMN_X, PLAYERLIST_COLUMN_Y), 0);
             // Header row
-            ui_element_size(ivec2(0, PLAYERLIST_ROW_HEIGHT));
-            ui_begin_row(ivec2(0, 0), 0);
-                ui_element_size(ivec2(PLAYERLIST_COLUMN_NAME_WIDTH, 0));
-                ui_text(FONT_HACK_GOLD, "Name");
+            ui_element_size(state.ui, ivec2(0, PLAYERLIST_ROW_HEIGHT));
+            ui_begin_row(state.ui, ivec2(0, 0), 0);
+                ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_NAME_WIDTH, 0));
+                ui_text(state.ui, FONT_HACK_GOLD, "Name");
 
-                ui_element_size(ivec2(PLAYERLIST_COLUMN_STATUS_WIDTH, 0));
-                ui_text(FONT_HACK_GOLD, "Status");
+                ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_STATUS_WIDTH, 0));
+                ui_text(state.ui, FONT_HACK_GOLD, "Status");
 
-                ui_element_size(ivec2(PLAYERLIST_COLUMN_TEAM_WIDTH, 0));
-                ui_text(FONT_HACK_GOLD, "Team");
+                ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_TEAM_WIDTH, 0));
+                ui_text(state.ui, FONT_HACK_GOLD, "Team");
 
-                ui_text(FONT_HACK_GOLD, "Color");
-            ui_end_container();
+                ui_text(state.ui, FONT_HACK_GOLD, "Color");
+            ui_end_container(state.ui);
 
             // Player rows
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -389,15 +391,15 @@ void menu_update(MenuState& state) {
                     continue;
                 }
 
-                ui_element_size(ivec2(0, PLAYERLIST_ROW_HEIGHT));
-                ui_begin_row(ivec2(0, 0), 0);
-                    ui_element_size(ivec2(PLAYERLIST_COLUMN_NAME_WIDTH, 0));
-                    ui_element_position(ivec2(0, 2));
-                    ui_text(FONT_HACK_GOLD, player.name);
+                ui_element_size(state.ui, ivec2(0, PLAYERLIST_ROW_HEIGHT));
+                ui_begin_row(state.ui, ivec2(0, 0), 0);
+                    ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_NAME_WIDTH, 0));
+                    ui_element_position(state.ui, ivec2(0, 2));
+                    ui_text(state.ui, FONT_HACK_GOLD, player.name);
 
-                    ui_element_size(ivec2(PLAYERLIST_COLUMN_STATUS_WIDTH, 0));
-                    ui_element_position(ivec2(0, 2));
-                    ui_text(FONT_HACK_GOLD, menu_get_player_status_string((NetworkPlayerStatus)player.status));
+                    ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_STATUS_WIDTH, 0));
+                    ui_element_position(state.ui, ivec2(0, 2));
+                    ui_text(state.ui, FONT_HACK_GOLD, menu_get_player_status_string((NetworkPlayerStatus)player.status));
 
                     bool teams_enabled = network_get_match_setting(MATCH_SETTING_TEAMS) == MATCH_SETTING_TEAMS_ENABLED;
                     char team_picker_char;
@@ -406,56 +408,56 @@ void menu_update(MenuState& state) {
                     } else {
                         team_picker_char = '-';
                     }
-                    ui_element_size(ivec2(PLAYERLIST_COLUMN_TEAM_WIDTH, 0));
-                    if (ui_team_picker(team_picker_char, !teams_enabled || player_id != network_get_player_id())) {
+                    ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_TEAM_WIDTH, 0));
+                    if (ui_team_picker(state.ui, team_picker_char, !teams_enabled || player_id != network_get_player_id())) {
                         network_set_player_team(player.team == 0 ? 1 : 0);
                     }
 
                     uint32_t player_color = player.recolor_id;
-                    if (ui_dropdown(UI_DROPDOWN_MINI, &player_color, PLAYER_COLOR_STRS, player_id != network_get_player_id())) {
+                    if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &player_color, PLAYER_COLOR_STRS, player_id != network_get_player_id())) {
                         network_set_player_color((uint8_t)player_color);
                     }
-                ui_end_container();
+                ui_end_container(state.ui);
             }
-        ui_end_container();
+        ui_end_container(state.ui);
         // End playerlist
 
         // Match settings
-        ui_frame_rect(MATCH_SETTINGS_RECT);
+        ui_frame_rect(state.ui, MATCH_SETTINGS_RECT);
         ivec2 match_settings_text_size = render_get_text_size(FONT_HACK_GOLD, "Settings");
-        ui_element_position(ivec2(MATCH_SETTINGS_RECT.x + (MATCH_SETTINGS_RECT.w / 2) - (match_settings_text_size.x / 2), MATCH_SETTINGS_RECT.y + 6));
-        ui_text(FONT_HACK_GOLD, "Settings");
+        ui_element_position(state.ui, ivec2(MATCH_SETTINGS_RECT.x + (MATCH_SETTINGS_RECT.w / 2) - (match_settings_text_size.x / 2), MATCH_SETTINGS_RECT.y + 6));
+        ui_text(state.ui, FONT_HACK_GOLD, "Settings");
 
-        ui_begin_column(ivec2(MATCH_SETTINGS_RECT.x + 8, MATCH_SETTINGS_RECT.y + 22), 4);
+        ui_begin_column(state.ui, ivec2(MATCH_SETTINGS_RECT.x + 8, MATCH_SETTINGS_RECT.y + 22), 4);
             int dropdown_width = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI).frame_width;
             const int setting_name_element_size = MATCH_SETTINGS_RECT.w - 16 - dropdown_width;
             for (int index = 0; index < MATCH_SETTING_COUNT; index++) {
                 const MatchSettingData& setting_data = match_setting_data((MatchSetting)index);
-                ui_begin_row(ivec2(0, 0), 0);
-                    ui_element_size(ivec2(setting_name_element_size, 0));
-                    ui_element_position(ivec2(0, 2));
-                    ui_text(FONT_HACK_GOLD, setting_data.name);
+                ui_begin_row(state.ui, ivec2(0, 0), 0);
+                    ui_element_size(state.ui, ivec2(setting_name_element_size, 0));
+                    ui_element_position(state.ui, ivec2(0, 2));
+                    ui_text(state.ui, FONT_HACK_GOLD, setting_data.name);
 
                     uint32_t match_setting_value = network_get_match_setting(index);
-                    if (ui_dropdown(UI_DROPDOWN_MINI, &match_setting_value, setting_data.values, !network_is_host())) {
+                    if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &match_setting_value, setting_data.values, !network_is_host())) {
                         network_set_match_setting((uint8_t)index, (uint8_t)match_setting_value);
                     }
-                ui_end_container();
+                ui_end_container(state.ui);
             }
-        ui_end_container();
+        ui_end_container(state.ui);
 
         // Chat
-        ui_frame_rect(LOBBY_CHAT_RECT);
+        ui_frame_rect(state.ui, LOBBY_CHAT_RECT);
         // Chat messages
-        ui_begin_column(ivec2(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y + 8), 0);
+        ui_begin_column(state.ui, ivec2(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y + 8), 0);
             for (const std::string& message : state.chat) {
-                ui_text(FONT_HACK_GOLD, message.c_str());
+                ui_text(state.ui, FONT_HACK_GOLD, message.c_str());
             }
-        ui_end_container();
+        ui_end_container(state.ui);
 
         // Chat input
-        ui_element_position(ivec2(24, 128 + 158 + 8 + 4));
-        ui_text_input("Chat: ", ivec2(432 - 16, 24), &state.chat_message, MENU_CHAT_MAX_MESSAGE_LENGTH);
+        ui_element_position(state.ui, ivec2(24, 128 + 158 + 8 + 4));
+        ui_text_input(state.ui, "Chat: ", ivec2(432 - 16, 24), &state.chat_message, MENU_CHAT_MAX_MESSAGE_LENGTH);
         if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active()) {
             if (!state.chat_message.empty()) {
                 char chat_message[128];
@@ -468,13 +470,13 @@ void menu_update(MenuState& state) {
         }
 
         // Lobby buttons
-        ui_begin_row(ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12, MATCH_SETTINGS_RECT.y + MATCH_SETTINGS_RECT.h + 4), 4);
-            if (ui_button("Back")) {
+        ui_begin_row(state.ui, ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12, MATCH_SETTINGS_RECT.y + MATCH_SETTINGS_RECT.h + 4), 4);
+            if (ui_button(state.ui, "Back")) {
                 network_disconnect();
                 menu_set_mode(state, MENU_MODE_LOBBYLIST);
             }
             if (network_is_host()) {
-                if (ui_button("Start")) {
+                if (ui_button(state.ui, "Start")) {
                     // Make sure all players are ready
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                         if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NOT_READY) {
@@ -504,37 +506,37 @@ void menu_update(MenuState& state) {
                     menu_set_mode(state, MENU_MODE_LOAD_MATCH);
                 }
             } else {
-                if (ui_button("Ready")) {
+                if (ui_button(state.ui, "Ready")) {
                     // Toggle player ready status
                     bool is_ready = network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_READY;
                     network_set_player_ready(!is_ready);
                 }
             }
-        ui_end_container();
+        ui_end_container(state.ui);
         // End lobby buttons
     } else if (state.mode == MENU_MODE_REPLAYS || state.mode == MENU_MODE_REPLAY_RENAME) {
-        ui_frame_rect(LOBBYLIST_RECT);
+        ui_frame_rect(state.ui, LOBBYLIST_RECT);
 
         if (state.replay_filenames.empty()) {
             int text_width = render_get_text_size(FONT_HACK_GOLD, "No replay files found.").x;
-            ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
-            ui_text(FONT_HACK_GOLD, "No replay files found.");
+            ui_element_position(state.ui, ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_width / 2), LOBBYLIST_RECT.y + 8));
+            ui_text(state.ui, FONT_HACK_GOLD, "No replay files found.");
         }
 
         // Search and top buttons
-        ui_begin_row(ivec2(44, 4), 4);
-            ui_text_input("Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
-            if (ui_sprite_button(SPRITE_UI_BUTTON_REFRESH, false, false)) {
+        ui_begin_row(state.ui, ivec2(44, 4), 4);
+            ui_text_input(state.ui, "Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+            if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_REFRESH, false, false)) {
                 menu_search_replays_folder(state);
                 state.lobbylist_page = 0;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
+            if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == 0, true)) {
                 state.lobbylist_page--;
             }
-            if (ui_sprite_button(SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(state.replay_filenames.size()) - 1, false)) {
+            if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_ARROW, state.lobbylist_page == menu_get_lobbylist_page_count(state.replay_filenames.size()) - 1, false)) {
                 state.lobbylist_page++;
             }
-        ui_end_container();
+        ui_end_container(state.ui);
 
         // Replay list
         size_t base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
@@ -544,47 +546,47 @@ void menu_update(MenuState& state) {
             sprintf(replay_text, "%s %s %s", selected ? "*" : " ", state.replay_filenames[lobby_index].c_str(), selected ? "*" : " ");
 
             ivec2 text_frame_size = ui_text_frame_size(replay_text);
-            ui_element_position(ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
-            if (ui_text_frame(replay_text, false)) {
+            ui_element_position(state.ui, ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
+            if (ui_text_frame(state.ui, replay_text, false)) {
                 state.lobbylist_item_selected = lobby_index;
             }
         }
 
         // Replaylist button row
-        ui_begin_row(ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
-            if (ui_button("Back")) {
+        ui_begin_row(state.ui, ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
+            if (ui_button(state.ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
             }
             if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
-                if (ui_button("Watch")) {
+                if (ui_button(state.ui, "Watch")) {
                     menu_set_mode(state, MENU_MODE_LOAD_REPLAY);
                 }
-                if (ui_button("Rename")) {
+                if (ui_button(state.ui, "Rename")) {
                     state.mode = MENU_MODE_REPLAY_RENAME;
                     state.replay_rename = state.replay_filenames[state.lobbylist_item_selected];
                 }
             }
-        ui_end_container();
+        ui_end_container(state.ui);
     } // End replaylist
 
     if (state.mode == MENU_MODE_OPTIONS) {
-        options_menu_update(state.options_menu);
+        options_menu_update(state.options_menu, state.ui);
         if (state.options_menu.mode == OPTIONS_MENU_CLOSED) {
             menu_set_mode(state, MENU_MODE_MAIN);
         }
     }
 
     if (state.mode == MENU_MODE_REPLAY_RENAME) {
-        ui_set_input_enabled(true);
-        ui_screen_shade();
-        ui_begin_column(ivec2((SCREEN_WIDTH / 2) - 150, (SCREEN_HEIGHT / 2) - 64), 4);
-            ui_text_input("Rename: ", ivec2(300, 24), &state.replay_rename, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        state.ui.input_enabled = !feedback_is_open();
+        ui_screen_shade(state.ui);
+        ui_begin_column(state.ui, ivec2((SCREEN_WIDTH / 2) - 150, (SCREEN_HEIGHT / 2) - 64), 4);
+            ui_text_input(state.ui, "Rename: ", ivec2(300, 24), &state.replay_rename, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
 
-            ui_begin_row(ivec2(0, 0), 4);
-                if (ui_button("Back")) {
+            ui_begin_row(state.ui, ivec2(0, 0), 4);
+                if (ui_button(state.ui, "Back")) {
                     state.mode = MENU_MODE_REPLAYS;
                 }
-                if (ui_button("OK")) {
+                if (ui_button(state.ui, "OK")) {
                     if (state.replay_rename.empty()) {
                         menu_show_status(state, "Replay name cannot be empty.");
                     } else {
@@ -600,8 +602,8 @@ void menu_update(MenuState& state) {
                         state.mode = MENU_MODE_REPLAYS;
                     }
                 }
-            ui_end_container();
-        ui_end_container();
+            ui_end_container(state.ui);
+        ui_end_container(state.ui);
     }
 }
 
@@ -785,7 +787,7 @@ void menu_render(const MenuState& state) {
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, version_text);
     render_text(FONT_WESTERN8_OFFBLACK, version_text, ivec2(4, SCREEN_HEIGHT - text_size.y - 4));
 
-    ui_render();
+    ui_render(state.ui);
 
     // Status text
     if (state.status_timer != 0) {

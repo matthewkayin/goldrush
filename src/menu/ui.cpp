@@ -10,95 +10,28 @@
 static const uint32_t UI_TEXT_INPUT_BLINK_DURATION = 30;
 static const int UI_ELEMENT_NONE = -1;
 
-enum UiRenderType {
-    UI_RENDER_TEXT,
-    UI_RENDER_SPRITE,
-    UI_RENDER_NINEPATCH,
-    UI_RENDER_FILL_RECT,
-    UI_RENDER_DRAW_RECT
-};
+ivec2 ui_get_container_origin(const UI& state);
+void ui_update_container(UI& state, ivec2 size);
+int ui_get_next_element_id(UI& state);
+int ui_get_next_text_input_id(UI& state);
+void ui_queue_text(UI& state, FontName font, const char* text, ivec2 position, int z_index);
+void ui_queue_sprite(UI& state, SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h = false);
+void ui_queue_ninepatch(UI& state, SpriteName sprite, Rect rect, int z_index);
+void ui_queue_draw_rect(UI& state, Rect rect, RenderColor color, int z_index);
+void ui_queue_fill_rect(UI& state, Rect rect, RenderColor color, int z_index);
 
-struct UiRenderText {
-    FontName font;
-    char text[UI_RENDER_TEXT_BUFFER_SIZE];
-    ivec2 position;
-};
+UI ui_init() {
+    UI state;
 
-struct UiRenderSprite {
-    SpriteName sprite;
-    ivec2 frame;
-    ivec2 position;
-    bool flip_h;
-};
+    state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
+    state.text_input_show_cursor = false;
+    state.element_selected = UI_ELEMENT_NONE;
+    state.element_selected_future = UI_ELEMENT_NONE;
 
-struct UiRenderNinepatch {
-    SpriteName sprite;
-    Rect rect;
-};
+    return state;
+}
 
-struct UiRenderRect {
-    Rect rect;
-    RenderColor color;
-};
-
-struct UiRender {
-    UiRenderType type;
-    union {
-        UiRenderText text;
-        UiRenderSprite sprite;
-        UiRenderNinepatch ninepatch;
-        UiRenderRect rect;
-    };
-};
-
-enum UiContainerType {
-    UI_CONTAINER_ROW,
-    UI_CONTAINER_COLUMN,
-    UI_CONTAINER_ELEMENT_POSITION,
-    UI_CONTAINER_ELEMENT_SIZE
-};
-
-struct UiContainer {
-    UiContainerType type;
-    ivec2 origin;
-    int spacing;
-    ivec2 size;
-};
-
-struct UiState {
-    uint32_t text_input_cursor_blink_timer;
-    bool text_input_show_cursor;
-    std::vector<UiContainer> container_stack;
-    std::vector<UiRender> render_queue[UI_Z_INDEX_COUNT]; 
-    int next_element_id;
-    int element_selected;
-    int element_selected_future;
-    int text_input_selected;
-    int next_text_input_id;
-    bool input_enabled;
-};
-static UiState state;
-static bool initialized = false;
-
-ivec2 ui_get_container_origin();
-void ui_update_container(ivec2 size);
-int ui_get_next_element_id();
-int ui_get_next_text_input_id();
-void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index);
-void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h = false);
-void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index);
-void ui_queue_draw_rect(Rect rect, RenderColor color, int z_index);
-void ui_queue_fill_rect(Rect rect, RenderColor color, int z_index);
-
-void ui_begin() {
-    if (!initialized) {
-        state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
-        state.text_input_show_cursor = false;
-        state.element_selected = UI_ELEMENT_NONE;
-        state.element_selected_future = UI_ELEMENT_NONE;
-        initialized = true;
-    }
-
+void ui_begin(UI& state) {
     state.container_stack.clear();
     for (int z_index = 0; z_index < UI_Z_INDEX_COUNT; z_index++) {
         state.render_queue[z_index].clear();
@@ -111,11 +44,7 @@ void ui_begin() {
     state.input_enabled = true;
 }
 
-void ui_set_input_enabled(bool value) {
-    state.input_enabled = value;
-}
-
-void ui_element_position(ivec2 position) {
+void ui_element_position(UI& state, ivec2 position) {
     state.container_stack.push_back((UiContainer) {
         .type = UI_CONTAINER_ELEMENT_POSITION,
         .origin = position,
@@ -124,7 +53,7 @@ void ui_element_position(ivec2 position) {
     });
 }
 
-void ui_element_size(ivec2 size) {
+void ui_element_size(UI& state, ivec2 size) {
     state.container_stack.push_back((UiContainer) {
         .type = UI_CONTAINER_ELEMENT_SIZE,
         .origin = ivec2(0, 0),
@@ -133,7 +62,7 @@ void ui_element_size(ivec2 size) {
     });
 }
 
-void ui_begin_row(ivec2 position, int spacing) {
+void ui_begin_row(UI& state, ivec2 position, int spacing) {
     state.container_stack.push_back((UiContainer) {
         .type = UI_CONTAINER_ROW,
         .origin = position,
@@ -142,7 +71,7 @@ void ui_begin_row(ivec2 position, int spacing) {
     });
 }
 
-void ui_begin_column(ivec2 position, int spacing) {
+void ui_begin_column(UI& state, ivec2 position, int spacing) {
     state.container_stack.push_back((UiContainer) {
         .type = UI_CONTAINER_COLUMN,
         .origin = position,
@@ -151,10 +80,10 @@ void ui_begin_column(ivec2 position, int spacing) {
     });
 }
 
-void ui_end_container() {
+void ui_end_container(UI& state) {
     ivec2 container_size = state.container_stack.back().size;
     state.container_stack.pop_back();
-    ui_update_container(container_size);
+    ui_update_container(state, container_size);
 }
 
 ivec2 ui_button_size(const char* text) {
@@ -167,14 +96,14 @@ ivec2 ui_button_size(const char* text) {
     return ivec2(text_size.x, 21);
 }
 
-bool ui_button(const char* text, ivec2 size, bool center_horizontally) {
-    ivec2 origin = ui_get_container_origin();
+bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally) {
+    ivec2 origin = ui_get_container_origin(state);
     ivec2 button_size = size.x == -1 ? ui_button_size(text) : size;
     Rect button_rect = (Rect) {
         .x = origin.x, .y = origin.y,
         .w = button_size.x, .h = button_size.y
     };
-    ui_update_container(ivec2(button_rect.w, button_rect.h));
+    ui_update_container(state, ivec2(button_rect.w, button_rect.h));
 
     if (center_horizontally) {
         button_rect.x -= button_size.x / 2;
@@ -190,7 +119,7 @@ bool ui_button(const char* text, ivec2 size, bool center_horizontally) {
         } else if (frame == frame_count - 1) {
             hframe = 2;
         }
-        ui_queue_sprite(SPRITE_UI_MENU_BUTTON, ivec2(hframe, (int)hovered), ivec2(button_rect.x + (frame * 8), button_rect.y - (int)hovered), 0);
+        ui_queue_sprite(state, SPRITE_UI_MENU_BUTTON, ivec2(hframe, (int)hovered), ivec2(button_rect.x + (frame * 8), button_rect.y - (int)hovered), 0);
     }
 
     ivec2 text_pos = ivec2(button_rect.x + 5, button_rect.y + 3 - (int)hovered);
@@ -198,7 +127,7 @@ bool ui_button(const char* text, ivec2 size, bool center_horizontally) {
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
         text_pos.x = button_rect.x + (button_rect.w / 2) - (text_size.x / 2);
     }
-    ui_queue_text(hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, text, text_pos, 0);
+    ui_queue_text(state, hovered ? FONT_WESTERN8_WHITE : FONT_WESTERN8_OFFBLACK, text, text_pos, 0);
 
     bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
@@ -207,10 +136,10 @@ bool ui_button(const char* text, ivec2 size, bool center_horizontally) {
     return clicked;
 }
 
-bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
-    ivec2 origin = ui_get_container_origin();
+bool ui_sprite_button(UI& state, SpriteName sprite, bool disabled, bool flip_h) {
+    ivec2 origin = ui_get_container_origin(state);
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
-    ui_update_container(ivec2(sprite_info.frame_width, sprite_info.frame_height));
+    ui_update_container(state, ivec2(sprite_info.frame_width, sprite_info.frame_height));
 
     Rect sprite_rect = (Rect) {
         .x = origin.x, .y = origin.y,
@@ -223,7 +152,7 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
         hframe = 1;
     }
 
-    ui_queue_sprite(sprite, ivec2(hframe, 0), origin, 0, flip_h);
+    ui_queue_sprite(state, sprite, ivec2(hframe, 0), origin, 0, flip_h);
 
     bool clicked = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && !disabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && sprite_rect.has_point(input_get_mouse_position());
     if (clicked) {
@@ -232,11 +161,11 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h) {
     return clicked;
 }
 
-bool ui_icon_button(SpriteName sprite, bool selected) {
+bool ui_icon_button(UI& state, SpriteName sprite, bool selected) {
     const SpriteInfo& button_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
 
-    ivec2 origin = ui_get_container_origin();
-    ui_update_container(ivec2(button_sprite_info.frame_width, button_sprite_info.frame_height));
+    ivec2 origin = ui_get_container_origin(state);
+    ui_update_container(state, ivec2(button_sprite_info.frame_width, button_sprite_info.frame_height));
 
     Rect button_rect = (Rect) {
         .x = origin.x, .y = origin.y,
@@ -250,9 +179,9 @@ bool ui_icon_button(SpriteName sprite, bool selected) {
         hframe = 1;
     }
 
-    ui_queue_sprite(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
+    ui_queue_sprite(state, SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
     if (sprite != UI_ICON_BUTTON_EMPTY) {
-        ui_queue_sprite(sprite, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
+        ui_queue_sprite(state, sprite, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
     }
 
     bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
@@ -263,11 +192,11 @@ bool ui_icon_button(SpriteName sprite, bool selected) {
     return clicked; 
 }
 
-void ui_text(FontName font, const char* text) {
+void ui_text(UI& state, FontName font, const char* text) {
     ivec2 text_size = render_get_text_size(font, text);
-    ivec2 origin = ui_get_container_origin();
-    ui_update_container(text_size);
-    ui_queue_text(font, text, origin, 0);
+    ivec2 origin = ui_get_container_origin(state);
+    ui_update_container(state, text_size);
+    ui_queue_text(state, font, text, origin, 0);
 }
 
 ivec2 ui_text_frame_size(const char* text) {
@@ -281,8 +210,8 @@ ivec2 ui_text_frame_size(const char* text) {
     return ivec2(sprite_info.frame_width * frame_count, sprite_info.frame_height);
 }
 
-bool ui_text_frame(const char* text, bool disabled) {
-    ivec2 origin = ui_get_container_origin();
+bool ui_text_frame(UI& state, const char* text, bool disabled) {
+    ivec2 origin = ui_get_container_origin(state);
 
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
     ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, text);
@@ -294,7 +223,7 @@ bool ui_text_frame(const char* text, bool disabled) {
         .x = origin.x, .y = origin.y,
         .w = frame_count * sprite_info.frame_width, .h = sprite_info.frame_height
     };
-    ui_update_container(ivec2(rect.w, rect.h));
+    ui_update_container(state, ivec2(rect.w, rect.h));
     bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && !disabled && rect.has_point(input_get_mouse_position());
 
     for (int frame = 0; frame < frame_count; frame++) {
@@ -304,10 +233,10 @@ bool ui_text_frame(const char* text, bool disabled) {
         } else if (frame == frame_count - 1) {
             hframe = 2;
         }
-        ui_queue_sprite(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), ivec2(origin.x + (frame * sprite_info.frame_width), origin.y - (int)hovered), 0);
+        ui_queue_sprite(state, SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), ivec2(origin.x + (frame * sprite_info.frame_width), origin.y - (int)hovered), 0);
     }
 
-    ui_queue_text(hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + (rect.w / 2) - (text_size.x / 2), rect.y + 1 -(int)hovered), 0);
+    ui_queue_text(state, hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + (rect.w / 2) - (text_size.x / 2), rect.y + 1 -(int)hovered), 0);
 
     bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
@@ -316,41 +245,41 @@ bool ui_text_frame(const char* text, bool disabled) {
     return clicked;
 }
 
-void ui_frame(ivec2 size) {
-    ivec2 origin = ui_get_container_origin();
-    ui_update_container(size);
+void ui_frame(UI& state, ivec2 size) {
+    ivec2 origin = ui_get_container_origin(state);
+    ui_update_container(state, size);
     Rect frame_rect = (Rect) {
         .x = origin.x, .y = origin.y,
         .w = size.x, .h = size.y
     };
-    ui_queue_ninepatch(SPRITE_UI_FRAME, frame_rect, 0);
+    ui_queue_ninepatch(state, SPRITE_UI_FRAME, frame_rect, 0);
 }
 
-void ui_frame_rect(Rect rect) {
-    ui_element_position(ivec2(rect.x, rect.y));
-    ui_frame(ivec2(rect.w, rect.h));
+void ui_frame_rect(UI& state, Rect rect) {
+    ui_element_position(state, ivec2(rect.x, rect.y));
+    ui_frame(state, ivec2(rect.w, rect.h));
 }
 
-void ui_screen_shade() {
-    ui_queue_fill_rect((Rect) { 
+void ui_screen_shade(UI& state) {
+    ui_queue_fill_rect(state, (Rect) { 
         .x = 0, .y = 0, 
         .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT},
     RENDER_COLOR_OFFBLACK_TRANSPARENT, 0);
 }
 
-void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t max_length) {
-    int id = ui_get_next_text_input_id();
-    ivec2 origin = ui_get_container_origin();
-    ui_update_container(size);
+void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length) {
+    int id = ui_get_next_text_input_id(state);
+    ivec2 origin = ui_get_container_origin(state);
+    ui_update_container(state, size);
 
     Rect text_input_rect = (Rect) {
         .x = origin.x, .y = origin.y,
         .w = size.x, .h = size.y
     };
-    ui_queue_ninepatch(SPRITE_UI_FRAME_SMALL, text_input_rect, 0);
-    ui_queue_text(FONT_HACK_GOLD, prompt, ivec2(text_input_rect.x + 5, text_input_rect.y + 6), 0);
+    ui_queue_ninepatch(state, SPRITE_UI_FRAME_SMALL, text_input_rect, 0);
+    ui_queue_text(state, FONT_HACK_GOLD, prompt, ivec2(text_input_rect.x + 5, text_input_rect.y + 6), 0);
     ivec2 prompt_size = render_get_text_size(FONT_HACK_GOLD, prompt);
-    ui_queue_text(FONT_HACK_GOLD, value->c_str(), ivec2(text_input_rect.x + prompt_size.x, text_input_rect.y + 6), 0);
+    ui_queue_text(state, FONT_HACK_GOLD, value->c_str(), ivec2(text_input_rect.x + prompt_size.x, text_input_rect.y + 6), 0);
 
     if (input_is_text_input_active() && state.text_input_selected == id) {
         if (!state.input_enabled) {
@@ -364,7 +293,7 @@ void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t ma
             if (state.text_input_show_cursor) {
                 int value_text_width = render_get_text_size(FONT_HACK_GOLD, value->c_str()).x;
                 ivec2 cursor_pos = ivec2(text_input_rect.x + prompt_size.x + value_text_width - 2, text_input_rect.y + 5);
-                ui_queue_text(FONT_HACK_GOLD, "|", cursor_pos, 0);
+                ui_queue_text(state, FONT_HACK_GOLD, "|", cursor_pos, 0);
             }
         }
     }
@@ -379,11 +308,11 @@ void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t ma
     } 
 }
 
-bool ui_team_picker(char value, bool disabled) {
-    ivec2 origin = ui_get_container_origin();
+bool ui_team_picker(UI& state, char value, bool disabled) {
+    ivec2 origin = ui_get_container_origin(state);
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_TEAM_PICKER);
     ivec2 size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
-    ui_update_container(size);
+    ui_update_container(state, size);
 
     Rect rect = (Rect) {
         .x = origin.x, .y = origin.y,
@@ -395,9 +324,9 @@ bool ui_team_picker(char value, bool disabled) {
             !disabled && 
             rect.has_point(input_get_mouse_position());
 
-    ui_queue_sprite(SPRITE_UI_TEAM_PICKER, ivec2((int)is_hovered, 0), origin, 0);
+    ui_queue_sprite(state, SPRITE_UI_TEAM_PICKER, ivec2((int)is_hovered, 0), origin, 0);
     char text[2] = { value, '\0' };
-    ui_queue_text(is_hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + 5, rect.y + 2), 0);
+    ui_queue_text(state, is_hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + 5, rect.y + 2), 0);
 
     bool clicked = is_hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
@@ -406,13 +335,13 @@ bool ui_team_picker(char value, bool disabled) {
     return clicked;
 }
 
-bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled) {
-    int dropdown_id = ui_get_next_element_id();
-    ivec2 origin = ui_get_container_origin();
+bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled) {
+    int dropdown_id = ui_get_next_element_id(state);
+    ivec2 origin = ui_get_container_origin(state);
     SpriteName sprite = type == UI_DROPDOWN ? SPRITE_UI_DROPDOWN : SPRITE_UI_DROPDOWN_MINI;
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
     ivec2 size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
-    ui_update_container(size);
+    ui_update_container(state, size);
 
     Rect rect = (Rect) {
         .x = origin.x, .y = origin.y,
@@ -435,7 +364,7 @@ bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector
 
     int text_yoffset = type == UI_DROPDOWN ? 3 : 2;
 
-    ui_queue_sprite(sprite, ivec2(0, vframe), origin, 0);
+    ui_queue_sprite(state, sprite, ivec2(0, vframe), origin, 0);
 
     char item_text[32];
     if (type == UI_DROPDOWN_MINI) {
@@ -444,7 +373,7 @@ bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector
     } else {
         strcpy(item_text, items.at(*selected_item).c_str());
     }
-    ui_queue_text(vframe == 1 ? hovered_font : font, item_text, ivec2(origin.x + 5, origin.y + text_yoffset), 0);
+    ui_queue_text(state, vframe == 1 ? hovered_font : font, item_text, ivec2(origin.x + 5, origin.y + text_yoffset), 0);
 
     if (state.element_selected == dropdown_id) {
         // Render all the dropdown items
@@ -454,9 +383,9 @@ bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector
                 .x = origin.x, .y = origin.y + (size.y * (index + 1)),
                 .w = size.x, .h = size.y
             };
-            bool item_is_hovered = item_rect.has_point(input_get_mouse_position());
+            bool item_is_hovered = state.input_enabled && item_rect.has_point(input_get_mouse_position());
 
-            ui_queue_sprite(sprite, ivec2(0, 3 + (int)item_is_hovered), ivec2(item_rect.x, item_rect.y), 1);
+            ui_queue_sprite(state, sprite, ivec2(0, 3 + (int)item_is_hovered), ivec2(item_rect.x, item_rect.y), 1);
 
             if (type == UI_DROPDOWN_MINI) {
                 strncpy(item_text, items.at(index).c_str(), 12);
@@ -464,7 +393,7 @@ bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector
             } else {
                 strcpy(item_text, items.at(index).c_str());
             }
-            ui_queue_text(item_is_hovered ? hovered_font : font, item_text, ivec2(item_rect.x + 5, item_rect.y + text_yoffset), 1);
+            ui_queue_text(state, item_is_hovered ? hovered_font : font, item_text, ivec2(item_rect.x + 5, item_rect.y + text_yoffset), 1);
 
             if (item_is_hovered) {
                 item_hovered = index;
@@ -490,14 +419,14 @@ bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector
     return false;
 }
 
-bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display) {
+bool ui_slider(UI& state, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display) {
     static const int VALUE_STR_PADDING = 4;
     static const int SLIDER_HEIGHT = 5;
     static const int NOTCH_WIDTH = 5;
     static const int NOTCH_HEIGHT = 14;
 
-    int slider_id = ui_get_next_element_id();
-    ivec2 origin = ui_get_container_origin();
+    int slider_id = ui_get_next_element_id(state);
+    ivec2 origin = ui_get_container_origin(state);
     uint32_t old_value = *value;
 
     // Slider width will be based on the dropdown sprite's width
@@ -514,10 +443,10 @@ bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay disp
         ivec2 value_str_text_size = render_get_text_size(FONT_WESTERN8_GOLD, option_value_str);
         size.x += VALUE_STR_PADDING + value_str_text_size.x;
 
-        ui_queue_text(FONT_WESTERN8_GOLD, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 3), 0);
+        ui_queue_text(state, FONT_WESTERN8_GOLD, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 3), 0);
     }
 
-    ui_update_container(size);
+    ui_update_container(state, size);
 
     Rect slider_rect = (Rect) {
         .x = origin.x,
@@ -537,10 +466,10 @@ bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay disp
         .w = NOTCH_WIDTH, .h = NOTCH_HEIGHT
     };
 
-    ui_queue_fill_rect(slider_subrect, RENDER_COLOR_GOLD, 0);
-    ui_queue_draw_rect(slider_rect, RENDER_COLOR_OFFBLACK, 0);
-    ui_queue_fill_rect(notch_rect, RENDER_COLOR_GOLD, 0);
-    ui_queue_draw_rect(notch_rect, RENDER_COLOR_OFFBLACK, 0);
+    ui_queue_fill_rect(state, slider_subrect, RENDER_COLOR_GOLD, 0);
+    ui_queue_draw_rect(state, slider_rect, RENDER_COLOR_OFFBLACK, 0);
+    ui_queue_fill_rect(state, notch_rect, RENDER_COLOR_GOLD, 0);
+    ui_queue_draw_rect(state, notch_rect, RENDER_COLOR_OFFBLACK, 0);
 
     Rect input_rect = (Rect) {
         .x = origin.x, .y = origin.y,
@@ -574,7 +503,7 @@ bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay disp
     return *value != old_value;
 }
 
-void ui_render() {
+void ui_render(const UI& state) {
     for (int z_index = 0; z_index < UI_Z_INDEX_COUNT; z_index++) {
         for (const UiRender& render : state.render_queue[z_index]) {
             switch (render.type) {
@@ -607,7 +536,7 @@ void ui_render() {
     }
 }
 
-ivec2 ui_get_container_origin() {
+ivec2 ui_get_container_origin(const UI& state) {
     ivec2 origin = ivec2(0, 0);
     for (const UiContainer& container : state.container_stack) {
         origin += container.origin;
@@ -616,7 +545,7 @@ ivec2 ui_get_container_origin() {
     return origin;
 }
 
-void ui_update_container(ivec2 size) {
+void ui_update_container(UI& state, ivec2 size) {
     if (!state.container_stack.empty()) {
         UiContainer& container = state.container_stack.back();
         switch (container.type) {
@@ -633,28 +562,28 @@ void ui_update_container(ivec2 size) {
                 break;
             }
             case UI_CONTAINER_ELEMENT_POSITION: {
-                ui_end_container();
+                ui_end_container(state);
                 break;
             }
             case UI_CONTAINER_ELEMENT_SIZE: {
-                ui_end_container();
+                ui_end_container(state);
                 break;
             }
         }
     }
 }
 
-int ui_get_next_element_id() {
+int ui_get_next_element_id(UI& state) {
     state.next_element_id++;
     return state.next_element_id;
 }
 
-int ui_get_next_text_input_id() {
+int ui_get_next_text_input_id(UI& state) {
     state.next_text_input_id++;
     return state.next_text_input_id;
 }
 
-void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index) {
+void ui_queue_text(UI& state, FontName font, const char* text, ivec2 position, int z_index) {
     UiRender render;
     render.type = UI_RENDER_TEXT;
     render.text.font = font;
@@ -663,7 +592,7 @@ void ui_queue_text(FontName font, const char* text, ivec2 position, int z_index)
     state.render_queue[z_index].push_back(render);
 }
 
-void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h) {
+void ui_queue_sprite(UI& state, SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h) {
     state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_SPRITE,
         .sprite = (UiRenderSprite) {
@@ -675,7 +604,7 @@ void ui_queue_sprite(SpriteName sprite, ivec2 frame, ivec2 position, int z_index
     });
 }
 
-void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index) {
+void ui_queue_ninepatch(UI& state, SpriteName sprite, Rect rect, int z_index) {
     state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_NINEPATCH,
         .ninepatch = (UiRenderNinepatch) {
@@ -685,7 +614,7 @@ void ui_queue_ninepatch(SpriteName sprite, Rect rect, int z_index) {
     });
 }
 
-void ui_queue_draw_rect(Rect rect, RenderColor color, int z_index) {
+void ui_queue_draw_rect(UI& state, Rect rect, RenderColor color, int z_index) {
     state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_DRAW_RECT,
         .rect = (UiRenderRect) {
@@ -695,7 +624,7 @@ void ui_queue_draw_rect(Rect rect, RenderColor color, int z_index) {
     });
 }
 
-void ui_queue_fill_rect(Rect rect, RenderColor color, int z_index) {
+void ui_queue_fill_rect(UI& state, Rect rect, RenderColor color, int z_index) {
     state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_FILL_RECT,
         .rect = (UiRenderRect) {

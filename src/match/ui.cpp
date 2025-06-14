@@ -10,6 +10,7 @@
 #include "menu/match_setting.h"
 #include "render/sprite.h"
 #include "render/render.h"
+#include "feedback/feedback.h"
 #include "hotkey.h"
 #include "upgrade.h"
 #include "replay.h"
@@ -134,6 +135,7 @@ MatchUiState match_ui_base_init() {
     state.rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
     state.building_fire_animation = animation_create(ANIMATION_FIRE_BURN);
     state.options_menu.mode = OPTIONS_MENU_CLOSED;
+    state.ui = ui_init();
 
     memset(state.displayed_gold_amounts, 0, sizeof(state.displayed_gold_amounts));
 
@@ -283,6 +285,10 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // This function returns after it handles a single input to avoid double input happening
 void match_ui_handle_input(MatchUiState& state) {
+    if (feedback_is_open()) {
+        return;
+    }
+
     // Begin chat
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active() && !state.replay_mode) {
         state.chat_message = "";
@@ -816,7 +822,6 @@ void match_ui_handle_input(MatchUiState& state) {
 }
 
 void match_ui_update(MatchUiState& state) {
-    ui_begin();
     if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
         if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
             network_set_player_ready(true);
@@ -854,86 +859,86 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Menu
-    // Always call UI begin to make sure everything is cleared out from the main menu
-    ui_set_input_enabled(state.options_menu.mode == OPTIONS_MENU_CLOSED);
     if (match_ui_is_in_menu(state.mode)) {
-        ui_frame_rect(MENU_RECT);
+        ui_begin(state.ui);
+        state.ui.input_enabled = state.options_menu.mode == OPTIONS_MENU_CLOSED && !feedback_is_open();
+        ui_frame_rect(state.ui, MENU_RECT);
 
         const char* header_text = match_ui_get_menu_header_text(state.mode);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
         ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 10);
-        ui_element_position(text_pos);
-        ui_text(FONT_WESTERN8_GOLD, header_text);
+        ui_element_position(state.ui, text_pos);
+        ui_text(state.ui, FONT_WESTERN8_GOLD, header_text);
 
         ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32);
         if (state.mode != MATCH_UI_MODE_MENU) {
             column_position.y += 11;
         }
-        ui_begin_column(column_position, 5);
+        ui_begin_column(state.ui, column_position, 5);
             ivec2 button_size = ui_button_size("Return to Menu");
             if (state.mode == MATCH_UI_MODE_MENU) {
-                if (ui_button("Leave Match", button_size, true)) {
+                if (ui_button(state.ui, "Leave Match", button_size, true)) {
                     if (match_ui_is_opponent_in_match(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER;
                     } else {
                         match_ui_leave_match(state, false);
                     }
                 }
-                if (ui_button("Exit Program", button_size, true)) {
+                if (ui_button(state.ui, "Exit Program", button_size, true)) {
                     if (match_ui_is_opponent_in_match(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP;
                     } else {
                         match_ui_leave_match(state, true);
                     }
                 }
-                if (ui_button("Options", button_size, true)) {
+                if (ui_button(state.ui, "Options", button_size, true)) {
                     state.options_menu = options_menu_open();
                 }
-                if (ui_button("Back", button_size, true)) {
+                if (ui_button(state.ui, "Back", button_size, true)) {
                     state.mode = MATCH_UI_MODE_NONE;
                 }
             } else if (state.mode == MATCH_UI_MODE_MENU_SURRENDER || state.mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP) {
-                if (ui_button("Yes", button_size, true)) {
+                if (ui_button(state.ui, "Yes", button_size, true)) {
                     match_ui_leave_match(state, state.mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP);
                 }
-                if (ui_button("Back", button_size, true)) {
+                if (ui_button(state.ui, "Back", button_size, true)) {
                     state.mode = MATCH_UI_MODE_MENU;
                 }
             } else if (state.mode == MATCH_UI_MODE_MATCH_OVER_VICTORY || state.mode == MATCH_UI_MODE_MATCH_OVER_DEFEAT) {
-                if (ui_button("Keep Playing", button_size, true)) {
+                if (ui_button(state.ui, "Keep Playing", button_size, true)) {
                     state.mode = MATCH_UI_MODE_NONE;
                 }
-                if (ui_button("Return to Menu", button_size, true)) {
+                if (ui_button(state.ui, "Return to Menu", button_size, true)) {
                     match_ui_leave_match(state, false);
                 }
-                if (ui_button("Exit Program", button_size, true)) {
+                if (ui_button(state.ui, "Exit Program", button_size, true)) {
                     match_ui_leave_match(state, true);
                 }
             }
-        ui_end_container();
+        ui_end_container(state.ui);
 
         if (state.options_menu.mode != OPTIONS_MENU_CLOSED) {
-            options_menu_update(state.options_menu);
+            options_menu_update(state.options_menu, state.ui);
         }
     } else if (state.replay_mode) {
-        ui_begin_column(ivec2(BUTTON_PANEL_RECT.x + 8, BUTTON_PANEL_RECT.y + 4), 2);
-            ui_element_size(ivec2(0, 32));
-            ui_begin_row(ivec2(0, 0), 4);
-                ui_element_position(ivec2(0, 2));
-                ui_text(FONT_HACK_WHITE, "Fog:");
+        ui_begin_column(state.ui, ivec2(BUTTON_PANEL_RECT.x + 8, BUTTON_PANEL_RECT.y + 4), 2);
+            ui_element_size(state.ui, ivec2(0, 32));
+            ui_begin_row(state.ui, ivec2(0, 0), 4);
+                ui_element_position(state.ui, ivec2(0, 2));
+                ui_text(state.ui, FONT_HACK_WHITE, "Fog:");
 
-                ui_element_position(ivec2(render_get_text_size(FONT_HACK_WHITE, "Fog:").x, 0));
-                ui_dropdown(UI_DROPDOWN_MINI, &state.replay_fog_index, state.replay_fog_texts, false);
-            ui_end_container();
+                ui_element_position(state.ui, ivec2(render_get_text_size(FONT_HACK_WHITE, "Fog:").x, 0));
+                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.replay_fog_index, state.replay_fog_texts, false);
+            ui_end_container(state.ui);
 
             uint32_t position = state.turn_counter;
-            if (ui_slider(&position, 0, match_ui_replay_end_of_tape(state), UI_SLIDER_DISPLAY_NO_VALUE)) {
+            if (ui_slider(state.ui, &position, 0, match_ui_replay_end_of_tape(state), UI_SLIDER_DISPLAY_NO_VALUE)) {
                 state.selection.clear();
                 match_ui_replay_scrub(state, position);
             }
 
-            ui_begin_row(ivec2(0, 0), 6);
-                if (ui_sprite_button(state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false)) {
+            ui_begin_row(state.ui, ivec2(0, 0), 6);
+                if (ui_sprite_button(state.ui, state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false)) {
                     state.replay_paused = !state.replay_paused;
                 }
 
@@ -943,11 +948,11 @@ void match_ui_update(MatchUiState& state) {
                 uint32_t seconds_total = (uint32_t)((match_ui_replay_end_of_tape(state) - 1) * UPDATE_DURATION);
                 Time time_total = Time::from_seconds(seconds_total);
                 char time_text[16];
-                ui_element_position(ivec2(0, 2));
+                ui_element_position(state.ui, ivec2(0, 2));
                 sprintf(time_text, "%i:%02i:%02i/%i:%02i:%02i", time_elapsed.hours, time_elapsed.minutes, time_elapsed.seconds, time_total.hours, time_total.minutes, time_total.seconds);
-                ui_text(FONT_HACK_WHITE, time_text);
-            ui_end_container();
-        ui_end_container();
+                ui_text(state.ui, FONT_HACK_WHITE, time_text);
+            ui_end_container(state.ui);
+        ui_end_container(state.ui);
     }
 
     if (state.mode == MATCH_UI_MODE_LEAVE_MATCH || state.mode == MATCH_UI_MODE_EXIT_PROGRAM) {
@@ -3321,7 +3326,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 
-    ui_render();
+    ui_render(state.ui);
     render_sprite_batch();
 }
 

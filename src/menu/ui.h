@@ -4,6 +4,7 @@
 #include "core/input.h"
 #include "render/sprite.h"
 #include "render/font.h"
+#include "render/render.h"
 #include <vector>
 #include <string>
 #include "defines.h"
@@ -32,49 +33,112 @@ enum UiSliderDisplay {
     UI_SLIDER_DISPLAY_NO_VALUE
 };
 
-/**
- * Clears the UI render list. Should be called every frame
- */
-void ui_begin();
+enum UiRenderType {
+    UI_RENDER_TEXT,
+    UI_RENDER_SPRITE,
+    UI_RENDER_NINEPATCH,
+    UI_RENDER_FILL_RECT,
+    UI_RENDER_DRAW_RECT
+};
+
+struct UiRenderText {
+    FontName font;
+    char text[UI_RENDER_TEXT_BUFFER_SIZE];
+    ivec2 position;
+};
+
+struct UiRenderSprite {
+    SpriteName sprite;
+    ivec2 frame;
+    ivec2 position;
+    bool flip_h;
+};
+
+struct UiRenderNinepatch {
+    SpriteName sprite;
+    Rect rect;
+};
+
+struct UiRenderRect {
+    Rect rect;
+    RenderColor color;
+};
+
+struct UiRender {
+    UiRenderType type;
+    union {
+        UiRenderText text;
+        UiRenderSprite sprite;
+        UiRenderNinepatch ninepatch;
+        UiRenderRect rect;
+    };
+};
+
+enum UiContainerType {
+    UI_CONTAINER_ROW,
+    UI_CONTAINER_COLUMN,
+    UI_CONTAINER_ELEMENT_POSITION,
+    UI_CONTAINER_ELEMENT_SIZE
+};
+
+struct UiContainer {
+    UiContainerType type;
+    ivec2 origin;
+    int spacing;
+    ivec2 size;
+};
+
+struct UI {
+    uint32_t text_input_cursor_blink_timer;
+    bool text_input_show_cursor;
+    std::vector<UiContainer> container_stack;
+    std::vector<UiRender> render_queue[UI_Z_INDEX_COUNT]; 
+    int next_element_id;
+    int element_selected;
+    int element_selected_future;
+    int text_input_selected;
+    int next_text_input_id;
+    bool input_enabled;
+};
+
+UI ui_init();
 
 /**
- * Enables or disables input
- * Input is enabled by default each time you call ui_begin
- * @param value The value to set input enabled to
+ * Marks the beginning of a new sub-UI. 
  */
-void ui_set_input_enabled(bool value);
+void ui_begin(UI& state);
 
 /**
  * Creates a one-off container. The next UI element will render at the specified position
  * @param position The position to render the next element at
  */
-void ui_element_position(ivec2 position);
+void ui_element_position(UI& state, ivec2 position);
 
 /**
  * Creates a one-off container. The next UI element will occupy the specified size in its parent container, regardless of its actual size
  * This function can be used to statically define the spacing of row and column elements
  * @param size The size that the next element should occupy
  */
-void ui_element_size(ivec2 size);
+void ui_element_size(UI& state, ivec2 size);
 
 /**
  * Creates a row container. Elements inside the row will be horizontally aligned
  * @param position Position to begin the row at. The row's first element will be rendered here.
  * @param spacing The horizontal space between each row element
  */
-void ui_begin_row(ivec2 position, int spacing);
+void ui_begin_row(UI& state, ivec2 position, int spacing);
 
 /**
  * Creates a column container. Elements inside the column will be vertically aligned
  * @param position Position to begin the column at. The column's first element will be rendered here.
  * @param spacing The vertical space between each row element
  */
-void ui_begin_column(ivec2 position, int spacing);
+void ui_begin_column(UI& state, ivec2 position, int spacing);
 
 /**
  * Ends the current container
  */
-void ui_end_container();
+void ui_end_container(UI& state);
 
 /**
  * Gets the size of a button
@@ -90,7 +154,7 @@ ivec2 ui_button_size(const char* text);
  * @param center_horizontally If true, the button will be centered horizontally about its render position
  * @return True if the button has been clicked this frame
  */
-bool ui_button(const char* text, ivec2 size = ivec2(-1, -1), bool center_horizontally = false);
+bool ui_button(UI& state, const char* text, ivec2 size = ivec2(-1, -1), bool center_horizontally = false);
 
 /**
  * Create a sprite button
@@ -99,7 +163,7 @@ bool ui_button(const char* text, ivec2 size = ivec2(-1, -1), bool center_horizon
  * @param flip_h If true, the sprite will be flipped horizontally when rendered
  * @return True if the button has been clicked this frame
  */
-bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h);
+bool ui_sprite_button(UI& state, SpriteName sprite, bool disabled, bool flip_h);
 
 /**
  * Create an icon button, which has an icon frame with an icon on top of it
@@ -107,14 +171,14 @@ bool ui_sprite_button(SpriteName sprite, bool disabled, bool flip_h);
  * @param selected If true, the button will appear brighter than normal
  * @return True if the button was clicked this frame
  */
-bool ui_icon_button(SpriteName sprite, bool selected);
+bool ui_icon_button(UI& state, SpriteName sprite, bool selected);
 
 /**
  * Creates text
  * @param font The font of the text
  * @param text The value of the text
  */
-void ui_text(FontName font, const char* text);
+void ui_text(UI& state, FontName font, const char* text);
 
 /**
  * Gets the size of the text a given frame
@@ -129,13 +193,13 @@ ivec2 ui_text_frame_size(const char* text);
  * @param disabled If true, the text frame will not act as a button. It will have no mouse hover effect and will not respond to click events.
  * @return True if the text frame is clicked
  */
-bool ui_text_frame(const char* text, bool disabled);
+bool ui_text_frame(UI& state, const char* text, bool disabled);
 
 /**
  * Creates a UI frame of the specified size
  * @param size The size of the frame
  */
-void ui_frame(ivec2 size);
+void ui_frame(UI& state, ivec2 size);
 
 /**
  * Creates a UI frame of the size and position specified by the Rect.
@@ -145,12 +209,12 @@ void ui_frame(ivec2 size);
  * 
  * @param rect The size and position of the frame
  */
-void ui_frame_rect(Rect rect);
+void ui_frame_rect(UI& state, Rect rect);
 
 /**
  * Reners an offblack transparent rect across the entire screen
  */
-void ui_screen_shade();
+void ui_screen_shade(UI& state);
 
 /**
  * Creates a text input
@@ -160,7 +224,7 @@ void ui_screen_shade();
  * @param value Pointer to the string that will be edited by the text input
  * @param max_length Text entered by the input will not exceed this length
  */
-void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t max_length);
+void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length);
 
 /**
  * Creates a team picker
@@ -168,7 +232,7 @@ void ui_text_input(const char* prompt, ivec2 size, std::string* value, size_t ma
  * @param disabled If true, the team picker will not act as a button
  * @return True if the team picker has been clicked this frame
  */
-bool ui_team_picker(char value, bool disabled);
+bool ui_team_picker(UI& state, char value, bool disabled);
 
 /**
  * Creates a dropdown menu
@@ -178,7 +242,7 @@ bool ui_team_picker(char value, bool disabled);
  * @param disabled If true, the dropdown will not be clickable.
  * @return True if the dropdown value was changed
  */
-bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
+bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
 
 /**
  * Creates a slider
@@ -189,11 +253,11 @@ bool ui_dropdown(UiDropdownType type, uint32_t* selected_item, const std::vector
  * @param display Determines how the slider should render the value text
  * @return True if the slider value has changed
  */
-bool ui_slider(uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display);
+bool ui_slider(UI& state, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display);
 
 /**
  * Renders everything in the UI's render list.
  * When a UI element is created it gets added to the render list.
  * Elements remain in the render list unless cleared by ui_begin().
  */
-void ui_render();
+void ui_render(const UI& state);

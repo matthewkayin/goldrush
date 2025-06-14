@@ -3,6 +3,7 @@
 #include "network/network.h"
 #include "core/animation.h"
 #include "match_setting.h"
+#include "ui.h"
 #include "options.h"
 #include <vector>
 #include <string>
@@ -55,6 +56,7 @@ struct MenuState {
     std::vector<std::string> replay_filenames;
 
     OptionsMenuState options_menu;
+    UI ui;
 };
 
 MenuState menu_init();

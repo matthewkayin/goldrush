@@ -234,8 +234,6 @@ int gold_main(int argc, char** argv) {
     uint32_t updates = 0;
     uint32_t ups = 0;
 
-    GOLD_ASSERT(false);
-
     game_set_mode((LoadParams) {
         .mode = GAME_MODE_MENU,
         .menu = (LoadMenuParams) {
@@ -382,6 +380,8 @@ int gold_main(int argc, char** argv) {
                     break;
                 }
             }
+
+            feedback_update();
         }
 
         sound_update();
@@ -426,6 +426,8 @@ int gold_main(int argc, char** argv) {
                 break;
             }
         }
+
+        feedback_render();
 
         if (render_debug_info) {
             char fps_text[32];
