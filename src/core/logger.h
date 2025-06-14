@@ -11,6 +11,7 @@ enum LogLevel {
 
 bool logger_init(const char* logfile_path);
 void logger_quit();
+const char* logger_get_path();
 void logger_output(LogLevel log_level, const char* message, ...);
 
 #define log_error(message, ...) logger_output(LOG_LEVEL_ERROR, message, ##__VA_ARGS__);

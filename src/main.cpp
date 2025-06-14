@@ -15,6 +15,7 @@
 #include "match/noise.h"
 #include "match/replay.h"
 #include "network/network.h"
+#include "feedback/feedback.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
@@ -219,7 +220,10 @@ int gold_main(int argc, char** argv) {
     match_setting_init();
     input_init(window);
     options_load();
+    feedback_init();
     srand(time(NULL));
+
+    feedback_send();
 
     bool is_running = true;
     bool render_debug_info = false;
@@ -433,6 +437,7 @@ int gold_main(int argc, char** argv) {
         render_present_frame();
     }
 
+    feedback_quit();
     network_quit();
     sound_quit();
     render_quit();

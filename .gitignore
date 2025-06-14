@@ -3,3 +3,4 @@ ase/
 obj/
 .log
 .DS_Store
+src/feedback/token.h

@@ -8,9 +8,9 @@
 #include <cstdarg>
 
 static FILE* logfile;
+static char logfile_path[256];
 
 bool logger_init(const char* logfile_subpath) {
-    char logfile_path[256];
     filesystem_get_data_path(logfile_path, logfile_subpath);
     logfile = fopen(logfile_path, "w");
     if (logfile == NULL) {
@@ -23,6 +23,10 @@ bool logger_init(const char* logfile_subpath) {
 
 void logger_quit() {
     fclose(logfile);
+}
+
+const char* logger_get_path() {
+    return logfile_path;
 }
 
 void logger_output(LogLevel log_level, const char* message, ...) {
