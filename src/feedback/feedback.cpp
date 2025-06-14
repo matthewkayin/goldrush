@@ -4,9 +4,11 @@
 #include "core/logger.h"
 #include "core/filesystem.h"
 #include "core/input.h"
+#include "core/options.h"
 #include "util.h"
 #include "menu/ui.h"
 #include "render/render.h"
+#include "math/gmath.h"
 #include <curl/curl.h>
 #include <unordered_map>
 #include <string>
@@ -51,8 +53,20 @@
     }
 #endif
 
+enum FeedbackMode {
+    FEEDBACK_CLOSED,
+    FEEDBACK_WELCOME,
+    FEEDBACK_OPEN
+};
+
+static const Rect WELCOME_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (336 / 2),
+    .y = (SCREEN_HEIGHT / 2) - 72,
+    .w = 336, .h = 112
+};
+
 struct FeedbackState {
-    bool is_open;
+    FeedbackMode mode;
     UI ui;
 };
 static FeedbackState state;
@@ -63,8 +77,10 @@ void feedback_init() {
         SetUnhandledExceptionFilter(feedback_on_crash);
     #endif
 
-    state.is_open = false;
+    state.mode = FEEDBACK_CLOSED;
     state.ui = ui_init();
+
+    state.mode = FEEDBACK_WELCOME;
 }
 
 void feedback_quit() {
@@ -72,23 +88,45 @@ void feedback_quit() {
 }
 
 bool feedback_is_open() {
-    return state.is_open;
+    return state.mode != FEEDBACK_CLOSED;
 }
 
 void feedback_update() {
     if (input_is_action_just_pressed(INPUT_ACTION_FEEDBACK_MENU)) {
-        state.is_open = !state.is_open;
+        if (state.mode != FEEDBACK_OPEN) {
+            state.mode = FEEDBACK_OPEN;
+        } else {
+            state.mode = FEEDBACK_CLOSED;
+        }
     }
-    if (!state.is_open) {
+    if (state.mode == FEEDBACK_CLOSED) {
         return;
     }
 
     ui_begin(state.ui);
     ui_screen_shade(state.ui);
+
+    if (state.mode == FEEDBACK_WELCOME) {
+        ui_frame_rect(state.ui, WELCOME_RECT);
+
+        ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Gold Rush Beta");
+        ui_element_position(state.ui, ivec2(WELCOME_RECT.x + (WELCOME_RECT.w / 2) - (header_text_size.x / 2), WELCOME_RECT.y + 6));
+        ui_text(state.ui, FONT_HACK_GOLD, "Gold Rush Beta");
+
+        ui_begin_column(state.ui, ivec2(WELCOME_RECT.x + 8, WELCOME_RECT.y + 26), 4);
+            ui_text(state.ui, FONT_HACK_GOLD, "Welcome to the Gold Rush Beta!");
+            ui_text(state.ui, FONT_HACK_GOLD, "If you find any bugs or just want to provide feedback,");
+            ui_text(state.ui, FONT_HACK_GOLD, "you can press F9 to open the feedback menu.");
+            ui_element_position(state.ui, ivec2((WELCOME_RECT.w - 16) / 2, 4));
+            if (ui_button(state.ui, "Ok", ivec2(-1, -1), true)) {
+                state.mode = FEEDBACK_CLOSED;
+            }
+        ui_end_container(state.ui);
+    }
 }
 
 void feedback_render() {
-    if (!state.is_open) {
+    if (state.mode == FEEDBACK_CLOSED) {
         return;
     }
 
