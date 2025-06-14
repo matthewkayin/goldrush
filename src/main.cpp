@@ -223,8 +223,6 @@ int gold_main(int argc, char** argv) {
     feedback_init();
     srand(time(NULL));
 
-    feedback_send();
-
     bool is_running = true;
     bool render_debug_info = false;
     const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
@@ -235,6 +233,8 @@ int gold_main(int argc, char** argv) {
     uint32_t fps = 0;
     uint32_t updates = 0;
     uint32_t ups = 0;
+
+    GOLD_ASSERT(false);
 
     game_set_mode((LoadParams) {
         .mode = GAME_MODE_MENU,
