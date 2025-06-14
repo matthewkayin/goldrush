@@ -112,3 +112,5 @@ void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pi
 void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
 void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size);
+bool render_take_screenshot(const char* path);
+void render_screenshot(ivec2 position, ivec2 dst_size);

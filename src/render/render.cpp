@@ -18,6 +18,7 @@
 #include "render/sprite.h"
 #include "render/font.h"
 #include "shader.h"
+#include "../util.h"
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
 #include <glad/glad.h>
@@ -91,6 +92,7 @@ struct RenderState {
     GLuint screen_shader;
     GLuint screen_framebuffer;
     GLuint screen_texture;
+    GLuint screenshot_texture;
     GLuint screen_vao;
 
     GLuint sprite_shader;
@@ -354,6 +356,12 @@ bool render_init_screen_framebuffer() {
         return false;
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glGenTextures(1, &state.screenshot_texture);
+    glBindTexture(GL_TEXTURE_2D, state.screenshot_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
     return true;
 }
@@ -1362,9 +1370,6 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, state.minimap_texture_pixels);
 
     glUseProgram(state.minimap_shader);
@@ -1372,6 +1377,82 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
     glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(minimap_vertices), minimap_vertices);
     glDrawArrays(GL_TRIANGLES, 0, 12);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+bool render_take_screenshot(const char* path) {
+    uint8_t pixels[SCREEN_WIDTH * SCREEN_HEIGHT * 4]; 
+    glBindTexture(GL_TEXTURE_2D, state.screen_texture);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    SDL_Surface* screenshot = SDL_CreateSurfaceFrom(SCREEN_WIDTH, SCREEN_HEIGHT, SDL_PIXELFORMAT_ABGR8888, pixels, 4 * SCREEN_WIDTH);
+    if (screenshot == NULL) {
+        log_error("Failed to take screenshot.");
+        return false;
+    }
+    render_flip_sdl_surface_vertically(screenshot);
+
+    bool success = IMG_SavePNG(screenshot, path);
+
+    glBindTexture(GL_TEXTURE_2D, state.screenshot_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    SDL_DestroySurface(screenshot);
+
+    return success;
+}
+
+void render_screenshot(ivec2 position, ivec2 dst_size) {
+    float position_left = (float)position.x;
+    float position_right = (float)(position.x + dst_size.x);
+    float position_top = (float)(SCREEN_HEIGHT - position.y);
+    float position_bottom = (float)(SCREEN_HEIGHT - (position.y + dst_size.y));
+
+    float tex_coord_left = 0.0f;
+    float tex_coord_right = 1.0f;
+    float tex_coord_top = 0.0f;
+    float tex_coord_bottom = 1.0f;
+
+    SpriteVertex vertices[6] = {
+        // minimap tiles
+        (SpriteVertex) {
+            .position = { position_left, position_top },
+            .tex_coord = { tex_coord_left, tex_coord_top, 0.0f }
+        },
+        (SpriteVertex) {
+            .position = { position_right, position_bottom },
+            .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
+        },
+        (SpriteVertex) {
+            .position = { position_left, position_bottom },
+            .tex_coord = { tex_coord_left, tex_coord_bottom, 0.0f }
+        },
+        (SpriteVertex) {
+            .position = { position_left, position_top },
+            .tex_coord = { tex_coord_left, tex_coord_top, 0.0f }
+        },
+        (SpriteVertex) {
+            .position = { position_right, position_top },
+            .tex_coord = { tex_coord_right, tex_coord_top, 0.0f }
+        },
+        (SpriteVertex) {
+            .position = { position_right, position_bottom },
+            .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
+        }
+    };
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, state.screenshot_texture);
+    glUseProgram(state.minimap_shader);
+    glBindVertexArray(state.sprite_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);

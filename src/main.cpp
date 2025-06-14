@@ -166,6 +166,7 @@ int gold_main(int argc, char** argv) {
 
     filesystem_create_data_folder("logs");
     filesystem_create_data_folder("replays");
+    filesystem_create_data_folder("screenshots");
 
     if(!logger_init(logfile_path)) {
         return -1;

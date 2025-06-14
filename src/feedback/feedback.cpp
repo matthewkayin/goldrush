@@ -63,7 +63,6 @@ enum FeedbackType {
     FEEDBACK_TYPE_FEEDBACK,
     FEEDBACK_TYPE_BUG
 };
-static const std::vector<std::string> FEEDBACK_TYPE_STRS = { "Feedback", "Bug" };
 
 static const Rect WELCOME_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (336 / 2),
@@ -73,21 +72,31 @@ static const Rect WELCOME_RECT = (Rect) {
 
 static const Rect FEEDBACK_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (364 / 2),
-    .y = 64,
-    .w = 364, .h = 192
+    .y = 32,
+    .w = 364, .h = 264
 };
 
+static const std::vector<std::string> FEEDBACK_TYPE_STRS = { "Feedback", "Bug" };
+static const std::vector<std::string> FEEDBACK_YES_NO_STRS = { "No", "Yes" };
 static const size_t FEEDBACK_NAME_MAX = 42;
 static const size_t FEEDBACK_DESC_MAX = 268;
+static const ivec2 SCREENSHOT_MINI_SIZE = ivec2(SCREEN_WIDTH / 5, SCREEN_HEIGHT / 5);
 
 struct FeedbackState {
     FeedbackMode mode;
     UI ui;
     uint32_t feedback_type;
+    uint32_t include_logs;
+    uint32_t include_replay;
+    uint32_t include_screenshot;
     std::string feedback_name;
     std::string feedback_desc;
+    char screenshot_path[256];
+    bool screenshot_successful;
 };
 static FeedbackState state;
+
+void feedback_ui_yes_no(UI& ui, const char* prompt, uint32_t* value, bool disabled);
 
 void feedback_init() {
     curl_global_init(CURL_GLOBAL_ALL);
@@ -98,6 +107,9 @@ void feedback_init() {
     state.ui = ui_init();
     state.feedback_type = FEEDBACK_TYPE_BUG;
     state.mode = FEEDBACK_WELCOME;
+    state.include_logs = 1;
+    state.include_replay = 1;
+    state.include_screenshot = 1;
 }
 
 void feedback_quit() {
@@ -111,6 +123,15 @@ bool feedback_is_open() {
 void feedback_update() {
     if (input_is_action_just_pressed(INPUT_ACTION_FEEDBACK_MENU)) {
         if (state.mode != FEEDBACK_OPEN) {
+            char screenshot_subpath[128];
+            char* screenshot_path_ptr = screenshot_subpath;
+            screenshot_path_ptr += sprintf(screenshot_path_ptr, "screenshots/");
+            screenshot_path_ptr += sprintf_timestamp(screenshot_path_ptr);
+            screenshot_path_ptr += sprintf(screenshot_path_ptr, ".png");
+            filesystem_get_data_path(state.screenshot_path, screenshot_subpath);
+            state.screenshot_successful = render_take_screenshot(state.screenshot_path);
+            state.include_screenshot = (uint32_t)state.screenshot_successful;
+
             state.mode = FEEDBACK_OPEN;
         } else {
             state.mode = FEEDBACK_CLOSED;
@@ -160,8 +181,30 @@ void feedback_update() {
 
             ui_text_input(state.ui, "Feedback Name: ", ivec2(FEEDBACK_RECT.w - 16, 24), &state.feedback_name, FEEDBACK_NAME_MAX);
             ui_text_input(state.ui, "Description: ", ivec2(FEEDBACK_RECT.w - 16, 92), &state.feedback_desc, FEEDBACK_DESC_MAX, true);
+
+            feedback_ui_yes_no(state.ui, "Include logs?", &state.include_logs, false);
+            feedback_ui_yes_no(state.ui, "Include last replay?", &state.include_replay, false);
+            feedback_ui_yes_no(state.ui, "Include screenshot?", &state.include_screenshot, !state.screenshot_successful);
+            if (state.screenshot_successful) {
+                ui_element_size(state.ui, ivec2(0, SCREENSHOT_MINI_SIZE.y));
+                ui_text(state.ui, FONT_HACK_WHITE, "Click the screenshot to preview.");
+            } else {
+                ui_text(state.ui, FONT_HACK_WHITE, "Error: could not save screenshot.");
+            }
         ui_end_container(state.ui);
     }
+}
+
+void feedback_ui_yes_no(UI& ui, const char* prompt, uint32_t* value, bool disabled) {
+    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+    ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
+    ui_begin_row(state.ui, ivec2(0, 0), 0);
+        ui_element_position(state.ui, ivec2(0, 2));
+        ui_text(state.ui, FONT_HACK_GOLD, prompt);
+
+        ui_element_position(state.ui, ivec2(FEEDBACK_RECT.w - 16 - dropdown_sprite_info.frame_width, 0));
+        ui_dropdown(state.ui, UI_DROPDOWN_MINI, value, FEEDBACK_YES_NO_STRS, disabled);
+    ui_end_container(state.ui);
 }
 
 void feedback_render() {
@@ -171,4 +214,8 @@ void feedback_render() {
 
     ui_render(state.ui);
     render_sprite_batch();
+
+    if (state.screenshot_successful) {
+        render_screenshot(ivec2(0, 0), ivec2(SCREEN_WIDTH / 4, SCREEN_HEIGHT / 4));
+    }
 }
