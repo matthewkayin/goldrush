@@ -3,10 +3,10 @@
 #include <string>
 #include <vector>
 
-struct FeedbackTicket {
+struct FeedbackReport {
     std::string name;
     std::string description;
     std::vector<std::string> attachments;
 };
 
-bool feedback_report_send(FeedbackTicket ticket);
+bool feedback_report_send(FeedbackReport ticket);

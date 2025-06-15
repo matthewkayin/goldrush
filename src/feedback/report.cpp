@@ -12,7 +12,7 @@ static const char* TRELLO_LIST_ID = "684c9d51f095781d10148d44";
 bool feedback_upload_attachment(const char* card_id, const char* filepath);
 size_t feedback_response_write_callback(void* contents, size_t size, size_t nmemb, std::string* response);
 
-bool feedback_report_send(FeedbackTicket ticket) {
+bool feedback_report_send(FeedbackReport ticket) {
     /* Send POST to create card */
     CURL* curl = curl_easy_init();
     if (!curl) {

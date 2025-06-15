@@ -10,7 +10,6 @@
 static const uint32_t UI_TEXT_INPUT_BLINK_DURATION = 30;
 static const int UI_ELEMENT_NONE = -1;
 
-ivec2 ui_get_container_origin(const UI& state);
 void ui_update_container(UI& state, ivec2 size);
 int ui_get_next_element_id(UI& state);
 int ui_get_next_text_input_id(UI& state);
@@ -62,6 +61,10 @@ void ui_element_size(UI& state, ivec2 size) {
     });
 }
 
+void ui_insert_padding(UI& state, ivec2 size) {
+    state.container_stack[state.container_stack.size() - 1].origin += size;
+}
+
 void ui_begin_row(UI& state, ivec2 position, int spacing) {
     state.container_stack.push_back((UiContainer) {
         .type = UI_CONTAINER_ROW,
@@ -94,6 +97,15 @@ ivec2 ui_button_size(const char* text) {
     text_size.x += 16;
 
     return ivec2(text_size.x, 21);
+}
+
+ivec2 ui_button_position_frame_bottom_left(Rect rect) {
+    return ivec2(rect.x + 16, rect.y + rect.h - 21 - 8);
+}
+
+ivec2 ui_button_position_frame_bottom_right(Rect rect, const char* text) {
+    ivec2 button_size = ui_button_size(text);
+    return ivec2(rect.x + rect.w - 16 - button_size.x, rect.y + rect.h - 21 - 8);
 }
 
 bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally) {
@@ -192,10 +204,13 @@ bool ui_icon_button(UI& state, SpriteName sprite, bool selected) {
     return clicked; 
 }
 
-void ui_text(UI& state, FontName font, const char* text) {
+void ui_text(UI& state, FontName font, const char* text, bool center_horizontally) {
     ivec2 text_size = render_get_text_size(font, text);
     ivec2 origin = ui_get_container_origin(state);
     ui_update_container(state, text_size);
+    if (center_horizontally) {
+        origin.x -= text_size.x / 2;
+    }
     ui_queue_text(state, font, text, origin, 0);
 }
 
@@ -554,6 +569,27 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t min, uint32_t max, UiSliderD
     } 
     
     return *value != old_value;
+}
+
+bool ui_screenshot_frame(UI& state, ivec2 size) {
+    ivec2 origin = ui_get_container_origin(state);
+    ui_update_container(state, size);
+
+    Rect frame_rect = (Rect) {
+        .x = origin.x, .y = origin.y,
+        .w = size.x, .h = size.y
+    };
+
+    bool hovered = state.input_enabled && frame_rect.has_point(input_get_mouse_position());
+    if (hovered) {
+        ui_queue_draw_rect(state, frame_rect, RENDER_COLOR_WHITE, 0);
+    }
+
+    bool clicked = hovered && state.element_selected == UI_ELEMENT_NONE && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
+    if (clicked) {
+        sound_play(SOUND_UI_CLICK);
+    }
+    return clicked;
 }
 
 void ui_render(const UI& state) {

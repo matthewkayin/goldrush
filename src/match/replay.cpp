@@ -4,6 +4,7 @@
 #include "network/types.h"
 #include "core/filesystem.h"
 #include "core/logger.h"
+#include "feedback/feedback.h"
 
 static const uint8_t REPLAY_FILE_VERSION = 0;
 
@@ -34,6 +35,8 @@ FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players
         log_error("Could not open replay file for writing with path %s.", replay_file_path);
         return NULL;
     }
+
+    feedback_set_replay_path(replay_file_path);
 
     // Version byte
     fwrite(&REPLAY_FILE_VERSION, 1, sizeof(uint8_t), file);
@@ -95,6 +98,8 @@ bool replay_file_read(std::vector<std::vector<MatchInput>>* match_inputs, MatchS
         log_error("Could not open replay file for reading with path %s.", replay_file_path);
         return false;
     }
+
+    feedback_set_replay_path(replay_file_path);
 
     // Version byte
     uint8_t replay_version;

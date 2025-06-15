@@ -984,7 +984,6 @@ void render_ninepatch(SpriteName sprite, Rect rect) {
     #endif
 
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
-    GOLD_ASSERT(rect.w > sprite_info.frame_width * 2 && rect.h > sprite_info.frame_height * 2);
 
     Rect src_rect = (Rect) {
         .x = 0,

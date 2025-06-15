@@ -122,6 +122,12 @@ void ui_element_position(UI& state, ivec2 position);
 void ui_element_size(UI& state, ivec2 size);
 
 /**
+ * @param state
+ * @param size
+ */
+void ui_insert_padding(UI& state, ivec2 size);
+
+/**
  * Creates a row container. Elements inside the row will be horizontally aligned
  * @param position Position to begin the row at. The row's first element will be rendered here.
  * @param spacing The horizontal space between each row element
@@ -141,11 +147,30 @@ void ui_begin_column(UI& state, ivec2 position, int spacing);
 void ui_end_container(UI& state);
 
 /**
+ * Returns the position that the next element in the current container will be placed at
+ * @param state
+ */
+ivec2 ui_get_container_origin(const UI& state);
+
+/**
  * Gets the size of a button
  * @param text The text on the button
  * @return The size of the button
  */
 ivec2 ui_button_size(const char* text);
+
+/*
+ * Returns the position a button so that the button is in the bottom left of the frame rect
+ * @param rect
+ */
+ivec2 ui_button_position_frame_bottom_left(Rect rect);
+
+/*
+ * Returns the position a button so that the button is in the bottom right of the frame rect
+ * @param rect
+ * @param text
+ */
+ivec2 ui_button_position_frame_bottom_right(Rect rect, const char* text);
 
 /**
  * Creates a button
@@ -178,7 +203,7 @@ bool ui_icon_button(UI& state, SpriteName sprite, bool selected);
  * @param font The font of the text
  * @param text The value of the text
  */
-void ui_text(UI& state, FontName font, const char* text);
+void ui_text(UI& state, FontName font, const char* text, bool center_horizontally = false);
 
 /**
  * Gets the size of the text a given frame
@@ -255,6 +280,13 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
  * @return True if the slider value has changed
  */
 bool ui_slider(UI& state, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display);
+
+/**
+ * Creates a screenshot frame
+ * @param state
+ * @param size
+ */
+bool ui_screenshot_frame(UI& state, ivec2 size);
 
 /**
  * Renders everything in the UI's render list.

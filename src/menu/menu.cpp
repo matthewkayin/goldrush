@@ -291,12 +291,11 @@ void menu_update(MenuState& state) {
             }
         ui_end_container(state.ui);
 
-        ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.x + 16, LOBBY_CREATE_RECT.y + LOBBY_CREATE_RECT.h - 21 - 8));
+        ui_element_position(state.ui, ui_button_position_frame_bottom_left(LOBBY_CREATE_RECT));
         if (ui_button(state.ui, "Back")) {
             menu_set_mode(state, MENU_MODE_LOBBYLIST);
         }
-        ivec2 create_button_size = ui_button_size("Create");
-        ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.x + LOBBY_CREATE_RECT.w - 16 - create_button_size.x, LOBBY_CREATE_RECT.y + LOBBY_CREATE_RECT.h - 21 - 8));
+        ui_element_position(state.ui, ui_button_position_frame_bottom_right(LOBBY_CREATE_RECT, "Create"));
         if (ui_button(state.ui, "Create")) {
             if (state.lobby_name.length() == 0) {
                 menu_show_status(state, "Please enter a lobby name.");
