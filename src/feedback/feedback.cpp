@@ -15,7 +15,6 @@
 #include <SDL3/SDL.h>
 
 enum FeedbackMode {
-    FEEDBACK_CLOSED,
     FEEDBACK_WELCOME,
     FEEDBACK_OPEN,
     FEEDBACK_PREVIEW_SCREENSHOT,
@@ -78,6 +77,7 @@ static const Rect SUCCESS_RECT = (Rect) {
 };
 
 struct FeedbackState {
+    bool is_open;
     FeedbackMode mode;
     UI ui;
     uint32_t feedback_type;
@@ -154,6 +154,7 @@ void feedback_init() {
     state.ui = ui_init();
     state.feedback_type = FEEDBACK_TYPE_BUG;
     state.mode = FEEDBACK_WELCOME;
+    state.is_open = true;
     state.include_replay = 0;
     state.include_screenshot = 0;
     state.has_replay_path = false;
@@ -164,7 +165,7 @@ void feedback_quit() {
 }
 
 bool feedback_is_open() {
-    return state.mode != FEEDBACK_CLOSED;
+    return state.is_open;
 }
 
 void feedback_set_replay_path(const char* path) {
@@ -175,7 +176,7 @@ void feedback_set_replay_path(const char* path) {
 
 void feedback_update() {
     if (input_is_action_just_pressed(INPUT_ACTION_FEEDBACK_MENU)) {
-        if (state.mode == FEEDBACK_CLOSED || state.mode == FEEDBACK_WELCOME) {
+        if (!state.is_open || state.mode == FEEDBACK_WELCOME) {
             char screenshot_subpath[128];
             char* screenshot_path_ptr = screenshot_subpath;
             screenshot_path_ptr += sprintf(screenshot_path_ptr, "screenshots/");
@@ -185,12 +186,24 @@ void feedback_update() {
             state.screenshot_successful = render_take_screenshot(state.screenshot_path);
             state.include_screenshot = (uint32_t)state.screenshot_successful;
 
-            state.mode = FEEDBACK_OPEN;
+            if (state.mode == FEEDBACK_WELCOME) {
+                state.mode = FEEDBACK_OPEN;
+            }
+            state.is_open = true;
         } else {
-            state.mode = FEEDBACK_CLOSED;
+            state.is_open = false;
         }
     }
-    if (state.mode == FEEDBACK_CLOSED) {
+
+    if (state.mode == FEEDBACK_SENDING) {
+        if (SDL_GetThreadState(state.send_report_thread) == SDL_THREAD_COMPLETE) {
+            int thread_error;
+            SDL_WaitThread(state.send_report_thread, &thread_error);
+            state.mode = thread_error == 0 ? FEEDBACK_SUCCESS : FEEDBACK_ERROR;
+        }
+    }
+
+    if (!state.is_open) {
         return;
     }
 
@@ -210,7 +223,8 @@ void feedback_update() {
             ui_text(state.ui, FONT_HACK_GOLD, "you can press F9 to open the feedback menu.");
             ui_element_position(state.ui, ivec2((WELCOME_RECT.w - 16) / 2, 4));
             if (ui_button(state.ui, "Ok", ivec2(-1, -1), true)) {
-                state.mode = FEEDBACK_CLOSED;
+                state.mode = FEEDBACK_OPEN;
+                state.is_open = false;
             }
         ui_end_container(state.ui);
     } else if (state.mode == FEEDBACK_OPEN) {
@@ -260,7 +274,7 @@ void feedback_update() {
 
         ui_element_position(state.ui, ui_button_position_frame_bottom_left(FEEDBACK_RECT));
         if (ui_button(state.ui, "Back")) {
-            state.mode = FEEDBACK_CLOSED;
+            state.is_open = false;
         }
         ui_element_position(state.ui, ui_button_position_frame_bottom_right(FEEDBACK_RECT, "Send"));
         if (ui_button(state.ui, "Send")) {
@@ -312,16 +326,9 @@ void feedback_update() {
                 if (state.mode == FEEDBACK_VALIDATION) {
                     state.mode = FEEDBACK_OPEN;
                 } else {
-                    state.mode = FEEDBACK_CLOSED;
+                    state.is_open = false;
+                    state.mode = FEEDBACK_OPEN;
                 }
-            }
-        }
-
-        if (state.mode == FEEDBACK_SENDING) {
-            if (SDL_GetThreadState(state.send_report_thread) == SDL_THREAD_COMPLETE) {
-                int thread_error;
-                SDL_WaitThread(state.send_report_thread, &thread_error);
-                state.mode = thread_error == 0 ? FEEDBACK_SUCCESS : FEEDBACK_ERROR;
             }
         }
     } 
@@ -394,7 +401,7 @@ const char* feedback_get_dialog_header_text(FeedbackMode mode) {
 }
 
 void feedback_render() {
-    if (state.mode == FEEDBACK_CLOSED) {
+    if (!state.is_open) {
         return;
     }
 
