@@ -128,18 +128,6 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
         .path = "gold_mine_collapse",
         .variants = 1
     }},
-    { SOUND_UNIT_HEY, (SoundParams) {
-        .path = "voice_hey",
-        .variants = 6
-    }},
-    { SOUND_UNIT_OK, (SoundParams) {
-        .path = "voice_awk",
-        .variants = 7
-    }},
-    { SOUND_UNIT_HAW, (SoundParams) {
-        .path = "voice_haw",
-        .variants = 5
-    }},
     { SOUND_MOLOTOV_IMPACT, (SoundParams) {
         .path = "molotov_impact",
         .variants = 1
