@@ -158,6 +158,8 @@ void feedback_init() {
     state.include_replay = 0;
     state.include_screenshot = 0;
     state.has_replay_path = false;
+
+    log_info("Initialized feedback system.");
 }
 
 void feedback_quit() {
@@ -350,7 +352,6 @@ void feedback_ui_retake_message() {
     ui_insert_padding(state.ui, ivec2(0, 8));
     ui_text(state.ui, FONT_HACK_WHITE, "You can re-take the screenshot by");
     ui_text(state.ui, FONT_HACK_WHITE, "closing and re-opening this menu.");
-    ui_text(state.ui, FONT_HACK_WHITE, "Your work will be saved.");
 }
 
 void feedback_begin_send() {
