@@ -224,8 +224,6 @@ void menu_update(MenuState& state) {
                 state.options_menu = options_menu_open();
                 menu_set_mode(state, MENU_MODE_OPTIONS);
             }
-            if (ui_button(state.ui, "Credits")) {
-            }
             if (ui_button(state.ui, "Exit")) {
                 menu_set_mode(state, MENU_MODE_EXIT);
             }
