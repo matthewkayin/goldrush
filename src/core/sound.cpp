@@ -272,7 +272,7 @@ void sound_set_mus_volume(int volume) {}
 void sound_update() {
     if (state.is_fire_loop_playing) {
         SoundData& sound_fire = state.sounds[state.sound_index[SOUND_FIRE_BURN]];
-        if (SDL_GetAudioStreamQueued(state.fire_stream) < sound_fire.length) {
+        if (SDL_GetAudioStreamQueued(state.fire_stream) < (int)sound_fire.length) {
             SDL_PutAudioStreamData(state.fire_stream, sound_fire.buffer, sound_fire.length);
         }
     }

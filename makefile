@@ -10,10 +10,10 @@ LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
-COMPILER_FLAGS := -std=c++17 -Wall -g -O0
-LINKER_FLAGS := -g 
+COMPILER_FLAGS := -std=c++17 -Wall -g -O3
+LINKER_FLAGS := -g
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
-RC_FILES := 
+RC_FILES :=
 
 ifeq ($(OS),Windows_NT)
 	BUILD_PLATFORM := win64
@@ -45,10 +45,11 @@ else
 	DIRECTORIES += $(shell find vendor -type d)
 
 	LINKER_FLAGS += $(shell pkg-config --libs --static libenet)
+	LINKER_FLAGS += $(shell pkg-config --libs --static libcurl)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-image)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-ttf)
-	LINKER_FLAGS += -Llib/osx -lsteam_api 
+	LINKER_FLAGS += -Llib/osx -lsteam_api
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine

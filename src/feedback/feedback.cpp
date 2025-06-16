@@ -5,7 +5,7 @@
 #include "core/filesystem.h"
 #include "core/input.h"
 #include "core/options.h"
-#include "util.h"
+#include "../util.h"
 #include "menu/ui.h"
 #include "render/render.h"
 #include "math/gmath.h"
@@ -95,8 +95,8 @@ struct FeedbackState {
 };
 static FeedbackState state;
 
-void feedback_ui_yes_no(UI& ui, const char* prompt, uint32_t* value, bool disabled);
-void feedback_ui_retake_message(UI& ui);
+void feedback_ui_yes_no(const char* prompt, uint32_t* value, bool disabled);
+void feedback_ui_retake_message();
 void feedback_begin_send();
 const char* feedback_get_dialog_header_text(FeedbackMode mode);
 
@@ -249,15 +249,15 @@ void feedback_update() {
             ui_text_input(state.ui, "Feedback Name: ", ivec2(FEEDBACK_RECT.w - 16, 24), &state.feedback_name, FEEDBACK_NAME_MAX);
             ui_text_input(state.ui, "Description: ", ivec2(FEEDBACK_RECT.w - 16, 92), &state.feedback_desc, FEEDBACK_DESC_MAX, true);
 
-            feedback_ui_yes_no(state.ui, "Include last replay?", &state.include_replay, !state.has_replay_path);
-            feedback_ui_yes_no(state.ui, "Include screenshot?", &state.include_screenshot, !state.screenshot_successful);
+            feedback_ui_yes_no("Include last replay?", &state.include_replay, !state.has_replay_path);
+            feedback_ui_yes_no("Include screenshot?", &state.include_screenshot, !state.screenshot_successful);
             if (state.screenshot_successful) {
                 ui_begin_row(state.ui, ivec2(0, 0), 0);
                     ui_element_size(state.ui, ivec2(0, SCREENSHOT_MINI_SIZE.y));
                     ui_begin_column(state.ui, ivec2(0, 0), 4);
                         ui_text(state.ui, FONT_HACK_WHITE, "Click the screenshot to preview.");
 
-                        feedback_ui_retake_message(state.ui);
+                        feedback_ui_retake_message();
                     ui_end_container(state.ui);
 
                     ui_element_position(state.ui, ivec2(FEEDBACK_RECT.w - 16 - (SCREENSHOT_MINI_SIZE.x + 1), 0));
@@ -268,7 +268,7 @@ void feedback_update() {
                 ui_end_container(state.ui);
             } else {
                 ui_text(state.ui, FONT_HACK_WHITE, "Error: could not save screenshot.");
-                feedback_ui_retake_message(state.ui);
+                feedback_ui_retake_message();
             }
         ui_end_container(state.ui);
 
@@ -289,7 +289,7 @@ void feedback_update() {
         ui_text(state.ui, FONT_HACK_GOLD, "Screenshot Preview");
 
         ivec2 button_size = ui_button_size("Back");
-        ui_element_position(state.ui, ivec2(FEEDBACK_PREVIEW_RECT.x + (FEEDBACK_PREVIEW_RECT.w / 2) - (button_size.x / 2), 
+        ui_element_position(state.ui, ivec2(FEEDBACK_PREVIEW_RECT.x + (FEEDBACK_PREVIEW_RECT.w / 2) - (button_size.x / 2),
                                             FEEDBACK_PREVIEW_RECT.y + FEEDBACK_PREVIEW_RECT.h - button_size.y - 8));
         if (ui_button(state.ui, "Back")) {
             state.mode = FEEDBACK_OPEN;
@@ -320,7 +320,7 @@ void feedback_update() {
         if (state.mode != FEEDBACK_SENDING) {
             const char* button_text = state.mode == FEEDBACK_VALIDATION ? "Back" : "Close";
             ivec2 button_size = ui_button_size(button_text);
-            ui_element_position(state.ui, ivec2(SUCCESS_RECT.x + (SUCCESS_RECT.w / 2) - (button_size.x / 2), 
+            ui_element_position(state.ui, ivec2(SUCCESS_RECT.x + (SUCCESS_RECT.w / 2) - (button_size.x / 2),
                                                 SUCCESS_RECT.y + SUCCESS_RECT.h - button_size.y - 8));
             if (ui_button(state.ui, button_text)) {
                 if (state.mode == FEEDBACK_VALIDATION) {
@@ -331,10 +331,10 @@ void feedback_update() {
                 }
             }
         }
-    } 
+    }
 }
 
-void feedback_ui_yes_no(UI& ui, const char* prompt, uint32_t* value, bool disabled) {
+void feedback_ui_yes_no(const char* prompt, uint32_t* value, bool disabled) {
     const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
     ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
     ui_begin_row(state.ui, ivec2(0, 0), 0);
@@ -346,7 +346,7 @@ void feedback_ui_yes_no(UI& ui, const char* prompt, uint32_t* value, bool disabl
     ui_end_container(state.ui);
 }
 
-void feedback_ui_retake_message(UI& ui) {
+void feedback_ui_retake_message() {
     ui_insert_padding(state.ui, ivec2(0, 8));
     ui_text(state.ui, FONT_HACK_WHITE, "You can re-take the screenshot by");
     ui_text(state.ui, FONT_HACK_WHITE, "closing and re-opening this menu.");
@@ -407,10 +407,10 @@ void feedback_render() {
 
     ui_render(state.ui);
     if (state.mode == FEEDBACK_PREVIEW_SCREENSHOT) {
-        render_draw_rect((Rect) { 
-            .x = SCREENSHOT_PREVIEW_POSITION.x - 1, 
-            .y = SCREENSHOT_PREVIEW_POSITION.y - 1, 
-            .w = SCREENSHOT_PREVIEW_WIDTH + 2, 
+        render_draw_rect((Rect) {
+            .x = SCREENSHOT_PREVIEW_POSITION.x - 1,
+            .y = SCREENSHOT_PREVIEW_POSITION.y - 1,
+            .w = SCREENSHOT_PREVIEW_WIDTH + 2,
             .h = SCREENSHOT_PREVIEW_HEIGHT + 2 }, RENDER_COLOR_GOLD);
     }
     render_sprite_batch();

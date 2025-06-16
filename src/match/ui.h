@@ -160,7 +160,7 @@ void match_ui_replay_begin_turn(MatchUiState& state);
 void match_ui_replay_scrub(MatchUiState& state, uint32_t position);
 size_t match_ui_replay_end_of_tape(const MatchUiState& state);
 
-void match_ui_render(const MatchUiState& state, bool render_debug_info);
+void match_ui_render(const MatchUiState& state);
 
 SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking);
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);

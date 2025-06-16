@@ -134,7 +134,11 @@ bool network_host_is_peer_connected(NetworkHost* host, uint16_t peer_id) {
 
 void network_host_disconnect_peer(NetworkHost* host, uint16_t peer_id, bool gently) {
     if (host->backend == NETWORK_BACKEND_LAN) {
-        enet_peer_disconnect(&host->lan.host->peers[peer_id], 0);
+        if (gently) {
+            enet_peer_disconnect(&host->lan.host->peers[peer_id], 0);
+        } else {
+            enet_peer_reset(&host->lan.host->peers[peer_id]);
+        }
     } else {
         SteamNetworkingSockets()->CloseConnection(host->steam.peers[peer_id], 0, "", false);
         host->steam.peers[peer_id] = host->steam.peers[host->steam.peer_count - 1];

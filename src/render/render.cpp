@@ -862,7 +862,7 @@ bool render_load_sprites() {
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    for (int atlas = 0; atlas < atlas_surfaces.size(); atlas++) {
+    for (int atlas = 0; atlas < (int)atlas_surfaces.size(); atlas++) {
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, atlas, ATLAS_WIDTH, ATLAS_HEIGHT, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlas_surfaces[atlas]->pixels);
         SDL_DestroySurface(atlas_surfaces[atlas]);
     }

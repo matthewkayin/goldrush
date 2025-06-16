@@ -330,8 +330,8 @@ void menu_update(MenuState& state) {
         ui_end_container(state.ui);
 
         // Lobby list
-        int base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
-        for (int lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, (uint32_t)network_get_lobby_count()); lobby_index++) {
+        uint32_t base_index = (state.lobbylist_page * LOBBYLIST_PAGE_SIZE);
+        for (uint32_t lobby_index = base_index; lobby_index < std::min(base_index + LOBBYLIST_PAGE_SIZE, (uint32_t)network_get_lobby_count()); lobby_index++) {
             char lobby_text[128];
             bool selected = lobby_index == state.lobbylist_item_selected;
             const NetworkLobby& lobby = network_get_lobby(lobby_index);

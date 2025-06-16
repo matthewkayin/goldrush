@@ -167,8 +167,8 @@ Noise noise_generate(uint64_t seed, uint32_t width, uint32_t height) {
     noise.map = (int8_t*)malloc(noise.width * noise.height * sizeof(int8_t));
 
     const double FREQUENCY = 1.0 / 56.0;
-    for (int x = 0; x < noise.width; x++) {
-        for (int y = 0; y < noise.height; y++) {
+    for (int x = 0; x < (int)noise.width; x++) {
+        for (int y = 0; y < (int)noise.height; y++) {
             // Generates result from -1 to 1
             double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
             if (perlin_result < 0.15) {

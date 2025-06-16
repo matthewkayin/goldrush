@@ -32,6 +32,10 @@ void input_init(SDL_Window* window) {
     input_update_screen_scale();
     input_stop_text_input();
     input_set_hotkey_mapping_to_default(state.hotkey_mapping);
+
+    #ifndef GOLD_DEBUG
+        SDL_SetWindowMouseGrab(state.window, true);
+    #endif
 }
 
 void input_update_screen_scale() {

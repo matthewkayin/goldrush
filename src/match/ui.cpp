@@ -35,7 +35,7 @@ static const uint32_t SOUND_COOLDOWN_DURATION = 5;
 static const uint32_t UI_ALERT_DURATION = 90;
 static const uint32_t UI_ALERT_LINGER_DURATION = 60 * 20;
 static const uint32_t UI_ALERT_TOTAL_DURATION = UI_ALERT_DURATION + UI_ALERT_LINGER_DURATION;
-static const uint32_t UI_ATTACK_ALERT_DISTANCE = 20;
+static const int UI_ATTACK_ALERT_DISTANCE = 20;
 static const uint32_t MATCH_UI_DOUBLE_CLICK_DURATION = 16;
 
 static const int MATCH_UI_BUTTON_X = SCREEN_WIDTH - 132 + 14; 
@@ -749,7 +749,7 @@ void match_ui_handle_input(MatchUiState& state) {
             }
         }
         if (number_key_pressed != 10) {
-            uint32_t control_group_index = number_key_pressed;
+            int control_group_index = number_key_pressed;
             // Set control group
             if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
                 if (state.selection.empty() || state.match.entities.get_by_id(state.selection[0]).player_id != network_get_player_id()) {
@@ -1292,7 +1292,7 @@ void match_ui_update(MatchUiState& state) {
 
     // Clear hidden units from selection
     {
-        int selection_index = 0;
+        uint32_t selection_index = 0;
         while (selection_index < state.selection.size()) {
             Entity& selected_entity = state.match.entities.get_by_id(state.selection[selection_index]);
             if (!entity_is_selectable(selected_entity) || !match_ui_is_entity_visible(state, selected_entity)) {
@@ -1670,7 +1670,7 @@ MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, cons
 }
 
 bool match_ui_selection_has_enough_energy(const MatchUiState& state, const std::vector<EntityId>& selection, uint32_t cost) {
-    for (EntityId id : state.selection) {
+    for (EntityId id : selection) {
         if (state.match.entities.get_by_id(id).energy >= cost) {
             return true;
             break;
@@ -2030,7 +2030,7 @@ size_t match_ui_replay_end_of_tape(const MatchUiState& state) {
 
 // RENDER
 
-void match_ui_render(const MatchUiState& state, bool render_debug_info) {
+void match_ui_render(const MatchUiState& state) {
     std::vector<RenderSpriteParams> above_fog_sprite_params;
     std::vector<RenderSpriteParams> ysort_params;
 
@@ -2577,8 +2577,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state.camera_offset, RENDER_SPRITE_NO_CULL, state.match.players[network_get_player_id()].recolor_id);
 
         // Then draw the green / red squares
-        bool is_placement_out_of_bounds = building_cell.x + building_data.cell_size > state.match.map.width ||
-                                          building_cell.y + building_data.cell_size > state.match.map.height;
+        bool is_placement_out_of_bounds = building_cell.x + building_data.cell_size > (int)state.match.map.width ||
+                                          building_cell.y + building_data.cell_size > (int)state.match.map.height;
         ivec2 miner_cell = state.match.entities.get_by_id(match_get_nearest_builder(state.match, state.selection, building_cell)).cell;
         for (int y = building_cell.y; y < building_cell.y + building_data.cell_size; y++) {
             for (int x = building_cell.x; x < building_cell.x + building_data.cell_size; x++) {
@@ -2684,7 +2684,7 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
     }
 
     // UI Control groups
-    for (uint32_t control_group_index = 0; control_group_index < MATCH_UI_CONTROL_GROUP_COUNT; control_group_index++) {
+    for (int control_group_index = 0; control_group_index < MATCH_UI_CONTROL_GROUP_COUNT; control_group_index++) {
         // Count the entities in this control group and determine which is the most common
         uint32_t entity_count = 0;
         std::unordered_map<EntityType, uint32_t> entity_occurances;
@@ -3226,8 +3226,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
 
     // MINIMAP
     // Minimap tiles
-    for (int y = 0; y < state.match.map.height; y++) {
-        for (int x = 0; x < state.match.map.width; x++) {
+    for (uint32_t y = 0; y < state.match.map.height; y++) {
+        for (uint32_t x = 0; x < state.match.map.width; x++) {
             MinimapPixel pixel; 
             Tile tile = map_get_tile(state.match.map, ivec2(x, y));
             if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
@@ -3282,8 +3282,8 @@ void match_ui_render(const MatchUiState& state, bool render_debug_info) {
         }
     }
     // Minimap fog of war
-    for (int y = 0; y < state.match.map.height; y++) {
-        for (int x = 0; x < state.match.map.width; x++) {
+    for (uint32_t y = 0; y < state.match.map.height; y++) {
+        for (uint32_t x = 0; x < state.match.map.width; x++) {
             int fog_value = match_ui_get_fog(state, ivec2(x, y));
             MinimapPixel pixel;
             if (fog_value > 0) {

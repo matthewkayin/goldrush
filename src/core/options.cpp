@@ -53,7 +53,7 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
 const OptionData& option_get_data(OptionName name) {
     return OPTION_DATA.at(name);
 }
-static std::unordered_map<OptionName, int> options;
+static std::unordered_map<OptionName, uint32_t> options;
 
 void options_load() {
     for (int option = 0; option < OPTION_COUNT; option++) {

@@ -8,7 +8,7 @@
 #include <vector>
 #include <string>
 
-#define MENU_ITEM_NONE -1
+#define MENU_ITEM_NONE UINT32_MAX
 #define MENU_CHAT_MAX_LINE_LENGTH 64
 #define MENU_CHAT_MAX_LINE_COUNT 11
 #define MENU_CHAT_MESSAGE_BUFFER_SIZE 60

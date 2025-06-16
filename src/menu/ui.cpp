@@ -446,7 +446,7 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
     if (state.element_selected == dropdown_id) {
         // Render all the dropdown items
         int item_hovered = -1;
-        for (int index = 0; index < items.size(); index++) {
+        for (int index = 0; index < (int)items.size(); index++) {
             Rect item_rect = (Rect) {
                 .x = origin.x, .y = origin.y + (size.y * (index + 1)),
                 .w = size.x, .h = size.y

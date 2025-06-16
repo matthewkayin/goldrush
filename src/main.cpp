@@ -15,7 +15,6 @@
 #include "match/noise.h"
 #include "match/replay.h"
 #include "network/network.h"
-#include "feedback/feedback.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
@@ -141,14 +140,16 @@ int gold_main(int argc, char** argv) {
 
     // Parse system arguments
     for (int argn = 1; argn < argc; argn++) {
-        if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
-            argn++;
-            strcpy(logfile_path, argv[argn]);
-        }
-        if (strcmp(argv[argn], "--replay-file") == 0 && argn + 1 < argc) {
-            argn++;
-            replay_debug_set_file_name(argv[argn]);
-        }
+        #ifdef GOLD_DEBUG
+            if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
+                argn++;
+                strcpy(logfile_path, argv[argn]);
+            }
+            if (strcmp(argv[argn], "--replay-file") == 0 && argn + 1 < argc) {
+                argn++;
+                replay_debug_set_file_name(argv[argn]);
+            }
+        #endif
         if (strcmp(argv[argn], "+connect_lobby") == 0 && argn + 1 < argc) {
             argn++;
             steam_invite_id = std::stoull(argv[argn]);
@@ -166,7 +167,6 @@ int gold_main(int argc, char** argv) {
 
     filesystem_create_data_folder("logs");
     filesystem_create_data_folder("replays");
-    filesystem_create_data_folder("screenshots");
 
     if(!logger_init(logfile_path)) {
         return -1;
@@ -189,18 +189,6 @@ int gold_main(int argc, char** argv) {
     ivec2 window_size = ivec2(1280, 720);
     SDL_Window* window = SDL_CreateWindow(APP_NAME, window_size.x, window_size.y, window_flags);
 
-    // Load window icon
-    char icon_path[256];
-    filesystem_get_resource_path(icon_path, "icon.png");
-    SDL_Surface* icon_surface = IMG_Load(icon_path);
-    if (icon_surface == NULL) {
-        log_error("Could not load icon surface. %s", SDL_GetError());
-        logger_quit();
-        return 1;
-    }
-    SDL_SetWindowIcon(window, icon_surface);
-    SDL_DestroySurface(icon_surface);
-
     if (!render_init(window)) {
         logger_quit();
         return -1;
@@ -221,8 +209,9 @@ int gold_main(int argc, char** argv) {
     match_setting_init();
     input_init(window);
     options_load();
-    feedback_init();
     srand(time(NULL));
+
+    log_info("base path %s", SDL_GetBasePath());
 
     bool is_running = true;
     bool render_debug_info = false;
@@ -255,11 +244,9 @@ int gold_main(int argc, char** argv) {
             updates = 0;
             last_second += SDL_NS_PER_SECOND;
 
-            #ifdef GOLD_DEBUG
-                if (ups != 60) {
-                    log_warn("Update count is off! ups: %u", ups);
-                }
-            #endif
+            if (ups != 60) {
+                log_warn("Update count is off! ups: %u", ups);
+            }
         }
         frames++;
 
@@ -381,8 +368,6 @@ int gold_main(int argc, char** argv) {
                     break;
                 }
             }
-
-            feedback_update();
         }
 
         sound_update();
@@ -403,7 +388,7 @@ int gold_main(int argc, char** argv) {
             }
             case GAME_MODE_MATCH: 
             case GAME_MODE_REPLAY: {
-                match_ui_render(state.match, render_debug_info);
+                match_ui_render(state.match);
                 break;
             }
             case GAME_MODE_LOADING: {
@@ -428,8 +413,6 @@ int gold_main(int argc, char** argv) {
             }
         }
 
-        feedback_render();
-
         if (render_debug_info) {
             char fps_text[32];
             sprintf(fps_text, "FPS: %u", fps);
@@ -440,7 +423,6 @@ int gold_main(int argc, char** argv) {
         render_present_frame();
     }
 
-    feedback_quit();
     network_quit();
     sound_quit();
     render_quit();
