@@ -271,9 +271,16 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
             sprintf(message, "%s left the game.", network_get_player(event.player_disconnected.player_id).name);
             match_ui_add_chat_message(state, PLAYER_NONE, message);
 
-            if (!match_ui_is_opponent_in_match(state)) {
-                state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
+            // Show the victory banner to other players when this player leaves,
+            // but only if the player was still active. If they are not active, it means they've 
+            // been defeated already, so don't show the victory banner for that player
+            if (state.match.players[event.player_disconnected.player_id].active) {
+                state.match.players[event.player_disconnected.player_id].active = false;
+                if (state.match.players[network_get_player_id()].active && !match_ui_is_opponent_in_match(state)) {
+                    state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
+                }
             }
+
             break;
         }
         default:
@@ -288,6 +295,8 @@ void match_ui_handle_input(MatchUiState& state) {
     if (feedback_is_open()) {
         return;
     }
+
+    bool spectator_mode = state.replay_mode || !state.match.players[network_get_player_id()].active;
 
     // Begin chat
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active() && !state.replay_mode) {
@@ -310,7 +319,7 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Hotkey click
-    if (!state.replay_mode) {
+    if (!spectator_mode) {
         for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
             InputAction hotkey = state.hotkey_group[hotkey_index];
             if (hotkey == INPUT_HOTKEY_NONE) {
@@ -499,7 +508,7 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Building queue click
     if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
-        !state.replay_mode &&
+        !spectator_mode &&
         !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
         const Entity& building = state.match.entities.get_by_id(state.selection[0]);
         const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
@@ -525,7 +534,7 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Garrisoned unit click
     if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
-        !state.replay_mode &&
+        !spectator_mode &&
         !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
         const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
         if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
@@ -561,7 +570,7 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Order movement
-    if (!state.replay_mode) {
+    if (!spectator_mode) {
         // Check that the left or right mouse button is being pressed
         InputAction action_required = match_ui_is_targeting(state) ? INPUT_ACTION_LEFT_CLICK : INPUT_ACTION_RIGHT_CLICK;
         bool is_action_pressed = input_is_action_just_pressed(action_required);
@@ -582,7 +591,7 @@ void match_ui_handle_input(MatchUiState& state) {
     // Set building rally
     if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK) && 
             match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_BUILDINGS &&
-            !state.replay_mode &&
+            !spectator_mode &&
             !(state.is_minimap_dragging || match_ui_is_selecting(state) || match_ui_is_targeting(state)) &&
             (!match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
         // Check to make sure that all buildings can rally
@@ -741,7 +750,7 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Control group key press
-    if (!state.replay_mode) {
+    if (!spectator_mode) {
         uint32_t number_key_pressed;
         for (number_key_pressed = 0; number_key_pressed < 10; number_key_pressed++) {
             if (input_is_action_just_pressed((InputAction)(INPUT_ACTION_NUM1 + number_key_pressed))) {
@@ -859,8 +868,8 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Menu
+    ui_begin(state.ui);
     if (match_ui_is_in_menu(state.mode)) {
-        ui_begin(state.ui);
         state.ui.input_enabled = state.options_menu.mode == OPTIONS_MENU_CLOSED && !feedback_is_open();
         ui_frame_rect(state.ui, MENU_RECT);
 
@@ -878,14 +887,14 @@ void match_ui_update(MatchUiState& state) {
             ivec2 button_size = ui_button_size("Return to Menu");
             if (state.mode == MATCH_UI_MODE_MENU) {
                 if (ui_button(state.ui, "Leave Match", button_size, true)) {
-                    if (match_ui_is_opponent_in_match(state)) {
+                    if (state.match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER;
                     } else {
                         match_ui_leave_match(state, false);
                     }
                 }
                 if (ui_button(state.ui, "Exit Program", button_size, true)) {
-                    if (match_ui_is_opponent_in_match(state)) {
+                    if (state.match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP;
                     } else {
                         match_ui_leave_match(state, true);
@@ -964,7 +973,7 @@ void match_ui_update(MatchUiState& state) {
         if (state.turn_timer == 0) {
             bool all_inputs_received = true;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
+                if (!state.match.players[player_id].active) {
                     continue;
                 }
 
@@ -988,7 +997,7 @@ void match_ui_update(MatchUiState& state) {
 
             // Handle input
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE) {
+                if (!state.match.players[player_id].active) {
                     replay_file_write_inputs(state.replay_file, player_id, NULL);
                     continue;
                 }
@@ -1009,23 +1018,25 @@ void match_ui_update(MatchUiState& state) {
             }
 
             // Flush input
-            // Always send at least one input per turn
-            if (state.input_queue.empty()) {
-                state.input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
-            } 
+            if (state.match.players[network_get_player_id()].active) {
+                // Always send at least one input per turn
+                if (state.input_queue.empty()) {
+                    state.input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
+                } 
 
-            // Serialize the inputs
-            uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
-            size_t out_buffer_length = 1;
-            for (const MatchInput& input : state.input_queue) {
-                match_input_serialize(out_buffer, out_buffer_length, input);
-                GOLD_ASSERT(out_buffer_length <= NETWORK_INPUT_BUFFER_SIZE);
+                // Serialize the inputs
+                uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
+                size_t out_buffer_length = 1;
+                for (const MatchInput& input : state.input_queue) {
+                    match_input_serialize(out_buffer, out_buffer_length, input);
+                    GOLD_ASSERT(out_buffer_length <= NETWORK_INPUT_BUFFER_SIZE);
+                }
+                state.inputs[network_get_player_id()].push(state.input_queue);
+                state.input_queue.clear();
+
+                // Send inputs to other players
+                network_send_input(out_buffer, out_buffer_length);
             }
-            state.inputs[network_get_player_id()].push(state.input_queue);
-            state.input_queue.clear();
-
-            // Send inputs to other players
-            network_send_input(out_buffer, out_buffer_length);
         } // End if tick timer is 0
 
         state.turn_timer--;
@@ -1066,7 +1077,7 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_ALERT: {
-                if (state.replay_mode) {
+                if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
                     break;
                 }
                 if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && network_get_player(event.alert.player_id).team != network_get_player(network_get_player_id()).team) ||
@@ -1147,7 +1158,7 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_SELECTION_HANDOFF: {
-                if (state.replay_mode) {
+                if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
                     break;
                 }
                 if (event.selection_handoff.player_id != network_get_player_id()) {
@@ -1166,7 +1177,7 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_STATUS: {
-                if (state.replay_mode) {
+                if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
                     break;
                 }
                 if (network_get_player_id() == event.status.player_id) {
@@ -1175,7 +1186,7 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_RESEARCH_COMPLETE: {
-                if (state.replay_mode) {
+                if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
                     break;
                 }
                 if (event.research_complete.player_id != network_get_player_id()) {
@@ -1498,6 +1509,34 @@ void match_ui_update(MatchUiState& state) {
         sound_begin_fire_loop();
     } else if (!is_fire_on_screen && sound_is_fire_loop_playing()) {
         sound_end_fire_loop();
+    }
+
+    // Check win conditions
+    bool player_has_buildings[MAX_PLAYERS];
+    bool opposing_player_just_lost = false;
+    memset(player_has_buildings, 0, sizeof(player_has_buildings));
+    for (const Entity& entity : state.match.entities) {
+        if (entity_is_building(entity.type) && entity.mode == MODE_BUILDING_FINISHED) {
+            player_has_buildings[entity.player_id] = true;
+        }
+    }
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.match.players[player_id].active && !player_has_buildings[player_id]) {
+            state.match.players[player_id].active = false;
+
+            char defeat_message[128];
+            sprintf(defeat_message, "%s has been defeated.", state.match.players[player_id].name);
+            match_ui_add_chat_message(state, player_id, defeat_message);
+
+            if (player_id == network_get_player_id()) {
+                state.mode = MATCH_UI_MODE_MATCH_OVER_DEFEAT;
+            } else {
+                opposing_player_just_lost = true;
+            }
+        }
+    }
+    if (opposing_player_just_lost && !match_ui_is_opponent_in_match(state)) {
+        state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
     }
 }
 
@@ -1899,7 +1938,7 @@ bool match_ui_is_opponent_in_match(const MatchUiState& state) {
         if (state.match.players[network_get_player_id()].team == state.match.players[player_id].team) {
             continue;
         }
-        if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_NONE) {
+        if (state.match.players[player_id].active) {
             return true;
         }
     }
