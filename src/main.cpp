@@ -140,22 +140,18 @@ int gold_main(int argc, char** argv) {
     uint64_t steam_invite_id = 0;
 
     // Parse system arguments
+    #ifdef GOLD_DEBUG
     for (int argn = 1; argn < argc; argn++) {
-        #ifdef GOLD_DEBUG
-            if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
-                argn++;
-                strcpy(logfile_path, argv[argn]);
-            }
-            if (strcmp(argv[argn], "--replay-file") == 0 && argn + 1 < argc) {
-                argn++;
-                replay_debug_set_file_name(argv[argn]);
-            }
-        #endif
-        if (strcmp(argv[argn], "+connect_lobby") == 0 && argn + 1 < argc) {
+        if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
             argn++;
-            steam_invite_id = std::stoull(argv[argn]);
+            strcpy(logfile_path, argv[argn]);
+        }
+        if (strcmp(argv[argn], "--replay-file") == 0 && argn + 1 < argc) {
+            argn++;
+            replay_debug_set_file_name(argv[argn]);
         }
     }
+    #endif
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         return -1;
@@ -212,6 +208,11 @@ int gold_main(int argc, char** argv) {
     options_load();
     feedback_init();
     srand(time(NULL));
+
+    const char* lobby_id_str = SteamApps()->GetLaunchQueryParam("+connect_lobby");
+    if (strlen(lobby_id_str) != 0) {
+        steam_invite_id = std::stoull(lobby_id_str);
+    }
 
     log_info("base path %s", SDL_GetBasePath());
 
