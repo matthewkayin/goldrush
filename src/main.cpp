@@ -38,12 +38,17 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE h_prev_instance, LPSTR lp_cmd
 
     char* command_line = GetCommandLineA();
     int command_line_index = 0;
+    bool is_in_quotes = false;
     while (command_line[command_line_index] != '\0') {
-        arg_buffer[argc][argv_index] = command_line[command_line_index];
+        if (command_line[command_line_index] == '"') {
+            is_in_quotes = !is_in_quotes;
+        } else {
+            arg_buffer[argc][argv_index] = command_line[command_line_index];
+            argv_index++;
+        }
         command_line_index++;
-        argv_index++;
 
-        if (command_line[command_line_index] == ' ') {
+        if ((command_line[command_line_index] == ' ' && !is_in_quotes) || command_line[command_line_index] == '\0') {
             command_line_index++;
             arg_buffer[argc][argv_index] = '\0';
             argv[argc] = arg_buffer[argc];
@@ -140,8 +145,8 @@ int gold_main(int argc, char** argv) {
     uint64_t steam_invite_id = 0;
 
     // Parse system arguments
-    #ifdef GOLD_DEBUG
     for (int argn = 1; argn < argc; argn++) {
+        #ifdef GOLD_DEBUG
         if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
             argn++;
             strcpy(logfile_path, argv[argn]);
@@ -150,8 +155,13 @@ int gold_main(int argc, char** argv) {
             argn++;
             replay_debug_set_file_name(argv[argn]);
         }
+        #endif
+        if (strcmp(argv[argn], "+connect_lobby") == 0 && argn + 1 < argc) {
+            argn++;
+            steam_invite_id = std::stoull(argv[argn]);
+            log_trace("Got connect_lobby from sys args, steam_invite_id:%u", steam_invite_id);
+        }
     }
-    #endif
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         return -1;
@@ -206,13 +216,8 @@ int gold_main(int argc, char** argv) {
     match_setting_init();
     input_init(window);
     options_load();
-    feedback_init();
+    feedback_init(steam_invite_id == 0);
     srand(time(NULL));
-
-    const char* lobby_id_str = SteamApps()->GetLaunchQueryParam("+connect_lobby");
-    if (strlen(lobby_id_str) != 0) {
-        steam_invite_id = std::stoull(lobby_id_str);
-    }
 
     log_info("base path %s", SDL_GetBasePath());
 

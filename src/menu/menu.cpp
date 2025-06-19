@@ -119,16 +119,19 @@ MenuState menu_init() {
 void menu_handle_network_event(MenuState& state, NetworkEvent event) {
     switch (event.type) {
         case NETWORK_EVENT_LOBBY_CONNECTION_FAILED: {
+            log_trace("Menu received LOBBY_CONNECTION_FAILED.");
             menu_set_mode(state, MENU_MODE_LOBBYLIST);
             menu_show_status(state, "Connection failed.");
             break;
         }
         case NETWORK_EVENT_LOBBY_INVALID_VERSION: {
+            log_trace("Menu received LOBBY_INVALID_VERSION.");
             menu_set_mode(state, MENU_MODE_LOBBYLIST);
             menu_show_status(state, "Game version does not match server.");
             break;
         }
         case NETWORK_EVENT_LOBBY_CONNECTED: {
+            log_trace("Menu received LOBBY_CONNECTED.");
             menu_set_mode(state, MENU_MODE_LOBBY);
             if (network_is_host() && network_get_backend() == NETWORK_BACKEND_STEAM) {
                 menu_add_chat_message(state, "You have created a lobby. You can invite your friends using the Steam overlay (SHIFT+TAB).");
@@ -161,11 +164,13 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             return;
         }
         case NETWORK_EVENT_STEAM_INVITE: {
+            log_trace("Menu received steam invite invite");
             if (state.mode == MENU_MODE_LOBBY) {
                 log_info("Ignoring steam invite because we're in a lobby already.");
                 return;
             }
 
+            log_trace("Connecting to Steam lobby.");
             network_disconnect();
             network_set_backend(NETWORK_BACKEND_STEAM);
             network_join_lobby(event.steam_invite.connection_info);

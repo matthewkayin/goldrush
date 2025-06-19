@@ -1,6 +1,6 @@
 #pragma once
 
-void feedback_init();
+void feedback_init(bool show_welcome);
 void feedback_quit();
 
 bool feedback_is_open();

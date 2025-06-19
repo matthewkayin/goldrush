@@ -264,15 +264,19 @@ void network_service() {
                 break;
             }
             case LobbyDataUpdate_t::k_iCallback: {
+                log_trace("Received LobbyDataUpdate callback");
                 if (state.status != NETWORK_STATUS_OFFLINE || !state.steam_invite_lobby_id.IsValid()) {
+                    log_trace("We are in a game are have been invited to something already, ignoring.");
                     break;
                 }
 
                 LobbyDataUpdate_t* lobby_data_update = (LobbyDataUpdate_t*)callback.m_pubParam;
                 if (!lobby_data_update->m_bSuccess) {
+                    log_trace("LobbyDataUpdate was not successful.");
                     break;
                 }
                 if (lobby_data_update->m_ulSteamIDLobby != state.steam_invite_lobby_id.ConvertToUint64()) {
+                    log_trace("LobbyDataUpdate lobby ID does not match the steam invite lobby ID.");
                     break;
                 }
 
@@ -281,6 +285,7 @@ void network_service() {
                 strncpy(event.steam_invite.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(state.steam_invite_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(event.steam_invite.connection_info.steam.identity_str));
                 state.events.push(event);
                 state.steam_invite_lobby_id.Clear();
+                log_trace("Pushed NETWORK_EVENT_STEAM_INVITE");
 
                 break;
             }
@@ -372,19 +377,16 @@ bool network_poll_events(NetworkEvent* event) {
 }
 
 void network_disconnect() {
-    if (state.status == NETWORK_STATUS_OFFLINE) {
-        log_warn("network_disconnect() called while offline.");
-        return;
-    }
-
     if (state.backend == NETWORK_BACKEND_LAN && state.lan_scanner != ENET_SOCKET_NULL) {
         network_lan_scanner_destroy();
-    }
-    if (state.backend == NETWORK_BACKEND_STEAM && state.status == NETWORK_STATUS_HOST) {
+    } else if (state.backend == NETWORK_BACKEND_STEAM && state.status == NETWORK_STATUS_HOST) {
         SteamMatchmaking()->LeaveLobby(state.steam_lobby_id);
+    } else if (state.status == NETWORK_STATUS_OFFLINE) {
+        log_warn("network_disconnect() called while offline."); 
     }
 
     if (state.host != NULL) {
+        log_trace("network_disconnect: cleaning up host...");
         uint16_t connected_peers = 0;
         for (uint16_t peer_id = 0; peer_id < network_host_get_peer_count(state.host); peer_id++) {
             if (network_host_is_peer_connected(state.host, peer_id)) {
@@ -516,8 +518,10 @@ void network_join_lobby(NetworkConnectionInfo connection_info) {
 }
 
 void network_steam_accept_invite(CSteamID lobby_id) {
+    log_trace("Called network_steam_accept_invite with lobby_id %u", lobby_id.ConvertToUint64());
     state.steam_invite_lobby_id = lobby_id;
-    SteamMatchmaking()->RequestLobbyData(state.steam_invite_lobby_id);
+    bool success = SteamMatchmaking()->RequestLobbyData(state.steam_invite_lobby_id);
+    log_trace("RequestLobbyData was a success? %i", (int)success);
 }
 
 const char* network_get_lobby_name() {

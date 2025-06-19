@@ -145,7 +145,7 @@ size_t feedback_response_write_callback(void* contents, size_t size, size_t nmem
     }
 #endif
 
-void feedback_init() {
+void feedback_init(bool show_welcome) {
     curl_global_init(CURL_GLOBAL_ALL);
     #ifdef PLATFORM_WIN32
         SetUnhandledExceptionFilter(feedback_on_crash);
@@ -153,11 +153,12 @@ void feedback_init() {
 
     state.ui = ui_init();
     state.feedback_type = FEEDBACK_TYPE_BUG;
-    state.mode = FEEDBACK_WELCOME;
-    state.is_open = true;
     state.include_replay = 0;
     state.include_screenshot = 0;
     state.has_replay_path = false;
+
+    state.mode = show_welcome ? FEEDBACK_WELCOME : FEEDBACK_OPEN;
+    state.is_open = show_welcome;
 
     log_info("Initialized feedback system.");
 }
