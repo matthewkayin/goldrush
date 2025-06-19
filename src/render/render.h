@@ -95,7 +95,6 @@ void render_quit();
 void render_update_screen_scale();
 void render_set_display(RenderDisplay display);
 void render_set_vsync(RenderVsync vsync);
-void render_request_report();
 void render_sprite_batch();
 void render_prepare_frame();
 void render_present_frame();

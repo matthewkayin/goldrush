@@ -376,12 +376,6 @@ int gold_main(int argc, char** argv) {
         sound_update();
 
         // RENDER
-        #ifdef GOLD_DEBUG
-            if (input_is_action_just_pressed(INPUT_ACTION_F4)) {
-                render_request_report();
-            }
-        #endif
-
         render_prepare_frame();
 
         switch (state.mode) {

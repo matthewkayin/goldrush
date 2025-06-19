@@ -137,6 +137,10 @@ MatchUiState match_ui_base_init() {
     state.options_menu.mode = OPTIONS_MENU_CLOSED;
     state.ui = ui_init();
 
+    #ifdef GOLD_DEBUG
+        state.theater_mode = false;
+    #endif
+
     memset(state.displayed_gold_amounts, 0, sizeof(state.displayed_gold_amounts));
 
     for (int index = 0; index < HOTKEY_GROUP_SIZE; index++) {
@@ -297,6 +301,17 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     bool spectator_mode = state.replay_mode || !state.match.players[network_get_player_id()].active;
+
+    #ifdef GOLD_DEBUG
+        if (input_is_action_just_pressed(INPUT_ACTION_F4)) {
+            state.theater_mode = !state.theater_mode;
+            if (state.theater_mode) {
+                SDL_HideCursor();
+            } else {
+                SDL_ShowCursor();
+            }
+        }
+    #endif
 
     // Begin chat
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active() && !state.replay_mode) {
@@ -887,7 +902,7 @@ void match_ui_update(MatchUiState& state) {
             ivec2 button_size = ui_button_size("Return to Menu");
             if (state.mode == MATCH_UI_MODE_MENU) {
                 if (ui_button(state.ui, "Leave Match", button_size, true)) {
-                    if (state.match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state)) {
+                    if (!state.replay_mode && state.match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER;
                     } else {
                         match_ui_leave_match(state, false);
@@ -2711,6 +2726,10 @@ void match_ui_render(const MatchUiState& state) {
         render_draw_rect(select_rect, RENDER_COLOR_WHITE);
     }
 
+    #ifdef GOLD_DEBUG
+    if (!state.theater_mode) {
+    #endif
+
     // UI frames
     const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
     render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
@@ -3261,7 +3280,15 @@ void match_ui_render(const MatchUiState& state) {
         }
     }
 
+    #ifdef GOLD_DEBUG
+    }
+    #endif
+
     render_sprite_batch();
+
+    #ifdef GOLD_DEBUG
+    if (!state.theater_mode) {
+    #endif
 
     // MINIMAP
     // Minimap tiles
@@ -3366,6 +3393,9 @@ void match_ui_render(const MatchUiState& state) {
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 
     ui_render(state.ui);
+    #ifdef GOLD_DEBUG
+    }
+    #endif
     render_sprite_batch();
 }
 

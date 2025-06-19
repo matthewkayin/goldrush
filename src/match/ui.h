@@ -124,6 +124,10 @@ struct MatchUiState {
     bool replay_paused;
     std::vector<MatchState> replay_checkpoints;
     std::vector<std::vector<MatchInput>> replay_inputs[MAX_PLAYERS];
+
+    #ifdef GOLD_DEBUG
+        bool theater_mode;
+    #endif
 };
 
 MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise);

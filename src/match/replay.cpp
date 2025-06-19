@@ -19,24 +19,26 @@ static const uint8_t REPLAY_FILE_VERSION = 0;
 #endif
 
 FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
-    char replay_file_path[256];
-    char* replay_file_ptr = replay_file_path;
-    replay_file_ptr += sprintf(replay_file_ptr, "replays/");
+    char replay_subpath[128];
+    char* replay_file_ptr = replay_subpath;
     replay_file_ptr += sprintf_timestamp(replay_file_ptr);
     replay_file_ptr += sprintf(replay_file_ptr, ".rep");
     #ifdef GOLD_DEBUG
         if (use_arg_replay_file) {
-            filesystem_get_replay_path(replay_file_path, arg_replay_file);
+            filesystem_get_replay_path(replay_subpath, arg_replay_file);
         }
     #endif
 
-    FILE* file = fopen(replay_file_path, "wb");
+    char replay_path[256];
+    filesystem_get_replay_path(replay_path, replay_subpath);
+
+    FILE* file = fopen(replay_path, "wb");
     if (file == NULL) {
-        log_error("Could not open replay file for writing with path %s.", replay_file_path);
+        log_error("Could not open replay file for writing with path %s.", replay_path);
         return NULL;
     }
 
-    feedback_set_replay_path(replay_file_path);
+    feedback_set_replay_path(replay_path);
 
     // Version byte
     fwrite(&REPLAY_FILE_VERSION, 1, sizeof(uint8_t), file);

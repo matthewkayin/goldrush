@@ -13,10 +13,10 @@
     #define PLATFORM_OSX 1
 #endif
 
-#define APP_NAME "GOLD RUSH"
+#define APP_NAME "Gold Rush"
 #define APP_VERSION "0.7.0"
 
-#define GOLD_DEBUG
+// #define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
 #define GOLD_STEAM_APP_ID 3774270U
 // #define GOLD_DEBUG_CHEATS

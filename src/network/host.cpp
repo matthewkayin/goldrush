@@ -30,6 +30,7 @@ NetworkHost* network_host_create(NetworkBackend backend) {
         host->steam.poll_group = SteamNetworkingSockets()->CreatePollGroup();
         host->steam.peer_count = 0;
     }
+    log_trace("Created host with backend %u", backend);
 
     return host;
 }
@@ -42,6 +43,8 @@ void network_host_destroy(NetworkHost* host) {
         SteamNetworkingSockets()->DestroyPollGroup(host->steam.poll_group);
         SteamNetworkingSockets()->CloseListenSocket(host->steam.listen_socket);
     }
+    free(host);
+    log_trace("Destroyed host with backend %u", host->backend);
 }
 
 bool network_host_connect(NetworkHost* host, NetworkConnectionInfo connection_info) {
@@ -65,6 +68,7 @@ bool network_host_connect(NetworkHost* host, NetworkConnectionInfo connection_in
         SteamNetworkingSockets()->SetConnectionPollGroup(connection, host->steam.poll_group);
         host->steam.peers[host->steam.peer_count] = connection;
         host->steam.peer_count++;
+        log_trace("Host has new peer with connection %u. Peer count %u", host->steam.peers[host->steam.peer_count], host->steam.peer_count);
     }
 
     return true;
