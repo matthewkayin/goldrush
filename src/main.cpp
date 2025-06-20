@@ -159,7 +159,6 @@ int gold_main(int argc, char** argv) {
         if (strcmp(argv[argn], "+connect_lobby") == 0 && argn + 1 < argc) {
             argn++;
             steam_invite_id = std::stoull(argv[argn]);
-            log_trace("Got connect_lobby from sys args, steam_invite_id:%u", steam_invite_id);
         }
     }
 
@@ -191,6 +190,9 @@ int gold_main(int argc, char** argv) {
         return -1;
     }
     log_info("Initialized Steam API");
+    if (steam_invite_id != 0) {
+        log_trace("Got connect_lobby from sys args, steam_invite_id:%u", steam_invite_id);
+    }
 
     uint32_t window_flags = SDL_WINDOW_OPENGL;
     ivec2 window_size = ivec2(1280, 720);

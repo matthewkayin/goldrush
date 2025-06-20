@@ -14,7 +14,7 @@
 #endif
 
 #define APP_NAME "Gold Rush"
-#define APP_VERSION "0.7.0"
+#define APP_VERSION "0.7.1"
 
 // #define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
