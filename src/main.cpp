@@ -277,7 +277,7 @@ int gold_main(int argc, char** argv) {
 
             network_service();
             NetworkEvent event;
-            while (network_poll_events(&event)) {
+            while (state.mode != GAME_MODE_LOADING && network_poll_events(&event)) {
                 switch (state.mode) {
                     case GAME_MODE_MENU: {
                         if (event.type == NETWORK_EVENT_MATCH_LOAD) {
@@ -299,9 +299,6 @@ int gold_main(int argc, char** argv) {
                         break;
                     }
                     case GAME_MODE_LOADING: {
-                        if (event.type == NETWORK_EVENT_INPUT) {
-                            log_warn("Received input event while loading.");
-                        }
                         break;
                     }
                 }
