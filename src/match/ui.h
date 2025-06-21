@@ -153,6 +153,7 @@ bool match_ui_building_can_be_placed(const MatchUiState& state);
 Rect match_ui_get_selection_list_item_rect(uint32_t selection_index);
 void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const char* message);
 bool match_ui_is_opponent_in_match(const MatchUiState& state);
+bool match_ui_is_surrender_required_to_leave(const MatchUiState& state);
 bool match_ui_is_in_menu(MatchUiMode mode);
 const char* match_ui_get_menu_header_text(MatchUiMode mode);
 void match_ui_leave_match(MatchUiState& state, bool exit_program);
