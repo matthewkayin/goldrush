@@ -898,14 +898,14 @@ void match_ui_update(MatchUiState& state) {
             ivec2 button_size = ui_button_size("Return to Menu");
             if (state.mode == MATCH_UI_MODE_MENU) {
                 if (ui_button(state.ui, "Leave Match", button_size, true)) {
-                    if (!state.replay_mode && state.match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state)) {
+                    if (match_ui_is_surrender_required_to_leave(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER;
                     } else {
                         match_ui_leave_match(state, false);
                     }
                 }
                 if (ui_button(state.ui, "Exit Program", button_size, true)) {
-                    if (state.match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state)) {
+                    if (match_ui_is_surrender_required_to_leave(state)) {
                         state.mode = MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP;
                     } else {
                         match_ui_leave_match(state, true);
@@ -1970,6 +1970,10 @@ bool match_ui_is_opponent_in_match(const MatchUiState& state) {
     }
 
     return false;
+}
+
+bool match_ui_is_surrender_required_to_leave(const MatchUiState& state) {
+    return !state.replay_mode && state.match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state);
 }
 
 bool match_ui_is_in_menu(MatchUiMode mode) {
@@ -3145,8 +3149,8 @@ void match_ui_render(const MatchUiState& state) {
     if (state.selection.size() == 1) {
         const Entity& building = state.match.entities.get_by_id(state.selection[0]);
         if (entity_is_building(building.type) && 
-                building.player_id == network_get_player_id() &&
-                !building.queue.empty()) {
+                !building.queue.empty() &&
+                (state.replay_mode || building.player_id == network_get_player_id())) {
             // Render building queue icon buttons
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
