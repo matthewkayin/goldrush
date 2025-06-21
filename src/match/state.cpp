@@ -34,7 +34,6 @@ static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 8;
 static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
-static const uint32_t MATCH_MAX_POPULATION = 100;
 static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 static const uint32_t COWBOY_FAN_HAMMER_RESET_DURATION = 60 * 5;
@@ -186,6 +185,16 @@ bool match_does_player_meet_hotkey_requirements(const MatchState& state, uint8_t
             return match_player_has_upgrade(state, player_id, hotkey_info.requirements.upgrade);
         }
     }
+}
+
+uint32_t match_get_miners_on_gold(const MatchState& state, EntityId goldmine_id, uint8_t player_id) {
+    uint32_t miner_count = 0;
+    for (const Entity& miner : state.entities) {
+        if (miner.type == ENTITY_MINER && miner.player_id == player_id && miner.gold_mine_id == goldmine_id) {
+            miner_count++;
+        }
+    }
+    return miner_count;
 }
 
 void match_handle_input(MatchState& state, const MatchInput& input) {

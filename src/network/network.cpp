@@ -31,50 +31,11 @@ struct NetworkState {
 };
 static NetworkState state;
 
-bool network_lan_scanner_create() {
-    state.lan_scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
-    if (state.lan_scanner == ENET_SOCKET_NULL) {
-        log_error("Failed to create scanner socket.");
-        return false;
-    }
-    enet_socket_set_option(state.lan_scanner, ENET_SOCKOPT_BROADCAST, 1);
-
-    return true;
-}
-
-bool network_lan_listener_create() {
-    state.lan_scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
-    if (state.lan_scanner == ENET_SOCKET_NULL) {
-        log_error("Failed to create listener socket.");
-        return false;
-    }
-    enet_socket_set_option(state.lan_scanner, ENET_SOCKOPT_REUSEADDR, 1);
-
-    ENetAddress scanner_address;
-    scanner_address.host = ENET_HOST_ANY;
-    scanner_address.port = NETWORK_SCANNER_PORT;
-    if (enet_socket_bind(state.lan_scanner, &scanner_address) != 0) {
-        log_error("Failed to bind listener socket.");
-        return false;
-    }
-
-    return true;
-}
-
-void network_lan_scanner_destroy() {
-    if (state.lan_scanner != ENET_SOCKET_NULL) {
-        enet_socket_shutdown(state.lan_scanner, ENET_SOCKET_SHUTDOWN_READ_WRITE);
-        enet_socket_destroy(state.lan_scanner);
-        state.lan_scanner = ENET_SOCKET_NULL;
-    }
-}
-
-void network_steam_update_lobby_player_count() {
-    state.steam_lobby_player_count = network_get_player_count();
-    char buffer[2] = { (char)state.steam_lobby_player_count, '\0' };
-    SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT, buffer);
-}
-
+bool network_lan_scanner_create();
+bool network_lan_listener_create();
+void network_lan_scanner_destroy();
+void network_steam_update_lobby_player_count();
+void network_set_players_not_ready();
 void network_handle_message(uint16_t peer_id, uint8_t* data, size_t length);
 
 bool network_init() {
@@ -488,6 +449,12 @@ void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
     state.players[0].status = NETWORK_PLAYER_STATUS_HOST;
     state.players[0].team = 0;
 
+    // TODO: delete
+    state.players[1].status = NETWORK_PLAYER_STATUS_BOT;
+    state.players[1].team = 1;
+    state.players[1].recolor_id = 1;
+    sprintf(state.players[1].name, "Bot");
+
     log_info("Created server.");
 }
 
@@ -585,11 +552,7 @@ void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
     }
 
     // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
-            state.players[player_id].status = NETWORK_PLAYER_STATUS_NOT_READY;
-        }
-    }
+    network_set_players_not_ready();
 
     state.status = NETWORK_STATUS_CONNECTED;
 
@@ -617,6 +580,58 @@ void network_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
 }
 
 // INTERNAL
+
+bool network_lan_scanner_create() {
+    state.lan_scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (state.lan_scanner == ENET_SOCKET_NULL) {
+        log_error("Failed to create scanner socket.");
+        return false;
+    }
+    enet_socket_set_option(state.lan_scanner, ENET_SOCKOPT_BROADCAST, 1);
+
+    return true;
+}
+
+bool network_lan_listener_create() {
+    state.lan_scanner = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (state.lan_scanner == ENET_SOCKET_NULL) {
+        log_error("Failed to create listener socket.");
+        return false;
+    }
+    enet_socket_set_option(state.lan_scanner, ENET_SOCKOPT_REUSEADDR, 1);
+
+    ENetAddress scanner_address;
+    scanner_address.host = ENET_HOST_ANY;
+    scanner_address.port = NETWORK_SCANNER_PORT;
+    if (enet_socket_bind(state.lan_scanner, &scanner_address) != 0) {
+        log_error("Failed to bind listener socket.");
+        return false;
+    }
+
+    return true;
+}
+
+void network_lan_scanner_destroy() {
+    if (state.lan_scanner != ENET_SOCKET_NULL) {
+        enet_socket_shutdown(state.lan_scanner, ENET_SOCKET_SHUTDOWN_READ_WRITE);
+        enet_socket_destroy(state.lan_scanner);
+        state.lan_scanner = ENET_SOCKET_NULL;
+    }
+}
+
+void network_steam_update_lobby_player_count() {
+    state.steam_lobby_player_count = network_get_player_count();
+    char buffer[2] = { (char)state.steam_lobby_player_count, '\0' };
+    SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT, buffer);
+}
+
+void network_set_players_not_ready() {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status == NETWORK_PLAYER_STATUS_READY || state.players[player_id].status == NETWORK_PLAYER_STATUS_HOST) {
+            state.players[player_id].status = NETWORK_PLAYER_STATUS_NOT_READY;
+        }
+    }
+}
 
 void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t length) {
     uint8_t message_type = data[0];
@@ -861,11 +876,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 network_lan_scanner_destroy();
             }
 
-            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
-                    state.players[player_id].status = NETWORK_PLAYER_STATUS_NOT_READY;
-                }
-            }
+            network_set_players_not_ready();
 
             NetworkEvent event;
             event.type = NETWORK_EVENT_MATCH_LOAD;
