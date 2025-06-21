@@ -10,7 +10,6 @@
 #include "menu/match_setting.h"
 #include "render/sprite.h"
 #include "render/render.h"
-#include "feedback/feedback.h"
 #include "hotkey.h"
 #include "upgrade.h"
 #include "replay.h"
@@ -296,10 +295,6 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 
 // This function returns after it handles a single input to avoid double input happening
 void match_ui_handle_input(MatchUiState& state) {
-    if (feedback_is_open()) {
-        return;
-    }
-
     bool spectator_mode = state.replay_mode || !state.match.players[network_get_player_id()].active;
 
     #ifdef GOLD_DEBUG
@@ -885,7 +880,7 @@ void match_ui_update(MatchUiState& state) {
     // Menu
     ui_begin(state.ui);
     if (match_ui_is_in_menu(state.mode)) {
-        state.ui.input_enabled = state.options_menu.mode == OPTIONS_MENU_CLOSED && !feedback_is_open();
+        state.ui.input_enabled = state.options_menu.mode == OPTIONS_MENU_CLOSED;
         ui_frame_rect(state.ui, MENU_RECT);
 
         const char* header_text = match_ui_get_menu_header_text(state.mode);

@@ -142,9 +142,6 @@ void input_poll_events() {
                     case SDL_SCANCODE_F4:
                         state.current[INPUT_ACTION_F4] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDL_SCANCODE_F9:
-                        state.current[INPUT_ACTION_FEEDBACK_MENU] = event.type == SDL_EVENT_KEY_DOWN;
-                        break;
                     case SDL_SCANCODE_F10:
                         state.current[INPUT_ACTION_MATCH_MENU] = event.type == SDL_EVENT_KEY_DOWN;
                         break;

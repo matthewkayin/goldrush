@@ -10,7 +10,6 @@
 #include "render/render.h"
 #include "menu/ui.h"
 #include "../util.h"
-#include "feedback/feedback.h"
 #include <steam/steam_api.h>
 
 static const int WAGON_X_DEFAULT = 380;
@@ -215,7 +214,7 @@ void menu_update(MenuState& state) {
     }
 
     ui_begin(state.ui);
-    state.ui.input_enabled = state.mode != MENU_MODE_OPTIONS && state.mode != MENU_MODE_REPLAY_RENAME && !feedback_is_open();
+    state.ui.input_enabled = state.mode != MENU_MODE_OPTIONS && state.mode != MENU_MODE_REPLAY_RENAME; 
 
     if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_OPTIONS) {
         ui_begin_column(state.ui, ivec2(BUTTON_X, BUTTON_Y), 4);
@@ -579,7 +578,7 @@ void menu_update(MenuState& state) {
     }
 
     if (state.mode == MENU_MODE_REPLAY_RENAME) {
-        state.ui.input_enabled = !feedback_is_open();
+        state.ui.input_enabled = true;
         ui_screen_shade(state.ui);
         ui_begin_column(state.ui, ivec2((SCREEN_WIDTH / 2) - 150, (SCREEN_HEIGHT / 2) - 64), 4);
             ui_text_input(state.ui, "Rename: ", ivec2(300, 24), &state.replay_rename, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);

@@ -3,7 +3,6 @@
 #include "core/logger.h"
 #include "render/render.h"
 #include "match/hotkey.h" 
-#include "feedback/feedback.h" 
 #include <unordered_map>
 
 static const int OPTIONS_MENU_WIDTH = 364;
@@ -171,7 +170,7 @@ OptionsMenuState options_menu_open() {
 }
 
 void options_menu_update(OptionsMenuState& state, UI& ui) {
-    ui.input_enabled = !feedback_is_open();
+    ui.input_enabled = true;
     ui_screen_shade(ui);
     ui_frame_rect(ui, OPTIONS_FRAME_RECT);
 
