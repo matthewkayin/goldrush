@@ -2,8 +2,12 @@
 
 #include "core/logger.h"
 
-bool match_bot_get_desired_building(const MatchState& state, uint8_t bot_player_id, EntityType* type);
+bool match_bot_should_build_house(const MatchState& state, uint8_t bot_player_id);
+void match_bot_get_desired_entities(const MatchState& state, uint8_t bot_player_id, uint32_t* desired_entities);
+void match_bot_get_entity_counts(const MatchState& state, uint8_t bot_player_id, uint32_t* entity_count);
 MatchInput match_bot_get_build_input(const MatchState& state, uint8_t bot_player_id, EntityType building_type);
+EntityType match_bot_get_building_type_which_trains_unit_type(EntityType unit_type);
+MatchInput match_bot_get_train_unit_input(const MatchState& state, uint8_t bot_player_id, EntityType unit_type);
 
 EntityId match_bot_pull_worker_off_gold(const MatchState& state, uint8_t bot_player_id, EntityId goldmine_id);
 EntityId match_bot_get_nearest_idle_worker(const MatchState& state, uint8_t bot_player_id, ivec2 cell);
@@ -87,14 +91,59 @@ MatchInput match_bot_get_turn_input(const MatchState& state, uint8_t bot_player_
         }
     }
 
+    // Build houses
+    if (match_bot_should_build_house(state, bot_player_id)) {
+        if (bot_effective_gold >= entity_get_data(ENTITY_HOUSE).gold_cost) {
+            MatchInput build_input = match_bot_get_build_input(state, bot_player_id, ENTITY_HOUSE);
+            if (build_input.type != MATCH_INPUT_NONE) {
+                return build_input;
+            }
+        } else {
+            bot_effective_gold = 0;
+        }
+    }
+
+    uint32_t desired_entities[ENTITY_TYPE_COUNT];
+    match_bot_get_desired_entities(state, bot_player_id, desired_entities);
+    uint32_t entity_count[ENTITY_TYPE_COUNT];
+    match_bot_get_entity_counts(state, bot_player_id, entity_count);
+
+    // Determine desired building
+    EntityType desired_building_type = ENTITY_TYPE_COUNT;
+    for (uint32_t building_type = ENTITY_HALL; building_type < ENTITY_TYPE_COUNT; building_type++) {
+        if (entity_count[building_type] < desired_entities[building_type]) {
+            desired_building_type = (EntityType)building_type;
+            break;
+        }
+    }
+
     // Build buildings
-    EntityType desired_building_type;
-    if (match_bot_get_desired_building(state, bot_player_id, &desired_building_type)) {
+    if (desired_building_type != ENTITY_TYPE_COUNT) {
         if (bot_effective_gold >= entity_get_data(desired_building_type).gold_cost) {
-            log_trace("building %s bot effective gold %u vs cost %u", entity_get_data(desired_building_type).name, bot_effective_gold, entity_get_data(desired_building_type).gold_cost);
             MatchInput build_input = match_bot_get_build_input(state, bot_player_id, desired_building_type);
             if (build_input.type != MATCH_INPUT_NONE) {
                 return build_input;
+            }
+        } else {
+            bot_effective_gold = 0;
+        }
+    }
+
+    // Determine desired unit
+    EntityType desired_unit_type = ENTITY_TYPE_COUNT;
+    for (uint32_t unit_type = 0; unit_type < ENTITY_HALL; unit_type++) {
+        if (entity_count[unit_type] < desired_entities[unit_type]) {
+            desired_unit_type = (EntityType)unit_type;
+            break;
+        }
+    }
+
+    // Make units
+    if (desired_unit_type != ENTITY_TYPE_COUNT) {
+        if (bot_effective_gold >= entity_get_data(desired_unit_type).gold_cost) {
+            MatchInput input = match_bot_get_train_unit_input(state, bot_player_id, desired_unit_type);
+            if (input.type != MATCH_INPUT_NONE) {
+                return input;
             }
         } else {
             bot_effective_gold = 0;
@@ -125,64 +174,51 @@ MatchInput match_bot_get_turn_input(const MatchState& state, uint8_t bot_player_
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
-bool match_bot_get_desired_building(const MatchState& state, uint8_t bot_player_id, EntityType* type) {
-    uint32_t desired_buildings[ENTITY_TYPE_COUNT];
-    memset(desired_buildings, 0, sizeof(desired_buildings));
-    desired_buildings[ENTITY_HALL] = 1;
-    desired_buildings[ENTITY_SALOON] = 1;
-
-    // Count the number of buildings that we currently have
-    uint32_t building_count[ENTITY_TYPE_COUNT];
+bool match_bot_should_build_house(const MatchState& state, uint8_t bot_player_id) {
     uint32_t future_max_population = match_get_player_max_population(state, bot_player_id);
     uint32_t future_population = match_get_player_population(state, bot_player_id);
-    memset(building_count, 0, sizeof(building_count));
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         const Entity& entity = state.entities[entity_index];
         if (entity.player_id != bot_player_id || !entity_is_selectable(entity)) {
             continue;
         }
 
-        if (entity_is_building(entity.type)) {
-            building_count[entity.type]++;
-
-            // Future min/max population
-            if ((entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE) && entity.mode == MODE_BUILDING_IN_PROGRESS) {
-                future_max_population += 10;
-            } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty() && entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT) {
-                future_population += entity_get_data(entity.queue.front().unit_type).unit_data.population_cost;
-            }
-        } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD) {
-            building_count[entity.target.build.building_type]++;
-
-            // Future min/max population
-            if (entity.target.build.building_type == ENTITY_HOUSE || entity.target.build.building_type == ENTITY_HALL) {
-                future_max_population += 10;
-            }
+        if ((entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE) && entity.mode == MODE_BUILDING_IN_PROGRESS) {
+            future_max_population += 10;
+        } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty() && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) {
+            future_population += entity_get_data(entity.queue[0].unit_type).unit_data.population_cost;
+        } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD && 
+                        (entity.target.build.building_type == ENTITY_HOUSE || entity.target.build.building_type == ENTITY_HALL)) {
+            future_max_population += 10;
         }
     }
 
-    // Determine if should build house
-    if (future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1) {
-        desired_buildings[ENTITY_HOUSE] = building_count[ENTITY_HOUSE] + 1;
-    }
+    return future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1;
+}
 
-    // Choose which building out of the desired buildings to build next
-    // Since the buildings are in order in the enum, we will always choose
-    // to make a pre-req building before a more advanced building if we
-    // don't have the pre-req
-    for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        if (!entity_is_building((EntityType)entity_type)) {
+void match_bot_get_desired_entities(const MatchState& state, uint8_t bot_player_id, uint32_t* desired_entities) {
+    memset(desired_entities, 0, sizeof(uint32_t) * ENTITY_TYPE_COUNT);
+
+    desired_entities[ENTITY_HALL] = 1;
+    desired_entities[ENTITY_SALOON] = 1;
+    desired_entities[ENTITY_BANDIT] = 4;
+}
+
+void match_bot_get_entity_counts(const MatchState& state, uint8_t bot_player_id, uint32_t* entity_count) {
+    memset(entity_count, 0, sizeof(uint32_t) * ENTITY_TYPE_COUNT);
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.player_id != bot_player_id || !entity_is_selectable(entity)) {
             continue;
         }
-        if (building_count[entity_type] >= desired_buildings[entity_type]) {
-            continue;
-        }
-        log_trace("desired building is %u", entity_type);
-        *type = (EntityType)entity_type;
-        return true;
-    }
 
-    return false;
+        entity_count[entity.type]++;
+        if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD) {
+            entity_count[entity.target.build.building_type]++;
+        } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty() && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) {
+            entity_count[entity.queue[0].unit_type]++;
+        }
+    }
 }
 
 MatchInput match_bot_get_build_input(const MatchState& state, uint8_t bot_player_id, EntityType building_type) {
@@ -209,6 +245,64 @@ MatchInput match_bot_get_build_input(const MatchState& state, uint8_t bot_player
     input.build.entity_count = 1;
     input.build.entity_ids[0] = builder_id;
 
+    return input;
+}
+
+EntityType match_bot_get_building_type_which_trains_unit_type(EntityType unit_type) {
+    switch (unit_type) {
+        case ENTITY_MINER:
+            return ENTITY_HALL;
+        case ENTITY_COWBOY:
+        case ENTITY_BANDIT:
+            return ENTITY_SALOON;
+        case ENTITY_WAGON:
+        case ENTITY_WAR_WAGON:
+        case ENTITY_JOCKEY:
+            return ENTITY_COOP;
+        case ENTITY_SAPPER:
+        case ENTITY_PYRO:
+        case ENTITY_BALLOON:
+            return ENTITY_WORKSHOP;
+        case ENTITY_SOLDIER:
+        case ENTITY_CANNON:
+            return ENTITY_BARRACKS;
+        case ENTITY_DETECTIVE:
+            return ENTITY_SHERIFFS;
+        default:
+            GOLD_ASSERT(false);
+            return ENTITY_TYPE_COUNT;
+    }
+}
+
+MatchInput match_bot_get_train_unit_input(const MatchState& state, uint8_t bot_player_id, EntityType unit_type) {
+    // Determine the type of building required to train this unit
+    EntityType building_type = match_bot_get_building_type_which_trains_unit_type(unit_type);
+    if (building_type == ENTITY_TYPE_COUNT) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Find a building of that type
+    EntityId building_id = ID_NULL;
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.player_id != bot_player_id || entity.mode != MODE_BUILDING_FINISHED || 
+                entity.type != building_type || !entity.queue.empty()) {
+            continue;
+        }
+
+        building_id = state.entities.get_id_of(entity_index);
+        break;
+    }
+    if (building_id == ID_NULL) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Train the unit using the building
+    MatchInput input;
+    input.type = MATCH_INPUT_BUILDING_ENQUEUE;
+    input.building_enqueue.building_id = building_id;
+    input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UNIT;
+    input.building_enqueue.item_subtype = unit_type;
     return input;
 }
 
