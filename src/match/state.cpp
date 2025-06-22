@@ -2798,6 +2798,7 @@ void match_event_alert(MatchState& state, MatchAlertType type, uint8_t player_id
 }
 
 void match_event_show_status(MatchState& state, uint8_t player_id, const char* message) {
+    log_trace("EVENT show status player %u message %s", player_id, message);
     state.events.push_back((MatchEvent) {
         .type = MATCH_EVENT_STATUS,
         .status = (MatchEventStatus) {
