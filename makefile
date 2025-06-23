@@ -11,7 +11,7 @@ BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
 COMPILER_FLAGS := -std=c++17 -Wall -g -O0
-LINKER_FLAGS :=
+LINKER_FLAGS := -g
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 RC_FILES :=
 

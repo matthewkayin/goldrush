@@ -35,7 +35,7 @@
 #define MAX_PLAYERS 4
 #define MAX_USERNAME_LENGTH 32
 #define PLAYER_NONE UINT8_MAX
-#define SELECTION_LIMIT 20
+#define SELECTION_LIMIT 20U
 #define HOTKEY_GROUP_SIZE 6
 
 typedef uint16_t EntityId;
