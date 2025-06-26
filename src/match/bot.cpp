@@ -14,6 +14,17 @@ Bot bot_init(uint8_t player_id) {
 };
 
 void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInput>& inputs) {
+    // Determine effective gold
+    bot.effective_gold = state.players[bot.player_id].gold;
+    for (const Entity& entity : state.entities) {
+        if (entity.player_id == bot.player_id && 
+                entity.type == ENTITY_MINER && 
+                entity.target.type == TARGET_BUILD) {
+            uint32_t gold_cost = entity_get_data(entity.target.build.building_type).gold_cost;
+            bot.effective_gold = bot.effective_gold > gold_cost ? bot.effective_gold - gold_cost : 0;
+        }
+    }
+
     // Run tasks
     for (BotTask& task : bot.tasks) {
         bot_run_task(state, bot, task, inputs);
@@ -38,10 +49,12 @@ bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id) {
 }
 
 void bot_reserve_entity(Bot& bot, EntityId entity_id) {
+    log_trace("BOT: reserve entity %u", entity_id);
     bot._is_entity_reserved[entity_id] = true;
 }
 
 void bot_release_entity(Bot& bot, EntityId entity_id) {
+    log_trace("BOT: release entity %u", entity_id);
     GOLD_ASSERT(bot.is_entity_reserved.find(entity_id) != bot.is_entity_reserved.end());
     bot._is_entity_reserved.erase(entity_id);
 }
@@ -57,6 +70,13 @@ void bot_add_task(Bot& bot, BotTaskMode mode) {
         }
         case BOT_TASK_SCOUT: {
             task.scout.scout_id = ID_NULL;
+            break;
+        }
+        case BOT_TASK_BUILD: {
+            memset(task.build.desired_buildings, 0, sizeof(task.build.desired_buildings));
+            task.build.desired_buildings[ENTITY_HALL] = 1;
+            task.build.desired_buildings[ENTITY_SALOON] = 1;
+            task.build.reserved_builders_count = 0;
             break;
         }
         case BOT_TASK_FINISHED:
@@ -125,7 +145,8 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
 
                     // If we're still here, then there were no idle workers
                     // So we'll create one out of the town hall
-                    if (bot_get_effective_gold(state, bot) >= entity_get_data(ENTITY_MINER).gold_cost && hall.queue.empty()) {
+                    if (bot.effective_gold >= entity_get_data(ENTITY_MINER).gold_cost && hall.queue.empty()) {
+                        bot.effective_gold -= entity_get_data(ENTITY_MINER).gold_cost;
                         inputs.push_back((MatchInput) {
                             .type = MATCH_INPUT_BUILDING_ENQUEUE,
                             .building_enqueue = (MatchInputBuildingEnqueue) {
@@ -151,21 +172,17 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
             break;
         } // End task saturate bases
         case BOT_TASK_BUILD_HOUSES: {
-            log_trace("--- build houses ---");
             // If we are already building a house, check on our builder's progress
             if (task.build_houses.builder_id != ID_NULL) {
-                log_trace("We have a builder. id %u", task.build_houses.builder_id);
                 uint32_t builder_index = state.entities.get_index_of(task.build_houses.builder_id);
                 if (builder_index == INDEX_INVALID || 
                         state.entities[builder_index].health == 0 ||
                         state.entities[builder_index].target.type != TARGET_BUILD) {
-                    log_trace("it's either dead or done. releasing.");
                     bot_release_entity(bot, task.build_houses.builder_id);
                     task.build_houses.builder_id = ID_NULL;
                 } else {
                     // This break will make it so that we only build one house at a time
                     // Maybe later on we will want to allow it to build two at a time?
-                    log_trace("And it's alive and cooking, do nothing.");
                     break;
                 }
             }
@@ -173,12 +190,16 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
             // Determine if we should build a house
             uint32_t future_max_population = match_get_player_max_population(state, bot.player_id);
             uint32_t future_population = match_get_player_population(state, bot.player_id);
+            bool has_hall = false;
             for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
                 const Entity& entity = state.entities[entity_index];
                 if (entity.player_id != bot.player_id || !entity_is_selectable(entity)) {
                     continue;
                 }
 
+                if (entity.type == ENTITY_HALL) {
+                    has_hall = true;
+                }
                 if ((entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE) && entity.mode == MODE_BUILDING_IN_PROGRESS) {
                     future_max_population += 10;
                 } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty() && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) {
@@ -188,23 +209,22 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
                     future_max_population += 10;
                 }
             }
-            bool should_build_houses = future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1;
-            log_trace("should build houses ? %i", (int)should_build_houses);
+            bool should_build_houses = has_hall && future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1;
             if (!should_build_houses) {
                 break;
             }
 
             // Check if we have enough money
-            if (bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_HOUSE).gold_cost) {
+            if (bot.effective_gold < entity_get_data(ENTITY_HOUSE).gold_cost) {
                 break;
             }
 
             // Create build house input
             MatchInput build_input = bot_create_build_input(state, bot, ENTITY_HOUSE);
             if (build_input.type != MATCH_INPUT_NONE) {
-                log_trace("build input with entity id of %u", build_input.build.entity_ids[0]);
                 bot_reserve_entity(bot, build_input.build.entity_ids[0]);
                 task.build_houses.builder_id = build_input.build.entity_ids[0];
+                bot.effective_gold -= entity_get_data(ENTITY_HOUSE).gold_cost;
                 inputs.push_back(build_input);
             }
 
@@ -249,22 +269,27 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
             if (scout.mode != MODE_UNIT_IDLE || scout.target.type != TARGET_NONE) {
                 break;
             }
+            EntityId goldmine_to_scout_id = ID_NULL;
             for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
                 const Entity& goldmine = state.entities[goldmine_index];
                 if (goldmine.type != ENTITY_GOLDMINE) {
                     continue;
                 }
                 if (!match_is_cell_rect_explored(state, state.players[bot.player_id].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
-                    MatchInput scout_input;
-                    scout_input.type = MATCH_INPUT_MOVE_ENTITY;
-                    scout_input.move.shift_command = 0;
-                    scout_input.move.target_cell = ivec2(0, 0);
-                    scout_input.move.target_id = state.entities.get_id_of(goldmine_index);
-                    scout_input.move.entity_count = 1;
-                    scout_input.move.entity_ids[0] = task.scout.scout_id;
-                    inputs.push_back(scout_input);
+                    goldmine_to_scout_id = state.entities.get_id_of(goldmine_index);
                     break;
                 }
+            }
+            if (goldmine_to_scout_id != ID_NULL) {
+                MatchInput scout_input;
+                scout_input.type = MATCH_INPUT_MOVE_ENTITY;
+                scout_input.move.shift_command = 0;
+                scout_input.move.target_cell = ivec2(0, 0);
+                scout_input.move.target_id = goldmine_to_scout_id;
+                scout_input.move.entity_count = 1;
+                scout_input.move.entity_ids[0] = task.scout.scout_id;
+                inputs.push_back(scout_input);
+                break;
             }
 
             // If we got here, it means the scout was free for us to scout, but
@@ -273,23 +298,112 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
             task.scout.scout_id = ID_NULL;
             task.mode = BOT_TASK_FINISHED;
 
+            bot_add_task(bot, BOT_TASK_BUILD);
+
+            break;
+        }
+        case BOT_TASK_BUILD: {
+            // Check all of our reserved builders to see if we should release one
+            uint32_t reserved_builders_index = 0;
+            while (reserved_builders_index < task.build.reserved_builders_count) {
+                EntityId builder_id = task.build.reserved_builders[reserved_builders_index];
+                uint32_t entity_index = state.entities.get_index_of(builder_id);
+                if (entity_index == INDEX_INVALID || state.entities[entity_index].health == 0 ||
+                        state.entities[entity_index].target.type != TARGET_BUILD) {
+                    // Release
+                    bot_release_entity(bot, builder_id);
+                    // Swap and pop
+                    task.build.reserved_builders[reserved_builders_index] = task.build.reserved_builders[task.build.reserved_builders_count - 1];
+                    task.build.reserved_builders_count--;
+                } else {
+                    reserved_builders_index++;
+                }
+            }
+
+            // Count all entities, not in progress to see if we have anything left to build
+            uint32_t entity_counts[ENTITY_TYPE_COUNT];
+            bot_count_entities(state, bot, false, entity_counts);
+
+            // Subtract entity counts against buildings desired to see what we still need to make
+            uint32_t desired_buildings[ENTITY_TYPE_COUNT];
+            memcpy(desired_buildings, task.build.desired_buildings, sizeof(desired_buildings));
+            for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+                if (entity_counts[entity_type] > desired_buildings[entity_type]) {
+                    desired_buildings[entity_type] = 0;
+                } else {
+                    desired_buildings[entity_type] -= entity_counts[entity_type];
+                }
+            }
+
+            // Choose the first building desired
+            EntityType desired_building_type = ENTITY_TYPE_COUNT;
+            for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+                if (desired_buildings[entity_type] > 0) {
+                    desired_building_type = (EntityType)entity_type;
+                    break;
+                }
+            }
+
+            // If no buildings are desired, then this task is finished
+            if (desired_building_type == ENTITY_TYPE_COUNT) {
+                for (uint32_t builders_index = 0; builders_index < task.build.reserved_builders_count; builders_index++) {
+                    EntityId builder_id = task.build.reserved_builders[builders_index];
+                    log_warn("BOT: Task BUILD_BUILDINGS is finished, but we still have a reserved entity with ID %u", builder_id);
+                    bot_release_entity(bot, builder_id);
+                }
+                task.mode = BOT_TASK_FINISHED;
+                break;
+            }
+
+            // Otherwise, we still have buildings to build, so re-count all entities
+            // including in-progress this time, to see if we need to make anything
+            bot_count_entities(state, bot, true, entity_counts);
+
+            // Subtract entity counts against buildings desired to see what we still need to make
+            memcpy(desired_buildings, task.build.desired_buildings, sizeof(desired_buildings));
+            for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+                if (entity_counts[entity_type] > desired_buildings[entity_type]) {
+                    desired_buildings[entity_type] = 0;
+                } else {
+                    desired_buildings[entity_type] -= entity_counts[entity_type];
+                }
+            }
+
+            // Choose the first building desired
+            desired_building_type = ENTITY_TYPE_COUNT;
+            for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+                if (desired_buildings[entity_type] > 0) {
+                    desired_building_type = (EntityType)entity_type;
+                    break;
+                }
+            }
+
+            // If no building is desired at this point, then it means that the task is not
+            // complete because we still have an in-progress building, but there's nothing 
+            // left for us to do because the building is already being made, so just break
+            if (desired_building_type == ENTITY_TYPE_COUNT) {
+                break;
+            }
+
+            // Otherwise, we have a desired_building_type so let's try making a building
+
+            // First let's check if we can afford this building
+            if (bot.effective_gold < entity_get_data(desired_building_type).gold_cost) {
+                break;
+            }
+
+            MatchInput build_input = bot_create_build_input(state, bot, desired_building_type);
+            if (build_input.type != MATCH_INPUT_NONE) {
+                bot.effective_gold -= entity_get_data(desired_building_type).gold_cost;
+                bot_reserve_entity(bot, build_input.build.entity_ids[0]);
+                task.build.reserved_builders[task.build.reserved_builders_count] = build_input.build.entity_ids[0];
+                task.build.reserved_builders_count++;
+                inputs.push_back(build_input);
+            }
+
             break;
         }
     }
-}
-
-uint32_t bot_get_effective_gold(const MatchState& state, Bot& bot) {
-    uint32_t gold = state.players[bot.player_id].gold;
-    for (const Entity& entity : state.entities) {
-        if (entity.player_id == bot.player_id && 
-                entity.type == ENTITY_MINER && 
-                entity.target.type == TARGET_BUILD) {
-            uint32_t gold_cost = entity_get_data(entity.target.build.building_type).gold_cost;
-            gold = gold > gold_cost ? gold - gold_cost : 0;
-        }
-    }
-
-    return gold;
 }
 
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id) {
@@ -484,4 +598,24 @@ MatchInput bot_create_build_input(const MatchState& state, const Bot& bot, Entit
     input.build.entity_ids[0] = builder_id;
 
     return input;
+}
+
+void bot_count_entities(const MatchState& state, const Bot& bot, bool include_in_progress_entities, uint32_t* entity_counts) {
+    memset(entity_counts, 0, sizeof(uint32_t) * ENTITY_TYPE_COUNT);
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.player_id != bot.player_id || !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        entity_counts[entity.type]++;
+        if (include_in_progress_entities && entity.type == ENTITY_MINER && 
+                entity.mode != MODE_UNIT_BUILD && entity.target.type == TARGET_BUILD) {
+            entity_counts[entity.target.build.building_type]++;
+        }
+        if (include_in_progress_entities && entity_is_building(entity.type) &&
+                !entity.queue.empty() && entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT) {
+            entity_counts[entity.queue.front().unit_type]++;
+        }
+    }
 }
