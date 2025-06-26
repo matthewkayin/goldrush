@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <vector>
 
+// TODO: use this guy to enforce max builders
 #define BOT_TASK_BUILD_MAX_BUILDERS 8
 
 enum BotTaskMode {

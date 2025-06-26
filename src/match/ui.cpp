@@ -2313,7 +2313,7 @@ void match_ui_render(const MatchUiState& state) {
     // Remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.replay_mode && 
-                (state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE || 
+                !(state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE || 
                  state.replay_fog_player_ids[state.replay_fog_index] == player_id)) {
             continue;
         }
@@ -2499,7 +2499,11 @@ void match_ui_render(const MatchUiState& state) {
 
         // Count how many miners are mining from this mine
         EntityId entity_id = state.match.entities.get_id_of(entity_index);
-        uint32_t miner_count = match_get_miners_on_gold(state.match, entity_id, network_get_player_id());
+        uint8_t player_id = state.replay_mode ? state.replay_fog_player_ids[state.replay_fog_index] : network_get_player_id();
+        if (player_id == PLAYER_NONE) {
+            continue;
+        }
+        uint32_t miner_count = match_get_miners_on_gold(state.match, entity_id, player_id);
         if (miner_count == 0) {
             continue;
         }
@@ -2511,7 +2515,7 @@ void match_ui_render(const MatchUiState& state) {
         text_size.x += miner_icon_info.frame_width;
         ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 6);
         render_text(miner_count > MATCH_MAX_MINERS_ON_GOLD ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2(miner_icon_info.frame_width + 2, 0));
-        render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[network_get_player_id()].recolor_id);
+        render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[player_id].recolor_id);
     }
 
     // Sky entities select rings
@@ -3350,7 +3354,7 @@ void match_ui_render(const MatchUiState& state) {
     // Minimap remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.replay_mode && 
-                (state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE || 
+                !(state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE || 
                  state.replay_fog_player_ids[state.replay_fog_index] == player_id)) {
             continue;
         }
