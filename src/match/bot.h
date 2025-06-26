@@ -5,4 +5,47 @@
 #include <cstdint>
 #include <vector>
 
-void match_bot_get_turn_inputs(const MatchState& state, uint8_t bot_player_id, std::vector<MatchInput>& inputs);
+enum BotTaskMode {
+    BOT_TASK_FINISHED,
+    BOT_TASK_SATURATE_BASES,
+    BOT_TASK_BUILD_HOUSES,
+    BOT_TASK_SCOUT
+};
+
+struct BotTaskBuildHouses {
+    EntityId builder_id;
+};
+
+struct BotTaskScout {
+    EntityId scout_id;
+};
+
+struct BotTask {
+    BotTaskMode mode;
+    union {
+        BotTaskBuildHouses build_houses;
+        BotTaskScout scout;
+    };
+};
+
+struct Bot {
+    uint8_t player_id;
+    std::vector<BotTask> tasks;
+    std::unordered_map<EntityId, bool> _is_entity_reserved;
+};
+
+Bot bot_init(uint8_t player_id);
+void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInput>& inputs);
+bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id);
+void bot_reserve_entity(Bot& bot, EntityId entity_id);
+void bot_release_entity(Bot& bot, EntityId entity_id);
+
+void bot_add_task(Bot& bot, BotTaskMode mode);
+void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<MatchInput>& inputs);
+uint32_t bot_get_effective_gold(const MatchState& state, Bot& bot);
+uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id);
+ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
+EntityId bot_pull_worker_off_gold(const MatchState& state, uint8_t bot_player_id, EntityId goldmine_id);
+EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, ivec2 cell);
+EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index);
+MatchInput bot_create_build_input(const MatchState& state, const Bot& bot, EntityType building_type);

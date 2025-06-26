@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "math/gmath.h"
 #include "noise.h"
+#include "bot.h"
 #include "match/state.h"
 #include "match/input.h"
 #include "render/render.h"
@@ -80,6 +81,7 @@ struct MatchUiState {
     uint32_t disconnect_timer;
     std::queue<std::vector<MatchInput>> inputs[MAX_PLAYERS];
     std::vector<MatchInput> input_queue;
+    Bot bots[MAX_PLAYERS];
 
     ivec2 camera_offset;
     bool is_minimap_dragging;

@@ -186,6 +186,13 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         }
     }
 
+    // Init bots
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT) {
+            state.bots[player_id] = bot_init(player_id);
+        }
+    }
+
     // Init camera
     for (const Entity& entity : state.match.entities) {
         if (entity.type == ENTITY_MINER && entity.player_id == network_get_player_id()) {
@@ -990,7 +997,7 @@ void match_ui_update(MatchUiState& state) {
 
                 if (state.inputs[player_id].empty()) {
                     std::vector<MatchInput> bot_inputs;
-                    match_bot_get_turn_inputs(state.match, player_id, bot_inputs);
+                    bot_get_turn_inputs(state.match, state.bots[player_id], bot_inputs);
                     if (bot_inputs.empty()) {
                         bot_inputs.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
                     }
