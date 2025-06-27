@@ -8,12 +8,14 @@
 // TODO: use this guy to enforce max builders
 #define BOT_TASK_BUILD_MAX_BUILDERS 8
 
-enum BotTaskMode {
+enum BotTaskType {
     BOT_TASK_FINISHED,
     BOT_TASK_SATURATE_BASES,
     BOT_TASK_BUILD_HOUSES,
     BOT_TASK_SCOUT,
     BOT_TASK_BUILD,
+    BOT_TASK_RAISE_ARMY,
+    BOT_TASK_GARRISON_ARMY
 };
 
 struct BotTaskBuildHouses {
@@ -30,12 +32,24 @@ struct BotTaskBuild {
     uint32_t reserved_builders_count;
 };
 
+struct BotTaskRaiseArmy {
+    uint32_t desired_army[ENTITY_TYPE_COUNT];
+    EntityId army_ids[MATCH_MAX_POPULATION];
+    uint32_t army_count;
+};
+
+struct BotTaskGarrisonArmy {
+    EntityId army_ids[MATCH_MAX_POPULATION];
+    uint32_t army_count;
+};
+
 struct BotTask {
-    BotTaskMode mode;
+    BotTaskType type;
     union {
         BotTaskBuildHouses build_houses;
         BotTaskScout scout;
         BotTaskBuild build;
+        BotTaskRaiseArmy raise_army;
     };
 };
 
@@ -53,7 +67,7 @@ bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id);
 void bot_reserve_entity(Bot& bot, EntityId entity_id);
 void bot_release_entity(Bot& bot, EntityId entity_id);
 
-void bot_add_task(Bot& bot, BotTaskMode mode);
+void bot_add_task(Bot& bot, BotTaskType type);
 void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<MatchInput>& inputs);
 
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id);
@@ -63,3 +77,4 @@ EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, i
 EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index);
 MatchInput bot_create_build_input(const MatchState& state, const Bot& bot, EntityType building_type);
 void bot_count_entities(const MatchState& state, const Bot& bot, bool include_in_progress_entities, uint32_t* entity_counts);
+EntityType bot_get_building_type_which_trains_unit_type(EntityType unit_type);

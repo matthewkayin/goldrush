@@ -59,11 +59,11 @@ void bot_release_entity(Bot& bot, EntityId entity_id) {
     bot._is_entity_reserved.erase(entity_id);
 }
 
-void bot_add_task(Bot& bot, BotTaskMode mode) {
+void bot_add_task(Bot& bot, BotTaskType mode) {
     BotTask task;
-    task.mode = mode;
+    task.type = type;
 
-    switch (task.mode) {
+    switch (task.type) {
         case BOT_TASK_BUILD_HOUSES: {
             task.build_houses.builder_id = ID_NULL;
             break;
@@ -79,6 +79,11 @@ void bot_add_task(Bot& bot, BotTaskMode mode) {
             task.build.reserved_builders_count = 0;
             break;
         }
+        case BOT_TASK_RAISE_ARMY: {
+            task.raise_army.desired_army[ENTITY_BANDIT] = 4;
+            task.raise_army.army_count = 0;
+            break;
+        }
         case BOT_TASK_FINISHED:
         case BOT_TASK_SATURATE_BASES:
             break;
@@ -88,7 +93,7 @@ void bot_add_task(Bot& bot, BotTaskMode mode) {
 }
 
 void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<MatchInput>& inputs) {
-    switch (task.mode) {
+    switch (task.type) {
         case BOT_TASK_FINISHED: {
             GOLD_ASSERT(false);
             break;
@@ -296,9 +301,7 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
             // there was nothing to scout, so the task is finished
             bot_release_entity(bot, task.scout.scout_id);
             task.scout.scout_id = ID_NULL;
-            task.mode = BOT_TASK_FINISHED;
-
-            bot_add_task(bot, BOT_TASK_BUILD);
+            task.type = BOT_TASK_FINISHED;
 
             break;
         }
@@ -351,7 +354,8 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
                     log_warn("BOT: Task BUILD_BUILDINGS is finished, but we still have a reserved entity with ID %u", builder_id);
                     bot_release_entity(bot, builder_id);
                 }
-                task.mode = BOT_TASK_FINISHED;
+                task.type = BOT_TASK_FINISHED;
+                bot_add_task(bot, BOT_TASK_RAISE_ARMY);
                 break;
             }
 
@@ -391,6 +395,10 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
             if (bot.effective_gold < entity_get_data(desired_building_type).gold_cost) {
                 break;
             }
+            // Next, let's check if we have capacity for another reserved builder on this task
+            if (task.build.reserved_builders_count == BOT_TASK_BUILD_MAX_BUILDERS) {
+                break;
+            }
 
             MatchInput build_input = bot_create_build_input(state, bot, desired_building_type);
             if (build_input.type != MATCH_INPUT_NONE) {
@@ -400,6 +408,100 @@ void bot_run_task(const MatchState& state, Bot& bot, BotTask& task, std::vector<
                 task.build.reserved_builders_count++;
                 inputs.push_back(build_input);
             }
+
+            break;
+        }
+        case BOT_TASK_RAISE_ARMY: {
+            // Check to see if we've met the army requirement first
+            uint32_t entity_counts[ENTITY_TYPE_COUNT];
+            uint32_t army_index = 0;
+            while (army_index < task.raise_army.army_count) {
+                uint32_t army_entity_index = state.entities.get_index_of(task.raise_army.army_ids[army_index]);
+                if (army_entity_index == INDEX_INVALID || state.entities[army_entity_index].health == 0) {
+                    bot_release_entity(bot, task.raise_army.army_ids[army_index]);
+                    task.raise_army.army_ids[army_index] = task.raise_army.army_ids[task.raise_army.army_count - 1];
+                    task.raise_army.army_count--;
+                } else {
+                    entity_counts[state.entities[army_entity_index].type]++;
+                    army_index++;
+                }
+            }
+
+            EntityType desired_entity = ENTITY_TYPE_COUNT;
+            for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
+                if (entity_counts[entity_type] < task.raise_army.desired_army[entity_type]) {
+                    desired_entity = (EntityType)entity_type;
+                    break;
+                }
+            }
+
+            if (desired_entity == ENTITY_TYPE_COUNT) {
+                task.type = BOT_TASK_FINISHED;
+                break;
+            }
+
+            // Count any in-progress entities before deciding to train another unit
+            for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                const Entity& entity = state.entities[entity_index];
+                if (entity.player_id != bot.player_id || 
+                        entity.mode != MODE_BUILDING_FINISHED ||
+                        entity.queue.empty() ||
+                        entity.queue.front().type != BUILDING_QUEUE_ITEM_UNIT) {
+                    continue;
+                }
+                entity_counts[entity.queue.front().unit_type]++;
+            }
+            bot_count_entities(state, bot, true, entity_counts);
+
+            desired_entity = ENTITY_TYPE_COUNT;
+            for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
+                if (entity_counts[entity_type] < task.raise_army.desired_army[entity_type]) {
+                    desired_entity = (EntityType)entity_type;
+                    break;
+                }
+            }
+
+            // If there is not desired entity, it means that the last of our desired
+            // army is being trained, but there is nothing for this task to do right now
+            if (desired_entity == ENTITY_TYPE_COUNT) {
+                break;
+            }
+
+            // Otherwise, we need to train a unit
+
+            // Check to make sure we can afford it
+            if (bot.effective_gold < entity_get_data(desired_entity).gold_cost) {
+                break;
+            }
+
+            // Find a building to train this unit at
+            EntityType building_type = bot_get_building_type_which_trains_unit_type(desired_entity);
+            EntityId building_id = ID_NULL;
+            for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                const Entity& entity = state.entities[entity_index];
+                if (entity.player_id != bot.player_id || 
+                        !entity_is_selectable(entity) ||
+                        entity.type != building_type ||
+                        entity.mode != MODE_BUILDING_FINISHED || 
+                        !entity.queue.empty()) {
+                    continue;
+                }
+                building_id = state.entities.get_id_of(entity_index);
+                break;
+            }
+
+            // There are no idle buildings to work with, so do nothing
+            if (building_id == ID_NULL) {
+                break;
+            }
+
+            MatchInput input;
+            input.type = MATCH_INPUT_BUILDING_ENQUEUE;
+            input.building_enqueue.building_id = building_id;
+            input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UNIT;
+            input.building_enqueue.item_subtype = desired_entity;
+            bot.effective_gold -= entity_get_data(desired_entity).gold_cost;
+            inputs.push_back(input);
 
             break;
         }
@@ -617,5 +719,30 @@ void bot_count_entities(const MatchState& state, const Bot& bot, bool include_in
                 !entity.queue.empty() && entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT) {
             entity_counts[entity.queue.front().unit_type]++;
         }
+    }
+}
+
+EntityType bot_get_building_type_which_trains_unit_type(EntityType unit_type) {
+    switch (unit_type) {
+        case ENTITY_MINER:
+            return ENTITY_HALL;
+        case ENTITY_COWBOY:
+        case ENTITY_BANDIT:
+            return ENTITY_SALOON;
+        case ENTITY_SAPPER:
+        case ENTITY_PYRO:
+        case ENTITY_BALLOON:
+            return ENTITY_BALLOON;
+        case ENTITY_JOCKEY:
+        case ENTITY_WAGON:
+            return ENTITY_COOP;
+        case ENTITY_SOLDIER:
+        case ENTITY_CANNON:
+            return ENTITY_BARRACKS;
+        case ENTITY_DETECTIVE:
+            return ENTITY_SHERIFFS;
+        default:
+            GOLD_ASSERT(false);
+            return ENTITY_TYPE_COUNT;
     }
 }
