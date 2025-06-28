@@ -2,7 +2,10 @@
 
 #include "core/logger.h"
 
-static const int ARMY_GATHER_DISTANCE = 25;
+// TODO: this needs to be dynamic based on the size of the army
+// Maybe we can do something like say that a unit has been gathered if it is
+// close to the gather point or if it is nearby another unit who is also gathered?
+static const int ARMY_GATHER_DISTANCE = 8;
 
 Bot bot_init(uint8_t player_id) {
     Bot bot;
@@ -570,6 +573,24 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                     }
 
                     break;
+                }
+
+                // At this point, entity is at the attack point and should be attacking
+                // Let's check to make sure this unit is attacking the best target
+
+                Target attack_target = match_entity_target_nearest_enemy(state, entity);
+                if (attack_target.type == TARGET_ATTACK_ENTITY && 
+                        entity.target.type == TARGET_ATTACK_ENTITY && 
+                        entity_get_data(state.entities.get_by_id(attack_target.id).type).attack_priority > 
+                        entity_get_data(state.entities.get_by_id(entity.target.id).type).attack_priority) {
+                    MatchInput attack_input;
+                    attack_input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
+                    attack_input.move.shift_command = 0;
+                    attack_input.move.target_id = attack_target.id;
+                    attack_input.move.target_cell = ivec2(0, 0);
+                    attack_input.move.entity_ids[0] = unit_id;
+                    attack_input.move.entity_count = 1;
+                    inputs.push_back(attack_input);
                 }
             }
 
