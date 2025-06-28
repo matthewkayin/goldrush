@@ -292,7 +292,6 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                     bot_reserve_entity(bot, entity_id);
                     bot.army.unit_ids.push_back(entity_id);
                     unit_count[entity.type]++;
-                    log_trace("add unit to army with id %u type %u unit count of type is now %u", entity_id, entity.type, unit_count[entity.type]);
                 }
             }
 
@@ -300,7 +299,6 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             bool is_army_raised = true;
             for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
                 if (unit_count[entity_type] < bot.army.desired_units[entity_type]) {
-                    log_trace("missing entity type %u, count %u desired %u", entity_type, unit_count[entity_type], bot.army.desired_units[entity_type]);
                     is_army_raised = false;
                     break;
                 }
@@ -311,6 +309,43 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
 
             // If we've reached here, it means that we have finished raising
             // our army, so switch army modes to GATHER
+
+            // Count how many units we could need to carry if we were to use transports
+            uint32_t carryable_count = 0;
+            bool army_has_cannons = false;
+            for (EntityId army_id : bot.army.unit_ids) {
+                const Entity& entity = state.entities.get_by_id(army_id);
+                if (entity.type == ENTITY_CANNON) {
+                    army_has_cannons = true;
+                    break;
+                }
+                carryable_count += entity_get_data(entity.type).garrison_size;
+            }
+
+            // Decide if we have any transports to use
+            std::vector<EntityId> available_transports;
+            for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                const Entity& entity = state.entities[entity_index];
+                EntityId entity_id = state.entities.get_id_of(entity_index);
+                if (entity.player_id != bot.player_id || 
+                        !(entity.type == ENTITY_WAGON || entity.type == ENTITY_WAR_WAGON) ||
+                        !entity_is_selectable(entity) || bot_is_entity_reserved(bot, entity_id)) {
+                    continue;
+                }
+                available_transports.push_back(entity_id);
+            }
+
+            // If we are using transports, add them to the army
+            if (!army_has_cannons && carryable_count <= available_transports.size() * entity_get_data(ENTITY_WAGON).garrison_capacity) {
+                uint32_t desired_transports = carryable_count / entity_get_data(ENTITY_WAGON).garrison_capacity;
+                if (carryable_count % entity_get_data(ENTITY_WAGON).garrison_capacity != 0) {
+                    desired_transports++;
+                }
+                for (uint32_t transport_index = 0; transport_index < desired_transports; transport_index++) {
+                    bot_reserve_entity(bot, available_transports[transport_index]);
+                    bot.army.unit_ids.push_back(available_transports[transport_index]);
+                }
+            }
 
             // Determine the army gather point
             std::vector<ivec2> gather_points;
@@ -346,7 +381,6 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 }
             }
 
-            log_trace("switched to gather mode");
             bot.army.mode = BOT_ARMY_MODE_GATHER;
             bot.army.gather_point = gather_points[highest_scored_gather_index];
             break;
@@ -383,7 +417,6 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 inputs.push_back(input);
             }
 
-            log_trace("all units are gathered ? %i", (int)all_units_are_gathered);
             if (!all_units_are_gathered) {
                 break;
             }
@@ -408,9 +441,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             bot.army.gather_point = bot_army_determine_attack_point(state, bot);
             if (army_has_cannons || carryable_count > transport_count * entity_get_data(ENTITY_WAGON).garrison_capacity) {
                 bot.army.mode = BOT_ARMY_MODE_ATTACK;
-                log_trace("switch to attack");
             } else {
-                log_trace("switch to garrison");
                 bot.army.mode = BOT_ARMY_MODE_GARRISON;
             }
             break;
@@ -506,6 +537,12 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
 
             for (EntityId unit_id : bot.army.unit_ids) {
                 const Entity& entity = state.entities.get_by_id(unit_id);
+
+                // Don't do anything with a unit that isn't selectable
+                // Unselectable units should only be garrisoned units in this case
+                if (!entity_is_selectable(entity)) {
+                    continue;
+                }
 
                 // Check if entity is at the attack point
                 if (ivec2::manhattan_distance(entity.cell, bot.army.gather_point) >= ARMY_GATHER_DISTANCE) {
