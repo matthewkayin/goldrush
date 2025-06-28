@@ -5,12 +5,27 @@
 #include <cstdint>
 #include <vector>
 
+enum BotArmyMode {
+    BOT_ARMY_MODE_RAISE,
+    BOT_ARMY_MODE_GATHER,
+    BOT_ARMY_MODE_GARRISON,
+    BOT_ARMY_MODE_ATTACK
+};
+
+struct BotArmy {
+    BotArmyMode mode;
+    uint32_t desired_units[ENTITY_HALL];
+    std::vector<EntityId> unit_ids;
+    ivec2 gather_point;
+};
+
 struct Bot {
     uint8_t player_id;
     uint32_t effective_gold;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<EntityId> reserved_builders;
+    BotArmy army;
 };
 
 Bot bot_init(uint8_t player_id);
@@ -28,3 +43,4 @@ EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near
 MatchInput bot_create_build_input(const MatchState& state, const Bot& bot, EntityType building_type);
 EntityType bot_get_building_type_which_trains_unit_type(EntityType unit_type);
 MatchInput bot_create_train_unit_input(const MatchState& state, const Bot& bot, EntityType unit_type);
+ivec2 bot_army_determine_attack_point(const MatchState& state, const Bot& bot);
