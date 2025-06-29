@@ -19,9 +19,7 @@ static const uint8_t REPLAY_FILE_VERSION = 0;
 
 FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     char replay_subpath[128];
-    char* replay_file_ptr = replay_subpath;
-    replay_file_ptr += sprintf_timestamp(replay_file_ptr);
-    replay_file_ptr += sprintf(replay_file_ptr, ".rep");
+    sprintf(replay_subpath, "latest.rep");
     #ifdef GOLD_DEBUG
         if (use_arg_replay_file) {
             filesystem_get_replay_path(replay_subpath, arg_replay_file);

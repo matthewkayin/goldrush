@@ -5,19 +5,25 @@
 #include <cstdint>
 #include <vector>
 
+enum BotArmyType {
+    BOT_ARMY_TYPE_ATTACK,
+    BOT_ARMY_TYPE_DEFEND
+};
+
 enum BotArmyMode {
     BOT_ARMY_MODE_RAISE,
     BOT_ARMY_MODE_GATHER,
     BOT_ARMY_MODE_GARRISON,
     BOT_ARMY_MODE_MOVE_OUT,
     BOT_ARMY_MODE_ATTACK,
+    BOT_ARMY_MODE_DEFEND,
     BOT_ARMY_MODE_DISSOLVED
 };
 
 struct BotArmy {
-    uint32_t id;
+    BotArmyType type;
     BotArmyMode mode;
-    uint32_t desired_units[ENTITY_HALL];
+    uint32_t desired_entities[ENTITY_TYPE_COUNT];
     std::vector<EntityId> unit_ids;
     ivec2 gather_point;
 };
