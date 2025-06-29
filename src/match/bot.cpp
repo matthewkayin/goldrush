@@ -11,19 +11,27 @@ Bot bot_init(uint8_t player_id) {
     Bot bot;
 
     bot.player_id = player_id;
-    bot.desired_entities[ENTITY_SALOON] = 1;
-    bot.desired_entities[ENTITY_BANDIT] = 4;
-
-    // TODO: make it so that the army desired units somehow influences the bot desired entities
-    // Maybe desired entities could simply be derivative of the desired units of the army?
-    bot.army.mode = BOT_ARMY_MODE_RAISE;
-    memset(bot.army.desired_units, 0, sizeof(bot.army.desired_units));
-    bot.army.desired_units[ENTITY_BANDIT] = 4;
 
     return bot;
 };
 
 void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInput>& inputs) {
+    // Determine if we need to start raising an army
+    bool is_raising_army = false;
+    for (BotArmy army : bot.armies) {
+        if (army.mode == BOT_ARMY_MODE_RAISE) {
+            is_raising_army = true;
+            break;
+        }
+    }
+    if (!is_raising_army) {
+        BotArmy army;
+        memset(army.desired_units, 0, sizeof(army.desired_units));
+        army.desired_units[ENTITY_BANDIT] = 4;
+        army.mode = BOT_ARMY_MODE_RAISE;
+        bot.armies.push_back(army);
+    }
+
     // Determine effective gold
     bot.effective_gold = state.players[bot.player_id].gold;
     for (const Entity& entity : state.entities) {
@@ -112,37 +120,6 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
         }
     } // End for each hall index
 
-    // Decide if we need to make a house
-    uint32_t future_max_population = match_get_player_max_population(state, bot.player_id);
-    uint32_t future_population = match_get_player_population(state, bot.player_id);
-    uint32_t house_count = 0;
-    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-        const Entity& entity = state.entities[entity_index];
-        if (entity.player_id != bot.player_id || !entity_is_selectable(entity)) {
-            continue;
-        }
-
-        if ((entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE) && entity.mode == MODE_BUILDING_IN_PROGRESS) {
-            if (entity.type == ENTITY_HOUSE) {
-                house_count++;
-            }
-            future_max_population += 10;
-        } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty() && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) {
-            future_population += entity_get_data(entity.queue[0].unit_type).unit_data.population_cost;
-        } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD && 
-                        (entity.target.build.building_type == ENTITY_HOUSE || entity.target.build.building_type == ENTITY_HALL)) {
-            if (entity.target.build.building_type == ENTITY_HOUSE) {
-                house_count++;
-            }
-            future_max_population += 10;
-        }
-    }
-    if (future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1) {
-        bot.desired_entities[ENTITY_HOUSE] = house_count + 1;
-    } else {
-        bot.desired_entities[ENTITY_HOUSE] = 0;
-    }
-
     // Check all of our reserved builders to see if we should release one
     uint32_t reserved_builders_index = 0;
     while (reserved_builders_index < bot.reserved_builders.size()) {
@@ -159,60 +136,28 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
         }
     }
 
-    // Count existing and in-progress entities
-    uint32_t entity_count[ENTITY_TYPE_COUNT];
-    memset(entity_count, 0, sizeof(entity_count));
-    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-        const Entity& entity = state.entities[entity_index];
-        if (entity.player_id != bot.player_id || 
-                !entity_is_selectable(entity)) {
-            continue;
-        }
-
-        entity_count[entity.type]++; 
-        if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD) {
-            entity_count[entity.target.build.building_type]++; 
-        } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty() && entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT) {
-            entity_count[entity.queue.front().unit_type]++;
-        }
-    }
-
-    // Determine which building to make
-    EntityType desired_building = ENTITY_TYPE_COUNT;
-    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        if (entity_count[entity_type] < bot.desired_entities[entity_type]) {
-            desired_building = (EntityType)entity_type;
-            break;
-        }
-    }
+    // Determine which entity to make
+    EntityType desired_entity = bot_get_desired_entity(state, bot);
     // Create build input
-    if (desired_building != ENTITY_TYPE_COUNT && 
-            entity_is_building(desired_building) && 
-            bot.effective_gold >= entity_get_data(desired_building).gold_cost) {
-        MatchInput build_input = bot_create_build_input(state, bot, desired_building);
+    if (desired_entity != ENTITY_TYPE_COUNT && 
+            entity_is_building(desired_entity) && 
+            bot.effective_gold >= entity_get_data(desired_entity).gold_cost) {
+        MatchInput build_input = bot_create_build_input(state, bot, desired_entity);
         if (build_input.type != MATCH_INPUT_NONE) {
             bot_reserve_entity(bot, build_input.build.entity_ids[0]);
             bot.reserved_builders.push_back(build_input.build.entity_ids[0]);
-            bot.effective_gold -= entity_get_data(desired_building).gold_cost;
+            bot.effective_gold -= entity_get_data(desired_entity).gold_cost;
             inputs.push_back(build_input);
         }
     }
 
-    // Determine which unit to make
-    EntityType desired_unit = ENTITY_TYPE_COUNT;
-    for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
-        if (entity_count[entity_type] < bot.desired_entities[entity_type]) {
-            desired_unit = (EntityType)entity_type;
-            break;
-        }
-    }
     // Create train unit input
-    if (desired_unit != ENTITY_TYPE_COUNT &&
-            entity_is_unit(desired_unit) &&
-            bot.effective_gold >= entity_get_data(desired_unit).gold_cost) {
-        MatchInput train_input = bot_create_train_unit_input(state, bot, desired_unit);
+    if (desired_entity != ENTITY_TYPE_COUNT &&
+            entity_is_unit(desired_entity) &&
+            bot.effective_gold >= entity_get_data(desired_entity).gold_cost) {
+        MatchInput train_input = bot_create_train_unit_input(state, bot, desired_entity);
         if (train_input.type != MATCH_INPUT_NONE) {
-            bot.effective_gold -= entity_get_data(desired_unit).gold_cost;
+            bot.effective_gold -= entity_get_data(desired_entity).gold_cost;
             inputs.push_back(train_input);
         }
     }
@@ -254,31 +199,43 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
         }
     }
 
-    // Army management
-    // Check army IDs and release any dead units
     uint32_t army_index = 0;
-    while (army_index < bot.army.unit_ids.size()) {
-        EntityId army_id = bot.army.unit_ids[army_index];
-        uint32_t army_entity_index = state.entities.get_index_of(army_id);
-        if (army_entity_index == INDEX_INVALID || 
-                state.entities[army_entity_index].health == 0) {
-            bot_release_entity(bot, bot.army.unit_ids[army_index]);
-            bot.army.unit_ids[army_index] = bot.army.unit_ids[bot.army.unit_ids.size() - 1];
-            bot.army.unit_ids.pop_back();
+    while (army_index < bot.armies.size()) {
+        bot_army_update(state, bot, bot.armies[army_index], inputs);
+        if (bot.armies[army_index].mode == BOT_ARMY_MODE_DISSOLVED) {
+            bot.armies.erase(bot.armies.begin() + army_index);
         } else {
             army_index++;
         }
     }
-    switch (bot.army.mode) {
-        case BOT_ARMY_MODE_RAISE: {
-            // Count how much of the army we have currently raised
-            uint32_t unit_count[ENTITY_HALL];
-            memset(unit_count, 0, sizeof(unit_count));
-            for (EntityId army_id : bot.army.unit_ids) {
-                const Entity& entity = state.entities.get_by_id(army_id);
-                unit_count[entity.type]++;
-            }
+}
 
+void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vector<MatchInput>& inputs) {
+    GOLD_ASSERT(army.mode != BOT_ARMY_MODE_DISSOLVED);
+
+    // Check army IDs and release any dead units
+    bool is_army_under_attack = false;
+    uint32_t army_index = 0;
+    while (army_index < army.unit_ids.size()) {
+        EntityId army_id = army.unit_ids[army_index];
+        uint32_t army_entity_index = state.entities.get_index_of(army_id);
+        if (army_entity_index == INDEX_INVALID || 
+                state.entities[army_entity_index].health == 0) {
+            bot_release_entity(bot, army.unit_ids[army_index]);
+            army.unit_ids[army_index] = army.unit_ids[army.unit_ids.size() - 1];
+            army.unit_ids.pop_back();
+        } else {
+            if (state.entities[army_entity_index].taking_damage_timer != 0) {
+                is_army_under_attack = true;
+            }
+            army_index++;
+        }
+    }
+    if (is_army_under_attack && army.mode != BOT_ARMY_MODE_ATTACK) {
+        army.mode = BOT_ARMY_MODE_ATTACK;
+    }
+    switch (army.mode) {
+        case BOT_ARMY_MODE_RAISE: {
             // Check the list of entities for any units we could add to this army
             for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
                 const Entity& entity = state.entities[entity_index];
@@ -289,19 +246,18 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                     continue;
                 }
 
-                if (unit_count[entity.type] < bot.army.desired_units[entity.type]) {
-                    GOLD_ASSERT(bot.army.desired_units[entity.type] != 0);
+                if (army.desired_units[entity.type] != 0) {
                     EntityId entity_id = state.entities.get_id_of(entity_index);
                     bot_reserve_entity(bot, entity_id);
-                    bot.army.unit_ids.push_back(entity_id);
-                    unit_count[entity.type]++;
+                    army.unit_ids.push_back(entity_id);
+                    army.desired_units[entity.type]--;
                 }
             }
 
             // Check if the army has finished being raised
             bool is_army_raised = true;
             for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
-                if (unit_count[entity_type] < bot.army.desired_units[entity_type]) {
+                if (army.desired_units[entity_type] != 0) {
                     is_army_raised = false;
                     break;
                 }
@@ -316,7 +272,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             // Count how many units we could need to carry if we were to use transports
             uint32_t carryable_count = 0;
             bool army_has_cannons = false;
-            for (EntityId army_id : bot.army.unit_ids) {
+            for (EntityId army_id : army.unit_ids) {
                 const Entity& entity = state.entities.get_by_id(army_id);
                 if (entity.type == ENTITY_CANNON) {
                     army_has_cannons = true;
@@ -346,7 +302,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 }
                 for (uint32_t transport_index = 0; transport_index < desired_transports; transport_index++) {
                     bot_reserve_entity(bot, available_transports[transport_index]);
-                    bot.army.unit_ids.push_back(available_transports[transport_index]);
+                    army.unit_ids.push_back(available_transports[transport_index]);
                 }
             }
 
@@ -355,7 +311,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             std::vector<ivec2> gather_points_min;
             std::vector<ivec2> gather_points_max;
             std::vector<uint32_t> gather_point_score;
-            for (EntityId army_id : bot.army.unit_ids) {
+            for (EntityId army_id : army.unit_ids) {
                 const Entity& entity = state.entities.get_by_id(army_id);
 
                 int nearest_gather_point = -1;
@@ -395,8 +351,8 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 }
             }
 
-            bot.army.mode = BOT_ARMY_MODE_GATHER;
-            bot.army.gather_point = gather_points[highest_scored_gather_index];
+            army.mode = BOT_ARMY_MODE_GATHER;
+            army.gather_point = gather_points[highest_scored_gather_index];
             break;
         }
         case BOT_ARMY_MODE_GATHER: {
@@ -405,17 +361,17 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             input.type = MATCH_INPUT_MOVE_CELL;
             input.move.shift_command = 0;
             input.move.target_id = ID_NULL;
-            input.move.target_cell = bot.army.gather_point;
+            input.move.target_cell = army.gather_point;
             input.move.entity_count = 0;
             bool all_units_are_gathered = true;
 
-            for (EntityId army_id : bot.army.unit_ids) {
+            for (EntityId army_id : army.unit_ids) {
                 const Entity& entity = state.entities.get_by_id(army_id);
-                if (ivec2::manhattan_distance(entity.cell, bot.army.gather_point) < ARMY_GATHER_DISTANCE) {
+                if (ivec2::manhattan_distance(entity.cell, army.gather_point) < ARMY_GATHER_DISTANCE) {
                     continue;
                 }
                 all_units_are_gathered = false;
-                if (entity.target.type == TARGET_CELL && ivec2::manhattan_distance(entity.target.cell, bot.army.gather_point) < ARMY_GATHER_DISTANCE) {
+                if (entity.target.type == TARGET_CELL && ivec2::manhattan_distance(entity.target.cell, army.gather_point) < ARMY_GATHER_DISTANCE) {
                     continue;
                 }
                 input.move.entity_ids[input.move.entity_count] = army_id;
@@ -439,7 +395,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             bool army_has_cannons = false;
             uint32_t transport_count = 0;
             uint32_t carryable_count = 0;
-            for (EntityId army_id : bot.army.unit_ids) {
+            for (EntityId army_id : army.unit_ids) {
                 const Entity& entity = state.entities.get_by_id(army_id);
                 if (entity.type == ENTITY_CANNON) {
                     army_has_cannons = true;
@@ -452,11 +408,11 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 }
             }
 
-            bot.army.gather_point = bot_army_determine_attack_point(state, bot);
+            army.gather_point = bot_army_determine_attack_point(state, bot);
             if (army_has_cannons || carryable_count > transport_count * entity_get_data(ENTITY_WAGON).garrison_capacity) {
-                bot.army.mode = BOT_ARMY_MODE_ATTACK;
+                army.mode = BOT_ARMY_MODE_MOVE_OUT;
             } else {
-                bot.army.mode = BOT_ARMY_MODE_GARRISON;
+                army.mode = BOT_ARMY_MODE_GARRISON;
             }
             break;
         }
@@ -465,7 +421,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             std::vector<EntityId> available_transports;
             std::vector<EntityId> ungarrisoned_units;
             bool all_units_are_garrisoned = true;
-            for (EntityId army_id : bot.army.unit_ids) {
+            for (EntityId army_id : army.unit_ids) {
                 const Entity& entity = state.entities.get_by_id(army_id);
                 const EntityData& entity_data = entity_get_data(entity.type);
 
@@ -491,7 +447,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             }
 
             if (all_units_are_garrisoned || available_transports.empty()) {
-                bot.army.mode = BOT_ARMY_MODE_ATTACK;
+                army.mode = BOT_ARMY_MODE_MOVE_OUT;
                 break;
             }
 
@@ -506,7 +462,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 // First determine how many units this transport is already carrying
                 const Entity& transport = state.entities.get_by_id(transport_id);
                 uint32_t transport_garrison_size = transport.garrisoned_units.size();
-                for (EntityId unit_id : bot.army.unit_ids) {
+                for (EntityId unit_id : army.unit_ids) {
                     const Entity& unit = state.entities.get_by_id(unit_id);
                     if (unit.target.type == TARGET_ENTITY && unit.target.id == transport_id) {
                         transport_garrison_size++;
@@ -550,18 +506,20 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
 
             break;
         }
-        case BOT_ARMY_MODE_ATTACK: {
+        case BOT_ARMY_MODE_MOVE_OUT: {
+            bool units_have_reached_move_out_point = true;
+
             // If there's any units away from the attack point, then move them
             MatchInput unload_input;
             unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
             unload_input.move.shift_command = 0;
             unload_input.move.target_id = ID_NULL;
-            unload_input.move.target_cell = bot.army.gather_point;
+            unload_input.move.target_cell = army.gather_point;
             unload_input.move.entity_count = 0;
             MatchInput move_input = unload_input;
-            move_input.type = MATCH_INPUT_MOVE_CELL;
+            move_input.type = MATCH_INPUT_MOVE_ATTACK_CELL;
 
-            for (EntityId unit_id : bot.army.unit_ids) {
+            for (EntityId unit_id : army.unit_ids) {
                 const Entity& entity = state.entities.get_by_id(unit_id);
 
                 // Don't do anything with a unit that isn't selectable
@@ -571,10 +529,11 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 }
 
                 // Check if entity is at the attack point
-                if (ivec2::manhattan_distance(entity.cell, bot.army.gather_point) >= ARMY_GATHER_DISTANCE) {
+                if (ivec2::manhattan_distance(entity.cell, army.gather_point) >= ARMY_GATHER_DISTANCE) {
+                    units_have_reached_move_out_point = false;
                     // If it is not, but it is on the way, then don't bother it
                     if ((entity.target.type == TARGET_CELL || entity.target.type == TARGET_UNLOAD) &&
-                            ivec2::manhattan_distance(entity.target.cell, bot.army.gather_point) < ARMY_GATHER_DISTANCE) {
+                            ivec2::manhattan_distance(entity.target.cell, army.gather_point) < ARMY_GATHER_DISTANCE) {
                         continue;
                     }
 
@@ -597,24 +556,6 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
 
                     break;
                 }
-
-                // At this point, entity is at the attack point and should be attacking
-                // Let's check to make sure this unit is attacking the best target
-
-                Target attack_target = match_entity_target_nearest_enemy(state, entity);
-                if (attack_target.type == TARGET_ATTACK_ENTITY && 
-                        entity.target.type == TARGET_ATTACK_ENTITY && 
-                        entity_get_data(state.entities.get_by_id(attack_target.id).type).attack_priority > 
-                        entity_get_data(state.entities.get_by_id(entity.target.id).type).attack_priority) {
-                    MatchInput attack_input;
-                    attack_input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
-                    attack_input.move.shift_command = 0;
-                    attack_input.move.target_id = attack_target.id;
-                    attack_input.move.target_cell = ivec2(0, 0);
-                    attack_input.move.entity_ids[0] = unit_id;
-                    attack_input.move.entity_count = 1;
-                    inputs.push_back(attack_input);
-                }
             }
 
             if (move_input.move.entity_count != 0) {
@@ -624,8 +565,98 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 inputs.push_back(unload_input);
             }
 
+            if (units_have_reached_move_out_point) {
+                army.mode = BOT_ARMY_MODE_ATTACK;
+            }
+
             break;
         }
+        case BOT_ARMY_MODE_ATTACK: {
+            uint32_t army_index = 0;
+            bool units_are_attacking = false;
+            while (army_index < army.unit_ids.size()) {
+                EntityId unit_id = army.unit_ids[army_index];
+                const Entity& entity = state.entities.get_by_id(unit_id);
+
+                // If a transport is here and it has units in it, then unload them
+                // Otherwise release the transport
+                if (entity.type == ENTITY_WAGON || entity.type == ENTITY_WAR_WAGON) {
+                    if (!entity.garrisoned_units.empty()) {
+                        MatchInput unload_input;
+                        unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
+                        unload_input.move.shift_command = 0;
+                        unload_input.move.target_id = ID_NULL;
+                        unload_input.move.target_cell = entity.cell;
+                        unload_input.move.entity_count = 1;
+                        unload_input.move.entity_ids[0] = unit_id;
+                        inputs.push_back(unload_input);
+                    } else {
+                        uint32_t nearest_hall_index = INDEX_INVALID;
+                        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                            const Entity& hall = state.entities[entity_index];
+                            if (hall.player_id != bot.player_id || hall.mode != MODE_BUILDING_FINISHED || hall.type != ENTITY_HALL) {
+                                continue;
+                            }
+
+                            if (nearest_hall_index == INDEX_INVALID || ivec2::manhattan_distance(hall.cell, entity.cell) < ivec2::manhattan_distance(state.entities[nearest_hall_index].cell, entity.cell)) {
+                                nearest_hall_index = entity_index;
+                            }
+                        }
+
+                        if (nearest_hall_index != INDEX_INVALID) {
+                            MatchInput move_input;
+                            move_input.type = MATCH_INPUT_MOVE_ENTITY;
+                            move_input.move.shift_command = 0;
+                            move_input.move.target_id = state.entities.get_id_of(nearest_hall_index);
+                            move_input.move.target_cell = ivec2(0, 0);
+                            move_input.move.entity_count = 1;
+                            move_input.move.entity_ids[0] = unit_id;
+                            inputs.push_back(move_input);
+                        }
+
+                        bot_release_entity(bot, unit_id);
+                        army.unit_ids[army_index] = army.unit_ids[army.unit_ids.size() - 1];
+                        army.unit_ids.pop_back();
+                        break;
+                    }
+                } 
+
+                if (entity_get_data(entity.type).unit_data.damage != 0) {
+                    if (entity.target.type == TARGET_ATTACK_ENTITY || entity.target.type == TARGET_ATTACK_CELL) {
+                        units_are_attacking = true;
+                    }
+
+                    // Let's check to make sure this unit is attacking the best target
+                    Target attack_target = match_entity_target_nearest_enemy(state, entity);
+                    if (attack_target.type == TARGET_ATTACK_ENTITY && 
+                            entity.target.type == TARGET_ATTACK_ENTITY && 
+                            entity_get_data(state.entities.get_by_id(attack_target.id).type).attack_priority > 
+                            entity_get_data(state.entities.get_by_id(entity.target.id).type).attack_priority) {
+                        MatchInput attack_input;
+                        attack_input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
+                        attack_input.move.shift_command = 0;
+                        attack_input.move.target_id = attack_target.id;
+                        attack_input.move.target_cell = ivec2(0, 0);
+                        attack_input.move.entity_ids[0] = unit_id;
+                        attack_input.move.entity_count = 1;
+                        inputs.push_back(attack_input);
+                    }
+                }
+
+                army_index++;
+            }
+
+            if (!units_are_attacking) {
+                for (EntityId unit_id : army.unit_ids) {
+                    bot_release_entity(bot, unit_id);
+                    army.unit_ids.clear();
+                    army.mode = BOT_ARMY_MODE_DISSOLVED;
+                }
+            }
+            break;
+        }
+        case BOT_ARMY_MODE_DISSOLVED: 
+            break;
     }
 }
 
@@ -644,6 +675,124 @@ void bot_release_entity(Bot& bot, EntityId entity_id) {
     bot.is_entity_reserved.erase(entity_id);
 }
 
+EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot) {
+    // TODO: decide here if we want to expand
+
+    // Decide if we need to make a house
+    uint32_t future_max_population = match_get_player_max_population(state, bot.player_id);
+    uint32_t future_population = match_get_player_population(state, bot.player_id);
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.player_id != bot.player_id || !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        if ((entity.type == ENTITY_HALL || entity.type == ENTITY_HOUSE) && entity.mode == MODE_BUILDING_IN_PROGRESS) {
+            future_max_population += 10;
+        } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty() && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) {
+            future_population += entity_get_data(entity.queue[0].unit_type).unit_data.population_cost;
+        } else if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD && 
+                        (entity.target.build.building_type == ENTITY_HOUSE || entity.target.build.building_type == ENTITY_HALL)) {
+            future_max_population += 10;
+        }
+    }
+
+    if (future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1) {
+        return ENTITY_HOUSE;
+    }
+
+    // Find the army we are currently raising (there should only be one)
+    uint32_t army_index = 0;
+    while (army_index < bot.armies.size()) {
+        if (bot.armies[army_index].mode == BOT_ARMY_MODE_RAISE) {
+            break;
+        }
+        army_index++;
+    }
+
+    // Determine the desired units based on the army
+    uint32_t desired_entities[ENTITY_TYPE_COUNT];
+    memset(desired_entities, 0, sizeof(desired_entities));
+    memcpy(desired_entities, bot.armies[army_index].desired_units, sizeof(bot.armies[army_index].desired_units));
+
+    // Subtract desired units for any unit which is in-progress
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.player_id != bot.player_id || entity.mode != MODE_BUILDING_FINISHED ||
+                entity.queue.empty() || entity.queue.front().type != BUILDING_QUEUE_ITEM_UNIT) {
+            continue;
+        }
+
+        if (desired_entities[entity.queue.front().unit_type] > 0) {
+            desired_entities[entity.queue.front().unit_type]--;
+        }
+    }
+
+    // Determine desired buildings based on desired army
+    for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
+        if (desired_entities[entity_type] == 0) {
+            continue;
+        }
+        EntityType building_type = bot_get_building_type_which_trains_unit_type((EntityType)entity_type);
+        if (desired_entities[entity_type] < 16) {
+            desired_entities[building_type] += 1;
+        } else if (desired_entities[entity_type] < 32) {
+            desired_entities[building_type] += 2;
+        } else if (desired_entities[entity_type] < 48) {
+            desired_entities[building_type] += 3;
+        } else if (desired_entities[entity_type] < 64) {
+            desired_entities[building_type] += 4;
+        } else {
+            desired_entities[building_type] += 5;
+        }
+    }
+
+    // Determine any other desired buildings based on building pre-reqs
+    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        if (desired_entities[entity_type] == 0) {
+            continue;
+        }
+        EntityType pre_req = bot_get_building_pre_req((EntityType)entity_type);
+        if (pre_req == ENTITY_TYPE_COUNT) {
+            continue;
+        }
+        if (desired_entities[pre_req] == 0) {
+            desired_entities[pre_req] = 1;
+        }
+    }
+
+    // Subtract from desired buildings based on buildings we already have
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.player_id != bot.player_id || !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD) {
+            if (desired_entities[entity.target.build.building_type] > 0) {
+                desired_entities[entity.target.build.building_type]--;
+            }
+        } else if (entity_is_building(entity.type)) {
+            if (desired_entities[entity.type] > 0) {
+                desired_entities[entity.type]--;
+            }
+        }
+    }
+
+    // Finally, determine desired entity. Choose from buildings first
+    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        if (desired_entities[entity_type] != 0) {
+            return (EntityType)entity_type;
+        }
+    }
+    for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
+        if (desired_entities[entity_type] != 0) {
+            return (EntityType)entity_type;
+        }
+    }
+
+    return ENTITY_TYPE_COUNT;
+}
 
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id) {
     // First find all the town halls for this bot
@@ -858,6 +1007,27 @@ EntityType bot_get_building_type_which_trains_unit_type(EntityType unit_type) {
             return ENTITY_BARRACKS;
         case ENTITY_DETECTIVE:
             return ENTITY_SHERIFFS;
+        default:
+            GOLD_ASSERT(false);
+            return ENTITY_TYPE_COUNT;
+    }
+}
+
+EntityType bot_get_building_pre_req(EntityType building_type) {
+    switch (building_type) {
+        case ENTITY_HALL:
+            return ENTITY_TYPE_COUNT;
+        case ENTITY_SALOON:
+        case ENTITY_HOUSE:
+            return ENTITY_HALL;
+        case ENTITY_BUNKER:
+        case ENTITY_WORKSHOP:
+        case ENTITY_SMITH:
+            return ENTITY_SALOON;
+        case ENTITY_COOP:
+        case ENTITY_BARRACKS:
+        case ENTITY_SHERIFFS:
+            return ENTITY_SMITH;
         default:
             GOLD_ASSERT(false);
             return ENTITY_TYPE_COUNT;
