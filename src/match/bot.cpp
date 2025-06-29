@@ -352,6 +352,8 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
 
             // Determine the army gather point
             std::vector<ivec2> gather_points;
+            std::vector<ivec2> gather_points_min;
+            std::vector<ivec2> gather_points_max;
             std::vector<uint32_t> gather_point_score;
             for (EntityId army_id : bot.army.unit_ids) {
                 const Entity& entity = state.entities.get_by_id(army_id);
@@ -369,8 +371,17 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 }
 
                 if (nearest_gather_point != -1) {
+                    gather_points_min[nearest_gather_point].x = std::min(gather_points_min[nearest_gather_point].x, entity.cell.x);
+                    gather_points_min[nearest_gather_point].y = std::min(gather_points_min[nearest_gather_point].y, entity.cell.y);
+                    gather_points_max[nearest_gather_point].x = std::max(gather_points_min[nearest_gather_point].x, entity.cell.x);
+                    gather_points_max[nearest_gather_point].y = std::max(gather_points_min[nearest_gather_point].y, entity.cell.y);
+                    gather_points[nearest_gather_point] = ivec2(
+                        gather_points_min[nearest_gather_point].x + ((gather_points_max[nearest_gather_point].x - gather_points_min[nearest_gather_point].x) / 2),
+                        gather_points_min[nearest_gather_point].y + ((gather_points_max[nearest_gather_point].y - gather_points_min[nearest_gather_point].y) / 2));
                     gather_point_score[nearest_gather_point]++;
                 } else {
+                    gather_points_min.push_back(entity.cell);
+                    gather_points_max.push_back(entity.cell);
                     gather_points.push_back(entity.cell);
                     gather_point_score.push_back(1);
                 }
@@ -403,10 +414,10 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
                 if (ivec2::manhattan_distance(entity.cell, bot.army.gather_point) < ARMY_GATHER_DISTANCE) {
                     continue;
                 }
+                all_units_are_gathered = false;
                 if (entity.target.type == TARGET_CELL && ivec2::manhattan_distance(entity.target.cell, bot.army.gather_point) < ARMY_GATHER_DISTANCE) {
                     continue;
                 }
-                all_units_are_gathered = false;
                 input.move.entity_ids[input.move.entity_count] = army_id;
                 input.move.entity_count++;
                 
@@ -485,6 +496,12 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             }
 
             // Load units into transports
+            // And also tell the transports to stop so that they're not moving away from
+            // the units that are trying to load into them
+            MatchInput stop_input;
+            stop_input.type = MATCH_INPUT_STOP;
+            stop_input.stop.entity_count = 0;
+
             for (EntityId transport_id : available_transports) {
                 // First determine how many units this transport is already carrying
                 const Entity& transport = state.entities.get_by_id(transport_id);
@@ -522,7 +539,13 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
 
                 if (input.move.entity_count != 0) {
                     inputs.push_back(input);
+                    stop_input.stop.entity_ids[stop_input.stop.entity_count] = input.move.target_id;
+                    stop_input.stop.entity_count++;
                 }
+            }
+
+            if (stop_input.stop.entity_count != 0) {
+                inputs.push_back(stop_input);
             }
 
             break;
