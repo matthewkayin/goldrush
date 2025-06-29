@@ -25,11 +25,17 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
         }
     }
     if (!is_raising_army) {
-        BotArmy army;
-        memset(army.desired_units, 0, sizeof(army.desired_units));
-        army.desired_units[ENTITY_BANDIT] = 4;
-        army.mode = BOT_ARMY_MODE_RAISE;
-        bot.armies.push_back(army);
+        static uint32_t next_army_id = 0;
+        if (next_army_id < 3) {
+            BotArmy army;
+            army.id = next_army_id;
+            next_army_id++;
+            memset(army.desired_units, 0, sizeof(army.desired_units));
+            army.desired_units[ENTITY_BANDIT] = 4;
+            army.mode = BOT_ARMY_MODE_RAISE;
+            bot.armies.push_back(army);
+            log_trace("BOT: Added army %u", army.id);
+        }
     }
 
     // Determine effective gold
@@ -203,6 +209,10 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
     while (army_index < bot.armies.size()) {
         bot_army_update(state, bot, bot.armies[army_index], inputs);
         if (bot.armies[army_index].mode == BOT_ARMY_MODE_DISSOLVED) {
+            for (EntityId unit_id : bot.armies[army_index].unit_ids) {
+                bot_release_entity(bot, unit_id);
+            }
+            log_trace("BOT: Dissolved army %u", bot.armies[army_index].id);
             bot.armies.erase(bot.armies.begin() + army_index);
         } else {
             army_index++;
@@ -233,6 +243,7 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
     }
     if (is_army_under_attack && army.mode != BOT_ARMY_MODE_ATTACK) {
         army.mode = BOT_ARMY_MODE_ATTACK;
+        log_trace("BOT: Army %u is under attack", army.id);
     }
     switch (army.mode) {
         case BOT_ARMY_MODE_RAISE: {
@@ -256,7 +267,7 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
 
             // Check if the army has finished being raised
             bool is_army_raised = true;
-            for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
+            for (uint32_t entity_type = ENTITY_MINER; entity_type < ENTITY_HALL; entity_type++) {
                 if (army.desired_units[entity_type] != 0) {
                     is_army_raised = false;
                     break;
@@ -352,6 +363,12 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
             }
 
             army.mode = BOT_ARMY_MODE_GATHER;
+            log_trace("BOT: Army %u is finished raising and is now GATHER", army.id);
+            log_trace("BOT -- begin unit print --");
+            for (EntityId unit_id : army.unit_ids) {
+                log_trace("%u", unit_id);
+            }
+            log_trace("BOT -- end unit print --");
             army.gather_point = gather_points[highest_scored_gather_index];
             break;
         }
@@ -411,8 +428,10 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
             army.gather_point = bot_army_determine_attack_point(state, bot);
             if (army_has_cannons || carryable_count > transport_count * entity_get_data(ENTITY_WAGON).garrison_capacity) {
                 army.mode = BOT_ARMY_MODE_MOVE_OUT;
+                log_trace("BOT: Army %u is finished GATHER and is MOVE_OUT", army.id);
             } else {
                 army.mode = BOT_ARMY_MODE_GARRISON;
+                log_trace("BOT: Army %u is finished GATHER and is GARRISON", army.id);
             }
             break;
         }
@@ -448,6 +467,7 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
 
             if (all_units_are_garrisoned || available_transports.empty()) {
                 army.mode = BOT_ARMY_MODE_MOVE_OUT;
+                log_trace("BOT: Army %u is finished GARRISON and is MOVE_OUT", army.id);
                 break;
             }
 
@@ -553,8 +573,6 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
                             unload_input.move.entity_count = 0;
                         }
                     }
-
-                    break;
                 }
             }
 
@@ -567,6 +585,7 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
 
             if (units_have_reached_move_out_point) {
                 army.mode = BOT_ARMY_MODE_ATTACK;
+                log_trace("Bot: Army %u is finished MOVE OUT and is attack", army.id);
             }
 
             break;
@@ -647,11 +666,7 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
             }
 
             if (!units_are_attacking) {
-                for (EntityId unit_id : army.unit_ids) {
-                    bot_release_entity(bot, unit_id);
-                    army.unit_ids.clear();
-                    army.mode = BOT_ARMY_MODE_DISSOLVED;
-                }
+                army.mode = BOT_ARMY_MODE_DISSOLVED;
             }
             break;
         }
@@ -729,7 +744,7 @@ EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot) {
     }
 
     // Determine desired buildings based on desired army
-    for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
+    for (uint32_t entity_type = ENTITY_MINER; entity_type < ENTITY_HALL; entity_type++) {
         if (desired_entities[entity_type] == 0) {
             continue;
         }
@@ -785,7 +800,7 @@ EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot) {
             return (EntityType)entity_type;
         }
     }
-    for (uint32_t entity_type = 0; entity_type < ENTITY_HALL; entity_type++) {
+    for (uint32_t entity_type = ENTITY_MINER; entity_type < ENTITY_HALL; entity_type++) {
         if (desired_entities[entity_type] != 0) {
             return (EntityType)entity_type;
         }
@@ -1001,6 +1016,7 @@ EntityType bot_get_building_type_which_trains_unit_type(EntityType unit_type) {
             return ENTITY_BALLOON;
         case ENTITY_JOCKEY:
         case ENTITY_WAGON:
+        case ENTITY_WAR_WAGON:
             return ENTITY_COOP;
         case ENTITY_SOLDIER:
         case ENTITY_CANNON:

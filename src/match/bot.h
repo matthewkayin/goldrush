@@ -15,6 +15,7 @@ enum BotArmyMode {
 };
 
 struct BotArmy {
+    uint32_t id;
     BotArmyMode mode;
     uint32_t desired_units[ENTITY_HALL];
     std::vector<EntityId> unit_ids;
