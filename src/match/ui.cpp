@@ -3211,13 +3211,15 @@ void match_ui_render(const MatchUiState& state) {
     // UI Garrisoned units
     if (state.selection.size() == 1) {
         const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
-        if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
+        if (carrier.type == ENTITY_GOLDMINE || 
+                state.replay_mode ||
+                carrier.player_id == network_get_player_id()) {
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             int index = 0;
             for (EntityId entity_id : carrier.garrisoned_units) {
                 const Entity& garrisoned_unit = state.match.entities.get_by_id(entity_id);
                 // We have to make this check here because goldmines might have both allied and enemy units in them
-                if (garrisoned_unit.player_id != network_get_player_id()) {
+                if (!state.replay_mode && garrisoned_unit.player_id != network_get_player_id()) {
                     continue;
                 }
 
