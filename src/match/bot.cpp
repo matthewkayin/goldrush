@@ -943,14 +943,14 @@ ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_ind
                 continue;
             }
             if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BUILDING) {
-                is_mine_unoccupied = true;
+                is_mine_unoccupied = false;
             }
-            cell = ivec2(building_block_rect.x + building_block_rect.w, y);
+            cell = ivec2(building_block_rect.x + building_block_rect.w - 1, y);
             if (!map_is_cell_in_bounds(state.map, cell)) {
                 continue;
             }
             if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BUILDING) {
-                is_mine_unoccupied = true;
+                is_mine_unoccupied = false;
             }
         }
         for (int x = building_block_rect.x; x < building_block_rect.x + building_block_rect.w; x++) {
@@ -959,14 +959,14 @@ ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_ind
                 continue;
             }
             if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BUILDING) {
-                is_mine_unoccupied = true;
+                is_mine_unoccupied = false;
             }
-            cell = ivec2(x, building_block_rect.y + building_block_rect.h);
+            cell = ivec2(x, building_block_rect.y + building_block_rect.h - 1);
             if (!map_is_cell_in_bounds(state.map, cell)) {
                 continue;
             }
             if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BUILDING) {
-                is_mine_unoccupied = true;
+                is_mine_unoccupied = false;
             }
         }
 
@@ -991,6 +991,12 @@ ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_ind
     // of the building_block_rect for this goldmine and evaluate each 
     // placement, choosing the one with the least obstacles nearby
     Rect building_block_rect = entity_goldmine_get_block_building_rect(state.entities[nearest_goldmine_index].cell);
+    Rect goldmine_rect = (Rect) {
+        .x = state.entities[nearest_goldmine_index].cell.x,
+        .y = state.entities[nearest_goldmine_index].cell.y,
+        .w = entity_get_data(ENTITY_GOLDMINE).cell_size,
+        .h = entity_get_data(ENTITY_GOLDMINE).cell_size
+    };
     const int HALL_SIZE = entity_get_data(ENTITY_HALL).cell_size;
     ivec2 corners[4] = { 
         ivec2(building_block_rect.x, building_block_rect.y) + ivec2(-HALL_SIZE, -HALL_SIZE),
@@ -1012,6 +1018,12 @@ ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_ind
     while (true) {
         // Evaluate hall cell score
         int hall_score = 0;
+        // Add the hall distance to the score so that we prefer less diagonal base placement
+        Rect hall_rect = (Rect) {
+            .x = hall_cell.x, .y = hall_cell.y,
+            .w = HALL_SIZE, .h = HALL_SIZE
+        };
+        hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
         // If the area is blocked (by a cactus, for example) then don't build there
         if (map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, hall_cell, HALL_SIZE)) {
             hall_score = -1;
@@ -1161,7 +1173,7 @@ MatchInput bot_create_build_input(const MatchState& state, const Bot& bot, Entit
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    ivec2 building_location = building_type == ENTITY_HALL ? bot_find_hall_location(state, hall_index) : bot_find_building_location(state, bot.player_id, state.entities.get_by_id(builder_id).cell, entity_get_data(building_type).cell_size);
+    ivec2 building_location = building_type == ENTITY_HALL ? bot_find_hall_location(state, hall_index) : bot_find_building_location(state, bot.player_id, state.entities[hall_index].cell + ivec2(1, 1), entity_get_data(building_type).cell_size);
     if (building_location.x == -1) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
