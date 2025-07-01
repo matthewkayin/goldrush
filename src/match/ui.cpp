@@ -2030,6 +2030,14 @@ bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity)
 
         return false;
     } else {
+        #ifdef GOLD_DEBUG_BOT_VISION
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
+                        match_is_entity_visible_to_player(state.match, entity, player_id)) {
+                    return true;
+                }
+            }
+        #endif
         return match_is_entity_visible_to_player(state.match, entity, network_get_player_id());
     }
 }
@@ -2046,6 +2054,14 @@ bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int c
 
         return false;
     } else {
+        #ifdef GOLD_DEBUG_BOT_VISION
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
+                        match_is_cell_rect_revealed(state.match, state.match.players[player_id].team, cell, cell_size)) {
+                    return true;
+                }
+            }
+        #endif
         return match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, cell, cell_size);
     }
 }
@@ -2071,6 +2087,24 @@ int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
 
         return fog_value;
     } else {
+        #ifdef GOLD_DEBUG_BOT_VISION
+            int fog_value = FOG_HIDDEN;
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if ((network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT || network_get_player_id() == player_id)) {
+                    int player_fog_value = match_get_fog(state.match, state.match.players[player_id].team, cell);
+
+                    // If at least one player has revealed fog, then return a revealed fog value
+                    if (player_fog_value > 0) {
+                        return 1;
+                    }
+                    // If set the returned value to explored, but keep iterating in case we get a revealed value
+                    if (player_fog_value == FOG_EXPLORED) {
+                        fog_value = FOG_EXPLORED;
+                    }
+                }
+            }
+            return fog_value;
+        #endif
         return match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell);
     }
 }
@@ -2363,11 +2397,11 @@ void match_ui_render(const MatchUiState& state) {
                 .frame = state.rally_flag_animation.frame,
                 .position = building.rally_point - ivec2(4, 15) - state.camera_offset,
                 .options = 0,
-                .recolor_id = state.match.players[network_get_player_id()].recolor_id
+                .recolor_id = state.match.players[building.player_id].recolor_id
             };
 
             ivec2 rally_cell = building.rally_point / TILE_SIZE;
-            if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, rally_cell) > 0) {
+            if (match_ui_get_fog(state, rally_cell) > 0) {
                 ysort_params.push_back(params);
             } else {
                 above_fog_sprite_params.push_back(params);
@@ -2705,11 +2739,11 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         if (entity.target.type == TARGET_BUILD && entity.target.id == ID_NULL) {
-            match_ui_render_target_build(state, entity.target);
+            match_ui_render_target_build(state, entity.target, entity.player_id);
         }
         for (const Target& target : entity.target_queue) {
             if (target.type == TARGET_BUILD) {
-                match_ui_render_target_build(state, target);
+                match_ui_render_target_build(state, target, entity.player_id);
             }
         }
     }
@@ -3514,7 +3548,7 @@ void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 s
     }
 }
 
-void match_ui_render_target_build(const MatchUiState& state, const Target& target) {
+void match_ui_render_target_build(const MatchUiState& state, const Target& target, uint8_t player_id) {
     const EntityData& building_data = entity_get_data(target.build.building_type);
     Rect building_rect = (Rect) {
         .x = (target.build.building_cell.x * TILE_SIZE) - state.camera_offset.x,
@@ -3522,7 +3556,7 @@ void match_ui_render_target_build(const MatchUiState& state, const Target& targe
         .w = building_data.cell_size * TILE_SIZE,
         .h = building_data.cell_size * TILE_SIZE
     };
-    render_sprite_frame(building_data.sprite, ivec2(3, 0), ivec2(building_rect.x, building_rect.y), 0, state.match.players[network_get_player_id()].recolor_id);
+    render_sprite_frame(building_data.sprite, ivec2(3, 0), ivec2(building_rect.x, building_rect.y), 0, state.match.players[player_id].recolor_id);
     render_fill_rect(building_rect, RENDER_COLOR_GREEN_TRANSPARENT);
 }
 
