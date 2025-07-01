@@ -238,7 +238,6 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
     }
     if (is_army_under_attack && army.mode != BOT_ARMY_MODE_ATTACK) {
         army.mode = BOT_ARMY_MODE_ATTACK;
-        log_trace("Bot: army switched to attack mode");
     }
     switch (army.mode) {
         case BOT_ARMY_MODE_RAISE: {
@@ -257,7 +256,6 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
                     bot_reserve_entity(bot, entity_id);
                     army.unit_ids.push_back(entity_id);
                     army.desired_entities[entity.type]--;
-                    log_trace("BOT: Army reserved entity of type %s, desired is now %u", entity_get_data(entity.type).name, army.desired_entities[entity.type]);
                 }
             }
 
@@ -361,13 +359,6 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
 
             army.gather_point = gather_points[highest_scored_gather_index];
             army.mode = BOT_ARMY_MODE_GATHER;
-
-            log_trace("BOT: army set to GATHER");
-            log_trace("BOT: --- begin unit print --");
-            for (EntityId unit_id : army.unit_ids) {
-                log_trace("BOT: %u %s", unit_id, entity_get_data(state.entities.get_by_id(unit_id).type).name);
-            }
-            log_trace("BOT: --- end --");
 
             break;
         }
@@ -668,7 +659,6 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
             }
 
             if (!units_are_attacking) {
-                log_trace("BOT: army is done attacking");
                 army.mode = BOT_ARMY_MODE_DISSOLVED;
             }
             break;
@@ -698,6 +688,15 @@ void bot_release_entity(Bot& bot, EntityId entity_id) {
 
 EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot) {
     // TODO: decide here if we want to expand
+    uint32_t hall_count = 0;
+    for (const Entity& entity : state.entities) {
+        if (entity.type == ENTITY_HALL && entity.player_id == bot.player_id) {
+            hall_count++;
+        }
+    }
+    if (hall_count < 2) {
+        return ENTITY_HALL;
+    }
 
     // Decide if we need to make a house
     uint32_t future_max_population = match_get_player_max_population(state, bot.player_id);
@@ -769,7 +768,6 @@ EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot) {
             desired_entities[building_type] += 5;
         }
     }
-    log_trace("BOT: since we need units, desired saloons: %u", desired_entities[ENTITY_SALOON]);
 
     // Determine any other desired buildings based on building pre-reqs
     for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
@@ -784,7 +782,6 @@ EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot) {
             desired_entities[pre_req] = 1;
         }
     }
-    log_trace("BOT: after pre-req, desired saloons: %u", desired_entities[ENTITY_SALOON]);
 
     // Subtract from desired buildings based on buildings we already have
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -804,9 +801,6 @@ EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot) {
             }
         }
     }
-
-    log_trace("BOT: desired bunkers after subtraction: %u", desired_entities[ENTITY_BUNKER]);
-    log_trace("BOT: desired saloons after subtraction: %u", desired_entities[ENTITY_SALOON]);
 
     // Finally, determine desired entity. Choose from buildings first
     for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
@@ -924,6 +918,158 @@ ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id,
     return ivec2(-1, -1);
 }
 
+ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_index) {
+    log_trace("Find hall location");
+    // Find the unoccupied goldmine nearest to the existing hall
+    uint32_t nearest_goldmine_index = INDEX_INVALID;
+    for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
+        if (state.entities[goldmine_index].type != ENTITY_GOLDMINE || state.entities[goldmine_index].gold_held == 0) {
+            continue;
+        }
+        // Take the block building rect and expand it by one
+        // Then check all the cells, and if there's a building in one,
+        // then we can consider this mine occupied and ignore it
+        
+        // This does mean that players can just "claim" all the mines by building a house next to them
+        Rect building_block_rect = entity_goldmine_get_block_building_rect(state.entities[goldmine_index].cell);
+        building_block_rect.y--;
+        building_block_rect.x--;
+        building_block_rect.w += 2;
+        building_block_rect.h += 2;
+        bool is_mine_unoccupied = true;
+        for (int y = building_block_rect.y; y < building_block_rect.y + building_block_rect.h; y++) {
+            ivec2 cell = ivec2(building_block_rect.x, y);
+            if (!map_is_cell_in_bounds(state.map, cell)) {
+                continue;
+            }
+            if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BUILDING) {
+                is_mine_unoccupied = true;
+            }
+            cell = ivec2(building_block_rect.x + building_block_rect.w, y);
+            if (!map_is_cell_in_bounds(state.map, cell)) {
+                continue;
+            }
+            if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BUILDING) {
+                is_mine_unoccupied = true;
+            }
+        }
+        for (int x = building_block_rect.x; x < building_block_rect.x + building_block_rect.w; x++) {
+            ivec2 cell = ivec2(x, building_block_rect.y);
+            if (!map_is_cell_in_bounds(state.map, cell)) {
+                continue;
+            }
+            if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BUILDING) {
+                is_mine_unoccupied = true;
+            }
+            cell = ivec2(x, building_block_rect.y + building_block_rect.h);
+            if (!map_is_cell_in_bounds(state.map, cell)) {
+                continue;
+            }
+            if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BUILDING) {
+                is_mine_unoccupied = true;
+            }
+        }
+
+        if (!is_mine_unoccupied) {
+            continue;
+        }
+
+        if (nearest_goldmine_index == INDEX_INVALID || 
+                ivec2::manhattan_distance(state.entities[goldmine_index].cell, state.entities[existing_hall_index].cell) < 
+                ivec2::manhattan_distance(state.entities[nearest_goldmine_index].cell, state.entities[existing_hall_index].cell)) {
+            nearest_goldmine_index = goldmine_index;
+        }
+    }
+
+    // If no goldmines are found, we will not build a hall
+    if (nearest_goldmine_index == INDEX_INVALID) {
+        log_trace("No nearest goldmine");
+        return ivec2(-1, -1);
+    }
+
+    // Do find the hall location, we will search around the perimeter
+    // of the building_block_rect for this goldmine and evaluate each 
+    // placement, choosing the one with the least obstacles nearby
+    Rect building_block_rect = entity_goldmine_get_block_building_rect(state.entities[nearest_goldmine_index].cell);
+    const int HALL_SIZE = entity_get_data(ENTITY_HALL).cell_size;
+    ivec2 corners[4] = { 
+        ivec2(building_block_rect.x, building_block_rect.y) + ivec2(-HALL_SIZE, -HALL_SIZE),
+        ivec2(building_block_rect.x, building_block_rect.y) + ivec2(-HALL_SIZE, building_block_rect.h), 
+        ivec2(building_block_rect.x, building_block_rect.y) + ivec2(building_block_rect.w, building_block_rect.h), 
+        ivec2(building_block_rect.x, building_block_rect.y) + ivec2(building_block_rect.w, -HALL_SIZE) 
+    };
+    ivec2 directions[4] = {
+        DIRECTION_IVEC2[DIRECTION_SOUTH],
+        DIRECTION_IVEC2[DIRECTION_EAST],
+        DIRECTION_IVEC2[DIRECTION_NORTH],
+        DIRECTION_IVEC2[DIRECTION_WEST]
+    };
+    ivec2 best_hall_cell = ivec2(-1, -1);
+    int best_hall_score = -1;
+
+    ivec2 hall_cell = corners[0];
+    ivec2 hall_step = directions[0];
+    while (true) {
+        // Evaluate hall cell score
+        int hall_score = 0;
+        // If the area is blocked (by a cactus, for example) then don't build there
+        if (map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, hall_cell, HALL_SIZE)) {
+            hall_score = -1;
+        } else {
+            // Check for obstacles (including stairs) in a rect around where the hall would be
+            // The more obstacles there are, the higher the score
+            hall_score = 0;
+            Rect hall_surround_rect = (Rect) {
+                .x = hall_cell.x - 2,
+                .y = hall_cell.y - 2,
+                .w = HALL_SIZE + 4,
+                .h = HALL_SIZE + 4
+            };
+            for (int y = hall_surround_rect.y; y < hall_surround_rect.y + hall_surround_rect.h; y++) {
+                for (int x = hall_surround_rect.x; x < hall_surround_rect.x + hall_surround_rect.w; x++) {
+                    if (!map_is_cell_in_bounds(state.map, ivec2(x, y))) {
+                        continue;
+                    }
+                    if (map_is_tile_ramp(state.map, ivec2(x, y)) ||
+                            map_get_cell(state.map, CELL_LAYER_GROUND, ivec2(x, y)).type != CELL_EMPTY) {
+                        hall_score++;
+                    } 
+                }
+            }
+        }
+
+        // Compare hall score to best hall score
+        if (hall_score != -1 && (best_hall_score == -1 || hall_score < best_hall_score))  {
+            best_hall_cell = hall_cell;
+            best_hall_score = hall_score;
+        }
+
+        // Increment perimeter search
+        hall_cell += hall_step;
+        int corner = 0;
+        while (corner < 4) {
+            if (hall_cell == corners[corner]) {
+                break;
+            } 
+            corner++;
+        }
+
+        // Determine whether to end the search or change the search direction
+        if (corner == 0) {
+            break;
+        } else if (corner < 4) {
+            hall_step = directions[corner];
+        }
+    } // End for each cell in perimeter
+
+    // Implicit, we will return ivec2(-1, -1) if there was no good hall cell
+    // found in the search above, but the only reason that would happen is 
+    // if we had a really bad map gen bug or the player surrounded the
+    // goldmine with units 
+    log_trace("best hall cell is %vi", &best_hall_cell);
+    return best_hall_cell;
+}
+
 EntityId bot_pull_worker_off_gold(const MatchState& state, uint8_t bot_player_id, EntityId goldmine_id) {
     for (uint32_t miner_index = 0; miner_index < state.entities.size(); miner_index++) {
         const Entity& miner = state.entities[miner_index];
@@ -1015,7 +1161,7 @@ MatchInput bot_create_build_input(const MatchState& state, const Bot& bot, Entit
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    ivec2 building_location = bot_find_building_location(state, bot.player_id, state.entities.get_by_id(builder_id).cell, entity_get_data(building_type).cell_size);
+    ivec2 building_location = building_type == ENTITY_HALL ? bot_find_hall_location(state, hall_index) : bot_find_building_location(state, bot.player_id, state.entities.get_by_id(builder_id).cell, entity_get_data(building_type).cell_size);
     if (building_location.x == -1) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }

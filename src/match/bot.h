@@ -47,6 +47,7 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id);
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
+ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_index);
 EntityId bot_pull_worker_off_gold(const MatchState& state, uint8_t bot_player_id, EntityId goldmine_id);
 EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, ivec2 cell);
 EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index);
