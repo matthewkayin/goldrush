@@ -129,8 +129,10 @@ void input_poll_events() {
                         break;
                     case SDL_SCANCODE_LCTRL:
                     case SDL_SCANCODE_RCTRL:
+                    #ifdef PLATFORM_OSX
                     case SDL_SCANCODE_LGUI:
                     case SDL_SCANCODE_RGUI:
+                    #endif
                         state.current[INPUT_ACTION_CTRL] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
                     case SDL_SCANCODE_SPACE:

@@ -526,8 +526,8 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Building queue click
     if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
-        !spectator_mode &&
-        !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
+            !spectator_mode &&
+            !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
         const Entity& building = state.match.entities.get_by_id(state.selection[0]);
         const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
         for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
@@ -552,8 +552,8 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Garrisoned unit click
     if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
-        !spectator_mode &&
-        !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
+            !spectator_mode &&
+            !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
         const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
         if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
