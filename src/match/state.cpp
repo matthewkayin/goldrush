@@ -266,6 +266,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                     continue;
                 }
                 Entity& entity = state.entities[entity_index];
+                log_trace("ordering move for entity %u type %s", input.move.entity_ids[id_index], entity_get_data(entity.type).name);
 
                 // Set the unit's target
                 Target target;
@@ -1931,8 +1932,9 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
     // Update animation
     AnimationName expected_animation = entity_get_expected_animation(entity);
-    if (entity.animation.name != expected_animation || !animation_is_playing(entity.animation)) {
+    if (entity.animation.name != expected_animation || (!animation_is_playing(entity.animation) && expected_animation != ANIMATION_UNIT_IDLE)) {
         entity.animation = animation_create(expected_animation);
+        log_trace("entity animation create %u", entity_id);
     }
     int prev_hframe = entity.animation.frame.x;
     animation_update(entity.animation);
