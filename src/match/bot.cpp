@@ -2,6 +2,9 @@
 
 #include "core/logger.h"
 
+#define BOT_MAX_AGGRESSIVENESS 8 
+#define BOT_MAX_BOLDNESS 8
+
 // TODO: this needs to be dynamic based on the size of the army
 // Maybe we can do something like say that a unit has been gathered if it is
 // close to the gather point or if it is nearby another unit who is also gathered?
@@ -11,6 +14,8 @@ Bot bot_init(uint8_t player_id) {
     Bot bot;
 
     bot.player_id = player_id;
+    bot.priority = BOT_PRIORITY_MILITARY;
+    bot.stance = BOT_STANCE_NEUTRAL;
 
     return bot;
 };
@@ -24,13 +29,8 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             break;
         }
     }
-    if (!is_raising_army && bot.armies.size() < 2) {
-        BotArmy army;
-        memset(army.desired_entities, 0, sizeof(army.desired_entities));
-        army.desired_entities[ENTITY_DETECTIVE] = 4;
-        army.mode = BOT_ARMY_MODE_RAISE;
-        army.type = BOT_ARMY_TYPE_ATTACK;
-        bot.armies.push_back(army);
+    if (!is_raising_army) {
+        bot_army_create(state, bot);
     }
 
     // Determine effective gold
@@ -212,6 +212,78 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             army_index++;
         }
     }
+}
+
+void bot_army_create(const MatchState& state, Bot& bot) {
+    // Count existing buildings, used to determine how well defended we are
+    // also used to determine how expensive it would be to use a certain tech
+    // compared to tech we have already invested in
+    uint32_t existing_tech[ENTITY_TYPE_COUNT];
+    std::unordered_map<uint32_t, uint32_t> hall_army_count;
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.type == ENTITY_BUNKER && !entity.garrisoned_units.empty()) {
+            continue;
+        }
+        if (entity.mode == MODE_BUILDING_FINISHED && entity.player_id == bot.player_id) {
+            existing_tech[entity.type]++;
+            if (entity.type == ENTITY_HALL) {
+                hall_army_count[entity_index] = 0;
+            }
+        }
+    }
+
+    // Count how many armies we have at each base
+    for (const BotArmy& army : bot.armies) {
+        if (army.type != BOT_ARMY_TYPE_DEFEND) {
+            continue;
+        }
+        uint32_t nearest_hall_index = INDEX_INVALID;
+        for (auto it : hall_army_count) {
+            const Entity& hall = state.entities[it.first];
+            if (nearest_hall_index == INDEX_INVALID || 
+                    ivec2::manhattan_distance(army.gather_point, hall.cell) <
+                    ivec2::manhattan_distance(army.gather_point, state.entities[nearest_hall_index].cell)) {
+                nearest_hall_index = it.first;
+            }
+        }
+        GOLD_ASSERT(nearest_hall_index != INDEX_INVALID);
+        hall_army_count[nearest_hall_index]++;
+    }
+
+    // Determine if bases are well defended or not
+    bool are_bases_well_defended = true;
+    int desired_armies_per_base = 2 - (int)bot.stance;
+    for (auto it : hall_army_count) {
+        if (it.second < desired_armies_per_base) {
+            are_bases_well_defended = true;
+        }
+    }
+
+    if (!are_bases_well_defended) {
+        BotArmy army;
+        army.type = BOT_ARMY_TYPE_DEFEND;
+        army.mode = BOT_ARMY_MODE_RAISE;
+        memset(army.desired_entities, 0, sizeof(army.desired_entities));
+        army.desired_entities[ENTITY_COWBOY] = 4;
+        army.desired_entities[ENTITY_BUNKER] = 1;
+        bot.armies.push_back(army);
+        return;
+    }
+
+    BotArmy army;
+    army.type = BOT_ARMY_TYPE_ATTACK;
+    army.mode = BOT_ARMY_MODE_RAISE;
+    memset(army.desired_entities, 0, sizeof(army.desired_entities));
+
+    int budget = (int)bot.effective_gold + (existing_tech[ENTITY_HALL] * 400);
+    while (budget > 0) {
+        EntityType next_entity = army.desired_entities[ENTITY_BANDIT] < 4 ? ENTITY_BANDIT : ENTITY_COWBOY;
+        army.desired_entities[next_entity]++;
+        budget -= entity_get_data(next_entity).gold_cost;
+    }
+
+    bot.armies.push_back(army);
 }
 
 void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vector<MatchInput>& inputs) {
@@ -702,20 +774,27 @@ void bot_release_entity(Bot& bot, EntityId entity_id) {
 }
 
 EntityType bot_get_desired_entity(const MatchState& state, const Bot& bot) {
-    // TODO: decide here if we want to expand
-    uint32_t hall_count = 0;
+    // Determine whether to create a base
+    int player_base_count[MAX_PLAYERS];
+    memset(player_base_count, 0, sizeof(player_base_count));
     for (const Entity& entity : state.entities) {
-        if ((entity.type == ENTITY_HALL && 
-                entity.player_id == bot.player_id && 
-                entity.mode == MODE_BUILDING_FINISHED) ||
-                (entity.type == ENTITY_MINER && 
-                    entity.player_id == bot.player_id &&
-                    entity.target.type == TARGET_BUILD && 
-                    entity.target.build.building_type == ENTITY_HALL)) {
-            hall_count++;
+        if ((entity.type == ENTITY_HALL && entity.mode == MODE_BUILDING_FINISHED) || 
+                (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD && entity.target.build.building_type == ENTITY_HALL)) {
+            player_base_count[entity.player_id]++;
         }
     }
-    if (hall_count < 1) {
+
+    int max_opponent_bases = -1;
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].team == state.players[bot.player_id].team) {
+            continue;
+        }
+        max_opponent_bases = std::max(max_opponent_bases, player_base_count[player_id]);
+    }
+
+    int base_advantage = player_base_count[bot.player_id] - max_opponent_bases;
+    if ((base_advantage == 0 && bot.priority == BOT_PRIORITY_EXPAND) ||
+            (base_advantage < 0 && bot.priority == BOT_PRIORITY_NEUTRAL)) {
         return ENTITY_HALL;
     }
 

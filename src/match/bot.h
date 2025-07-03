@@ -28,8 +28,22 @@ struct BotArmy {
     ivec2 gather_point;
 };
 
+enum BotPriority {
+    BOT_PRIORITY_EXPAND,
+    BOT_PRIORITY_NEUTRAL,
+    BOT_PRIORITY_MILITARY
+};
+
+enum BotStance {
+    BOT_STANCE_DEFENSIVE,
+    BOT_STANCE_NEUTRAL,
+    BOT_STANCE_AGGRESSIVE
+};
+
 struct Bot {
     uint8_t player_id;
+    BotPriority priority;
+    BotStance stance;
     uint32_t effective_gold;
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<EntityId> reserved_builders;
@@ -38,6 +52,7 @@ struct Bot {
 
 Bot bot_init(uint8_t player_id);
 void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInput>& inputs);
+void bot_army_create(const MatchState& state, Bot& bot);
 void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vector<MatchInput>& inputs);
 
 bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id);
