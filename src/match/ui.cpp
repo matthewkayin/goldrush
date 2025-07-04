@@ -2531,25 +2531,32 @@ void match_ui_render(const MatchUiState& state) {
             continue;
         }
 
-        // Count how many miners are mining from this mine
-        EntityId entity_id = state.match.entities.get_id_of(entity_index);
-        uint8_t player_id = state.replay_mode ? state.replay_fog_player_ids[state.replay_fog_index] : network_get_player_id();
-        if (player_id == PLAYER_NONE) {
-            continue;
-        }
-        uint32_t miner_count = match_get_miners_on_gold(state.match, entity_id, player_id);
-        if (miner_count == 0) {
-            continue;
-        }
-
-        char counter_text[4];
-        sprintf(counter_text, "%u", miner_count);
-        ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, counter_text);
         const SpriteInfo& miner_icon_info = render_get_sprite_info(SPRITE_UI_MINER_ICON);
-        text_size.x += miner_icon_info.frame_width;
-        ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 6);
-        render_text(miner_count > MATCH_MAX_MINERS_ON_GOLD ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2(miner_icon_info.frame_width + 2, 0));
-        render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[player_id].recolor_id);
+        int icon_y_offset = 0;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (!state.replay_mode && player_id != network_get_player_id()) {
+                continue;
+            }
+
+            // Count how many miners are mining from this mine
+            EntityId entity_id = state.match.entities.get_id_of(entity_index);
+            if (player_id == PLAYER_NONE) {
+                continue;
+            }
+            uint32_t miner_count = match_get_miners_on_gold(state.match, entity_id, player_id);
+            if (miner_count == 0) {
+                continue;
+            }
+
+            char counter_text[4];
+            sprintf(counter_text, "%u", miner_count);
+            ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, counter_text);
+            text_size.x += miner_icon_info.frame_width;
+            ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 6) + ivec2(0, icon_y_offset);
+            render_text(miner_count > MATCH_MAX_MINERS_ON_GOLD ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2(miner_icon_info.frame_width + 2, 0));
+            render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[player_id].recolor_id);
+            icon_y_offset -= miner_icon_info.frame_height + 1;
+        }
     }
 
     // Sky entities select rings

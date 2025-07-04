@@ -177,6 +177,7 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
         if (train_input.type != MATCH_INPUT_NONE) {
             bot.effective_gold -= entity_get_data(desired_unit).gold_cost;
             inputs.push_back(train_input);
+            inputs.push_back(bot_create_building_rally_input(state, bot, train_input.building_enqueue.building_id));
         }
     }
 
@@ -1420,4 +1421,60 @@ MatchInput bot_create_train_unit_input(const MatchState& state, const Bot& bot, 
     input.building_enqueue.item_type = BUILDING_QUEUE_ITEM_UNIT;
     input.building_enqueue.item_subtype = unit_type;
     return input;
+}
+
+MatchInput bot_create_building_rally_input(const MatchState& state, const Bot& bot, EntityId building_id) {
+    static const int RALLY_CELL_RADIUS = 4;
+
+    std::queue<ivec2> frontier;
+    std::unordered_map<uint32_t, bool> explored;
+    frontier.push(state.entities.get_by_id(building_id).cell);
+
+    ivec2 rally_cell = ivec2(-1, -1);
+    while (!frontier.empty()) {
+        ivec2 next = frontier.front();
+        frontier.pop();
+
+        if (explored.find(next.x + (next.y * state.map.width)) != explored.end()) {
+            continue;
+        }
+
+        bool is_next_valid = true;
+        for (int y = next.y - RALLY_CELL_RADIUS; y < next.y + RALLY_CELL_RADIUS; y++) {
+            for (int x = next.x - RALLY_CELL_RADIUS; x < next.x + RALLY_CELL_RADIUS; x++) {
+                if (!map_is_cell_in_bounds(state.map, ivec2(x, y))) {
+                    is_next_valid = false;
+                    break;
+                }
+                CellType cell_type = map_get_cell(state.map, CELL_LAYER_GROUND, ivec2(x, y)).type;
+                if (!(cell_type == CELL_EMPTY || cell_type == CELL_UNIT)) {
+                    is_next_valid = false;
+                    break;
+                }
+            }
+            if (!is_next_valid) {
+                break;
+            }
+        }
+        if (is_next_valid) {
+            rally_cell = next;
+            break;
+        }
+
+        explored[next.x + (next.y * state.map.width)] = true;
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            ivec2 child = next + DIRECTION_IVEC2[direction];
+            frontier.push(child);
+        }
+    }
+
+    GOLD_ASSERT(rally_cell.x != -1);
+
+    MatchInput rally_input;
+    rally_input.type = MATCH_INPUT_RALLY;
+    rally_input.rally.building_ids[0] = building_id;
+    rally_input.rally.building_count = 1;
+    rally_input.rally.rally_point = cell_center(rally_cell).to_ivec2();
+
+    return rally_input;
 }

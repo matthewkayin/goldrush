@@ -68,3 +68,4 @@ MatchInput bot_create_build_input(const MatchState& state, const Bot& bot, Entit
 EntityType bot_get_building_type_which_trains_unit_type(EntityType unit_type);
 EntityType bot_get_building_pre_req(EntityType building_type);
 MatchInput bot_create_train_unit_input(const MatchState& state, const Bot& bot, EntityType unit_type);
+MatchInput bot_create_building_rally_input(const MatchState& state, const Bot& bot, EntityId building_id);
