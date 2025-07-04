@@ -7,7 +7,8 @@
 
 enum BotStrategy {
     BOT_STRATEGY_BANDIT_RUSH,
-    BOT_STRATEGY_EXPAND
+    BOT_STRATEGY_EXPAND,
+    BOT_STRATEGY_BUNKER
 };
 
 enum BotArmyType {

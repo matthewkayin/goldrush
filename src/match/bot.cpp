@@ -14,7 +14,7 @@ Bot bot_init(uint8_t player_id) {
     Bot bot;
 
     bot.player_id = player_id;
-    bot.strategy = BOT_STRATEGY_BANDIT_RUSH;
+    bot.strategy = BOT_STRATEGY_BUNKER;
 
     return bot;
 };
@@ -22,9 +22,11 @@ Bot bot_init(uint8_t player_id) {
 void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInput>& inputs) {
     // Do bot strategy
     switch (bot.strategy) {
-        case BOT_STRATEGY_BANDIT_RUSH: {
+        case BOT_STRATEGY_BANDIT_RUSH: 
+        case BOT_STRATEGY_BUNKER: {
+            BotArmyType type = bot.strategy == BOT_STRATEGY_BUNKER ? BOT_ARMY_DEFENSIVE : BOT_ARMY_OFFENSIVE;
             if (bot_has_desired_army(state, bot)) {
-                bot_army_create(state, bot, BOT_ARMY_OFFENSIVE);
+                bot_army_create(state, bot, type);
                 bot.strategy = BOT_STRATEGY_EXPAND;
             }
             break;
@@ -765,7 +767,38 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
             break;
         }
         case BOT_ARMY_MODE_DEFEND: {
-            // TODO: move units closer in to defend point and maybe give them defense behavior?
+            MatchInput move_input;
+            move_input.type = MATCH_INPUT_MOVE_CELL;
+            move_input.move.shift_command = 0;
+            move_input.move.target_id = ID_NULL;
+            move_input.move.target_cell = army.target_cell;
+            move_input.move.entity_count = 0;
+
+            for (EntityId unit_id : army.units) {
+                const Entity& entity = state.entities.get_by_id(unit_id);
+
+                // Don't do anything with a unit that isn't selectable (should be none of the units, but just in case)
+                // Also don't do anything with non-units i.e. bunkers
+                if (!entity_is_selectable(entity) || !entity_is_unit(entity.type)) {
+                    continue;
+                }
+
+                // Check if entity is at defend point
+                if (ivec2::manhattan_distance(entity.cell, army.target_cell) >= ARMY_GATHER_DISTANCE && 
+                        !(entity.target.type == TARGET_CELL && ivec2::manhattan_distance(entity.target.cell, army.target_cell) < ARMY_GATHER_DISTANCE)) {
+                    move_input.move.entity_ids[move_input.move.entity_count] = unit_id;
+                    move_input.move.entity_count++;
+                    if (move_input.move.entity_count == SELECTION_LIMIT) {
+                        inputs.push_back(move_input);
+                        move_input.move.entity_count = 0;
+                    }
+                }
+            }
+
+            if (move_input.move.entity_count != 0) {
+                inputs.push_back(move_input);
+            }
+
             break;
         }
         case BOT_ARMY_MODE_DISSOLVED: 
@@ -794,6 +827,11 @@ void bot_get_desired_army(const Bot& bot, uint32_t* desired_entities) {
         case BOT_STRATEGY_BANDIT_RUSH: {
             desired_entities[ENTITY_BANDIT] = 4;
             desired_entities[ENTITY_WAGON] = 1;
+            break;
+        }
+        case BOT_STRATEGY_BUNKER: {
+            desired_entities[ENTITY_COWBOY] = 4;
+            desired_entities[ENTITY_BUNKER] = 1;
             break;
         }
         case BOT_STRATEGY_EXPAND:
@@ -893,15 +931,15 @@ EntityType bot_get_desired_entities(const MatchState& state, const Bot& bot, uin
         }
         EntityType building_type = bot_get_building_type_which_trains_unit_type((EntityType)entity_type);
         if (desired_entities[entity_type] < 16) {
-            desired_entities[building_type] += 1;
-        } else if (desired_entities[entity_type] < 32) {
             desired_entities[building_type] += 2;
-        } else if (desired_entities[entity_type] < 48) {
+        } else if (desired_entities[entity_type] < 32) {
             desired_entities[building_type] += 3;
-        } else if (desired_entities[entity_type] < 64) {
+        } else if (desired_entities[entity_type] < 48) {
             desired_entities[building_type] += 4;
-        } else {
+        } else if (desired_entities[entity_type] < 64) {
             desired_entities[building_type] += 5;
+        } else {
+            desired_entities[building_type] += 6;
         }
     }
 
