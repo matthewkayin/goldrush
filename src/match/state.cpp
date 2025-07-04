@@ -1934,7 +1934,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     AnimationName expected_animation = entity_get_expected_animation(entity);
     if (entity.animation.name != expected_animation || (!animation_is_playing(entity.animation) && expected_animation != ANIMATION_UNIT_IDLE)) {
         entity.animation = animation_create(expected_animation);
-        log_trace("entity animation create %u", entity_id);
     }
     int prev_hframe = entity.animation.frame.x;
     animation_update(entity.animation);
@@ -2351,15 +2350,20 @@ Target match_entity_target_nearest_hall(const MatchState& state, const Entity& e
 
 Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& entity) {
     const EntityData& entity_data = entity_get_data(entity.type);
+    // This radius makes it so that enemies can target farther than they themselves can see
+    // But the enemies player will still need to have vision of the unit before the entity
+    // attacks it. This prevents entities from just standing there while their friends are
+    // in a fight
+    static const int ENTITY_TARGET_RADIUS = 16;
     Rect entity_rect = (Rect) { 
         .x = entity.cell.x, .y = entity.cell.y, 
         .w = entity_data.cell_size, .h = entity_data.cell_size
     };
     Rect entity_sight_rect = (Rect) {
-        .x = entity.cell.x - entity_data.sight,
-        .y = entity.cell.y - entity_data.sight,
-        .w = 2 * entity_data.sight,
-        .h = 2 * entity_data.sight
+        .x = entity.cell.x - ENTITY_TARGET_RADIUS,
+        .y = entity.cell.y - ENTITY_TARGET_RADIUS,
+        .w = 2 * ENTITY_TARGET_RADIUS,
+        .h = 2 * ENTITY_TARGET_RADIUS
     };
     uint32_t nearest_enemy_index = INDEX_INVALID;
     int nearest_enemy_dist = -1;
