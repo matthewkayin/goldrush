@@ -96,6 +96,11 @@ void input_poll_events() {
         #endif
 
         switch (event.type) {
+            case SDL_EVENT_WINDOW_FOCUS_LOST: 
+            case SDL_EVENT_WINDOW_FOCUS_GAINED: {
+                memset(state.current, 0, sizeof(state.current));
+                break;
+            }
             case SDL_EVENT_MOUSE_MOTION: {
                 state.mouse_position = ivec2(event.motion.x - state.scaled_screen_position.x, event.motion.y - state.scaled_screen_position.y);
                 state.mouse_position = ivec2((state.mouse_position.x * SCREEN_WIDTH) / state.scaled_screen_size.x, (state.mouse_position.y * SCREEN_HEIGHT) / state.scaled_screen_size.y);
