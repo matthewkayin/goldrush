@@ -9,7 +9,8 @@ enum BotStrategy {
     BOT_STRATEGY_BANDIT_RUSH,
     BOT_STRATEGY_EXPAND,
     BOT_STRATEGY_BUNKER,
-    BOT_STRATEGY_DEFENSIVE_PYRO
+    BOT_STRATEGY_DEFENSIVE_PYRO,
+    BOT_STRATEGY_OFFENSIVE_PYRO
 };
 
 enum BotArmyType {
@@ -77,3 +78,4 @@ MatchInput bot_create_upgrade_input(const MatchState& state, const Bot& bot, uin
 void bot_create_landmine_draw_circle(int x_center, int y_center, int x, int y, std::vector<ivec2>& points);
 MatchInput bot_create_landmine_input(const MatchState& state, const Bot& bot, EntityId pyro_id, ivec2 base_center, int base_radius);
 void bot_get_base_info(const MatchState& state, EntityId base_id, ivec2* base_center, int* base_radius, uint32_t* landmine_count);
+MatchInput bot_create_molotov_input(const MatchState& state, EntityId pyro_id, ivec2 attack_point);

@@ -39,6 +39,9 @@ const int SOLDIER_BAYONET_DAMAGE = 5;
 const uint32_t BLEED_DAMAGE_RATE = 30;
 const uint32_t BLEED_DURATION = 60 * 5;
 
+const int PROJECTILE_MOLOTOV_FIRE_SPREAD = 3;
+const int MOLOTOV_RANGE_SQUARED = 49;
+
 struct MatchPlayer {
     bool active;
     char name[MAX_USERNAME_LENGTH + 1];

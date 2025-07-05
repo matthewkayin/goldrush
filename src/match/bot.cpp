@@ -11,7 +11,7 @@ Bot bot_init(uint8_t player_id) {
     Bot bot;
 
     bot.player_id = player_id;
-    bot.strategy = BOT_STRATEGY_DEFENSIVE_PYRO;
+    bot.strategy = BOT_STRATEGY_OFFENSIVE_PYRO;
 
     return bot;
 };
@@ -21,7 +21,8 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
     switch (bot.strategy) {
         case BOT_STRATEGY_BANDIT_RUSH: 
         case BOT_STRATEGY_BUNKER: 
-        case BOT_STRATEGY_DEFENSIVE_PYRO: {
+        case BOT_STRATEGY_DEFENSIVE_PYRO:
+        case BOT_STRATEGY_OFFENSIVE_PYRO: {
             BotArmyType type = bot.strategy == BOT_STRATEGY_BUNKER || bot.strategy == BOT_STRATEGY_DEFENSIVE_PYRO 
                                     ? BOT_ARMY_DEFENSIVE 
                                     : BOT_ARMY_OFFENSIVE;
@@ -655,7 +656,7 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
                 if (ivec2::manhattan_distance(entity.cell, army.attack_cell) >= ARMY_GATHER_DISTANCE) {
                     units_have_reached_move_out_point = false;
                     // If it is not, but it is on the way, then don't bother it
-                    if ((entity.target.type == TARGET_ATTACK_CELL || entity.target.type == TARGET_UNLOAD) &&
+                    if ((entity.target.type == TARGET_ATTACK_CELL || entity.target.type == TARGET_UNLOAD || entity.target.type == TARGET_MOLOTOV) &&
                             ivec2::manhattan_distance(entity.target.cell, army.attack_cell) < ARMY_GATHER_DISTANCE) {
                         continue;
                     }
@@ -745,6 +746,21 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
                         attack_input.move.entity_ids[0] = unit_id;
                         attack_input.move.entity_count = 1;
                         inputs.push_back(attack_input);
+                    }
+                }
+
+                // Throw molotovs
+                if (entity.type == ENTITY_PYRO) {
+                    // We're not actually going to use this target, we're just using it to see if there is anything to attack nearby
+                    Target attack_target = match_entity_target_nearest_enemy(state, entity);
+                    if (attack_target.type != TARGET_NONE) {
+                        units_are_attacking = true;
+                    }
+                    if (entity.target.type != TARGET_MOLOTOV && entity.energy > MOLOTOV_ENERGY_COST) {
+                        MatchInput molotov_input = bot_create_molotov_input(state, unit_id, army.attack_cell);
+                        if (molotov_input.type != MATCH_INPUT_NONE) {
+                            inputs.push_back(molotov_input);
+                        }
                     }
                 }
 
@@ -863,8 +879,9 @@ void bot_get_desired_army(const Bot& bot, uint32_t* desired_entities) {
             desired_entities[ENTITY_BUNKER] = 1;
             break;
         }
-        case BOT_STRATEGY_DEFENSIVE_PYRO: {
-            desired_entities[ENTITY_PYRO] = 1;
+        case BOT_STRATEGY_DEFENSIVE_PYRO: 
+        case BOT_STRATEGY_OFFENSIVE_PYRO: {
+            desired_entities[ENTITY_PYRO] = 2;
             break;
         }
         case BOT_STRATEGY_EXPAND:
@@ -1750,4 +1767,97 @@ void bot_get_base_info(const MatchState& state, EntityId base_id, ivec2* base_ce
             }
         }
     }
+}
+
+MatchInput bot_create_molotov_input(const MatchState& state, EntityId pyro_id, ivec2 attack_point) {
+    static const int MOLOTOV_THROW_SEARCH_MARGIN = 32;
+    const Entity& pyro = state.entities.get_by_id(pyro_id);
+
+    ivec2 best_molotov_cell = ivec2(-1, -1);
+    int best_molotov_cell_score = 0;
+
+    // Consider all cells in the search range
+    for (int y = attack_point.y - MOLOTOV_THROW_SEARCH_MARGIN; y < attack_point.y + MOLOTOV_THROW_SEARCH_MARGIN; y++) {
+        for (int x = attack_point.x - MOLOTOV_THROW_SEARCH_MARGIN; x < attack_point.x + MOLOTOV_THROW_SEARCH_MARGIN; x++) {
+            ivec2 cell = ivec2(x, y);
+            if (!map_is_cell_in_bounds(state.map, cell)) {
+                continue;
+            }
+
+            // For each cell, score them based on what units we would hit if we threw fire there
+            int molotov_cell_score = 0;
+            std::unordered_map<EntityId, bool> entity_considered;
+            for (int fire_y = cell.y - PROJECTILE_MOLOTOV_FIRE_SPREAD; fire_y < cell.y + PROJECTILE_MOLOTOV_FIRE_SPREAD; fire_y++) {
+                for (int fire_x = cell.x - PROJECTILE_MOLOTOV_FIRE_SPREAD; fire_x < cell.x + PROJECTILE_MOLOTOV_FIRE_SPREAD; fire_x++) {
+                    // Don't count the corners of this square
+                    if ((fire_y == cell.y - PROJECTILE_MOLOTOV_FIRE_SPREAD || fire_y == cell.y + PROJECTILE_MOLOTOV_FIRE_SPREAD - 1) &&
+                            (fire_x == cell.x - PROJECTILE_MOLOTOV_FIRE_SPREAD || fire_x == cell.x + PROJECTILE_MOLOTOV_FIRE_SPREAD - 1)) {
+                        continue;
+                    }
+                    ivec2 fire_cell = ivec2(fire_x, fire_y);
+                    if (!map_is_cell_in_bounds(state.map, fire_cell)) {
+                        continue;
+                    }
+
+                    Cell fire_map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, fire_cell);
+                    if (fire_map_cell.type == CELL_BUILDING || fire_map_cell.type == CELL_UNIT || fire_map_cell.type == CELL_MINER) {
+                        if (entity_considered.find(fire_map_cell.id) != entity_considered.end()) {
+                            continue;
+                        }
+                        entity_considered[fire_map_cell.id] = true;
+                        const Entity& fire_target = state.entities.get_by_id(fire_map_cell.id);
+                        if (fire_map_cell.id == pyro_id) {
+                            molotov_cell_score -= 4;
+                        } else if (state.players[fire_target.player_id].team == state.players[pyro.player_id].team) {
+                            molotov_cell_score -= 2;
+                        } else if (entity_is_unit(fire_target.type)) {
+                            molotov_cell_score += 2;
+                        } else {
+                            molotov_cell_score++;
+                        }
+                    }
+
+                    if (match_is_cell_on_fire(state, fire_cell)) {
+                        molotov_cell_score--;
+                    }
+                }
+            } // End for each fire_y
+
+            // Consider other existing or about to exist molotov fires
+            for (const Entity& entity : state.entities) {
+                if (entity.target.type == TARGET_MOLOTOV && ivec2::manhattan_distance(cell, entity.target.cell) < PROJECTILE_MOLOTOV_FIRE_SPREAD) {
+                    molotov_cell_score--;
+                }
+            }
+            for (const Projectile& projectile : state.projectiles) {
+                if (projectile.type == PROJECTILE_MOLOTOV && ivec2::manhattan_distance(cell, projectile.target.to_ivec2() / TILE_SIZE) < PROJECTILE_MOLOTOV_FIRE_SPREAD) {
+                    molotov_cell_score--;
+                }
+            }
+
+            // Also score based on how far away the molotov cell is 
+            // Divide by the molotov range so that we don't weight this too heavily
+            // The real reason we care about the range is if we have multiple pyros, it'd be nice if they 
+            // didn't both decide to throw to the same spot but instead considered their own position
+            molotov_cell_score -= (2 * ivec2::euclidean_distance_squared(pyro.cell, cell) / MOLOTOV_RANGE_SQUARED);
+
+            if (molotov_cell_score > best_molotov_cell_score) {
+                best_molotov_cell = cell;
+                best_molotov_cell_score = molotov_cell_score;
+            }
+        }
+    } // End for each y
+
+    if (best_molotov_cell_score == 0) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_MOLOTOV;
+    input.move.shift_command = 0;
+    input.move.target_id = ID_NULL;
+    input.move.target_cell = best_molotov_cell;
+    input.move.entity_count = 1;
+    input.move.entity_ids[0] = pyro_id;
+    return input;
 }
