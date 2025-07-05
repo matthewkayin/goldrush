@@ -1590,9 +1590,29 @@ void bot_create_landmine_draw_circle(int x_center, int y_center, int x, int y, s
     points.push_back(ivec2(x_center - y, y_center - x));
 }
 
-MatchInput bot_create_landmine_input(const MatchState& state, const Bot& bot, EntityId pyro_id, ivec2 base_center, int base_radius) {
+bool bot_is_landmine_point_valid(const MatchState& state, ivec2 point) {
     static const int MINE_SPACING = 1;
 
+    ivec2 point_rect_top_left = point - ivec2(MINE_SPACING, MINE_SPACING);
+    int point_rect_size = 1 + (2 * MINE_SPACING);
+    if (!map_is_cell_rect_in_bounds(state.map, point_rect_top_left, point_rect_size) ||
+            map_is_cell_rect_occupied(state.map, CELL_LAYER_UNDERGROUND, point_rect_top_left, point_rect_size)) {
+        return false;
+    }
+    for (int y = point_rect_top_left.y; y < point_rect_top_left.y + point_rect_size; y++) {
+        for (int x = point_rect_top_left.x; x < point_rect_top_left.x + point_rect_size; x++) {
+            CellType cell_type = map_get_cell(state.map, CELL_LAYER_GROUND, ivec2(x, y)).type;
+            if ((x == point.x && y == point.y && cell_type != CELL_EMPTY) ||
+                    (x != point.x && y != point.y && cell_type == CELL_BUILDING)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+MatchInput bot_create_landmine_input(const MatchState& state, const Bot& bot, EntityId pyro_id, ivec2 base_center, int base_radius) {
     // Using Besenham's Circle to create list of points along which to place landmines
     // https://www.geeksforgeeks.org/c/bresenhams-circle-drawing-algorithm/
     std::vector<ivec2> circle_points;
@@ -1637,11 +1657,7 @@ MatchInput bot_create_landmine_input(const MatchState& state, const Bot& bot, En
     ivec2 nearest_mine_cell = ivec2(-1, -1);
     ivec2 enemy_cell = state.entities[nearest_enemy_base_index].cell;
     for (ivec2 point : circle_points) {
-        ivec2 point_rect_top_left = point - ivec2(MINE_SPACING, MINE_SPACING);
-        int point_rect_size = 1 + (2 * MINE_SPACING);
-        if (!map_is_cell_rect_in_bounds(state.map, point_rect_top_left, point_rect_size) ||
-                map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, point_rect_top_left, point_rect_size) ||
-                map_is_cell_rect_occupied(state.map, CELL_LAYER_UNDERGROUND, point_rect_top_left, point_rect_size)) {
+        if (!bot_is_landmine_point_valid(state, point)) {
             continue;
         }
 
