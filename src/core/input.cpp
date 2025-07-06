@@ -293,7 +293,6 @@ void input_set_hotkey_mapping_to_default(SDL_Scancode* hotkey_mapping) {
 
     // Coop
     hotkey_mapping[INPUT_HOTKEY_WAGON] = SDL_SCANCODE_W;
-    hotkey_mapping[INPUT_HOTKEY_WAR_WAGON] = SDL_SCANCODE_W;
     hotkey_mapping[INPUT_HOTKEY_JOCKEY] = SDL_SCANCODE_C;
 
     // Smith

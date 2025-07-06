@@ -685,7 +685,7 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
 
                 // If a transport is here and it has units in it, then unload them
                 // Otherwise release the transport
-                if (entity.type == ENTITY_WAGON || entity.type == ENTITY_WAR_WAGON) {
+                if (entity.type == ENTITY_WAGON) {
                     if (!entity.garrisoned_units.empty()) {
                         MatchInput unload_input;
                         unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
@@ -1412,7 +1412,6 @@ EntityType bot_get_building_type_which_trains_unit_type(EntityType unit_type) {
             return ENTITY_WORKSHOP;
         case ENTITY_JOCKEY:
         case ENTITY_WAGON:
-        case ENTITY_WAR_WAGON:
             return ENTITY_COOP;
         case ENTITY_SOLDIER:
         case ENTITY_CANNON:

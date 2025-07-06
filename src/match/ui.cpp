@@ -1455,9 +1455,7 @@ void match_ui_update(MatchUiState& state) {
                         }
                         case ENTITY_COOP: {
                             state.hotkey_group[0] = INPUT_HOTKEY_JOCKEY;
-                            state.hotkey_group[1] = match_player_has_upgrade(state.match, network_get_player_id(), UPGRADE_WAR_WAGON)
-                                                        ? INPUT_HOTKEY_WAR_WAGON
-                                                        : INPUT_HOTKEY_WAGON;
+                            state.hotkey_group[1] = INPUT_HOTKEY_WAGON;
                             break;
                         }
                         case ENTITY_BARRACKS: {
@@ -1530,7 +1528,7 @@ void match_ui_update(MatchUiState& state) {
             }
 
             RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
-            const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
+            const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
             Rect render_rect = (Rect) {
                 .x = params.position.x, .y = params.position.y,
                 .w = sprite_info.frame_width, .h = sprite_info.frame_height
@@ -2311,7 +2309,7 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
-        const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
+        const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
         Rect render_rect = (Rect) {
             .x = params.position.x, .y = params.position.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
@@ -2596,7 +2594,7 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
-        const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
+        const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
         Rect render_rect = (Rect) {
             .x = params.position.x, .y = params.position.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
@@ -2844,7 +2842,7 @@ void match_ui_render(const MatchUiState& state) {
             button_frame = 2;
         }
 
-        SpriteName button_icon = entity_get_data(most_common_entity_type).icon;
+        SpriteName button_icon = match_entity_get_icon(state.match, most_common_entity_type, network_get_player_id());
         const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_CONTROL_GROUP);
         ivec2 render_pos = ivec2(BOTTOM_PANEL_RECT.x, BOTTOM_PANEL_RECT.y) + ivec2(2, 0) + ivec2((3 + sprite_info.frame_width) * control_group_index, -32);
         render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0);
@@ -2886,7 +2884,7 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(hotkey_get_sprite(hotkey, match_ui_should_render_hotkey_toggled(state, hotkey)), ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(match_ui_hotkey_get_sprite(state, hotkey, match_ui_should_render_hotkey_toggled(state, hotkey)), ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
     }
 
     // UI Tooltip
@@ -3088,7 +3086,7 @@ void match_ui_render(const MatchUiState& state) {
 
         // Entity icon
         render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(entity_data.icon, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
 
         if (entity.type == ENTITY_GOLDMINE) {
             if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
@@ -3220,7 +3218,7 @@ void match_ui_render(const MatchUiState& state) {
                 SpriteName item_sprite;
                 switch (building.queue[building_queue_index].type) {
                     case BUILDING_QUEUE_ITEM_UNIT: {
-                        item_sprite = entity_get_data(building.queue[building_queue_index].unit_type).icon;
+                        item_sprite = match_entity_get_icon(state.match, building.queue[building_queue_index].unit_type, building.player_id);
                         break;
                     }
                     case BUILDING_QUEUE_ITEM_UPGRADE: {
@@ -3489,6 +3487,15 @@ SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking) {
     return select_ring;
 }
 
+SpriteName match_ui_hotkey_get_sprite(const MatchUiState& state, InputAction hotkey, bool show_toggled) {
+    const HotkeyButtonInfo& info = hotkey_get_button_info(hotkey);
+    if (info.type == HOTKEY_BUTTON_BUILD || info.type == HOTKEY_BUTTON_TRAIN) {
+        return match_entity_get_icon(state.match, info.entity_type, network_get_player_id());
+    } else {
+        return hotkey_get_sprite(hotkey, show_toggled);
+    }
+}
+
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high) {
     RenderSpriteParams pivot = params[high];
     int i = low - 1;
@@ -3569,13 +3576,13 @@ void match_ui_render_target_build(const MatchUiState& state, const Target& targe
 
 RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& state, const Entity& entity) {
     RenderSpriteParams params = (RenderSpriteParams) {
-        .sprite = entity_get_sprite(entity),
+        .sprite = match_entity_get_sprite(state.match, entity),
         .frame = entity_get_animation_frame(entity),
         .position = entity.position.to_ivec2() - state.camera_offset,
         .options = 0,
         .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state.match.players[entity.player_id].recolor_id
     };
-    const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_sprite(entity));
+    const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
     if (entity_is_unit(entity.type)) {
         if (entity.mode == MODE_UNIT_BUILD) {
             const Entity& building = state.match.entities.get_by_id(entity.target.id);
@@ -3651,7 +3658,7 @@ void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity
                             icon_rect.has_point(input_get_mouse_position());
 
     render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
-    render_sprite_frame(entity_data.icon, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
+    render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
     ivec2 healthbar_position = ivec2(icon_rect.x + 1, icon_rect.y + 27 - (int)icon_hovered);
     ivec2 healthbar_size = ivec2(30, 4);
     uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);

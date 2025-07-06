@@ -156,39 +156,6 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .min_range_squared = 1
         }
     }},
-    { ENTITY_WAR_WAGON, (EntityData) {
-        .name = "War Wagon",
-        .sprite = SPRITE_UNIT_WAR_WAGON,
-        .icon = SPRITE_BUTTON_ICON_WAR_WAGON,
-        .death_sound = SOUND_DEATH_CHICKEN,
-        .cell_layer = CELL_LAYER_GROUND,
-        .cell_size = 2,
-        
-        .gold_cost = 200,
-        .train_duration = 38,
-        .max_health = 120,
-        .sight = 9,
-        .armor = 3,
-        .attack_priority = 1,
-
-        .garrison_capacity = 4,
-        .garrison_size = ENTITY_CANNOT_GARRISON,
-        .has_detection = false,
-
-        .unit_data = (EntityDataUnit) {
-            .population_cost = 2,
-            .speed = fixed::from_int_and_raw_decimal(1, 20),
-            .max_energy = 0,
-
-            .attack_sound = SOUND_PICKAXE,
-            .damage = 0,
-            .accuracy = 0,
-            .evasion = 12,
-            .attack_cooldown = 0,
-            .range_squared = 1,
-            .min_range_squared = 1
-        }
-    }},
     { ENTITY_JOCKEY, (EntityData) {
         .name = "Jockey",
         .sprite = SPRITE_UNIT_JOCKEY,
@@ -777,37 +744,6 @@ void entity_set_flag(Entity& entity, uint32_t flag, bool value) {
     } else {
         entity.flags &= ~flag;
     }
-}
-
-SpriteName entity_get_sprite(const Entity& entity) {
-    const EntityData& entity_data = ENTITY_DATA.at(entity.type);
-
-    if (entity.mode == MODE_BUILDING_DESTROYED) {
-        if (entity.type == ENTITY_BUNKER) {
-            return SPRITE_BUILDING_DESTROYED_BUNKER;
-        }
-        if (entity.type == ENTITY_LANDMINE) {
-            return SPRITE_BUILDING_DESTROYED_MINE;
-        }
-        switch (entity_data.cell_size) {
-            case 2:
-                return SPRITE_BUILDING_DESTROYED_2;
-            case 3:
-                return SPRITE_BUILDING_DESTROYED_3;
-            case 4:
-                return SPRITE_BUILDING_DESTROYED_4;
-            default:
-                GOLD_ASSERT_MESSAGE(false, "Destroyed sprite needed for building of this size");
-                return SPRITE_BUILDING_DESTROYED_2;
-        }
-    }
-    if (entity.mode == MODE_UNIT_BUILD || entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD_ASSIST) {
-        return SPRITE_MINER_BUILDING;
-    }
-    if (entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
-        return SPRITE_UNIT_DETECTIVE_INVISIBLE;
-    }
-    return entity_data.sprite;
 }
 
 AnimationName entity_get_expected_animation(const Entity& entity) {

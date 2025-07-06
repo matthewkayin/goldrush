@@ -477,12 +477,6 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                 return;
             }
 
-            // Check if the player has the war wagon upgrade
-            // TODO
-            if (item.type == BUILDING_QUEUE_ITEM_UNIT && item.unit_type == ENTITY_WAGON && match_player_has_upgrade(state, building.player_id, UPGRADE_WAR_WAGON)) {
-                item.unit_type = ENTITY_WAR_WAGON;
-            }
-
             // Mark upgrades as in-progress when we enqueue them
             if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
                 state.players[building.player_id].upgrades_in_progress |= item.upgrade;
@@ -915,7 +909,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 // Do nothing if unit is garrisoned
                 if (entity.garrison_id != ID_NULL) {
                     const Entity& carrier = state.entities.get_by_id(entity.garrison_id);
-                    if (!(carrier.type == ENTITY_BUNKER || carrier.type == ENTITY_WAR_WAGON)) {
+                    if (!(carrier.type == ENTITY_BUNKER || 
+                            (carrier.type == ENTITY_WAGON && match_player_has_upgrade(state, entity.player_id, UPGRADE_WAR_WAGON)))) {
                         update_finished = true;
                         break;
                     }
@@ -1781,24 +1776,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     } else if (entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UPGRADE) {
                         match_grant_player_upgrade(state, entity.player_id, entity.queue[0].upgrade);
 
-                        // Set all existing wagons to war wagons
-                        if (entity.queue[0].upgrade == UPGRADE_WAR_WAGON) {
-                            for (Entity& other_entity : state.entities) {
-                                if (other_entity.player_id != entity.player_id) {
-                                    continue;
-                                }
-                                if (other_entity.type == ENTITY_WAGON) {
-                                    other_entity.type = ENTITY_WAR_WAGON;
-                                } else if (entity_is_building(other_entity.type)) {
-                                    for (BuildingQueueItem& other_item : other_entity.queue) {
-                                        if (other_item.type == BUILDING_QUEUE_ITEM_UNIT && other_item.unit_type == ENTITY_WAGON) {
-                                            other_item.unit_type = ENTITY_WAR_WAGON;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
                         // Show status
                         state.events.push_back((MatchEvent) {
                             .type = MATCH_EVENT_RESEARCH_COMPLETE,
@@ -1952,6 +1929,47 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             match_entity_attack_target(state, entity_id);
         }
     }
+}
+
+SpriteName match_entity_get_sprite(const MatchState& state, const Entity& entity) {
+    const EntityData& entity_data = entity_get_data(entity.type);
+
+    if (entity.mode == MODE_BUILDING_DESTROYED) {
+        if (entity.type == ENTITY_BUNKER) {
+            return SPRITE_BUILDING_DESTROYED_BUNKER;
+        }
+        if (entity.type == ENTITY_LANDMINE) {
+            return SPRITE_BUILDING_DESTROYED_MINE;
+        }
+        switch (entity_data.cell_size) {
+            case 2:
+                return SPRITE_BUILDING_DESTROYED_2;
+            case 3:
+                return SPRITE_BUILDING_DESTROYED_3;
+            case 4:
+                return SPRITE_BUILDING_DESTROYED_4;
+            default:
+                GOLD_ASSERT_MESSAGE(false, "Destroyed sprite needed for building of this size");
+                return SPRITE_BUILDING_DESTROYED_2;
+        }
+    }
+    if (entity.mode == MODE_UNIT_BUILD || entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD_ASSIST) {
+        return SPRITE_MINER_BUILDING;
+    }
+    if (entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
+        return SPRITE_UNIT_DETECTIVE_INVISIBLE;
+    }
+    if (entity.type == ENTITY_WAGON && match_player_has_upgrade(state, entity.player_id, UPGRADE_WAR_WAGON)) {
+        return SPRITE_UNIT_WAR_WAGON;
+    }
+    return entity_data.sprite;
+}
+
+SpriteName match_entity_get_icon(const MatchState& state, EntityType type, uint8_t player_id) {
+    if (type == ENTITY_WAGON && match_player_has_upgrade(state, player_id, UPGRADE_WAR_WAGON)) {
+        return SPRITE_BUTTON_ICON_WAR_WAGON;
+    }
+    return entity_get_data(type).icon;
 }
 
 bool match_is_entity_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id) {
@@ -2452,7 +2470,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
         ivec2 particle_position;
         if (carrier.type == ENTITY_BUNKER) {
             particle_position = (carrier.cell * TILE_SIZE) + BUNKER_PARTICLE_OFFSETS[particle_index];
-        } else if (carrier.type == ENTITY_WAR_WAGON) {
+        } else if (carrier.type == ENTITY_WAGON) {
             const SpriteInfo& wagon_sprite_info = render_get_sprite_info(SPRITE_UNIT_WAR_WAGON);
             particle_position = carrier.position.to_ivec2() - (ivec2(wagon_sprite_info.frame_width, wagon_sprite_info.frame_height) / 2);
             if (carrier.direction == DIRECTION_SOUTH) {
@@ -2576,7 +2594,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
                 if (!entity_rect.intersects(full_damage_rect)) {
                     damage /= 2;
                 }
-                damage = std::max(1, damage - entity_get_data(entity.type).armor);
+                damage = std::max(1, damage - match_entity_get_armor(state, entity));
 
                 entity.health = std::max(0, entity.health - damage);
                 log_trace("DESYNC cannon hit entity index %u ID %u damage %i health %i", entity_index, state.entities.get_id_of(entity_index), damage, entity.health);
@@ -2585,7 +2603,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
         }
     } else if (!attack_missed) {
         int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
-        int damage = std::max(1, attacker_damage - defender_data.armor);
+        int damage = std::max(1, attacker_damage - match_entity_get_armor(state, defender));
         defender.health = std::max(0, defender.health - damage);
         if (attacker.type == ENTITY_BANDIT && match_player_has_upgrade(state, attacker.player_id, UPGRADE_SERRATED_KNIVES) && entity_is_unit(defender.type)) {
             defender.bleed_timer = BLEED_DURATION;
@@ -2725,7 +2743,7 @@ void match_entity_explode(MatchState& state, EntityId entity_id) {
 
         Rect defender_rect = entity_get_rect(defender);
         if (explosion_rect.intersects(defender_rect)) {
-            int defender_armor = entity_get_data(defender.type).armor;
+            int defender_armor = match_entity_get_armor(state, defender); 
             int damage = std::max(1, explosion_damage - defender_armor);
             defender.health = std::max(defender.health - damage, 0);
             match_entity_on_attack(state, entity_id, defender);
@@ -2775,6 +2793,14 @@ bool match_entity_has_detection(const MatchState& state, const Entity& entity) {
         return true;
     }
     return entity_get_data(entity.type).has_detection;
+}
+
+int match_entity_get_armor(const MatchState& state, const Entity& entity) {
+    int armor = entity_get_data(entity.type).armor;
+    if (entity.type == ENTITY_WAGON && match_player_has_upgrade(state, entity.player_id, UPGRADE_WAR_WAGON)) {
+        armor += 2;
+    }
+    return armor;
 }
 
 // EVENTS

@@ -201,6 +201,8 @@ void match_update(MatchState& state);
 EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uint8_t player_id);
 EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left);
 void match_entity_update(MatchState& state, uint32_t entity_index);
+SpriteName match_entity_get_sprite(const MatchState& state, const Entity& entity);
+SpriteName match_entity_get_icon(const MatchState& state, EntityType type, uint8_t player_id);
 bool match_is_entity_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);
 bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id);
 bool match_has_entity_reached_target(const MatchState& state, const Entity& entity);
@@ -223,6 +225,7 @@ void match_entity_release_garrisoned_units_on_death(MatchState& state, Entity& e
 void match_entity_explode(MatchState& state, EntityId entity_id);
 uint32_t match_entity_get_max_energy(const MatchState& state, const Entity& entity);
 bool match_entity_has_detection(const MatchState& state, const Entity& entity);
+int match_entity_get_armor(const MatchState& state, const Entity& entity);
 
 // Event
 

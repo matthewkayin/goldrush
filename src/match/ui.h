@@ -170,6 +170,7 @@ size_t match_ui_replay_end_of_tape(const MatchUiState& state);
 void match_ui_render(const MatchUiState& state);
 
 SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking);
+SpriteName match_ui_hotkey_get_sprite(const MatchUiState& state, InputAction hotkey, bool show_toggled);
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max);
