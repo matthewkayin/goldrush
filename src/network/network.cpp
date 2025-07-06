@@ -450,10 +450,12 @@ void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
     state.players[0].team = 0;
 
     // TODO: delete
+    /*
     state.players[1].status = NETWORK_PLAYER_STATUS_BOT;
     state.players[1].team = 1;
     state.players[1].recolor_id = 1;
     sprintf(state.players[1].name, "Bot");
+    */
 
     log_info("Created server.");
 }

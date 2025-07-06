@@ -791,6 +791,10 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     });
     match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, true);
 
+    if (entity_is_building(type)) {
+        map_calculate_unreachable_cells(state.map);
+    }
+
     log_trace("Created entity %s ID %u player %u cell %vi", entity_data.name, id, player_id, &cell);
 
     return id;
@@ -882,6 +886,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         }
                     }
                 }
+                map_calculate_unreachable_cells(state.map);
             }
         }
 
