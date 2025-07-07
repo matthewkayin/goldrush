@@ -503,7 +503,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
             ivec2 town_hall_cell = map_get_player_town_hall_cell(map, player_spawns[player_id]);
             for (int y = town_hall_cell.y; y < town_hall_cell.y + 4; y++) {
                 for (int x = town_hall_cell.x; x < town_hall_cell.x + 4; x++) {
-                    params.avoid_values[x + (y * map.width)] = 1;
+                    params.avoid_values[x + (y * map.width)] = 4;
                 }
             }
         }

@@ -246,6 +246,17 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
         bot_army_update(state, bot, bot.armies[army_index], inputs);
         if (bot.armies[army_index].mode == BOT_ARMY_MODE_DISSOLVED) {
             for (EntityId unit_id : bot.armies[army_index].units) {
+                const Entity& entity = state.entities.get_by_id(unit_id);
+                if (entity.type == ENTITY_WAGON && !entity.garrisoned_units.empty()) {
+                    MatchInput unload_input;
+                    unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
+                    unload_input.move.shift_command = 0;
+                    unload_input.move.target_id = ID_NULL;
+                    unload_input.move.target_cell = entity.cell;
+                    unload_input.move.entity_count = 1;
+                    unload_input.move.entity_ids[0] = unit_id;
+                    inputs.push_back(unload_input);
+                }
                 bot_release_entity(bot, unit_id);
             }
             bot.armies.erase(bot.armies.begin() + army_index);
@@ -652,41 +663,43 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
                     continue;
                 }
 
+                Target attack_target = match_entity_target_nearest_enemy(state, entity);
+                if (entity.target.type == TARGET_ATTACK_ENTITY ||
+                         entity.target.type == TARGET_ATTACK_CELL ||
+                         attack_target.type == TARGET_ATTACK_ENTITY) {
+                    units_are_attacking = true;
+                }
+
                 // Check if entity is at the attack point
                 if (ivec2::manhattan_distance(entity.cell, army.attack_cell) >= ARMY_GATHER_DISTANCE) {
                     units_have_reached_move_out_point = false;
-                    // If it is not, but it is on the way, then don't bother it
-                    if ((entity.target.type == TARGET_ATTACK_CELL || entity.target.type == TARGET_UNLOAD || entity.target.type == TARGET_MOLOTOV) &&
-                            ivec2::manhattan_distance(entity.target.cell, army.attack_cell) < ARMY_GATHER_DISTANCE) {
-                        continue;
-                    }
-
-                    // Otherwise, send an input to move it closer
-                    if (entity.garrisoned_units.empty()) {
-                        move_input.move.entity_ids[move_input.move.entity_count] = unit_id;
-                        move_input.move.entity_count++;
-                        if (move_input.move.entity_count == SELECTION_LIMIT) {
-                            inputs.push_back(move_input);
-                            move_input.move.entity_count = 0;
+                    // If it is not, and it is not attacking something, and it is not on the way, then move it closer
+                    if (attack_target.type == TARGET_NONE && 
+                            !((entity.target.type == TARGET_ATTACK_CELL || entity.target.type == TARGET_UNLOAD || entity.target.type == TARGET_MOLOTOV) &&
+                            ivec2::manhattan_distance(entity.target.cell, army.attack_cell) < ARMY_GATHER_DISTANCE)) {
+                        // Otherwise, send an input to move it closer
+                        if (entity.garrisoned_units.empty()) {
+                            move_input.move.entity_ids[move_input.move.entity_count] = unit_id;
+                            move_input.move.entity_count++;
+                            if (move_input.move.entity_count == SELECTION_LIMIT) {
+                                inputs.push_back(move_input);
+                                move_input.move.entity_count = 0;
+                            }
+                        } else {
+                            unload_input.move.entity_ids[unload_input.move.entity_count] = unit_id;
+                            unload_input.move.entity_count++;
+                            if (unload_input.move.entity_count == SELECTION_LIMIT) {
+                                inputs.push_back(unload_input);
+                                unload_input.move.entity_count = 0;
+                            }
                         }
-                    } else {
-                        unload_input.move.entity_ids[unload_input.move.entity_count] = unit_id;
-                        unload_input.move.entity_count++;
-                        if (unload_input.move.entity_count == SELECTION_LIMIT) {
-                            inputs.push_back(unload_input);
-                            unload_input.move.entity_count = 0;
-                        }
                     }
-
-                    continue;
                 }
-
-                // At this point, the unit has reached the attack point
 
                 // If a transport is here and it has units in it, then unload them
                 // Otherwise release the transport
                 if (entity.type == ENTITY_WAGON) {
-                    if (!entity.garrisoned_units.empty()) {
+                    if (attack_target.type == TARGET_ATTACK_ENTITY && !entity.garrisoned_units.empty()) {
                         MatchInput unload_input;
                         unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
                         unload_input.move.shift_command = 0;
@@ -695,7 +708,7 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
                         unload_input.move.entity_count = 1;
                         unload_input.move.entity_ids[0] = unit_id;
                         inputs.push_back(unload_input);
-                    } else {
+                    } else if (entity.garrisoned_units.empty()) {
                         uint32_t nearest_hall_index = INDEX_INVALID;
                         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
                             const Entity& hall = state.entities[entity_index];
@@ -726,36 +739,24 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
                     }
                 } 
 
-                // Manage entity target
-                if (entity_get_data(entity.type).unit_data.damage != 0) {
-                    if (entity.target.type == TARGET_ATTACK_ENTITY || entity.target.type == TARGET_ATTACK_CELL) {
-                        units_are_attacking = true;
-                    }
-
-                    // Let's check to make sure this unit is attacking the best target
-                    Target attack_target = match_entity_target_nearest_enemy(state, entity);
-                    if (attack_target.type == TARGET_ATTACK_ENTITY && 
-                            entity.target.type == TARGET_ATTACK_ENTITY && 
-                            entity_get_data(state.entities.get_by_id(attack_target.id).type).attack_priority > 
-                            entity_get_data(state.entities.get_by_id(entity.target.id).type).attack_priority) {
-                        MatchInput attack_input;
-                        attack_input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
-                        attack_input.move.shift_command = 0;
-                        attack_input.move.target_id = attack_target.id;
-                        attack_input.move.target_cell = ivec2(0, 0);
-                        attack_input.move.entity_ids[0] = unit_id;
-                        attack_input.move.entity_count = 1;
-                        inputs.push_back(attack_input);
-                    }
+                // Check to make sure this unit is attacking the best target
+                if (attack_target.type == TARGET_ATTACK_ENTITY && 
+                        entity_get_data(entity.type).unit_data.damage != 0 &&
+                        (entity.target.type != TARGET_ATTACK_ENTITY ||
+                        entity_get_data(state.entities.get_by_id(attack_target.id).type).attack_priority > 
+                        entity_get_data(state.entities.get_by_id(entity.target.id).type).attack_priority)) {
+                    MatchInput attack_input;
+                    attack_input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
+                    attack_input.move.shift_command = 0;
+                    attack_input.move.target_id = attack_target.id;
+                    attack_input.move.target_cell = ivec2(0, 0);
+                    attack_input.move.entity_ids[0] = unit_id;
+                    attack_input.move.entity_count = 1;
+                    inputs.push_back(attack_input);
                 }
 
                 // Throw molotovs
-                if (entity.type == ENTITY_PYRO) {
-                    // We're not actually going to use this target, we're just using it to see if there is anything to attack nearby
-                    Target attack_target = match_entity_target_nearest_enemy(state, entity);
-                    if (attack_target.type != TARGET_NONE) {
-                        units_are_attacking = true;
-                    }
+                if (entity.type == ENTITY_PYRO && attack_target.type == TARGET_ATTACK_ENTITY) {
                     if (entity.target.type != TARGET_MOLOTOV && entity.energy > MOLOTOV_ENERGY_COST) {
                         MatchInput molotov_input = bot_create_molotov_input(state, unit_id, army.attack_cell);
                         if (molotov_input.type != MATCH_INPUT_NONE) {
@@ -766,12 +767,13 @@ void bot_army_update(const MatchState& state, Bot& bot, BotArmy& army, std::vect
 
                 // Camo the detective
                 if (entity.type == ENTITY_DETECTIVE && 
+                        attack_target.type == TARGET_ATTACK_ENTITY &&
                         !entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) &&
                         entity.energy >= CAMO_ENERGY_COST) {
                     camo_input.camo.unit_ids[camo_input.camo.unit_count] = unit_id;
                     camo_input.camo.unit_count++;
                 }
-            }
+            } // End for each unit in army
 
             if (move_input.move.entity_count != 0) {
                 inputs.push_back(move_input);

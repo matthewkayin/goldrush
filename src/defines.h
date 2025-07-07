@@ -16,14 +16,16 @@
 #define APP_NAME "Gold Rush"
 #define APP_VERSION "0.7.3"
 
-// #define GOLD_DEBUG
+#define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
 // #define GOLD_STEAM_APP_ID 3774270U
 #define GOLD_STEAM_APP_ID 3831190
-// #define GOLD_DEBUG_CHEATS
-// #define GOLD_ASSERTS_ENABLED
-// #define GOLD_RAND_SEED 1751411021
-#define GOLD_DEBUG_BOT_VISION
+#ifdef GOLD_DEBUG
+    // #define GOLD_DEBUG_CHEATS
+    // #define GOLD_ASSERTS_ENABLED
+    #define GOLD_RAND_SEED 1751884660
+    #define GOLD_DEBUG_BOT_VISION
+#endif
 #ifdef GOLD_DEBUG_CHEATS
     #define GOLD_DEBUG_FAST_BUILD
     #define GOLD_DEBUG_FAST_TRAIN

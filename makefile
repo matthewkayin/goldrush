@@ -10,8 +10,8 @@ LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
-COMPILER_FLAGS := -std=c++17 -Wall -O3
-LINKER_FLAGS :=
+COMPILER_FLAGS := -std=c++17 -g -Wall -O0
+LINKER_FLAGS := -g
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 RC_FILES :=
 
