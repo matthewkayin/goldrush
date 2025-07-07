@@ -4,6 +4,7 @@
 #include "state.h"
 #include <cstdint>
 #include <vector>
+#include <functional>
 
 enum BotStrategy {
     BOT_STRATEGY_BANDIT_RUSH,
@@ -79,3 +80,7 @@ void bot_create_landmine_draw_circle(int x_center, int y_center, int x, int y, s
 MatchInput bot_create_landmine_input(const MatchState& state, const Bot& bot, EntityId pyro_id, ivec2 base_center, int base_radius);
 void bot_get_base_info(const MatchState& state, EntityId base_id, ivec2* base_center, int* base_radius, uint32_t* landmine_count);
 MatchInput bot_create_molotov_input(const MatchState& state, EntityId pyro_id, ivec2 attack_point);
+MatchInput bot_create_repair_building_input(const MatchState& state, const Bot& bot, EntityId building_id);
+
+EntityId bot_find_first_entity(const MatchState& state, std::function<bool(const Entity&, EntityId)> filter_fn);
+EntityId bot_find_best_entity(const MatchState& state, std::function<bool(const Entity&,EntityId)> filter_fn, std::function<bool(const Entity&, const Entity&)> compare_fn);

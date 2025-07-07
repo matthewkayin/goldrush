@@ -205,18 +205,11 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
     }
 
     // Find scout
-    EntityId bot_scout_id = ID_NULL;
-    for (uint32_t scout_index = 0; scout_index < state.entities.size(); scout_index++) {
-        const Entity& scout = state.entities[scout_index];
-        EntityId scout_id = state.entities.get_id_of(scout_index);
-        if (scout.player_id != bot.player_id || scout.type != ENTITY_WAGON ||
-                scout.mode != MODE_UNIT_IDLE || scout.target.type != TARGET_NONE ||
-                !scout.garrisoned_units.empty() || bot_is_entity_reserved(bot, scout_id)) {
-            continue;
-        }
-        bot_scout_id = scout_id;
-        break;
-    }
+    EntityId bot_scout_id = bot_find_first_entity(state, [&bot](const Entity& entity, EntityId entity_id) {
+        return entity.player_id == bot.player_id && entity.type == ENTITY_WAGON &&
+                entity.mode == MODE_UNIT_IDLE && entity.target.type == TARGET_NONE &&
+                entity.garrisoned_units.empty() && !bot_is_entity_reserved(bot, entity_id);
+    });
     if (bot_scout_id != ID_NULL) {
         EntityId goldmine_to_scout_id = ID_NULL;
         for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
@@ -238,6 +231,38 @@ void bot_get_turn_inputs(const MatchState& state, Bot& bot, std::vector<MatchInp
             scout_input.move.entity_count = 1;
             scout_input.move.entity_ids[0] = bot_scout_id;
             inputs.push_back(scout_input);
+        }
+    }
+
+    // Repair buildings
+    EntityId on_fire_building_id = bot_find_first_entity(state, [&state, &bot](const Entity& building, EntityId building_id) {
+        if (building.player_id != bot.player_id || !entity_check_flag(building, ENTITY_FLAG_ON_FIRE)) {
+            return false;
+        }
+        EntityId existing_repairer_id = bot_find_first_entity(state, [&building_id](const Entity& unit, EntityId unit_id) {
+            return unit.target.type == TARGET_REPAIR && unit.target.id == building_id;
+        });
+        if (existing_repairer_id != ID_NULL) {
+            return false;
+        }
+        return true;
+    });
+    if (on_fire_building_id != ID_NULL) {
+        MatchInput repair_input = bot_create_repair_building_input(state, bot, on_fire_building_id);
+        if (repair_input.type != MATCH_INPUT_NONE) {
+            bot_reserve_entity(bot, repair_input.move.entity_ids[0]);
+            inputs.push_back(repair_input);
+            log_trace("BOT: repairing building with id %u and unit id %u", repair_input.move.target_id, repair_input.move.entity_ids[0]);
+        }
+    }
+
+    // Release idle repairers
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
+        if (entity.player_id == bot.player_id && entity.type == ENTITY_MINER &&
+                bot_is_entity_reserved(bot, entity_id) && entity.target.type == TARGET_NONE) {
+            bot_release_entity(bot, entity_id);
         }
     }
 
@@ -1861,4 +1886,66 @@ MatchInput bot_create_molotov_input(const MatchState& state, EntityId pyro_id, i
     input.move.entity_count = 1;
     input.move.entity_ids[0] = pyro_id;
     return input;
+}
+
+MatchInput bot_create_repair_building_input(const MatchState& state, const Bot& bot, EntityId building_id) {
+    const Entity& building = state.entities.get_by_id(building_id);
+    EntityId worker_id = bot_find_nearest_idle_worker(state, bot, building.cell);
+    if (worker_id == ID_NULL) {
+        EntityId nearest_goldmine_id = bot_find_best_entity(state, 
+            // Filter
+            [](const Entity& entity, EntityId entity_id) {
+                return entity.type == ENTITY_GOLDMINE;
+            }, 
+            // Compare
+            [&building](const Entity& a, const Entity& b) {
+                return ivec2::manhattan_distance(a.cell, building.cell) < ivec2::manhattan_distance(b.cell, building.cell);
+            });
+        GOLD_ASSERT(nearest_goldmine_id != ID_NULL);
+        worker_id = bot_pull_worker_off_gold(state, bot.player_id, nearest_goldmine_id);
+    }
+    if (worker_id == ID_NULL) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_REPAIR;
+    input.move.shift_command = 0;
+    input.move.target_cell = ivec2(0, 0);
+    input.move.target_id = building_id;
+    input.move.entity_count = 1;
+    input.move.entity_ids[0] = worker_id;
+    return input;
+}
+
+EntityId bot_find_first_entity(const MatchState& state, std::function<bool(const Entity&, EntityId)> filter_fn) {
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
+        if (filter_fn(entity, entity_id)) {
+            return entity_id;
+        }
+    }
+
+    return ID_NULL;
+}
+
+EntityId bot_find_best_entity(const MatchState& state, std::function<bool(const Entity&,EntityId)> filter_fn, std::function<bool(const Entity&, const Entity&)> compare_fn) {
+    uint32_t best_entity_index = INDEX_INVALID;
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
+
+        if (!filter_fn(entity, entity_id)) {
+            continue;
+        }
+        if (best_entity_index == INDEX_INVALID || compare_fn(entity, state.entities[best_entity_index])) {
+            best_entity_index = entity_index;
+        }
+    }
+
+    if (best_entity_index == INDEX_INVALID) {
+        return ID_NULL;
+    }
+    return state.entities.get_id_of(best_entity_index);
 }
