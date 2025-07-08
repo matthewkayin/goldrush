@@ -1446,7 +1446,6 @@ ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_ind
             .x = hall_cell.x, .y = hall_cell.y,
             .w = HALL_SIZE, .h = HALL_SIZE
         };
-        hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
         // If the area is blocked (by a cactus, for example) then don't build there
         if (!map_is_cell_rect_in_bounds(state.map, hall_cell, HALL_SIZE) || map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, hall_cell, HALL_SIZE)) {
             hall_score = -1;
@@ -1465,12 +1464,20 @@ ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_ind
                     if (!map_is_cell_in_bounds(state.map, ivec2(x, y))) {
                         continue;
                     }
-                    if (map_is_tile_ramp(state.map, ivec2(x, y)) ||
-                            map_get_cell(state.map, CELL_LAYER_GROUND, ivec2(x, y)).type != CELL_EMPTY) {
+                    if (map_is_tile_ramp(state.map, ivec2(x, y))) {
                         hall_score++;
                     } 
                 }
             }
+
+            ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell + ivec2(1, 1), 1, hall_cell, entity_get_data(ENTITY_HALL).cell_size, true);
+            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell, entity_get_data(ENTITY_GOLDMINE).cell_size, 1, rally_cell, true);
+
+            GOLD_ASSERT(mine_exit_cell.x != -1);
+            std::vector<ivec2> path;
+            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &path, true);
+            hall_score += path.size();
+            hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
         }
 
         // Compare hall score to best hall score
