@@ -1562,7 +1562,7 @@ void match_ui_update(MatchUiState& state) {
 
             char defeat_message[128];
             sprintf(defeat_message, "%s has been defeated.", state.match.players[player_id].name);
-            match_ui_add_chat_message(state, player_id, defeat_message);
+            match_ui_add_chat_message(state, PLAYER_NONE, defeat_message);
 
             if (player_id == network_get_player_id()) {
                 state.mode = MATCH_UI_MODE_MATCH_OVER_DEFEAT;
