@@ -128,6 +128,10 @@ void logger_output(LogLevel log_level, const char* message, ...) {
 
     fprintf(logfile, "%s", log_message);
     fflush(logfile);
+
+    #ifdef GOLD_DEBUG
+        printf("%s", log_message);
+    #endif
 }
 
 // Definition of function declared in asserts.h

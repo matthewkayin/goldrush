@@ -25,7 +25,7 @@
 
 int gold_main(int argc, char** argv);
 
-#if defined PLATFORM_WIN32 
+#if defined PLATFORM_WIN32 and not defined GOLD_DEBUG
 #include <windows.h>
 #define MAX_ARGS 16
 
