@@ -274,6 +274,14 @@ void bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type) {
     input.building_enqueue.item_subtype = unit_type;
     input.building_enqueue.building_id = building_id;
     bot.inputs.push_back(input);
+
+    // Set rally points
+    MatchInput rally_input;
+    rally_input.type = MATCH_INPUT_RALLY;
+    rally_input.rally.rally_point = bot_get_best_rally_point(state, building_id);
+    rally_input.rally.building_count = 1;
+    rally_input.rally.building_ids[0] = building_id;
+    bot.inputs.push_back(rally_input);
 }
 
 void bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade) {
@@ -1292,4 +1300,114 @@ void bot_get_base_info(const MatchState& state, EntityId base_id, ivec2* base_ce
             }
         }
     }
+}
+
+void bot_get_circle_draw(int x_center, int y_center, int x, int y, std::vector<ivec2>& points) {
+    points.push_back(ivec2(x_center + x, y_center + y));
+    points.push_back(ivec2(x_center - x, y_center + y));
+    points.push_back(ivec2(x_center + x, y_center - y));
+    points.push_back(ivec2(x_center - x, y_center - y));
+
+    points.push_back(ivec2(x_center + y, y_center + x));
+    points.push_back(ivec2(x_center - y, y_center + x));
+    points.push_back(ivec2(x_center + y, y_center - x));
+    points.push_back(ivec2(x_center - y, y_center - x));
+}
+
+std::vector<ivec2> bot_get_cell_circle(ivec2 center, int radius) {
+    // Using Besenham's Circle 
+    // https://www.geeksforgeeks.org/c/bresenhams-circle-drawing-algorithm/
+    std::vector<ivec2> circle_points;
+    // Guessing we will have circumference, 2PI*R points on the circle, 7 is 2PI rounded up
+    circle_points.reserve(7 * radius);
+    int x = 0;
+    int y = radius;
+    int d = 3 - (2 * radius);
+    bot_get_circle_draw(center.x, center.y, x, y, circle_points);
+    while (y >= x) {
+        if (d > 0) {
+            y--;
+            d = d + 4 * (x - y) + 10;
+        } else {
+            d = d + (4 * x) + 6;
+        }
+
+        x++;
+
+        bot_get_circle_draw(center.x, center.y, x, y, circle_points);
+    }
+
+    return circle_points;
+}
+
+ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id) {
+    ivec2 base_center;
+    int base_radius;
+    bot_get_base_info(state, building_id, &base_center, &base_radius, NULL);
+    std::vector<ivec2> circle_points = bot_get_cell_circle(base_center, base_radius);
+
+    const Entity& building = state.entities.get_by_id(building_id);
+    EntityId nearest_enemy_id = bot_find_best_entity(state, 
+        // Filter
+        [&state, &building](const Entity& entity, EntityId entity_id) {
+            return entity.player_id != PLAYER_NONE &&
+                        state.players[entity.player_id].team != state.players[building.player_id].team && 
+                        entity_is_selectable(entity);
+        },
+        // Compare
+        [&base_center](const Entity& a, const Entity& b) {
+            return ivec2::manhattan_distance(a.cell, base_center) < ivec2::manhattan_distance(b.cell, base_center);
+        });
+
+    // If there are no enemies, then really doesn't matter where we rally to
+    if (nearest_enemy_id == ID_NULL) {
+        return ivec2(-1, -1);
+    }
+
+    ivec2 nearest_enemy_cell = state.entities.get_by_id(nearest_enemy_id).cell;
+    std::vector<ivec2> path;
+    map_pathfind(state.map, CELL_LAYER_GROUND, building.cell + ivec2(-1, 0), nearest_enemy_cell + ivec2(-1, 0), 1, &path, false);
+    if (path.empty()) {
+        return ivec2(-1, -1);
+    }
+
+    int best_path_index = 0;
+    while (best_path_index < path.size() && ivec2::manhattan_distance(path[best_path_index], base_center) < base_radius) {
+        best_path_index++;
+    }
+
+    int best_circle_point_index = -1;
+    for (int circle_point_index = 0; circle_point_index < circle_points.size(); circle_point_index++) {
+        ivec2 point = circle_points[circle_point_index];
+        if (!map_is_cell_rect_in_bounds(state.map, point - ivec2(1, 1), 3)) {
+            continue;
+        }
+
+        bool is_circle_point_valid = true;
+        for (int y = point.y - 1; y < point.y + 2; y++) {
+            for (int x = point.x - 1; x < point.x + 2; x++) {
+                if (map_is_tile_ramp(state.map, ivec2(x, y)) || 
+                        map_get_tile(state.map, ivec2(x, y)).elevation != map_get_tile(state.map, building.cell).elevation ||
+                        map_get_cell(state.map, CELL_LAYER_GROUND, ivec2(x, y)).type == CELL_BUILDING ||
+                        map_get_cell(state.map, CELL_LAYER_GROUND, ivec2(x, y)).type == CELL_GOLDMINE) {
+                    is_circle_point_valid = false;
+                }
+            }
+        }
+        if (!is_circle_point_valid) {
+            continue;
+        }
+
+        if (best_circle_point_index == -1 ||
+                ivec2::manhattan_distance(circle_points[circle_point_index], path[best_path_index]) <
+                ivec2::manhattan_distance(circle_points[best_circle_point_index], path[best_path_index])) {
+            best_circle_point_index = circle_point_index;
+        }
+    }
+
+    if (best_circle_point_index == -1) {
+        return ivec2(-1, -1);
+    }
+
+    return cell_center(circle_points[best_circle_point_index]).to_ivec2();
 }

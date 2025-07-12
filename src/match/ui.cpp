@@ -2383,7 +2383,8 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // Rally points
-    if (match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_BUILDINGS) {
+    uint32_t selection_type = match_ui_get_selection_type(state, state.selection);
+    if (selection_type == MATCH_UI_SELECTION_BUILDINGS || (state.replay_mode && selection_type == MATCH_UI_SELECTION_ENEMY_BUILDING)) {
         for (EntityId id : state.selection) {
             const Entity& building = state.match.entities.get_by_id(id);
             if (building.mode != MODE_BUILDING_FINISHED || building.rally_point.x == -1) {

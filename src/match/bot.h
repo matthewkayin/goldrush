@@ -80,3 +80,6 @@ EntityType bot_get_building_which_trains(EntityType unit_type);
 EntityType bot_get_building_prereq(EntityType unit_type);
 EntityType bot_get_building_which_researches(uint32_t upgrade);
 void bot_get_base_info(const MatchState& state, EntityId base_id, ivec2* base_center, int* base_radius, uint32_t* landmine_count);
+void bot_get_circle_draw(int x_center, int y_center, int x, int y, std::vector<ivec2>& points);
+std::vector<ivec2> bot_get_cell_circle(ivec2 center, int radius);
+ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id);
