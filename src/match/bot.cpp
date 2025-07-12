@@ -10,7 +10,7 @@ Bot bot_init(uint8_t player_id) {
     Bot bot;
 
     bot.player_id = player_id;
-    bot_set_strategy(bot, BOT_STRATEGY_BANDIT_RUSH);
+    bot_set_strategy(bot, BOT_STRATEGY_LANDMINES);
 
     return bot;
 };
@@ -63,7 +63,7 @@ void bot_update(const MatchState& state, Bot& bot) {
         if (bot_has_desired_entities(state, bot) &&
                 (bot.strategy.desired_upgrade == 0 || match_player_has_upgrade(state, bot.player_id, bot.strategy.desired_upgrade))) {
             bot_squad_create(state, bot);
-            // TODO: set next strategy
+            bot_set_strategy(bot, bot_get_next_strategy(state, bot));
         }
     }
 
@@ -84,6 +84,10 @@ void bot_update(const MatchState& state, Bot& bot) {
 
 // Behaviors
 
+BotStrategyType bot_get_next_strategy(const MatchState& state, const Bot& bot) {
+    return BOT_STRATEGY_BANDIT_RUSH;
+}
+
 void bot_set_strategy(Bot& bot, BotStrategyType type) {
     BotStrategy strategy;
     memset(strategy.desired_entities, 0, sizeof(strategy.desired_entities));
@@ -94,6 +98,11 @@ void bot_set_strategy(Bot& bot, BotStrategyType type) {
         case BOT_STRATEGY_BANDIT_RUSH: {
             strategy.desired_entities[ENTITY_BANDIT] = 4;
             strategy.desired_entities[ENTITY_WAGON] = 1;
+            break;
+        }
+        case BOT_STRATEGY_LANDMINES: {
+            strategy.desired_entities[ENTITY_PYRO] = 1;
+            strategy.desired_upgrade = UPGRADE_LANDMINES;
             break;
         }
     }
@@ -443,6 +452,15 @@ void bot_squad_create(const MatchState& state, Bot& bot) {
         }
     }
 
+    switch (bot.strategy.type) {
+        case BOT_STRATEGY_BANDIT_RUSH:
+            squad.type = BOT_SQUAD_TYPE_ATTACK;
+            break;
+        case BOT_STRATEGY_LANDMINES:
+            squad.type = BOT_SQUAD_TYPE_LANDMINES;
+            break;
+    }
+
     bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_GATHER);
     bot.squads.push_back(squad);
 }
@@ -611,7 +629,11 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
             }
 
             if (entities_have_reached_gather_point) {
-                bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_GARRISON);
+                if (squad.type == BOT_SQUAD_TYPE_LANDMINES) {
+                    bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_LANDMINES);
+                } else {
+                    bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_GARRISON);
+                }
             }
             break;
         }
@@ -763,6 +785,123 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
 
             if (attack_move_input.move.entity_count != 0) {
                 bot.inputs.push_back(attack_move_input);
+            }
+
+            break;
+        }
+        case BOT_SQUAD_MODE_LANDMINES: {
+            const Entity& pyro = state.entities.get_by_id(squad.entities[0]);
+            GOLD_ASSERT(pyro.type == ENTITY_PYRO);
+
+            // Find the nearest base which needs to be landmined
+            EntityId nearest_base_id = ID_NULL;
+            ivec2 nearest_base_center;
+            int nearest_base_radius;
+            for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                // Filter entities down to only bases
+                const Entity& entity = state.entities[entity_index];
+                if (entity.player_id != bot.player_id ||
+                        entity.type != ENTITY_HALL || 
+                        !entity_is_selectable(entity)) {
+                    continue;
+                }
+
+                // Get info of this base
+                EntityId base_id = state.entities.get_id_of(entity_index);
+                ivec2 base_center;
+                int base_radius;
+                uint32_t landmine_count;
+                bot_get_base_info(state, base_id, &base_center, &base_radius, &landmine_count);
+
+                // Skip this base if we already have enough mines at it
+                if (landmine_count >= SQUAD_LANDMINE_MAX) {
+                    continue;
+                }
+
+                // Otherwise, decide whether this base is closer than the other bases
+                if (nearest_base_id == ID_NULL || 
+                        ivec2::manhattan_distance(base_center, pyro.cell) <
+                        ivec2::manhattan_distance(nearest_base_center, pyro.cell)) {
+                    nearest_base_id = base_id;
+                    nearest_base_center = base_center;
+                    nearest_base_radius = base_radius;
+                }
+            }
+
+            // If the ID is null, it means that all the bases have been fully landmined
+            if (nearest_base_id == ID_NULL) {
+                bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_DISSOLVED);
+                break;
+            }
+
+            // Lay mines
+            if (pyro.target.type == TARGET_NONE && pyro.energy >= entity_get_data(ENTITY_LANDMINE).gold_cost) {
+                // Find the nearest enemy base, to determine where to place mines
+                EntityId nearest_enemy_base_index = INDEX_INVALID;
+                for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                    const Entity& entity = state.entities[entity_index];
+                    if (entity.type != ENTITY_HALL || !entity_is_selectable(entity) ||
+                            state.players[entity.player_id].team == state.players[bot.player_id].team) {
+                        continue;
+                    }
+
+                    if (nearest_enemy_base_index == INDEX_INVALID || 
+                            ivec2::manhattan_distance(nearest_base_center, state.entities[entity_index].cell) <
+                            ivec2::manhattan_distance(nearest_base_center, state.entities[nearest_enemy_base_index].cell)) {
+                        nearest_enemy_base_index = entity_index;
+                    }
+                }
+                if (nearest_enemy_base_index == INDEX_INVALID) {
+                    break;
+                }
+
+                // Pathfind to the base so that we place mines close to where the enemies would be coming in
+                ivec2 enemy_cell = state.entities[nearest_enemy_base_index].cell;
+                std::vector<ivec2> path;
+                map_pathfind(state.map, CELL_LAYER_GROUND, nearest_base_center, enemy_cell, 1, &path, false);
+                int best_path_index = 0;
+                while (best_path_index < path.size() && ivec2::manhattan_distance(path[best_path_index], nearest_base_center) < nearest_base_radius) {
+                    best_path_index++;
+                }
+
+                // Determine radius of possible landmine points
+                std::vector<ivec2> circle_points = bot_get_cell_circle(nearest_base_center, nearest_base_radius);
+                ivec2 nearest_mine_cell = ivec2(-1, -1);
+                for (ivec2 point : circle_points) {
+                    if (!bot_is_landmine_point_valid(state, point)) {
+                        continue;
+                    }
+
+                    if (nearest_mine_cell.x == -1 || 
+                            ivec2::manhattan_distance(path[best_path_index], point) < 
+                            ivec2::manhattan_distance(path[best_path_index], nearest_mine_cell)) {
+                        nearest_mine_cell = point;
+                    }
+                }
+                if (nearest_mine_cell.x == -1) {
+                    break;
+                }
+
+                MatchInput landmine_input;
+                landmine_input.type = MATCH_INPUT_BUILD;
+                landmine_input.build.shift_command = 0;
+                landmine_input.build.building_type = ENTITY_LANDMINE;
+                landmine_input.build.target_cell = nearest_mine_cell;
+                landmine_input.build.entity_count = 1;
+                landmine_input.build.entity_ids[0] = squad.entities[0];
+                bot.inputs.push_back(landmine_input);
+            // Make sure that the pyro moves to the next base, even if it's out of energy
+            } else if (pyro.target.type == TARGET_NONE && 
+                    pyro.energy < entity_get_data(ENTITY_LANDMINE).gold_cost && 
+                    ivec2::manhattan_distance(pyro.cell, nearest_base_center) > nearest_base_radius) {
+                MatchInput move_input;
+                move_input.type = MATCH_INPUT_MOVE_CELL;
+                move_input.move.shift_command = 0;
+                move_input.move.target_id = ID_NULL;
+                move_input.move.target_cell = nearest_base_center;
+                move_input.move.entity_count = 1;
+                move_input.move.entity_ids[0] = squad.entities[0];
+                bot.inputs.push_back(move_input);
             }
 
             break;
@@ -1288,8 +1427,8 @@ void bot_get_base_info(const MatchState& state, EntityId base_id, ivec2* base_ce
 
     if (landmine_count != NULL) {
         *landmine_count = 0;
-        for (int y = base_min_y - SEARCH_MARGIN; y < base_max_y + SEARCH_MARGIN; y++) {
-            for (int x = base_min_x - SEARCH_MARGIN; x < base_max_x + SEARCH_MARGIN; x++) {
+        for (int y = base_min_y - (SEARCH_MARGIN * 2); y < base_max_y + (SEARCH_MARGIN * 2); y++) {
+            for (int x = base_min_x - (SEARCH_MARGIN * 2); x < base_max_x + (SEARCH_MARGIN * 2); x++) {
                 ivec2 cell = ivec2(x, y);
                 if (!map_is_cell_in_bounds(state.map, cell)) {
                     continue;
@@ -1410,4 +1549,26 @@ ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id) {
     }
 
     return cell_center(circle_points[best_circle_point_index]).to_ivec2();
+}
+
+bool bot_is_landmine_point_valid(const MatchState& state, ivec2 point) {
+    static const int MINE_SPACING = 1;
+
+    ivec2 point_rect_top_left = point - ivec2(MINE_SPACING, MINE_SPACING);
+    int point_rect_size = 1 + (2 * MINE_SPACING);
+    if (!map_is_cell_rect_in_bounds(state.map, point_rect_top_left, point_rect_size) ||
+            map_is_cell_rect_occupied(state.map, CELL_LAYER_UNDERGROUND, point_rect_top_left, point_rect_size)) {
+        return false;
+    }
+    for (int y = point_rect_top_left.y; y < point_rect_top_left.y + point_rect_size; y++) {
+        for (int x = point_rect_top_left.x; x < point_rect_top_left.x + point_rect_size; x++) {
+            CellType cell_type = map_get_cell(state.map, CELL_LAYER_GROUND, ivec2(x, y)).type;
+            if ((x == point.x && y == point.y && cell_type != CELL_EMPTY) ||
+                    (x != point.x && y != point.y && (cell_type == CELL_BUILDING || cell_type == CELL_BLOCKED))) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }

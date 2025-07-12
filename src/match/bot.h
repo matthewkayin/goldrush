@@ -8,7 +8,8 @@
 #include <functional>
 
 enum BotStrategyType {
-    BOT_STRATEGY_BANDIT_RUSH
+    BOT_STRATEGY_BANDIT_RUSH,
+    BOT_STRATEGY_LANDMINES
 };
 
 struct BotStrategy {
@@ -17,14 +18,21 @@ struct BotStrategy {
     uint32_t desired_upgrade;
 };
 
+enum BotSquadType {
+    BOT_SQUAD_TYPE_ATTACK,
+    BOT_SQUAD_TYPE_LANDMINES
+};
+
 enum BotSquadMode {
     BOT_SQUAD_MODE_GATHER,
     BOT_SQUAD_MODE_GARRISON,
     BOT_SQUAD_MODE_ATTACK,
+    BOT_SQUAD_MODE_LANDMINES,
     BOT_SQUAD_MODE_DISSOLVED
 };
 
 struct BotSquad {
+    BotSquadType type;
     BotSquadMode mode;
     ivec2 target_cell;
     std::vector<EntityId> entities;
@@ -43,6 +51,7 @@ void bot_update(const MatchState& state, Bot& bot);
 
 // Behaviors
 
+BotStrategyType bot_get_next_strategy(const MatchState& state, const Bot& bot);
 void bot_set_strategy(Bot& bot, BotStrategyType type);
 void bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_expand(const MatchState& state, const Bot& bot);
@@ -83,3 +92,4 @@ void bot_get_base_info(const MatchState& state, EntityId base_id, ivec2* base_ce
 void bot_get_circle_draw(int x_center, int y_center, int x, int y, std::vector<ivec2>& points);
 std::vector<ivec2> bot_get_cell_circle(ivec2 center, int radius);
 ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id);
+bool bot_is_landmine_point_valid(const MatchState& state, ivec2 point);
