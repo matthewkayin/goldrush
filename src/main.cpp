@@ -223,14 +223,19 @@ int gold_main(int argc, char** argv) {
 
     bool is_running = true;
     bool render_debug_info = false;
+    #ifdef GOLD_DEBUG_TURBO
+        render_debug_info = true;
+    #endif
     const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
     uint64_t last_time = SDL_GetTicksNS();
     uint64_t last_second = last_time;
     uint64_t update_accumulator = 0;
     uint32_t frames = 0;
     uint32_t fps = 0;
-    uint32_t updates = 0;
-    uint32_t ups = 0;
+
+    #ifdef GOLD_DEBUG_TURBO
+    uint64_t playback_speed = 1;
+    #endif
 
     game_set_mode((LoadParams) {
         .mode = GAME_MODE_MENU,
@@ -242,19 +247,25 @@ int gold_main(int argc, char** argv) {
     while (is_running) {
         // TIMEKEEP
         uint64_t current_time = SDL_GetTicksNS();
+        #ifdef GOLD_DEBUG_TURBO
+        if (input_is_action_just_pressed(INPUT_ACTION_TURBO)) {
+            if (playback_speed == 8) {
+                playback_speed = 1;
+            } else {
+                playback_speed *= 2;
+            }
+        } 
+
+        update_accumulator += (current_time - last_time) * playback_speed;
+        #else
         update_accumulator += current_time - last_time;
+        #endif
         last_time = current_time;
 
         if (current_time - last_second >= SDL_NS_PER_SECOND) {
             fps = frames;
             frames = 0;
-            ups = updates;
-            updates = 0;
             last_second += SDL_NS_PER_SECOND;
-
-            if (ups != 60) {
-                log_warn("Update count is off! ups: %u", ups);
-            }
         }
         frames++;
 
@@ -306,7 +317,6 @@ int gold_main(int argc, char** argv) {
         // UPDATE
         while (update_accumulator >= UPDATE_DURATION) {
             update_accumulator -= UPDATE_DURATION;
-            updates++;
 
             switch (state.mode) {
                 case GAME_MODE_MENU: {
@@ -416,6 +426,13 @@ int gold_main(int argc, char** argv) {
             char fps_text[32];
             sprintf(fps_text, "FPS: %u", fps);
             render_text(FONT_HACK_WHITE, fps_text, ivec2(0, 0));
+
+            #ifdef GOLD_DEBUG_TURBO
+                char turbo_text[32];
+                sprintf(turbo_text, "Playback Speed x%llu", playback_speed);
+                render_text(FONT_HACK_WHITE, turbo_text, ivec2(0, 10));
+            #endif
+
             render_sprite_batch();
         }
 

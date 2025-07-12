@@ -705,9 +705,10 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                     // If we're throwing a molotov or unloading, then change targets only if our current target cell is too far away from the new target
                     // This is because we generally want to allow molotov / unload actions to finish, but if such an action is targeting a base far away,
                     // then we want to refocus our efforts on the more immediate danger of this nearby target
-                    } else if ((entity.target.type == TARGET_MOLOTOV || entity.target.type == TARGET_UNLOAD) &&
-                                    ivec2::manhattan_distance(entity.target.cell, attack_target_entity.cell) > 2 * ATTACK_SIGHT_RADIUS) {
-                        should_change_targets = true;
+                    } else if ((entity.target.type == TARGET_MOLOTOV || entity.target.type == TARGET_UNLOAD)) {
+                        if (ivec2::manhattan_distance(entity.target.cell, attack_target_entity.cell) > 2 * ATTACK_SIGHT_RADIUS) {
+                            should_change_targets = true;
+                        }
                     // Finally, all other target types will require a target change
                     } else {
                         should_change_targets = true;
@@ -724,6 +725,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                         attack_input.move.entity_ids[0] = entity_id;
                         bot.inputs.push_back(attack_input);
                     } else if (should_change_targets && !entity.garrisoned_units.empty()) {
+                        log_trace("BOT: should change targets unload input");
                         MatchInput unload_input;
                         unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
                         unload_input.move.shift_command = 0;
@@ -741,6 +743,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                 // If we reached here, it means there was no attack target
                 if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > ATTACK_SIGHT_RADIUS &&
                         !(entity.target.type == TARGET_ATTACK_CELL && ivec2::manhattan_distance(entity.target.cell, squad.target_cell) < ATTACK_SIGHT_RADIUS)) {
+                    log_trace("BOT: No attack target, giving A move.");
                     attack_move_input.move.entity_ids[attack_move_input.move.entity_count] = entity_id;
                     attack_move_input.move.entity_count++;
                     if (attack_move_input.move.entity_count == SELECTION_LIMIT) {
