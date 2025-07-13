@@ -10,7 +10,7 @@ Bot bot_init(uint8_t player_id) {
     Bot bot;
 
     bot.player_id = player_id;
-    bot_set_strategy(bot, BOT_STRATEGY_LANDMINES);
+    bot_set_strategy(bot, BOT_STRATEGY_BANDIT_RUSH);
 
     return bot;
 };
@@ -96,7 +96,8 @@ void bot_set_strategy(Bot& bot, BotStrategyType type) {
 
     switch (strategy.type) {
         case BOT_STRATEGY_BANDIT_RUSH: {
-            strategy.desired_entities[ENTITY_BANDIT] = 4;
+            strategy.desired_entities[ENTITY_BANDIT] = 2;
+            strategy.desired_entities[ENTITY_PYRO] = 1;
             strategy.desired_entities[ENTITY_WAGON] = 1;
             break;
         }
@@ -424,6 +425,115 @@ bool bot_has_desired_entities(const MatchState& state, const Bot& bot) {
     }
 
     return true;
+}
+
+int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell) {
+    int score = 0;
+    std::unordered_map<EntityId, bool> entity_considered;
+
+    for (int y = cell.y - PROJECTILE_MOLOTOV_FIRE_SPREAD; y < cell.y + PROJECTILE_MOLOTOV_FIRE_SPREAD; y++) {
+        for (int x = cell.x - PROJECTILE_MOLOTOV_FIRE_SPREAD; x < cell.x + PROJECTILE_MOLOTOV_FIRE_SPREAD; x++) {
+            // Don't count the corners of the square
+            if ((y == cell.y - PROJECTILE_MOLOTOV_FIRE_SPREAD || y == cell.y + PROJECTILE_MOLOTOV_FIRE_SPREAD - 1) &&
+                    (x == cell.x - PROJECTILE_MOLOTOV_FIRE_SPREAD || x == cell.x + PROJECTILE_MOLOTOV_FIRE_SPREAD - 1)) {
+                continue;
+            }
+
+            ivec2 fire_cell = ivec2(x, y);
+            if (!map_is_cell_in_bounds(state.map, fire_cell)) {
+                continue;
+            }
+            if (fire_cell == pyro.cell) {
+                score -= 4;
+                continue;
+            }
+            if (match_is_cell_on_fire(state, fire_cell)) {
+                score--;
+                continue;
+            }
+
+            Cell map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, fire_cell);
+            if (map_cell.type == CELL_BUILDING || map_cell.type == CELL_UNIT || map_cell.type == CELL_MINER) {
+                if (entity_considered.find(map_cell.id) != entity_considered.end()) {
+                    continue;
+                }
+                entity_considered[map_cell.id] = true;
+
+                const Entity& target = state.entities.get_by_id(map_cell.id);
+                if (state.players[target.player_id].team == state.players[pyro.player_id].team) {
+                    score -= 2;
+                } else if (entity_is_unit(target.type)) {
+                    score += 2;
+                } else {
+                    score++;
+                }
+            }
+        }
+    } // End for each fire y
+
+    // Consider other existing or about to exist molotov fires
+    std::vector<ivec2> existing_molotov_cells;
+    for (const Entity& entity : state.entities) {
+        if (entity.target.type == TARGET_MOLOTOV) {
+            existing_molotov_cells.push_back(entity.target.cell);
+        }
+    }
+    for (const Projectile& projectile : state.projectiles) {
+        if (projectile.type == PROJECTILE_MOLOTOV) {
+            existing_molotov_cells.push_back(projectile.target.to_ivec2());
+        }
+    }
+    for (const MatchInput& input : bot.inputs) {
+        if (input.type == MATCH_INPUT_MOVE_MOLOTOV) {
+            existing_molotov_cells.push_back(input.move.target_cell);
+        }
+    }
+    for (ivec2 existing_molotov_cell : existing_molotov_cells) {
+        int distance = ivec2::manhattan_distance(cell, existing_molotov_cell);
+        if (distance < PROJECTILE_MOLOTOV_FIRE_SPREAD) {
+            score -= PROJECTILE_MOLOTOV_FIRE_SPREAD - distance;
+        }
+    }
+
+    return score;
+}
+
+void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius) {
+    const Entity& pyro = state.entities.get_by_id(pyro_id);
+    GOLD_ASSERT(pyro.type == ENTITY_PYRO);
+
+    ivec2 best_molotov_cell = ivec2(-1, -1);
+    int best_molotov_cell_score = 0;
+
+    for (int y = attack_point.y - attack_radius; y < attack_point.y + attack_radius; y++) {
+        for (int x = attack_point.x - attack_radius; x < attack_point.x + attack_radius; x++) {
+            ivec2 cell = ivec2(x, y);
+            if (!map_is_cell_in_bounds(state.map, cell)) {
+                continue;
+            }
+
+            int molotov_cell_score = bot_get_molotov_cell_score(state, bot, pyro, cell);
+            if (molotov_cell_score > best_molotov_cell_score) {
+                best_molotov_cell = cell;
+                best_molotov_cell_score = molotov_cell_score;
+            }
+        }
+    }
+
+    // We only have to check against exact 0, because
+    // a negative number would never overcome the default 0 value
+    if (best_molotov_cell_score == 0) {
+        return;
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_MOLOTOV;
+    input.move.shift_command = 0;
+    input.move.target_id = ID_NULL;
+    input.move.target_cell = best_molotov_cell;
+    input.move.entity_count = 1;
+    input.move.entity_ids[0] = pyro_id;
+    bot.inputs.push_back(input);
 }
 
 // Squads
@@ -755,7 +865,6 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                         attack_input.move.entity_ids[0] = entity_id;
                         bot.inputs.push_back(attack_input);
                     } else if (should_change_targets && !entity.garrisoned_units.empty()) {
-                        log_trace("BOT: should change targets unload input");
                         MatchInput unload_input;
                         unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
                         unload_input.move.shift_command = 0;
@@ -764,8 +873,9 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                         unload_input.move.entity_count = 1;
                         unload_input.move.entity_ids[0] = entity_id;
                         bot.inputs.push_back(unload_input);
+                    } else if (should_change_targets && entity.type == ENTITY_PYRO && entity.energy >= MOLOTOV_ENERGY_COST) {
+                        bot_throw_molotov(state, bot, entity_id, attack_target_entity.cell, ATTACK_SIGHT_RADIUS);
                     }
-                    // TODO: molotov input
 
                     continue;
                 } // End if attack_target type is TARGET_ATTACK_ENTITY

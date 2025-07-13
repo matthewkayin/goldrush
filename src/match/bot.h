@@ -61,6 +61,8 @@ void bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
 void bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t desired_entities[ENTITY_TYPE_COUNT]);
 bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
+int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
+void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
 
 // Squads
 
