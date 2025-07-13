@@ -63,6 +63,7 @@ Cell map_get_cell(const Map& map, CellLayer layer, ivec2 cell);
 void map_set_cell(Map& map, CellLayer layer, ivec2 cell, Cell value);
 void map_set_cell_rect(Map& map, CellLayer layer, ivec2 cell, int size, Cell value);
 bool map_is_cell_rect_equal_to(const Map& map, CellLayer layer, ivec2 cell, int size, EntityId id);
+bool map_is_cell_rect_empty(const Map& map, CellLayer layer, ivec2 cell, int size);
 bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int size, ivec2 origin = ivec2(-1, -1), bool gold_walk = false);
 
 ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell);

@@ -849,6 +849,18 @@ bool map_is_cell_rect_equal_to(const Map& map, CellLayer layer, ivec2 cell, int 
     return true;
 }
 
+bool map_is_cell_rect_empty(const Map& map, CellLayer layer, ivec2 cell, int size) {
+    for (int y = cell.y; y < cell.y + size; y++) {
+        for (int x = cell.x; x < cell.x + size; x++) {
+            if (map.cells[layer][x + (y * map.width)].type != CELL_EMPTY) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int size, ivec2 origin, bool gold_walk) {
     EntityId origin_id = origin.x == -1 ? ID_NULL : map_get_cell(map, layer, origin).id;
     Rect origin_rect = (Rect) { .x = origin.x, .y = origin.y, .w = size, .h = size };

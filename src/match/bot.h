@@ -26,13 +26,15 @@ struct BotSquad {
     BotSquadType type;
     BotSquadMode mode;
     ivec2 target_cell;
+    std::vector<ivec2> attack_path;
     std::vector<EntityId> entities;
 };
 
 enum BotStrategyType {
     BOT_STRATEGY_BANDIT_RUSH,
     BOT_STRATEGY_LANDMINES,
-    BOT_STRATEGY_BUNKER
+    BOT_STRATEGY_BUNKER,
+    BOT_STRATEGY_SOLDIER_CANNON_PUSH
 };
 
 struct BotStrategy {

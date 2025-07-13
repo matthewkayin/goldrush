@@ -10,7 +10,7 @@ Bot bot_init(uint8_t player_id) {
     Bot bot;
 
     bot.player_id = player_id;
-    bot_set_strategy(bot, BOT_STRATEGY_BANDIT_RUSH);
+    bot_set_strategy(bot, BOT_STRATEGY_SOLDIER_CANNON_PUSH);
 
     return bot;
 };
@@ -117,6 +117,13 @@ void bot_set_strategy(Bot& bot, BotStrategyType type) {
             strategy.squad_type = BOT_SQUAD_TYPE_DEFEND;
             strategy.desired_entities[ENTITY_COWBOY] = 4;
             strategy.desired_entities[ENTITY_BUNKER] = 1;
+            break;
+        }
+        case BOT_STRATEGY_SOLDIER_CANNON_PUSH: {
+            strategy.squad_type = BOT_SQUAD_TYPE_ATTACK;
+            strategy.desired_entities[ENTITY_SOLDIER] = 16;
+            strategy.desired_entities[ENTITY_CANNON] = 2;
+            strategy.desired_entities[ENTITY_BANDIT] = 8;
             break;
         }
     }
@@ -700,8 +707,27 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
             ivec2 base_center;
             bot_get_base_info(state, nearest_enemy_building_id, &base_center, NULL, NULL);
 
-            squad.target_cell = base_center;
-            log_trace("BOT: entered attack mode with squad, cell %vi", &squad.target_cell);
+            // Get a detailed path from squad gather point to the target base
+            std::vector<ivec2> detailed_attack_path;
+            // Pathfinding is done with cell size of 2 to ensure that if we have wagons that they can fit through any gaps
+            map_pathfind(state.map, CELL_LAYER_GROUND, squad.target_cell, base_center, 2, &detailed_attack_path, false);
+
+            // Make a loose attack path based on different points along the detailed path
+            squad.attack_path.clear();
+            squad.attack_path.push_back(base_center);
+            for (int detailed_attack_path_index = detailed_attack_path.size() - 1; detailed_attack_path_index >= 0; detailed_attack_path_index--) {
+                ivec2 point = detailed_attack_path[detailed_attack_path_index];
+                if (ivec2::manhattan_distance(point, squad.attack_path.back()) > 32 &&
+                        map_is_cell_rect_in_bounds(state.map, point - ivec2(1, 1), 3) &&
+                        map_is_cell_rect_empty(state.map, CELL_LAYER_GROUND, point - ivec2(1, 1), 3)) {
+                    squad.attack_path.push_back(point);
+                }
+            }
+
+            // Set target cell based on attack path
+            squad.target_cell = squad.attack_path.back();
+            squad.attack_path.pop_back();
+
             break;
         }
         case BOT_SQUAD_MODE_DEFEND: {
@@ -907,7 +933,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                 MatchInput input;
                 input.type = MATCH_INPUT_MOVE_ENTITY;
                 input.move.shift_command = 0;
-                input.move.target_id = carriers.front();
+                input.move.target_id = carrier_id;
                 input.move.target_cell = ivec2(0, 0);
                 input.move.entity_count = 0;
 
@@ -935,7 +961,9 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
             int sight_radius; 
             bool units_have_reached_point = true;
             bool units_are_attacking = false;
-            if (squad.mode == BOT_SQUAD_MODE_ATTACK) {
+            if (squad.mode == BOT_SQUAD_MODE_ATTACK && !squad.attack_path.empty()) {
+                sight_radius = 8;
+            } else if (squad.mode == BOT_SQUAD_MODE_ATTACK && squad.attack_path.empty()) {
                 sight_radius = 16;
             } else {
                 // If defending, we expect the target_cell to be at the town hall position
@@ -1036,7 +1064,12 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
             }
 
             if (squad.type == BOT_SQUAD_TYPE_ATTACK && units_have_reached_point && !units_are_attacking) {
-                bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_DISSOLVED);
+                if (!squad.attack_path.empty()) {
+                    squad.target_cell = squad.attack_path.back();
+                    squad.attack_path.pop_back();
+                } else {
+                    bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_DISSOLVED);
+                }
             }
 
             break;
