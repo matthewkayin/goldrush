@@ -16,6 +16,10 @@ Bot bot_init(uint8_t player_id) {
 };
 
 void bot_update(const MatchState& state, Bot& bot) {
+    if (bot_strategy_should_be_abandoned(state, bot)) {
+        bot_set_strategy(bot, bot_get_next_strategy(state, bot));
+    }
+
     bot_saturate_bases(state, bot);
     if (bot_should_expand(state, bot)) {
         bot_build_building(state, bot, ENTITY_HALL);
@@ -80,6 +84,8 @@ void bot_update(const MatchState& state, Bot& bot) {
             squad_index++;
         }
     }
+
+    bot_scout(state, bot);
 }
 
 // Behaviors
@@ -116,6 +122,17 @@ void bot_set_strategy(Bot& bot, BotStrategyType type) {
     }
 
     bot.strategy = strategy;
+}
+
+bool bot_strategy_should_be_abandoned(const MatchState& state, const Bot& bot) {
+    if (bot.strategy.type == BOT_STRATEGY_BANDIT_RUSH) {
+        EntityId wagon_id = bot_find_entity(state, [&bot](const Entity& entity, EntityId entity_id) {
+            return entity.player_id == bot.player_id && entity.type == ENTITY_WAGON && entity_is_selectable(entity);
+        });
+        return wagon_id == ID_NULL;
+    }
+
+    return false;
 }
 
 void bot_saturate_bases(const MatchState& state, Bot& bot) {
@@ -543,6 +560,43 @@ void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec
     bot.inputs.push_back(input);
 }
 
+void bot_scout(const MatchState& state, Bot& bot) {
+    // Scouting
+    EntityId scout_id = bot_find_entity(state, [&bot](const Entity& entity, EntityId entity_id) {
+        return entity.player_id == bot.player_id && entity.type == ENTITY_WAGON &&
+                entity.mode == MODE_UNIT_IDLE && entity.target.type == TARGET_NONE &&
+                entity.garrisoned_units.empty() && !bot_is_entity_reserved(bot, entity_id);
+    });
+    if (scout_id == ID_NULL) {
+        return;
+    }
+
+    const Entity& scout = state.entities.get_by_id(scout_id);
+    EntityId unscouted_goldmine_id = bot_find_best_entity(state, 
+        // Filter
+        [&state, &bot](const Entity& entity, EntityId entity_id) {
+            return entity.type == ENTITY_GOLDMINE && !match_is_cell_rect_explored(state, state.players[bot.player_id].team, entity.cell, entity_get_data(entity.type).cell_size);
+        },
+        // Compare
+        [&scout](const Entity& a, const Entity& b) {
+            return ivec2::manhattan_distance(a.cell, scout.cell) <
+                    ivec2::manhattan_distance(b.cell, scout.cell);
+        });
+    if (unscouted_goldmine_id == ID_NULL) {
+        return;
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_ENTITY;
+    input.move.shift_command = 0;
+    input.move.target_cell = ivec2(0, 0);
+    input.move.target_id = unscouted_goldmine_id;
+    input.move.entity_count = 1;
+    input.move.entity_count = 1;
+    input.move.entity_ids[0] = scout_id;
+    bot.inputs.push_back(input);
+}
+
 // Squads
 
 void bot_squad_create(const MatchState& state, Bot& bot) {
@@ -629,7 +683,8 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
                 [&state, &bot](const Entity& entity, EntityId entity_id) {
                     return state.players[entity.player_id].team != state.players[bot.player_id].team &&
                             entity_is_building(entity.type) &&
-                            entity_is_selectable(entity);
+                            entity_is_selectable(entity) &&
+                            bot_has_scouted_entity(state, bot, entity, entity_id);
                 },
                 // Compare
                 [&squad](const Entity& a, const Entity& b) {
@@ -647,6 +702,60 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
 
             squad.target_cell = base_center;
             log_trace("BOT: entered attack mode with squad, cell %vi", &squad.target_cell);
+            break;
+        }
+        case BOT_SQUAD_MODE_DEFEND: {
+            // Determine base defense cell
+
+            // If there is a bunker in this army, choose the cell of the base closeset to it
+            for (EntityId entity_id : squad.entities) {
+                const Entity& squad_entity = state.entities.get_by_id(entity_id);
+                if (squad_entity.type == ENTITY_BUNKER) {
+                    EntityId base_id = bot_find_best_entity(state, 
+                        [&bot](const Entity& entity, EntityId entity_id) {
+                            return entity.player_id == bot.player_id && entity.type == ENTITY_HALL && entity_is_selectable(entity);
+                        },
+                        [&squad_entity](const Entity& a, const Entity& b) {
+                            return ivec2::manhattan_distance(a.cell, squad_entity.cell) < 
+                                    ivec2::manhattan_distance(b.cell, squad_entity.cell);
+                        });
+                    if (base_id == ID_NULL) {
+                        bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_DISSOLVED);
+                        return;
+                    }
+                    squad.target_cell = state.entities.get_by_id(base_id).cell;
+                    return;
+                }
+            }
+
+            // Otherwise, compare the number of defending armies at each base
+            uint32_t least_defended_base_index = INDEX_INVALID;
+            int least_defended_base_score = 0;
+            for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                const Entity& entity = state.entities[entity_index];
+                if (entity.player_id == bot.player_id && entity.type == ENTITY_HALL && entity_is_selectable(entity)) {
+                    int base_defense_score = 0;
+                    for (const BotSquad& defense_squad : bot.squads) {
+                        if (&defense_squad == &squad) {
+                            continue;
+                        }
+                        if (defense_squad.mode == BOT_SQUAD_MODE_DEFEND && defense_squad.target_cell == entity.cell) {
+                            base_defense_score++;
+                        }
+                    }
+                    if (least_defended_base_index == INDEX_INVALID || base_defense_score < least_defended_base_score) {
+                        least_defended_base_index = entity_index;
+                        least_defended_base_score = base_defense_score;
+                    }
+                }
+            }
+
+            if (least_defended_base_index == INDEX_INVALID) {
+                bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_DISSOLVED);
+                return;
+            }
+
+            squad.target_cell = state.entities[least_defended_base_index].cell;
             break;
         }
         case BOT_SQUAD_MODE_DISSOLVED: {
@@ -1050,7 +1159,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
             break;
         }
         case BOT_SQUAD_MODE_DISSOLVED:
-            GOLD_ASSERT(false);
+            break;
     }
 }
 
@@ -1714,4 +1823,20 @@ bool bot_is_landmine_point_valid(const MatchState& state, ivec2 point) {
     }
 
     return true;
+}
+
+bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id) {
+    int entity_cell_size = entity_get_data(entity.type).cell_size;
+    uint32_t bot_team = state.players[bot.player_id].team;
+    // If fog is revealed, then they can see it
+    if (match_is_cell_rect_revealed(state, bot_team, entity.cell, entity_cell_size)) {
+        return true;
+    }
+    // If for is only explored but they have seen the entity before, then they can see it
+    if (match_is_cell_rect_explored(state, bot_team, entity.cell, entity_cell_size) &&
+            state.remembered_entities[bot_team].find(entity_id) != state.remembered_entities[bot_team].end()) {
+        return true;
+    }
+    // Otherwise, they have not scouted it
+    return false;
 }

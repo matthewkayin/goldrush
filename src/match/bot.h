@@ -57,6 +57,7 @@ void bot_update(const MatchState& state, Bot& bot);
 
 BotStrategyType bot_get_next_strategy(const MatchState& state, const Bot& bot);
 void bot_set_strategy(Bot& bot, BotStrategyType type);
+bool bot_strategy_should_be_abandoned(const MatchState& state, const Bot& bot);
 void bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_expand(const MatchState& state, const Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
@@ -67,6 +68,7 @@ void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t 
 bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
 void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
+void bot_scout(const MatchState& state, Bot& bot);
 
 // Squads
 
@@ -99,3 +101,4 @@ void bot_get_circle_draw(int x_center, int y_center, int x, int y, std::vector<i
 std::vector<ivec2> bot_get_cell_circle(ivec2 center, int radius);
 ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id);
 bool bot_is_landmine_point_valid(const MatchState& state, ivec2 point);
+bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
