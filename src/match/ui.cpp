@@ -888,6 +888,10 @@ void match_ui_update(MatchUiState& state) {
     // Menu
     ui_begin(state.ui);
     if (match_ui_is_in_menu(state.mode)) {
+        if (state.is_minimap_dragging) {
+            state.is_minimap_dragging = false;
+        }
+
         state.ui.input_enabled = state.options_menu.mode == OPTIONS_MENU_CLOSED;
         ui_frame_rect(state.ui, MENU_RECT);
 

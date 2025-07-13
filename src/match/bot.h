@@ -7,20 +7,10 @@
 #include <vector>
 #include <functional>
 
-enum BotStrategyType {
-    BOT_STRATEGY_BANDIT_RUSH,
-    BOT_STRATEGY_LANDMINES
-};
-
-struct BotStrategy {
-    BotStrategyType type;
-    uint32_t desired_entities[ENTITY_TYPE_COUNT];
-    uint32_t desired_upgrade;
-};
-
 enum BotSquadType {
     BOT_SQUAD_TYPE_ATTACK,
-    BOT_SQUAD_TYPE_LANDMINES
+    BOT_SQUAD_TYPE_LANDMINES,
+    BOT_SQUAD_TYPE_DEFEND
 };
 
 enum BotSquadMode {
@@ -28,6 +18,7 @@ enum BotSquadMode {
     BOT_SQUAD_MODE_GARRISON,
     BOT_SQUAD_MODE_ATTACK,
     BOT_SQUAD_MODE_LANDMINES,
+    BOT_SQUAD_MODE_DEFEND,
     BOT_SQUAD_MODE_DISSOLVED
 };
 
@@ -36,6 +27,19 @@ struct BotSquad {
     BotSquadMode mode;
     ivec2 target_cell;
     std::vector<EntityId> entities;
+};
+
+enum BotStrategyType {
+    BOT_STRATEGY_BANDIT_RUSH,
+    BOT_STRATEGY_LANDMINES,
+    BOT_STRATEGY_BUNKER
+};
+
+struct BotStrategy {
+    BotStrategyType type;
+    BotSquadType squad_type;
+    uint32_t desired_entities[ENTITY_TYPE_COUNT];
+    uint32_t desired_upgrade;
 };
 
 struct Bot {

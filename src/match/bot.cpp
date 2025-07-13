@@ -96,14 +96,21 @@ void bot_set_strategy(Bot& bot, BotStrategyType type) {
 
     switch (strategy.type) {
         case BOT_STRATEGY_BANDIT_RUSH: {
-            strategy.desired_entities[ENTITY_BANDIT] = 2;
-            strategy.desired_entities[ENTITY_PYRO] = 1;
+            strategy.squad_type = BOT_SQUAD_TYPE_ATTACK;
+            strategy.desired_entities[ENTITY_BANDIT] = 4;
             strategy.desired_entities[ENTITY_WAGON] = 1;
             break;
         }
         case BOT_STRATEGY_LANDMINES: {
+            strategy.squad_type = BOT_SQUAD_TYPE_LANDMINES;
             strategy.desired_entities[ENTITY_PYRO] = 1;
             strategy.desired_upgrade = UPGRADE_LANDMINES;
+            break;
+        }
+        case BOT_STRATEGY_BUNKER: {
+            strategy.squad_type = BOT_SQUAD_TYPE_DEFEND;
+            strategy.desired_entities[ENTITY_COWBOY] = 4;
+            strategy.desired_entities[ENTITY_BUNKER] = 1;
             break;
         }
     }
@@ -562,15 +569,7 @@ void bot_squad_create(const MatchState& state, Bot& bot) {
         }
     }
 
-    switch (bot.strategy.type) {
-        case BOT_STRATEGY_BANDIT_RUSH:
-            squad.type = BOT_SQUAD_TYPE_ATTACK;
-            break;
-        case BOT_STRATEGY_LANDMINES:
-            squad.type = BOT_SQUAD_TYPE_LANDMINES;
-            break;
-    }
-
+    squad.type = bot.strategy.squad_type;
     bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_GATHER);
     bot.squads.push_back(squad);
 }
@@ -759,8 +758,17 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                 // Add carrier to the list but only if it has capacity for more units
                 if (entity_data.garrison_capacity != 0 && entity.garrisoned_units.size() < entity_data.garrison_capacity) {
                     carriers.push(entity_id);
+                    continue;
+                }
+
+                // Unit is infantry
+                // If we are a defending army and this unit is not a ranged attacker, then ignore it
+                if (squad.type == BOT_SQUAD_TYPE_DEFEND && (entity_data.unit_data.damage == 0 || entity_data.unit_data.range_squared == 0)) {
+                    continue;
+                }
+
                 // Add infantry to the list but only if it is not garrisoned
-                } else if (entity_data.garrison_size != ENTITY_CANNOT_GARRISON && entity.garrison_id == ID_NULL) {
+                if (entity_data.garrison_size != ENTITY_CANNOT_GARRISON && entity.garrison_id == ID_NULL) {
                     all_infantry_are_garrisoned = false;
                     // Only add this infantry to the list if it is not targeting an entity
                     // if it is targeting an entity, we assume it's already being garrisoned
@@ -772,7 +780,11 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
 
             // If there's no more garrisoning to do, then attack
             if (carriers.empty() || all_infantry_are_garrisoned) {
-                bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_ATTACK);
+                if (squad.type == BOT_SQUAD_TYPE_ATTACK) {
+                    bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_ATTACK);
+                } else {
+                    bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_DEFEND);
+                }
                 break;
             }
 
@@ -802,15 +814,29 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
 
             break;
         }
-        case BOT_SQUAD_MODE_ATTACK: {
-            static const int ATTACK_SIGHT_RADIUS = 16;
+        case BOT_SQUAD_MODE_ATTACK:
+        case BOT_SQUAD_MODE_DEFEND: {
+            MatchInput move_input;
+            move_input.type = squad.mode == BOT_SQUAD_MODE_ATTACK ? MATCH_INPUT_MOVE_ATTACK_CELL : MATCH_INPUT_MOVE_CELL;
+            move_input.move.shift_command = 0;
+            move_input.move.target_id = ID_NULL;
+            move_input.move.target_cell = squad.target_cell;
+            move_input.move.entity_count = 0;
 
-            MatchInput attack_move_input;
-            attack_move_input.type = MATCH_INPUT_MOVE_ATTACK_CELL;
-            attack_move_input.move.shift_command = 0;
-            attack_move_input.move.target_id = ID_NULL;
-            attack_move_input.move.target_cell = squad.target_cell;
-            attack_move_input.move.entity_count = 0;
+            int sight_radius; 
+            bool units_have_reached_point = true;
+            bool units_are_attacking = false;
+            if (squad.mode == BOT_SQUAD_MODE_ATTACK) {
+                sight_radius = 16;
+            } else {
+                // If defending, we expect the target_cell to be at the town hall position
+                Cell map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, squad.target_cell);
+                if (map_cell.type == CELL_BUILDING) {
+                    bot_get_base_info(state, map_cell.id, NULL, &sight_radius, NULL);
+                } else {
+                    sight_radius = 16;
+                }
+            }
 
             // Manage attack targets for each entity
             for (EntityId entity_id : squad.entities) {
@@ -827,9 +853,10 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                 // Determine what the target would be if we were to switch targets
                 Target attack_target = match_entity_target_nearest_enemy(state, entity);
                 if (attack_target.type == TARGET_ATTACK_ENTITY) {
+                    units_are_attacking = true;
                     const Entity& attack_target_entity = state.entities.get_by_id(attack_target.id);
-
                     bool should_change_targets = false;
+
                     if (entity.target.type == TARGET_ATTACK_ENTITY) {
                         uint32_t existing_target_index = state.entities.get_index_of(entity.target.id);
                         // If we're attacking an entity, but that entity no longer exists, change targets
@@ -846,7 +873,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                     // This is because we generally want to allow molotov / unload actions to finish, but if such an action is targeting a base far away,
                     // then we want to refocus our efforts on the more immediate danger of this nearby target
                     } else if ((entity.target.type == TARGET_MOLOTOV || entity.target.type == TARGET_UNLOAD)) {
-                        if (ivec2::manhattan_distance(entity.target.cell, attack_target_entity.cell) > 2 * ATTACK_SIGHT_RADIUS) {
+                        if (ivec2::manhattan_distance(entity.target.cell, attack_target_entity.cell) > 2 * sight_radius) {
                             should_change_targets = true;
                         }
                     // Finally, all other target types will require a target change
@@ -874,27 +901,33 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                         unload_input.move.entity_ids[0] = entity_id;
                         bot.inputs.push_back(unload_input);
                     } else if (should_change_targets && entity.type == ENTITY_PYRO && entity.energy >= MOLOTOV_ENERGY_COST) {
-                        bot_throw_molotov(state, bot, entity_id, attack_target_entity.cell, ATTACK_SIGHT_RADIUS);
+                        bot_throw_molotov(state, bot, entity_id, squad.type == BOT_SQUAD_TYPE_ATTACK ? attack_target_entity.cell : squad.target_cell, sight_radius);
                     }
 
                     continue;
                 } // End if attack_target type is TARGET_ATTACK_ENTITY
 
                 // If we reached here, it means there was no attack target
-                if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > ATTACK_SIGHT_RADIUS &&
-                        !(entity.target.type == TARGET_ATTACK_CELL && ivec2::manhattan_distance(entity.target.cell, squad.target_cell) < ATTACK_SIGHT_RADIUS)) {
-                    log_trace("BOT: No attack target, giving A move.");
-                    attack_move_input.move.entity_ids[attack_move_input.move.entity_count] = entity_id;
-                    attack_move_input.move.entity_count++;
-                    if (attack_move_input.move.entity_count == SELECTION_LIMIT) {
-                        bot.inputs.push_back(attack_move_input);
-                        attack_move_input.move.entity_count = 0;
+                if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > sight_radius / 2) {
+                    units_have_reached_point = false;
+                    TargetType move_target_type = squad.type == BOT_SQUAD_TYPE_ATTACK ? TARGET_ATTACK_CELL : TARGET_CELL;
+                    if (!(entity.target.type == move_target_type && ivec2::manhattan_distance(entity.target.cell, squad.target_cell) < sight_radius)) {
+                        move_input.move.entity_ids[move_input.move.entity_count] = entity_id;
+                        move_input.move.entity_count++;
+                        if (move_input.move.entity_count == SELECTION_LIMIT) {
+                            bot.inputs.push_back(move_input);
+                            move_input.move.entity_count = 0;
+                        }
                     }
                 }
             } // End for each entity in squad
 
-            if (attack_move_input.move.entity_count != 0) {
-                bot.inputs.push_back(attack_move_input);
+            if (move_input.move.entity_count != 0) {
+                bot.inputs.push_back(move_input);
+            }
+
+            if (squad.type == BOT_SQUAD_TYPE_ATTACK && units_have_reached_point && !units_are_attacking) {
+                bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_DISSOLVED);
             }
 
             break;
