@@ -1000,12 +1000,8 @@ void match_ui_update(MatchUiState& state) {
                 }
 
                 if (state.inputs[player_id].empty()) {
-                    bot_update(state.match, state.bots[player_id]);
-                    if (state.bots[player_id].inputs.empty()) {
-                        state.bots[player_id].inputs.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
-                    }
-                    state.inputs[player_id].push(state.bots[player_id].inputs);
-                    state.bots[player_id].inputs.clear();
+                    MatchInput bot_input = bot_get_turn_input(state.match, state.bots[player_id]);
+                    state.inputs[player_id].push({ bot_input });
                     // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied whenever its deciding the next one
                     for (int index = 0; index < TURN_OFFSET - 1; index++) {
                         state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
