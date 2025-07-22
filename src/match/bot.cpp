@@ -15,26 +15,16 @@ Bot bot_init(uint8_t player_id) {
     return bot;
 };
 
-MatchInput bot_get_turn_input(const MatchState& state, Bot& bot) {
+void bot_update(const MatchState& state, Bot& bot) {
     if (bot_strategy_should_be_abandoned(state, bot)) {
         bot_set_strategy(bot, bot_get_next_strategy(state, bot));
     }
 
-    MatchInput saturate_input = bot_saturate_bases(state, bot);
-    if (saturate_input.type != MATCH_INPUT_NONE) {
-        return saturate_input;
-    }
-
+    bot_saturate_bases(state, bot);
     if (bot_should_expand(state, bot)) {
-        MatchInput input = bot_build_building(state, bot, ENTITY_HALL);
-        if (input.type != MATCH_INPUT_NONE) {
-            return input;
-        }
+        bot_build_building(state, bot, ENTITY_HALL);
     } else if (bot_should_build_house(state, bot)) {
-        MatchInput input = bot_build_building(state, bot, ENTITY_HOUSE);
-        if (input.type != MATCH_INPUT_NONE) {
-            return input;
-        }
+        bot_build_building(state, bot, ENTITY_HOUSE);
     } else {
         // Get desired entities
         uint32_t desired_entities[ENTITY_TYPE_COUNT];
@@ -60,26 +50,17 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot) {
 
         // Train unit
         if (desired_unit != ENTITY_TYPE_COUNT) {
-            MatchInput train_input = bot_train_unit(state, bot, desired_unit);
-            if (train_input.type != MATCH_INPUT_NONE) {
-                return train_input;
-            }
+            bot_train_unit(state, bot, desired_unit);
         }
 
         // Build building
         if (desired_building != ENTITY_TYPE_COUNT) {
-            MatchInput build_input = bot_build_building(state, bot, desired_building);
-            if (build_input.type != MATCH_INPUT_NONE) {
-                return build_input;
-            }
+            bot_build_building(state, bot, desired_building);
         }
 
         // Research upgrade
         if (bot.strategy.desired_upgrade != 0 && match_player_upgrade_is_available(state, bot.player_id, bot.strategy.desired_upgrade)) {
-            MatchInput research_input = bot_research_upgrade(state, bot, bot.strategy.desired_upgrade);
-            if (research_input.type != MATCH_INPUT_NONE) {
-                return research_input;
-            }
+            bot_research_upgrade(state, bot, bot.strategy.desired_upgrade);
         }
 
         // If we have no desired unit, building, or upgrade, then this strategy is done
@@ -93,7 +74,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot) {
     // Squad update
     uint32_t squad_index = 0;
     while (squad_index < bot.squads.size()) {
-        MatchInput squad_input = bot_squad_update(state, bot, bot.squads[squad_index]);
+        bot_squad_update(state, bot, bot.squads[squad_index]);
 
         // Check if squad is dissolved
         if (bot.squads[squad_index].mode == BOT_SQUAD_MODE_DISSOLVED) {
@@ -102,18 +83,9 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot) {
         } else {
             squad_index++;
         }
-
-        if (squad_input.type != MATCH_INPUT_NONE) {
-            return squad_input;
-        }
     }
 
-    MatchInput scout_input = bot_scout(state, bot);
-    if (scout_input.type != MATCH_INPUT_NONE) {
-        return scout_input;
-    }
-
-    return (MatchInput) { .type = MATCH_INPUT_NONE };
+    bot_scout(state, bot);
 }
 
 // Behaviors
@@ -170,7 +142,7 @@ bool bot_strategy_should_be_abandoned(const MatchState& state, const Bot& bot) {
     return false;
 }
 
-MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
+void bot_saturate_bases(const MatchState& state, Bot& bot) {
     for (uint32_t hall_index = 0; hall_index < state.entities.size(); hall_index++) {
         const Entity& hall = state.entities[hall_index];
         if (hall.player_id != bot.player_id || hall.type != ENTITY_HALL || hall.mode != MODE_BUILDING_FINISHED) {
@@ -200,7 +172,8 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
                 input.move.target_id = ID_NULL;
                 input.move.entity_count = 1;
                 input.move.entity_ids[0] = miner_id;
-                return input;
+                bot.inputs.push_back(input);
+                break;
             }
         }
 
@@ -215,24 +188,23 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
                 input.move.target_id = goldmine_id;
                 input.move.entity_count = 1;
                 input.move.entity_ids[0] = idle_worker_id;
-                return input;
+                bot.inputs.push_back(input);
+                break;
             }
 
             // If we're still here, then there were no idle workers
             // So we'll create one out of the town hall
             if (bot_get_effective_gold(state, bot) >= entity_get_data(ENTITY_MINER).gold_cost && hall.queue.empty()) {
-                return (MatchInput) {
+                bot.inputs.push_back((MatchInput) {
                     .type = MATCH_INPUT_BUILDING_ENQUEUE,
                     .building_enqueue = (MatchInputBuildingEnqueue) {
                         .building_id = state.entities.get_id_of(hall_index),
                         .item_type = BUILDING_QUEUE_ITEM_UNIT,
                         .item_subtype = ENTITY_MINER
                     }
-                };
+                });
 
-                /*
                 // Since we're training a miner, rally to the mine
-                // TODO: rally inputs
                 if (hall.rally_point.x == -1) {
                     MatchInput rally_input;
                     rally_input.type = MATCH_INPUT_RALLY;
@@ -242,12 +214,9 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
                     bot.inputs.push_back(rally_input);
                 }
                 return;
-                */
             }
         }
     } // End for each hall index
-
-    return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
 bool bot_should_expand(const MatchState& state, const Bot& bot) {
@@ -276,7 +245,7 @@ bool bot_should_build_house(const MatchState& state, const Bot& bot) {
     return future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1;
 }
 
-MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type) {
+void bot_build_building(const MatchState& state, Bot& bot, EntityType building_type) {
     GOLD_ASSERT(building_type != ENTITY_TYPE_COUNT && entity_is_building(building_type));
 
     // Check pre-req
@@ -286,28 +255,28 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
             return entity.player_id == bot.player_id && entity.mode == MODE_BUILDING_FINISHED && entity.type == prereq_type;
         });
         if (prereq_id == ID_NULL) {
-            return (MatchInput) { .type = MATCH_INPUT_NONE };
+            return;
         }
     }
 
     // Check gold cost
     if (bot_get_effective_gold(state, bot) < entity_get_data(building_type).gold_cost) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     uint32_t hall_index = bot_find_hall_index_with_least_nearby_buildings(state, bot.player_id);
     if (hall_index == INDEX_INVALID) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     EntityId builder_id = bot_find_builder(state, bot, hall_index);
     if (builder_id == ID_NULL) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     ivec2 building_location = building_type == ENTITY_HALL ? bot_find_hall_location(state, hall_index) : bot_find_building_location(state, bot.player_id, state.entities[hall_index].cell + ivec2(1, 1), entity_get_data(building_type).cell_size);
     if (building_location.x == -1) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     MatchInput input;
@@ -317,10 +286,10 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
     input.build.building_type = building_type;
     input.build.entity_count = 1;
     input.build.entity_ids[0] = builder_id;
-    return input;
+    bot.inputs.push_back(input);
 }
 
-MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type) {
+void bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type) {
     GOLD_ASSERT(unit_type != ENTITY_TYPE_COUNT && entity_is_unit(unit_type));
 
     // Find building to train unit
@@ -332,12 +301,12 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
                 entity.queue.empty();
     });
     if (building_id == ID_NULL) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     // Check gold
     if (bot_get_effective_gold(state, bot) < entity_get_data(unit_type).gold_cost) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     MatchInput input;
@@ -345,9 +314,8 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
     input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UNIT;
     input.building_enqueue.item_subtype = unit_type;
     input.building_enqueue.building_id = building_id;
-    return input;
+    bot.inputs.push_back(input);
 
-    /* TODO: rally
     // Set rally points
     MatchInput rally_input;
     rally_input.type = MATCH_INPUT_RALLY;
@@ -355,10 +323,9 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
     rally_input.rally.building_count = 1;
     rally_input.rally.building_ids[0] = building_id;
     bot.inputs.push_back(rally_input);
-    */
 }
 
-MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade) {
+void bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade) {
     GOLD_ASSERT(match_player_upgrade_is_available(state, bot.player_id, upgrade));
 
     EntityType building_type = bot_get_building_which_researches(upgrade);
@@ -369,19 +336,19 @@ MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgr
                 entity.queue.empty();
     });
     if (building_id == ID_NULL) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     // Check gold
     if (bot_get_effective_gold(state, bot) < upgrade_get_data(upgrade).gold_cost) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     MatchInput input;
     input.type = MATCH_INPUT_BUILDING_ENQUEUE;
     input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UPGRADE;
     input.building_enqueue.item_subtype = upgrade;
-    return input;
+    bot.inputs.push_back(input);
 }
 
 void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t desired_entities[ENTITY_TYPE_COUNT]) {
@@ -562,7 +529,7 @@ int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const En
     return score;
 }
 
-MatchInput bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius) {
+void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius) {
     const Entity& pyro = state.entities.get_by_id(pyro_id);
     GOLD_ASSERT(pyro.type == ENTITY_PYRO);
 
@@ -587,7 +554,7 @@ MatchInput bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id
     // We only have to check against exact 0, because
     // a negative number would never overcome the default 0 value
     if (best_molotov_cell_score == 0) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     MatchInput input;
@@ -597,10 +564,10 @@ MatchInput bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id
     input.move.target_cell = best_molotov_cell;
     input.move.entity_count = 1;
     input.move.entity_ids[0] = pyro_id;
-    return input;
+    bot.inputs.push_back(input);
 }
 
-MatchInput bot_scout(const MatchState& state, Bot& bot) {
+void bot_scout(const MatchState& state, Bot& bot) {
     // Scouting
     EntityId scout_id = bot_find_entity(state, [&bot](const Entity& entity, EntityId entity_id) {
         return entity.player_id == bot.player_id && entity.type == ENTITY_WAGON &&
@@ -608,7 +575,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot) {
                 entity.garrisoned_units.empty() && !bot_is_entity_reserved(bot, entity_id);
     });
     if (scout_id == ID_NULL) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     const Entity& scout = state.entities.get_by_id(scout_id);
@@ -623,7 +590,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot) {
                     ivec2::manhattan_distance(b.cell, scout.cell);
         });
     if (unscouted_goldmine_id == ID_NULL) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     MatchInput input;
@@ -634,7 +601,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot) {
     input.move.entity_count = 1;
     input.move.entity_count = 1;
     input.move.entity_ids[0] = scout_id;
-    return input;
+    bot.inputs.push_back(input);
 }
 
 // Squads
@@ -845,7 +812,7 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
     }
 }
 
-MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
+void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
     // Check the squad entity list for any entities which have died
     uint32_t squad_entity_index = 0;
     while (squad_entity_index < squad.entities.size()) {
@@ -863,7 +830,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     // If we have no more entities after that, then dissolve the squad
     if (squad.entities.empty()) {
         bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_DISSOLVED);
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        return;
     }
 
     // Update squad behavior
@@ -902,7 +869,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                     input.move.entity_count++;
                     entities_to_move.pop();
                 }
-                return input;
+                bot.inputs.push_back(input);
             }
 
             if (entities_have_reached_gather_point) {
@@ -977,7 +944,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 }
 
                 GOLD_ASSERT(input.move.entity_count != 0);
-                return input;
+                bot.inputs.push_back(input);
             }
 
             break;
@@ -1060,7 +1027,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                         attack_input.move.target_id = attack_target.id;
                         attack_input.move.entity_count = 1;
                         attack_input.move.entity_ids[0] = entity_id;
-                        return attack_input;
+                        bot.inputs.push_back(attack_input);
                     } else if (should_change_targets && !entity.garrisoned_units.empty()) {
                         MatchInput unload_input;
                         unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
@@ -1069,12 +1036,9 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                         unload_input.move.target_id = ID_NULL;
                         unload_input.move.entity_count = 1;
                         unload_input.move.entity_ids[0] = entity_id;
-                        return unload_input;
+                        bot.inputs.push_back(unload_input);
                     } else if (should_change_targets && entity.type == ENTITY_PYRO && entity.energy >= MOLOTOV_ENERGY_COST) {
-                        MatchInput molotov_input = bot_throw_molotov(state, bot, entity_id, squad.type == BOT_SQUAD_TYPE_ATTACK ? attack_target_entity.cell : squad.target_cell, sight_radius);
-                        if (molotov_input.type != MATCH_INPUT_NONE) {
-                            return molotov_input;
-                        }
+                        bot_throw_molotov(state, bot, entity_id, squad.type == BOT_SQUAD_TYPE_ATTACK ? attack_target_entity.cell : squad.target_cell, sight_radius);
                     }
 
                     continue;
@@ -1088,14 +1052,15 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                         move_input.move.entity_ids[move_input.move.entity_count] = entity_id;
                         move_input.move.entity_count++;
                         if (move_input.move.entity_count == SELECTION_LIMIT) {
-                            return move_input;
+                            bot.inputs.push_back(move_input);
+                            move_input.move.entity_count = 0;
                         }
                     }
                 }
             } // End for each entity in squad
 
             if (move_input.move.entity_count != 0) {
-                return move_input;
+                bot.inputs.push_back(move_input);
             }
 
             if (squad.type == BOT_SQUAD_TYPE_ATTACK && units_have_reached_point && !units_are_attacking) {
@@ -1209,7 +1174,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 landmine_input.build.target_cell = nearest_mine_cell;
                 landmine_input.build.entity_count = 1;
                 landmine_input.build.entity_ids[0] = squad.entities[0];
-                return landmine_input;
+                bot.inputs.push_back(landmine_input);
             // Make sure that the pyro moves to the next base, even if it's out of energy
             } else if (pyro.target.type == TARGET_NONE && 
                     pyro.energy < entity_get_data(ENTITY_LANDMINE).gold_cost && 
@@ -1221,7 +1186,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 move_input.move.target_cell = nearest_base_center;
                 move_input.move.entity_count = 1;
                 move_input.move.entity_ids[0] = squad.entities[0];
-                return move_input;
+                bot.inputs.push_back(move_input);
             }
 
             break;
@@ -1229,8 +1194,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         case BOT_SQUAD_MODE_DISSOLVED:
             break;
     }
-
-    return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
 // Entity management

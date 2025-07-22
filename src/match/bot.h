@@ -53,30 +53,30 @@ struct Bot {
 };
 
 Bot bot_init(uint8_t player_id);
-MatchInput bot_get_turn_input(const MatchState& state, Bot& bot);
+void bot_update(const MatchState& state, Bot& bot);
 
 // Behaviors
 
 BotStrategyType bot_get_next_strategy(const MatchState& state, const Bot& bot);
 void bot_set_strategy(Bot& bot, BotStrategyType type);
 bool bot_strategy_should_be_abandoned(const MatchState& state, const Bot& bot);
-MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
+void bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_expand(const MatchState& state, const Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
-MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
-MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
-MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
+void bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
+void bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
+void bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t desired_entities[ENTITY_TYPE_COUNT]);
 bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
-MatchInput bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
-MatchInput bot_scout(const MatchState& state, Bot& bot);
+void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
+void bot_scout(const MatchState& state, Bot& bot);
 
 // Squads
 
 void bot_squad_create(const MatchState& state, Bot& bot);
 void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotSquadMode mode);
-MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
+void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
 
 // Entity management
 
