@@ -636,6 +636,9 @@ void bot_squad_create(const MatchState& state, Bot& bot) {
 }
 
 void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotSquadMode mode) {
+    log_trace("BOT: bot_squad_set_mode to %u", mode);
+    uint64_t start_time = SDL_GetTicksNS();
+
     squad.mode = mode;
     switch (squad.mode) {
         case BOT_SQUAD_MODE_GATHER: {
@@ -710,9 +713,12 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
             // Get a detailed path from squad gather point to the target base
             std::vector<ivec2> detailed_attack_path;
             // Pathfinding is done with cell size of 2 to ensure that if we have wagons that they can fit through any gaps
-            map_pathfind(state.map, CELL_LAYER_GROUND, squad.target_cell, base_center, 2, &detailed_attack_path, false);
+            uint64_t pathfind_start_time = SDL_GetTicksNS();
+            map_pathfind(state.map, CELL_LAYER_GROUND, squad.target_cell, base_center, 2, &detailed_attack_path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+            double pathfind_elapsed_time = (double)(SDL_GetTicksNS() - pathfind_start_time) / (double)SDL_NS_PER_SECOND;
 
             // Make a loose attack path based on different points along the detailed path
+            uint64_t pathtrace_start_time = SDL_GetTicksNS();
             squad.attack_path.clear();
             squad.attack_path.push_back(base_center);
             for (int detailed_attack_path_index = detailed_attack_path.size() - 1; detailed_attack_path_index >= 0; detailed_attack_path_index--) {
@@ -727,6 +733,8 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
             // Set target cell based on attack path
             squad.target_cell = squad.attack_path.back();
             squad.attack_path.pop_back();
+            double pathtrace_elapsed_time = (double)(SDL_GetTicksNS() - pathtrace_start_time) / (double)SDL_NS_PER_SECOND;
+            log_trace("PROFILE pathfind %f path trace", pathfind_elapsed_time, pathtrace_elapsed_time);
 
             break;
         }
@@ -810,9 +818,14 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
         default:
             break;
     }
+
+    double elapsed = (double)(SDL_GetTicksNS() - start_time) / (double)SDL_NS_PER_SECOND;
+    log_trace("PROFILE: bot_squad_set_mode %f", elapsed);
 }
 
 void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
+    uint64_t start_time = SDL_GetTicksNS();
+
     // Check the squad entity list for any entities which have died
     uint32_t squad_entity_index = 0;
     while (squad_entity_index < squad.entities.size()) {
@@ -958,22 +971,30 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
             move_input.move.target_cell = squad.target_cell;
             move_input.move.entity_count = 0;
 
-            int sight_radius; 
+            int target_radius; 
             bool units_have_reached_point = true;
             bool units_are_attacking = false;
-            if (squad.mode == BOT_SQUAD_MODE_ATTACK && !squad.attack_path.empty()) {
-                sight_radius = 8;
-            } else if (squad.mode == BOT_SQUAD_MODE_ATTACK && squad.attack_path.empty()) {
-                sight_radius = 16;
+            Cell map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, squad.target_cell);
+            if (map_cell.type == CELL_BUILDING) {
+                bot_get_base_info(state, map_cell.id, NULL, &target_radius, NULL);
             } else {
-                // If defending, we expect the target_cell to be at the town hall position
-                Cell map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, squad.target_cell);
-                if (map_cell.type == CELL_BUILDING) {
-                    bot_get_base_info(state, map_cell.id, NULL, &sight_radius, NULL);
-                } else {
-                    sight_radius = 16;
-                }
+                target_radius = 32;
             }
+
+            // Check if there is an enemy in range of the target cell and radius
+            EntityId nearby_enemy_id = bot_find_best_entity(state,
+                [&state, &bot, &squad, &target_radius](const Entity& entity, EntityId entity_id) {
+                    return entity.type != ENTITY_GOLDMINE &&
+                                state.players[entity.player_id].team != state.players[bot.player_id].team &&
+                                entity_is_selectable(entity) && 
+                                ivec2::manhattan_distance(entity.cell, squad.target_cell) <= target_radius;
+                },
+                [&squad](const Entity& a, const Entity &b) {
+                    if (entity_get_data(a.type).attack_priority > entity_get_data(b.type).attack_priority) {
+                        return true;
+                    }
+                    return ivec2::manhattan_distance(a.cell, squad.target_cell) < ivec2::manhattan_distance(b.cell, squad.target_cell);
+                });
 
             // Manage attack targets for each entity
             for (EntityId entity_id : squad.entities) {
@@ -987,11 +1008,10 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                     continue;
                 }
 
-                // Determine what the target would be if we were to switch targets
-                Target attack_target = match_entity_target_nearest_enemy(state, entity);
-                if (attack_target.type == TARGET_ATTACK_ENTITY) {
+                // If there is an enemy close by, consider changing targets
+                if (nearby_enemy_id != ID_NULL) {
                     units_are_attacking = true;
-                    const Entity& attack_target_entity = state.entities.get_by_id(attack_target.id);
+                    const Entity& attack_target_entity = state.entities.get_by_id(nearby_enemy_id);
                     bool should_change_targets = false;
 
                     if (entity.target.type == TARGET_ATTACK_ENTITY) {
@@ -1010,7 +1030,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                     // This is because we generally want to allow molotov / unload actions to finish, but if such an action is targeting a base far away,
                     // then we want to refocus our efforts on the more immediate danger of this nearby target
                     } else if ((entity.target.type == TARGET_MOLOTOV || entity.target.type == TARGET_UNLOAD)) {
-                        if (ivec2::manhattan_distance(entity.target.cell, attack_target_entity.cell) > 2 * sight_radius) {
+                        if (ivec2::manhattan_distance(entity.target.cell, attack_target_entity.cell) > 2 * target_radius) {
                             should_change_targets = true;
                         }
                     // Finally, all other target types will require a target change
@@ -1024,7 +1044,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                         attack_input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
                         attack_input.move.shift_command = 0;
                         attack_input.move.target_cell = ivec2(0, 0);
-                        attack_input.move.target_id = attack_target.id;
+                        attack_input.move.target_id = nearby_enemy_id;
                         attack_input.move.entity_count = 1;
                         attack_input.move.entity_ids[0] = entity_id;
                         bot.inputs.push_back(attack_input);
@@ -1038,17 +1058,17 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                         unload_input.move.entity_ids[0] = entity_id;
                         bot.inputs.push_back(unload_input);
                     } else if (should_change_targets && entity.type == ENTITY_PYRO && entity.energy >= MOLOTOV_ENERGY_COST) {
-                        bot_throw_molotov(state, bot, entity_id, squad.type == BOT_SQUAD_TYPE_ATTACK ? attack_target_entity.cell : squad.target_cell, sight_radius);
+                        bot_throw_molotov(state, bot, entity_id, squad.type == BOT_SQUAD_TYPE_ATTACK ? attack_target_entity.cell : squad.target_cell, target_radius);
                     }
 
                     continue;
                 } // End if attack_target type is TARGET_ATTACK_ENTITY
 
-                // If we reached here, it means there was no attack target
-                if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > sight_radius / 2) {
+                // If we reached here, it means there was no nearby entity
+                if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > target_radius / 2) {
                     units_have_reached_point = false;
                     TargetType move_target_type = squad.type == BOT_SQUAD_TYPE_ATTACK ? TARGET_ATTACK_CELL : TARGET_CELL;
-                    if (!(entity.target.type == move_target_type && ivec2::manhattan_distance(entity.target.cell, squad.target_cell) < sight_radius)) {
+                    if (!(entity.target.type == move_target_type && ivec2::manhattan_distance(entity.target.cell, squad.target_cell) < target_radius)) {
                         move_input.move.entity_ids[move_input.move.entity_count] = entity_id;
                         move_input.move.entity_count++;
                         if (move_input.move.entity_count == SELECTION_LIMIT) {
@@ -1143,7 +1163,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                 // Pathfind to the base so that we place mines close to where the enemies would be coming in
                 ivec2 enemy_cell = state.entities[nearest_enemy_base_index].cell;
                 std::vector<ivec2> path;
-                map_pathfind(state.map, CELL_LAYER_GROUND, nearest_base_center, enemy_cell, 1, &path, false);
+                map_pathfind(state.map, CELL_LAYER_GROUND, nearest_base_center, enemy_cell, 1, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
                 int best_path_index = 0;
                 while (best_path_index < path.size() && ivec2::manhattan_distance(path[best_path_index], nearest_base_center) < nearest_base_radius) {
                     best_path_index++;
@@ -1194,6 +1214,9 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
         case BOT_SQUAD_MODE_DISSOLVED:
             break;
     }
+
+    double elapsed = (double)(SDL_GetTicksNS() - start_time) / (double)SDL_NS_PER_SECOND;
+    log_trace("PROFILE bot_squad_update %f", elapsed);
 }
 
 // Entity management
@@ -1552,11 +1575,11 @@ ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_ind
             }
 
             ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell + ivec2(1, 1), 1, hall_cell, entity_get_data(ENTITY_HALL).cell_size, true);
-            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell, entity_get_data(ENTITY_GOLDMINE).cell_size, 1, rally_cell, true);
+            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell, entity_get_data(ENTITY_GOLDMINE).cell_size, 1, rally_cell, MAP_IGNORE_MINERS);
 
             GOLD_ASSERT(mine_exit_cell.x != -1);
             std::vector<ivec2> path;
-            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &path, true);
+            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &path, MAP_IGNORE_MINERS);
             hall_score += path.size();
             hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
         }
@@ -1790,7 +1813,7 @@ ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id) {
 
     ivec2 nearest_enemy_cell = state.entities.get_by_id(nearest_enemy_id).cell;
     std::vector<ivec2> path;
-    map_pathfind(state.map, CELL_LAYER_GROUND, building.cell + ivec2(-1, 0), nearest_enemy_cell + ivec2(-1, 0), 1, &path, false);
+    map_pathfind(state.map, CELL_LAYER_GROUND, building.cell + ivec2(-1, 0), nearest_enemy_cell + ivec2(-1, 0), 1, &path, MAP_IGNORE_NONE);
     if (path.empty()) {
         return ivec2(-1, -1);
     }

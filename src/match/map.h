@@ -6,6 +6,10 @@
 #include "math/gmath.h"
 #include <vector>
 
+const uint32_t MAP_IGNORE_NONE = 0;
+const uint32_t MAP_IGNORE_UNITS = 1;
+const uint32_t MAP_IGNORE_MINERS = 2;
+
 struct Tile {
     SpriteName sprite;
     ivec2 frame;
@@ -64,11 +68,11 @@ void map_set_cell(Map& map, CellLayer layer, ivec2 cell, Cell value);
 void map_set_cell_rect(Map& map, CellLayer layer, ivec2 cell, int size, Cell value);
 bool map_is_cell_rect_equal_to(const Map& map, CellLayer layer, ivec2 cell, int size, EntityId id);
 bool map_is_cell_rect_empty(const Map& map, CellLayer layer, ivec2 cell, int size);
-bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int size, ivec2 origin = ivec2(-1, -1), bool gold_walk = false);
+bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int size, ivec2 origin = ivec2(-1, -1), uint32_t ignore = 0);
 
 ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell);
-ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 start, int start_size, ivec2 rect_position, int rect_size, bool gold_walk = false, ivec2 ignore_cell = ivec2(-1, -1));
+ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 start, int start_size, ivec2 rect_position, int rect_size, uint32_t ignore = 0, ivec2 ignore_cell = ivec2(-1, -1));
 
-ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, bool gold_walk);
+ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, uint32_t ignore);
 
-void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, bool gold_walk, std::vector<ivec2>* ignore_cells = NULL);
+void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells = NULL);

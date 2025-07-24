@@ -81,7 +81,7 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
             GOLD_ASSERT(goldmine_target.type != TARGET_NONE);
             Entity& mine = state.entities.get_by_id(goldmine_target.id);
             for (int index = 0; index < 3; index++) {
-                ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, false);
+                ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, MAP_IGNORE_NONE);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
 
@@ -988,15 +988,15 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         Target hall_target = match_entity_target_nearest_hall(state, entity);
                         if (hall_target.type == TARGET_ENTITY) {
                             const Entity& hall = state.entities.get_by_id(hall_target.id);
-                            ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, mine.cell + ivec2(1, 1), 1, hall.cell, entity_get_data(hall.type).cell_size, true);
-                            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, mine.cell, entity_get_data(mine.type).cell_size, entity_data.cell_size, rally_cell, true);
+                            ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, mine.cell + ivec2(1, 1), 1, hall.cell, entity_get_data(hall.type).cell_size, MAP_IGNORE_MINERS);
+                            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, mine.cell, entity_get_data(mine.type).cell_size, entity_data.cell_size, rally_cell, MAP_IGNORE_MINERS);
 
                             GOLD_ASSERT(mine_exit_cell.x != -1);
                             std::vector<ivec2> mine_exit_path;
-                            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &mine_exit_path, true);
+                            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &mine_exit_path, MAP_IGNORE_MINERS);
                             mine_exit_path.push_back(mine_exit_cell);
 
-                            map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), 1, &entity.path, true, &mine_exit_path);
+                            map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), 1, &entity.path, MAP_IGNORE_MINERS, &mine_exit_path);
                             used_ideal_mining_path = true;
                         }
                     }
@@ -1004,7 +1004,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                 // Pathfind
                 if (!used_ideal_mining_path) {
-                    map_pathfind(state.map, entity_data.cell_layer, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity));
+                    map_pathfind(state.map, entity_data.cell_layer, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity) ? MAP_IGNORE_MINERS : MAP_IGNORE_NONE);
                 }
 
                 // Check path
@@ -1047,7 +1047,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     // If the unit is not moving between tiles, then pop the next cell off the path
                     if (entity.position == entity_get_target_position(entity) && !entity.path.empty()) {
                         entity.direction = enum_from_ivec2_direction(entity.path[0] - entity.cell);
-                        if (map_is_cell_rect_occupied(state.map, entity_data.cell_layer, entity.path[0], entity_data.cell_size, entity.cell, false)) {
+                        if (map_is_cell_rect_occupied(state.map, entity_data.cell_layer, entity.path[0], entity_data.cell_size, entity.cell, MAP_IGNORE_NONE)) {
                             path_is_blocked = true;
                             // breaks out of while movement left
                             break;
@@ -1133,7 +1133,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     }
                     if (try_walk_around_blocker) {
                         entity.path.clear();
-                        map_pathfind(state.map, entity_data.cell_layer, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, false);
+                        map_pathfind(state.map, entity_data.cell_layer, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, MAP_IGNORE_NONE);
                         update_finished = true;
                         break;
                     }
@@ -1558,8 +1558,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     uint32_t hall_index = hall_target.type == TARGET_NONE ? INDEX_INVALID : state.entities.get_index_of(hall_target.id);
                     ivec2 rally_cell = hall_target.type == TARGET_NONE 
                                         ? (mine.cell + ivec2(1, mine_data.cell_size)) 
-                                        : map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, mine.cell + ivec2(1, 1), 1, state.entities[hall_index].cell, hall_data.cell_size, true);
-                    ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, mine.cell, mine_data.cell_size, entity_data.cell_size, rally_cell, false);
+                                        : map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, mine.cell + ivec2(1, 1), 1, state.entities[hall_index].cell, hall_data.cell_size, MAP_IGNORE_MINERS);
+                    ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, mine.cell, mine_data.cell_size, entity_data.cell_size, rally_cell, MAP_IGNORE_NONE);
 
                     if (exit_cell.x == -1) {
                         match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_MINE_EXIT_BLOCKED);
@@ -1744,7 +1744,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         ivec2 rally_cell = entity.rally_point.x == -1 
                                             ? entity.cell + ivec2(0, entity_data.cell_size)
                                             : entity.rally_point / TILE_SIZE;
-                        ivec2 exit_cell = map_get_exit_cell(state.map, entity_data.cell_layer, entity.cell, entity_data.cell_size, entity_get_data(entity.queue[0].unit_type).cell_size, rally_cell, false);
+                        ivec2 exit_cell = map_get_exit_cell(state.map, entity_data.cell_layer, entity.cell, entity_data.cell_size, entity_get_data(entity.queue[0].unit_type).cell_size, rally_cell, MAP_IGNORE_NONE);
                         if (exit_cell.x == -1) {
                             if (entity.timer == 0) {
                                 match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_BUILDING_EXIT_BLOCKED);
@@ -2115,7 +2115,7 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
             return entity.cell;
         case TARGET_BUILD: {
             if (entity.target.build.building_type == ENTITY_LANDMINE) {
-                return map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_get_data(entity.type).cell_size, entity.target.build.building_cell, entity_get_data(ENTITY_LANDMINE).cell_size, false);
+                return map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_get_data(entity.type).cell_size, entity.target.build.building_cell, entity_get_data(ENTITY_LANDMINE).cell_size, MAP_IGNORE_NONE);
             }
             return entity.target.build.unit_cell;
         }
@@ -2128,7 +2128,7 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
                         entity_get_data(entity.type).cell_size, 
                         builder.target.build.building_cell, 
                         entity_get_data(builder.target.build.building_type).cell_size, 
-                        false, ivec2(-1, -1));
+                        MAP_IGNORE_NONE, ivec2(-1, -1));
         }
         case TARGET_CELL:
         case TARGET_ATTACK_CELL:
@@ -2156,11 +2156,11 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
                 if (hall_target.type != TARGET_NONE) {
                     const Entity& hall = state.entities.get_by_id(hall_target.id);
                     const EntityData& hall_data = entity_get_data(ENTITY_HALL);
-                    ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, target.cell + ivec2(1, 1), 1, hall.cell, hall_data.cell_size, true);
-                    ignore_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, target.cell, target_cell_size, entity_cell_size, rally_cell, true);
+                    ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, target.cell + ivec2(1, 1), 1, hall.cell, hall_data.cell_size, MAP_IGNORE_MINERS);
+                    ignore_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, target.cell, target_cell_size, entity_cell_size, rally_cell, MAP_IGNORE_MINERS);
                 }
             }
-            return map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_cell_size, target.cell, target_cell_size, match_is_entity_mining(state, entity), ignore_cell);
+            return map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_cell_size, target.cell, target_cell_size, match_is_entity_mining(state, entity) ? MAP_IGNORE_MINERS : MAP_IGNORE_NONE, ignore_cell);
         }
     }
 }
@@ -2661,7 +2661,7 @@ void match_entity_unload_unit(MatchState& state, Entity& carrier, EntityId garri
             const EntityData& garrisoned_unit_data = entity_get_data(garrisoned_unit.type);
 
             // Find the exit cell
-            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, carrier.cell, carrier_data.cell_size, garrisoned_unit_data.cell_size, carrier.cell + ivec2(0, carrier_data.cell_size), false);
+            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, carrier.cell, carrier_data.cell_size, garrisoned_unit_data.cell_size, carrier.cell + ivec2(0, carrier_data.cell_size), MAP_IGNORE_NONE);
             if (exit_cell.x == -1) {
                 if (entity_is_building(carrier.type)) {
                     match_event_show_status(state, garrisoned_unit.player_id, MATCH_UI_STATUS_BUILDING_EXIT_BLOCKED);
