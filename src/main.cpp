@@ -260,6 +260,9 @@ int gold_main(int argc, char** argv) {
 
         if (current_time - last_second >= SDL_NS_PER_SECOND) {
             fps = frames;
+            if (fps < 60) {
+                log_warn("FPS DIP %u.", fps);
+            }
             frames = 0;
             last_second += SDL_NS_PER_SECOND;
         }

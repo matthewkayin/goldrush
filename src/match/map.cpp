@@ -1111,7 +1111,10 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     for (int y = to.y; y < to.y + cell_size; y++) {
         for (int x = to.x; x < to.x + cell_size; x++) {
             Cell cell = map_get_cell(map, layer, ivec2(x, y));
-            if (cell.type == CELL_BLOCKED || cell.type == CELL_UNREACHABLE) {
+            if (cell.type == CELL_BLOCKED || 
+                    cell.type == CELL_UNREACHABLE || 
+                    cell.type == CELL_BUILDING ||
+                    cell.type == CELL_UNIT) {
                 is_target_unreachable = true;
                 // Cause break on both inner and outer loops
                 x = to.x + cell_size;
