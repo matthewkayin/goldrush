@@ -578,24 +578,11 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
     }
 }
 
-static uint64_t entity_idle_duration;
-static uint64_t entity_move_duration;
-static uint64_t entity_idle_target_enemy_duration;
-static uint64_t entity_idle_pathfind_duration;
 void match_update(MatchState& state) {
     // Update entities
-    entity_idle_duration = 0;
-    entity_move_duration = 0;
-    entity_idle_pathfind_duration = 0;
-    entity_idle_target_enemy_duration = 0;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         match_entity_update(state, entity_index);
     }
-    double entity_idle_float_duration = (double)entity_idle_duration / (double)SDL_NS_PER_SECOND;
-    double entity_move_float_duration = (double)entity_move_duration / (double)SDL_NS_PER_SECOND;
-    double entity_idle_target_enemy_float_duration = (double)entity_idle_target_enemy_duration / (double)SDL_NS_PER_SECOND;
-    double entity_idle_pathfind_float_duration = (double)entity_idle_pathfind_duration/ (double)SDL_NS_PER_SECOND;
-    log_trace("PROFILE: idle %f idle target enemy %f idle pathfind %f idle move %f", entity_idle_float_duration, entity_idle_target_enemy_float_duration, entity_idle_pathfind_float_duration, entity_move_float_duration);
 
     // Update particles
     for (int particle_layer = 0; particle_layer < PARTICLE_LAYER_COUNT; particle_layer++) {
@@ -923,8 +910,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
         movement_left = movement_left * BLEED_SPEED_PERCENTAGE;
     }
     while (!update_finished) {
-        uint64_t start_time = SDL_GetTicksNS();
-        EntityMode old_mode = entity.mode;
         switch (entity.mode) {
             case MODE_UNIT_IDLE: {
                 // Do nothing if unit is garrisoned
@@ -947,9 +932,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && 
                         entity_data.unit_data.damage != 0 && 
                         !(entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE))) {
-                    uint64_t target_enemy_start = SDL_GetTicksNS();
                     entity.target = match_entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
-                    entity_idle_target_enemy_duration += SDL_GetTicksNS() - target_enemy_start;
                 }
 
                 // If unit is still idle, do nothing
@@ -1022,9 +1005,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                 // Pathfind
                 if (!used_ideal_mining_path) {
-                    uint64_t pathfind_start_time = SDL_GetTicksNS();
                     map_pathfind(state.map, entity_data.cell_layer, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity) ? MAP_IGNORE_MINERS : MAP_IGNORE_NONE);
-                    entity_idle_pathfind_duration += SDL_GetTicksNS() - pathfind_start_time;
                 }
 
                 // Check path
@@ -1830,12 +1811,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             default:
                 update_finished = true;
                 break;
-        }
-        uint64_t duration = SDL_GetTicksNS() - start_time;
-        if (old_mode == MODE_UNIT_IDLE) {
-            entity_idle_duration += duration;
-        } else if (old_mode == MODE_UNIT_MOVE) {
-            entity_move_duration += duration;
         }
     }
 

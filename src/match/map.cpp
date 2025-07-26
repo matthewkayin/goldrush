@@ -1146,6 +1146,11 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
             // If it's the solution, return it
             if (!map_is_cell_rect_occupied(map, layer, smallest.cell, cell_size, from, ignore)) {
+                // But first, check to see if this new "to" cell even gets us any closer to our goal
+                if (ivec2::manhattan_distance(from, to) - ivec2::manhattan_distance(smallest.cell, to) < 3) {
+                    path->clear();
+                    return;
+                }
                 to = smallest.cell;
                 break; // breaks while frontier not empty
             }

@@ -249,7 +249,13 @@ int gold_main(int argc, char** argv) {
         uint64_t current_time = SDL_GetTicksNS();
         #ifdef GOLD_DEBUG_TURBO
         if (input_is_action_just_pressed(INPUT_ACTION_TURBO)) {
-            playback_speed = playback_speed == 4 ? 1 : 4;
+            if (playback_speed == 1) {
+                playback_speed = 4;
+            } else if (playback_speed == 4) {
+                playback_speed = 8;
+            } else {
+                playback_speed = 1;
+            }
         } 
 
         update_accumulator += (current_time - last_time) * playback_speed;

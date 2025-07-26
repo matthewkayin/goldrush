@@ -3,7 +3,7 @@
 #include "core/logger.h"
 #include "upgrade.h"
 
-static const int SQUAD_GATHER_DISTANCE = 8;
+static const int SQUAD_GATHER_DISTANCE = 16;
 static const uint32_t SQUAD_LANDMINE_MAX = 6;
 
 Bot bot_init(uint8_t player_id) {
@@ -636,9 +636,6 @@ void bot_squad_create(const MatchState& state, Bot& bot) {
 }
 
 void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotSquadMode mode) {
-    log_trace("BOT: bot_squad_set_mode to %u", mode);
-    uint64_t start_time = SDL_GetTicksNS();
-
     squad.mode = mode;
     switch (squad.mode) {
         case BOT_SQUAD_MODE_GATHER: {
@@ -711,14 +708,10 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
             bot_get_base_info(state, nearest_enemy_building_id, &base_center, NULL, NULL);
 
             // Get a detailed path from squad gather point to the target base
-            std::vector<ivec2> detailed_attack_path;
             // Pathfinding is done with cell size of 2 to ensure that if we have wagons that they can fit through any gaps
-            uint64_t pathfind_start_time = SDL_GetTicksNS();
+            std::vector<ivec2> detailed_attack_path;
             map_pathfind(state.map, CELL_LAYER_GROUND, squad.target_cell, base_center, 2, &detailed_attack_path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
-            double pathfind_elapsed_time = (double)(SDL_GetTicksNS() - pathfind_start_time) / (double)SDL_NS_PER_SECOND;
-
             // Make a loose attack path based on different points along the detailed path
-            uint64_t pathtrace_start_time = SDL_GetTicksNS();
             squad.attack_path.clear();
             squad.attack_path.push_back(base_center);
             for (int detailed_attack_path_index = detailed_attack_path.size() - 1; detailed_attack_path_index >= 0; detailed_attack_path_index--) {
@@ -733,8 +726,6 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
             // Set target cell based on attack path
             squad.target_cell = squad.attack_path.back();
             squad.attack_path.pop_back();
-            double pathtrace_elapsed_time = (double)(SDL_GetTicksNS() - pathtrace_start_time) / (double)SDL_NS_PER_SECOND;
-            log_trace("PROFILE pathfind %f path trace", pathfind_elapsed_time, pathtrace_elapsed_time);
 
             break;
         }
@@ -818,14 +809,9 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
         default:
             break;
     }
-
-    double elapsed = (double)(SDL_GetTicksNS() - start_time) / (double)SDL_NS_PER_SECOND;
-    log_trace("PROFILE: bot_squad_set_mode %f", elapsed);
 }
 
 void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
-    uint64_t start_time = SDL_GetTicksNS();
-
     // Check the squad entity list for any entities which have died
     uint32_t squad_entity_index = 0;
     while (squad_entity_index < squad.entities.size()) {
@@ -978,7 +964,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
             if (map_cell.type == CELL_BUILDING) {
                 bot_get_base_info(state, map_cell.id, NULL, &target_radius, NULL);
             } else {
-                target_radius = 32;
+                target_radius = SQUAD_GATHER_DISTANCE;
             }
 
             // Check if there is an enemy in range of the target cell and radius
@@ -1214,9 +1200,6 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
         case BOT_SQUAD_MODE_DISSOLVED:
             break;
     }
-
-    double elapsed = (double)(SDL_GetTicksNS() - start_time) / (double)SDL_NS_PER_SECOND;
-    log_trace("PROFILE bot_squad_update %f", elapsed);
 }
 
 // Entity management
