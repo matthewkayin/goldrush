@@ -7,6 +7,16 @@
 #include <vector>
 #include <functional>
 
+enum BotStrategy {
+    BOT_STRATEGY_NONE,
+    BOT_STRATEGY_EXPAND,
+    BOT_STRATEGY_BANDIT_RUSH,
+    BOT_STRATEGY_LANDMINES,
+    BOT_STRATEGY_BUNKER,
+    BOT_STRATEGY_HARASS,
+    BOT_STRATEGY_PUSH
+};
+
 enum BotSquadType {
     BOT_SQUAD_TYPE_NONE,
     BOT_SQUAD_TYPE_ATTACK,
@@ -31,42 +41,29 @@ struct BotSquad {
     std::vector<EntityId> entities;
 };
 
-enum BotStrategyType {
-    BOT_STRATEGY_NONE,
-    BOT_STRATEGY_EXPAND_FIRST,
-    BOT_STRATEGY_BANDIT_RUSH,
-    BOT_STRATEGY_LANDMINES,
-    BOT_STRATEGY_BUNKER,
-    BOT_STRATEGY_HARASS,
-    BOT_STRATEGY_PUSH
-};
-
-struct BotStrategy {
-    BotStrategyType type;
-    BotSquadType squad_type;
-    uint32_t desired_entities[ENTITY_TYPE_COUNT];
-    uint32_t desired_upgrade;
-};
 
 struct Bot {
     uint8_t player_id;
-    EntityType preferred_unit_comp[3];
     BotStrategy strategy;
+    BotSquadType desired_squad_type;
+    uint32_t desired_entities[ENTITY_TYPE_COUNT];
+    uint32_t desired_upgrade;
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotSquad> squads;
     std::vector<MatchInput> inputs;
 };
 
 Bot bot_init(uint8_t player_id);
-void bot_update(const MatchState& state, Bot& bot);
+void bot_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 
 // Behaviors
 
-BotStrategyType bot_choose_next_strategy(const MatchState& state, const Bot& bot);
-void bot_set_strategy(Bot& bot, BotStrategyType type);
+BotStrategy bot_choose_next_strategy(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
+void bot_clear_strategy(Bot& bot);
+void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy);
 bool bot_strategy_should_be_abandoned(const MatchState& state, const Bot& bot);
 void bot_saturate_bases(const MatchState& state, Bot& bot);
-bool bot_should_expand(const MatchState& state, const Bot& bot);
+// bool bot_should_expand(const MatchState& state, const Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
 void bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
 void bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
@@ -76,7 +73,7 @@ bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
 void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
 void bot_scout(const MatchState& state, Bot& bot);
-int bot_get_defense_score(const MatchState& state, const Bot& bot);
+// int bot_get_defense_score(const MatchState& state, const Bot& bot);
 
 // Squads
 

@@ -994,13 +994,15 @@ void match_ui_update(MatchUiState& state) {
     if (!state.replay_mode) {
         if (state.turn_timer == 0) {
             // Bot input
+            static const uint32_t TURNS_PER_SECOND = UPDATES_PER_SECOND / TURN_DURATION;
+            uint32_t match_time_minutes = (state.turn_counter / TURNS_PER_SECOND) / 60U;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
                     continue;
                 }
 
                 if (state.inputs[player_id].empty()) {
-                    bot_update(state.match, state.bots[player_id]);
+                    bot_update(state.match, state.bots[player_id], match_time_minutes);
                     if (state.bots[player_id].inputs.empty()) {
                         state.bots[player_id].inputs.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
                     }

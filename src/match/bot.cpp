@@ -10,28 +10,27 @@ Bot bot_init(uint8_t player_id) {
     Bot bot;
 
     bot.player_id = player_id;
-    bot_set_strategy(bot, BOT_STRATEGY_EXPAND_FIRST);
+    bot_clear_strategy(bot);
 
     return bot;
 };
 
-void bot_update(const MatchState& state, Bot& bot) {
+void bot_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
     if (bot_strategy_should_be_abandoned(state, bot)) {
-        bot_set_strategy(bot, BOT_STRATEGY_NONE);
+        bot_clear_strategy(bot);
     }
-    if (bot.strategy.type == BOT_STRATEGY_NONE) {
-        bot_set_strategy(bot, bot_choose_next_strategy(state, bot));
+    if (bot.strategy == BOT_STRATEGY_NONE) {
+        bot_set_strategy(state, bot, bot_choose_next_strategy(state, bot, match_time_minutes));
     }
 
     bot_saturate_bases(state, bot);
-    if (bot_should_expand(state, bot)) {
-        bot_build_building(state, bot, ENTITY_HALL);
-    } else if (bot_should_build_house(state, bot)) {
+    if (bot_should_build_house(state, bot)) {
         bot_build_building(state, bot, ENTITY_HOUSE);
     } else {
         // Get desired entities
         uint32_t desired_entities[ENTITY_TYPE_COUNT];
         bot_get_desired_entities(state, bot, desired_entities);
+        log_trace("BOT: desired halls %u", desired_entities[ENTITY_HALL]);
 
         // Choose desired unit
         EntityType desired_unit = ENTITY_TYPE_COUNT;
@@ -43,9 +42,8 @@ void bot_update(const MatchState& state, Bot& bot) {
         }
 
         // Chose desired building
-        // Using hall + 1 as starting type because halls should be handled by bot_should_expand()
         EntityType desired_building = ENTITY_TYPE_COUNT;
-        for (uint32_t entity_type = ENTITY_HALL + 1; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
             if (desired_entities[entity_type] > 0) {
                 desired_building = (EntityType)entity_type;
                 break;
@@ -63,15 +61,17 @@ void bot_update(const MatchState& state, Bot& bot) {
         }
 
         // Research upgrade
-        if (bot.strategy.desired_upgrade != 0 && match_player_upgrade_is_available(state, bot.player_id, bot.strategy.desired_upgrade)) {
-            bot_research_upgrade(state, bot, bot.strategy.desired_upgrade);
+        if (bot.desired_upgrade != 0 && match_player_upgrade_is_available(state, bot.player_id, bot.desired_upgrade)) {
+            bot_research_upgrade(state, bot, bot.desired_upgrade);
         }
 
         // If we have no desired unit, building, or upgrade, then this strategy is done
         if (bot_has_desired_entities(state, bot) &&
-                (bot.strategy.desired_upgrade == 0 || match_player_has_upgrade(state, bot.player_id, bot.strategy.desired_upgrade))) {
-            bot_squad_create(state, bot);
-            bot_set_strategy(bot, BOT_STRATEGY_NONE);
+                (bot.desired_upgrade == 0 || match_player_has_upgrade(state, bot.player_id, bot.desired_upgrade))) {
+            if (bot.desired_squad_type != BOT_SQUAD_TYPE_NONE) {
+                bot_squad_create(state, bot);
+            }
+            bot_clear_strategy(bot);
         }
     }
 
@@ -94,48 +94,63 @@ void bot_update(const MatchState& state, Bot& bot) {
 
 // Behaviors
 
-BotStrategyType bot_choose_next_strategy(const MatchState& state, const Bot& bot) {
+BotStrategy bot_choose_next_strategy(const MatchState& state, const Bot& bot, uint32_t match_time_minutes) {
+    if (match_time_minutes == 0) {
+        return BOT_STRATEGY_EXPAND;
+    }
+
     return BOT_STRATEGY_PUSH;
 }
 
-void bot_set_strategy(Bot& bot, BotStrategyType type) {
-    bot.strategy.type = type;
-    bot.strategy.squad_type = BOT_SQUAD_TYPE_NONE;
-    memset(bot.strategy.desired_entities, 0, sizeof(bot.strategy.desired_entities));
-    bot.strategy.desired_upgrade = 0;
+void bot_clear_strategy(Bot& bot) {
+    bot.strategy = BOT_STRATEGY_NONE;
+    bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
+    memset(bot.desired_entities, 0, sizeof(bot.desired_entities));
+    bot.desired_upgrade = 0;
+}
 
-    switch (bot.strategy.type) {
+void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy) {
+    bot_clear_strategy(bot);
+    bot.strategy = strategy;
+
+    switch (bot.strategy) {
         case BOT_STRATEGY_NONE: {
             break;
         }
-        case BOT_STRATEGY_EXPAND_FIRST: {
-            bot.strategy.squad_type = BOT_SQUAD_TYPE_NONE;
-            bot.strategy.desired_entities[ENTITY_HALL] = 2;
+        case BOT_STRATEGY_EXPAND: {
+            uint32_t existing_hall_count = 0;
+            for (const Entity& entity : state.entities) {
+                if (entity.type == ENTITY_HALL && entity.player_id == bot.player_id && entity_is_selectable(entity)) {
+                    existing_hall_count++;
+                }
+            }
+            bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
+            bot.desired_entities[ENTITY_HALL] = existing_hall_count + 1;
             break;
         }
         case BOT_STRATEGY_BANDIT_RUSH: {
-            bot.strategy.squad_type = BOT_SQUAD_TYPE_ATTACK;
-            bot.strategy.desired_entities[ENTITY_BANDIT] = 4;
-            bot.strategy.desired_entities[ENTITY_WAGON] = 1;
+            bot.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
+            bot.desired_entities[ENTITY_BANDIT] = 4;
+            bot.desired_entities[ENTITY_WAGON] = 1;
             break;
         }
         case BOT_STRATEGY_LANDMINES: {
-            bot.strategy.squad_type = BOT_SQUAD_TYPE_LANDMINES;
-            bot.strategy.desired_entities[ENTITY_PYRO] = 1;
-            bot.strategy.desired_upgrade = UPGRADE_LANDMINES;
+            bot.desired_squad_type = BOT_SQUAD_TYPE_LANDMINES;
+            bot.desired_entities[ENTITY_PYRO] = 1;
+            bot.desired_upgrade = UPGRADE_LANDMINES;
             break;
         }
         case BOT_STRATEGY_BUNKER: {
-            bot.strategy.squad_type = BOT_SQUAD_TYPE_DEFEND;
-            bot.strategy.desired_entities[ENTITY_COWBOY] = 4;
-            bot.strategy.desired_entities[ENTITY_BUNKER] = 1;
+            bot.desired_squad_type = BOT_SQUAD_TYPE_DEFEND;
+            bot.desired_entities[ENTITY_COWBOY] = 4;
+            bot.desired_entities[ENTITY_BUNKER] = 1;
             break;
         }
-        case BOT_STRATEGY_SOLDIER_CANNON_PUSH: {
-            bot.strategy.squad_type = BOT_SQUAD_TYPE_ATTACK;
-            bot.strategy.desired_entities[ENTITY_SOLDIER] = 16;
-            bot.strategy.desired_entities[ENTITY_CANNON] = 2;
-            bot.strategy.desired_entities[ENTITY_BANDIT] = 8;
+        case BOT_STRATEGY_PUSH: {
+            bot.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
+            bot.desired_entities[ENTITY_SOLDIER] = 16;
+            bot.desired_entities[ENTITY_CANNON] = 2;
+            bot.desired_entities[ENTITY_BANDIT] = 8;
             break;
         }
     }
@@ -151,12 +166,12 @@ bool bot_strategy_should_be_abandoned(const MatchState& state, const Bot& bot) {
     bool is_base_under_attack = building_under_attack_id != ID_NULL;
 
     if (is_base_under_attack && (
-            bot.strategy.type == BOT_STRATEGY_BANDIT_RUSH ||
-            bot.strategy.type == BOT_STRATEGY_EXPAND_FIRST)) {
+            bot.strategy == BOT_STRATEGY_BANDIT_RUSH ||
+            bot.strategy == BOT_STRATEGY_EXPAND)) {
         return true;
     }
 
-    if (bot.strategy.type == BOT_STRATEGY_BANDIT_RUSH) {
+    if (bot.strategy == BOT_STRATEGY_BANDIT_RUSH) {
         EntityId wagon_id = bot_find_entity(state, [&bot](const Entity& entity, EntityId entity_id) {
             return entity.player_id == bot.player_id && entity.type == ENTITY_WAGON && entity_is_selectable(entity);
         });
@@ -243,6 +258,7 @@ void bot_saturate_bases(const MatchState& state, Bot& bot) {
     } // End for each hall index
 }
 
+/*
 bool bot_should_expand(const MatchState& state, const Bot& bot) {
     // If there's no unoccupied goldmines, don't expand
     EntityId unoccupied_goldmine_id = bot_find_entity(state, [&state](const Entity& entity, EntityId entity_id) {
@@ -265,7 +281,7 @@ bool bot_should_expand(const MatchState& state, const Bot& bot) {
         }
     }
 
-    if (bot.strategy.desired_entities[ENTITY_HALL] > player_base_count[bot.player_id]) {
+    if (bot.desired_entities[ENTITY_HALL] > player_base_count[bot.player_id]) {
         return true;
     }
 
@@ -289,6 +305,7 @@ bool bot_should_expand(const MatchState& state, const Bot& bot) {
 
     return false;
 }
+*/
 
 bool bot_should_build_house(const MatchState& state, const Bot& bot) {
     uint32_t future_max_population = match_get_player_max_population(state, bot.player_id);
@@ -419,7 +436,7 @@ void bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade) {
 }
 
 void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t desired_entities[ENTITY_TYPE_COUNT]) {
-    memcpy(desired_entities, bot.strategy.desired_entities, sizeof(bot.strategy.desired_entities));
+    memcpy(desired_entities, bot.desired_entities, sizeof(bot.desired_entities));
 
     // Subtract from desired units any unit which we already have or which is in-progress
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -436,7 +453,7 @@ void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t 
                 entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT &&
                 desired_entities[entity.queue.front().unit_type] > 0) {
             desired_entities[entity.queue.front().unit_type]--;
-        } else if (desired_entities[entity.type] > 0) {
+        } else if (entity_is_unit(entity.type) && desired_entities[entity.type] > 0) {
             desired_entities[entity.type]--;
         }
     }
@@ -463,8 +480,8 @@ void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t 
     }
 
     // Determine desired buildings based on desired upgrade
-    if (bot.strategy.desired_upgrade != 0 && !match_player_upgrade_is_available(state, bot.player_id, bot.strategy.desired_upgrade)) {
-        EntityType building_type = bot_get_building_which_researches(bot.strategy.desired_upgrade);
+    if (bot.desired_upgrade != 0 && !match_player_upgrade_is_available(state, bot.player_id, bot.desired_upgrade)) {
+        EntityType building_type = bot_get_building_which_researches(bot.desired_upgrade);
         if (desired_entities[building_type] == 0) {
             desired_entities[building_type] = 1;
         }
@@ -517,7 +534,7 @@ bool bot_has_desired_entities(const MatchState& state, const Bot& bot) {
     }
 
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        if (entity_count[entity_type] < bot.strategy.desired_entities[entity_type]) {
+        if (entity_count[entity_type] < bot.desired_entities[entity_type]) {
             return false;
         }
     }
@@ -671,6 +688,7 @@ void bot_scout(const MatchState& state, Bot& bot) {
     bot.inputs.push_back(input);
 }
 
+/*
 // The defense score is positive if the bot is well defended and negative if the bot feels not well defended
 int bot_get_defense_score(const MatchState& state, const Bot& bot) {
     int defense_score = 0;
@@ -699,13 +717,12 @@ int bot_get_defense_score(const MatchState& state, const Bot& bot) {
 
     return defense_score;
 }
+*/
 
 // Squads
 
 void bot_squad_create(const MatchState& state, Bot& bot) {
-    if (bot.strategy.squad_type == BOT_SQUAD_TYPE_NONE) {
-        return;
-    }
+    GOLD_ASSERT(bot.desired_squad_type != BOT_SQUAD_TYPE_NONE);
 
     BotSquad squad;
 
@@ -713,7 +730,7 @@ void bot_squad_create(const MatchState& state, Bot& bot) {
     uint32_t squad_entity_count[ENTITY_TYPE_COUNT];
     memset(squad_entity_count, 0, sizeof(squad_entity_count));
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        while (squad_entity_count[entity_type] < bot.strategy.desired_entities[entity_type]) {
+        while (squad_entity_count[entity_type] < bot.desired_entities[entity_type]) {
             // Search for an entity of this type
             EntityId entity_id = bot_find_entity(state, [&bot, &entity_type](const Entity& entity, EntityId entity_id) {
                 return entity.player_id == bot.player_id &&
@@ -730,7 +747,7 @@ void bot_squad_create(const MatchState& state, Bot& bot) {
         }
     }
 
-    squad.type = bot.strategy.squad_type;
+    squad.type = bot.desired_squad_type;
     bot_squad_set_mode(state, bot, squad, BOT_SQUAD_MODE_GATHER);
     bot.squads.push_back(squad);
 }
