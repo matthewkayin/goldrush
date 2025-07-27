@@ -6,3 +6,4 @@ obj/
 src/feedback/token.h
 *.zip
 *.app
+.cache/

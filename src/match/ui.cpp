@@ -189,7 +189,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     // Init bots
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT) {
-            state.bots[player_id] = bot_init(player_id);
+            state.bots[player_id] = bot_init(player_id, state.match.lcg_seed);
         }
     }
 

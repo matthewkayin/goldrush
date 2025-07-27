@@ -1,0 +1,322 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/match/bot.cpp.o",
+      "src/match/bot.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/match/bot.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/match/bot.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/match/replay.cpp.o",
+      "src/match/replay.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/match/replay.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/match/replay.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/match/hotkey.cpp.o",
+      "src/match/hotkey.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/match/hotkey.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/match/hotkey.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/network/network.cpp.o",
+      "src/network/network.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/network/network.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/network/network.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/network/host.cpp.o",
+      "src/network/host.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/network/host.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/network/host.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/render/render.cpp.o",
+      "src/render/render.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/render/render.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/render/render.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/render/glad.cpp.o",
+      "src/render/glad.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/render/glad.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/render/glad.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/render/sprite.cpp.o",
+      "src/render/sprite.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/render/sprite.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/render/sprite.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/render/font.cpp.o",
+      "src/render/font.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/render/font.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/render/font.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/render/shader.cpp.o",
+      "src/render/shader.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/render/shader.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/render/shader.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/math/mat4.cpp.o",
+      "src/math/mat4.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/math/mat4.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/math/mat4.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/menu/ui.cpp.o",
+      "src/menu/ui.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/menu/ui.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/menu/ui.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/menu/menu.cpp.o",
+      "src/menu/menu.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/menu/menu.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/menu/menu.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/menu/options.cpp.o",
+      "src/menu/options.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/menu/options.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/menu/options.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/menu/match_setting.cpp.o",
+      "src/menu/match_setting.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/menu/match_setting.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/menu/match_setting.cpp.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang++",
+      "-std=c++17",
+      "-g",
+      "-Wall",
+      "-O0",
+      "-Wno-deprecated-declarations",
+      "-c",
+      "-D_CRT_SECURE_NO_WARNINGS",
+      "-Isrc",
+      "-Ivendor",
+      "-o",
+      "obj/src/main.cpp.o",
+      "src/main.cpp"
+    ],
+    "directory": "/Users/kayin/goldrush",
+    "file": "/Users/kayin/goldrush/src/main.cpp",
+    "output": "/Users/kayin/goldrush/obj/src/main.cpp.o"
+  }
+]

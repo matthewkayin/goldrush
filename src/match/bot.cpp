@@ -2,14 +2,28 @@
 
 #include "core/logger.h"
 #include "upgrade.h"
+#include "lcg.h"
 
 static const int SQUAD_GATHER_DISTANCE = 16;
 static const uint32_t SQUAD_LANDMINE_MAX = 6;
 
-Bot bot_init(uint8_t player_id) {
+Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
 
     bot.player_id = player_id;
+
+    // The bot takes a copy of the random seed, that way
+    // it can make deterministic random decisions that will be
+    // synced across each player's computer, but since the 
+    // bot code will not be rerun during a replay, the bot will
+    // not mess up replay playback
+    bot.lcg_seed = lcg_seed;
+
+    // Calculate personality values
+    bot.personality_aggressiveness = fixed::from_int_and_raw_decimal(0, lcg_rand(&bot.lcg_seed) % 256);
+    bot.personality_boldness = fixed::from_int_and_raw_decimal(0, lcg_rand(&bot.lcg_seed) % 256);
+    bot.personality_quirkiness = fixed::from_int_and_raw_decimal(0, lcg_rand(&bot.lcg_seed) % 256);
+
     bot_clear_strategy(bot);
 
     return bot;
@@ -113,6 +127,14 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy) {
     bot_clear_strategy(bot);
     bot.strategy = strategy;
 
+    uint32_t entity_count[ENTITY_TYPE_COUNT];
+    memset(entity_count, 0, sizeof(entity_count));
+    for (const Entity& entity : state.entities) {
+        if (entity.player_id == bot.player_id && entity_is_selectable(entity)) {
+            entity_count[entity.type]++;
+        }
+    }
+
     switch (bot.strategy) {
         case BOT_STRATEGY_NONE: {
             break;
@@ -128,9 +150,14 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy) {
             bot.desired_entities[ENTITY_HALL] = existing_hall_count + 1;
             break;
         }
-        case BOT_STRATEGY_BANDIT_RUSH: {
+        case BOT_STRATEGY_RUSH: {
             bot.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
-            bot.desired_entities[ENTITY_BANDIT] = 4;
+            int unit_comp_roll = lcg_rand(&bot.lcg_seed) % 5;
+            if (unit_comp_roll == 0) {
+                bot.desired_entities[ENTITY_COWBOY] = 4;
+            } else {
+                bot.desired_entities[ENTITY_BANDIT] = 4;
+            }
             bot.desired_entities[ENTITY_WAGON] = 1;
             break;
         }
@@ -148,6 +175,66 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy) {
         }
         case BOT_STRATEGY_PUSH: {
             bot.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
+
+            // Count buildings to know how much existing production we have
+            uint32_t building_count[ENTITY_TYPE_COUNT];
+            memset(building_count, 0, sizeof(building_count));
+            for (const Entity& entity : state.entities) {
+                if (entity.mode == MODE_BUILDING_FINISHED && 
+                        entity.player_id == bot.player_id) {
+                    building_count[entity.type]++;
+                }
+            }
+
+            // Roll for this army's bread 
+            struct EntityRoll {
+                EntityType type;
+                int roll;
+                static bool compare(const EntityRoll& a, const EntityRoll& b) {
+                    return a.roll < b.roll;
+                }
+            };
+            /*
+            std::vector<EntityRoll> bread_rolls;
+            bread_rolls.push_back((EntityRoll) {
+                .type = ENTITY_COWBOY,
+                .roll = (lcg_rand(&bot.lcg_seed) % 10) + 
+                            building_count[ENTITY_SALOON] + 
+                            (int)match_player_has_upgrade(state, bot.player_id, UPGRADE_FAN_HAMMER)
+            });
+            bread_rolls.push_back((EntityRoll) {
+                .type = ENTITY_BANDIT,
+                .roll = (lcg_rand(&bot.lcg_seed) % 10) + 
+                            building_count[ENTITY_SALOON] +
+                            (int)match_player_has_upgrade(state, bot.player_id, UPGRADE_SERRATED_KNIVES)
+            });
+            bread_rolls.push_back((EntityRoll) {
+                .type = ENTITY_SOLDIER,
+                .roll =  (lcg_rand(&bot.lcg_seed) % 10) + 
+                            building_count[ENTITY_BARRACKS] +
+                            (int)match_player_has_upgrade(state, bot.player_id, UPGRADE_BAYONETS)
+            });
+            bread_rolls.push_back((EntityRoll) {
+                .type = ENTITY_JOCKEY,
+                .roll = (lcg_rand(&bot.lcg_seed) % 10) +
+                            building_count[ENTITY_COOP]
+            });
+            std::sort(bread_rolls.begin(), bread_rolls.end(), EntityRoll::compare);
+            EntityType bread = bread_rolls.back().type;
+
+            // Decide if we want butter
+            int butter_roll = (lcg_rand(&bot.lcg_seed) % 10) + (fixed::from_int(5) * bot.personality_quirkiness).integer_part();
+            EntityType butter = ENTITY_TYPE_COUNT;
+            if (butter_roll > 5) {
+                std::vector<EntityRoll> butter_rolls;
+                if (bread == ENTITY_COWBOY) {
+                    butter_rolls.push_back((EntityRoll) {
+                        .type = ENTITY_BANDIT
+                    })
+                }
+            }
+            */
+
             bot.desired_entities[ENTITY_SOLDIER] = 16;
             bot.desired_entities[ENTITY_CANNON] = 2;
             bot.desired_entities[ENTITY_BANDIT] = 8;
@@ -166,12 +253,12 @@ bool bot_strategy_should_be_abandoned(const MatchState& state, const Bot& bot) {
     bool is_base_under_attack = building_under_attack_id != ID_NULL;
 
     if (is_base_under_attack && (
-            bot.strategy == BOT_STRATEGY_BANDIT_RUSH ||
+            bot.strategy == BOT_STRATEGY_RUSH ||
             bot.strategy == BOT_STRATEGY_EXPAND)) {
         return true;
     }
 
-    if (bot.strategy == BOT_STRATEGY_BANDIT_RUSH) {
+    if (bot.strategy == BOT_STRATEGY_RUSH) {
         EntityId wagon_id = bot_find_entity(state, [&bot](const Entity& entity, EntityId entity_id) {
             return entity.player_id == bot.player_id && entity.type == ENTITY_WAGON && entity_is_selectable(entity);
         });

@@ -8,14 +8,16 @@
 #include <functional>
 
 enum BotStrategy {
-    BOT_STRATEGY_NONE,
     BOT_STRATEGY_EXPAND,
-    BOT_STRATEGY_BANDIT_RUSH,
+    BOT_STRATEGY_RUSH,
     BOT_STRATEGY_LANDMINES,
     BOT_STRATEGY_BUNKER,
     BOT_STRATEGY_HARASS,
-    BOT_STRATEGY_PUSH
+    BOT_STRATEGY_PUSH,
+    BOT_STRATEGY_COUNT
 };
+
+#define BOT_STRATEGY_NONE BOT_STRATEGY_COUNT
 
 enum BotSquadType {
     BOT_SQUAD_TYPE_NONE,
@@ -44,16 +46,23 @@ struct BotSquad {
 
 struct Bot {
     uint8_t player_id;
+    int32_t lcg_seed;
+
+    fixed personality_aggressiveness;
+    fixed personality_boldness;
+    fixed personality_quirkiness;
+
     BotStrategy strategy;
     BotSquadType desired_squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
     uint32_t desired_upgrade;
+
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotSquad> squads;
     std::vector<MatchInput> inputs;
 };
 
-Bot bot_init(uint8_t player_id);
+Bot bot_init(uint8_t player_id, int32_t lcg_seed);
 void bot_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 
 // Behaviors
