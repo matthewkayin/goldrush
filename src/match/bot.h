@@ -8,6 +8,7 @@
 #include <functional>
 
 enum BotSquadType {
+    BOT_SQUAD_TYPE_NONE,
     BOT_SQUAD_TYPE_ATTACK,
     BOT_SQUAD_TYPE_LANDMINES,
     BOT_SQUAD_TYPE_DEFEND
@@ -31,10 +32,13 @@ struct BotSquad {
 };
 
 enum BotStrategyType {
+    BOT_STRATEGY_NONE,
+    BOT_STRATEGY_EXPAND_FIRST,
     BOT_STRATEGY_BANDIT_RUSH,
     BOT_STRATEGY_LANDMINES,
     BOT_STRATEGY_BUNKER,
-    BOT_STRATEGY_SOLDIER_CANNON_PUSH
+    BOT_STRATEGY_HARASS,
+    BOT_STRATEGY_PUSH
 };
 
 struct BotStrategy {
@@ -46,6 +50,7 @@ struct BotStrategy {
 
 struct Bot {
     uint8_t player_id;
+    EntityType preferred_unit_comp[3];
     BotStrategy strategy;
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotSquad> squads;
@@ -57,7 +62,7 @@ void bot_update(const MatchState& state, Bot& bot);
 
 // Behaviors
 
-BotStrategyType bot_get_next_strategy(const MatchState& state, const Bot& bot);
+BotStrategyType bot_choose_next_strategy(const MatchState& state, const Bot& bot);
 void bot_set_strategy(Bot& bot, BotStrategyType type);
 bool bot_strategy_should_be_abandoned(const MatchState& state, const Bot& bot);
 void bot_saturate_bases(const MatchState& state, Bot& bot);
@@ -71,6 +76,7 @@ bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
 void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
 void bot_scout(const MatchState& state, Bot& bot);
+int bot_get_defense_score(const MatchState& state, const Bot& bot);
 
 // Squads
 
@@ -95,6 +101,7 @@ uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id);
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
 ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_index);
+bool bot_is_goldmine_occupied(const MatchState& state, EntityId goldmine_id);
 EntityType bot_get_building_which_trains(EntityType unit_type);
 EntityType bot_get_building_prereq(EntityType unit_type);
 EntityType bot_get_building_which_researches(uint32_t upgrade);
