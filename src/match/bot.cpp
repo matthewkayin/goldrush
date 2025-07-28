@@ -7,6 +7,19 @@
 static const int SQUAD_GATHER_DISTANCE = 16;
 static const uint32_t SQUAD_LANDMINE_MAX = 6;
 
+enum BotPushType {
+    BOT_PUSH_TYPE_COWBOY_BANDIT,
+    BOT_PUSH_TYPE_SOLDIER_CANNON,
+    BOT_PUSH_TYPE_JOCKEY_WAGON,
+    BOT_PUSH_TYPE_COUNT
+};
+
+enum BotHarassType {
+    BOT_HARASS_TYPE_BANDITS,
+    BOT_HARASS_TYPE_JOCKEYS,
+    BOT_HARASS_TYPE_COUNT
+};
+
 Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
 
@@ -20,9 +33,10 @@ Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     bot.lcg_seed = lcg_seed;
 
     // Calculate personality values
-    bot.personality_aggressiveness = fixed::from_int_and_raw_decimal(0, lcg_rand(&bot.lcg_seed) % 256);
-    bot.personality_boldness = fixed::from_int_and_raw_decimal(0, lcg_rand(&bot.lcg_seed) % 256);
-    bot.personality_quirkiness = fixed::from_int_and_raw_decimal(0, lcg_rand(&bot.lcg_seed) % 256);
+    bot.personality_aggressiveness = lcg_rand(&bot.lcg_seed) % 100;
+    bot.personality_boldness = lcg_rand(&bot.lcg_seed) % 100;
+    bot.personality_quirkiness = lcg_rand(&bot.lcg_seed) % 100;
+    log_trace("BOT: aggressiveness %i boldness %i quirkiness %i", bot.personality_aggressiveness, bot.personality_boldness, bot.personality_quirkiness);
 
     bot_clear_strategy(bot);
 
@@ -44,7 +58,6 @@ void bot_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes) 
         // Get desired entities
         uint32_t desired_entities[ENTITY_TYPE_COUNT];
         bot_get_desired_entities(state, bot, desired_entities);
-        log_trace("BOT: desired halls %u", desired_entities[ENTITY_HALL]);
 
         // Choose desired unit
         EntityType desired_unit = ENTITY_TYPE_COUNT;
@@ -80,8 +93,12 @@ void bot_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes) 
         }
 
         // If we have no desired unit, building, or upgrade, then this strategy is done
-        if (bot_has_desired_entities(state, bot) &&
-                (bot.desired_upgrade == 0 || match_player_has_upgrade(state, bot.player_id, bot.desired_upgrade))) {
+        bool population_maxed_out = bot.desired_squad_type != BOT_SQUAD_TYPE_NONE && 
+                                        match_get_player_max_population(state, bot.player_id) == MATCH_MAX_POPULATION && 
+                                        match_get_player_population(state, bot.player_id) >= 98;
+        if ((population_maxed_out && bot.desired_squad_type != BOT_SQUAD_TYPE_NONE) || 
+                (bot_has_desired_entities(state, bot) && 
+                (bot.desired_upgrade == 0 || match_player_has_upgrade(state, bot.player_id, bot.desired_upgrade)))) {
             if (bot.desired_squad_type != BOT_SQUAD_TYPE_NONE) {
                 bot_squad_create(state, bot);
             }
@@ -108,12 +125,140 @@ void bot_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes) 
 
 // Behaviors
 
-BotStrategy bot_choose_next_strategy(const MatchState& state, const Bot& bot, uint32_t match_time_minutes) {
+BotStrategy bot_choose_next_strategy(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
+    // If 0 minutes, determine opening strategy
     if (match_time_minutes == 0) {
-        return BOT_STRATEGY_EXPAND;
+        if (lcg_rand(&bot.lcg_seed) % 100 < bot.personality_boldness) {
+            // Bold opener
+            if (lcg_rand(&bot.lcg_seed) % 100 < bot.personality_aggressiveness) {
+                return BOT_STRATEGY_RUSH;
+            } else {
+                return BOT_STRATEGY_EXPAND;
+            }
+        } else {
+            // Safe opener
+            return BOT_STRATEGY_BUNKER;
+        }
     }
 
-    return BOT_STRATEGY_PUSH;
+    int best_strategy = BOT_STRATEGY_NONE;
+    int best_strategy_score = -1;
+    for (int strategy = 0; strategy < BOT_STRATEGY_COUNT; strategy++) {
+        int strategy_score = 0;
+        switch ((BotStrategy)strategy) {
+            case BOT_STRATEGY_EXPAND: {
+                // If there's no unoccupied goldmines, don't expand
+                EntityId unoccupied_goldmine_id = bot_find_entity(state, [&state](const Entity& entity, EntityId entity_id) {
+                    return entity.type == ENTITY_GOLDMINE &&
+                            entity.gold_held != 0 &&
+                            !bot_is_goldmine_occupied(state, entity_id);
+                });
+                if (unoccupied_goldmine_id == ID_NULL) {
+                    strategy_score = -1;
+                    break;
+                }
+
+                // Count how many bases each player has
+                int player_base_count[MAX_PLAYERS];
+                memset(player_base_count, 0, sizeof(player_base_count));
+                for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                    const Entity& entity = state.entities[entity_index];
+                    EntityId entity_id = state.entities.get_id_of(entity_index);
+                    if (entity.type == ENTITY_HALL && entity_is_selectable(entity) && bot_has_scouted_entity(state, bot, entity, entity_id)) {
+                        player_base_count[entity.player_id]++;
+                    }
+                }
+
+                int max_base_difference = -INT32_MAX;
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (player_id == bot.player_id) {
+                        continue;
+                    }
+                    max_base_difference = std::max(max_base_difference, player_base_count[player_id] - player_base_count[bot.player_id]);
+                }
+
+                // If other players have more bases than us, then expand
+                if (max_base_difference < 0) {
+                    strategy_score = -1;
+                    break;
+                }
+                if (max_base_difference > 0) {
+                    strategy_score += 50;
+                }
+
+                strategy_score += bot_get_defense_score(state, bot);
+                strategy_score += bot.personality_boldness;
+
+                break;
+            }
+            case BOT_STRATEGY_RUSH: {
+                // Don't rush outside of the opener
+                strategy_score = -1;
+                break;
+            }
+            case BOT_STRATEGY_LANDMINES: {
+                bool already_has_landmine_squad = false;
+                for (const BotSquad& squad : bot.squads) {
+                    if (squad.type == BOT_SQUAD_TYPE_LANDMINES) {
+                        already_has_landmine_squad = true;
+                        break;
+                    }
+                }
+                if (already_has_landmine_squad) {
+                    strategy_score = -1;
+                    break;
+                }
+
+                // If we feel undefended, bump this up
+                strategy_score -= bot_get_defense_score(state, bot);
+                strategy_score -= bot.personality_aggressiveness;
+                strategy_score += lcg_rand(&bot.lcg_seed) % 100;
+
+                break;
+            }
+            case BOT_STRATEGY_BUNKER: {
+                strategy_score -= bot_get_defense_score(state, bot);
+                strategy_score -= bot.personality_aggressiveness;
+                strategy_score += lcg_rand(&bot.lcg_seed) % 100;
+                break;
+            }
+            case BOT_STRATEGY_HARASS: {
+                if (bot_get_defense_score(state, bot) < 0 && bot.personality_boldness < 50) {
+                    strategy_score = -1;
+                    break;
+                }
+                strategy_score += bot.personality_boldness;
+                strategy_score += bot.personality_aggressiveness;
+                strategy_score += lcg_rand(&bot.lcg_seed) % 100;
+                break;
+            }
+            case BOT_STRATEGY_PUSH: {
+                if (bot_get_defense_score(state, bot) < 0 && bot.personality_boldness < 50) {
+                    strategy_score = -1;
+                    break;
+                }
+                strategy_score -= bot.personality_boldness;
+                strategy_score += bot.personality_aggressiveness;
+                strategy_score += lcg_rand(&bot.lcg_seed) % 100;
+                break;
+            }
+            case BOT_STRATEGY_COUNT: {
+                GOLD_ASSERT(false);
+                break;
+            }
+        }
+
+        if (strategy_score < 0) {
+            continue;
+        }
+
+        if (best_strategy_score == -1 || strategy_score > best_strategy_score) {
+            best_strategy = strategy;
+            best_strategy_score = strategy_score;
+        }
+    }
+
+    return (BotStrategy)best_strategy;
 }
 
 void bot_clear_strategy(Bot& bot) {
@@ -173,11 +318,59 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy) {
             bot.desired_entities[ENTITY_BUNKER] = 1;
             break;
         }
+        case BOT_STRATEGY_HARASS: {
+            bot.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
+
+            // Count buildings to know how much existing production we have
+            int building_count[ENTITY_TYPE_COUNT];
+            memset(building_count, 0, sizeof(building_count));
+            for (const Entity& entity : state.entities) {
+                if (entity.mode == MODE_BUILDING_FINISHED && 
+                        entity.player_id == bot.player_id) {
+                    building_count[entity.type]++;
+                }
+            }
+            
+            int harass_type_rolls[BOT_HARASS_TYPE_COUNT];
+            harass_type_rolls[BOT_HARASS_TYPE_BANDITS] = (lcg_rand(&bot.lcg_seed) % 100) + building_count[ENTITY_SALOON];
+            harass_type_rolls[BOT_HARASS_TYPE_JOCKEYS] = (lcg_rand(&bot.lcg_seed) % 100) + building_count[ENTITY_COOP];
+            BotHarassType best_harass_type = (BotHarassType)0;
+            for (int harass_type = 1; harass_type < BOT_HARASS_TYPE_COUNT; harass_type++) {
+                if (harass_type_rolls[harass_type] > harass_type_rolls[best_harass_type]) {
+                    best_harass_type = (BotHarassType)harass_type;
+                }
+            }
+
+            // The higher the quirkiness, the more likely to change push types
+            if (lcg_rand(&bot.lcg_seed) % 100 < bot.personality_quirkiness) {
+                best_harass_type = (BotHarassType)(best_harass_type + 1);
+                if (best_harass_type == BOT_HARASS_TYPE_COUNT) {
+                    best_harass_type = (BotHarassType)0;
+                }
+            }
+
+            switch (best_harass_type) {
+                case BOT_HARASS_TYPE_BANDITS: {
+                    bot.desired_entities[ENTITY_BANDIT] = 8;
+                    break;
+                }
+                case BOT_HARASS_TYPE_JOCKEYS: {
+                    bot.desired_entities[ENTITY_JOCKEY] = 4;
+                    break;
+                }
+                case BOT_HARASS_TYPE_COUNT: {
+                    GOLD_ASSERT(false);
+                    break;
+                }
+            }
+
+            break;
+        }
         case BOT_STRATEGY_PUSH: {
             bot.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
 
             // Count buildings to know how much existing production we have
-            uint32_t building_count[ENTITY_TYPE_COUNT];
+            int building_count[ENTITY_TYPE_COUNT];
             memset(building_count, 0, sizeof(building_count));
             for (const Entity& entity : state.entities) {
                 if (entity.mode == MODE_BUILDING_FINISHED && 
@@ -186,58 +379,48 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy) {
                 }
             }
 
-            // Roll for this army's bread 
-            struct EntityRoll {
-                EntityType type;
-                int roll;
-                static bool compare(const EntityRoll& a, const EntityRoll& b) {
-                    return a.roll < b.roll;
-                }
-            };
-            /*
-            std::vector<EntityRoll> bread_rolls;
-            bread_rolls.push_back((EntityRoll) {
-                .type = ENTITY_COWBOY,
-                .roll = (lcg_rand(&bot.lcg_seed) % 10) + 
-                            building_count[ENTITY_SALOON] + 
-                            (int)match_player_has_upgrade(state, bot.player_id, UPGRADE_FAN_HAMMER)
-            });
-            bread_rolls.push_back((EntityRoll) {
-                .type = ENTITY_BANDIT,
-                .roll = (lcg_rand(&bot.lcg_seed) % 10) + 
-                            building_count[ENTITY_SALOON] +
-                            (int)match_player_has_upgrade(state, bot.player_id, UPGRADE_SERRATED_KNIVES)
-            });
-            bread_rolls.push_back((EntityRoll) {
-                .type = ENTITY_SOLDIER,
-                .roll =  (lcg_rand(&bot.lcg_seed) % 10) + 
-                            building_count[ENTITY_BARRACKS] +
-                            (int)match_player_has_upgrade(state, bot.player_id, UPGRADE_BAYONETS)
-            });
-            bread_rolls.push_back((EntityRoll) {
-                .type = ENTITY_JOCKEY,
-                .roll = (lcg_rand(&bot.lcg_seed) % 10) +
-                            building_count[ENTITY_COOP]
-            });
-            std::sort(bread_rolls.begin(), bread_rolls.end(), EntityRoll::compare);
-            EntityType bread = bread_rolls.back().type;
-
-            // Decide if we want butter
-            int butter_roll = (lcg_rand(&bot.lcg_seed) % 10) + (fixed::from_int(5) * bot.personality_quirkiness).integer_part();
-            EntityType butter = ENTITY_TYPE_COUNT;
-            if (butter_roll > 5) {
-                std::vector<EntityRoll> butter_rolls;
-                if (bread == ENTITY_COWBOY) {
-                    butter_rolls.push_back((EntityRoll) {
-                        .type = ENTITY_BANDIT
-                    })
+            int push_type_rolls[BOT_PUSH_TYPE_COUNT];
+            push_type_rolls[BOT_PUSH_TYPE_COWBOY_BANDIT] = (lcg_rand(&bot.lcg_seed) % 100) + building_count[ENTITY_SALOON];
+            push_type_rolls[BOT_PUSH_TYPE_SOLDIER_CANNON] = (lcg_rand(&bot.lcg_seed) % 100) + building_count[ENTITY_BARRACKS];
+            push_type_rolls[BOT_PUSH_TYPE_JOCKEY_WAGON] = (lcg_rand(&bot.lcg_seed) % 100) + building_count[ENTITY_COOP];
+            BotPushType best_push_type = (BotPushType)0;
+            for (int push_type = 1; push_type < BOT_PUSH_TYPE_COUNT; push_type++) {
+                if (push_type_rolls[push_type] > push_type_rolls[best_push_type]) {
+                    best_push_type = (BotPushType)push_type;
                 }
             }
-            */
 
-            bot.desired_entities[ENTITY_SOLDIER] = 16;
-            bot.desired_entities[ENTITY_CANNON] = 2;
-            bot.desired_entities[ENTITY_BANDIT] = 8;
+            // The higher the quirkiness, the more likely to change push types
+            if (lcg_rand(&bot.lcg_seed) % 100 < bot.personality_quirkiness) {
+                best_push_type = (BotPushType)(best_push_type + 1);
+                if (best_push_type == BOT_PUSH_TYPE_COUNT) {
+                    best_push_type = (BotPushType)0;
+                }
+            }
+
+            switch (best_push_type) {
+                case BOT_PUSH_TYPE_COWBOY_BANDIT: {
+                    bot.desired_entities[ENTITY_COWBOY] = 16;
+                    bot.desired_entities[ENTITY_BANDIT] = 8;
+                    break;
+                }
+                case BOT_PUSH_TYPE_SOLDIER_CANNON: {
+                    bot.desired_entities[ENTITY_SOLDIER] = 16;
+                    bot.desired_entities[ENTITY_CANNON] = 4;
+                    break;
+                }
+                case BOT_PUSH_TYPE_JOCKEY_WAGON: {
+                    bot.desired_entities[ENTITY_JOCKEY] = 12;
+                    bot.desired_entities[ENTITY_WAGON] = 2;
+                    bot.desired_entities[ENTITY_COWBOY] = bot.desired_entities[ENTITY_WAGON] * 4;
+                    break;
+                }
+                case BOT_PUSH_TYPE_COUNT: {
+                    GOLD_ASSERT(false);
+                    break;
+                }
+            }
+
             break;
         }
     }
@@ -344,55 +527,6 @@ void bot_saturate_bases(const MatchState& state, Bot& bot) {
         }
     } // End for each hall index
 }
-
-/*
-bool bot_should_expand(const MatchState& state, const Bot& bot) {
-    // If there's no unoccupied goldmines, don't expand
-    EntityId unoccupied_goldmine_id = bot_find_entity(state, [&state](const Entity& entity, EntityId entity_id) {
-        return entity.type == ENTITY_GOLDMINE &&
-                entity.gold_held != 0 &&
-                !bot_is_goldmine_occupied(state, entity_id);
-    });
-    if (unoccupied_goldmine_id == ID_NULL) {
-        return false;
-    }
-
-    // Count how many bases each player has
-    int player_base_count[MAX_PLAYERS];
-    memset(player_base_count, 0, sizeof(player_base_count));
-    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-        const Entity& entity = state.entities[entity_index];
-        EntityId entity_id = state.entities.get_id_of(entity_index);
-        if (entity.type == ENTITY_HALL && entity_is_selectable(entity) && bot_has_scouted_entity(state, bot, entity, entity_id)) {
-            player_base_count[entity.player_id]++;
-        }
-    }
-
-    if (bot.desired_entities[ENTITY_HALL] > player_base_count[bot.player_id]) {
-        return true;
-    }
-
-    int max_base_difference = -INT32_MAX;
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (player_id == bot.player_id) {
-            continue;
-        }
-        max_base_difference = std::max(max_base_difference, player_base_count[player_id] - player_base_count[bot.player_id]);
-    }
-
-    // If other players have more bases than us, then expand
-    if (max_base_difference > 0) {
-        return true;
-    }
-
-    // If we feel well defended, then expand
-    if (bot_get_defense_score(state, bot) > 0) {
-        return true;
-    }
-
-    return false;
-}
-*/
 
 bool bot_should_build_house(const MatchState& state, const Bot& bot) {
     uint32_t future_max_population = match_get_player_max_population(state, bot.player_id);
@@ -775,36 +909,31 @@ void bot_scout(const MatchState& state, Bot& bot) {
     bot.inputs.push_back(input);
 }
 
-/*
 // The defense score is positive if the bot is well defended and negative if the bot feels not well defended
 int bot_get_defense_score(const MatchState& state, const Bot& bot) {
     int defense_score = 0;
-    int landmine_count = 0;
     for (const Entity& entity : state.entities) {
         if (entity.player_id != bot.player_id || !entity_is_selectable(entity)) {
             continue;
         }
 
         if (entity.type == ENTITY_HALL) {
-            defense_score -= 2;
+            defense_score -= 50;
         } else if (entity.type == ENTITY_LANDMINE) {
-            landmine_count++;
+            defense_score += 10;
         }
     }
 
     for (const BotSquad& squad : bot.squads) {
         if (squad.type == BOT_SQUAD_TYPE_ATTACK) {
-            defense_score++;
+            defense_score += 20;
         } else if (squad.type == BOT_SQUAD_TYPE_DEFEND) {
-            defense_score += 2;
+            defense_score += 50;
         }
     }
 
-    defense_score += landmine_count / 4;
-
     return defense_score;
 }
-*/
 
 // Squads
 
