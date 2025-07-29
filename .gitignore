@@ -7,3 +7,4 @@ src/feedback/token.h
 *.zip
 *.app
 .cache/
+./compile_commands.json
