@@ -3,16 +3,10 @@
 #include "core/logger.h"
 #include "upgrade.h"
 #include "lcg.h"
+#include <algorithm>
 
 static const int SQUAD_GATHER_DISTANCE = 16;
 static const uint32_t SQUAD_LANDMINE_MAX = 6;
-
-enum BotPushType {
-    BOT_PUSH_TYPE_COWBOY_BANDIT,
-    BOT_PUSH_TYPE_SOLDIER_CANNON,
-    BOT_PUSH_TYPE_JOCKEY_WAGON,
-    BOT_PUSH_TYPE_COUNT
-};
 
 Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
@@ -399,48 +393,46 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy) {
                 }
             }
 
-            int push_type_rolls[BOT_PUSH_TYPE_COUNT];
-            push_type_rolls[BOT_PUSH_TYPE_COWBOY_BANDIT] = (lcg_rand(&bot.lcg_seed) % 100) + building_count[ENTITY_SALOON];
-            push_type_rolls[BOT_PUSH_TYPE_SOLDIER_CANNON] = (lcg_rand(&bot.lcg_seed) % 100) + building_count[ENTITY_BARRACKS];
-            push_type_rolls[BOT_PUSH_TYPE_JOCKEY_WAGON] = (lcg_rand(&bot.lcg_seed) % 100) + building_count[ENTITY_COOP];
-            BotPushType best_push_type = BOT_PUSH_TYPE_COUNT;
-            int best_push_type_score = 0;
-            for (int push_type = 1; push_type < BOT_PUSH_TYPE_COUNT; push_type++) {
-                
-                if (push_type_rolls[push_type] > push_type_rolls[best_push_type]) {
-                    best_push_type = (BotPushType)push_type;
+            static const uint32_t PUSH_BASE_UNIT_TYPE_COUNT = 3;
+            static const EntityType PUSH_BASE_UNIT_TYPES[PUSH_BASE_UNIT_TYPE_COUNT] = { ENTITY_COWBOY, ENTITY_SOLDIER, ENTITY_JOCKEY };
+
+            // Roll to determine the push's base unit
+            EntityType push_base_unit_type = ENTITY_TYPE_COUNT;
+            int best_base_unit_roll;
+            for (uint32_t index = 0; index < PUSH_BASE_UNIT_TYPE_COUNT; index++) {
+                int roll = 10 * building_count[bot_get_building_which_trains(PUSH_BASE_UNIT_TYPES[index])];
+                roll += lcg_rand(&bot.lcg_seed) % (25 + bot.personality_quirkiness);
+
+                if (push_base_unit_type == ENTITY_TYPE_COUNT || roll > best_base_unit_roll) {
+                    push_base_unit_type = PUSH_BASE_UNIT_TYPES[index];
+                    best_base_unit_roll = roll;
                 }
             }
+            GOLD_ASSERT(push_base_unit_type != ENTITY_TYPE_COUNT);
 
-            // The higher the quirkiness, the more likely to change push types
-            if (lcg_rand(&bot.lcg_seed) % 100 < bot.personality_quirkiness) {
-                best_push_type = (BotPushType)(best_push_type + 1);
-                if (best_push_type == BOT_PUSH_TYPE_COUNT) {
-                    best_push_type = (BotPushType)0;
+            // Determine push unit counts
+            uint32_t total_push_size = 8 + (building_count[bot_get_building_which_trains(push_base_unit_type)] * (1 + (lcg_rand(&bot.lcg_seed))));
+            if (push_base_unit_type == ENTITY_COWBOY) {
+                // Roll to use wagons, we only do this on a cowboy/bandit push
+                int include_wagons_roll = lcg_rand(&bot.lcg_seed) % 100;
+                int include_wagons_dc = bot.personality_quirkiness + (15 * building_count[ENTITY_COOP]);
+                if (include_wagons_roll < include_wagons_dc && push_base_unit_type != ENTITY_JOCKEY) {
+                    int garrison_capacity = entity_get_data(ENTITY_WAGON).garrison_capacity;
+                    while (total_push_size % garrison_capacity != 0) {
+                        total_push_size++;
+                    }
+                    bot.desired_entities[ENTITY_WAGON] = total_push_size / garrison_capacity;
                 }
-            }
 
-            switch (best_push_type) {
-                case BOT_PUSH_TYPE_COWBOY_BANDIT: {
-                    bot.desired_entities[ENTITY_COWBOY] = 16;
-                    bot.desired_entities[ENTITY_BANDIT] = 8;
-                    break;
-                }
-                case BOT_PUSH_TYPE_SOLDIER_CANNON: {
-                    bot.desired_entities[ENTITY_SOLDIER] = 16;
-                    bot.desired_entities[ENTITY_CANNON] = 4;
-                    break;
-                }
-                case BOT_PUSH_TYPE_JOCKEY_WAGON: {
-                    bot.desired_entities[ENTITY_JOCKEY] = 12;
-                    bot.desired_entities[ENTITY_WAGON] = 2;
-                    bot.desired_entities[ENTITY_COWBOY] = bot.desired_entities[ENTITY_WAGON] * 4;
-                    break;
-                }
-                case BOT_PUSH_TYPE_COUNT: {
-                    GOLD_ASSERT(false);
-                    break;
-                }
+                bot.desired_entities[ENTITY_BANDIT] = total_push_size / 3;
+                bot.desired_entities[ENTITY_COWBOY] = total_push_size - bot.desired_entities[ENTITY_BANDIT];
+            } else if (push_base_unit_type == ENTITY_SOLDIER) {
+                bot.desired_entities[ENTITY_CANNON] = 2 + (2 * (lcg_rand(&bot.lcg_seed) % 2));
+                bot.desired_entities[ENTITY_SOLDIER] = total_push_size - bot.desired_entities[ENTITY_CANNON];
+            } else if (push_base_unit_type == ENTITY_JOCKEY) {
+                bot.desired_entities[ENTITY_WAGON] = 2 + (2 * (lcg_rand(&bot.lcg_seed) % 2));
+                bot.desired_entities[ENTITY_JOCKEY] = total_push_size - bot.desired_entities[ENTITY_WAGON];
+                bot.desired_entities[ENTITY_COWBOY] = bot.desired_entities[ENTITY_WAGON] * 4;
             }
 
             break;
@@ -1002,8 +994,9 @@ void bot_squad_set_mode(const MatchState& state, Bot& bot, BotSquad& squad, BotS
             for (EntityId entity_id : squad.entities) {
                 const Entity& entity = state.entities.get_by_id(entity_id);
                 // Special case for bunkers
-                if (entity_is_building(entity.type)) {
-                    continue;
+                if (entity.type == ENTITY_BUNKER) {
+                    squad.target_cell = entity.cell + ivec2(0, entity_get_data(ENTITY_BUNKER).cell_size);
+                    return;
                 }
 
                 int nearest_gather_point_index = -1;
