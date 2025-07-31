@@ -43,6 +43,12 @@ struct BotSquad {
     std::vector<EntityId> entities;
 };
 
+struct BotScoutInfo {
+    EntityId goldmine_id;
+    uint8_t occupying_player_id;
+    uint32_t bunker_count;
+    uint32_t last_scout_time;
+};
 
 struct Bot {
     uint8_t player_id;
@@ -56,6 +62,11 @@ struct Bot {
     BotSquadType desired_squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
     uint32_t desired_upgrade;
+
+    EntityId scout_id;
+    std::vector<BotScoutInfo> scout_info;
+    uint32_t scouted_player_tech[ENTITY_TYPE_COUNT][MAX_PLAYERS];
+    uint32_t last_scout_time;
 
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotSquad> squads;
@@ -80,7 +91,7 @@ void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t 
 bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
 void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
-void bot_scout(const MatchState& state, Bot& bot);
+void bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 int bot_get_defense_score(const MatchState& state, const Bot& bot);
 
 // Squads
@@ -116,3 +127,4 @@ std::vector<ivec2> bot_get_cell_circle(ivec2 center, int radius);
 ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id);
 bool bot_is_landmine_point_valid(const MatchState& state, ivec2 point);
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
+uint8_t bot_scout_get_goldmine_occupying_player_id(const MatchState& state, const Bot& bot, const Entity& goldmine);
