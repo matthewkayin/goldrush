@@ -1662,11 +1662,24 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                         attack_input.move.entity_count = 1;
                         attack_input.move.entity_ids[0] = entity_id;
                         bot.inputs.push_back(attack_input);
-                    } else if (should_change_targets && !entity.garrisoned_units.empty() && ivec2::manhattan_distance(entity.cell, attack_target_entity.cell) < 8) {
+                    } else if (should_change_targets && !entity.garrisoned_units.empty()) {
+                        std::vector<ivec2> path;
+                        map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, attack_target_entity.cell, entity_get_data(entity.type).cell_size, &path, MAP_IGNORE_UNITS);
+                        ivec2 unload_cell; 
+                        if (path.empty()) {
+                            unload_cell = attack_target_entity.cell;
+                        } else {
+                            uint32_t path_index = 0;
+                            while (path_index < path.size() && ivec2::manhattan_distance(path[path_index], attack_target_entity.cell) > 8) {
+                                path_index++;
+                            }
+                            unload_cell = path[path_index];
+                        }
+
                         MatchInput unload_input;
                         unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
                         unload_input.move.shift_command = 0;
-                        unload_input.move.target_cell = entity.cell;
+                        unload_input.move.target_cell = unload_cell;
                         unload_input.move.target_id = ID_NULL;
                         unload_input.move.entity_count = 1;
                         unload_input.move.entity_ids[0] = entity_id;
@@ -1690,17 +1703,7 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                             move_input.move.entity_count = 0;
                         }
                     }
-                } else if (squad.attack_path.empty() && entity_get_data(entity.type).garrison_capacity != 0 && !entity.garrisoned_units.empty()) {
-                    /*
-                    MatchInput unload_input;
-                    unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
-                    unload_input.move.shift_command = 0;
-                    unload_input.move.target_cell = entity.cell;
-                    unload_input.move.target_id = ID_NULL;
-                    unload_input.move.entity_count = 1;
-                    unload_input.move.entity_ids[0] = entity_id;
-                    */
-                }
+                } 
             } // End for each entity in squad
 
             if (move_input.move.entity_count != 0) {
