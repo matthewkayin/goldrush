@@ -1768,11 +1768,24 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                     best_path_index++;
                 }
 
+                EntityId nearest_goldmine_id = bot_find_best_entity(state, 
+                        [](const Entity& goldmine, EntityId goldmine_id) {
+                            return goldmine.type == ENTITY_GOLDMINE;
+                        },
+                        [&nearest_base_center](const Entity& a, const Entity& b) {
+                            return ivec2::manhattan_distance(a.cell, nearest_base_center) <
+                                    ivec2::manhattan_distance(b.cell, nearest_base_center);
+                        });
+                Rect goldmine_block_rect = entity_goldmine_get_block_building_rect(state.entities.get_by_id(nearest_goldmine_id).cell);
+
                 // Determine radius of possible landmine points
                 std::vector<ivec2> circle_points = bot_get_cell_circle(nearest_base_center, nearest_base_radius);
                 ivec2 nearest_mine_cell = ivec2(-1, -1);
                 for (ivec2 point : circle_points) {
                     if (!bot_is_landmine_point_valid(state, point)) {
+                        continue;
+                    }
+                    if (goldmine_block_rect.has_point(point)) {
                         continue;
                     }
 
@@ -2422,10 +2435,23 @@ ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id) {
         best_path_index++;
     }
 
+    EntityId nearest_goldmine_id = bot_find_best_entity(state, 
+        [](const Entity& goldmine, EntityId goldmine_id) { 
+            return goldmine.type == ENTITY_GOLDMINE;
+        }, 
+        [&building](const Entity& a, const Entity& b) { 
+            return ivec2::manhattan_distance(a.cell, building.cell) < 
+                ivec2::manhattan_distance(b.cell, building.cell); 
+        });
+    Rect goldmine_block_rect = entity_goldmine_get_block_building_rect(state.entities.get_by_id(nearest_goldmine_id).cell);
+
     int best_circle_point_index = -1;
     for (int circle_point_index = 0; circle_point_index < circle_points.size(); circle_point_index++) {
         ivec2 point = circle_points[circle_point_index];
         if (!map_is_cell_rect_in_bounds(state.map, point - ivec2(1, 1), 3)) {
+            continue;
+        }
+        if (goldmine_block_rect.has_point(point)) {
             continue;
         }
 

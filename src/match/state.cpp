@@ -264,7 +264,6 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                     continue;
                 }
                 Entity& entity = state.entities[entity_index];
-                log_trace("ordering move for entity %u type %s", input.move.entity_ids[id_index], entity_get_data(entity.type).name);
 
                 // Set the unit's target
                 Target target;
