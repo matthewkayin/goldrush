@@ -47,7 +47,7 @@ struct BotScoutInfo {
     EntityId goldmine_id;
     uint8_t occupying_player_id;
     uint32_t bunker_count;
-    uint32_t last_scout_time;
+    bool scouted;
 };
 
 struct Bot {
@@ -127,4 +127,5 @@ std::vector<ivec2> bot_get_cell_circle(ivec2 center, int radius);
 ivec2 bot_get_best_rally_point(const MatchState& state, EntityId building_id);
 bool bot_is_landmine_point_valid(const MatchState& state, ivec2 point);
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
-uint8_t bot_scout_get_goldmine_occupying_player_id(const MatchState& state, const Bot& bot, const Entity& goldmine);
+EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& bot, const Entity& goldmine);
+bool bot_is_population_maxed_out(const MatchState& state, const Bot& bot);
