@@ -93,6 +93,7 @@ int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const En
 void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
 void bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 int bot_get_defense_score(const MatchState& state, const Bot& bot);
+void bot_move_unit_to_nearest_hall(const MatchState& state, Bot& bot, EntityId entity_id);
 
 // Squads
 

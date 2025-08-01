@@ -89,6 +89,7 @@ void bot_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes) 
         if ((bot_is_population_maxed_out(state, bot) && bot.desired_squad_type != BOT_SQUAD_TYPE_NONE) || 
                 (bot_has_desired_entities(state, bot) && 
                 (bot.desired_upgrade == 0 || match_player_has_upgrade(state, bot.player_id, bot.desired_upgrade)))) {
+            log_trace("BOT: strategy %u finished.", bot.strategy);
             if (bot.desired_squad_type != BOT_SQUAD_TYPE_NONE) {
                 bot_squad_create(state, bot);
             }
@@ -280,6 +281,7 @@ BotStrategy bot_choose_next_strategy(const MatchState& state, Bot& bot, uint32_t
         }
     }
 
+    log_trace("BOT: choose next strategy %u", best_strategy);
     return (BotStrategy)best_strategy;
 }
 
@@ -683,6 +685,7 @@ void bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade) {
 
     MatchInput input;
     input.type = MATCH_INPUT_BUILDING_ENQUEUE;
+    input.building_enqueue.building_id = building_id;
     input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UPGRADE;
     input.building_enqueue.item_subtype = upgrade;
     bot.inputs.push_back(input);
@@ -1124,50 +1127,7 @@ void bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
             bot.inputs.push_back(input);
         } else {
             // If there are no goldmines to scout, then the scout is complete
-
-            // Find a place to return the scout to
-            EntityId nearest_allied_hall = bot_find_best_entity(state,
-                [&bot](const Entity& entity, EntityId entity_id) {
-                    return entity.type == ENTITY_HALL && 
-                                entity.player_id == bot.player_id &&
-                                entity_is_selectable(entity);
-                },
-                [&scout](const Entity& a, const Entity& b) {
-                    return ivec2::manhattan_distance(a.cell, scout.cell) < ivec2::manhattan_distance(b.cell, scout.cell);
-                });
-            if (nearest_allied_hall != ID_NULL) {
-                // Return the scout to a place around the nearest town hall
-                const Entity& hall = state.entities.get_by_id(nearest_allied_hall);
-                int hall_cell_size = entity_get_data(hall.type).cell_size;
-                ivec2 hall_corners[4] = {
-                    hall.cell + ivec2(-2, -2),
-                    hall.cell + ivec2(-2, hall_cell_size + 2),
-                    hall.cell + ivec2(hall_cell_size + 2, hall_cell_size + 2),
-                    hall.cell + ivec2(hall_cell_size + 2, -2)
-                };
-
-                int best_hall_corner_index = -1;
-                for (int index = 0; index < 4; index++) {
-                    if (!map_is_cell_in_bounds(state.map, hall_corners[index])) {
-                        continue;
-                    }
-                    if (best_hall_corner_index == -1 ||
-                            ivec2::manhattan_distance(scout.cell, hall_corners[index]) <
-                            ivec2::manhattan_distance(scout.cell, hall_corners[best_hall_corner_index])) {
-                        best_hall_corner_index = index;
-                    }
-                }
-
-                ivec2 return_cell = best_hall_corner_index == -1 ? hall.cell : hall_corners[best_hall_corner_index];
-                MatchInput input;
-                input.type = MATCH_INPUT_MOVE_CELL;
-                input.move.shift_command = 0;
-                input.move.target_id = ID_NULL;
-                input.move.target_cell = return_cell;
-                input.move.entity_ids[0] = bot.scout_id;
-                input.move.entity_count = 1;
-                bot.inputs.push_back(input);
-            } // end if nearest allied hall is not null
+            bot_move_unit_to_nearest_hall(state, bot, bot.scout_id);
 
             bot.last_scout_time = match_time_minutes;
             if (bot_is_entity_reserved(bot, bot.scout_id)) {
@@ -1202,6 +1162,58 @@ int bot_get_defense_score(const MatchState& state, const Bot& bot) {
     }
 
     return std::clamp(defense_score, 0, 100);
+}
+
+void bot_move_unit_to_nearest_hall(const MatchState& state, Bot& bot, EntityId entity_id) {
+    const Entity& entity = state.entities.get_by_id(entity_id);
+
+    // Find a place to return the scout to
+    EntityId nearest_allied_hall = bot_find_best_entity(state,
+        [&bot](const Entity& hall, EntityId hall_id) {
+            return hall.type == ENTITY_HALL && 
+                        hall.player_id == bot.player_id &&
+                        entity_is_selectable(hall);
+        },
+        [&entity](const Entity& a, const Entity& b) {
+            return ivec2::manhattan_distance(a.cell, entity.cell) < 
+                        ivec2::manhattan_distance(b.cell, entity.cell);
+        });
+
+    if (nearest_allied_hall == ID_NULL) {
+        return;
+    }
+
+    // Return the unit to a place around the nearest town hall
+    const Entity& hall = state.entities.get_by_id(nearest_allied_hall);
+    int hall_cell_size = entity_get_data(hall.type).cell_size;
+    ivec2 hall_corners[4] = {
+        hall.cell + ivec2(-2, -2),
+        hall.cell + ivec2(-2, hall_cell_size + 2),
+        hall.cell + ivec2(hall_cell_size + 2, hall_cell_size + 2),
+        hall.cell + ivec2(hall_cell_size + 2, -2)
+    };
+
+    int best_hall_corner_index = -1;
+    for (int index = 0; index < 4; index++) {
+        if (!map_is_cell_in_bounds(state.map, hall_corners[index])) {
+            continue;
+        }
+        if (best_hall_corner_index == -1 ||
+                ivec2::manhattan_distance(entity.cell, hall_corners[index]) <
+                ivec2::manhattan_distance(entity.cell, hall_corners[best_hall_corner_index])) {
+            best_hall_corner_index = index;
+        }
+    }
+
+    ivec2 return_cell = best_hall_corner_index == -1 ? hall.cell : hall_corners[best_hall_corner_index];
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_CELL;
+    input.move.shift_command = 0;
+    input.move.target_id = ID_NULL;
+    input.move.target_cell = return_cell;
+    input.move.entity_ids[0] = entity_id;
+    input.move.entity_count = 1;
+    bot.inputs.push_back(input);
 }
 
 // Squads
@@ -1429,8 +1441,11 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
     uint32_t squad_entity_index = 0;
     while (squad_entity_index < squad.entities.size()) {
         uint32_t entity_index = state.entities.get_index_of(squad.entities[squad_entity_index]);
-        if (entity_index == INDEX_INVALID || state.entities[entity_index].health == 0 ||
-                (squad.mode == BOT_SQUAD_MODE_ATTACK && state.entities[entity_index].type == ENTITY_WAGON && state.entities[entity_index].garrisoned_units.empty())) {
+        bool entity_is_empty_wagon = entity_index != INDEX_INVALID && (squad.mode == BOT_SQUAD_MODE_ATTACK && state.entities[entity_index].type == ENTITY_WAGON && state.entities[entity_index].garrisoned_units.empty());
+        if (entity_index == INDEX_INVALID || state.entities[entity_index].health == 0 || entity_is_empty_wagon) {
+            if (entity_is_empty_wagon) {
+                bot_move_unit_to_nearest_hall(state, bot, squad.entities[squad_entity_index]);
+            }
             bot_release_entity(bot, squad.entities[squad_entity_index]);
             squad.entities[squad_entity_index] = squad.entities[squad.entities.size() - 1];
             squad.entities.pop_back();
@@ -1647,11 +1662,11 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                         attack_input.move.entity_count = 1;
                         attack_input.move.entity_ids[0] = entity_id;
                         bot.inputs.push_back(attack_input);
-                    } else if (should_change_targets && !entity.garrisoned_units.empty()) {
+                    } else if (should_change_targets && !entity.garrisoned_units.empty() && ivec2::manhattan_distance(entity.cell, attack_target_entity.cell) < 8) {
                         MatchInput unload_input;
                         unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
                         unload_input.move.shift_command = 0;
-                        unload_input.move.target_cell = attack_target_entity.cell;
+                        unload_input.move.target_cell = entity.cell;
                         unload_input.move.target_id = ID_NULL;
                         unload_input.move.entity_count = 1;
                         unload_input.move.entity_ids[0] = entity_id;
@@ -1675,6 +1690,16 @@ void bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
                             move_input.move.entity_count = 0;
                         }
                     }
+                } else if (squad.attack_path.empty() && entity_get_data(entity.type).garrison_capacity != 0 && !entity.garrisoned_units.empty()) {
+                    /*
+                    MatchInput unload_input;
+                    unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
+                    unload_input.move.shift_command = 0;
+                    unload_input.move.target_cell = entity.cell;
+                    unload_input.move.target_id = ID_NULL;
+                    unload_input.move.entity_count = 1;
+                    unload_input.move.entity_ids[0] = entity_id;
+                    */
                 }
             } // End for each entity in squad
 
