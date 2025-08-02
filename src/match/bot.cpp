@@ -2207,13 +2207,12 @@ ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id,
 ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot, uint32_t existing_hall_index) {
     // Find the unoccupied goldmine nearest to the existing hall
     uint32_t nearest_goldmine_index = INDEX_INVALID;
-    for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
-        if (state.entities[goldmine_index].type != ENTITY_GOLDMINE || 
-                state.entities[goldmine_index].gold_held == 0 ||
-                bot_is_goldmine_occupied(bot, state.entities.get_id_of(goldmine_index))) {
+    for (const BotScoutInfo& scout_info : bot.scout_info) {
+        if (scout_info.occupying_player_id != PLAYER_NONE) {
             continue;
         }
 
+        uint32_t goldmine_index = state.entities.get_index_of(scout_info.goldmine_id);
         if (nearest_goldmine_index == INDEX_INVALID || 
                 ivec2::manhattan_distance(state.entities[goldmine_index].cell, state.entities[existing_hall_index].cell) < 
                 ivec2::manhattan_distance(state.entities[nearest_goldmine_index].cell, state.entities[existing_hall_index].cell)) {
