@@ -1078,16 +1078,18 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         entity.position = entity_get_target_position(entity);
                         // On step finished
                         // Check to see if we triggered a mine
-                        for (Entity& mine : state.entities) {
-                            if (mine.type != ENTITY_LANDMINE || mine.health == 0 || mine.mode != MODE_BUILDING_FINISHED || 
-                                    state.players[mine.player_id].team == state.players[entity.player_id].team ||
-                                    std::abs(entity.cell.x - mine.cell.x) > 1 || std::abs(entity.cell.y - mine.cell.y) > 1) {
-                                continue;
+                        if (entity_data.cell_layer == CELL_LAYER_GROUND) {
+                            for (Entity& mine : state.entities) {
+                                if (mine.type != ENTITY_LANDMINE || mine.health == 0 || mine.mode != MODE_BUILDING_FINISHED || 
+                                        state.players[mine.player_id].team == state.players[entity.player_id].team ||
+                                        std::abs(entity.cell.x - mine.cell.x) > 1 || std::abs(entity.cell.y - mine.cell.y) > 1) {
+                                    continue;
+                                }
+                                mine.animation = animation_create(ANIMATION_MINE_PRIME);
+                                mine.timer = MINE_PRIME_DURATION;
+                                mine.mode = MODE_MINE_PRIME;
+                                entity_set_flag(mine, ENTITY_FLAG_INVISIBLE, false);
                             }
-                            mine.animation = animation_create(ANIMATION_MINE_PRIME);
-                            mine.timer = MINE_PRIME_DURATION;
-                            mine.mode = MODE_MINE_PRIME;
-                            entity_set_flag(mine, ENTITY_FLAG_INVISIBLE, false);
                         }
                         if (entity.target.type == TARGET_ATTACK_CELL) {
                             Target attack_target = match_entity_target_nearest_enemy(state, entity);

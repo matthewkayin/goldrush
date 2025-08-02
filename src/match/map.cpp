@@ -5,6 +5,7 @@
 #include "render/render.h"
 #include "lcg.h"
 #include <unordered_map>
+#include <algorithm>
 
 static const int MAP_PLAYER_SPAWN_SIZE = 13;
 static const int MAP_PLAYER_SPAWN_MARGIN = 13;
@@ -798,6 +799,13 @@ bool map_is_cell_in_bounds(const Map& map, ivec2 cell) {
 
 bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, int size) {
     return !(cell.x < 0 || cell.y < 0 || cell.x + size > (int)map.width || cell.y + size > (int)map.height);
+}
+
+ivec2 map_clamp_cell(const Map& map, ivec2 cell) {
+    return ivec2(
+        std::clamp(cell.x, 0, (int)map.width),
+        std::clamp(cell.y, 0, (int)map.height)
+    );
 }
 
 Tile map_get_tile(const Map& map, ivec2 cell) {

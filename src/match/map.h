@@ -58,6 +58,7 @@ uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
 
 bool map_is_cell_in_bounds(const Map& map, ivec2 cell);
 bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, int size);
+ivec2 map_clamp_cell(const Map& map, ivec2 cell);
 
 Tile map_get_tile(const Map& map, ivec2 cell);
 bool map_is_tile_ramp(const Map& map, ivec2 cell);

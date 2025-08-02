@@ -65,7 +65,8 @@ struct Bot {
 
     EntityId scout_id;
     std::vector<BotScoutInfo> scout_info;
-    uint32_t scouted_player_tech[ENTITY_TYPE_COUNT][MAX_PLAYERS];
+    uint32_t scouted_enemy_tech[ENTITY_TYPE_COUNT];
+    bool scout_enemy_has_landmines;
     uint32_t last_scout_time;
 
     std::unordered_map<EntityId, bool> is_entity_reserved;
@@ -94,6 +95,7 @@ void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec
 void bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 int bot_get_defense_score(const MatchState& state, const Bot& bot);
 void bot_move_unit_to_nearest_hall(const MatchState& state, Bot& bot, EntityId entity_id);
+bool bot_enemy_has_landmines(const Bot& bot);
 
 // Squads
 
@@ -118,7 +120,7 @@ uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id);
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
 ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_index);
-bool bot_is_goldmine_occupied(const MatchState& state, EntityId goldmine_id);
+bool bot_is_goldmine_occupied(const Bot& bot, EntityId goldmine_id);
 EntityType bot_get_building_which_trains(EntityType unit_type);
 EntityType bot_get_building_prereq(EntityType unit_type);
 EntityType bot_get_building_which_researches(uint32_t upgrade);
