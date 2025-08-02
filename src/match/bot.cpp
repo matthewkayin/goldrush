@@ -9,7 +9,7 @@ static const int SQUAD_GATHER_DISTANCE = 16;
 static const uint32_t SQUAD_LANDMINE_MAX = 6;
 static const uint32_t BOT_HAS_NOT_SCOUTED = UINT32_MAX;
 
-Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
+Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
 
     bot.player_id = player_id;
@@ -33,6 +33,28 @@ Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     bot.last_scout_time = BOT_HAS_NOT_SCOUTED;
     bot.scout_enemy_has_landmines = false;
     memset(bot.scouted_enemy_tech, 0, sizeof(bot.scouted_enemy_tech));
+
+    // Populate the scout info array
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.type == ENTITY_GOLDMINE) {
+            BotScoutInfo scout_info = (BotScoutInfo) {
+                .goldmine_id = state.entities.get_id_of(entity_index),
+                .occupying_player_id = PLAYER_NONE,
+                .bunker_count = 0,
+                .scouted = false
+            };
+            if (match_is_entity_visible_to_player(state, entity, bot.player_id)) {
+                scout_info.scouted = true;
+                EntityId surrounding_hall_id = bot_find_hall_surrounding_goldmine(state, bot, entity);
+                scout_info.occupying_player_id = surrounding_hall_id == ID_NULL 
+                                                    ? PLAYER_NONE
+                                                    : state.entities.get_by_id(surrounding_hall_id).player_id;
+            }
+
+            bot.scout_info.push_back(scout_info);
+        }
+    }
 
     return bot;
 };
@@ -140,10 +162,10 @@ BotStrategy bot_choose_next_strategy(const MatchState& state, Bot& bot, uint32_t
         switch ((BotStrategy)strategy) {
             case BOT_STRATEGY_EXPAND: {
                 // If there's no unoccupied goldmines, don't expand
-                EntityId unoccupied_goldmine_id = bot_find_entity(state, [&state](const Entity& entity, EntityId entity_id) {
+                EntityId unoccupied_goldmine_id = bot_find_entity(state, [&bot](const Entity& entity, EntityId entity_id) {
                     return entity.type == ENTITY_GOLDMINE &&
                             entity.gold_held != 0 &&
-                            !bot_is_goldmine_occupied(state, entity_id);
+                            !bot_is_goldmine_occupied(bot, entity_id);
                 });
                 if (unoccupied_goldmine_id == ID_NULL) {
                     strategy_score = -1;
@@ -687,7 +709,7 @@ void bot_build_building(const MatchState& state, Bot& bot, EntityType building_t
         return;
     }
 
-    ivec2 building_location = building_type == ENTITY_HALL ? bot_find_hall_location(state, hall_index) : bot_find_building_location(state, bot.player_id, state.entities[hall_index].cell + ivec2(1, 1), entity_get_data(building_type).cell_size);
+    ivec2 building_location = building_type == ENTITY_HALL ? bot_find_hall_location(state, bot, hall_index) : bot_find_building_location(state, bot.player_id, state.entities[hall_index].cell + ivec2(1, 1), entity_get_data(building_type).cell_size);
     if (building_location.x == -1) {
         return;
     }
@@ -1086,39 +1108,15 @@ void bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
             return;
         }
 
-        // Populate the scout info array
-        if (bot.scout_info.empty()) {
-            for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-                const Entity& entity = state.entities[entity_index];
-                if (entity.type == ENTITY_GOLDMINE) {
-                    BotScoutInfo scout_info = (BotScoutInfo) {
-                        .goldmine_id = state.entities.get_id_of(entity_index),
-                        .occupying_player_id = PLAYER_NONE,
-                        .bunker_count = 0,
-                        .scouted = false
-                    };
-                    if (match_is_entity_visible_to_player(state, entity, bot.player_id)) {
-                        scout_info.scouted = true;
-                        EntityId surrounding_hall_id = bot_find_hall_surrounding_goldmine(state, bot, entity);
-                        scout_info.occupying_player_id = surrounding_hall_id == ID_NULL 
-                                                            ? PLAYER_NONE
-                                                            : state.entities.get_by_id(surrounding_hall_id).player_id;
-                    }
+        // Reset the scouted status of each scout info
+        for (BotScoutInfo& scout_info : bot.scout_info) {
+            scout_info.scouted = false;
 
-                    bot.scout_info.push_back(scout_info);
-                }
-            }
-        } else {
-            // Reset the scouted status of each scout info
-            for (BotScoutInfo& scout_info : bot.scout_info) {
-                scout_info.scouted = false;
-
-                const Entity& goldmine = state.entities.get_by_id(scout_info.goldmine_id);
-                if (match_is_entity_visible_to_player(state, goldmine, bot.player_id)) {
-                    EntityId surrounding_hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
-                    if (surrounding_hall_id != ID_NULL && state.players[state.entities.get_by_id(surrounding_hall_id).player_id].team == state.players[bot.player_id].team) {
-                        scout_info.scouted = true;
-                    }
+            const Entity& goldmine = state.entities.get_by_id(scout_info.goldmine_id);
+            if (match_is_entity_visible_to_player(state, goldmine, bot.player_id)) {
+                EntityId surrounding_hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
+                if (surrounding_hall_id != ID_NULL && state.players[state.entities.get_by_id(surrounding_hall_id).player_id].team == state.players[bot.player_id].team) {
+                    scout_info.scouted = true;
                 }
             }
         }

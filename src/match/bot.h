@@ -74,7 +74,7 @@ struct Bot {
     std::vector<MatchInput> inputs;
 };
 
-Bot bot_init(uint8_t player_id, int32_t lcg_seed);
+Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
 void bot_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 
 // Behaviors
@@ -119,7 +119,7 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id);
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
-ivec2 bot_find_hall_location(const MatchState& state, uint32_t existing_hall_index);
+ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot, uint32_t existing_hall_index);
 bool bot_is_goldmine_occupied(const Bot& bot, EntityId goldmine_id);
 EntityType bot_get_building_which_trains(EntityType unit_type);
 EntityType bot_get_building_prereq(EntityType unit_type);
