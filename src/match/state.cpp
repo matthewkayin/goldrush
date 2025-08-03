@@ -1295,7 +1295,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         const EntityData& target_data = entity_get_data(target.type);
 
                         // Sapper explosion
-                        if (entity.target.type == TARGET_ATTACK_ENTITY && entity.type == ENTITY_SAPPER) {
+                        if (entity.target.type == TARGET_ATTACK_ENTITY && entity.type == ENTITY_SAPPER && target_data.cell_layer != CELL_LAYER_SKY) {
                             match_entity_explode(state, entity_id);
                             update_finished = true;
                             break;
@@ -2744,7 +2744,9 @@ void match_entity_explode(MatchState& state, EntityId entity_id) {
             continue;
         }
         Entity& defender = state.entities[defender_index];
-        if (defender.type == ENTITY_GOLDMINE || !entity_is_selectable(defender)) {
+        if (defender.type == ENTITY_GOLDMINE || 
+                !entity_is_selectable(defender) ||
+                entity_get_data(defender.type).cell_layer == CELL_LAYER_SKY) {
             continue;
         }
 
