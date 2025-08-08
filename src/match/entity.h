@@ -146,7 +146,7 @@ struct Entity {
     uint32_t cooldown_timer;
 
     uint32_t gold_held;
-    EntityId gold_mine_id;
+    EntityId goldmine_id;
 
     uint32_t taking_damage_counter;
     uint32_t taking_damage_timer;

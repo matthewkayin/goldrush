@@ -188,7 +188,7 @@ bool match_does_player_meet_hotkey_requirements(const MatchState& state, uint8_t
 uint32_t match_get_miners_on_gold(const MatchState& state, EntityId goldmine_id, uint8_t player_id) {
     uint32_t miner_count = 0;
     for (const Entity& miner : state.entities) {
-        if (miner.type == ENTITY_MINER && miner.player_id == player_id && miner.gold_mine_id == goldmine_id) {
+        if (miner.type == ENTITY_MINER && miner.player_id == player_id && miner.goldmine_id == goldmine_id) {
             miner_count++;
         }
     }
@@ -765,7 +765,7 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.garrison_id = ID_NULL;
     entity.cooldown_timer = 0;
     entity.gold_held = 0;
-    entity.gold_mine_id = ID_NULL;
+    entity.goldmine_id = ID_NULL;
 
     entity.taking_damage_counter = 0;
     entity.taking_damage_timer = 0;
@@ -821,7 +821,7 @@ EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left
     entity.garrison_id = ID_NULL;
     entity.cooldown_timer = 0;
     entity.gold_held = gold_left;
-    entity.gold_mine_id = ID_NULL;
+    entity.goldmine_id = ID_NULL;
 
     entity.taking_damage_counter = 0;
     entity.taking_damage_timer = 0;
@@ -850,7 +850,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     // Check if entity should die
     if (entity_should_die(entity)) {
         if (entity_is_unit(entity.type)) {
-            entity.gold_mine_id = ID_NULL;
+            entity.goldmine_id = ID_NULL;
             entity.mode = entity.type == ENTITY_BALLOON ? MODE_UNIT_BALLOON_DEATH_START : MODE_UNIT_DEATH;
             entity.animation = animation_create(entity_get_expected_animation(entity));
             entity.bleed_timer = 0;
@@ -954,13 +954,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 if (entity.type == ENTITY_MINER && entity.target.type == TARGET_ENTITY) {
                     const Entity& target = state.entities.get_by_id(entity.target.id);
                     if (target.type == ENTITY_GOLDMINE && target.gold_held != 0) {
-                        entity.gold_mine_id = entity.target.id;
+                        entity.goldmine_id = entity.target.id;
                     }
                 }
-                if (entity.gold_mine_id != ID_NULL) {
-                    const Entity& mine = state.entities.get_by_id(entity.gold_mine_id);
+                if (entity.goldmine_id != ID_NULL) {
+                    const Entity& mine = state.entities.get_by_id(entity.goldmine_id);
                     if (mine.gold_held == 0) {
-                        entity.gold_mine_id = ID_NULL;
+                        entity.goldmine_id = ID_NULL;
                     }
                 }
 
@@ -1378,13 +1378,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             // First clear entity's target
                             entity.target = (Target) { .type = TARGET_NONE };
                             // Then try to set its target based on the gold mine it just visited
-                            if (entity.gold_mine_id != ID_NULL) {
+                            if (entity.goldmine_id != ID_NULL) {
                                 // It's safe to do this because gold mines never get removed from the array
-                                const Entity& gold_mine = state.entities.get_by_id(entity.gold_mine_id);
+                                const Entity& gold_mine = state.entities.get_by_id(entity.goldmine_id);
                                 if (gold_mine.gold_held != 0) {
                                     entity.target = (Target) {
                                         .type = TARGET_ENTITY,
-                                        .id = entity.gold_mine_id
+                                        .id = entity.goldmine_id
                                     };
                                 }
                             // If it doesn't have a last visited gold mine, then find a mine to visit
@@ -1577,7 +1577,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         entity.garrison_id = ID_NULL;
                         entity.target = hall_target;
                         if (entity.target.type == TARGET_NONE) {
-                            entity.gold_mine_id = ID_NULL;
+                            entity.goldmine_id = ID_NULL;
                         }
                         match_fog_update(state, state.players[entity.player_id].team, entity.cell, entity_data.cell_size, entity_data.sight, match_entity_has_detection(state, entity), entity_data.cell_layer, false);
                         entity.cell = exit_cell;
@@ -2174,7 +2174,7 @@ bool match_is_entity_mining(const MatchState& state, const Entity& entity) {
 
     const Entity& target = state.entities.get_by_id(entity.target.id);
     return (target.type == ENTITY_GOLDMINE && target.gold_held > 0) ||
-           (target.type == ENTITY_HALL && target.mode == MODE_BUILDING_FINISHED && entity.gold_mine_id != ID_NULL &&
+           (target.type == ENTITY_HALL && target.mode == MODE_BUILDING_FINISHED && entity.goldmine_id != ID_NULL &&
                 entity.player_id == target.player_id && entity.gold_held > 0);
 }
 
@@ -2681,7 +2681,7 @@ void match_entity_unload_unit(MatchState& state, Entity& carrier, EntityId garri
             garrisoned_unit.mode = MODE_UNIT_IDLE;
             garrisoned_unit.target = (Target) { .type = TARGET_NONE };
             garrisoned_unit.garrison_id = ID_NULL;
-            garrisoned_unit.gold_mine_id = ID_NULL;
+            garrisoned_unit.goldmine_id = ID_NULL;
 
             // Remove the unit from the garrisoned units list
             carrier.garrisoned_units.erase(carrier.garrisoned_units.begin() + index);

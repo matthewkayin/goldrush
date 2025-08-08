@@ -96,6 +96,7 @@ void bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 int bot_get_defense_score(const MatchState& state, const Bot& bot);
 void bot_move_unit_to_nearest_hall(const MatchState& state, Bot& bot, EntityId entity_id);
 bool bot_enemy_has_landmines(const Bot& bot);
+void bot_unit_flee(const MatchState& state, Bot& bot, EntityId entity_id);
 
 // Squads
 

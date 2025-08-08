@@ -723,7 +723,7 @@ void entity_set_target(Entity& entity, Target target) {
     GOLD_ASSERT(entity.mode != MODE_UNIT_BUILD);
     entity.target = target;
     entity.path.clear();
-    entity.gold_mine_id = ID_NULL;
+    entity.goldmine_id = ID_NULL;
     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, false);
 
     if (entity.mode != MODE_UNIT_MOVE) {
