@@ -867,26 +867,35 @@ void bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t 
     }
 
     // Determine desired buildings based on desired army
+    uint32_t desired_units_from_building[ENTITY_TYPE_COUNT];
+    memset(desired_units_from_building, 0, sizeof(desired_units_from_building));
     for (uint32_t entity_type = ENTITY_MINER; entity_type < ENTITY_HALL; entity_type++) {
         if (desired_entities[entity_type] == 0) {
             continue;
         }
         EntityType building_type = bot_get_building_which_trains((EntityType)entity_type);
+        desired_units_from_building[building_type] += desired_entities[entity_type];
+    }
+    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        if (desired_units_from_building[entity_type] == 0) {
+            continue;
+        }
+
         uint32_t desired_building_count;
-        if (desired_entities[entity_type] < 4) {
+        if (desired_units_from_building[entity_type] < 4) {
             desired_building_count = 1;
-        } else if (desired_entities[entity_type] < 16) {
+        } else if (desired_units_from_building[entity_type] < 16) {
             desired_building_count = 2;
-        } else if (desired_entities[entity_type] < 32) {
+        } else if (desired_units_from_building[entity_type] < 32) {
             desired_building_count = 3;
-        } else if (desired_entities[entity_type] < 48) {
+        } else if (desired_units_from_building[entity_type] < 48) {
             desired_building_count = 4;
-        } else if (desired_entities[entity_type] < 64) {
+        } else if (desired_units_from_building[entity_type] < 64) {
             desired_building_count = 5;
         } else {
             desired_building_count = 6;
         }
-        desired_entities[building_type] = std::max(desired_entities[building_type], desired_building_count);
+        desired_entities[entity_type] = std::max(desired_entities[entity_type], desired_building_count);
     }
 
     // Determine desired buildings based on desired upgrade
