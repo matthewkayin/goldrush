@@ -61,7 +61,7 @@ struct Bot {
     BotStrategy strategy;
     BotSquadType desired_squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
-    uint32_t desired_upgrade;
+    uint32_t desired_upgrades;
 
     EntityId scout_id;
     std::vector<BotScoutInfo> scout_info;
@@ -93,6 +93,8 @@ bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
 void bot_throw_molotov(const MatchState& state, Bot& bot, EntityId pyro_id, ivec2 attack_point, int attack_radius);
 void bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
+int bot_score_scout_type(EntityType type);
+uint32_t bot_get_next_scout_time(const Bot& bot);
 int bot_get_defense_score(const MatchState& state, const Bot& bot);
 void bot_move_unit_to_nearest_hall(const MatchState& state, Bot& bot, EntityId entity_id);
 bool bot_enemy_has_landmines(const Bot& bot);
