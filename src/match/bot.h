@@ -38,11 +38,13 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot);
+bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot);
+MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
 
 // Entity management
 
@@ -55,8 +57,6 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 void bot_squad_create(const MatchState& state, Bot& bot);
 void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
-MatchInput bot_squad_movement(const MatchState& state, Bot& bot, BotSquad& squad);
-bool bot_squad_should_entity_move_to_target(const BotSquad& squad, const Entity& entity);
 
 // Helpers
 
