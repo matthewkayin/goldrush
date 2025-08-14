@@ -88,3 +88,5 @@ bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell
 EntityType bot_get_building_which_trains(EntityType unit_type);
 EntityType bot_get_building_prereq(EntityType building_type);
 EntityType bot_get_building_which_researches(uint32_t upgrade);
+
+ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, const Entity& building);

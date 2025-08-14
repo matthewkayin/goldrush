@@ -502,6 +502,22 @@ MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot) {
             rally_input.rally.rally_point = (state.entities.get_by_id(goldmine_id).cell * TILE_SIZE) + ivec2((3 * TILE_SIZE) / 2, (3 * TILE_SIZE) / 2);
             return rally_input;
         }
+
+        ivec2 rally_cell = bot_choose_building_rally_point(state, bot, building);
+        if (rally_cell.x == -1) {
+            continue;
+        }
+        ivec2 rally_point = cell_center(rally_cell).to_ivec2();
+        if (building.rally_point == rally_point) {
+            continue;
+        }
+
+        MatchInput input;
+        input.type = MATCH_INPUT_RALLY;
+        input.rally.building_ids[0] = building_id;
+        input.rally.building_count = 1;
+        input.rally.rally_point = rally_point;
+        return input;
     } // End for each building
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -1361,4 +1377,52 @@ EntityType bot_get_building_which_researches(uint32_t upgrade) {
             GOLD_ASSERT(false);
             return ENTITY_TYPE_COUNT;
     }
+}
+
+ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, const Entity& building) {
+    std::vector<ivec2> frontier;
+    std::vector<bool> explored(state.map.width * state.map.height, false);
+    frontier.push_back(building.cell);
+    ivec2 rally_cell = ivec2(-1, -1);
+
+    while (!frontier.empty()) {
+        ivec2 next = frontier[0];
+        frontier.erase(frontier.begin());
+
+        if (explored[next.x + (next.y * state.map.width)]) {
+            continue;
+        }
+
+        static const int RALLY_MARGIN = 4;
+        bool is_rally_point_valid = map_get_tile(state.map, next).elevation == map_get_tile(state.map, building.cell).elevation;
+        for (int y = next.y - RALLY_MARGIN; y < next.y + RALLY_MARGIN + 1; y++) {
+            for (int x = next.x - RALLY_MARGIN; x < next.x + RALLY_MARGIN + 1; x++) {
+                ivec2 cell = ivec2(x, y);
+                if (!map_is_cell_in_bounds(state.map, cell)) {
+                    is_rally_point_valid = false;
+                }
+                if (map_is_tile_ramp(state.map, cell)) {
+                    is_rally_point_valid = false;
+                }
+                Cell map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, cell);
+                if (map_cell.type == CELL_BUILDING || map_cell.type == CELL_GOLDMINE) {
+                    is_rally_point_valid = false;
+                }
+            }
+        }
+        if (is_rally_point_valid) {
+            return next;
+        }
+
+        explored[next.x + (next.y * state.map.width)] = true;
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            ivec2 child = next + DIRECTION_IVEC2[direction];
+            if (!map_is_cell_in_bounds(state.map, child)) {
+                continue;
+            }
+            frontier.push_back(child);
+        }
+    }
+
+    return ivec2(-1, -1);
 }
