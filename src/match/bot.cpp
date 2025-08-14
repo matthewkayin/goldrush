@@ -71,6 +71,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     }
     if (bot_has_desired_entities(state, bot) ||
             (desired_unit_count != 0 && match_get_player_population(state, bot.player_id) >= 98)) {
+        bot_squad_create(state, bot);
     }
 
     // Squad update
@@ -650,18 +651,19 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             // Only take non-garrisoned infantry who are not garrisoning to a unit already
             if (infantry.garrison_id != ID_NULL || 
                     infantry.target.type == TARGET_ENTITY ||
-                    entity_get_data(infantry.type).garrison_size != ENTITY_CANNOT_GARRISON) {
+                    entity_get_data(infantry.type).garrison_size == ENTITY_CANNOT_GARRISON) {
                 continue;
             }
 
             // If attacking and this infantry is already close enough, then don't worry about garrisoning
             if (squad.type == BOT_SQUAD_ATTACK && 
-                    ivec2::manhattan_distance(infantry.cell, squad.target_cell) > BOT_SQUAD_GATHER_DISTANCE * 2) {
+                    ivec2::manhattan_distance(infantry.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE * 2) {
                 continue;
             }
 
             infantry_ids.push_back(infantry_id);
         }
+        log_trace("BOT: squad update infantry_ids count %u", infantry_ids.size());
 
         // If there are infantry who want to garrison, we're going to try to garrison them
         if (!infantry_ids.empty()) {
@@ -669,12 +671,13 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             for (EntityId carrier_id : squad.entities) {
                 // Determine if entity is a carrier
                 const Entity& carrier = state.entities.get_by_id(carrier_id);
-                const uint32_t GARRISON_CAPACITY = entity_get_data(carrier.type).garrison_size;
+                const uint32_t GARRISON_CAPACITY = entity_get_data(carrier.type).garrison_capacity;
                 // This will also filter out non-carriers, because they will always have a 
                 // garrison size of 0, matching their garrison capacity
                 if (carrier.garrisoned_units.size() == GARRISON_CAPACITY) {
                     continue;
                 }
+                log_trace("BOT: considering carrier %s", entity_get_data(carrier.type).name);
 
                 // Count units that are already going into this carrier
                 uint32_t garrison_size = carrier.garrisoned_units.size();
@@ -684,6 +687,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                         garrison_size++;
                     }
                 }
+                log_trace("BOT: carrier garrison size is %u", garrison_size);
 
                 // If we're already at capacity, then don't add any more to this carrier
                 if (garrison_size >= GARRISON_CAPACITY) {
@@ -779,7 +783,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 // At this point, the carrier does not have any infantry en-route to it
                 // If the carrier is empty, and no one is en-route to it, and there is no one to pick up,
                 // then release the carrier from the army
-                if (BOT_SQUAD_ATTACK && carrier.garrisoned_units.empty()) {
+                if (squad.type == BOT_SQUAD_ATTACK && carrier.garrisoned_units.empty()) {
                     bot_release_entity(bot, carrier_id);
                     squad.entities[squad_entity_index] = squad.entities.back();
                     squad.entities.pop_back();
@@ -851,8 +855,8 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         const Entity& entity = state.entities.get_by_id(entity_id);
         const EntityData& entity_data = entity_get_data(entity.type);
 
-        // Filter out carriers
-        if (entity_data.garrison_capacity != 0) {
+        // Filter out carriers and garrisoned units
+        if (entity_data.garrison_capacity != 0 || entity.garrison_id != ID_NULL) {
             continue;
         }
 
@@ -974,7 +978,9 @@ EntityId bot_find_best_entity(BotFindBestEntityParams params) {
     return params.state.entities.get_id_of(best_entity_index);
 }
 
-std::function<bool(const Entity&, const Entity&)> bot_closest_manhattan_distance_to(ivec2 cell) {
+std::function<bool(const Entity&, const Entity&)> bot_closest_manhattan_distance_to(ivec2 p_cell) {
+    // We have to copy the variable because the lambda is passing a reference, but p_cell is itself just a reference to the actual variable
+    ivec2 cell = p_cell;
     return [&cell](const Entity& a, const Entity& b) {
         return ivec2::manhattan_distance(a.cell, cell) < ivec2::manhattan_distance(b.cell, cell);
     };
