@@ -22,6 +22,12 @@ struct BotSquad {
     ivec2 target_cell;
 };
 
+struct BotScoutInfo {
+    EntityId goldmine_id;
+    uint8_t occupying_player_id;
+    bool should_scout;
+};
+
 struct Bot {
     uint8_t player_id;
     int32_t lcg_seed;
@@ -31,7 +37,10 @@ struct Bot {
 
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotSquad> squads;
+
     EntityId scout_id;
+    std::vector<BotScoutInfo> scout_info;
+    uint32_t last_scout_time;
 };
 
 Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
@@ -45,6 +54,7 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
+MatchInput bot_unit_flee(const MatchState& state, Bot& bot, EntityId entity_id);
 
 // Entity management
 
@@ -57,6 +67,14 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 void bot_squad_create(const MatchState& state, Bot& bot);
 void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
+
+// Scouting
+
+void bot_scout_update(const MatchState& state, Bot& bot);
+MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
+MatchInput bot_scout_next_target(const MatchState& state, Bot& bot, const Entity& scout, uint32_t match_time_minutes);
+uint32_t bot_get_next_scout_time(const Bot& bot);
+int bot_score_scout_type(EntityType type);
 
 // Helpers
 
@@ -79,6 +97,7 @@ EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, i
 EntityId bot_pull_worker_off_gold(const MatchState& state, const Bot& bot, EntityId goldmine_id);
 EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id);
+EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& bot, const Entity& goldmine);
 
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
 ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot, uint32_t existing_hall_index);
@@ -90,3 +109,4 @@ EntityType bot_get_building_prereq(EntityType building_type);
 EntityType bot_get_building_which_researches(uint32_t upgrade);
 
 ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, const Entity& building);
+bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);

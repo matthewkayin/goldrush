@@ -23,11 +23,36 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot.desired_entities[ENTITY_WAGON] = 1;
 
     bot.scout_id = ID_NULL;
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (entity.type != ENTITY_GOLDMINE) {
+            continue;
+        }
+
+        // Leaving the occupying player id uninitialized because it will be
+        // picked up the next time we call bot_scout_update
+        BotScoutInfo scout_info;
+        scout_info.goldmine_id = state.entities.get_id_of(entity_index);
+        scout_info.occupying_player_id = PLAYER_NONE;
+        scout_info.should_scout = true;
+
+        if (match_is_entity_visible_to_player(state, entity, bot.player_id)) {
+            EntityId surrounding_hall_id = bot_find_hall_surrounding_goldmine(state, bot, entity);
+            if (surrounding_hall_id != ID_NULL) {
+                scout_info.occupying_player_id = state.entities.get_by_id(surrounding_hall_id).player_id;
+            } 
+        }
+
+        bot.scout_info.push_back(scout_info);
+    }
+    bot.last_scout_time = 0;
 
     return bot;
 }
 
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
+    bot_scout_update(state, bot);
+
     MatchInput saturate_bases_input = bot_saturate_bases(state, bot);
     if (saturate_bases_input.type != MATCH_INPUT_NONE) {
         return saturate_bases_input;
@@ -89,6 +114,11 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
         if (input.type != MATCH_INPUT_NONE) {
             return input;
         }
+    }
+
+    MatchInput scout_input = bot_scout(state, bot, match_time_minutes);
+    if (scout_input.type != MATCH_INPUT_NONE) {
+        return scout_input;
     }
 
     MatchInput rally_input = bot_set_rally_points(state, bot);
@@ -561,6 +591,48 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
     return input;
 }
 
+MatchInput bot_unit_flee(const MatchState& state, Bot& bot, EntityId entity_id) {
+    static const int FLEE_CELL_DISTANCE = 16;
+
+    const Entity& entity = state.entities.get_by_id(entity_id);
+    ivec2 flee_cells[DIRECTION_COUNT];
+    int flee_cell_scores[DIRECTION_COUNT];
+    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+        flee_cells[direction] = map_clamp_cell(state.map, entity.cell + (DIRECTION_IVEC2[direction] * FLEE_CELL_DISTANCE));
+        flee_cell_scores[direction] = 0;
+    }
+
+    for (const Entity& enemy : state.entities) {
+        if (!entity_is_selectable(enemy) ||
+                enemy.type == ENTITY_GOLDMINE ||
+                state.players[enemy.player_id].team == state.players[entity.player_id].team) {
+            continue;
+        }
+
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            if (ivec2::manhattan_distance(enemy.cell, flee_cells[direction]) < FLEE_CELL_DISTANCE) {
+                flee_cell_scores[direction]++;
+            }
+        }
+    }
+
+    int safest_direction = -1;
+    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+        if (safest_direction == -1 || flee_cell_scores[direction] < flee_cell_scores[safest_direction]) {
+            safest_direction = direction;
+        }
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_CELL;
+    input.move.shift_command = 0;
+    input.move.target_id = ID_NULL;
+    input.move.target_cell = flee_cells[safest_direction];
+    input.move.entity_ids[0] = entity_id;
+    input.move.entity_count = 1;
+    return input;
+}
+
 // Entity management
 
 bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id) {
@@ -679,7 +751,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
             infantry_ids.push_back(infantry_id);
         }
-        log_trace("BOT: squad update infantry_ids count %u", infantry_ids.size());
 
         // If there are infantry who want to garrison, we're going to try to garrison them
         if (!infantry_ids.empty()) {
@@ -960,6 +1031,233 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
+// Scouting
+
+void bot_scout_update(const MatchState& state, Bot& bot) {
+    // Check for scout death
+    if (bot.scout_id != ID_NULL) {
+        uint32_t scout_index = state.entities.get_index_of(bot.scout_id);
+        if (scout_index == INDEX_INVALID) {
+            bot_release_entity(bot, bot.scout_id);
+            bot.scout_id = ID_NULL;
+        }
+    }
+}
+
+MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
+    // If we have no scout, it means we're not scouting
+    if (bot.scout_id == ID_NULL) {
+        // Determine if we should be
+        if (bot_get_next_scout_time(bot) > match_time_minutes) {
+            return (MatchInput) { .type = MATCH_INPUT_NONE };
+        }
+
+        // If we got here, it means we should do another scout, so let's find a scout
+        bot.scout_id = bot_find_best_entity((BotFindBestEntityParams) {
+            .state = state, 
+            .filter = [&bot](const Entity& entity, EntityId entity_id) {
+                return entity.player_id == bot.player_id && 
+                    bot_score_scout_type(entity.type) != 0 &&
+                    entity.garrisoned_units.empty() && 
+                    !bot_is_entity_reserved(bot, entity_id);
+            },
+            .compare = [](const Entity&a, const Entity& b) {
+                return bot_score_scout_type(a.type) > bot_score_scout_type(b.type);
+            }
+        });
+        if (bot.scout_id == ID_NULL) {
+            return (MatchInput) { .type = MATCH_INPUT_NONE };
+        }
+        // TODO
+        // if (bot.strategy != BOT_STRATEGY_RUSH) {
+            bot_reserve_entity(bot, bot.scout_id);
+        // 
+
+        // Reset the scouted status of each scout info
+        // TODO: decide whether to do a full scout or a small scout
+        for (BotScoutInfo& scout_info : bot.scout_info) {
+            const Entity& goldmine = state.entities.get_by_id(scout_info.goldmine_id);
+            scout_info.should_scout = !match_is_entity_visible_to_player(state, goldmine, bot.player_id);
+        }
+    }
+
+    const Entity& scout = state.entities.get_by_id(bot.scout_id);
+
+    if (scout.target.type == TARGET_NONE) {
+        return bot_scout_next_target(state, bot, scout, match_time_minutes);
+    }
+
+    if (scout.target.type == TARGET_ENTITY) {
+        uint32_t target_index = state.entities.get_index_of(scout.target.id);
+        if (target_index == INDEX_INVALID || entity_is_unit(state.entities[target_index].type)) {
+            return bot_scout_next_target(state, bot, scout, match_time_minutes);
+        }
+
+        if (match_is_entity_visible_to_player(state, state.entities[target_index], bot.player_id)) {
+            // We are targeting either a goldmine or a building
+            // Find the closest goldmine to our target (which may be our target itself)
+            EntityId goldmine_id;
+            const Entity& target = state.entities[target_index];
+            goldmine_id = bot_find_best_entity((BotFindBestEntityParams) {
+                .state = state, 
+                .filter = [](const Entity& goldmine, EntityId goldmine_id) {
+                    return goldmine.type == ENTITY_GOLDMINE;
+                },
+                .compare = [&target](const Entity& a, const Entity& b) {
+                    return ivec2::manhattan_distance(a.cell, target.cell) <
+                            ivec2::manhattan_distance(b.cell, target.cell);
+                }
+            });
+            GOLD_ASSERT((target.type == ENTITY_GOLDMINE && scout.target.id == goldmine_id) || (target.type != ENTITY_GOLDMINE && scout.target.id != goldmine_id));
+
+            const Entity& goldmine = state.entities.get_by_id(goldmine_id);
+            EntityId surrounding_hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
+
+            int scout_info_index = -1;
+            for (int index = 0; index < bot.scout_info.size(); index++) {
+                if (bot.scout_info[index].goldmine_id == scout.target.id) {
+                    scout_info_index = index;
+                    break;
+                }
+            }
+            GOLD_ASSERT(scout_info_index != -1);
+
+            bot.scout_info[scout_info_index].occupying_player_id = surrounding_hall_id != ID_NULL 
+                                                                        ? state.entities.get_by_id(surrounding_hall_id).player_id
+                                                                        : PLAYER_NONE;
+
+            if (surrounding_hall_id == ID_NULL) {
+                bot.scout_info[scout_info_index].should_scout = false;
+                return bot_scout_next_target(state, bot, scout, match_time_minutes);
+            }
+
+            EntityId unscouted_building_id = bot_find_best_entity((BotFindBestEntityParams) {
+                .state = state,
+                .filter = [&state, &bot, &goldmine_id](const Entity& entity, EntityId entity_id) {
+                    // Filter out non-buildings and already-scouted buildings
+                    if (!entity_is_building(entity.type) ||
+                            !entity_is_selectable(entity) ||
+                            bot_has_scouted_entity(state, bot, entity, entity_id)) {
+                        return false;
+                    }
+
+                    // Find the goldmine nearest to this building
+                    uint32_t nearest_goldmine_index = INDEX_INVALID;
+                    for (const BotScoutInfo& scout_info : bot.scout_info) {
+                        uint32_t goldmine_index = state.entities.get_index_of(scout_info.goldmine_id);
+                        if (nearest_goldmine_index == INDEX_INVALID ||
+                                ivec2::manhattan_distance(entity.cell, state.entities[goldmine_index].cell) <
+                                ivec2::manhattan_distance(entity.cell, state.entities[nearest_goldmine_index].cell)) {
+                            nearest_goldmine_index = goldmine_index;
+                        }
+                    }
+
+                    // And return true only if the nearest goldmine is 
+                    // equal to the goldmine that we are scouting right now
+                    GOLD_ASSERT(nearest_goldmine_index != INDEX_INVALID);
+                    return state.entities.get_id_of(nearest_goldmine_index) == goldmine_id;
+                },
+                .compare = bot_closest_manhattan_distance_to(scout.cell)
+            });
+
+            if (unscouted_building_id == ID_NULL) {
+                bot.scout_info[scout_info_index].should_scout = false;
+                return bot_scout_next_target(state, bot, scout, match_time_minutes);
+            } else {
+                MatchInput input;
+                input.type = MATCH_INPUT_MOVE_ENTITY;
+                input.move.shift_command = 0;
+                input.move.target_id = unscouted_building_id;
+                input.move.target_cell = ivec2(0, 0);
+                input.move.entity_ids[0] = bot.scout_id;
+                input.move.entity_count = 1;
+                return input;
+            }
+        }
+    }
+
+    // If we are taking damage, flee and mark the nearest goldmine
+    // as scouted. This way we don't sacrifice the scout
+    if (scout.taking_damage_timer != 0) {
+        for (BotScoutInfo& scout_info : bot.scout_info) {
+            const Entity& goldmine = state.entities.get_by_id(scout_info.goldmine_id);
+            if (ivec2::manhattan_distance(scout.cell, goldmine.cell) < 32) {
+                scout_info.should_scout = false;
+            }
+        }
+        return bot_unit_flee(state, bot, bot.scout_id);
+    }
+
+    return (MatchInput) { .type = MATCH_INPUT_NONE };
+}
+
+MatchInput bot_scout_next_target(const MatchState& state, Bot& bot, const Entity& scout, uint32_t match_time_minutes) {
+    // Choose the next goldmine to scout
+    EntityId next_goldmine_id = ID_NULL;
+    int next_goldmine_distance;
+    for (const BotScoutInfo& scout_info : bot.scout_info) {
+        if (!scout_info.should_scout) {
+            continue;
+        }
+        const Entity& goldmine = state.entities.get_by_id(scout_info.goldmine_id);
+        int goldmine_distance = ivec2::manhattan_distance(scout.cell, goldmine.cell);
+        if (next_goldmine_id == ID_NULL || goldmine_distance < next_goldmine_distance) {
+            next_goldmine_id = scout_info.goldmine_id;
+            next_goldmine_distance = goldmine_distance;
+        }
+    }
+
+    if (next_goldmine_id != ID_NULL) {
+        MatchInput input;
+        input.type = MATCH_INPUT_MOVE_ENTITY;
+        input.move.shift_command = 0;
+        input.move.target_id = next_goldmine_id;
+        input.move.target_cell = ivec2(0, 0);
+        input.move.entity_ids[0] = bot.scout_id;
+        input.move.entity_count = 1;
+        return input;
+    } else {
+        // If there are no goldmines to scout, then the scout is complete
+        MatchInput input = bot_return_entity_to_nearest_hall(state, bot, bot.scout_id);
+
+        bot.last_scout_time = match_time_minutes;
+        if (bot_is_entity_reserved(bot, bot.scout_id)) {
+            bot_release_entity(bot, bot.scout_id);
+        }
+        bot.scout_id = ID_NULL;
+
+        return input;
+    } // end if next goldmine is null
+}
+
+uint32_t bot_get_next_scout_time(const Bot& bot) {
+    uint32_t next_scout_time;
+    if (bot.last_scout_time == 0) {
+        next_scout_time = 0;
+    } else if (bot.last_scout_time < 10) {
+        next_scout_time = bot.last_scout_time + 5;
+    } else {
+        next_scout_time = bot.last_scout_time + 10;
+    }
+
+    return next_scout_time;
+}
+
+int bot_score_scout_type(EntityType type) {
+    switch (type) {
+        case ENTITY_WAGON:
+            return 4;
+        case ENTITY_JOCKEY:
+            return 3;
+        case ENTITY_DETECTIVE:
+            return 2;
+        case ENTITY_BANDIT:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
 // Helpers
 
 EntityId bot_find_entity(BotFindEntityParams params) {
@@ -1093,6 +1391,18 @@ uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state
     }
 
     return hall_indices[least_buildings_hall_indices_index];
+}
+
+EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& bot, const Entity& goldmine) {
+    return bot_find_entity((BotFindEntityParams) {
+        .state = state,
+        .filter = [&state, &bot, &goldmine](const Entity& hall, EntityId hall_id) {
+            return hall.type == ENTITY_HALL &&
+                    entity_is_selectable(hall) &&
+                    bot_has_scouted_entity(state, bot, hall, hall_id) &&
+                    bot_does_entity_surround_goldmine(hall, goldmine.cell);
+        }
+    });
 }
 
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size) {
@@ -1425,4 +1735,20 @@ ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, c
     }
 
     return ivec2(-1, -1);
+}
+
+bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id) {
+    int entity_cell_size = entity_get_data(entity.type).cell_size;
+    uint32_t bot_team = state.players[bot.player_id].team;
+    // If fog is revealed, then they can see it
+    if (match_is_cell_rect_revealed(state, bot_team, entity.cell, entity_cell_size)) {
+        return true;
+    }
+    // If for is only explored but they have seen the entity before, then they can see it
+    if (match_is_cell_rect_explored(state, bot_team, entity.cell, entity_cell_size) &&
+            state.remembered_entities[bot_team].find(entity_id) != state.remembered_entities[bot_team].end()) {
+        return true;
+    }
+    // Otherwise, they have not scouted it
+    return false;
 }
