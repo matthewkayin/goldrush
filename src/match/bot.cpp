@@ -102,7 +102,8 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     // Squad update
     uint32_t squad_index = 0;
     while (squad_index < bot.squads.size()) {
-        MatchInput input = bot_squad_update(state, bot, bot.squads[squad_index]);
+        bot_squad_remove_dead_units(state, bot, bot.squads[squad_index]);
+        bot_squad_assess_target(state, bot, bot.squads[squad_index]);
 
         if (bot.squads[squad_index].entities.empty()) {
             bot.squads[squad_index] = bot.squads[bot.squads.size() - 1];
@@ -110,7 +111,11 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
         } else {
             squad_index++;
         }
+    }
 
+    // Squad inputs
+    for (BotSquad& squad : bot.squads) {
+        MatchInput input = bot_squad_get_input(state, bot, squad);
         if (input.type != MATCH_INPUT_NONE) {
             return input;
         }
@@ -708,23 +713,89 @@ void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad) {
     squad.entities.clear();
 }
 
-MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
-    // Check the squad entity list for any entities which have died
-    {
+void bot_squad_remove_dead_units(const MatchState& state, Bot& bot, BotSquad& squad) {
+    uint32_t squad_entity_index = 0;
+    while (squad_entity_index < squad.entities.size()) {
+        uint32_t entity_index = state.entities.get_index_of(squad.entities[squad_entity_index]);
+        if (entity_index == INDEX_INVALID || state.entities[entity_index].health == 0) {
+            // Release and remove the entity
+            bot_release_entity(bot, squad.entities[squad_entity_index]);
+            squad.entities[squad_entity_index] = squad.entities[squad.entities.size() - 1];
+            squad.entities.pop_back();
+        } else {
+            squad_entity_index++;
+        }
+    }
+}
+
+void bot_squad_assess_target(const MatchState& state, Bot& bot, BotSquad& squad) {
+    // Squad check if under attack
+    for (EntityId entity_id : squad.entities) {
+        const Entity& entity = state.entities[entity_id];
+        if (entity.taking_damage_timer == 0) {
+            continue;
+        }
+
+        EntityId nearest_enemy_id = bot_find_best_entity((BotFindBestEntityParams) {
+            .state = state,
+            .filter = [&state, &bot](const Entity& enemy, EntityId enemy_id) {
+                return entity_is_unit(enemy.type) &&
+                        entity_is_selectable(enemy) &&
+                        state.players[enemy.player_id].team != state.players[bot.player_id].team;
+            },
+            .compare = bot_closest_manhattan_distance_to(entity.cell)
+        });
+        // Would be really weird if true
+        if (nearest_enemy_id == ID_NULL) {
+            continue;
+        }
+
+        // If the attacking enemy is close by, then we don't need to change targets
+        const Entity& nearest_enemy = state.entities.get_by_id(nearest_enemy_id);
+        if (ivec2::manhattan_distance(nearest_enemy.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE) {
+            continue;
+        }
+
+        // If we're being attacked by an entity nearby, then move any units nearby
+        // the outside attacker into a new squad
+        BotSquad new_squad;
+        new_squad.type = BOT_SQUAD_ATTACK;
+        new_squad.target_cell = nearest_enemy.cell;
+
         uint32_t squad_entity_index = 0;
         while (squad_entity_index < squad.entities.size()) {
-            uint32_t entity_index = state.entities.get_index_of(squad.entities[squad_entity_index]);
-            if (entity_index == INDEX_INVALID || state.entities[entity_index].health == 0) {
-                // Release and remove the entity
-                bot_release_entity(bot, squad.entities[squad_entity_index]);
-                squad.entities[squad_entity_index] = squad.entities[squad.entities.size() - 1];
+            const Entity& squad_entity = state.entities.get_by_id(squad.entities[squad_entity_index]);
+            if (ivec2::manhattan_distance(squad_entity.cell, new_squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE * 2) {
+                new_squad.entities.push_back(squad.entities[squad_entity_index]);
+                squad.entities[squad_entity_index] = squad.entities.back();
                 squad.entities.pop_back();
             } else {
                 squad_entity_index++;
             }
         }
+
+        bot.squads.push_back(new_squad);
     }
 
+    if (squad.type == BOT_SQUAD_ATTACK) {
+        EntityId enemy_near_target_id = bot_find_entity((BotFindEntityParams) {
+            .state = state,
+            .filter = [&state, &bot, &squad](const Entity& entity, EntityId entity_id) {
+                return entity_is_unit(entity.type) &&
+                        entity_is_selectable(entity) &&
+                        state.players[entity.player_id].team != state.players[bot.player_id].team &&
+                        ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE;
+            }
+        });
+
+        if (enemy_near_target_id == ID_NULL) {
+            bot_squad_dissolve(state, bot, squad);
+            return;
+        }
+    }
+}
+
+MatchInput bot_squad_get_input(const MatchState& state, Bot& bot, BotSquad& squad) {
     if (squad.entities.empty()) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }

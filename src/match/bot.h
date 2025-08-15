@@ -66,7 +66,9 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 
 void bot_squad_create(const MatchState& state, Bot& bot);
 void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
-MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
+void bot_squad_remove_dead_units(const MatchState& state, Bot& bot, BotSquad& squad);
+void bot_squad_assess_target(const MatchState& state, Bot& bot, BotSquad& squad);
+MatchInput bot_squad_get_input(const MatchState& state, Bot& bot, BotSquad& squad);
 
 // Scouting
 
