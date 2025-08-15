@@ -1550,31 +1550,33 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Check win conditions
-    bool player_has_buildings[MAX_PLAYERS];
-    bool opposing_player_just_lost = false;
-    memset(player_has_buildings, 0, sizeof(player_has_buildings));
-    for (const Entity& entity : state.match.entities) {
-        if (entity_is_building(entity.type) && entity.mode == MODE_BUILDING_FINISHED) {
-            player_has_buildings[entity.player_id] = true;
-        }
-    }
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state.match.players[player_id].active && !player_has_buildings[player_id]) {
-            state.match.players[player_id].active = false;
-
-            char defeat_message[128];
-            sprintf(defeat_message, "%s has been defeated.", state.match.players[player_id].name);
-            match_ui_add_chat_message(state, PLAYER_NONE, defeat_message);
-
-            if (player_id == network_get_player_id()) {
-                state.mode = MATCH_UI_MODE_MATCH_OVER_DEFEAT;
-            } else {
-                opposing_player_just_lost = true;
+    if (!state.replay_mode) {
+        bool player_has_buildings[MAX_PLAYERS];
+        bool opposing_player_just_lost = false;
+        memset(player_has_buildings, 0, sizeof(player_has_buildings));
+        for (const Entity& entity : state.match.entities) {
+            if (entity_is_building(entity.type) && entity.mode == MODE_BUILDING_FINISHED) {
+                player_has_buildings[entity.player_id] = true;
             }
         }
-    }
-    if (opposing_player_just_lost && !match_ui_is_opponent_in_match(state)) {
-        state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (state.match.players[player_id].active && !player_has_buildings[player_id]) {
+                state.match.players[player_id].active = false;
+
+                char defeat_message[128];
+                sprintf(defeat_message, "%s has been defeated.", state.match.players[player_id].name);
+                match_ui_add_chat_message(state, PLAYER_NONE, defeat_message);
+
+                if (player_id == network_get_player_id()) {
+                    state.mode = MATCH_UI_MODE_MATCH_OVER_DEFEAT;
+                } else {
+                    opposing_player_just_lost = true;
+                }
+            }
+        }
+        if (opposing_player_just_lost && !match_ui_is_opponent_in_match(state)) {
+            state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
+        }
     }
 }
 
