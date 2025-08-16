@@ -1880,10 +1880,6 @@ void match_ui_order_move(MatchUiState& state) {
         state.move_animation_entity_id = input.move.target_id;
     }
 
-    // Play ack sound
-    // TODO: only play this if unit voices are on
-    // sound_play(input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_ENTITY ? SOUND_UNIT_HAW : SOUND_UNIT_OK);
-
     // Reset UI mode if targeting
     if (match_ui_is_targeting(state) && !input_is_action_pressed(INPUT_ACTION_SHIFT)) {
         state.mode = MATCH_UI_MODE_NONE;

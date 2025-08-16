@@ -81,7 +81,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     }
 
     // Get desired entities
-    BotDesiredEntities desired_entities = bot_get_desired_entities(state, bot);
+    BotDesiredEntities desired_entities = bot_get_desired_entities(state, bot, match_time_minutes);
 
     // Train unit
     if (desired_entities.unit != ENTITY_TYPE_COUNT) {
@@ -216,7 +216,7 @@ void bot_set_desired_entities(const MatchState& state, Bot& bot) {
     }
 }
 
-BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot) {
+BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t match_time_minutes) {
     if (bot_should_build_house(state, bot)) {
         return (BotDesiredEntities) {
             .unit = ENTITY_TYPE_COUNT,
@@ -310,7 +310,24 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
         }
     }
 
-    // TODO: add scout entity
+    // If we want to scout but haven't grabbed a scout yet, 
+    // it means we there is probably nothing to scout with,
+    // so add a scout to our desired entities
+    if (bot_get_next_scout_time(bot) > match_time_minutes &&
+            bot_get_next_scout_time(bot) - match_time_minutes > 1 &&
+            bot.scout_id == ID_NULL) {
+        EntityId scout_train_building_id = bot_find_best_entity((BotFindBestEntityParams) {
+            .state = state,
+            .filter = [&bot](const Entity& building, EntityId building_id) {
+                return building.player_id == bot.player_id &&
+                        (building.type == ENTITY_COOP || building.type == ENTITY_SALOON) &&
+                        entity_is_selectable(building);
+            },
+            .compare = [](const Entity& a, const Entity& b) {
+                return a.type == ENTITY_COOP && b.type != ENTITY_COOP;
+            }
+        });
+    }
 
     // Determine desired unit
     uint32_t desired_unit;
@@ -399,64 +416,18 @@ void bot_on_strategy_finished(const MatchState& state, Bot& bot) {
 
     squad.target_cell = ivec2(-1, -1);
     if (bot.strategy == BOT_STRATEGY_RUSH) {
-        std::unordered_map<uint32_t, uint32_t> enemy_hall_defense_score;
-        // First pass, find all enemy halls
-        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-            const Entity& entity = state.entities[entity_index];
-            if (state.players[entity.player_id].team == 
-                    state.players[bot.player_id].team ||
-                    entity.type != ENTITY_HALL ||
-                    !entity_is_selectable(entity)) {
-                continue;
-            }
+        squad.type = BOT_SQUAD_ATTACK;
+        squad.target_cell = bot_get_squad_attack_point(state, bot, squad);
 
-            enemy_hall_defense_score[entity_index] = 0;
-        }
-
-        // TODO: see if there is maybe still a nearby enemy building we could attack
-        if (enemy_hall_defense_score.empty()) {
-            log_trace("BOT: When creating attack squad, no enemy halls found, abandoning squad.");
+        if (squad.target_cell.x == -1) {
+            log_trace("BOT: no attack point found. Abandoning squad.");
+            // If we got here it means that there were no enemy buildings
+            // to attack, so we set the last scout time to 0. This makes
+            // it so that we will scout again immediately and discover
+            // any hidden enemy buildings that the bot cannot yet see
+            bot.last_scout_time = 0;
             return;
         }
-
-        // Second pass, find all hall defenses
-        // (this way allows us to avoid O(n^2) because we don't have to search
-        // all entities for every defense just to find the nearest hall)
-        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-            const Entity& entity = state.entities[entity_index];
-            if (state.players[entity.player_id].team == 
-                    state.players[bot.player_id].team ||
-                    entity.type == ENTITY_HALL ||
-                    !entity_is_building(entity.type) ||
-                    !entity_is_selectable(entity)) {
-                continue;
-            }
-
-            uint32_t nearest_hall_index = INDEX_INVALID;
-            for (auto it : enemy_hall_defense_score) {
-                if (nearest_hall_index == INDEX_INVALID ||
-                        ivec2::manhattan_distance(entity.cell, state.entities[it.first].cell) <
-                        ivec2::manhattan_distance(entity.cell, state.entities[nearest_hall_index].cell)) {
-                    nearest_hall_index = it.first;
-                }
-            }
-
-            GOLD_ASSERT(nearest_hall_index != INDEX_INVALID);
-            uint32_t entity_defense_value = entity.type == ENTITY_BUNKER ? 2 : 1;
-            enemy_hall_defense_score[nearest_hall_index] += entity_defense_value;
-        }
-
-        // Find the least defended hall
-        uint32_t least_defended_hall_index = INDEX_INVALID;
-        for (auto it : enemy_hall_defense_score) {
-            if (least_defended_hall_index == INDEX_INVALID ||
-                    enemy_hall_defense_score[it.first] < enemy_hall_defense_score[least_defended_hall_index]) {
-                least_defended_hall_index = it.first;
-            }
-        }
-
-        squad.type = BOT_SQUAD_ATTACK;
-        squad.target_cell = state.entities[least_defended_hall_index].cell;
     } else if (bot.strategy == BOT_STRATEGY_BUNKER) {
         squad.type = BOT_SQUAD_DEFEND;
 
@@ -1294,10 +1265,9 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
         if (bot.scout_id == ID_NULL) {
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
-        // TODO
-        // if (bot.strategy != BOT_STRATEGY_RUSH) {
+        if (bot.strategy != BOT_STRATEGY_RUSH) {
             bot_reserve_entity(bot, bot.scout_id);
-        // 
+        }
 
         // Reset the scouted status of each scout info
         // TODO: decide whether to do a full scout or a small scout
@@ -1977,4 +1947,155 @@ bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entit
     }
     // Otherwise, they have not scouted it
     return false;
+}
+
+ivec2 bot_get_squad_center_point(const MatchState& state, const BotSquad& squad) {
+    struct CenterPoint {
+        ivec2 sum;
+        int size;
+        ivec2 point() {
+            return sum / size;
+        }
+    };
+    std::vector<CenterPoint> center_points;
+
+    for (EntityId entity_id : squad.entities) {
+        ivec2 entity_cell = state.entities.get_by_id(entity_id).cell;
+
+        int nearest_center_point_index = -1;
+        for (int center_point_index = 0; center_point_index < center_points.size(); center_point_index++) {
+            if (ivec2::manhattan_distance(
+                    entity_cell, 
+                    center_points[center_point_index].point()) > BOT_SQUAD_GATHER_DISTANCE) {
+                continue;
+            }
+
+            if (nearest_center_point_index == -1 || 
+                    ivec2::manhattan_distance(
+                        entity_cell, 
+                        center_points[center_point_index].point()) <
+                    ivec2::manhattan_distance(
+                        entity_cell, 
+                        center_points[nearest_center_point_index].point())) {
+                nearest_center_point_index = center_point_index;
+            }
+        }
+
+        if (nearest_center_point_index == -1) {
+            center_points.push_back((CenterPoint) {
+                .sum = entity_cell,
+                .size = 1
+            });
+        } else {
+            center_points[nearest_center_point_index].sum += entity_cell;
+            center_points[nearest_center_point_index].size++;
+        }
+    }
+
+    GOLD_ASSERT(!center_points.empty());
+    int biggest_center_point = 0;
+    for (int index = 1; index < center_points.size(); index++) {
+        if (center_points[index].size > center_points[biggest_center_point].size) {
+            biggest_center_point = index;
+        }
+    }
+
+    return center_points[biggest_center_point].point();
+}
+
+ivec2 bot_get_squad_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad) {
+    ivec2 center_point = bot_get_squad_center_point(state, squad);
+    EntityId nearest_building_id = bot_find_best_entity((BotFindBestEntityParams) {
+        .state = state,
+        .filter = [&state, &bot](const Entity& building, EntityId building_id) {
+            return state.players[building.player_id].team !=
+                    state.players[bot.player_id].team &&
+                    entity_is_building(building.type) &&
+                    entity_is_selectable(building) &&
+                    bot_has_scouted_entity(state, bot, building, building_id);
+        },
+        .compare = [&center_point](const Entity& a, const Entity& b) {
+            if (a.type == ENTITY_HALL && b.type != ENTITY_HALL) {
+                return true;
+            }
+            return ivec2::manhattan_distance(a.cell, center_point) <
+                    ivec2::manhattan_distance(b.cell, center_point);
+        }
+    });
+
+    // There are no buildings that we know of
+    if (nearest_building_id == ID_NULL) {
+        return ivec2(-1, -1);
+    }
+
+    // If nearest building is not a hall, that means there are no halls that
+    // we know of, so just attack the nearest building
+    const Entity& nearest_building = state.entities.get_by_id(nearest_building_id);
+    if (nearest_building.type != ENTITY_HALL) {
+        return nearest_building.cell;
+    }
+
+    std::unordered_map<uint32_t, uint32_t> enemy_hall_defense_score;
+    // First pass, find all enemy halls
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
+        if (state.players[entity.player_id].team == 
+                state.players[bot.player_id].team ||
+                entity.type != ENTITY_HALL ||
+                !entity_is_selectable(entity) ||
+                !bot_has_scouted_entity(state, bot, entity, entity_id)) {
+            continue;
+        }
+
+        enemy_hall_defense_score[entity_index] = 0;
+    }
+
+    // Second pass, find all hall defenses
+    // (this way allows us to avoid O(n^2) because we don't have to search
+    // all entities for every defense just to find the nearest hall)
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        if (state.players[entity.player_id].team == 
+                state.players[bot.player_id].team ||
+                entity.type == ENTITY_HALL ||
+                !entity_is_building(entity.type) ||
+                !entity_is_selectable(entity)) {
+            continue;
+        }
+
+        uint32_t nearest_hall_index = INDEX_INVALID;
+        for (auto it : enemy_hall_defense_score) {
+            if (nearest_hall_index == INDEX_INVALID ||
+                    ivec2::manhattan_distance(entity.cell, state.entities[it.first].cell) <
+                    ivec2::manhattan_distance(entity.cell, state.entities[nearest_hall_index].cell)) {
+                nearest_hall_index = it.first;
+            }
+        }
+
+        GOLD_ASSERT(nearest_hall_index != INDEX_INVALID);
+        uint32_t entity_defense_value = entity.type == ENTITY_BUNKER ? 2 : 1;
+        enemy_hall_defense_score[nearest_hall_index] += entity_defense_value;
+    }
+
+    // Find the least defended hall
+    uint32_t least_defended_hall_index = INDEX_INVALID;
+    for (auto it : enemy_hall_defense_score) {
+        if (least_defended_hall_index == INDEX_INVALID ||
+                enemy_hall_defense_score[it.first] < enemy_hall_defense_score[least_defended_hall_index]) {
+            least_defended_hall_index = it.first;
+        }
+    }
+
+    // Compare the least defended hall with the nearest one. If the nearest
+    // one is basically as well defended as the least defended hall, then
+    // prefer the nearest
+    uint32_t nearest_building_index = state.entities.get_index_of(nearest_building_id);
+    GOLD_ASSERT(nearest_building_index != INDEX_INVALID && 
+                    enemy_hall_defense_score.find(nearest_building_index) != enemy_hall_defense_score.end());
+    if (enemy_hall_defense_score[nearest_building_index] - enemy_hall_defense_score[least_defended_hall_index] < 2) {
+        least_defended_hall_index = nearest_building_index;
+    }
+
+    return state.entities[least_defended_hall_index].cell;
 }

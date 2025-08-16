@@ -60,7 +60,7 @@ bool bot_should_abandon_strategy(const MatchState& state, const Bot& bot);
 void bot_clear_strategy(Bot& bot);
 BotStrategy bot_choose_next_strategy(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 void bot_set_desired_entities(const MatchState& state, Bot& bot);
-BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot);
+BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
 bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 void bot_on_strategy_finished(const MatchState& state, Bot& bot);
 
@@ -130,3 +130,5 @@ EntityType bot_get_building_which_researches(uint32_t upgrade);
 
 ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, const Entity& building);
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
+ivec2 bot_get_squad_center_point(const MatchState& state, const BotSquad& squad);
+ivec2 bot_get_squad_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
