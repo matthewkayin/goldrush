@@ -5,11 +5,10 @@
 #include <functional>
 #include <unordered_map>
 
+struct Bot;
+
 enum BotStrategy {
-    BOT_STRATEGY_NONE,
-    BOT_STRATEGY_RUSH,
-    BOT_STRATEGY_EXPAND,
-    BOT_STRATEGY_BUNKER
+    BOT_STRATEGY_SALOON_CORE
 };
 
 struct BotDesiredEntities {
@@ -18,15 +17,23 @@ struct BotDesiredEntities {
 };
 
 enum BotSquadType {
-    BOT_SQUAD_ATTACK,
-    BOT_SQUAD_DEFEND,
-    BOT_SQUAD_LANDMINES
+    BOT_SQUAD_TYPE_NONE,
+    BOT_SQUAD_TYPE_RUSH,
+    BOT_SQUAD_TYPE_ATTACK,
+    BOT_SQUAD_TYPE_BUNKER,
+    BOT_SQUAD_TYPE_LANDMINES
 };
 
 struct BotSquad {
     BotSquadType type;
     std::vector<EntityId> entities;
     ivec2 target_cell;
+};
+
+struct BotGoal {
+    BotSquadType squad_type;
+    uint32_t desired_entities[ENTITY_TYPE_COUNT];
+    std::function<bool(const MatchState&, const Bot&)> should_be_abandoned;
 };
 
 struct BotScoutInfo {
@@ -40,7 +47,7 @@ struct Bot {
     int32_t lcg_seed;
 
     BotStrategy strategy;
-    uint32_t desired_entities[ENTITY_TYPE_COUNT];
+    BotGoal goal;
     uint32_t desired_upgrades;
 
     std::unordered_map<EntityId, bool> is_entity_reserved;
@@ -56,13 +63,14 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 // Strategy
 
-bool bot_should_abandon_strategy(const MatchState& state, const Bot& bot);
-void bot_clear_strategy(Bot& bot);
-BotStrategy bot_choose_next_strategy(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
-void bot_set_desired_entities(const MatchState& state, Bot& bot);
-BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
+BotGoal bot_goal_empty();
+BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
+bool bot_is_goal_met(const MatchState& state, const Bot& bot);
+bool bot_is_goal_empty(const BotGoal& goal);
 bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
-void bot_on_strategy_finished(const MatchState& state, Bot& bot);
+void bot_on_goal_finished(const MatchState& state, Bot& bot);
+
+BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
 
 // Behaviors
 
@@ -132,3 +140,4 @@ ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, c
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
 ivec2 bot_get_squad_center_point(const MatchState& state, const BotSquad& squad);
 ivec2 bot_get_squad_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
+bool bot_is_base_under_attack(const MatchState& state, const Bot& bot);
