@@ -5,6 +5,13 @@
 #include <functional>
 #include <unordered_map>
 
+enum BotStrategy {
+    BOT_STRATEGY_NONE,
+    BOT_STRATEGY_RUSH,
+    BOT_STRATEGY_EXPAND,
+    BOT_STRATEGY_BUNKER
+};
+
 struct BotDesiredEntities {
     EntityType unit;
     EntityType building;
@@ -32,6 +39,7 @@ struct Bot {
     uint8_t player_id;
     int32_t lcg_seed;
 
+    BotStrategy strategy;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
     uint32_t desired_upgrades;
 
@@ -45,9 +53,20 @@ struct Bot {
 
 Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
-MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
+
+// Strategy
+
+bool bot_should_abandon_strategy(const MatchState& state, const Bot& bot);
+void bot_clear_strategy(Bot& bot);
+BotStrategy bot_choose_next_strategy(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
+void bot_set_desired_entities(const MatchState& state, Bot& bot);
 BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot);
 bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
+void bot_on_strategy_finished(const MatchState& state, Bot& bot);
+
+// Behaviors
+
+MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
@@ -64,7 +83,6 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 
 // Squads
 
-void bot_squad_create(const MatchState& state, Bot& bot);
 void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
 void bot_squad_remove_dead_units(const MatchState& state, Bot& bot, BotSquad& squad);
 void bot_squad_assess_target(const MatchState& state, Bot& bot, BotSquad& squad);
