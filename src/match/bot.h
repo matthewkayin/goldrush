@@ -5,21 +5,10 @@
 #include <functional>
 #include <unordered_map>
 
-struct Bot;
-
-enum BotStrategy {
-    BOT_STRATEGY_SALOON_CORE
-};
-
-struct BotDesiredEntities {
-    EntityType unit;
-    EntityType building;
-};
-
 enum BotSquadType {
     BOT_SQUAD_TYPE_NONE,
-    BOT_SQUAD_TYPE_RUSH,
-    BOT_SQUAD_TYPE_ATTACK,
+    BOT_SQUAD_TYPE_HARASS,
+    BOT_SQUAD_TYPE_PUSH,
     BOT_SQUAD_TYPE_BUNKER,
     BOT_SQUAD_TYPE_LANDMINES
 };
@@ -30,10 +19,28 @@ struct BotSquad {
     ivec2 target_cell;
 };
 
+enum BotStrategy {
+    BOT_STRATEGY_SALOON_CORE
+};
+
+enum BotGoalType {
+    BOT_GOAL_NONE,
+    BOT_GOAL_RUSH,
+    BOT_GOAL_EXPAND,
+    BOT_GOAL_BUNKER,
+    BOT_GOAL_LANDMINES,
+    BOT_GOAL_HARASS
+};
+
 struct BotGoal {
+    BotGoalType type;
     BotSquadType squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
-    std::function<bool(const MatchState&, const Bot&)> should_be_abandoned;
+};
+
+struct BotDesiredEntities {
+    EntityType unit;
+    EntityType building;
 };
 
 struct BotScoutInfo {
@@ -65,17 +72,15 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 BotGoal bot_goal_empty();
 BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
+bool bot_goal_should_be_abandoned(const MatchState& state, const Bot& bot);
 bool bot_is_goal_met(const MatchState& state, const Bot& bot);
-bool bot_is_goal_empty(const BotGoal& goal);
-bool bot_has_desired_entities(const MatchState& state, const Bot& bot);
 void bot_on_goal_finished(const MatchState& state, Bot& bot);
-
-BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
 
 // Behaviors
 
 MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
+BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
@@ -92,9 +97,11 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 // Squads
 
 void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
-void bot_squad_remove_dead_units(const MatchState& state, Bot& bot, BotSquad& squad);
-void bot_squad_assess_target(const MatchState& state, Bot& bot, BotSquad& squad);
-MatchInput bot_squad_get_input(const MatchState& state, Bot& bot, BotSquad& squad);
+MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
+MatchInput bot_squad_attack_micro(const MatchState& state, const Bot& bot, const BotSquad& squad);
+MatchInput bot_squad_garrison_into_carriers(const MatchState& state, const Bot& bot, const BotSquad& squad);
+MatchInput bot_squad_manage_carriers(const MatchState& state, Bot& bot, BotSquad& squad);
+MatchInput bot_squad_move_infantry_to_target(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
 // Scouting
 

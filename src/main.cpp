@@ -251,8 +251,6 @@ int gold_main(int argc, char** argv) {
         if (input_is_action_just_pressed(INPUT_ACTION_TURBO)) {
             if (playback_speed == 1) {
                 playback_speed = 4;
-            } else if (playback_speed == 4) {
-                playback_speed = 8;
             } else {
                 playback_speed = 1;
             }
