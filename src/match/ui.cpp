@@ -1051,7 +1051,7 @@ void match_ui_update(MatchUiState& state) {
                         char* out_ptr = debug_buffer;
                         out_ptr += sprintf(out_ptr, "TURN %u PLAYER %u ", state.turn_counter, player_id);
                         match_input_print(out_ptr, input);
-                        log_trace(debug_buffer);
+                        log_info(debug_buffer);
                     }
                 }
                 state.inputs[player_id].pop();
