@@ -148,3 +148,4 @@ bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entit
 ivec2 bot_get_squad_center_point(const MatchState& state, const BotSquad& squad);
 ivec2 bot_get_squad_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
 bool bot_is_base_under_attack(const MatchState& state, const Bot& bot);
+bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const Entity& infantry, const Entity& nearby_enemy);

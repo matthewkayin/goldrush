@@ -2448,7 +2448,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
     const EntityData& attacker_data = entity_get_data(attacker.type);
     const EntityData& defender_data = entity_get_data(defender.type);
 
-    log_trace("DESYNC match_entity_attack_target attacker ID %u name %s player %u defender ID %u name %s player %u", attacker_id, attacker_data.name, attacker.player_id, attacker.target.id, defender_data.name, defender.player_id);
+    // log_trace("DESYNC match_entity_attack_target attacker ID %u name %s player %u defender ID %u name %s player %u", attacker_id, attacker_data.name, attacker.player_id, attacker.target.id, defender_data.name, defender.player_id);
 
     // Reset fan hammer cooldown, should happen regardless of hit or miss
     if (attacker.type == ENTITY_COWBOY) {
@@ -2518,7 +2518,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
     int32_t accuracy_roll = lcg_rand(&state.lcg_seed) % 100;
     bool attack_missed = accuracy < accuracy_roll;
     bool attack_is_melee = attack_with_bayonets || attacker_data.unit_data.range_squared == 1;
-    log_trace("DESYNC bayonets? %i attack missed? %i attack is melee? %i accuracy %i accuracy roll %i", (int)attack_with_bayonets, (int)attack_missed, (int)attack_is_melee, accuracy, accuracy_roll);
+    // log_trace("DESYNC bayonets? %i attack missed? %i attack is melee? %i accuracy %i accuracy roll %i", (int)attack_with_bayonets, (int)attack_missed, (int)attack_is_melee, accuracy, accuracy_roll);
     if (attack_missed && attack_is_melee) {
         return;
     }
@@ -2543,7 +2543,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
         hit_position.x = defender_rect.x + (defender_rect.w / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.w / 2));
         hit_position.y = defender_rect.y + (defender_rect.h / 4) + (lcg_rand(&state.lcg_seed) % (defender_rect.h / 2));
     }
-    log_trace("DESYNC attack hit_position %vi", &hit_position);
+    // log_trace("DESYNC attack hit_position %vi", &hit_position);
 
     // Play sound
     if (attack_missed && attacker.type != ENTITY_CANNON) {
@@ -2604,7 +2604,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
                 damage = std::max(1, damage - match_entity_get_armor(state, entity));
 
                 entity.health = std::max(0, entity.health - damage);
-                log_trace("DESYNC cannon hit entity index %u ID %u damage %i health %i", entity_index, state.entities.get_id_of(entity_index), damage, entity.health);
+                // log_trace("DESYNC cannon hit entity index %u ID %u damage %i health %i", entity_index, state.entities.get_id_of(entity_index), damage, entity.health);
                 match_entity_on_attack(state, attacker_id, entity);
             }
         }
@@ -2615,7 +2615,7 @@ void match_entity_attack_target(MatchState& state, EntityId attacker_id) {
         if (attacker.type == ENTITY_BANDIT && match_player_has_upgrade(state, attacker.player_id, UPGRADE_SERRATED_KNIVES) && entity_is_unit(defender.type)) {
             defender.bleed_timer = BLEED_DURATION;
         }
-        log_trace("DESYNC attacker hit defender damage %i health %i bleed timer %u", damage, defender.health, defender.bleed_timer);
+        // log_trace("DESYNC attacker hit defender damage %i health %i bleed timer %u", damage, defender.health, defender.bleed_timer);
         match_entity_on_attack(state, attacker_id, defender);
     }
 }
@@ -2642,7 +2642,7 @@ void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& def
             .type = TARGET_ATTACK_ENTITY,
             .id = attacker_id
         };
-        log_trace("DESYNC match_entity_on_attacker defender target is now %u", defender.target.id);
+        // log_trace("DESYNC match_entity_on_attacker defender target is now %u", defender.target.id);
     }
 }
 
