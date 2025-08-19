@@ -70,8 +70,8 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 // Strategy
 
-BotGoal bot_goal_empty();
-BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
+void bot_clear_goal(Bot& bot);
+void bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 bool bot_goal_should_be_abandoned(const MatchState& state, const Bot& bot);
 bool bot_is_goal_met(const MatchState& state, const Bot& bot);
 void bot_on_goal_finished(const MatchState& state, Bot& bot);
@@ -98,10 +98,6 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 
 void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
-MatchInput bot_squad_attack_micro(const MatchState& state, const Bot& bot, const BotSquad& squad);
-MatchInput bot_squad_garrison_into_carriers(const MatchState& state, const Bot& bot, const BotSquad& squad);
-MatchInput bot_squad_manage_carriers(const MatchState& state, Bot& bot, BotSquad& squad);
-MatchInput bot_squad_move_infantry_to_target(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
 // Scouting
 
@@ -149,3 +145,5 @@ ivec2 bot_get_squad_center_point(const MatchState& state, const BotSquad& squad)
 ivec2 bot_get_squad_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
 bool bot_is_base_under_attack(const MatchState& state, const Bot& bot);
 bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const Entity& infantry, const Entity& nearby_enemy);
+int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
+ivec2 bot_find_best_molotov_cell(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 attack_point);
