@@ -464,6 +464,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             }
 
             Entity& building = state.entities[building_index];
+            GOLD_ASSERT(building.mode == MODE_BUILDING_FINISHED);
             if (state.players[building.player_id].gold < building_queue_item_cost(item)) {
                 return;
             }

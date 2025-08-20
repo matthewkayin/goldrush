@@ -1060,19 +1060,6 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    struct Node {
-        fixed cost;
-        fixed distance;
-        // The parent is the previous node stepped in the path to reach this node
-        // It should be an index in the explored list or -1 if it is the start node
-        int parent;
-        ivec2 cell;
-
-        fixed score() const {
-            return cost + distance;
-        };
-    };
-
     // Don't bother pathing to the unit's cell
     if (from == to) {
         path->clear();
@@ -1105,8 +1092,8 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         }
     }
 
-    std::vector<Node> frontier;
-    std::vector<Node> explored;
+    std::vector<MapPathNode> frontier;
+    std::vector<MapPathNode> explored;
     std::vector<int> explored_indices = std::vector<int>(map.width * map.height, -1);
 
     if (ignore_cells != NULL) {
@@ -1132,7 +1119,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     }
     if (is_target_unreachable) {
         // Reverse pathfind to find the nearest reachable cell
-        frontier.push_back((Node) {
+        frontier.push_back((MapPathNode) {
             .cost = fixed::from_int(0),
             .distance = fixed::from_int(0),
             .parent = -1,
@@ -1149,7 +1136,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             }
 
             // Pop the smallest path
-            Node smallest = frontier[smallest_index];
+            MapPathNode smallest = frontier[smallest_index];
             frontier.erase(frontier.begin() + smallest_index);
 
             // If it's the solution, return it
@@ -1168,7 +1155,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
             // Consider all children
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                Node child = (Node) {
+                MapPathNode child = (MapPathNode) {
                     .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
                     .distance = fixed::from_int(ivec2::manhattan_distance(smallest.cell + DIRECTION_IVEC2[direction], to)),
                     .parent = -1,
@@ -1188,7 +1175,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
                 // Check if it's in the frontier
                 uint32_t frontier_index;
                 for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                    Node& frontier_node = frontier[frontier_index];
+                    MapPathNode& frontier_node = frontier[frontier_index];
                     if (frontier_node.cell == child.cell) {
                         break;
                     }
@@ -1212,9 +1199,9 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
     uint32_t closest_explored = 0;
     bool found_path = false;
-    Node path_end;
+    MapPathNode path_end;
 
-    frontier.push_back((Node) {
+    frontier.push_back((MapPathNode) {
         .cost = fixed::from_int(0),
         .distance = fixed::from_int(ivec2::manhattan_distance(from, to)),
         .parent = -1,
@@ -1231,7 +1218,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         }
 
         // Pop the smallest path
-        Node smallest = frontier[smallest_index];
+        MapPathNode smallest = frontier[smallest_index];
         frontier.erase(frontier.begin() + smallest_index);
 
         // If it's the solution, return it
@@ -1260,7 +1247,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
                                                         DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST, DIRECTION_NORTHWEST };
         for (int direction_index = 0; direction_index < DIRECTION_COUNT; direction_index++) {
             int direction = CHILD_DIRECTIONS[direction_index];
-            Node child = (Node) {
+            MapPathNode child = (MapPathNode) {
                 .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
                 .distance = fixed::from_int(ivec2::manhattan_distance(smallest.cell + DIRECTION_IVEC2[direction], to)),
                 .parent = (int)explored.size() - 1,
@@ -1296,7 +1283,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
             uint32_t frontier_index;
             for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                Node& frontier_node = frontier[frontier_index];
+                MapPathNode& frontier_node = frontier[frontier_index];
                 if (frontier_node.cell == child.cell) {
                     break;
                 }
@@ -1315,7 +1302,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     } // End while not frontier empty
 
     // Backtrack to build the path
-    Node current = found_path ? path_end : explored[closest_explored];
+    MapPathNode current = found_path ? path_end : explored[closest_explored];
     path->clear();
     path->reserve(current.cost.integer_part() + 1);
     while (current.parent != -1) {

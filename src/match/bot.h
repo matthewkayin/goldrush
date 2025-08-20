@@ -5,6 +5,30 @@
 #include <functional>
 #include <unordered_map>
 
+enum BotStrategy {
+    BOT_STRATEGY_SALOON_CORE
+};
+
+enum BotGoal {
+    BOT_GOAL_NONE,
+    BOT_GOAL_RUSH,
+    BOT_GOAL_EXPAND,
+    BOT_GOAL_BUNKER,
+    BOT_GOAL_LANDMINES,
+    BOT_GOAL_HARASS
+};
+
+struct BotDesiredEntities {
+    EntityType unit;
+    EntityType building;
+};
+
+struct BotScoutInfo {
+    EntityId goldmine_id;
+    uint8_t occupying_player_id;
+    bool should_scout;
+};
+
 enum BotSquadType {
     BOT_SQUAD_TYPE_NONE,
     BOT_SQUAD_TYPE_HARASS,
@@ -19,35 +43,6 @@ struct BotSquad {
     ivec2 target_cell;
 };
 
-enum BotStrategy {
-    BOT_STRATEGY_SALOON_CORE
-};
-
-enum BotGoalType {
-    BOT_GOAL_NONE,
-    BOT_GOAL_RUSH,
-    BOT_GOAL_EXPAND,
-    BOT_GOAL_BUNKER,
-    BOT_GOAL_LANDMINES,
-    BOT_GOAL_HARASS
-};
-
-struct BotGoal {
-    BotGoalType type;
-    BotSquadType squad_type;
-    uint32_t desired_entities[ENTITY_TYPE_COUNT];
-};
-
-struct BotDesiredEntities {
-    EntityType unit;
-    EntityType building;
-};
-
-struct BotScoutInfo {
-    EntityId goldmine_id;
-    uint8_t occupying_player_id;
-    bool should_scout;
-};
 
 struct Bot {
     uint8_t player_id;
@@ -55,7 +50,8 @@ struct Bot {
 
     BotStrategy strategy;
     BotGoal goal;
-    uint32_t desired_upgrades;
+    BotSquadType desired_squad_type;
+    uint32_t desired_entities[ENTITY_TYPE_COUNT];
 
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotSquad> squads;
@@ -63,6 +59,8 @@ struct Bot {
     EntityId scout_id;
     std::vector<BotScoutInfo> scout_info;
     uint32_t last_scout_time;
+
+    ivec2 landmine_cell = ivec2(-1, -1);
 };
 
 Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
@@ -81,6 +79,7 @@ void bot_on_goal_finished(const MatchState& state, Bot& bot);
 MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
 BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
+uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
@@ -147,3 +146,4 @@ bool bot_is_base_under_attack(const MatchState& state, const Bot& bot);
 bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const Entity& infantry, const Entity& nearby_enemy);
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
 ivec2 bot_find_best_molotov_cell(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 attack_point);
+void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, ivec2 from, ivec2 to, std::vector<ivec2>* path);

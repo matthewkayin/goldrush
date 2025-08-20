@@ -44,6 +44,19 @@ struct Cell {
     uint8_t padding[2];
 };
 
+struct MapPathNode {
+    fixed cost;
+    fixed distance;
+    // The parent is the previous node stepped in the path to reach this node
+    // It should be an index in the explored list or -1 if it is the start node
+    int parent;
+    ivec2 cell;
+
+    fixed score() const {
+        return cost + distance;
+    };
+};
+
 struct Map {
     uint32_t width;
     uint32_t height;
