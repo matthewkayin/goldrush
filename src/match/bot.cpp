@@ -43,6 +43,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
 
         bot.scout_info.push_back(scout_info);
     }
+    bot.scout_enemy_has_invisible_units = false;
     bot.last_scout_time = 0;
 
     return bot;
@@ -139,30 +140,17 @@ void bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_time
 
     static uint32_t goal_counter = 0;
     if (goal_counter == 0) {
-        bot.goal = BOT_GOAL_EXPAND;
-        bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
-        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-            if (state.entities[entity_index].type == ENTITY_HALL && 
-                    state.entities[entity_index].player_id == bot.player_id &&
-                    entity_is_selectable(state.entities[entity_index])) {
-                bot.desired_entities[ENTITY_HALL]++;
-            }
-        }
-        bot.desired_entities[ENTITY_HALL]++;
+        bot.goal = BOT_GOAL_HARASS;
+        bot.desired_squad_type = BOT_SQUAD_TYPE_HARASS;
+        bot.desired_entities[ENTITY_DETECTIVE] = 2;
         goal_counter++;
         return;
-    } else if (goal_counter == 1) {
-        bot.goal = BOT_GOAL_LANDMINES;
-        bot.desired_squad_type = BOT_SQUAD_TYPE_LANDMINES;
-        bot.desired_entities[ENTITY_PYRO] = 1;
-        goal_counter++;
-        return;
-    }
+    } 
 
-    bot.goal = BOT_GOAL_HARASS;
-    bot.desired_squad_type = BOT_SQUAD_TYPE_HARASS;
+    bot.goal = BOT_GOAL_BUNKER;
+    bot.desired_squad_type = BOT_SQUAD_TYPE_BUNKER;
     bot.desired_entities[ENTITY_COWBOY] = 4;
-    bot.desired_entities[ENTITY_BANDIT] = 4;
+    bot.desired_entities[ENTITY_BUNKER] = 1;
 }
 
 bool bot_goal_should_be_abandoned(const MatchState& state, const Bot& bot) {
@@ -594,6 +582,17 @@ uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
         return UPGRADE_LANDMINES;
     }
 
+    EntityId detective_id = bot_find_entity((BotFindEntityParams) {
+        .state = state,
+        .filter = [&bot](const Entity& entity, EntityId entity_id) {
+            return entity.type == ENTITY_DETECTIVE &&
+                    entity.player_id == bot.player_id;
+        }
+    });
+    if (detective_id != ID_NULL) {
+        return UPGRADE_STAKEOUT;
+    }
+
     return 0;
 }
 
@@ -973,6 +972,40 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             return input;
         }
 
+        // If this unit is a detective, then activate camo
+        if (unit.type == ENTITY_DETECTIVE && !entity_check_flag(unit, ENTITY_FLAG_INVISIBLE)) {
+            if (unit.energy < CAMO_ENERGY_COST) {
+                squad.entities[squad_entity_index] = squad.entities[squad.entities.size() - 1];
+                squad.entities.pop_back();
+                bot_release_entity(bot, unit_id);
+                return bot_return_entity_to_nearest_hall(state, bot, unit_id);
+            }
+
+            MatchInput input;
+            input.type = MATCH_INPUT_CAMO;
+            input.camo.unit_count = 1;
+            input.camo.unit_ids[0] = unit_id;
+
+            // Seee if there are any other un-cloaked detectives in the squad
+            for (EntityId other_id : squad.entities) {
+                if (other_id == unit_id) {
+                    continue;
+                }
+                const Entity& other = state.entities.get_by_id(other_id);
+                if (other.type == ENTITY_DETECTIVE && 
+                        !entity_check_flag(other, ENTITY_FLAG_INVISIBLE) && 
+                        other.energy >= CAMO_ENERGY_COST) {
+                    input.camo.unit_ids[input.camo.unit_count] = other_id;
+                    input.camo.unit_count++;
+                    if (input.camo.unit_count == SELECTION_LIMIT) {
+                        break;
+                    }
+                }
+            }
+
+            return input;
+        }
+
         // Skip this infantry if it's already attacking something
         if (bot_is_unit_already_attacking_nearby_target(state, unit, nearby_enemy)) {
             continue;
@@ -1130,8 +1163,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 bot_squad_dissolve(state, bot, squad);
                 return (MatchInput) { .type = MATCH_INPUT_NONE };
             }
-
-            bot.landmine_cell = path[path_index];
 
             MatchInput landmine_input;
             landmine_input.type = MATCH_INPUT_BUILD;
@@ -1381,6 +1412,22 @@ void bot_scout_update(const MatchState& state, Bot& bot) {
         if (scout_index == INDEX_INVALID) {
             bot_release_entity(bot, bot.scout_id);
             bot.scout_id = ID_NULL;
+        }
+    }
+
+    // Check for invisible units
+    for (const Entity& entity : state.entities) {
+        if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
+            continue;
+        }
+        if (entity.type == ENTITY_SHERIFFS || entity.type == ENTITY_PYRO) {
+            bot.scout_enemy_has_invisible_units = true;
+            break;
+        }
+        if ((entity.type == ENTITY_LANDMINE || entity.type == ENTITY_DETECTIVE) &&
+                match_is_entity_visible_to_player(state, entity, bot.player_id)) {
+            bot.scout_enemy_has_invisible_units = true;
+            break;
         }
     }
 }

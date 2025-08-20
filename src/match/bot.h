@@ -59,8 +59,7 @@ struct Bot {
     EntityId scout_id;
     std::vector<BotScoutInfo> scout_info;
     uint32_t last_scout_time;
-
-    ivec2 landmine_cell = ivec2(-1, -1);
+    bool scout_enemy_has_invisible_units;
 };
 
 Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
