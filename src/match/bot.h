@@ -6,16 +6,10 @@
 #include <unordered_map>
 
 enum BotStrategy {
-    BOT_STRATEGY_SALOON_CORE
-};
-
-enum BotGoal {
-    BOT_GOAL_NONE,
-    BOT_GOAL_RUSH,
-    BOT_GOAL_EXPAND,
-    BOT_GOAL_BUNKER,
-    BOT_GOAL_LANDMINES,
-    BOT_GOAL_HARASS
+    BOT_STRATEGY_OPENER_BANDIT_RUSH,
+    BOT_STRATEGY_OPENER_FAST_EXPAND,
+    BOT_STRATEGY_OPENER_SAFE_EXPAND,
+    BOT_STRATEGY_SALOON_HARASS
 };
 
 struct BotDesiredEntities {
@@ -49,7 +43,6 @@ struct Bot {
     int32_t lcg_seed;
 
     BotStrategy strategy;
-    BotGoal goal;
     BotSquadType desired_squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
 
@@ -67,9 +60,11 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 // Strategy
 
-void bot_clear_goal(Bot& bot);
-void bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
-bool bot_goal_should_be_abandoned(const MatchState& state, const Bot& bot);
+void bot_strategy_update(const MatchState& state, Bot& bot);
+void bot_clear_desired_entities(Bot& bot);
+void bot_choose_next_goal(const MatchState& state, Bot& bot);
+void bot_set_goal_expand(const MatchState& state, Bot& bot);
+bool bot_is_goal_empty(const Bot& bot);
 bool bot_is_goal_met(const MatchState& state, const Bot& bot);
 void bot_on_goal_finished(const MatchState& state, Bot& bot);
 
@@ -94,6 +89,7 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 
 // Squads
 
+void bot_squad_create_from_desired_entities(const MatchState& state, Bot& bot);
 void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
 

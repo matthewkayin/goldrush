@@ -1326,8 +1326,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 .x = target.cell.x, .y = target.cell.y,
                                 .w = target_data.cell_size, .h = target_data.cell_size
                             };
+                            // Min range is ignored when the target is in the sky
+                            // Min range is also ignored when the attacking entity is garrisoned
                             bool attack_with_bayonets = false;
-                            if (Rect::euclidean_distance_squared_between(entity_rect, target_rect) < entity_data.unit_data.min_range_squared && target_data.cell_layer != CELL_LAYER_SKY) {
+                            if (entity.garrison_id == ID_NULL && 
+                                        target_data.cell_layer != CELL_LAYER_SKY &&
+                                        Rect::euclidean_distance_squared_between(entity_rect, target_rect) < 
+                                        entity_data.unit_data.min_range_squared) {
                                 if (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
                                     attack_with_bayonets = true;
                                 } else {
