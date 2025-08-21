@@ -411,6 +411,10 @@ void match_ui_handle_input(MatchUiState& state) {
                             state.input_queue.push_back(input);
                             break;
                         }
+                        case INPUT_HOTKEY_REPAIR: {
+                            state.mode = MATCH_UI_MODE_TARGET_REPAIR;
+                            break;
+                        }
                         case INPUT_HOTKEY_UNLOAD: {
                             if (entity_is_unit(state.match.entities.get_by_id(state.selection[0]).type)) {
                                 state.mode = MATCH_UI_MODE_TARGET_UNLOAD;
