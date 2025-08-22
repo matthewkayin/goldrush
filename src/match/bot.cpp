@@ -19,7 +19,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot.lcg_seed = lcg_seed;
 
     bot.strategy = (BotStrategy)(lcg_rand(&bot.lcg_seed) % 3);
-    bot.strategy = BOT_STRATEGY_OPENER_BANDIT_RUSH;
+    bot.strategy = BOT_STRATEGY_OPENER_SAFE_EXPAND;
     bot_clear_desired_entities(bot);
 
     bot.scout_id = ID_NULL;
@@ -192,9 +192,9 @@ void bot_choose_next_goal(const MatchState& state, Bot& bot) {
             return;
         }
         case BOT_STRATEGY_SALOON_HARASS: {
-            bot.desired_squad_type = BOT_SQUAD_TYPE_HARASS;
-            bot.desired_entities[ENTITY_COWBOY] = 4;
-            bot.desired_entities[ENTITY_BANDIT] = 4;
+            bot.desired_squad_type = BOT_SQUAD_TYPE_PUSH;
+            bot.desired_entities[ENTITY_COWBOY] = 16;
+            bot.desired_entities[ENTITY_BANDIT] = 16;
             break;
         }
     }
@@ -936,6 +936,8 @@ void bot_squad_create_from_desired_entities(const MatchState& state, Bot& bot) {
     }
     GOLD_ASSERT(squad.target_cell.x != -1);
 
+    squad.starting_entity_count = squad.entities.size();
+
     // This is done here in case we abandon squad creation
     log_trace("BOT: -- creating squad with type %u --", squad.type);
     for (EntityId entity_id : squad.entities) {
@@ -971,6 +973,58 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
     if (squad.entities.empty()) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Retreat
+    if (squad.type == BOT_SQUAD_TYPE_PUSH && squad.entities.size() < squad.starting_entity_count / 2) {
+        // Find the nearest base to retreat to
+        EntityId nearest_allied_hall_id = bot_find_best_entity((BotFindBestEntityParams) {
+            .state = state,
+            .filter = [&bot](const Entity& hall, EntityId hall_id) {
+                return hall.type == ENTITY_HALL && entity_is_selectable(hall) &&
+                        hall.player_id == bot.player_id;
+            },
+            .compare = bot_closest_manhattan_distance_to(squad.target_cell)
+        });
+
+        // If there is no nearby base, just dissolve the army
+        if (nearest_allied_hall_id == ID_NULL) {
+            bot_squad_dissolve(state, bot, squad);
+            return (MatchInput) { .type = MATCH_INPUT_NONE };
+        }
+
+        // To determine the retreat_cell, first path to the nearby base
+        std::vector<ivec2> path;
+        ivec2 hall_cell = state.entities.get_by_id(nearest_allied_hall_id).cell;
+        map_pathfind(state.map, CELL_LAYER_GROUND, squad.target_cell, hall_cell, 1, &path, MAP_IGNORE_UNITS);
+
+        // Then walk backwards on the path a little so that the units do not end up right up against the town hall
+        int path_index = path.size() - 1;
+        while (path_index >= 0 && ivec2::manhattan_distance(path[path_index], hall_cell) < BOT_SQUAD_GATHER_DISTANCE) {
+            path_index--;
+        }
+        ivec2 retreat_cell = path_index < 0 ? hall_cell : path[path_index];
+
+        // Build out the input
+        MatchInput retreat_input;
+        retreat_input.type = MATCH_INPUT_MOVE_CELL;
+        retreat_input.move.shift_command = 0;
+        retreat_input.move.target_id = ID_NULL;
+        retreat_input.move.target_cell = retreat_cell;
+        retreat_input.move.entity_count = 0;
+
+        // Find entities to order to retreat
+        while (!squad.entities.empty()) {
+            retreat_input.move.entity_ids[retreat_input.move.entity_count] = squad.entities.back();
+            retreat_input.move.entity_count++;
+            squad.entities.pop_back();
+
+            if (retreat_input.move.entity_count == SELECTION_LIMIT) {
+                break;
+            }
+        }
+
+        return retreat_input;
     }
 
     // Attack micro

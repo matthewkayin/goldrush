@@ -222,9 +222,8 @@ int gold_main(int argc, char** argv) {
     log_info("base path %s", SDL_GetBasePath());
 
     bool is_running = true;
-    bool render_debug_info = false;
-    #ifdef GOLD_DEBUG_TURBO
-        render_debug_info = true;
+    #ifdef GOLD_DEBUG
+        bool render_debug_info = true;
     #endif
     const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
     uint64_t last_time = SDL_GetTicksNS();
@@ -283,9 +282,11 @@ int gold_main(int argc, char** argv) {
                 break;
             }
 
-            if (input_is_action_just_pressed(INPUT_ACTION_F3)) {
-                render_debug_info = !render_debug_info;
-            }
+            #ifdef GOLD_DEBUG
+                if (input_is_action_just_pressed(INPUT_ACTION_F3)) {
+                    render_debug_info = !render_debug_info;
+                }
+            #endif
 
             network_service();
             NetworkEvent event;
@@ -425,19 +426,40 @@ int gold_main(int argc, char** argv) {
             }
         }
 
-        if (render_debug_info) {
-            char fps_text[32];
-            sprintf(fps_text, "FPS: %u", fps);
-            render_text(FONT_HACK_WHITE, fps_text, ivec2(0, 0));
+        #ifdef GOLD_DEBUG
+            if (render_debug_info) {
+                int render_y = state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY ? 20 : 0;
 
-            #ifdef GOLD_DEBUG_TURBO
-                char turbo_text[32];
-                sprintf(turbo_text, "Playback Speed x%llu", playback_speed);
-                render_text(FONT_HACK_WHITE, turbo_text, ivec2(0, 10));
-            #endif
+                char fps_text[32];
+                sprintf(fps_text, "FPS: %u", fps);
+                render_text(FONT_HACK_WHITE, fps_text, ivec2(0, render_y));
+                render_y += 10;
 
-            render_sprite_batch();
-        }
+                #ifdef GOLD_DEBUG_TURBO
+                    char turbo_text[32];
+                    sprintf(turbo_text, "Playback Speed x%llu", playback_speed);
+                    render_text(FONT_HACK_WHITE, turbo_text, ivec2(0, render_y));
+                    render_y += 10;
+                #endif
+
+                if (state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) {
+                    ivec2 mouse_world_pos = input_get_mouse_position() + state.match.camera_offset;
+                    for (uint32_t entity_index = 0; entity_index < state.match.match.entities.size(); entity_index++) {
+                        const Entity& entity = state.match.match.entities[entity_index];
+                        Rect entity_rect = entity_get_rect(entity);
+                        if (entity_rect.has_point(mouse_world_pos)) {
+                            char text[256];
+                            sprintf(text, "ID %u Name %s", state.match.match.entities.get_id_of(entity_index), entity_get_data(entity.type).name);
+                            render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
+                            render_y += 10;
+                            break;
+                        }
+                    }
+                }
+
+                render_sprite_batch();
+            }
+        #endif
 
         render_present_frame();
     }

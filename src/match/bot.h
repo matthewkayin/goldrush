@@ -35,6 +35,7 @@ struct BotSquad {
     BotSquadType type;
     std::vector<EntityId> entities;
     ivec2 target_cell;
+    uint32_t starting_entity_count;
 };
 
 
