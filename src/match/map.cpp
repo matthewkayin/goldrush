@@ -1137,7 +1137,8 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
             // Pop the smallest path
             MapPathNode smallest = frontier[smallest_index];
-            frontier.erase(frontier.begin() + smallest_index);
+            frontier[smallest_index] = frontier.back();
+            frontier.pop_back();
 
             // If it's the solution, return it
             if (!map_is_cell_rect_occupied(map, layer, smallest.cell, cell_size, from, ignore)) {
