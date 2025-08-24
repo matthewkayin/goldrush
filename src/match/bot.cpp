@@ -23,6 +23,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot_clear_desired_entities(bot);
 
     bot.scout_id = ID_NULL;
+    bot.last_scout_time = 0;
     bot.is_requesting_new_scout = false;
     bot.scout_enemy_has_invisible_units = false;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -753,63 +754,6 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
     return input;
 }
 
-MatchInput bot_unit_flee(const MatchState& state, Bot& bot, EntityId entity_id) {
-    static const int FLEE_CELL_DISTANCE = 32;
-
-    const Entity& entity = state.entities.get_by_id(entity_id);
-    ivec2 flee_cells[DIRECTION_COUNT];
-    int flee_cell_scores[DIRECTION_COUNT];
-    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-        flee_cells[direction] = map_clamp_cell(state.map, entity.cell + (DIRECTION_IVEC2[direction] * FLEE_CELL_DISTANCE));
-        flee_cell_scores[direction] = 0;
-    }
-
-    for (const Entity& enemy : state.entities) {
-        if (!entity_is_selectable(enemy) ||
-                enemy.type == ENTITY_GOLDMINE ||
-                state.players[enemy.player_id].team == state.players[entity.player_id].team) {
-            continue;
-        }
-
-        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-            if (ivec2::manhattan_distance(enemy.cell, flee_cells[direction]) < FLEE_CELL_DISTANCE) {
-                flee_cell_scores[direction]++;
-            }
-        }
-    }
-
-    // Negatively weight flee cells that are close to the edges of the map
-    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-        ivec2 distance_from_center = ivec2(
-            flee_cells[direction].x < state.map.width / 2
-                ? (state.map.width / 2) - flee_cells[direction].x
-                : flee_cells[direction].x - (state.map.width / 2),
-            flee_cells[direction].y < state.map.height / 2
-                ? (state.map.height / 2) - flee_cells[direction].y
-                : flee_cells[direction].y - (state.map.height / 2)
-        );
-        // The dividor can be adjusted here to make the weight bigger or smaller
-        ivec2 negative_weights = distance_from_center / FLEE_CELL_DISTANCE;
-        flee_cell_scores[direction] -= negative_weights.x + negative_weights.y;
-    }
-
-    int safest_direction = -1;
-    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-        if (safest_direction == -1 || flee_cell_scores[direction] < flee_cell_scores[safest_direction]) {
-            safest_direction = direction;
-        }
-    }
-
-    MatchInput input;
-    input.type = MATCH_INPUT_MOVE_CELL;
-    input.move.shift_command = 0;
-    input.move.target_id = ID_NULL;
-    input.move.target_cell = flee_cells[safest_direction];
-    input.move.entity_ids[0] = entity_id;
-    input.move.entity_count = 1;
-    return input;
-}
-
 // Entity management
 
 bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id) {
@@ -1505,34 +1449,46 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 void bot_scout_update(const MatchState& state, Bot& bot) {
     // Scout goal update, done before scout death check because bot_release_scout
     // will clear the scout goal
-    if (bot.scout_goal == BOT_SCOUT_GOAL_OPENERS) {
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (!state.players[player_id].active ||
-                    state.players[player_id].team == state.players[bot.player_id].team ||
-                    bot.scout_opponent_strategy[player_id] != BOT_SCOUT_OPPONENT_STRATEGY_UNKNOWN) {
-                continue;
-            }
+    uint32_t player_entity_counts[MAX_PLAYERS][ENTITY_TYPE_COUNT];
+    memset(player_entity_counts, 0, sizeof(player_entity_counts));
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
 
-            uint32_t scouted_entity_count[ENTITY_TYPE_COUNT];
-            memset(scouted_entity_count, 0, sizeof(scouted_entity_count));
-            for (uint32_t building_index = 0; building_index < state.entities.size(); building_index++) {
-                const Entity& building = state.entities[building_index];
-                EntityId building_id = state.entities.get_id_of(building_index);
+        // Ignore goldmines and un-selectables
+        if (entity.type == ENTITY_GOLDMINE || 
+                !entity_is_selectable(entity)) {
+            continue;
+        }
+        // Ignore allied units
+        if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
+            continue;
+        }
+        // Ignore units we can't see
+        if (entity_is_unit(entity.type) && !match_is_entity_visible_to_player(state, entity, bot.player_id)) {
+            continue;
+        }
+        // Ignore buildings we haven't scouted
+        if (entity_is_building(entity.type) && !bot_has_scouted_entity(state, bot, entity, entity_id)) {
+            continue;
+        }
 
-                if (!entity_is_building(building.type) ||
-                        building.player_id != player_id ||
-                        building.type == ENTITY_LANDMINE ||
-                        !entity_is_selectable(building) ||
-                        !bot_has_scouted_entity(state, bot, building, building_id)) {
-                    continue;
-                }
+        player_entity_counts[entity.player_id][entity.type]++;
+    }
 
-                scouted_entity_count[building.type]++;
-            }
+    // Determine opponent strategies based on entity counts
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        // For each active opponent
+        if (!state.players[player_id].active ||
+                state.players[player_id].team == state.players[bot.player_id].team) {
+            continue;
+        }
 
-            if (scouted_entity_count[ENTITY_SALOON] > 0) {
+        // TODO: maybe base this judgement off of match_time_minutes once we have other strats?
+        if (bot.scout_opponent_strategy[player_id] == BOT_SCOUT_OPPONENT_STRATEGY_UNKNOWN) {
+            if (player_entity_counts[player_id][ENTITY_SALOON] > 0) {
                 bot.scout_opponent_strategy[player_id] = BOT_SCOUT_OPPONENT_STRATEGY_OPENER_SALOON_FIRST;
-            } else if (scouted_entity_count[ENTITY_HALL] > 1) {
+            } else if (player_entity_counts[player_id][ENTITY_HALL] > 1) {
                 bot.scout_opponent_strategy[player_id] = BOT_SCOUT_OPPONENT_STRATEGY_OPENER_EXPAND_FIRST;
             }
         }
@@ -1567,8 +1523,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
     // If we have no scout, it means we're not scouting
     if (bot.scout_id == ID_NULL) {
         // Determine if we should begin scouting
-        bot.scout_goal = bot_scout_get_goal(state, bot);
-        if (bot.scout_goal == BOT_SCOUT_GOAL_NONE) {
+        if (!bot_should_scout(state, bot, match_time_minutes)) {
             bot.is_requesting_new_scout = false;
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
@@ -1600,70 +1555,36 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
 
     // If we are taking damage, flee 
     if (scout.taking_damage_timer != 0) {
-        return bot_unit_flee(state, bot, bot.scout_id);
+        return bot_scout_finish(state, bot, match_time_minutes);
     }
 
-    switch (bot.scout_goal) {
-        case BOT_SCOUT_GOAL_GOLDMINES: {
-            EntityId nearest_unscouted_goldmine_id = bot_find_best_entity((BotFindBestEntityParams) {
-                .state = state,
-                .filter = [&state, &bot](const Entity& goldmine, EntityId goldmine_id) {
-                    return goldmine.type == ENTITY_GOLDMINE && !bot_has_scouted_entity(state, bot, goldmine, goldmine_id);
-                },
-                .compare = bot_closest_manhattan_distance_to(scout.cell)
-            });
-            if (nearest_unscouted_goldmine_id == ID_NULL) {
-                return bot_scout_finish(state, bot);
+    EntityId unscouted_entity_id = bot_find_best_entity((BotFindBestEntityParams) {
+        .state = state,
+        .filter = [&state, &bot](const Entity& entity, EntityId entity_id) {
+            if (entity_is_unit(entity.type) || entity.type == ENTITY_LANDMINE) {
+                return false;
             }
+            return !bot_has_scouted_entity(state, bot, entity, entity_id);
+        },
+        .compare = bot_closest_manhattan_distance_to(scout.cell)
+    });
 
-            return bot_scout_move_to_entity(bot, scout, nearest_unscouted_goldmine_id);
-        }
-        case BOT_SCOUT_GOAL_OPENERS: {
-            uint8_t unscouted_opponent_player_id = PLAYER_NONE;
-            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (state.players[player_id].active && 
-                        state.players[player_id].team != state.players[bot.player_id].team &&
-                        bot.scout_opponent_strategy[player_id] == BOT_SCOUT_OPPONENT_STRATEGY_UNKNOWN) {
-                    unscouted_opponent_player_id = player_id;
-                    break;
-                }
-            }
-            if (unscouted_opponent_player_id == PLAYER_NONE) {
-                return bot_scout_finish(state, bot);
-            }
-
-            EntityId nearest_unscouted_opponent_building_id = bot_find_best_entity((BotFindBestEntityParams) {
-                .state = state,
-                .filter = [&state, &bot](const Entity& building, EntityId building_id) {
-                    return entity_is_building(building.type) &&
-                            building.type != ENTITY_LANDMINE &&
-                            state.players[building.player_id].team != 
-                                state.players[bot.player_id].team &&
-                            entity_is_selectable(building) &&
-                            !bot_has_scouted_entity(state, bot, building, building_id);
-                },
-                .compare = bot_closest_manhattan_distance_to(scout.cell)
-            });
-            if (nearest_unscouted_opponent_building_id == ID_NULL) {
-                log_warn("BOT: hasn't finished opponent strategy scout, yet no unscouted building exists.");
-                return (MatchInput) { .type = MATCH_INPUT_NONE };
-            }
-
-            if (scout.target.type == TARGET_ENTITY && scout.target.id == nearest_unscouted_opponent_building_id) {
-                return (MatchInput) { .type = MATCH_INPUT_NONE };
-            }
-
-            return bot_scout_move_to_entity(bot, scout, nearest_unscouted_opponent_building_id);
-
-            break;
-        }
-        case BOT_SCOUT_GOAL_NONE: {
-            GOLD_ASSERT(false);
-            break;
-        }
+    if (unscouted_entity_id == ID_NULL) {
+        return bot_scout_finish(state, bot, match_time_minutes);
     }
 
-    return (MatchInput) { .type = MATCH_INPUT_NONE };
+    if (scout.target.type == TARGET_ENTITY && scout.target.id == unscouted_entity_id) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_ENTITY;
+    input.move.shift_command = 0;
+    input.move.target_id = unscouted_entity_id;
+    input.move.target_cell = ivec2(0, 0);
+    input.move.entity_ids[0] = bot.scout_id;
+    input.move.entity_count = 1;
+    return input;
 }
 
 void bot_release_scout(Bot& bot) {
@@ -1674,31 +1595,16 @@ void bot_release_scout(Bot& bot) {
         bot_release_entity(bot, bot.scout_id);
     }
     bot.scout_id = ID_NULL;
-    bot.scout_goal = BOT_SCOUT_GOAL_NONE;
 }
 
-MatchInput bot_scout_finish(const MatchState& state, Bot& bot) {
+MatchInput bot_scout_finish(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
     MatchInput input = bot_return_entity_to_nearest_hall(state, bot, bot.scout_id);
     bot_release_scout(bot);
+    bot.last_scout_time = match_time_minutes;
     return input;
 }
 
-MatchInput bot_scout_move_to_entity(Bot& bot, const Entity& scout, EntityId entity_id) {
-    if (scout.target.type == TARGET_ENTITY && scout.target.id == entity_id) {
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
-    }
-
-    MatchInput input;
-    input.type = MATCH_INPUT_MOVE_ENTITY;
-    input.move.shift_command = 0;
-    input.move.target_id = entity_id;
-    input.move.target_cell = ivec2(0, 0);
-    input.move.entity_ids[0] = bot.scout_id;
-    input.move.entity_count = 1;
-    return input;
-}
-
-BotScoutGoal bot_scout_get_goal(const MatchState& state, const Bot& bot) {
+bool bot_should_scout(const MatchState& state, const Bot& bot, uint32_t match_time_minutes) {
     EntityId unscouted_goldmine_id = bot_find_entity((BotFindEntityParams) {
         .state = state,
         .filter = [&state, &bot](const Entity& goldmine, EntityId goldmine_id) {
@@ -1706,18 +1612,23 @@ BotScoutGoal bot_scout_get_goal(const MatchState& state, const Bot& bot) {
         }
     });
     if (unscouted_goldmine_id != ID_NULL) {
-        return BOT_SCOUT_GOAL_GOLDMINES;
+        return true;
     }
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state.players[player_id].active &&
                 state.players[player_id].team != state.players[bot.player_id].team &&
                 bot.scout_opponent_strategy[player_id] == BOT_SCOUT_OPPONENT_STRATEGY_UNKNOWN) {
-            return BOT_SCOUT_GOAL_OPENERS;
+            return true;
         }
     }
 
-    return BOT_SCOUT_GOAL_NONE;
+    if ( match_time_minutes > bot.last_scout_time && 
+            match_time_minutes - bot.last_scout_time >= 5) {
+        return true;
+    }
+
+    return false;
 }
 
 int bot_score_scout_type(EntityType type) {
@@ -1770,7 +1681,7 @@ EntityId bot_find_best_entity(BotFindBestEntityParams params) {
 }
 
 std::function<bool(const Entity&, const Entity&)> bot_closest_manhattan_distance_to(ivec2 p_cell) {
-    // We have to copy the variable because the lambda is passing a reference, but p_cell is itself just a reference to the actual variable
+    // We have to copy the variable because the parameter gets popped from the stack before the lambda is called
     ivec2 cell = p_cell;
     return [&cell](const Entity& a, const Entity& b) {
         return ivec2::manhattan_distance(a.cell, cell) < ivec2::manhattan_distance(b.cell, cell);

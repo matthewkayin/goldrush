@@ -17,12 +17,6 @@ struct BotDesiredEntities {
     EntityType building;
 };
 
-enum BotScoutGoal {
-    BOT_SCOUT_GOAL_NONE,
-    BOT_SCOUT_GOAL_GOLDMINES,
-    BOT_SCOUT_GOAL_OPENERS
-};
-
 enum BotScoutOpponentStrategy {
     BOT_SCOUT_OPPONENT_STRATEGY_UNKNOWN,
     BOT_SCOUT_OPPONENT_STRATEGY_OPENER_EXPAND_FIRST,
@@ -57,7 +51,7 @@ struct Bot {
 
     EntityId scout_id;
     bool is_requesting_new_scout;
-    BotScoutGoal scout_goal;
+    uint32_t last_scout_time;
     BotScoutOpponentStrategy scout_opponent_strategy[MAX_PLAYERS];
     bool scout_enemy_has_invisible_units;
 };
@@ -86,7 +80,6 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
-MatchInput bot_unit_flee(const MatchState& state, Bot& bot, EntityId entity_id);
 
 // Entity management
 
@@ -105,9 +98,8 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
 void bot_scout_update(const MatchState& state, Bot& bot);
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 void bot_release_scout(Bot& bot);
-MatchInput bot_scout_finish(const MatchState& state, Bot& bot);
-MatchInput bot_scout_move_to_entity(Bot& bot, const Entity& scout, EntityId entity_id);
-BotScoutGoal bot_scout_get_goal(const MatchState& state, const Bot& bot);
+MatchInput bot_scout_finish(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
+bool bot_should_scout(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
 int bot_score_scout_type(EntityType type);
 
 // Helpers
