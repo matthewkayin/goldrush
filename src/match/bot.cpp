@@ -1571,28 +1571,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
 
-        // Find a scout
-        bot.scout_id = bot_find_best_entity((BotFindBestEntityParams) {
-            .state = state, 
-            .filter = [&bot](const Entity& entity, EntityId entity_id) {
-                return entity.player_id == bot.player_id && 
-                    bot_score_scout_type(entity.type) != 0 &&
-                    entity.garrisoned_units.empty() && 
-                    !bot_is_entity_reserved(bot, entity_id);
-            },
-            .compare = [](const Entity&a, const Entity& b) {
-                return bot_score_scout_type(a.type) > bot_score_scout_type(b.type);
-            }
-        });
-        if (bot.scout_id == ID_NULL) {
-            bot.is_requesting_new_scout = true;
-            return (MatchInput) { .type = MATCH_INPUT_NONE };
-        }
-        if (bot.strategy != BOT_STRATEGY_OPENER_BANDIT_RUSH) {
-            bot_reserve_entity(bot, bot.scout_id);
-        }
-        bot.is_requesting_new_scout = false;
-
         // Determine entities to scout
         bot.entities_to_scout.clear();
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -1610,6 +1588,11 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
                 continue;
             }
 
+            // Filter out houses and landmines
+            if (entity.type == ENTITY_HOUSE || entity.type == ENTITY_LANDMINE) {
+                continue;
+            }
+
             // Filter out things we've already scouted
             if (bot_has_scouted_entity(state, bot, entity, entity_id)) {
                 continue;
@@ -1617,6 +1600,29 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
 
             bot.entities_to_scout.push_back(entity_id);
         }
+        if (bot.entities_to_scout.empty()) {
+            bot.is_requesting_new_scout = false;
+            return (MatchInput) { .type = MATCH_INPUT_NONE };
+        }
+
+        // Find a scout
+        bot.scout_id = bot_find_best_entity((BotFindBestEntityParams) {
+            .state = state, 
+            .filter = [&bot](const Entity& entity, EntityId entity_id) {
+                return entity.player_id == bot.player_id && 
+                    bot_score_scout_type(entity.type) != 0 &&
+                    entity.garrisoned_units.empty() && 
+                    !bot_is_entity_reserved(bot, entity_id);
+            },
+            .compare = [](const Entity&a, const Entity& b) {
+                return bot_score_scout_type(a.type) > bot_score_scout_type(b.type);
+            }
+        });
+        if (bot.scout_id == ID_NULL) {
+            bot.is_requesting_new_scout = true;
+            return (MatchInput) { .type = MATCH_INPUT_NONE };
+        }
+        bot.is_requesting_new_scout = false;
     }
 
     const Entity& scout = state.entities.get_by_id(bot.scout_id);
@@ -2317,6 +2323,9 @@ ivec2 bot_get_squad_attack_point(const MatchState& state, const Bot& bot, const 
             if (a.type == ENTITY_HALL && b.type != ENTITY_HALL) {
                 return true;
             }
+            if (a.type != ENTITY_HALL && b.type == ENTITY_HALL) {
+                return false;
+            }
             return ivec2::manhattan_distance(a.cell, center_point) <
                     ivec2::manhattan_distance(b.cell, center_point);
         }
@@ -2373,7 +2382,7 @@ ivec2 bot_get_squad_attack_point(const MatchState& state, const Bot& bot, const 
         }
 
         GOLD_ASSERT(nearest_hall_index != INDEX_INVALID);
-        uint32_t entity_defense_value = entity.type == ENTITY_BUNKER ? 2 : 1;
+        uint32_t entity_defense_value = entity.type == ENTITY_BUNKER ? 4 : 1;
         enemy_hall_defense_score[nearest_hall_index] += entity_defense_value;
     }
 
