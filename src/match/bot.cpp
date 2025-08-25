@@ -26,6 +26,11 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot.last_scout_time = 0;
     bot.is_requesting_new_scout = false;
     bot.scout_enemy_has_invisible_units = false;
+    for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
+        if (state.entities[goldmine_index].type == ENTITY_GOLDMINE) {
+            bot.should_scout_goldmine[goldmine_index] = false;
+        }
+    }
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         bot.scout_opponent_strategy[player_id] = BOT_SCOUT_OPPONENT_STRATEGY_UNKNOWN;
     }
@@ -748,6 +753,44 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
     input.type = MATCH_INPUT_MOVE_CELL;
     input.move.shift_command = 0;
     input.move.target_cell = target_cell;
+    input.move.target_id = ID_NULL;
+    input.move.entity_ids[0] = entity_id;
+    input.move.entity_count = 1;
+    return input;
+}
+
+MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id) {
+    const Entity& entity = state.entities.get_by_id(entity_id);
+
+    EntityId nearest_hall_id = bot_find_best_entity((BotFindBestEntityParams) {
+        .state = state,
+        .filter = [&bot](const Entity& hall, EntityId hall_id) {
+            return hall.type == ENTITY_HALL &&
+                entity_is_selectable(hall) &&
+                hall.player_id == bot.player_id;
+        },
+        .compare = bot_closest_manhattan_distance_to(entity.cell)
+    });
+
+    if (nearest_hall_id == ID_NULL) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    int entity_size = entity_get_data(entity.type).cell_size;
+    ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_IGNORE_UNITS);
+
+    std::vector<ivec2> path_to_hall;
+    map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, target_cell, entity_size, &path_to_hall, MAP_IGNORE_UNITS);
+
+    static const int FLEE_DISTANCE = 16;
+    if (path_to_hall.size() < FLEE_DISTANCE) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_CELL;
+    input.move.shift_command = 0;
+    input.move.target_cell = path_to_hall[FLEE_DISTANCE];
     input.move.target_id = ID_NULL;
     input.move.entity_ids[0] = entity_id;
     input.move.entity_count = 1;
@@ -1549,29 +1592,102 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
             bot_reserve_entity(bot, bot.scout_id);
         }
         bot.is_requesting_new_scout = false;
+
+        // Determine entities to scout
+        bot.entities_to_scout.clear();
+        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+            const Entity& entity = state.entities[entity_index];
+            EntityId entity_id = state.entities.get_id_of(entity_index);
+
+            // Filter out units
+            if (entity_is_unit(entity.type)) {
+                continue;
+            }
+
+            // Filter out allied buildings
+            if (entity_is_building(entity.type) &&
+                    state.players[entity.player_id].team == state.players[bot.player_id].team) {
+                continue;
+            }
+
+            // Filter out things we've already scouted
+            if (bot_has_scouted_entity(state, bot, entity, entity_id)) {
+                continue;
+            }
+
+            bot.entities_to_scout.push_back(entity_id);
+        }
     }
 
     const Entity& scout = state.entities.get_by_id(bot.scout_id);
 
+    // Remove scouted and dead entities from to-scout list
+    {
+        uint32_t entities_to_scout_index = 0;
+        while (entities_to_scout_index < bot.entities_to_scout.size()) {
+            EntityId entity_id = bot.entities_to_scout[entities_to_scout_index];
+            uint32_t entity_index = state.entities.get_index_of(entity_id);
+            if (entity_index == INDEX_INVALID || bot_has_scouted_entity(state, bot, state.entities[entity_index], entity_id)) {
+                bot.entities_to_scout[entities_to_scout_index] = bot.entities_to_scout.back();
+                bot.entities_to_scout.pop_back();
+            } else {
+                entities_to_scout_index++;
+            }
+        }
+    }
+
+    // Finish scout
+    if (bot.entities_to_scout.empty()) {
+        MatchInput input = bot_return_entity_to_nearest_hall(state, bot, bot.scout_id);
+        bot_release_scout(bot);
+        bot.last_scout_time = match_time_minutes;
+        return input;
+    }
+
     // If we are taking damage, flee 
     if (scout.taking_damage_timer != 0) {
-        return bot_scout_finish(state, bot, match_time_minutes);
-    }
+        EntityId attacker_id = bot_find_best_entity((BotFindBestEntityParams) {
+            .state = state,
+            .filter = [&bot](const Entity& entity, EntityId entity_id) {
+                return entity_is_unit(entity.type) &&
+                        entity_is_selectable(entity) &&
+                        entity.target.type == TARGET_ATTACK_ENTITY && 
+                        entity.target.id == bot.scout_id;
+            },
+            .compare = bot_closest_manhattan_distance_to(scout.cell)
+        });
+        if (attacker_id != ID_NULL) {
+            const Entity& attacker = state.entities.get_by_id(attacker_id);
 
-    EntityId unscouted_entity_id = bot_find_best_entity((BotFindBestEntityParams) {
-        .state = state,
-        .filter = [&state, &bot](const Entity& entity, EntityId entity_id) {
-            if (entity_is_unit(entity.type) || entity.type == ENTITY_LANDMINE) {
-                return false;
+            // Give up on scouting anything close to the danger
+            uint32_t entities_to_scout_index = 0;
+            while (entities_to_scout_index < bot.entities_to_scout.size()) {
+                EntityId entity_id = bot.entities_to_scout[entities_to_scout_index];
+                ivec2 to_scout_cell = state.entities.get_by_id(entity_id).cell;
+
+                if (ivec2::manhattan_distance(to_scout_cell, attacker.cell) < BOT_SQUAD_GATHER_DISTANCE * 2) {
+                    bot.entities_to_scout[entities_to_scout_index] = bot.entities_to_scout.back();
+                    bot.entities_to_scout.pop_back();
+                } else {
+                    entities_to_scout_index++;
+                }
             }
-            return !bot_has_scouted_entity(state, bot, entity, entity_id);
-        },
-        .compare = bot_closest_manhattan_distance_to(scout.cell)
-    });
 
-    if (unscouted_entity_id == ID_NULL) {
-        return bot_scout_finish(state, bot, match_time_minutes);
+            return bot_unit_flee(state, bot, bot.scout_id);
+        }
     }
+
+    uint32_t closest_unscouted_entity_index = INDEX_INVALID;
+    for (EntityId entity_id : bot.entities_to_scout) {
+        uint32_t entity_index = state.entities.get_index_of(entity_id);
+        if (closest_unscouted_entity_index == INDEX_INVALID || 
+                ivec2::manhattan_distance(state.entities[entity_index].cell, scout.cell) <
+                ivec2::manhattan_distance(state.entities[closest_unscouted_entity_index].cell, scout.cell)) {
+            closest_unscouted_entity_index = entity_index;
+        }
+    }
+    EntityId unscouted_entity_id = state.entities.get_id_of(closest_unscouted_entity_index);
+    GOLD_ASSERT(unscouted_entity_id != ID_NULL);
 
     if (scout.target.type == TARGET_ENTITY && scout.target.id == unscouted_entity_id) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -1595,13 +1711,6 @@ void bot_release_scout(Bot& bot) {
         bot_release_entity(bot, bot.scout_id);
     }
     bot.scout_id = ID_NULL;
-}
-
-MatchInput bot_scout_finish(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
-    MatchInput input = bot_return_entity_to_nearest_hall(state, bot, bot.scout_id);
-    bot_release_scout(bot);
-    bot.last_scout_time = match_time_minutes;
-    return input;
 }
 
 bool bot_should_scout(const MatchState& state, const Bot& bot, uint32_t match_time_minutes) {
@@ -1680,10 +1789,8 @@ EntityId bot_find_best_entity(BotFindBestEntityParams params) {
     return params.state.entities.get_id_of(best_entity_index);
 }
 
-std::function<bool(const Entity&, const Entity&)> bot_closest_manhattan_distance_to(ivec2 p_cell) {
-    // We have to copy the variable because the parameter gets popped from the stack before the lambda is called
-    ivec2 cell = p_cell;
-    return [&cell](const Entity& a, const Entity& b) {
+std::function<bool(const Entity&, const Entity&)> bot_closest_manhattan_distance_to(ivec2 cell) {
+    return [cell](const Entity& a, const Entity& b) {
         return ivec2::manhattan_distance(a.cell, cell) < ivec2::manhattan_distance(b.cell, cell);
     };
 }

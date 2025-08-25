@@ -52,6 +52,8 @@ struct Bot {
     EntityId scout_id;
     bool is_requesting_new_scout;
     uint32_t last_scout_time;
+    std::vector<EntityId> entities_to_scout;
+    std::unordered_map<uint32_t, bool> should_scout_goldmine;
     BotScoutOpponentStrategy scout_opponent_strategy[MAX_PLAYERS];
     bool scout_enemy_has_invisible_units;
 };
@@ -80,6 +82,7 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
+MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
 
 // Entity management
 
@@ -98,7 +101,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
 void bot_scout_update(const MatchState& state, Bot& bot);
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 void bot_release_scout(Bot& bot);
-MatchInput bot_scout_finish(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 bool bot_should_scout(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
 int bot_score_scout_type(EntityType type);
 
