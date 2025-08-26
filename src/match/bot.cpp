@@ -987,6 +987,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
     // Attack micro
     std::vector<EntityId> unengaged_units;
+    bool is_enemy_near_squad = false;
     for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) {
         EntityId unit_id = squad.entities[squad_entity_index];
         const Entity& unit = state.entities.get_by_id(unit_id);
@@ -1028,6 +1029,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
 
         const Entity& nearby_enemy = state.entities.get_by_id(nearby_enemy_id);
+        is_enemy_near_squad = true;
 
         // If this unit is a pyro, then throw molotov
         if (unit.type == ENTITY_PYRO) {
@@ -1484,6 +1486,11 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
     }
 
+    if (distant_infantry.empty() && !is_enemy_near_squad) {
+        bot_squad_dissolve(state, bot, squad);
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
@@ -1656,7 +1663,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
             .state = state,
             .filter = [&bot](const Entity& entity, EntityId entity_id) {
                 return entity_is_unit(entity.type) &&
-                        entity_is_selectable(entity) &&
+                        entity.health != 0 &&
                         entity.target.type == TARGET_ATTACK_ENTITY && 
                         entity.target.id == bot.scout_id;
             },
