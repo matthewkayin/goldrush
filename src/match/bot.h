@@ -23,6 +23,24 @@ enum BotScoutOpponentStrategy {
     BOT_SCOUT_OPPONENT_STRATEGY_OPENER_SALOON_FIRST
 };
 
+enum BotScoutDangerType {
+    BOT_SCOUT_DANGER_TYPE_UNITS,
+    BOT_SCOUT_DANGER_TYPE_BUNKER
+};
+
+struct BotScoutDangerUnits {
+    ivec2 cell;
+    uint32_t expiration_time_minutes;
+};
+
+struct BotScoutDanger {
+    BotScoutDangerType type;
+    union {
+        BotScoutDangerUnits units;
+        EntityId bunker_id;
+    };
+};
+
 enum BotSquadType {
     BOT_SQUAD_TYPE_NONE,
     BOT_SQUAD_TYPE_HARASS,
@@ -53,6 +71,7 @@ struct Bot {
     bool is_requesting_new_scout;
     uint32_t last_scout_time;
     std::vector<EntityId> entities_to_scout;
+    std::vector<BotScoutDanger> scout_danger;
     std::unordered_map<uint32_t, bool> should_scout_goldmine;
     BotScoutOpponentStrategy scout_opponent_strategy[MAX_PLAYERS];
     bool scout_enemy_has_invisible_units;
@@ -98,11 +117,13 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
 
 // Scouting
 
-void bot_scout_update(const MatchState& state, Bot& bot);
+void bot_scout_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 void bot_release_scout(Bot& bot);
 bool bot_should_scout(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
 int bot_score_scout_type(EntityType type);
+bool bot_scout_danger_is_expired(const MatchState& state, const BotScoutDanger& danger, uint32_t match_time_mintutes);
+ivec2 bot_scout_danger_get_cell(const MatchState& state, const BotScoutDanger& danger);
 
 // Helpers
 

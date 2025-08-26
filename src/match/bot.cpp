@@ -39,7 +39,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
 }
 
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
-    bot_scout_update(state, bot);
+    bot_scout_update(state, bot, match_time_minutes);
 
     // Strategy update
     bot_strategy_update(state, bot);
@@ -1496,7 +1496,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
 // Scouting
 
-void bot_scout_update(const MatchState& state, Bot& bot) {
+void bot_scout_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
     // Scout goal update, done before scout death check because bot_release_scout
     // will clear the scout goal
     uint32_t player_entity_counts[MAX_PLAYERS][ENTITY_TYPE_COUNT];
@@ -1566,6 +1566,44 @@ void bot_scout_update(const MatchState& state, Bot& bot) {
             bot.scout_enemy_has_invisible_units = true;
             break;
         }
+    }
+
+    // Remove expired danger
+    uint32_t danger_index = 0;
+    while (danger_index < bot.scout_danger.size()) {
+        if (bot_scout_danger_is_expired(state, bot.scout_danger[danger_index], match_time_minutes)) {
+            bot.scout_danger[danger_index] = bot.scout_danger.back();
+            bot.scout_danger.pop_back();
+        } else {
+            danger_index++;
+        }
+    }
+
+    // Add bunkers to danger list
+    for (uint32_t bunker_index = 0; bunker_index < state.entities.size(); bunker_index++) {
+        const Entity& bunker = state.entities[bunker_index];
+        EntityId bunker_id = state.entities.get_id_of(bunker_index);
+        if (bunker.type != ENTITY_BUNKER ||
+                !entity_is_selectable(bunker) ||
+                state.players[bunker.player_id].team == state.players[bot.player_id].team ||
+                !bot_has_scouted_entity(state, bot, bunker, bunker_id)) {
+            continue;
+        }
+
+        bool is_bunker_already_in_danger_list = false;
+        for (const BotScoutDanger& danger : bot.scout_danger) {
+            if (danger.type == BOT_SCOUT_DANGER_TYPE_BUNKER && danger.bunker_id == bunker_id) {
+                is_bunker_already_in_danger_list = true;
+            }
+        }
+        if (is_bunker_already_in_danger_list) {
+            continue;
+        }
+
+        bot.scout_danger.push_back((BotScoutDanger) {
+            .type = BOT_SCOUT_DANGER_TYPE_BUNKER,
+            .bunker_id = bunker_id
+        });
     }
 }
 
@@ -1672,18 +1710,28 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
         if (attacker_id != ID_NULL) {
             const Entity& attacker = state.entities.get_by_id(attacker_id);
 
-            // Give up on scouting anything close to the danger
-            uint32_t entities_to_scout_index = 0;
-            while (entities_to_scout_index < bot.entities_to_scout.size()) {
-                EntityId entity_id = bot.entities_to_scout[entities_to_scout_index];
-                ivec2 to_scout_cell = state.entities.get_by_id(entity_id).cell;
-
-                if (ivec2::manhattan_distance(to_scout_cell, attacker.cell) < BOT_SQUAD_GATHER_DISTANCE * 2) {
-                    bot.entities_to_scout[entities_to_scout_index] = bot.entities_to_scout.back();
-                    bot.entities_to_scout.pop_back();
-                } else {
-                    entities_to_scout_index++;
+            // Add a danger cell
+            bool is_existing_danger_cell_nearby = false;
+            for (const BotScoutDanger& danger : bot.scout_danger) {
+                ivec2 danger_cell = bot_scout_danger_get_cell(state, danger);
+                if (ivec2::manhattan_distance(danger_cell, attacker.cell) < BOT_SQUAD_GATHER_DISTANCE) {
+                    is_existing_danger_cell_nearby = true;
+                    break;
                 }
+            }
+            if (!is_existing_danger_cell_nearby) {
+                // Danger cell is being added as type of units
+                // It's possible that the attacker is actually inside a bunker,
+                // but we should never reach this part of the code when that happens because
+                // that would mean that there is an existing bunker-type scout danger nearby
+                static const uint32_t BOT_SCOUT_DANGER_UNITS_TTL = 5;
+                bot.scout_danger.push_back((BotScoutDanger) {
+                    .type = BOT_SCOUT_DANGER_TYPE_UNITS,
+                    .units = (BotScoutDangerUnits) {
+                        .cell = attacker.cell,
+                        .expiration_time_minutes = match_time_minutes + BOT_SCOUT_DANGER_UNITS_TTL
+                    }
+                });
             }
 
             return bot_unit_flee(state, bot, bot.scout_id);
@@ -1701,6 +1749,51 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
     }
     EntityId unscouted_entity_id = state.entities.get_id_of(closest_unscouted_entity_index);
     GOLD_ASSERT(unscouted_entity_id != ID_NULL);
+
+    const Entity& unscouted_entity = state.entities.get_by_id(unscouted_entity_id);
+
+    // Check for any danger along the path
+    bool is_danger_along_path = false;
+    std::vector<ivec2> path;
+    map_pathfind(state.map, CELL_LAYER_GROUND, scout.cell, state.entities[closest_unscouted_entity_index].cell, 2, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    static const uint32_t DANGER_RADIUS = 4;
+    for (uint32_t path_index = 0; path_index < path.size(); path_index += DANGER_RADIUS) {
+        for (const BotScoutDanger& danger : bot.scout_danger) {
+            ivec2 danger_cell = bot_scout_danger_get_cell(state, danger);
+            if (ivec2::manhattan_distance(path[path_index], danger_cell) < DANGER_RADIUS * 2 &&
+                    map_get_tile(state.map, path[path_index]).elevation == map_get_tile(state.map, danger_cell).elevation) {
+                is_danger_along_path = true;
+            }
+        }
+        if (is_danger_along_path) {
+            break;
+        }
+    }
+
+    // If there is danger, abandon scouting this target
+    if (is_danger_along_path) {
+        uint32_t entities_to_scout_index = 0;
+        while (entities_to_scout_index < bot.entities_to_scout.size() &&
+                    bot.entities_to_scout[entities_to_scout_index] != unscouted_entity_id) {
+            entities_to_scout_index++;
+        }
+        GOLD_ASSERT(entities_to_scout_index < bot.entities_to_scout.size());
+
+        bot.entities_to_scout[entities_to_scout_index] = bot.entities_to_scout.back();
+        bot.entities_to_scout.pop_back();
+
+        // If we are moving towards our now-abandoned target, order the scout to stop
+        // It will get a new order on the next iteration
+        if (scout.target.type == TARGET_ENTITY && scout.target.id == unscouted_entity_id) {
+            MatchInput input;
+            input.type = MATCH_INPUT_STOP;
+            input.stop.entity_ids[0] = bot.scout_id;
+            input.stop.entity_count = 1;
+            return input;
+        } else {
+            return (MatchInput) { .type = MATCH_INPUT_NONE };
+        }
+    }
 
     if (scout.target.type == TARGET_ENTITY && scout.target.id == unscouted_entity_id) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -1765,6 +1858,29 @@ int bot_score_scout_type(EntityType type) {
             return 1;
         default:
             return 0;
+    }
+}
+
+bool bot_scout_danger_is_expired(const MatchState& state, const BotScoutDanger& danger, uint32_t match_time_mintutes) {
+    switch (danger.type) {
+        case BOT_SCOUT_DANGER_TYPE_UNITS: {
+            return match_time_mintutes >= danger.units.expiration_time_minutes;
+        }
+        case BOT_SCOUT_DANGER_TYPE_BUNKER: {
+            uint32_t bunker_index = state.entities.get_index_of(danger.bunker_id);
+            return bunker_index == INDEX_INVALID || state.entities[bunker_index].health == 0;
+        }
+    }
+}
+
+ivec2 bot_scout_danger_get_cell(const MatchState& state, const BotScoutDanger& danger) {
+    switch (danger.type) {
+        case BOT_SCOUT_DANGER_TYPE_UNITS: {
+            return danger.units.cell;
+        }
+        case BOT_SCOUT_DANGER_TYPE_BUNKER: {
+            return state.entities.get_by_id(danger.bunker_id).cell;
+        }
     }
 }
 
