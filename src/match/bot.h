@@ -53,7 +53,6 @@ struct BotSquad {
     BotSquadType type;
     std::vector<EntityId> entities;
     ivec2 target_cell;
-    uint32_t starting_entity_count;
 };
 
 struct Bot {
@@ -114,6 +113,7 @@ void bot_release_entity(Bot& bot, EntityId entity_id);
 void bot_squad_create_from_desired_entities(const MatchState& state, Bot& bot);
 void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
+bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
 // Scouting
 
