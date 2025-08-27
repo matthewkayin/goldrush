@@ -52,9 +52,10 @@ struct MatchInputBuildCancel {
 };
 
 struct MatchInputBuildingEnqueue {
-    EntityId building_id;
     uint8_t item_type;
     uint32_t item_subtype;
+    uint8_t building_count;
+    EntityId building_ids[SELECTION_LIMIT];
 };
 
 struct MatchInputBuildingDequeue {

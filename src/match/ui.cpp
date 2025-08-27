@@ -463,15 +463,7 @@ void match_ui_handle_input(MatchUiState& state) {
                         state.building_type = hotkey_info.entity_type;
                     }
                 } else if (hotkey_info.type == HOTKEY_BUTTON_TRAIN || hotkey_info.type == HOTKEY_BUTTON_RESEARCH) {
-                    // Decide which building to enqueue
-                    uint32_t selected_building_index = state.match.entities.get_index_of(state.selection[0]);
-                    for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
-                        if (state.match.entities.get_by_id(state.selection[selection_index]).queue.size() < state.match.entities[selected_building_index].queue.size()) {
-                            selected_building_index = state.match.entities.get_index_of(state.selection[selection_index]);
-                        }
-                    }
-                    const Entity& building = state.match.entities[selected_building_index];
-
+                    // Build the queue item
                     BuildingQueueItem item = hotkey_info.type == HOTKEY_BUTTON_TRAIN 
                                                 ? (BuildingQueueItem) {
                                                     .type = BUILDING_QUEUE_ITEM_UNIT,
@@ -481,8 +473,17 @@ void match_ui_handle_input(MatchUiState& state) {
                                                     .type = BUILDING_QUEUE_ITEM_UPGRADE,
                                                     .upgrade = hotkey_info.upgrade
                                                 };
-                    
-                    if (building.queue.size() == BUILDING_QUEUE_MAX) {
+
+                    // Check to make sure at least one building queue has room
+                    bool are_building_queues_full = true;
+                    for (EntityId building_id : state.selection) {
+                        const Entity& building = state.match.entities.get_by_id(building_id);
+                        if (building.queue.size() < BUILDING_QUEUE_MAX) {
+                            are_building_queues_full = false;
+                        }
+                    }
+
+                    if (are_building_queues_full) {
                         match_ui_show_status(state, MATCH_UI_STATUS_BUILDING_QUEUE_FULL);
                     } else if (state.match.players[network_get_player_id()].gold < building_queue_item_cost(item)) {
                         match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
@@ -490,16 +491,15 @@ void match_ui_handle_input(MatchUiState& state) {
                         if (match_ui_is_in_submenu(state)) {
                             state.mode = MATCH_UI_MODE_NONE;
                         }
-                        state.input_queue.push_back((MatchInput) {
-                            .type = MATCH_INPUT_BUILDING_ENQUEUE,
-                            .building_enqueue = (MatchInputBuildingEnqueue) {
-                                .building_id = state.match.entities.get_id_of(selected_building_index),
-                                .item_type = (uint8_t)item.type,
-                                .item_subtype = item.type == BUILDING_QUEUE_ITEM_UNIT 
-                                                    ? (uint32_t)item.unit_type
-                                                    : item.upgrade
-                            }
-                        });
+                        MatchInput input;
+                        input.type = MATCH_INPUT_BUILDING_ENQUEUE;
+                        input.building_enqueue.item_type = (uint8_t)item.type;
+                        input.building_enqueue.item_subtype = item.type == BUILDING_QUEUE_ITEM_UNIT
+                                                                ? (uint32_t)item.unit_type
+                                                                : item.upgrade;
+                        input.building_enqueue.building_count = (uint8_t)state.selection.size();
+                        memcpy(&input.building_enqueue.building_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
+                        state.input_queue.push_back(input);
                     }
                 } 
 

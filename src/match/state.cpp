@@ -448,7 +448,29 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
             break;
         }
         case MATCH_INPUT_BUILDING_ENQUEUE: {
-            uint32_t building_index = state.entities.get_index_of(input.building_enqueue.building_id);
+            // Choose the best building to enqueue out of the selection
+            uint32_t building_index = INDEX_INVALID;
+            for (int index = 0; index < input.building_enqueue.building_count; index++) {
+                uint32_t candidate_index = state.entities.get_index_of(input.building_enqueue.building_ids[index]);
+                if (candidate_index == INDEX_INVALID ||
+                        !entity_is_selectable(state.entities[candidate_index]) ||
+                        state.entities[candidate_index].queue.size() == BUILDING_QUEUE_MAX) {
+                    continue;
+                }
+                if (building_index == INDEX_INVALID || 
+                        state.entities[candidate_index].queue.size() < 
+                        state.entities[building_index].queue.size()) {
+                    building_index = candidate_index;
+                }
+            }
+            if (building_index == INDEX_INVALID) {
+                return;
+            }
+
+            Entity& building = state.entities[building_index];
+            GOLD_ASSERT(building.mode == MODE_BUILDING_FINISHED);
+
+            // Parse the building queue item
             BuildingQueueItem item;
             item.type = (BuildingQueueItemType)input.building_enqueue.item_type;
             switch (item.type) {
@@ -459,16 +481,9 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                     item.upgrade = input.building_enqueue.item_subtype;
                     break;
             }
-            if (building_index == INDEX_INVALID || !entity_is_selectable(state.entities[building_index])) {
-                return;
-            }
 
-            Entity& building = state.entities[building_index];
-            GOLD_ASSERT(building.mode == MODE_BUILDING_FINISHED);
+            // Make sure the player can afford the item
             if (state.players[building.player_id].gold < building_queue_item_cost(item)) {
-                return;
-            }
-            if (building.queue.size() == BUILDING_QUEUE_MAX) {
                 return;
             }
 

@@ -347,14 +347,13 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
             // If we're still here, then there were no idle workers
             // So we'll create one out of the town hall
             if (bot_get_effective_gold(state, bot) >= entity_get_data(ENTITY_MINER).gold_cost && hall.queue.empty()) {
-                return (MatchInput) {
-                    .type = MATCH_INPUT_BUILDING_ENQUEUE,
-                    .building_enqueue = (MatchInputBuildingEnqueue) {
-                        .building_id = hall_id,
-                        .item_type = BUILDING_QUEUE_ITEM_UNIT,
-                        .item_subtype = ENTITY_MINER
-                    }
-                };
+                MatchInput input;
+                input.type = MATCH_INPUT_BUILDING_ENQUEUE;
+                input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UNIT;
+                input.building_enqueue.item_subtype = (uint32_t)ENTITY_MINER;
+                input.building_enqueue.building_count = 1;
+                input.building_enqueue.building_ids[0] = hall_id;
+                return input;
             }
         }
     } // End for each goldmine
@@ -631,8 +630,9 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
     MatchInput input;
     input.type = MATCH_INPUT_BUILDING_ENQUEUE;
     input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UNIT;
-    input.building_enqueue.item_subtype = unit_type;
-    input.building_enqueue.building_id = building_id;
+    input.building_enqueue.item_subtype = (uint32_t)unit_type;
+    input.building_enqueue.building_count = 1;
+    input.building_enqueue.building_ids[0] = building_id;
     return input;
 }
 
@@ -660,9 +660,10 @@ MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgr
 
     MatchInput input;
     input.type = MATCH_INPUT_BUILDING_ENQUEUE;
-    input.building_enqueue.building_id = building_id;
     input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UPGRADE;
     input.building_enqueue.item_subtype = upgrade;
+    input.building_enqueue.building_count = 1;
+    input.building_enqueue.building_ids[0] = building_id;
     return input;
 }
 

@@ -66,14 +66,18 @@ void match_input_serialize(uint8_t* out_buffer, size_t& out_buffer_length, const
             break;
         }
         case MATCH_INPUT_BUILDING_ENQUEUE: {
-            memcpy(out_buffer + out_buffer_length, &input.building_enqueue.building_id, sizeof(EntityId));
-            out_buffer_length += sizeof(EntityId);
-
             memcpy(out_buffer + out_buffer_length, &input.building_enqueue.item_type, sizeof(uint8_t));
             out_buffer_length += sizeof(uint8_t);
 
             memcpy(out_buffer + out_buffer_length, &input.building_enqueue.item_subtype, sizeof(uint32_t));
             out_buffer_length += sizeof(uint32_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.building_enqueue.building_count, sizeof(uint8_t));
+            out_buffer_length += sizeof(uint8_t);
+
+            memcpy(out_buffer + out_buffer_length, &input.building_enqueue.building_ids, input.building_enqueue.building_count * sizeof(EntityId));
+            out_buffer_length += input.building_enqueue.building_count * sizeof(EntityId);
+
             break;
         }
         case MATCH_INPUT_BUILDING_DEQUEUE: {
@@ -183,14 +187,17 @@ MatchInput match_input_deserialize(const uint8_t* in_buffer, size_t& in_buffer_h
             break;
         }
         case MATCH_INPUT_BUILDING_ENQUEUE: {
-            memcpy(&input.building_enqueue.building_id, in_buffer + in_buffer_head, sizeof(EntityId));
-            in_buffer_head += sizeof(EntityId);
-
             memcpy(&input.building_enqueue.item_type, in_buffer + in_buffer_head, sizeof(uint8_t));
             in_buffer_head += sizeof(uint8_t);
 
             memcpy(&input.building_enqueue.item_subtype, in_buffer + in_buffer_head, sizeof(uint32_t));
             in_buffer_head += sizeof(uint32_t);
+
+            memcpy(&input.building_enqueue.building_count, in_buffer + in_buffer_head, sizeof(uint8_t));
+            in_buffer_head += sizeof(uint8_t);
+
+            memcpy(&input.building_enqueue.building_ids, in_buffer + in_buffer_head, input.building_enqueue.building_count * sizeof(EntityId));
+            in_buffer_head += input.building_enqueue.building_count * sizeof(EntityId);
             break;
         }
         case MATCH_INPUT_BUILDING_DEQUEUE: {
@@ -304,7 +311,11 @@ void match_input_print(char* out_ptr, const MatchInput& input) {
             break;
         }
         case MATCH_INPUT_BUILDING_ENQUEUE: {
-            out_ptr += sprintf(out_ptr, "enqueue building id %u type %u subtype %u", input.building_enqueue.building_id, input.building_enqueue.item_type, input.building_enqueue.item_subtype);
+            out_ptr += sprintf(out_ptr, "enqueue type %u subtype %u count %u ids[", input.building_enqueue.item_type, input.building_enqueue.item_subtype, input.building_enqueue.building_count);
+            for (int index = 0; index < input.building_enqueue.building_count; index++) {
+                out_ptr += sprintf(out_ptr, "%u ", input.building_enqueue.building_ids[index]);
+            }
+            out_ptr += sprintf(out_ptr, "]");
             break;
         }
         case MATCH_INPUT_BUILDING_DEQUEUE: {
