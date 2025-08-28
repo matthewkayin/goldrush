@@ -46,7 +46,8 @@ enum BotSquadType {
     BOT_SQUAD_TYPE_HARASS,
     BOT_SQUAD_TYPE_PUSH,
     BOT_SQUAD_TYPE_BUNKER,
-    BOT_SQUAD_TYPE_LANDMINES
+    BOT_SQUAD_TYPE_LANDMINES,
+    BOT_SQUAD_TYPE_DEFEND
 };
 
 struct BotSquad {
@@ -88,6 +89,7 @@ void bot_set_goal_expand(const MatchState& state, Bot& bot);
 bool bot_is_goal_empty(const Bot& bot);
 bool bot_is_goal_met(const MatchState& state, const Bot& bot);
 void bot_on_goal_finished(const MatchState& state, Bot& bot);
+void bot_handle_base_under_attack(const MatchState& state, Bot& bot);
 
 // Behaviors
 
@@ -166,3 +168,4 @@ bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const 
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
 ivec2 bot_find_best_molotov_cell(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 attack_point);
 void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, ivec2 from, ivec2 to, std::vector<ivec2>* path);
+uint32_t bot_score_entity(const Entity& entity);
