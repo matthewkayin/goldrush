@@ -5,11 +5,12 @@
 #include <functional>
 #include <unordered_map>
 
-enum BotStrategy {
-    BOT_STRATEGY_OPENER_BANDIT_RUSH,
-    BOT_STRATEGY_OPENER_FAST_EXPAND,
-    BOT_STRATEGY_OPENER_SAFE_EXPAND,
-    BOT_STRATEGY_SALOON_HARASS
+enum BotGoal {
+    BOT_GOAL_NONE,
+    BOT_GOAL_BANDIT_RUSH,
+    BOT_GOAL_BUNKER,
+    BOT_GOAL_EXPAND,
+    BOT_GOAL_HARASS
 };
 
 struct BotDesiredEntities {
@@ -60,7 +61,7 @@ struct Bot {
     uint8_t player_id;
     int32_t lcg_seed;
 
-    BotStrategy strategy;
+    BotGoal goal;
     BotSquadType desired_squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
 
@@ -82,11 +83,10 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 // Strategy
 
-void bot_strategy_update(const MatchState& state, Bot& bot);
-void bot_clear_desired_entities(Bot& bot);
-void bot_choose_next_goal(const MatchState& state, Bot& bot);
-void bot_set_goal_expand(const MatchState& state, Bot& bot);
-bool bot_is_goal_empty(const Bot& bot);
+BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot);
+void bot_clear_goal(Bot& bot);
+void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal);
+bool bot_goal_should_be_abandoned(const MatchState& state, const Bot& bot);
 bool bot_is_goal_met(const MatchState& state, const Bot& bot);
 void bot_on_goal_finished(const MatchState& state, Bot& bot);
 void bot_handle_base_under_attack(const MatchState& state, Bot& bot);

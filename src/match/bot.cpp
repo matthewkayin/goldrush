@@ -18,9 +18,9 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     // not mess up replay playback
     bot.lcg_seed = lcg_seed;
 
-    bot.strategy = (BotStrategy)(lcg_rand(&bot.lcg_seed) % 3);
-    bot.strategy = BOT_STRATEGY_OPENER_SAFE_EXPAND;
-    bot_clear_desired_entities(bot);
+    int bot_opener_roll = lcg_rand(&bot.lcg_seed) % 3;
+    BotGoal opener = (BotGoal)(BOT_GOAL_BANDIT_RUSH + bot_opener_roll);
+    bot_set_goal(state, bot, opener);
 
     bot.scout_id = ID_NULL;
     bot.last_scout_time = 0;
@@ -42,10 +42,15 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     bot_scout_update(state, bot, match_time_minutes);
 
     // Strategy update
-    bot_strategy_update(state, bot);
+    if (bot_goal_should_be_abandoned(state, bot)) {
+        bot_clear_goal(bot);
+    }
+    if (bot.goal == BOT_GOAL_NONE) {
+        bot_set_goal(state, bot, bot_choose_next_goal(state, bot));
+    }
     if (bot_is_goal_met(state, bot)) {
         bot_on_goal_finished(state, bot);
-        bot_clear_desired_entities(bot);
+        bot_clear_goal(bot);
     }
 
     bot_handle_base_under_attack(state, bot);
@@ -115,10 +120,65 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 // Strategy
 
-void bot_strategy_update(const MatchState& state, Bot& bot) {
-    // Check if strategy should be abandoned
-    bool should_strategy_be_abandoned = false;
-    if (bot.strategy == BOT_STRATEGY_OPENER_BANDIT_RUSH) {
+BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot) {
+    return BOT_GOAL_HARASS;
+}
+
+void bot_clear_goal(Bot& bot) {
+    bot.goal = BOT_GOAL_NONE;
+    bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
+    memset(bot.desired_entities, 0, sizeof(bot.desired_entities));
+}
+
+void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
+    bot_clear_goal(bot);
+    bot.goal = goal;
+
+    // TODO: make sure that full pop cap doesn't block goal from being
+    // met, but I feel like the best way to do this is to just make it
+    // so that we don't request armies that are bigger than mox pop
+
+    switch (bot.goal) {
+        case BOT_GOAL_NONE: {
+            break;
+        }
+        case BOT_GOAL_BANDIT_RUSH: {
+            bot.desired_squad_type = BOT_SQUAD_TYPE_HARASS;
+            bot.desired_entities[ENTITY_BANDIT] = 4;
+            bot.desired_entities[ENTITY_WAGON] = 1;
+            break;
+        }
+        case BOT_GOAL_BUNKER: {
+            bot.desired_squad_type = BOT_SQUAD_TYPE_BUNKER;
+            bot.desired_entities[ENTITY_COWBOY] = 4;
+            bot.desired_entities[ENTITY_BUNKER] = 1;
+            break;
+        }
+        case BOT_GOAL_EXPAND: {
+            uint32_t hall_count = 0;
+            for (const Entity& entity : state.entities) {
+                if (entity.type != ENTITY_HALL ||
+                        entity.player_id != bot.player_id ||
+                        !entity_is_selectable(entity)) {
+                    continue;
+                }
+                hall_count++;
+            }
+
+            bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
+            bot.desired_entities[ENTITY_HALL] = hall_count + 1;
+            break;
+        }
+        case BOT_GOAL_HARASS: {
+            bot.desired_entities[ENTITY_BANDIT] = 4;
+            bot.desired_entities[ENTITY_COWBOY] = 2;
+            break;
+        }
+    }
+}
+
+bool bot_goal_should_be_abandoned(const MatchState& state, const Bot& bot) {
+    if (bot.goal == BOT_GOAL_BANDIT_RUSH) {
         EntityId wagon_id = bot_find_entity((BotFindEntityParams) {
             .state = state, 
             .filter = [&bot](const Entity& entity, EntityId entity_id) {
@@ -128,100 +188,17 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
             }
         });
         if (wagon_id == ID_NULL || bot_is_base_under_attack(state, bot)) {
-            should_strategy_be_abandoned = true;
-        }
-    }
-    if (should_strategy_be_abandoned) {
-        bot_clear_desired_entities(bot);
-        bot.strategy = BOT_STRATEGY_SALOON_HARASS;
-    }
-
-    if (bot_is_goal_empty(bot)) {
-        bot_choose_next_goal(state, bot);
-    }
-}
-
-void bot_clear_desired_entities(Bot& bot) {
-    bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
-    memset(bot.desired_entities, 0, sizeof(bot.desired_entities));
-}
-
-void bot_choose_next_goal(const MatchState& state, Bot& bot) {
-    bot_clear_desired_entities(bot);
-
-    switch (bot.strategy) {
-        case BOT_STRATEGY_OPENER_BANDIT_RUSH: {
-            bot.desired_squad_type = BOT_SQUAD_TYPE_HARASS;
-            bot.desired_entities[ENTITY_BANDIT] = 4;
-            bot.desired_entities[ENTITY_WAGON] = 1;
-            return;
-        }
-        case BOT_STRATEGY_OPENER_FAST_EXPAND: {
-            bot_set_goal_expand(state, bot);
-            return;
-            break;
-        }
-        case BOT_STRATEGY_OPENER_SAFE_EXPAND: {
-            EntityId saloon_id = bot_find_entity((BotFindEntityParams) {
-                .state = state,
-                .filter = [&bot](const Entity& entity, EntityId entity_id) {
-                    return entity.type == ENTITY_SALOON && 
-                        entity_is_selectable(entity) &&
-                        entity.player_id == bot.player_id;
-                }
-            });
-            if (saloon_id == ID_NULL) {
-                bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
-                // The bot will create the saloon without us having to specify it
-                bot.desired_entities[ENTITY_COWBOY] = 2;
-                return;
-            }
-
-            bot_set_goal_expand(state, bot);
-            return;
-        }
-        case BOT_STRATEGY_SALOON_HARASS: {
-            bot.desired_squad_type = BOT_SQUAD_TYPE_PUSH;
-            bot.desired_entities[ENTITY_COWBOY] = 16;
-            bot.desired_entities[ENTITY_BANDIT] = 16;
-            break;
-        }
-    }
-}
-
-void bot_set_goal_expand(const MatchState& state, Bot& bot) {
-    uint32_t hall_count = 0;
-    for (const Entity& entity : state.entities) {
-        if (entity.type != ENTITY_HALL ||
-                entity.player_id != bot.player_id ||
-                !entity_is_selectable(entity)) {
-            continue;
-        }
-        hall_count++;
-    }
-
-    bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
-    bot.desired_entities[ENTITY_HALL] = hall_count + 1;
-}
-
-bool bot_is_goal_empty(const Bot& bot) {
-    for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        if (bot.desired_entities[entity_type] != 0) {
-            return false;
+            return true;
         }
     }
 
-    return true;
+    return false;
 }
 
 bool bot_is_goal_met(const MatchState& state, const Bot& bot) {
-    if (bot_is_goal_empty(bot)) {
+    if (bot.goal == BOT_GOAL_NONE) {
         return false;
     }
-
-    // TODO: make sure that full pop cap doesn't block goal from being
-    // met, but I feel like the best way to do this is to just make it
-    // so that we don't request armies that are bigger than mox pop
 
     uint32_t entity_count[ENTITY_TYPE_COUNT];
     memset(entity_count, 0, sizeof(entity_count));
@@ -247,24 +224,6 @@ bool bot_is_goal_met(const MatchState& state, const Bot& bot) {
 
 void bot_on_goal_finished(const MatchState& state, Bot& bot) {
     bot_squad_create_from_desired_entities(state, bot);
-
-    // Check for strategy completion
-    if (bot.strategy == BOT_STRATEGY_OPENER_BANDIT_RUSH) {
-        bot.strategy = BOT_STRATEGY_SALOON_HARASS;
-    } else if (bot.strategy == BOT_STRATEGY_OPENER_FAST_EXPAND) {
-        bot.strategy = BOT_STRATEGY_SALOON_HARASS;
-    } else if (bot.strategy == BOT_STRATEGY_OPENER_SAFE_EXPAND) {
-        uint32_t entity_count[ENTITY_TYPE_COUNT];
-        memset(entity_count, 0, sizeof(entity_count));
-        for (const Entity& entity : state.entities) {
-            if (entity.player_id == bot.player_id) {
-                entity_count[entity.type]++;
-            }
-        }
-        if (entity_count[ENTITY_SALOON] > 0 && entity_count[ENTITY_HALL] > 1) {
-            bot.strategy = BOT_STRATEGY_SALOON_HARASS;
-        }
-    }
 }
 
 void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
@@ -629,25 +588,29 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
         EntityType building_type = bot_get_building_which_trains((EntityType)entity_type);
         desired_units_from_building[building_type] += desired_entities[entity_type];
     }
+    uint32_t hall_count = 0;
+    for (const Entity& hall : state.entities) {
+        if (hall.type == ENTITY_HALL && 
+                hall.player_id == bot.player_id &&
+                entity_is_selectable(hall)) {
+            hall_count++;
+        }
+    }
     for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         if (desired_units_from_building[entity_type] == 0) {
             continue;
         }
 
         uint32_t desired_building_count;
-        if (desired_units_from_building[entity_type] < 4) {
+        if (desired_units_from_building[entity_type] <= 2) {
             desired_building_count = 1;
-        } else if (desired_units_from_building[entity_type] < 16) {
+        } else if (desired_units_from_building[entity_type] <= 4) {
             desired_building_count = 2;
-        } else if (desired_units_from_building[entity_type] < 32) {
+        } else if (desired_units_from_building[entity_type] <= 8) {
             desired_building_count = 3;
-        } else if (desired_units_from_building[entity_type] < 48) {
-            desired_building_count = 4;
-        } else if (desired_units_from_building[entity_type] < 64) {
-            desired_building_count = 5;
         } else {
-            desired_building_count = 6;
-        }
+            desired_building_count = hall_count * 2;
+        } 
         desired_entities[entity_type] = std::max(desired_entities[entity_type], desired_building_count);
     }
 
@@ -731,6 +694,109 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
         .unit = (EntityType)desired_unit,
         .building = (EntityType)desired_building
     };
+}
+
+uint32_t bot_get_time_to_desired_entities_with_production(const MatchState& state, const Bot& bot, uint32_t desired_entities[ENTITY_TYPE_COUNT], uint32_t production[ENTITY_TYPE_COUNT]) {
+    struct EntityInProgress {
+        EntityType type;
+        uint32_t seconds_remaining;
+    };
+    std::vector<EntityInProgress> entities_in_progress;
+
+    // Determine income and starting gold
+    uint32_t gold = state.players[bot.player_id].gold;
+    uint32_t gold_income = 0;
+    static const uint32_t GOLD_PER_SECOND_PER_GOLDMINE = 8;
+    for (const Entity& goldmine : state.entities) {
+        if (goldmine.type != ENTITY_GOLDMINE || goldmine.gold_held == 0) {
+            continue;
+        }
+
+        EntityId occupying_hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
+        if (occupying_hall_id == ID_NULL) {
+            continue;
+        }
+
+        const Entity& hall = state.entities.get_by_id(occupying_hall_id);
+        if (hall.player_id != bot.player_id) {
+            continue;
+        }
+
+        gold_income += GOLD_PER_SECOND_PER_GOLDMINE;
+    }
+
+    // Determine existing entity counts
+    uint32_t entity_count[ENTITY_TYPE_COUNT];
+    memset(entity_count, 0, sizeof(entity_count));
+    for (const Entity& entity : state.entities) {
+        if (entity.player_id != bot.player_id ||
+                entity.health == 0) {
+            continue;
+        }
+
+        if (entity.mode == MODE_BUILDING_IN_PROGRESS && 
+                (entity.type == ENTITY_SALOON ||
+                entity.type == ENTITY_WORKSHOP ||
+                entity.type == ENTITY_COOP ||
+                entity.type == ENTITY_BARRACKS ||
+                entity.type == ENTITY_SHERIFFS)) {
+            uint32_t time_left = (entity.timer * UNIT_BUILD_TICK_DURATION) / UPDATES_PER_SECOND;
+            entities_in_progress.push_back((EntityInProgress) {
+                .type = entity.type,
+                .seconds_remaining = time_left
+            });
+            continue;
+        }
+
+        entity_count[entity.type]++;
+    }
+
+    uint32_t seconds = 0;
+    bool has_desired_entities = false;
+
+    while (!has_desired_entities) {
+        seconds++;
+        gold += gold_income;
+
+        // Try to make production
+        for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+            // Count all existing entities of type, including in-progress entities, in order to make sure we don't over-make the production
+            uint32_t count = entity_count[entity_type];
+            for (const EntityInProgress& entity_in_progress : entities_in_progress) {
+                if (entity_in_progress.type == (EntityType)entity_type) {
+                    count++;
+                }
+            }
+
+            // If we already have enough of this production, skip it
+            if (count >= production[entity_type]) {
+                continue;
+            }
+
+            // If we can't afford it, skip it
+            const EntityData& entity_data = entity_get_data((EntityType)entity_type);
+            if (gold < entity_data.gold_cost) {
+                continue;
+            }
+
+            gold -= entity_data.gold_cost;
+            entities_in_progress.push_back((EntityInProgress) {
+                .type = (EntityType)entity_type,
+                .seconds_remaining = ((entity_data.max_health - (entity_data.max_health / 10)) * UNIT_BUILD_TICK_DURATION) / UPDATES_PER_SECOND
+            });
+        }
+
+        // Try to make units
+        for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+            // Count all existing entities of type, including in-progress entities, in order to make sure we don't over-make the production
+            uint32_t count = entity_count[entity_type];
+            for (const EntityInProgress& entity_in_progress : entities_in_progress) {
+                if (entity_in_progress.type == (EntityType)entity_type) {
+                    count++;
+                }
+            }
+        }
+    }
 }
 
 uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {

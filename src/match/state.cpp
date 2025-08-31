@@ -14,7 +14,6 @@ static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
 #endif
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
 static const uint32_t UNIT_ENERGY_REGEN_DURATION = 64;
-static const uint32_t UNIT_BUILD_TICK_DURATION = 6;
 static const uint32_t UNIT_REPAIR_RATE = 4;
 static const uint32_t UNIT_IN_MINE_DURATION = 150;
 static const uint32_t UNIT_MAX_GOLD_HELD = 5;
