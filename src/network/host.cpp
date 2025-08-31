@@ -36,6 +36,7 @@ NetworkHost* network_host_create(NetworkBackend backend) {
 }
 
 void network_host_destroy(NetworkHost* host) {
+    log_trace("Destroying host with backend %u", host->backend);
     delete host->events;
     if (host->backend == NETWORK_BACKEND_LAN) {
         enet_host_destroy(host->lan.host);
@@ -44,7 +45,6 @@ void network_host_destroy(NetworkHost* host) {
         SteamNetworkingSockets()->CloseListenSocket(host->steam.listen_socket);
     }
     free(host);
-    log_trace("Destroyed host with backend %u", host->backend);
 }
 
 bool network_host_connect(NetworkHost* host, NetworkConnectionInfo connection_info) {

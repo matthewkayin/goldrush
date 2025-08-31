@@ -696,109 +696,6 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
     };
 }
 
-uint32_t bot_get_time_to_desired_entities_with_production(const MatchState& state, const Bot& bot, uint32_t desired_entities[ENTITY_TYPE_COUNT], uint32_t production[ENTITY_TYPE_COUNT]) {
-    struct EntityInProgress {
-        EntityType type;
-        uint32_t seconds_remaining;
-    };
-    std::vector<EntityInProgress> entities_in_progress;
-
-    // Determine income and starting gold
-    uint32_t gold = state.players[bot.player_id].gold;
-    uint32_t gold_income = 0;
-    static const uint32_t GOLD_PER_SECOND_PER_GOLDMINE = 8;
-    for (const Entity& goldmine : state.entities) {
-        if (goldmine.type != ENTITY_GOLDMINE || goldmine.gold_held == 0) {
-            continue;
-        }
-
-        EntityId occupying_hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
-        if (occupying_hall_id == ID_NULL) {
-            continue;
-        }
-
-        const Entity& hall = state.entities.get_by_id(occupying_hall_id);
-        if (hall.player_id != bot.player_id) {
-            continue;
-        }
-
-        gold_income += GOLD_PER_SECOND_PER_GOLDMINE;
-    }
-
-    // Determine existing entity counts
-    uint32_t entity_count[ENTITY_TYPE_COUNT];
-    memset(entity_count, 0, sizeof(entity_count));
-    for (const Entity& entity : state.entities) {
-        if (entity.player_id != bot.player_id ||
-                entity.health == 0) {
-            continue;
-        }
-
-        if (entity.mode == MODE_BUILDING_IN_PROGRESS && 
-                (entity.type == ENTITY_SALOON ||
-                entity.type == ENTITY_WORKSHOP ||
-                entity.type == ENTITY_COOP ||
-                entity.type == ENTITY_BARRACKS ||
-                entity.type == ENTITY_SHERIFFS)) {
-            uint32_t time_left = (entity.timer * UNIT_BUILD_TICK_DURATION) / UPDATES_PER_SECOND;
-            entities_in_progress.push_back((EntityInProgress) {
-                .type = entity.type,
-                .seconds_remaining = time_left
-            });
-            continue;
-        }
-
-        entity_count[entity.type]++;
-    }
-
-    uint32_t seconds = 0;
-    bool has_desired_entities = false;
-
-    while (!has_desired_entities) {
-        seconds++;
-        gold += gold_income;
-
-        // Try to make production
-        for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-            // Count all existing entities of type, including in-progress entities, in order to make sure we don't over-make the production
-            uint32_t count = entity_count[entity_type];
-            for (const EntityInProgress& entity_in_progress : entities_in_progress) {
-                if (entity_in_progress.type == (EntityType)entity_type) {
-                    count++;
-                }
-            }
-
-            // If we already have enough of this production, skip it
-            if (count >= production[entity_type]) {
-                continue;
-            }
-
-            // If we can't afford it, skip it
-            const EntityData& entity_data = entity_get_data((EntityType)entity_type);
-            if (gold < entity_data.gold_cost) {
-                continue;
-            }
-
-            gold -= entity_data.gold_cost;
-            entities_in_progress.push_back((EntityInProgress) {
-                .type = (EntityType)entity_type,
-                .seconds_remaining = ((entity_data.max_health - (entity_data.max_health / 10)) * UNIT_BUILD_TICK_DURATION) / UPDATES_PER_SECOND
-            });
-        }
-
-        // Try to make units
-        for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-            // Count all existing entities of type, including in-progress entities, in order to make sure we don't over-make the production
-            uint32_t count = entity_count[entity_type];
-            for (const EntityInProgress& entity_in_progress : entities_in_progress) {
-                if (entity_in_progress.type == (EntityType)entity_type) {
-                    count++;
-                }
-            }
-        }
-    }
-}
-
 uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
     bool bot_has_landmine_squad = false;
     for (const BotSquad& squad : bot.squads) {
@@ -2064,7 +1961,8 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
     // Check for any danger along the path
     bool is_danger_along_path = false;
     std::vector<ivec2> path;
-    map_pathfind(state.map, CELL_LAYER_GROUND, scout.cell, state.entities[closest_unscouted_entity_index].cell, 2, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    ivec2 scout_path_dest_cell = map_get_nearest_cell_around_rect( state.map, CELL_LAYER_GROUND, scout.cell, 2, state.entities[closest_unscouted_entity_index].cell, entity_get_data(state.entities[closest_unscouted_entity_index].type).cell_size, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    map_pathfind(state.map, CELL_LAYER_GROUND, scout.cell, scout_path_dest_cell, 2, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
     static const uint32_t DANGER_RADIUS = 4;
     for (uint32_t path_index = 0; path_index < path.size(); path_index += DANGER_RADIUS) {
         for (const BotScoutDanger& danger : bot.scout_danger) {
