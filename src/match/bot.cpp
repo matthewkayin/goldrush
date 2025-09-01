@@ -20,6 +20,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
 
     int bot_opener_roll = lcg_rand(&bot.lcg_seed) % 3;
     BotGoal opener = (BotGoal)(BOT_GOAL_BANDIT_RUSH + bot_opener_roll);
+    opener = BOT_GOAL_EXPAND;
     bot_set_goal(state, bot, opener);
 
     bot.scout_id = ID_NULL;
@@ -170,8 +171,8 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
             break;
         }
         case BOT_GOAL_HARASS: {
-            bot.desired_entities[ENTITY_BANDIT] = 4;
-            bot.desired_entities[ENTITY_COWBOY] = 2;
+            bot.desired_entities[ENTITY_BANDIT] = 16;
+            bot.desired_entities[ENTITY_SOLDIER] = 8;
             break;
         }
     }
@@ -527,6 +528,10 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
 }
 
 bool bot_should_build_house(const MatchState& state, const Bot& bot) {
+    if (bot.goal == BOT_GOAL_EXPAND) {
+        return false;
+    }
+
     uint32_t future_max_population = match_get_player_max_population(state, bot.player_id);
     uint32_t future_population = match_get_player_population(state, bot.player_id);
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -558,6 +563,12 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
 
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
     memcpy(desired_entities, bot.desired_entities, sizeof(desired_entities));
+
+    // Count total desired units
+    uint32_t desired_units_total = 0;
+    for (uint32_t entity_type = ENTITY_MINER; entity_type < ENTITY_HALL; entity_type++) {
+        desired_units_total += desired_entities[entity_type];
+    }
 
     // Subtract from desired units any unit which we already have or which is in-progress
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -596,21 +607,23 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
             hall_count++;
         }
     }
+    uint32_t max_production_buildings = std::max(1U, hall_count * 2);
     for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         if (desired_units_from_building[entity_type] == 0) {
             continue;
         }
 
         uint32_t desired_building_count;
-        if (desired_units_from_building[entity_type] <= 2) {
-            desired_building_count = 1;
-        } else if (desired_units_from_building[entity_type] <= 4) {
-            desired_building_count = 2;
-        } else if (desired_units_from_building[entity_type] <= 8) {
+        if (desired_units_total > max_production_buildings && desired_units_from_building[entity_type] > 7) {
+            uint32_t production_building_divisor = desired_units_total / max_production_buildings;
+            desired_building_count = std::max(1U, desired_units_from_building[entity_type] / production_building_divisor);
+        } else if (desired_units_from_building[entity_type] > 7) {
             desired_building_count = 3;
+        } else if (desired_units_from_building[entity_type] > 3) {
+            desired_building_count = 2;
         } else {
-            desired_building_count = hall_count * 2;
-        } 
+            desired_building_count = 1;
+        }
         desired_entities[entity_type] = std::max(desired_entities[entity_type], desired_building_count);
     }
 
@@ -2546,7 +2559,7 @@ ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, c
                     is_rally_point_valid = false;
                 }
                 Cell map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, cell);
-                if (map_cell.type == CELL_BUILDING || map_cell.type == CELL_GOLDMINE) {
+                if (map_cell.type == CELL_BUILDING || map_cell.type == CELL_GOLDMINE || map_cell.type == CELL_BLOCKED) {
                     is_rally_point_valid = false;
                 }
             }
