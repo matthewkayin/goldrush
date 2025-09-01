@@ -391,7 +391,6 @@ int gold_main(int argc, char** argv) {
         }
 
         double update_duration = (double)(SDL_GetTicksNS() - update_start_time) / (double)SDL_NS_PER_SECOND;
-        log_trace("PROFILE: update duration %f", update_duration);
 
         sound_update();
 

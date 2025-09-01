@@ -6,12 +6,13 @@
 #include <unordered_map>
 
 enum BotGoal {
-    BOT_GOAL_NONE,
     BOT_GOAL_BANDIT_RUSH,
     BOT_GOAL_BUNKER,
     BOT_GOAL_EXPAND,
-    BOT_GOAL_HARASS
+    BOT_GOAL_HARASS,
+    BOT_GOAL_COUNT
 };
+#define BOT_GOAL_NONE BOT_GOAL_COUNT
 
 struct BotDesiredEntities {
     EntityType unit;

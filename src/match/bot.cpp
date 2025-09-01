@@ -122,7 +122,96 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 // Strategy
 
 BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot) {
-    return BOT_GOAL_HARASS;
+    // Count unreserved entities
+    uint32_t entity_count[ENTITY_TYPE_COUNT];
+    memset(entity_count, 0, sizeof(entity_count));
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
+        if (entity.player_id != bot.player_id ||
+                !entity_is_selectable(entity) ||
+                bot_is_entity_reserved(bot, entity_id)) {
+            continue;
+        }
+
+        entity_count[entity.type]++;
+    }
+
+    // Count halls
+    uint32_t player_mining_base_count[MAX_PLAYERS];
+    memset(player_mining_base_count, 0, sizeof(player_mining_base_count));
+    uint32_t unoccupied_goldmine_count = 0;
+    for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
+        const Entity& goldmine = state.entities[goldmine_index];
+        if (goldmine.type != ENTITY_GOLDMINE || goldmine.gold_held == 0) {
+            continue;
+        }
+
+        EntityId surrounding_hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
+        if (surrounding_hall_id == ID_NULL) {
+            unoccupied_goldmine_count++;
+            continue;
+        }
+
+        const Entity& surrounding_hall = state.entities.get_by_id(surrounding_hall_id);
+        player_mining_base_count[surrounding_hall.player_id]++;
+    }
+    uint32_t max_opponent_base_count = 0;
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (!state.players[player_id].active) {
+            continue;
+        }
+        if (state.players[player_id].team == state.players[bot.player_id].team) {
+            continue;
+        }
+        max_opponent_base_count = std::max(max_opponent_base_count, player_mining_base_count[player_id]);
+    }
+
+    BotGoal highest_scored_goal = BOT_GOAL_NONE;
+    int highest_scored_goal_score = -1;
+    for (uint32_t goal = 0; goal < BOT_GOAL_COUNT; goal++) {
+        // A negative goal will not be chosen
+        int score = -1;
+
+        switch (goal) {
+            case BOT_GOAL_BUNKER: {
+                if (entity_count[ENTITY_HALL] > entity_count[ENTITY_BUNKER] &&
+                        entity_count[ENTITY_HALL] - entity_count[ENTITY_BUNKER] > 1) {
+                    score += 50;
+                }
+                break;
+            }
+            case BOT_GOAL_EXPAND: {
+                if (unoccupied_goldmine_count == 0 ||
+                        player_mining_base_count[bot.player_id] > max_opponent_base_count) {
+                    break;
+                }
+                if (bot_get_effective_gold(state, bot) > 1000) {
+                    score += 50;
+                }
+                if (max_opponent_base_count > player_mining_base_count[bot.player_id]) {
+                    score += 50;
+                }
+
+                break;
+            }
+            case BOT_GOAL_HARASS: {
+                score += 25;
+                if (max_opponent_base_count > player_mining_base_count[bot.player_id]) {
+                    score += 50;
+                }
+                break;
+            }
+        }
+
+        if (score > highest_scored_goal_score) {
+            highest_scored_goal = (BotGoal)goal;
+            highest_scored_goal_score = score;
+        }
+    }
+
+    log_trace("BOT: next goal is %u", bot.goal);
+    return highest_scored_goal;
 }
 
 void bot_clear_goal(Bot& bot) {
@@ -134,10 +223,22 @@ void bot_clear_goal(Bot& bot) {
 void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
     bot_clear_goal(bot);
     bot.goal = goal;
+    log_trace("BOT: bot_set_goal to %u", goal);
 
-    // TODO: make sure that full pop cap doesn't block goal from being
-    // met, but I feel like the best way to do this is to just make it
-    // so that we don't request armies that are bigger than mox pop
+    // Count unreserved entities
+    uint32_t entity_count[ENTITY_TYPE_COUNT];
+    memset(entity_count, 0, sizeof(entity_count));
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
+        if (entity.player_id != bot.player_id ||
+                !entity_is_selectable(entity) ||
+                bot_is_entity_reserved(bot, entity_id)) {
+            continue;
+        }
+
+        entity_count[entity.type]++;
+    }
 
     switch (bot.goal) {
         case BOT_GOAL_NONE: {
@@ -156,26 +257,75 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
             break;
         }
         case BOT_GOAL_EXPAND: {
-            uint32_t hall_count = 0;
-            for (const Entity& entity : state.entities) {
-                if (entity.type != ENTITY_HALL ||
-                        entity.player_id != bot.player_id ||
-                        !entity_is_selectable(entity)) {
-                    continue;
-                }
-                hall_count++;
-            }
-
             bot.desired_squad_type = BOT_SQUAD_TYPE_NONE;
-            bot.desired_entities[ENTITY_HALL] = hall_count + 1;
+            bot.desired_entities[ENTITY_HALL] = entity_count[ENTITY_HALL] + 1;
             break;
         }
         case BOT_GOAL_HARASS: {
-            bot.desired_entities[ENTITY_BANDIT] = 16;
-            bot.desired_entities[ENTITY_SOLDIER] = 8;
+            int use_wagon_score = 1 + entity_count[ENTITY_WAGON] + entity_count[ENTITY_COOP];
+            bool should_use_wagons = lcg_rand(&bot.lcg_seed) % 5 < use_wagon_score;
+
+            if (should_use_wagons) {
+                if (entity_count[ENTITY_WAGON] >= 2) {
+                    bot.desired_entities[ENTITY_WAGON] = 2;
+                } else {
+                    bot.desired_entities[ENTITY_WAGON] = 1 + lcg_rand(&bot.lcg_seed) % 2;
+                }
+            }
+
+            uint32_t desired_harass_unit_count = should_use_wagons 
+                                            ? bot.desired_entities[ENTITY_WAGON] * 4
+                                            : 4 + lcg_rand(&bot.lcg_seed) % 5;
+            EntityType infantry_types[3] = { ENTITY_BANDIT, ENTITY_COWBOY, ENTITY_SAPPER };
+            uint32_t infantry_type_scores[3] = { 0, 0, 0 };
+            for (uint32_t infantry_type_index = 0; infantry_type_index < 3; infantry_type_index++) {
+                infantry_type_scores[infantry_type_index] += entity_count[infantry_types[infantry_type_index]];
+                infantry_type_scores[infantry_type_index] += entity_count[bot_get_building_which_trains(infantry_types[infantry_type_index])];
+                infantry_type_scores[infantry_type_index] += lcg_rand(&bot.lcg_seed) % 4;
+            }
+
+            EntityType primary_infantry_type = ENTITY_TYPE_COUNT;
+            uint32_t primary_infantry_type_score = 0;
+            for (uint32_t infantry_type_index = 0; infantry_type_index < 3; infantry_type_index++) {
+                if (infantry_type_scores[infantry_type_index] > primary_infantry_type_score) {
+                    primary_infantry_type = infantry_types[infantry_type_index];
+                    primary_infantry_type_score = infantry_type_scores[infantry_type_index];
+                }
+            }
+            if (primary_infantry_type == ENTITY_TYPE_COUNT) {
+                primary_infantry_type = ENTITY_BANDIT;
+            }
+
+            EntityType secondary_infantry_type = ENTITY_TYPE_COUNT;
+            uint32_t secondary_infantry_type_score = 0;
+            for (uint32_t infantry_type_index = 0; infantry_type_index < 3; infantry_type_index++) {
+                if (infantry_types[infantry_type_index] == primary_infantry_type) {
+                    continue;
+                }
+                if (infantry_type_scores[infantry_type_index] > secondary_infantry_type_score) {
+                    secondary_infantry_type = infantry_types[infantry_type_index];
+                    secondary_infantry_type_score = infantry_type_scores[infantry_type_index];
+                }
+            }
+
+            uint32_t desired_secondary_infantry_count = 0;
+            if (secondary_infantry_type != ENTITY_TYPE_COUNT && desired_harass_unit_count > 4) {
+                desired_secondary_infantry_count = desired_harass_unit_count - 4;
+                bot.desired_entities[secondary_infantry_type] = desired_harass_unit_count;
+            }
+            bot.desired_entities[primary_infantry_type] = desired_harass_unit_count - desired_secondary_infantry_count;
+
+            bot.desired_squad_type = BOT_SQUAD_TYPE_HARASS;
+
             break;
         }
     }
+
+    log_trace("BOT: -- desired entities --");
+    for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        log_trace("%s %u", entity_get_data((EntityType)entity_type).name, bot.desired_entities[entity_type]);
+    }
+    log_trace("BOT: -- end -- ");
 }
 
 bool bot_goal_should_be_abandoned(const MatchState& state, const Bot& bot) {
@@ -212,6 +362,26 @@ bool bot_is_goal_met(const MatchState& state, const Bot& bot) {
         }
 
         entity_count[entity.type]++;
+    }
+
+    bool is_maxed_out = true;
+    uint32_t population = match_get_player_population(state, bot.player_id);
+    for (uint32_t unit_type = ENTITY_MINER; unit_type < ENTITY_HALL; unit_type++) {
+        if (entity_count[unit_type] >= bot.desired_entities[unit_type]) {
+            continue;
+        }
+        if (population + entity_get_data((EntityType)unit_type).unit_data.population_cost <= MATCH_MAX_POPULATION) {
+            is_maxed_out = false;
+        }
+    }
+    bool still_has_desired_buildings = false;
+    for (uint32_t building_type = ENTITY_HALL; building_type < ENTITY_TYPE_COUNT; building_type++) {
+        if (entity_count[building_type] < bot.desired_entities[building_type]) {
+            still_has_desired_buildings = true;
+        }
+    }
+    if (is_maxed_out && !still_has_desired_buildings) {
+        return true;
     }
 
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
