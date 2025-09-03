@@ -319,7 +319,6 @@ int gold_main(int argc, char** argv) {
         }
 
         // UPDATE
-        uint64_t update_start_time = SDL_GetTicksNS();
         while (update_accumulator >= UPDATE_DURATION) {
             update_accumulator -= UPDATE_DURATION;
 
@@ -389,8 +388,6 @@ int gold_main(int argc, char** argv) {
                 }
             }
         }
-
-        double update_duration = (double)(SDL_GetTicksNS() - update_start_time) / (double)SDL_NS_PER_SECOND;
 
         sound_update();
 

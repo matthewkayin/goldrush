@@ -5,6 +5,11 @@
 #include <functional>
 #include <unordered_map>
 
+enum BotStrategy {
+    BOT_STRATEGY_SALOON_DROP_HARASS,
+    BOT_STRATEGY_COUNT
+};
+
 enum BotGoal {
     BOT_GOAL_BANDIT_RUSH,
     BOT_GOAL_BUNKER,
@@ -17,12 +22,6 @@ enum BotGoal {
 struct BotDesiredEntities {
     EntityType unit;
     EntityType building;
-};
-
-enum BotScoutOpponentStrategy {
-    BOT_SCOUT_OPPONENT_STRATEGY_UNKNOWN,
-    BOT_SCOUT_OPPONENT_STRATEGY_OPENER_EXPAND_FIRST,
-    BOT_SCOUT_OPPONENT_STRATEGY_OPENER_SALOON_FIRST
 };
 
 enum BotScoutDangerType {
@@ -62,6 +61,7 @@ struct Bot {
     uint8_t player_id;
     int32_t lcg_seed;
 
+    BotStrategy strategy;
     BotGoal goal;
     BotSquadType desired_squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
@@ -75,7 +75,6 @@ struct Bot {
     std::vector<EntityId> entities_to_scout;
     std::vector<BotScoutDanger> scout_danger;
     std::unordered_map<uint32_t, bool> should_scout_goldmine;
-    BotScoutOpponentStrategy scout_opponent_strategy[MAX_PLAYERS];
     bool scout_enemy_has_invisible_units;
 };
 
@@ -84,6 +83,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 // Strategy
 
+BotGoal bot_choose_opening_goal(const Bot& bot);
 BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot);
 void bot_clear_goal(Bot& bot);
 void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal);
@@ -104,6 +104,7 @@ MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgr
 MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
 MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
+MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bot);
 
 // Entity management
 
