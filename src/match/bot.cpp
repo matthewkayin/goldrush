@@ -124,7 +124,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 BotGoal bot_choose_opening_goal(const Bot& bot) {
     switch (bot.strategy) {
         case BOT_STRATEGY_SALOON_DROP_HARASS:
-            return BOT_GOAL_BANDIT_RUSH;
+            return BOT_GOAL_BUNKER;
         case BOT_STRATEGY_COUNT:
             GOLD_ASSERT(false);
             return BOT_GOAL_NONE;
@@ -1654,7 +1654,8 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         } // End if squad type is landmines
 
         // If the unit is far away, add it to the distant infantry/cavalry list
-        if (ivec2::manhattan_distance(unit.cell, squad.target_cell) > BOT_SQUAD_GATHER_DISTANCE) {
+        if (ivec2::manhattan_distance(unit.cell, squad.target_cell) > BOT_SQUAD_GATHER_DISTANCE ||
+                squad.type == BOT_SQUAD_TYPE_BUNKER) {
             if (entity_get_data(unit.type).garrison_size == ENTITY_CANNOT_GARRISON) {
                 distant_cavalry.push_back(unit_id);
             } else {
@@ -1798,7 +1799,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         // Unload garrisoned units if the carrier is 
         // 1. close to the target cell or 2. nearby an enemy
         bool should_unload_garrisoned_units = false;
-        if (ivec2::manhattan_distance(carrier.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE) {
+        if (ivec2::manhattan_distance(carrier.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE - 4) {
             should_unload_garrisoned_units = true;
         } else {
             EntityId nearby_enemy_id = bot_find_entity((BotFindEntityParams) {
@@ -1882,7 +1883,12 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
     }
 
-    if (!squad_has_carriers && distant_infantry.empty() && !is_enemy_near_squad) {
+    if ((squad.type == BOT_SQUAD_TYPE_HARASS ||
+            squad.type == BOT_SQUAD_TYPE_PUSH ||
+            squad.type == BOT_SQUAD_TYPE_DEFEND) &&
+            !squad_has_carriers && 
+            distant_infantry.empty() && 
+            !is_enemy_near_squad) {
         bot_squad_dissolve(state, bot, squad);
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
