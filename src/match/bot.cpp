@@ -124,7 +124,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 BotGoal bot_choose_opening_goal(const Bot& bot) {
     switch (bot.strategy) {
         case BOT_STRATEGY_SALOON_DROP_HARASS:
-            return BOT_GOAL_BUNKER;
+            return BOT_GOAL_BANDIT_RUSH;
         case BOT_STRATEGY_COUNT:
             GOLD_ASSERT(false);
             return BOT_GOAL_NONE;
@@ -204,16 +204,24 @@ BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot) {
     }
 
     // If we have less than 2 bases and we feel safe, then expand
+    bool bot_feels_safe = max_opponent_army_size = army_size[bot.player_id] < 4 * max_opponent_base_count;
     if (player_mining_base_count[bot.player_id] < 2 && 
             unoccupied_goldmine_count > 0 &&
-            max_opponent_army_size - army_size[bot.player_id] < 4) {
+            bot_feels_safe) {
         return BOT_GOAL_EXPAND;
     }
 
-    // If we have less bases than opponent 
+    // If we have less bases than opponent and we feel safe, then expand
     if (player_mining_base_count[bot.player_id] < max_opponent_base_count &&
             unoccupied_goldmine_count > 0 &&
-            max_opponent_army_size - army_size[bot.player_id] < 4 * max_opponent_base_count) {
+            bot_feels_safe) {
+        return BOT_GOAL_EXPAND;
+    }
+
+    // If we have lots of excess gold, then expand
+    if (bot_get_effective_gold(state, bot) > 1000 && 
+            unoccupied_goldmine_count > 0 && 
+            bot_feels_safe) {
         return BOT_GOAL_EXPAND;
     }
 
@@ -1379,20 +1387,24 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     }
 
     // Attack micro
+    log_trace("BOT: squad attack micro");
     std::vector<EntityId> unengaged_units;
     bool is_enemy_near_squad = false;
     for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) {
         EntityId unit_id = squad.entities[squad_entity_index];
         const Entity& unit = state.entities.get_by_id(unit_id);
+        log_trace("consider unit %u %s", unit_id, entity_get_data(unit.type).name);
 
         // Filter down to only units
         if (!entity_is_unit(unit.type)) {
+            log_trace("unit is not unit");
             continue;
         }
 
         // Filter down to only ungarrisoned units (non-carriers)
         const EntityData& unit_data = entity_get_data(unit.type);
         if (unit.garrison_id != ID_NULL || unit_data.garrison_capacity != 0) {
+            log_trace("unit is either garrisoned or is a carrier");
             continue;
         }
 
@@ -1417,6 +1429,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
         // If not, skip for now, we'll get back to this unit later
         if (nearby_enemy_id == ID_NULL) {
+            log_trace("unit is unengaged");
             unengaged_units.push_back(unit_id);
             continue;
         }
@@ -1542,9 +1555,11 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     std::vector<EntityId> distant_cavalry;
     for (EntityId unit_id : unengaged_units) {
         const Entity& unit = state.entities.get_by_id(unit_id);
+        log_trace("considering unengaged unit %u %s", unit_id, entity_get_data(unit.type).name);
 
         // Skip units that are already garrisoning
         if (unit.target.type == TARGET_ENTITY) {
+            log_trace("unit is already garrisoning, skip");
             continue;
         } 
 
@@ -1657,8 +1672,10 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         if (ivec2::manhattan_distance(unit.cell, squad.target_cell) > BOT_SQUAD_GATHER_DISTANCE ||
                 squad.type == BOT_SQUAD_TYPE_BUNKER) {
             if (entity_get_data(unit.type).garrison_size == ENTITY_CANNOT_GARRISON) {
+                log_trace("unit added to distant cavalry");
                 distant_cavalry.push_back(unit_id);
             } else {
+                log_trace("unit added to distant infantry");
                 distant_infantry.push_back(unit_id);
             }
         }
@@ -1697,6 +1714,11 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             input.move.entity_count = 0;
 
             for (EntityId infantry_id : distant_infantry) {
+                // If a distant infantry is close enough, don't bother transporting it
+                if (squad.type != BOT_SQUAD_TYPE_BUNKER && 
+                        ivec2::manhattan_distance(state.entities.get_by_id(infantry_id).cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE * 2) {
+                    continue;
+                }
                 if (garrison_size + input.move.entity_count < GARRISON_CAPACITY) {
                     input.move.entity_ids[input.move.entity_count] = infantry_id;
                     input.move.entity_count++;
@@ -1718,8 +1740,9 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 }
             } // End for each infantry in infantry_id
 
-            GOLD_ASSERT(input.move.entity_count != 0);
-            return input;
+            if (input.move.entity_count != 0) {
+                return input;
+            }
         }
     }
 
@@ -1799,7 +1822,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         // Unload garrisoned units if the carrier is 
         // 1. close to the target cell or 2. nearby an enemy
         bool should_unload_garrisoned_units = false;
-        if (ivec2::manhattan_distance(carrier.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE - 4) {
+        if (ivec2::manhattan_distance(carrier.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE) {
             should_unload_garrisoned_units = true;
         } else {
             EntityId nearby_enemy_id = bot_find_entity((BotFindEntityParams) {
@@ -2245,17 +2268,19 @@ void bot_release_scout(Bot& bot) {
 }
 
 bool bot_should_scout(const MatchState& state, const Bot& bot, uint32_t match_time_minutes) {
-    EntityId unscouted_goldmine_id = bot_find_entity((BotFindEntityParams) {
+    EntityId unscouted_hall_or_goldmine_id = bot_find_entity((BotFindEntityParams) {
         .state = state,
-        .filter = [&state, &bot](const Entity& goldmine, EntityId goldmine_id) {
-            return goldmine.type == ENTITY_GOLDMINE && !bot_has_scouted_entity(state, bot, goldmine, goldmine_id);
+        .filter = [&state, &bot](const Entity& entity, EntityId entity_id) {
+            return (entity.type == ENTITY_GOLDMINE ||
+                        entity.type == ENTITY_HALL) && 
+                    !bot_has_scouted_entity(state, bot, entity, entity_id);
         }
     });
-    if (unscouted_goldmine_id != ID_NULL) {
+    if (unscouted_hall_or_goldmine_id != ID_NULL) {
         return true;
     }
 
-    if ( match_time_minutes > bot.last_scout_time && 
+    if (match_time_minutes > bot.last_scout_time && 
             match_time_minutes - bot.last_scout_time >= 5) {
         return true;
     }
