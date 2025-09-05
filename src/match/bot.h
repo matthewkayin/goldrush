@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 enum BotStrategy {
-    BOT_STRATEGY_SALOON_DROP_HARASS,
+    BOT_STRATEGY_SALOON_COOP,
     BOT_STRATEGY_COUNT
 };
 
@@ -14,6 +14,7 @@ enum BotGoal {
     BOT_GOAL_BANDIT_RUSH,
     BOT_GOAL_BUNKER,
     BOT_GOAL_EXPAND,
+    BOT_GOAL_LANDMINES,
     BOT_GOAL_HARASS,
     BOT_GOAL_PUSH,
     BOT_GOAL_COUNT
@@ -165,6 +166,7 @@ EntityType bot_get_building_which_researches(uint32_t upgrade);
 ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, const Entity& building);
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
 ivec2 bot_get_squad_center_point(const MatchState& state, const BotSquad& squad);
+std::unordered_map<uint32_t, uint32_t> bot_get_enemy_hall_defense_scores(const MatchState& state, const Bot& bot);
 ivec2 bot_get_squad_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
 bool bot_is_base_under_attack(const MatchState& state, const Bot& bot);
 bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const Entity& infantry, const Entity& nearby_enemy);
@@ -172,3 +174,4 @@ int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const En
 ivec2 bot_find_best_molotov_cell(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 attack_point);
 void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, ivec2 from, ivec2 to, std::vector<ivec2>* path);
 uint32_t bot_score_entity(const Entity& entity);
+uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot);
