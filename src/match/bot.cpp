@@ -204,7 +204,7 @@ BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot) {
     }
 
     // If we have less than 2 bases and we feel safe, then expand
-    bool bot_feels_safe = max_opponent_army_size = army_size[bot.player_id] < 4 * max_opponent_base_count;
+    bool bot_feels_safe = max_opponent_army_size - army_size[bot.player_id] < 4 * max_opponent_base_count;
     if (player_mining_base_count[bot.player_id] < 2 && 
             unoccupied_goldmine_count > 0 &&
             bot_feels_safe) {
@@ -243,7 +243,7 @@ BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot) {
         return BOT_GOAL_BUNKER;
     }
 
-    return BOT_GOAL_HARASS;
+    return BOT_GOAL_PUSH;
 }
 
 void bot_clear_goal(Bot& bot) {
@@ -296,7 +296,7 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
             bool should_use_wagons = true;
 
             if (should_use_wagons) {
-                if (entity_count[ENTITY_WAGON] >= 2) {
+                if (entity_count[ENTITY_WAGON] > 1) {
                     bot.desired_entities[ENTITY_WAGON] = 2;
                 } else {
                     bot.desired_entities[ENTITY_WAGON] = 1 + lcg_rand(&bot.lcg_seed) % 2;
@@ -346,6 +346,38 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
             bot.desired_entities[primary_infantry_type] = desired_harass_unit_count - desired_secondary_infantry_count;
 
             bot.desired_squad_type = BOT_SQUAD_TYPE_HARASS;
+
+            break;
+        }
+        case BOT_GOAL_PUSH: {
+            uint32_t bot_mining_base_count = 0;
+            for (const Entity& goldmine : state.entities) {
+                if (goldmine.type != ENTITY_GOLDMINE || goldmine.gold_held == 0) {
+                    continue;
+                }
+                EntityId surrounding_base_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
+                if (surrounding_base_id == ID_NULL) {
+                    continue;
+                }
+                if (state.entities.get_by_id(surrounding_base_id).player_id == bot.player_id) {
+                    bot_mining_base_count++;
+                }
+            }
+            uint32_t push_size = (16 + (lcg_rand(&bot.lcg_seed) % 5)) + bot_mining_base_count;
+
+            switch (bot.strategy) {
+                case BOT_STRATEGY_SALOON_DROP_HARASS: {
+                    bot.desired_entities[ENTITY_WAGON] = push_size / 4;
+                    bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % ((bot.desired_entities[ENTITY_WAGON] * 4) + 1);
+                    bot.desired_entities[ENTITY_COWBOY] = (bot.desired_entities[ENTITY_WAGON] * 4) - bot.desired_entities[ENTITY_BANDIT];
+                    bot.desired_entities[ENTITY_JOCKEY] = push_size - (bot.desired_entities[ENTITY_COWBOY] + bot.desired_entities[ENTITY_BANDIT] + (2 * bot.desired_entities[ENTITY_WAGON]));
+                    break;
+                }
+                case BOT_STRATEGY_COUNT: {
+                    GOLD_ASSERT(false);
+                    break;
+                }
+            }
 
             break;
         }
