@@ -36,7 +36,7 @@ static const uint32_t UI_ALERT_DURATION = 90;
 static const uint32_t UI_ALERT_LINGER_DURATION = 60 * 20;
 static const uint32_t UI_ALERT_TOTAL_DURATION = UI_ALERT_DURATION + UI_ALERT_LINGER_DURATION;
 static const int UI_ATTACK_ALERT_DISTANCE = 20;
-static const uint32_t MATCH_UI_DOUBLE_CLICK_DURATION = 16;
+static const uint32_t MATCH_UI_DOUBLE_CLICK_DURATION = 30;
 
 static const int MATCH_UI_BUTTON_X = SCREEN_WIDTH - 132 + 14; 
 static const int MATCH_UI_BUTTON_Y = SCREEN_HEIGHT - MATCH_UI_HEIGHT + 10;
