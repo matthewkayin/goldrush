@@ -157,6 +157,7 @@ EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& 
 
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
 ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot, uint32_t existing_hall_index);
+ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t nearby_hall_index);
 uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot);
 bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell);
 

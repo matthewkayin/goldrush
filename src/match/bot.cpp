@@ -196,6 +196,7 @@ BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot) {
 
     switch (bot.strategy) {
         case BOT_STRATEGY_SALOON_COOP: {
+            return BOT_GOAL_BUNKER;
             // TODO: check for safety before expanding?
             if (unoccupied_goldmine_count > 0 &&
                     (player_mining_base_count[bot.player_id] < 2 || 
@@ -1014,7 +1015,14 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    ivec2 building_location = building_type == ENTITY_HALL ? bot_find_hall_location(state, bot, hall_index) : bot_find_building_location(state, bot.player_id, state.entities[hall_index].cell + ivec2(1, 1), entity_get_data(building_type).cell_size);
+    ivec2 building_location; 
+    if (building_type == ENTITY_HALL) {
+        building_location = bot_find_hall_location(state, bot, hall_index);
+    } else if (building_type == ENTITY_BUNKER) {
+        building_location = bot_find_bunker_location(state, bot, hall_index);
+    } else {
+        building_location = bot_find_building_location(state, bot.player_id, state.entities[hall_index].cell + ivec2(1, 1), entity_get_data(building_type).cell_size);
+    }
     if (building_location.x == -1) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
@@ -2703,6 +2711,55 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot, uint32_t e
     // if we had a really bad map gen bug or the player surrounded the
     // goldmine with units 
     return best_hall_cell;
+}
+
+ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t nearby_hall_index) {
+    const Entity& nearby_hall = state.entities[nearby_hall_index];
+    ivec2 nearby_hall_cell = nearby_hall.cell;
+    EntityId nearest_enemy_building_id = bot_find_best_entity((BotFindBestEntityParams) {
+        .state = state,
+        .filter = [&state, &bot](const Entity& building, EntityId building_id) {
+            return entity_is_building(building.type) &&
+                    entity_is_selectable(building) &&
+                    state.players[building.player_id].team != state.players[bot.player_id].team;
+        },
+        .compare = [&nearby_hall_cell](const Entity& a, const Entity& b) {
+            if (a.type == ENTITY_HALL && b.type != ENTITY_HALL) {
+                return true;
+            }
+            if (a.type != ENTITY_HALL && b.type == ENTITY_HALL) {
+                return false;
+            }
+            return ivec2::manhattan_distance(a.cell, nearby_hall_cell) < ivec2::manhattan_distance(b.cell, nearby_hall_cell);
+        }
+    });
+
+    // If there are no enemy buildings, then it doesn't matter where we put the bunker
+    if (nearest_enemy_building_id == ID_NULL) {
+        return bot_find_building_location(state, bot.player_id, nearby_hall_cell, entity_get_data(ENTITY_BUNKER).cell_size);
+    }
+
+    const Entity& nearest_enemy_building = state.entities.get_by_id(nearest_enemy_building_id);
+    std::vector<ivec2> path;
+    ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, nearby_hall_cell, entity_get_data(ENTITY_HALL).cell_size, 1, nearest_enemy_building.cell, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_building.cell, entity_get_data(nearest_enemy_building.type).cell_size, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    if (path_start_cell.x == -1 || path_end_cell.x == -1) {
+        return bot_find_building_location(state, bot.player_id, nearby_hall_cell, entity_get_data(ENTITY_BUNKER).cell_size);
+    }
+    map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+
+    ivec2 search_start_cell = path_start_cell;
+    int path_index = path.size() - 1;
+    while (path_index >= 0 &&
+            (ivec2::manhattan_distance(path[path_index], path_start_cell) >= 16 ||
+            map_get_tile(state.map, path[path_index]).elevation != map_get_tile(state.map, path_start_cell).elevation)) {
+        path_index--;
+    }
+    if (path_index >= 0 && path_index < path.size()) {
+        search_start_cell = path[path_index];
+    }
+
+    return bot_find_building_location(state, bot.player_id, search_start_cell, entity_get_data(ENTITY_BUNKER).cell_size);
 }
 
 uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot) {
