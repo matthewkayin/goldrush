@@ -143,12 +143,6 @@ void input_poll_events() {
                     case SDL_SCANCODE_SPACE:
                         state.current[INPUT_ACTION_SPACE] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    case SDL_SCANCODE_F3:
-                        state.current[INPUT_ACTION_F3] = event.type == SDL_EVENT_KEY_DOWN;
-                        break;
-                    case SDL_SCANCODE_F4:
-                        state.current[INPUT_ACTION_F4] = event.type == SDL_EVENT_KEY_DOWN;
-                        break;
                     #ifdef GOLD_DEBUG_TURBO
                     case SDL_SCANCODE_F9:
                         state.current[INPUT_ACTION_TURBO] = event.type == SDL_EVENT_KEY_DOWN;
@@ -170,6 +164,9 @@ void input_poll_events() {
                         if (event.key.scancode >= SDL_SCANCODE_1 && event.key.scancode <= SDL_SCANCODE_0) {
                             int key_index = event.key.scancode - SDL_SCANCODE_1;
                             state.current[INPUT_ACTION_NUM1 + key_index] = event.type == SDL_EVENT_KEY_DOWN;
+                        } else if (event.key.scancode >= SDL_SCANCODE_F1 && event.key.scancode <= SDL_SCANCODE_F6) {
+                            int key_index = event.key.scancode - SDL_SCANCODE_F1;
+                            state.current[INPUT_ACTION_F1 + key_index] = event.type == SDL_EVENT_KEY_DOWN;
                         } else {
                             for (uint32_t hotkey = INPUT_HOTKEY_NONE + 1; hotkey < INPUT_ACTION_COUNT; hotkey++) {
                                 if (event.key.scancode == state.hotkey_mapping[hotkey]) {

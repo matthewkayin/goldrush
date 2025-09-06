@@ -282,11 +282,13 @@ int gold_main(int argc, char** argv) {
                 break;
             }
 
+            /*
             #ifdef GOLD_DEBUG
                 if (input_is_action_just_pressed(INPUT_ACTION_F3)) {
                     render_debug_info = !render_debug_info;
                 }
             #endif
+            */
 
             network_service();
             NetworkEvent event;

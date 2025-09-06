@@ -147,6 +147,10 @@ MatchUiState match_ui_base_init() {
         state.hotkey_group[index] = INPUT_HOTKEY_NONE;
     }
 
+    for (int index = 0; index < MATCH_UI_CAMERA_HOTKEY_COUNT; index++) {
+        state.camera_hotkeys[index] = ivec2(-1, -1);
+    }
+
     return state;
 }
 
@@ -305,6 +309,7 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 void match_ui_handle_input(MatchUiState& state) {
     bool spectator_mode = state.replay_mode || !state.match.players[network_get_player_id()].active;
 
+    /*
     #ifdef GOLD_DEBUG
         if (input_is_action_just_pressed(INPUT_ACTION_F4)) {
             state.theater_mode = !state.theater_mode;
@@ -315,6 +320,7 @@ void match_ui_handle_input(MatchUiState& state) {
             }
         }
     #endif
+    */
 
     // Begin chat
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active() && !state.replay_mode) {
@@ -849,6 +855,17 @@ void match_ui_handle_input(MatchUiState& state) {
     // Jump to latest alert
     if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && !state.alerts.empty()) {
         match_ui_center_camera_on_cell(state, state.alerts.back().cell);
+    }
+
+    // Camera hotkeys
+    for (int index = 0; index < MATCH_UI_CAMERA_HOTKEY_COUNT; index++) {
+        if (input_is_action_just_pressed((InputAction)(INPUT_ACTION_F1 + index))) {
+            if (input_is_action_pressed(INPUT_ACTION_SHIFT)) {
+                state.camera_hotkeys[index] = state.camera_offset;
+            } else if (state.camera_hotkeys[index].x != -1) {
+                state.camera_offset = state.camera_hotkeys[index];
+            }
+        }
     }
 }
 

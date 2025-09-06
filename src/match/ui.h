@@ -15,6 +15,7 @@
 #define MATCH_UI_HEIGHT 88
 #define MATCH_UI_CONTROL_GROUP_COUNT 10
 #define MATCH_UI_CONTROL_GROUP_NONE -1
+#define MATCH_UI_CAMERA_HOTKEY_COUNT 6
 
 const uint16_t ELEVATION_COUNT = 3;
 
@@ -85,6 +86,7 @@ struct MatchUiState {
 
     ivec2 camera_offset;
     bool is_minimap_dragging;
+    ivec2 camera_hotkeys[MATCH_UI_CAMERA_HOTKEY_COUNT];
 
     ivec2 select_origin;
     uint32_t double_click_timer;
