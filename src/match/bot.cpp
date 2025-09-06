@@ -363,7 +363,6 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
                     if (population_used_so_far < push_size) {
                         bot.desired_entities[ENTITY_JOCKEY] = push_size - population_used_so_far;
                     }
-                    log_trace("BOT: push size %u desired wagons %u bandits %u cowboys %u jockeys %u", push_size, bot.desired_entities[ENTITY_WAGON], bot.desired_entities[ENTITY_BANDIT], bot.desired_entities[ENTITY_COWBOY], bot.desired_entities[ENTITY_JOCKEY]);
                     break;
                 }
                 case BOT_STRATEGY_COUNT: {
@@ -827,7 +826,6 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
         }
     }
     uint32_t max_production_buildings = std::max(1U, hall_count * 2);
-    log_trace("BOT: max production buildings %u", max_production_buildings);
     for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         if (desired_units_from_building[entity_type] == 0) {
             continue;
@@ -837,7 +835,6 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
         if (desired_units_total > max_production_buildings && desired_units_from_building[entity_type] > 7) {
             uint32_t production_building_divisor = desired_units_total / max_production_buildings;
             desired_building_count = std::max(1U, desired_units_from_building[entity_type] / production_building_divisor);
-            log_trace("BOT: building type %s desired units %u / divisor %u = building count %u", entity_get_data((EntityType)entity_type).name, desired_units_from_building[entity_type], production_building_divisor, desired_building_count);
         } else if (desired_units_from_building[entity_type] > 7) {
             desired_building_count = 3;
         } else if (desired_units_from_building[entity_type] > 3) {
@@ -846,7 +843,6 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
             desired_building_count = 1;
         }
         desired_entities[entity_type] = std::max(desired_entities[entity_type], desired_building_count);
-        log_trace("BOT: desired entities of type %s: %u", entity_get_data((EntityType)entity_type).name, desired_entities[entity_type]);
     }
 
     // Determine additional desired buildings based on desired upgrade

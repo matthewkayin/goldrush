@@ -1640,7 +1640,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         entity_set_flag(entity, ENTITY_FLAG_CHARGED, false);
                         entity.mode = MODE_UNIT_SOLDIER_CHARGE;
                     } else {
-                        entity.cooldown_timer = entity_data.unit_data.attack_cooldown;
+                        entity.cooldown_timer = entity_data.unit_data.attack_cooldown + lcg_rand(&state.lcg_seed) % 4;
                         entity.mode = MODE_UNIT_IDLE;
                     }
 
