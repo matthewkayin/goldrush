@@ -238,46 +238,6 @@ BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot) {
         }
     }
 
-    // If we have less than 2 bases and we feel safe, then expand
-    bool bot_feels_safe = max_opponent_army_size - army_size[bot.player_id] < 4 * max_opponent_base_count;
-    if (player_mining_base_count[bot.player_id] < 2 && 
-            unoccupied_goldmine_count > 0 &&
-            bot_feels_safe) {
-        return BOT_GOAL_EXPAND;
-    }
-
-    // If we have less bases than opponent and we feel safe, then expand
-    if (player_mining_base_count[bot.player_id] < max_opponent_base_count &&
-            unoccupied_goldmine_count > 0 &&
-            bot_feels_safe) {
-        return BOT_GOAL_EXPAND;
-    }
-
-    // If we have lots of excess gold, then expand
-    if (bot_get_effective_gold(state, bot) > 1000 && 
-            unoccupied_goldmine_count > 0 && 
-            bot_feels_safe) {
-        return BOT_GOAL_EXPAND;
-    }
-
-    // If opponent has undefended base, then harass
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state.players[player_id].active ||
-                state.players[player_id].team == state.players[bot.player_id].team) {
-            continue;
-        }
-        if (entity_count[player_id][ENTITY_BUNKER] == 0 || 
-                entity_count[player_id][ENTITY_HALL] / entity_count[player_id][ENTITY_BUNKER] < 1) {
-            return BOT_GOAL_HARASS;
-        }
-    }
-
-    // If we have an undefended base, then build bunker
-    if (entity_count[bot.player_id][ENTITY_BUNKER] == 0 ||
-            entity_count[bot.player_id][ENTITY_HALL] / entity_count[bot.player_id][ENTITY_BUNKER] < 1) {
-        return BOT_GOAL_BUNKER;
-    }
-
     return BOT_GOAL_PUSH;
 }
 
@@ -294,6 +254,7 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
     // Count unreserved entities
     uint32_t entity_count[ENTITY_TYPE_COUNT];
     memset(entity_count, 0, sizeof(entity_count));
+    uint32_t bot_finished_base_count = 0;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         const Entity& entity = state.entities[entity_index];
         EntityId entity_id = state.entities.get_id_of(entity_index);
@@ -304,6 +265,9 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
         }
 
         entity_count[entity.type]++;
+        if (entity.type == ENTITY_HALL && entity.mode == MODE_BUILDING_FINISHED) {
+            bot_finished_base_count++;
+        }
     }
 
     switch (bot.goal) {
@@ -347,14 +311,21 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
                     SaloonCoopHarassType harass_type = (SaloonCoopHarassType)(lcg_rand(&bot.lcg_seed) % SALOON_COOP_HARASS_TYPE_COUNT);
                     switch (harass_type) {
                         case SALOON_COOP_HARASS_TYPE_WAGON: {
-                            if (entity_count[ENTITY_WAGON] > 1) {
-                                bot.desired_entities[ENTITY_WAGON] = 2;
+                            if (bot_finished_base_count < 2) {
+                                uint32_t infantry_count = 4 + (lcg_rand(&bot.lcg_seed) % 4);
+                                bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (infantry_count + 1);
+                                bot.desired_entities[ENTITY_COWBOY] = infantry_count - bot.desired_entities[ENTITY_BANDIT];
                             } else {
-                                bot.desired_entities[ENTITY_WAGON] = 1 + lcg_rand(&bot.lcg_seed) % 2;
+                                if (entity_count[ENTITY_WAGON] > 1) {
+                                    bot.desired_entities[ENTITY_WAGON] = 2;
+                                } else {
+                                    bot.desired_entities[ENTITY_WAGON] = 1 + lcg_rand(&bot.lcg_seed) % 2;
+                                }
+
+                                uint32_t infantry_count = bot.desired_entities[ENTITY_WAGON] * entity_get_data(ENTITY_WAGON).garrison_capacity;
+                                bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (infantry_count + 1);
+                                bot.desired_entities[ENTITY_COWBOY] = infantry_count - bot.desired_entities[ENTITY_BANDIT];
                             }
-                            uint32_t infantry_count = bot.desired_entities[ENTITY_WAGON] * entity_get_data(ENTITY_WAGON).garrison_capacity;
-                            bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (infantry_count + 1);
-                            bot.desired_entities[ENTITY_COWBOY] = infantry_count - bot.desired_entities[ENTITY_BANDIT];
                             break;
                         }
                         case SALOON_COOP_HARASS_TYPE_JOCKEYS: {
@@ -380,14 +351,19 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
         case BOT_GOAL_PUSH: {
             bot.desired_squad_type = BOT_SQUAD_TYPE_PUSH;
 
-            uint32_t push_size = (16 + (lcg_rand(&bot.lcg_seed) % 5)) + bot_get_mining_base_count(state, bot);
+            uint32_t push_size = 16 + ((lcg_rand(&bot.lcg_seed) % 5) * bot_get_mining_base_count(state, bot));
 
             switch (bot.strategy) {
                 case BOT_STRATEGY_SALOON_COOP: {
-                    bot.desired_entities[ENTITY_WAGON] = push_size / 4;
-                    bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % ((bot.desired_entities[ENTITY_WAGON] * 4) + 1);
-                    bot.desired_entities[ENTITY_COWBOY] = (bot.desired_entities[ENTITY_WAGON] * 4) - bot.desired_entities[ENTITY_BANDIT];
-                    bot.desired_entities[ENTITY_JOCKEY] = push_size - (bot.desired_entities[ENTITY_COWBOY] + bot.desired_entities[ENTITY_BANDIT] + (2 * bot.desired_entities[ENTITY_WAGON]));
+                    bot.desired_entities[ENTITY_WAGON] = push_size / 8;
+                    uint32_t wagon_capacity = bot.desired_entities[ENTITY_WAGON] * entity_get_data(ENTITY_WAGON).garrison_capacity;
+                    bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (wagon_capacity + 1);
+                    bot.desired_entities[ENTITY_COWBOY] = wagon_capacity - bot.desired_entities[ENTITY_BANDIT];
+                    uint32_t population_used_so_far = (bot.desired_entities[ENTITY_COWBOY] + bot.desired_entities[ENTITY_BANDIT] + (2 * bot.desired_entities[ENTITY_WAGON]));
+                    if (population_used_so_far < push_size) {
+                        bot.desired_entities[ENTITY_JOCKEY] = push_size - population_used_so_far;
+                    }
+                    log_trace("BOT: push size %u desired wagons %u bandits %u cowboys %u jockeys %u", push_size, bot.desired_entities[ENTITY_WAGON], bot.desired_entities[ENTITY_BANDIT], bot.desired_entities[ENTITY_COWBOY], bot.desired_entities[ENTITY_JOCKEY]);
                     break;
                 }
                 case BOT_STRATEGY_COUNT: {
@@ -851,6 +827,7 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
         }
     }
     uint32_t max_production_buildings = std::max(1U, hall_count * 2);
+    log_trace("BOT: max production buildings %u", max_production_buildings);
     for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         if (desired_units_from_building[entity_type] == 0) {
             continue;
@@ -860,6 +837,7 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
         if (desired_units_total > max_production_buildings && desired_units_from_building[entity_type] > 7) {
             uint32_t production_building_divisor = desired_units_total / max_production_buildings;
             desired_building_count = std::max(1U, desired_units_from_building[entity_type] / production_building_divisor);
+            log_trace("BOT: building type %s desired units %u / divisor %u = building count %u", entity_get_data((EntityType)entity_type).name, desired_units_from_building[entity_type], production_building_divisor, desired_building_count);
         } else if (desired_units_from_building[entity_type] > 7) {
             desired_building_count = 3;
         } else if (desired_units_from_building[entity_type] > 3) {
@@ -868,6 +846,7 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
             desired_building_count = 1;
         }
         desired_entities[entity_type] = std::max(desired_entities[entity_type], desired_building_count);
+        log_trace("BOT: desired entities of type %s: %u", entity_get_data((EntityType)entity_type).name, desired_entities[entity_type]);
     }
 
     // Determine additional desired buildings based on desired upgrade
