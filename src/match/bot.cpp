@@ -124,7 +124,8 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 BotGoal bot_choose_opening_goal(const Bot& bot) {
     switch (bot.strategy) {
         case BOT_STRATEGY_SALOON_COOP:
-            return BOT_GOAL_BANDIT_RUSH;
+            return BOT_GOAL_BUNKER;
+            // return BOT_GOAL_BANDIT_RUSH;
         case BOT_STRATEGY_COUNT:
             GOLD_ASSERT(false);
             return BOT_GOAL_NONE;
@@ -2749,14 +2750,15 @@ ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t
     map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
 
     ivec2 search_start_cell = path_start_cell;
-    int path_index = path.size() - 1;
-    while (path_index >= 0 &&
-            (ivec2::manhattan_distance(path[path_index], path_start_cell) >= 16 ||
-            map_get_tile(state.map, path[path_index]).elevation != map_get_tile(state.map, path_start_cell).elevation)) {
-        path_index--;
+    int path_index = 0;
+    while (path_index < path.size() &&
+            (ivec2::manhattan_distance(path[path_index], path_start_cell) < 17 &&
+            map_get_tile(state.map, path[path_index]).elevation == 
+            map_get_tile(state.map, path_start_cell).elevation)) {
+        path_index++;
     }
-    if (path_index >= 0 && path_index < path.size()) {
-        search_start_cell = path[path_index];
+    if (path_index > 1 && path_index < path.size() && path_index < path.size()) {
+        search_start_cell = path[path_index - 1];
     }
 
     return bot_find_building_location(state, bot.player_id, search_start_cell, entity_get_data(ENTITY_BUNKER).cell_size);
