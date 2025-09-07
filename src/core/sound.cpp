@@ -8,7 +8,7 @@
 #include <cstdlib>
 #include <cstdio>
 
-#define SFX_STREAM_COUNT 4
+#define SFX_STREAM_COUNT 8
 
 struct SoundParams {
     const char* path;
