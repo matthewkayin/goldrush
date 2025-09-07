@@ -77,7 +77,8 @@ struct Bot {
     std::vector<EntityId> entities_to_scout;
     std::vector<BotScoutDanger> scout_danger;
     std::unordered_map<uint32_t, bool> should_scout_goldmine;
-    bool scout_enemy_has_invisible_units;
+    bool scout_enemy_has_detectives;
+    bool scout_enemy_has_landmines;
 };
 
 Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
@@ -121,6 +122,7 @@ void bot_squad_dissolve(const MatchState& state, Bot& bot, BotSquad& squad);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad);
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);
+bool bot_squad_is_detective_harass(const MatchState& state, const BotSquad& squad);
 
 // Scouting
 

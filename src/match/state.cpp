@@ -944,8 +944,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                 // If unit is idle, try to find a nearby target
                 if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && 
-                        entity_data.unit_data.damage != 0 && 
-                        !(entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE))) {
+                        entity_data.unit_data.damage != 0) {
                     entity.target = match_entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
                 }
 
