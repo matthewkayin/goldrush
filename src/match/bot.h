@@ -72,7 +72,6 @@ struct Bot {
     std::vector<BotSquad> squads;
 
     EntityId scout_id;
-    bool is_requesting_new_scout;
     uint32_t last_scout_time;
     std::vector<EntityId> entities_to_scout;
     std::vector<BotScoutDanger> scout_danger;
@@ -131,7 +130,6 @@ void bot_scout_update(const MatchState& state, Bot& bot, uint32_t match_time_min
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 void bot_release_scout(Bot& bot);
 bool bot_should_scout(const MatchState& state, const Bot& bot, uint32_t match_time_minutes);
-int bot_score_scout_type(EntityType type);
 bool bot_scout_danger_is_expired(const MatchState& state, const BotScoutDanger& danger, uint32_t match_time_mintutes);
 ivec2 bot_scout_danger_get_cell(const MatchState& state, const BotScoutDanger& danger);
 

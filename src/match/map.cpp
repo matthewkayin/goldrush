@@ -9,6 +9,7 @@
 
 static const int MAP_PLAYER_SPAWN_SIZE = 13;
 static const int MAP_PLAYER_SPAWN_MARGIN = 13;
+static const int8_t NOISE_LEVEL_WATER = -1;
 
 struct PoissonDiskParams {
     std::vector<int> avoid_values;
@@ -42,7 +43,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
     const int WATER_WALL_DIST = 4;
     for (int x = 0; x < (int)noise.width; x++) {
         for (int y = 0; y < (int)noise.height; y++) {
-            if (noise.map[x + (y * noise.width)] != -1) {
+            if (noise.map[x + (y * noise.width)] != NOISE_LEVEL_WATER) {
                 continue;
             }
 
@@ -69,7 +70,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
     // Widen gaps that are too narrow
     for (int y = 0; y < (int)noise.height; y++) {
         for (int x = 0; x < (int)noise.width; x++) {
-            if (noise.map[x + (y * noise.width)] == -1 || noise.map[x + (y * noise.width)] == 2) {
+            if (noise.map[x + (y * noise.width)] == NOISE_LEVEL_WATER || noise.map[x + (y * noise.width)] == 2) {
                 continue;
             }
 
@@ -86,6 +87,92 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Remove lowground areas that are too small
+    {
+        std::vector<int> map_tile_islands(noise.width * noise.height, -1);
+        std::vector<int> island_size;
+
+        while (true) {
+            // Set index equal to the first index of the first unassigned tile in the array
+            uint32_t index;
+            for (index = 0; index < noise.width * noise.height; index++) {
+                if (map_tile_islands[index] == -1) {
+                    break;
+                }
+            }
+            if (index == noise.width * noise.height) {
+                // Island mapping is complete
+                break;
+            }
+
+            // Determine the next island index
+            int island_index = island_size.size();
+            island_size.push_back(0);
+            int8_t island_noise_value = noise.map[index];
+
+            // Flood fill this island index
+            std::vector<ivec2> frontier;
+            frontier.push_back(ivec2(index % noise.width, index / noise.height));
+
+            while (!frontier.empty()) {
+                ivec2 next = frontier.back();
+                frontier.pop_back();
+
+                if (next.x < 0 || next.y < 0 || next.x >= noise.width || next.y >= noise.height) {
+                    continue;
+                }
+                if (noise.map[next.x + (next.y * noise.width)] != island_noise_value) {
+                    continue;
+                }
+
+                // skip this because we've already explored it
+                if (map_tile_islands[next.x + (next.y * noise.width)] != -1) {
+                    continue;
+                }
+
+                map_tile_islands[next.x + (next.y * map.width)] = island_index;
+                island_size[island_index]++;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    frontier.push_back(next + DIRECTION_IVEC2[direction]);
+                }
+            }
+        } 
+        // End assign noise tiles to islands
+
+        for (int island_index = 0; island_index < island_size.size(); island_index++) {
+            log_trace("Island index %u size %u", island_index, island_size[island_index]);
+            // Big islands are fine as they are
+            if (island_size[island_index] > 15) {
+                continue;
+            }
+
+            // Find the first index which belongs to this island
+            int first_index;
+            for (first_index = 0; first_index < noise.width * noise.height; first_index++) {
+                if (map_tile_islands[first_index] == island_index) {
+                    break;
+                }
+            }
+            ivec2 first_index_coord = ivec2(first_index % noise.width, first_index / noise.width);
+
+            // And use that index to determine the island's noise value
+            // If the noise value is non-zero, then skip it
+            if (noise.map[first_index] != 0) {
+                continue;
+            }
+
+            // We now have a small 0-elevation section of the noise map that we would like to clean up
+            // So replace the 0-elevation section with a different noise level
+            for (int index = 0; index < noise.width * noise.height; index++) {
+                if (map_tile_islands[index] != island_index) {
+                    continue;
+                }
+
+                noise.map[index] = 1;
             }
         }
     }
@@ -175,7 +262,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                             artifacts.push_back(ivec2(x, y));
                         }
                     }
-                } else if (noise.map[index] == -1) {
+                } else if (noise.map[index] == NOISE_LEVEL_WATER) {
                     uint32_t neighbors = 0;
                     // Check adjacent neighbors
                     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {

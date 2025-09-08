@@ -23,7 +23,6 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
 
     bot.scout_id = ID_NULL;
     bot.last_scout_time = 0;
-    bot.is_requesting_new_scout = false;
     bot.scout_enemy_has_detectives = false;
     bot.scout_enemy_has_landmines = false;
     for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
@@ -933,23 +932,6 @@ BotDesiredEntities bot_get_desired_entities(const MatchState& state, const Bot& 
             if (desired_entities[entity.type] > 0) {
                 desired_entities[entity.type]--;
             }
-        }
-    }
-
-    // Requesting scout
-    if (bot.is_requesting_new_scout) {
-        EntityId coop_id = bot_find_entity((BotFindEntityParams) {
-            .state = state,
-            .filter = [&bot](const Entity& building, EntityId building_id) {
-                return building.player_id == bot.player_id &&
-                        building.type == ENTITY_COOP &&
-                        entity_is_selectable(building);
-            }
-        });
-        if (coop_id != ID_NULL) {
-            desired_entities[ENTITY_WAGON]++;
-        }else {
-            desired_entities[ENTITY_BANDIT]++;
         }
     }
 
@@ -2218,7 +2200,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
     if (bot.scout_id == ID_NULL) {
         // Determine if we should begin scouting
         if (!bot_should_scout(state, bot, match_time_minutes)) {
-            bot.is_requesting_new_scout = false;
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
 
@@ -2252,7 +2233,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
             bot.entities_to_scout.push_back(entity_id);
         }
         if (bot.entities_to_scout.empty()) {
-            bot.is_requesting_new_scout = false;
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
 
@@ -2261,22 +2241,24 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
             .state = state, 
             .filter = [&bot](const Entity& entity, EntityId entity_id) {
                 return entity.player_id == bot.player_id && 
-                    bot_score_scout_type(entity.type) != 0 &&
+                    (entity.type == ENTITY_WAGON || entity.type == ENTITY_MINER) &&
+                    !(entity.target.type == TARGET_BUILD || entity.target.type == TARGET_REPAIR || entity.target.type == TARGET_UNLOAD) &&
                     entity.garrisoned_units.empty() && 
                     !bot_is_entity_reserved(bot, entity_id);
             },
             .compare = [](const Entity&a, const Entity& b) {
-                return bot_score_scout_type(a.type) > bot_score_scout_type(b.type);
+                if (a.type == ENTITY_WAGON && b.type != ENTITY_WAGON) {
+                    return true;
+                }
+                return false;
             }
         });
         if (bot.scout_id == ID_NULL) {
-            bot.is_requesting_new_scout = true;
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
         if (bot.goal != BOT_GOAL_BANDIT_RUSH) {
             bot_reserve_entity(bot, bot.scout_id);
         }
-        bot.is_requesting_new_scout = false;
     }
 
     const Entity& scout = state.entities.get_by_id(bot.scout_id);
@@ -2428,39 +2410,16 @@ void bot_release_scout(Bot& bot) {
 }
 
 bool bot_should_scout(const MatchState& state, const Bot& bot, uint32_t match_time_minutes) {
-    EntityId unscouted_hall_or_goldmine_id = bot_find_entity((BotFindEntityParams) {
-        .state = state,
-        .filter = [&state, &bot](const Entity& entity, EntityId entity_id) {
-            return (entity.type == ENTITY_GOLDMINE ||
-                        entity.type == ENTITY_HALL) && 
-                    !bot_has_scouted_entity(state, bot, entity, entity_id);
-        }
-    });
-    if (unscouted_hall_or_goldmine_id != ID_NULL) {
-        return true;
+    uint32_t next_scout_time;
+    if (bot.last_scout_time == 0)  {
+        next_scout_time = 0;
+    } else if (match_time_minutes < 10) {
+        next_scout_time = bot.last_scout_time + 2;
+    } else {
+        next_scout_time = bot.last_scout_time + 5;
     }
 
-    if (match_time_minutes > bot.last_scout_time && 
-            match_time_minutes - bot.last_scout_time >= 5) {
-        return true;
-    }
-
-    return false;
-}
-
-int bot_score_scout_type(EntityType type) {
-    switch (type) {
-        case ENTITY_WAGON:
-            return 4;
-        case ENTITY_JOCKEY:
-            return 3;
-        case ENTITY_DETECTIVE:
-            return 2;
-        case ENTITY_BANDIT:
-            return 1;
-        default:
-            return 0;
-    }
+    return match_time_minutes >= next_scout_time;
 }
 
 bool bot_scout_danger_is_expired(const MatchState& state, const BotScoutDanger& danger, uint32_t match_time_mintutes) {
@@ -2986,6 +2945,7 @@ ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, c
                 ivec2 cell = ivec2(x, y);
                 if (!map_is_cell_in_bounds(state.map, cell)) {
                     is_rally_point_valid = false;
+                    break;
                 }
                 if (map_is_tile_ramp(state.map, cell)) {
                     is_rally_point_valid = false;

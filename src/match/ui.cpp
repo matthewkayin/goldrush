@@ -113,6 +113,7 @@ static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 31, BUTTON
 
 static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
 static const uint32_t REPLAY_CHECKPOINT_FREQ = 32;
+static const uint32_t REPLAY_FOG_NONE = 0;
 
 // INIT
 
@@ -237,7 +238,9 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
     match_ui_replay_scrub(state, 0);
 
     // Init replay fog picker
-    state.replay_fog_index = 0;
+    state.replay_fog_index = 1;
+    state.replay_fog_player_ids.push_back(PLAYER_NONE);
+    state.replay_fog_texts.push_back("None");
     state.replay_fog_player_ids.push_back(PLAYER_NONE);
     state.replay_fog_texts.push_back("Everyone");
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -2039,6 +2042,9 @@ void match_ui_leave_match(MatchUiState& state, bool exit_program) {
 
 bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity) {
     if (state.replay_mode) {
+        if (state.replay_fog_index == REPLAY_FOG_NONE) {
+            return 1;
+        }
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if ((state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
                     state.replay_fog_player_ids[state.replay_fog_index] == player_id) &&
@@ -2063,6 +2069,9 @@ bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity)
 
 bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size) {
     if (state.replay_mode) {
+        if (state.replay_fog_index == REPLAY_FOG_NONE) {
+            return true;
+        }
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if ((state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
                     state.replay_fog_player_ids[state.replay_fog_index] == player_id) &&
@@ -2087,6 +2096,9 @@ bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int c
 
 int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
     if (state.replay_mode) {
+        if (state.replay_fog_index == REPLAY_FOG_NONE) {
+            return 1;
+        }
         int fog_value = FOG_HIDDEN;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
