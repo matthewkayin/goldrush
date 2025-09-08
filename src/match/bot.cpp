@@ -107,6 +107,11 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
         return scout_input;
     }
 
+    MatchInput rein_in_input = bot_rein_in_stray_units(state, bot);
+    if (rein_in_input.type != MATCH_INPUT_NONE) {
+        return rein_in_input;
+    }
+
     MatchInput rally_input = bot_set_rally_points(state, bot);
     if (rally_input.type != MATCH_INPUT_NONE) {
         return rally_input;
@@ -1198,7 +1203,7 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
     std::vector<ivec2> path_to_hall;
     map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, target_cell, entity_size, &path_to_hall, MAP_IGNORE_UNITS);
 
-    static const int DISTANCE_FROM_HALL = 4;
+    static const int DISTANCE_FROM_HALL = 8;
     if (path_to_hall.size() > DISTANCE_FROM_HALL) {
         target_cell = path_to_hall[path_to_hall.size() - DISTANCE_FROM_HALL];
     }
@@ -1273,6 +1278,65 @@ MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bo
     input.move.target_cell = state.entities.get_by_id(carrier_id).cell;
     input.move.entity_ids[0] = carrier_id;
     input.move.entity_count = 1;
+    return input;
+}
+
+MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot) {
+    MatchInput input = (MatchInput) { .type = MATCH_INPUT_NONE };
+
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
+
+        // Filter down to bot-owned, unreserved units
+        if (!entity_is_unit(entity.type) ||
+                !entity_is_selectable(entity) ||
+                entity.player_id != bot.player_id ||
+                bot_is_entity_reserved(bot, entity_id)) {
+            continue;
+        }
+
+        // Don't interrupt units with targets
+        if (!(entity.target.type == TARGET_ATTACK_ENTITY || entity.target.type == TARGET_NONE)) {
+            continue;
+        }
+
+        // If the unit is attacking something, don't bother it
+        uint32_t target_index = entity.target.type == TARGET_ATTACK_ENTITY ? state.entities.get_index_of(entity.target.id) : INDEX_INVALID;
+        if (target_index != INDEX_INVALID && ivec2::manhattan_distance(entity.cell, state.entities[target_index].cell) < BOT_SQUAD_GATHER_DISTANCE) {
+            continue;
+        }
+
+        // If this unit is already nearby an allied building, skip
+        EntityId nearby_allied_building_id = bot_find_entity((BotFindEntityParams) {
+            .state = state,
+            .filter = [&entity](const Entity& building, EntityId building_id) {
+                return entity_is_building(building.type) &&
+                        entity_is_selectable(building) &&
+                        entity.player_id == building.player_id &&
+                        ivec2::manhattan_distance(entity.cell, building.cell) < BOT_SQUAD_GATHER_DISTANCE * 2;
+            }
+        });
+        if (nearby_allied_building_id != ID_NULL) {
+            continue;
+        }
+
+        // If we've gotten all the way down here, it's time to rein in the unit
+
+        // But first let's check the input, if the input is none, then start a new retreat input
+        if (input.type == MATCH_INPUT_NONE) {
+            input = bot_return_entity_to_nearest_hall(state, bot, entity_id);
+            continue;
+        } 
+
+        // Otherwise if the input is not none, then add this unit to it
+        input.move.entity_ids[input.move.entity_count] = entity_id;
+        input.move.entity_count++;
+        if (input.move.entity_count == SELECTION_LIMIT) {
+            break;
+        }
+    } // End for each entity
+
     return input;
 }
 
@@ -1697,7 +1761,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
 
         // If the unit is far away, add it to the distant infantry/cavalry list
-        if (ivec2::manhattan_distance(unit.cell, squad.target_cell) > BOT_SQUAD_GATHER_DISTANCE ||
+        if (ivec2::manhattan_distance(unit.cell, squad.target_cell) > BOT_SQUAD_GATHER_DISTANCE / 2 ||
                 squad.type == BOT_SQUAD_TYPE_BUNKER) {
             if (entity_get_data(unit.type).garrison_size == ENTITY_CANNOT_GARRISON) {
                 distant_cavalry.push_back(unit_id);
@@ -1848,7 +1912,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         // Unload garrisoned units if the carrier is 
         // 1. close to the target cell or 2. nearby an enemy
         bool should_unload_garrisoned_units = false;
-        if (ivec2::manhattan_distance(carrier.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE) {
+        if (ivec2::manhattan_distance(carrier.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE - 4) {
             should_unload_garrisoned_units = true;
         } else {
             EntityId nearby_enemy_id = bot_find_entity((BotFindEntityParams) {

@@ -108,6 +108,7 @@ MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
 MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
 MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bot);
+MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot);
 
 // Entity management
 
