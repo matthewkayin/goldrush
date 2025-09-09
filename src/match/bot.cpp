@@ -728,6 +728,10 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
 
             for (uint32_t miner_index = 0; miner_index < state.entities.size(); miner_index++) {
                 const Entity& miner = state.entities[miner_index];
+                EntityId miner_id = state.entities.get_id_of(miner_index);
+                if (miner_id == bot.scout_id) {
+                    continue;
+                }
                 if (miner.player_id == bot.player_id && miner.goldmine_id == goldmine_id) {
                     input.stop.entity_ids[input.stop.entity_count] = state.entities.get_id_of(miner_index);
                     input.stop.entity_count++;
@@ -2242,6 +2246,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
             .filter = [&bot](const Entity& entity, EntityId entity_id) {
                 return entity.player_id == bot.player_id && 
                     (entity.type == ENTITY_WAGON || entity.type == ENTITY_MINER) &&
+                    entity.garrison_id == ID_NULL &&
                     !(entity.target.type == TARGET_BUILD || entity.target.type == TARGET_REPAIR || entity.target.type == TARGET_UNLOAD) &&
                     entity.garrisoned_units.empty() && 
                     !bot_is_entity_reserved(bot, entity_id);
@@ -2325,6 +2330,42 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
                 });
             }
 
+            // If there is a base near the danger that we haven't scouted, then assume that it exists
+            for (EntityId entity_to_scout_id : bot.entities_to_scout) {
+                const Entity& entity_to_scout = state.entities.get_by_id(entity_to_scout_id);
+                if (entity_to_scout.type != ENTITY_HALL || 
+                        ivec2::manhattan_distance(entity_to_scout.cell, attacker.cell) > BOT_SQUAD_GATHER_DISTANCE) {
+                    continue;
+                }
+
+                // Confirm that this base is the nearest base to the danger
+                EntityId nearest_hall_to_danger_id = bot_find_best_entity((BotFindBestEntityParams) {
+                    .state = state,
+                    .filter = [&attacker](const Entity& hall, EntityId hall_id) {
+                        return hall.type == ENTITY_HALL &&
+                                entity_is_selectable(hall) &&
+                                hall.player_id == attacker.player_id;
+                    },
+                    .compare = bot_closest_manhattan_distance_to(attacker.cell)
+                });
+                if (nearest_hall_to_danger_id != entity_to_scout_id) {
+                    continue;
+                }
+
+                EntityId goldmine_nearest_to_hall_id = bot_find_best_entity((BotFindBestEntityParams) {
+                    .state = state,
+                    .filter = [](const Entity& goldmine, EntityId goldmine_id) {
+                        return goldmine.type == ENTITY_GOLDMINE;
+                    },
+                    .compare = bot_closest_manhattan_distance_to(state.entities.get_by_id(nearest_hall_to_danger_id).cell)
+                });
+                GOLD_ASSERT(goldmine_nearest_to_hall_id != ID_NULL);
+
+                // Mark the entity as scouted even though we haven't technically seen it yet
+                bot.scout_assumed_entities[nearest_hall_to_danger_id] = true;
+                bot.scout_assumed_entities[goldmine_nearest_to_hall_id] = true;
+            }
+
             return bot_unit_flee(state, bot, bot.scout_id);
         }
     }
@@ -2344,7 +2385,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
     // Check for any danger along the path
     bool is_danger_along_path = false;
     std::vector<ivec2> path;
-    ivec2 scout_path_dest_cell = map_get_nearest_cell_around_rect( state.map, CELL_LAYER_GROUND, scout.cell, 2, state.entities[closest_unscouted_entity_index].cell, entity_get_data(state.entities[closest_unscouted_entity_index].type).cell_size, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    ivec2 scout_path_dest_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, scout.cell, 2, state.entities[closest_unscouted_entity_index].cell, entity_get_data(state.entities[closest_unscouted_entity_index].type).cell_size, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
     map_pathfind(state.map, CELL_LAYER_GROUND, scout.cell, scout_path_dest_cell, 2, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
     static const uint32_t DANGER_RADIUS = 4;
     for (uint32_t path_index = 0; path_index < path.size(); path_index += DANGER_RADIUS) {
@@ -2493,6 +2534,7 @@ EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, i
                     entity.player_id == bot.player_id &&
                     entity.mode == MODE_UNIT_IDLE &&
                     entity.target.type == TARGET_NONE &&
+                    entity_id != bot.scout_id &&
                     !bot_is_entity_reserved(bot, entity_id);
         },
         .compare = bot_closest_manhattan_distance_to(cell)
@@ -2983,6 +3025,9 @@ bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entit
     // If for is only explored but they have seen the entity before, then they can see it
     if (match_is_cell_rect_explored(state, bot_team, entity.cell, entity_cell_size) &&
             state.remembered_entities[bot_team].find(entity_id) != state.remembered_entities[bot_team].end()) {
+        return true;
+    }
+    if (bot.scout_assumed_entities.find(entity_id) != bot.scout_assumed_entities.end()) {
         return true;
     }
     // Otherwise, they have not scouted it

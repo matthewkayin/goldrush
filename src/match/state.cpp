@@ -1127,6 +1127,15 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             // break out of while movement left
                             break;
                         }
+                        // If our path is no longer close to the target entity, then clear path and go into idle to trigger a repath
+                        if (!entity.path.empty() &&
+                                (entity.target.type == TARGET_ENTITY || entity.target.type == TARGET_ATTACK_ENTITY) &&
+                                ivec2::manhattan_distance(entity.path.back(), match_get_entity_target_cell(state, entity)) > 8) {
+                            entity.mode = MODE_UNIT_IDLE;
+                            entity.path.clear();
+                            // break out of while movement left
+                            break;
+                        }
                         if (entity.path.empty()) {
                             entity.mode = MODE_UNIT_IDLE;
                             // break out of while movement left

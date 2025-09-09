@@ -76,6 +76,7 @@ struct Bot {
     std::vector<EntityId> entities_to_scout;
     std::vector<BotScoutDanger> scout_danger;
     std::unordered_map<uint32_t, bool> should_scout_goldmine;
+    std::unordered_map<EntityId, bool> scout_assumed_entities;
     bool scout_enemy_has_detectives;
     bool scout_enemy_has_landmines;
 };
