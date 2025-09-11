@@ -13,6 +13,7 @@
 #include "hotkey.h"
 #include "upgrade.h"
 #include "replay.h"
+#include "lcg.h"
 #include "bot.h"
 #include <algorithm>
 
@@ -192,9 +193,12 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     }
 
     // Init bots
+    int32_t bot_lcg_seed = lcg_seed;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT) {
-            state.bots[player_id] = bot_init(state.match, player_id, state.match.lcg_seed);
+            // Randomize the seed here, that way if we have multiple bots they do not generate the same personalities / strategies
+            bot_lcg_seed = lcg_rand(&bot_lcg_seed);
+            state.bots[player_id] = bot_init(state.match, player_id, bot_lcg_seed);
         }
     }
 
@@ -217,7 +221,7 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
     // Because we are not saving any replay data
     state.replay_file = NULL;
 
-    replay_file_read(state.replay_inputs, &state.match, replay_path);
+    replay_file_read(replay_path, &state.match, state.replay_inputs, &state.replay_chatlog);
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         log_trace("player %u input count %u", player_id, state.replay_inputs[player_id].size());
     }
@@ -285,20 +289,7 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
             break;
         }
         case NETWORK_EVENT_PLAYER_DISCONNECTED: {
-            char message[128];
-            sprintf(message, "%s left the game.", network_get_player(event.player_disconnected.player_id).name);
-            match_ui_add_chat_message(state, PLAYER_NONE, message);
-
-            // Show the victory banner to other players when this player leaves,
-            // but only if the player was still active. If they are not active, it means they've 
-            // been defeated already, so don't show the victory banner for that player
-            if (state.match.players[event.player_disconnected.player_id].active) {
-                state.match.players[event.player_disconnected.player_id].active = false;
-                if (state.match.players[network_get_player_id()].active && !match_ui_is_opponent_in_match(state)) {
-                    state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
-                }
-            }
-
+            match_ui_handle_player_disconnect(state, event.player_disconnected.player_id);
             break;
         }
         default:
@@ -989,6 +980,7 @@ void match_ui_update(MatchUiState& state) {
             uint32_t position = state.turn_counter;
             if (ui_slider(state.ui, &position, 0, match_ui_replay_end_of_tape(state), UI_SLIDER_DISPLAY_NO_VALUE)) {
                 state.selection.clear();
+                state.chat.clear();
                 match_ui_replay_scrub(state, position);
             }
 
@@ -1021,7 +1013,8 @@ void match_ui_update(MatchUiState& state) {
             static const uint32_t TURNS_PER_SECOND = UPDATES_PER_SECOND / TURN_DURATION;
             uint32_t match_time_minutes = (state.turn_counter / TURNS_PER_SECOND) / 60U;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
+                if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT ||
+                        !state.match.players[player_id].active) {
                     continue;
                 }
 
@@ -1031,6 +1024,11 @@ void match_ui_update(MatchUiState& state) {
                     // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied whenever its deciding the next one
                     for (int index = 0; index < TURN_OFFSET - 1; index++) {
                         state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
+                    }
+
+                    if (state.bots[player_id].has_surrendered) {
+                        match_ui_add_chat_message(state, player_id, "gg");
+                        match_ui_handle_player_disconnect(state, player_id);
                     }
                 }
             }
@@ -1109,6 +1107,17 @@ void match_ui_update(MatchUiState& state) {
     if (state.replay_mode && !state.replay_paused && state.turn_counter < match_ui_replay_end_of_tape(state)) {
         match_ui_replay_begin_turn(state);
         state.turn_counter++;
+
+        // Chatlog
+        if (state.turn_counter % TURN_DURATION == 0) {
+            uint32_t turn_index = state.turn_counter / TURN_DURATION;
+            for (const ReplayChatMessage& message : state.replay_chatlog) {
+                if (message.turn == turn_index) {
+                    match_ui_add_chat_message(state, message.player_id, message.message);
+                }
+            }
+        }
+
         if (state.turn_counter == match_ui_replay_end_of_tape(state)) {
             state.replay_paused = true;
         }
@@ -1991,6 +2000,27 @@ void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const cha
         state.chat.erase(state.chat.begin());
     }
     state.chat.push_back(chat_message);
+
+    if (!state.replay_mode) {
+        replay_file_write_chat(state.replay_file, player_id, state.turn_counter, message);
+    }
+}
+
+void match_ui_handle_player_disconnect(MatchUiState& state, uint8_t player_id) {
+    char message[128];
+    sprintf(message, "%s left the game.", network_get_player(player_id).name);
+    match_ui_add_chat_message(state, PLAYER_NONE, message);
+
+    // Show the victory banner to other players when this player leaves,
+    // but only if the player was still active. If they are not active, it means they've 
+    // been defeated already, so don't show the victory banner for that player
+    if (state.match.players[player_id].active) {
+        state.match.players[player_id].active = false;
+        if (state.match.players[network_get_player_id()].active && !match_ui_is_opponent_in_match(state)) {
+            state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
+        }
+    }
+
 }
 
 bool match_ui_is_opponent_in_match(const MatchUiState& state) {

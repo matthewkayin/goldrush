@@ -18,6 +18,9 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     // not mess up replay playback
     bot.lcg_seed = lcg_seed;
 
+    bot.should_surrender = true;
+    bot.has_surrendered = false;
+
     bot.strategy = (BotStrategy)(lcg_rand(&bot.lcg_seed) % BOT_STRATEGY_COUNT);
     bot_set_goal(state, bot, bot_choose_opening_goal(bot));
 
@@ -498,7 +501,15 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
     // Prepare the goldmines under attack list with each goldmine
     std::unordered_map<uint32_t, bool> goldmines_under_attack;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-        if (state.entities[entity_index].type == ENTITY_GOLDMINE) {
+        if (state.entities[entity_index].type != ENTITY_GOLDMINE) {
+            continue;
+        }
+
+        EntityId hall_id = bot_find_hall_surrounding_goldmine(state, bot, state.entities[entity_index]);
+        if (hall_id == ID_NULL) {
+            continue;
+        }
+        if (state.entities.get_by_id(hall_id).player_id == bot.player_id) {
             goldmines_under_attack[entity_index] = false;
         }
     }
@@ -695,6 +706,13 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
 
             bot.squads.push_back(defend_squad);
             continue;
+        }
+
+        // If there wasn't anything we should do, should we surrender?
+        if (bot.should_surrender && 
+                goldmines_under_attack.size() == 1 &&
+                defending_score <= enemy_score / 2) {
+            bot.has_surrendered = true;
         }
     } // End for each goldmine under attack
 }

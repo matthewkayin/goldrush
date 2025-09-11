@@ -4,6 +4,7 @@
 #include "math/gmath.h"
 #include "noise.h"
 #include "bot.h"
+#include "replay.h"
 #include "match/state.h"
 #include "match/input.h"
 #include "render/render.h"
@@ -128,6 +129,7 @@ struct MatchUiState {
     bool replay_paused;
     std::vector<MatchState> replay_checkpoints;
     std::vector<std::vector<MatchInput>> replay_inputs[MAX_PLAYERS];
+    std::vector<ReplayChatMessage> replay_chatlog;
 
     #ifdef GOLD_DEBUG
         bool theater_mode;
@@ -156,6 +158,7 @@ ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset);
 bool match_ui_building_can_be_placed(const MatchUiState& state);
 Rect match_ui_get_selection_list_item_rect(uint32_t selection_index);
 void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const char* message);
+void match_ui_handle_player_disconnect(MatchUiState& state, uint8_t player_id);
 bool match_ui_is_opponent_in_match(const MatchUiState& state);
 bool match_ui_is_surrender_required_to_leave(const MatchUiState& state);
 bool match_ui_is_in_menu(MatchUiMode mode);

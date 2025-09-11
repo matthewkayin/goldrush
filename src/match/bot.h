@@ -62,6 +62,8 @@ struct BotSquad {
 struct Bot {
     uint8_t player_id;
     int32_t lcg_seed;
+    bool should_surrender;
+    bool has_surrendered;
 
     BotStrategy strategy;
     BotGoal goal;
