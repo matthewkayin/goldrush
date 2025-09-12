@@ -15,6 +15,7 @@ enum BotGoal {
     BOT_GOAL_BUNKER,
     BOT_GOAL_EXPAND,
     BOT_GOAL_LANDMINES,
+    BOT_GOAL_DETECTIVE_DEFENSE,
     BOT_GOAL_HARASS,
     BOT_GOAL_PUSH,
     BOT_GOAL_COUNT
@@ -50,7 +51,8 @@ enum BotSquadType {
     BOT_SQUAD_TYPE_PUSH,
     BOT_SQUAD_TYPE_BUNKER,
     BOT_SQUAD_TYPE_LANDMINES,
-    BOT_SQUAD_TYPE_DEFEND
+    BOT_SQUAD_TYPE_RESERVES,
+    BOT_SQUAD_TYPE_DEFENSE
 };
 
 struct BotSquad {
@@ -126,6 +128,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad);
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);
 bool bot_squad_is_detective_harass(const MatchState& state, const BotSquad& squad);
+bool bot_squad_can_defend_against_detectives(const MatchState& state, const BotSquad& squad);
 
 // Scouting
 
@@ -181,3 +184,4 @@ ivec2 bot_find_best_molotov_cell(const MatchState& state, const Bot& bot, const 
 void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, ivec2 from, ivec2 to, std::vector<ivec2>* path);
 uint32_t bot_score_entity(const Entity& entity);
 uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot);
+ivec2 bot_get_squad_defense_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
