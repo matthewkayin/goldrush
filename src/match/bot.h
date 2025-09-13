@@ -7,6 +7,7 @@
 
 enum BotStrategy {
     BOT_STRATEGY_SALOON_COOP,
+    BOT_STRATEGY_SALOON_WORKSHOP,
     BOT_STRATEGY_COUNT
 };
 
@@ -21,6 +22,16 @@ enum BotGoal {
     BOT_GOAL_COUNT
 };
 #define BOT_GOAL_NONE BOT_GOAL_COUNT
+
+enum BotHarassType {
+    BOT_HARASS_TYPE_SALOON_INFANTRY,
+    BOT_HARASS_TYPE_SALOON_WORKSHOP,
+    BOT_HARASS_TYPE_WAGON_DROP,
+    BOT_HARASS_TYPE_JOCKEYS,
+    BOT_HARASS_TYPE_DETECTIVES,
+    BOT_HARASS_TYPE_PYROS,
+    BOT_HARASS_TYPE_COUNT
+};
 
 struct BotDesiredEntities {
     EntityType unit;
@@ -159,7 +170,7 @@ std::function<bool(const Entity&, const Entity&)> bot_closest_manhattan_distance
 EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, ivec2 cell);
 EntityId bot_pull_worker_off_gold(const MatchState& state, const Bot& bot, EntityId goldmine_id);
 EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index);
-uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id);
+uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id, bool count_bunkers_only);
 EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& bot, const Entity& goldmine);
 
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);

@@ -22,6 +22,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot.has_surrendered = false;
 
     bot.strategy = (BotStrategy)(lcg_rand(&bot.lcg_seed) % BOT_STRATEGY_COUNT);
+    bot.strategy = BOT_STRATEGY_SALOON_WORKSHOP;
     bot_set_goal(state, bot, bot_choose_opening_goal(bot));
 
     bot.scout_id = ID_NULL;
@@ -62,6 +63,15 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     // Get desired entities
     BotDesiredEntities desired_entities = bot_get_desired_entities(state, bot, match_time_minutes);
 
+    // Research upgrade
+    uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot);
+    if (desired_upgrade != 0 && match_player_upgrade_is_available(state, bot.player_id, desired_upgrade)) {
+        MatchInput input = bot_research_upgrade(state, bot, desired_upgrade);
+        if (input.type != MATCH_INPUT_NONE) {
+            return input;
+        }
+    }
+
     // Train unit
     if (desired_entities.unit != ENTITY_TYPE_COUNT) {
         MatchInput input = bot_train_unit(state, bot, desired_entities.unit);
@@ -73,15 +83,6 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     // Build building
     if (desired_entities.building != ENTITY_TYPE_COUNT) {
         MatchInput input = bot_build_building(state, bot, desired_entities.building);
-        if (input.type != MATCH_INPUT_NONE) {
-            return input;
-        }
-    }
-
-    // Research upgrade
-    uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot);
-    if (desired_upgrade != 0 && match_player_upgrade_is_available(state, bot.player_id, desired_upgrade)) {
-        MatchInput input = bot_research_upgrade(state, bot, desired_upgrade);
         if (input.type != MATCH_INPUT_NONE) {
             return input;
         }
@@ -133,6 +134,8 @@ BotGoal bot_choose_opening_goal(const Bot& bot) {
     switch (bot.strategy) {
         case BOT_STRATEGY_SALOON_COOP:
             return BOT_GOAL_BANDIT_RUSH;
+        case BOT_STRATEGY_SALOON_WORKSHOP:
+            return BOT_GOAL_BUNKER;
         case BOT_STRATEGY_COUNT:
             GOLD_ASSERT(false);
             return BOT_GOAL_NONE;
@@ -202,79 +205,94 @@ BotGoal bot_choose_next_goal(const MatchState& state, const Bot& bot) {
         max_opponent_base_count = std::max(max_opponent_base_count, player_mining_base_count[player_id]);
     }
 
-    switch (bot.strategy) {
-        case BOT_STRATEGY_SALOON_COOP: {
-            // TODO: check for safety before expanding?
-            if (unoccupied_goldmine_count > 0 &&
-                    (player_mining_base_count[bot.player_id] < 2 || 
-                    player_mining_base_count[bot.player_id] < max_opponent_base_count)) {
-                return BOT_GOAL_EXPAND;
-            }
-
-            if (bot.scout_enemy_has_detectives) {
-                std::unordered_map<uint32_t, uint32_t> hall_defenses;
-                for (uint32_t hall_index = 0; hall_index < state.entities.size(); hall_index++) {
-                    const Entity& hall = state.entities[hall_index];
-                    if (hall.player_id != bot.player_id || 
-                            !entity_is_selectable(hall)) {
-                        continue;
-                    }
-
-                    hall_defenses[hall_index] = 0;
-                }
-                for (const BotSquad& squad : bot.squads) {
-                    if (!bot_squad_can_defend_against_detectives(state, squad)) {
-                        continue;
-                    }
-
-                    uint32_t nearest_hall_index = INDEX_INVALID;
-                    for (auto it : hall_defenses) {
-                        if (nearest_hall_index == INDEX_INVALID ||
-                                ivec2::manhattan_distance(state.entities[it.first].cell, squad.target_cell) <
-                                ivec2::manhattan_distance(state.entities[nearest_hall_index].cell, squad.target_cell)) {
-                            nearest_hall_index = it.first;
-                        }
-                    }
-                    // nearest_hall_index should be INDEX_INVALID only when there are no halls
-                    if (nearest_hall_index == INDEX_INVALID) {
-                        continue;
-                    }
-                    hall_defenses[nearest_hall_index]++;
-                }
-
-                for (auto it : hall_defenses) {
-                    if (it.second == 0) {
-                        return BOT_GOAL_DETECTIVE_DEFENSE;
-                    }
-                }
-            }
-
-            std::unordered_map<uint32_t, uint32_t> enemy_hall_defense_score = bot_get_enemy_hall_defense_scores(state, bot);
-
-            // If this is empty it means there's no enemy halls, so just send a harass army to finish them off
-            if (enemy_hall_defense_score.empty()) {
-                return BOT_GOAL_HARASS;
-            }
-
-            bool enemy_has_undefended_base = false;
-            for (auto it : enemy_hall_defense_score) {
-                if (it.second < 4) {
-                    enemy_has_undefended_base = true;
-                }
-            }
-
-            if (enemy_has_undefended_base) {
-                return BOT_GOAL_HARASS;
-            }
-
-            return BOT_GOAL_PUSH;
+    // Count hall defenses
+    std::unordered_map<uint32_t, uint32_t> hall_detective_defenses;
+    uint32_t base_count = 0;
+    for (uint32_t hall_index = 0; hall_index < state.entities.size(); hall_index++) {
+        const Entity& hall = state.entities[hall_index];
+        if (hall.type != ENTITY_HALL ||
+                hall.player_id != bot.player_id || 
+                !entity_is_selectable(hall)) {
+            continue;
         }
-        case BOT_STRATEGY_COUNT: {
-            GOLD_ASSERT(false);
-            return BOT_GOAL_NONE;
+
+        base_count++;
+        hall_detective_defenses[hall_index] = 0;
+    }
+    for (const BotSquad& squad : bot.squads) {
+        if (bot_squad_can_defend_against_detectives(state, squad)) {
+            uint32_t nearest_hall_index = INDEX_INVALID;
+            for (auto it : hall_detective_defenses) {
+                if (nearest_hall_index == INDEX_INVALID ||
+                        ivec2::manhattan_distance(state.entities[it.first].cell, squad.target_cell) <
+                        ivec2::manhattan_distance(state.entities[nearest_hall_index].cell, squad.target_cell)) {
+                    nearest_hall_index = it.first;
+                }
+            }
+            // nearest_hall_index should be INDEX_INVALID only when there are no halls
+            if (nearest_hall_index == INDEX_INVALID) {
+                continue;
+            }
+
+            hall_detective_defenses[nearest_hall_index]++;
         }
     }
 
+
+    // If we are not safe from detectives, make detective defense squad
+    bool is_bot_safe_from_detectives = true;
+    for (auto it : hall_detective_defenses) {
+        if (it.second == 0) {
+            is_bot_safe_from_detectives = false;
+        }
+    }
+    if (bot.scout_enemy_has_detectives && !is_bot_safe_from_detectives) {
+        return BOT_GOAL_DETECTIVE_DEFENSE;
+    }
+
+    // If we are undefended, make bunker squad
+    // uint32_t desired_squads_per_base = 1;
+    // if (bot.squads.size() < desired_squads_per_base * base_count) {
+        // return BOT_GOAL_BUNKER;
+    // }
+
+    // Expand
+    uint32_t desired_base_count = std::max(2U, max_opponent_base_count);
+    if (unoccupied_goldmine_count > 0 && player_mining_base_count[bot.player_id] < desired_base_count) {
+        return BOT_GOAL_EXPAND;
+    }
+
+    // Landmines
+    if (bot.strategy == BOT_STRATEGY_SALOON_WORKSHOP) {
+        bool bot_has_landmine_squad = false;
+        for (const BotSquad& squad : bot.squads) {
+            if (squad.type == BOT_SQUAD_TYPE_LANDMINES) {
+                bot_has_landmine_squad = true;
+            }
+        }
+        if (!bot_has_landmine_squad) {
+            return BOT_GOAL_LANDMINES;
+        }
+    }
+
+    // If enemy has no base, then harass
+    std::unordered_map<uint32_t, uint32_t> enemy_hall_defense_score = bot_get_enemy_hall_defense_scores(state, bot);
+    if (enemy_hall_defense_score.empty()) {
+        return BOT_GOAL_HARASS;
+    }
+
+    // If enemy has undefended base, then harass
+    bool enemy_has_undefended_base = false;
+    for (auto it : enemy_hall_defense_score) {
+        if (it.second < 4) {
+            enemy_has_undefended_base = true;
+        }
+    }
+    if (enemy_has_undefended_base) {
+        return BOT_GOAL_HARASS;
+    }
+
+    // Otherwise push
     return BOT_GOAL_PUSH;
 }
 
@@ -289,7 +307,7 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
     bot.goal = goal;
 
     // Count unreserved entities
-    uint32_t entity_count[ENTITY_TYPE_COUNT];
+    int entity_count[ENTITY_TYPE_COUNT];
     memset(entity_count, 0, sizeof(entity_count));
     uint32_t bot_finished_base_count = 0;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -304,17 +322,6 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
         entity_count[entity.type]++;
         if (entity.type == ENTITY_HALL && entity.mode == MODE_BUILDING_FINISHED) {
             bot_finished_base_count++;
-        }
-    }
-
-    uint32_t enemy_landmine_count = 0;
-    if (bot.scout_enemy_has_landmines) {
-        for (const Entity& entity : state.entities) {
-            if (entity.type == ENTITY_LANDMINE && 
-                    entity_is_selectable(entity) &&
-                    state.players[entity.player_id].team != state.players[bot.player_id].team) {
-                enemy_landmine_count++;
-            }
         }
     }
 
@@ -345,119 +352,132 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
         case BOT_GOAL_LANDMINES: {
             bot.desired_entities[ENTITY_PYRO] = bot_get_mining_base_count(state, bot) > 1 ? 2 : 1;
             bot.desired_squad_type = BOT_SQUAD_TYPE_LANDMINES;
-
             break;
         }
         case BOT_GOAL_DETECTIVE_DEFENSE: {
-            switch (bot.strategy) {
-                case BOT_STRATEGY_SALOON_COOP: {
-                    bot.desired_squad_type = BOT_SQUAD_TYPE_DEFENSE;
-                    bot.desired_entities[ENTITY_COWBOY] = 2;
-                    bot.desired_entities[ENTITY_BALLOON] = 1;
-                    break;
-                }
-                case BOT_STRATEGY_COUNT: {
-                    GOLD_ASSERT(false);
-                    break;
-                }
-            }
-            
+            bot.desired_squad_type = BOT_SQUAD_TYPE_DEFENSE;
+            bot.desired_entities[ENTITY_COWBOY] = 2;
+            bot.desired_entities[ENTITY_BALLOON] = 1;
             break;
         }
         case BOT_GOAL_HARASS: {
             bot.desired_squad_type = BOT_SQUAD_TYPE_HARASS;
 
-            switch (bot.strategy) {
-                case BOT_STRATEGY_SALOON_COOP: {
-                    enum SaloonCoopHarassType {
-                        SALOON_COOP_HARASS_TYPE_INFANTRY,
-                        SALOON_COOP_HARASS_TYPE_WAGON,
-                        SALOON_COOP_HARASS_TYPE_JOCKEYS,
-                        SALOON_COOP_HARASS_TYPE_DETECTIVES,
-                        SALOON_COOP_HARASS_TYPE_COUNT
-                    };
-
-                    // Choose the harass type
-                    SaloonCoopHarassType harass_type = SALOON_COOP_HARASS_TYPE_COUNT;
-                    
-                    // If we don't have a second base yet, then choose infantry harass
-                    // This is so that we don't try to tech up too soon
-                    if (bot_finished_base_count < 2) {
-                        harass_type = SALOON_COOP_HARASS_TYPE_INFANTRY;
-                    } else {
-                        // First score the harass types based on what existing units we have
-                        uint32_t harass_type_scores[SALOON_COOP_HARASS_TYPE_COUNT];
-                        harass_type_scores[SALOON_COOP_HARASS_TYPE_INFANTRY] = entity_count[ENTITY_COWBOY] + entity_count[ENTITY_BANDIT];
-                        harass_type_scores[SALOON_COOP_HARASS_TYPE_WAGON] = entity_count[ENTITY_COWBOY] + entity_count[ENTITY_BANDIT] + entity_count[ENTITY_WAGON];
-                        harass_type_scores[SALOON_COOP_HARASS_TYPE_JOCKEYS] = entity_count[ENTITY_JOCKEY]; 
-                        harass_type_scores[SALOON_COOP_HARASS_TYPE_DETECTIVES] = entity_count[ENTITY_DETECTIVE] + (enemy_landmine_count / 2);
-
-                        // Then choose the one with the highest score
-                        for (uint32_t harass_type_index = 0; harass_type_index < SALOON_COOP_HARASS_TYPE_COUNT; harass_type_index++) {
-                            if (harass_type_scores[harass_type_index] == 0) {
-                                continue;
-                            }
-                            if (harass_type == SALOON_COOP_HARASS_TYPE_COUNT || 
-                                    harass_type_scores[harass_type_index] > harass_type_scores[harass_type]) {
-                                harass_type = (SaloonCoopHarassType)harass_type_index;
-                            }
-                        }
-
-                        // If no harass_type was chosen, it means all the scores were 0, so just choose a random one
-                        if (harass_type == SALOON_COOP_HARASS_TYPE_COUNT) {
-                            harass_type = (SaloonCoopHarassType)(lcg_rand(&bot.lcg_seed) % SALOON_COOP_HARASS_TYPE_COUNT);
-                        }
+            // Count enemy landmines
+            uint32_t enemy_landmine_count = 0;
+            if (bot.scout_enemy_has_landmines) {
+                for (const Entity& entity : state.entities) {
+                    if (entity.type == ENTITY_LANDMINE && 
+                            entity_is_selectable(entity) &&
+                            state.players[entity.player_id].team != state.players[bot.player_id].team) {
+                        enemy_landmine_count++;
                     }
+                }
+            }
 
-                    GOLD_ASSERT(harass_type != SALOON_COOP_HARASS_TYPE_COUNT);
+            // Choose harass type
+            BotHarassType highest_harass_type = BOT_HARASS_TYPE_COUNT;
 
-                    switch (harass_type) {
-                        case SALOON_COOP_HARASS_TYPE_INFANTRY: {
-                            uint32_t infantry_count = 4 + (lcg_rand(&bot.lcg_seed) % 4);
-                            bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (infantry_count + 1);
-                            bot.desired_entities[ENTITY_COWBOY] = infantry_count - bot.desired_entities[ENTITY_BANDIT];
-                            break;
-                        }
-                        case SALOON_COOP_HARASS_TYPE_WAGON: {
-                            if (entity_count[ENTITY_WAGON] > 1) {
-                                bot.desired_entities[ENTITY_WAGON] = 2;
-                            } else {
-                                bot.desired_entities[ENTITY_WAGON] = 1 + lcg_rand(&bot.lcg_seed) % 2;
-                            }
+            // If we don't have a second base yet, then choose infantry harass
+            // This is so that we don't try to tech up too soon
+            if (bot_finished_base_count < 2) {
+                highest_harass_type = BOT_HARASS_TYPE_SALOON_INFANTRY;
+            } else {
+                int harass_type_scores[BOT_HARASS_TYPE_COUNT];
+                static const int HARASS_TYPE_INVALID_FOR_STRATEGY = -1;
+                memset(harass_type_scores, HARASS_TYPE_INVALID_FOR_STRATEGY, sizeof(harass_type_scores));
 
-                            uint32_t infantry_count = bot.desired_entities[ENTITY_WAGON] * entity_get_data(ENTITY_WAGON).garrison_capacity;
-                            bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (infantry_count + 1);
-                            bot.desired_entities[ENTITY_COWBOY] = infantry_count - bot.desired_entities[ENTITY_BANDIT];
-                            break;
-                        }
-                        case SALOON_COOP_HARASS_TYPE_JOCKEYS: {
-                            bot.desired_entities[ENTITY_JOCKEY] = 4 + (lcg_rand(&bot.lcg_seed) % 5);
-                            break;
-                        }
-                        case SALOON_COOP_HARASS_TYPE_DETECTIVES: {
-                            bot.desired_entities[ENTITY_DETECTIVE] = 2 + (lcg_rand(&bot.lcg_seed) % 2);
-                            break;
-                        }
-                        case SALOON_COOP_HARASS_TYPE_COUNT: {
-                            GOLD_ASSERT(false);
-                            break;
-                        }
+                harass_type_scores[BOT_HARASS_TYPE_SALOON_INFANTRY] = entity_count[ENTITY_COWBOY] + entity_count[ENTITY_BANDIT];
+                harass_type_scores[BOT_HARASS_TYPE_DETECTIVES] = entity_count[ENTITY_DETECTIVE] + (enemy_landmine_count / 2);
+
+                if (bot.strategy == BOT_STRATEGY_SALOON_COOP) {
+                    harass_type_scores[BOT_HARASS_TYPE_WAGON_DROP] = entity_count[ENTITY_COWBOY] + entity_count[ENTITY_BANDIT] + entity_count[ENTITY_SAPPER] + entity_count[ENTITY_WAGON];
+                    harass_type_scores[BOT_HARASS_TYPE_JOCKEYS] = entity_count[ENTITY_JOCKEY]; 
+                }
+
+                if (bot.strategy == BOT_STRATEGY_SALOON_WORKSHOP) {
+                    harass_type_scores[BOT_HARASS_TYPE_SALOON_WORKSHOP] = entity_count[ENTITY_COWBOY] + entity_count[ENTITY_BANDIT] + entity_count[ENTITY_SAPPER];
+                    harass_type_scores[BOT_HARASS_TYPE_PYROS] = entity_count[ENTITY_PYRO];
+                }
+
+                for (uint32_t harass_type = 0; harass_type < BOT_HARASS_TYPE_COUNT; harass_type++) {
+                    if (harass_type_scores[harass_type] == HARASS_TYPE_INVALID_FOR_STRATEGY) {
+                        continue;
+                    } 
+                    if (highest_harass_type == BOT_HARASS_TYPE_COUNT || harass_type_scores[harass_type] > harass_type_scores[highest_harass_type]) {
+                        highest_harass_type = (BotHarassType)harass_type;
                     }
+                }
+                log_trace("BOT: highest scored harass type %u", highest_harass_type);
 
+                // This assert shouldn't be necessary, but if it fails then the while loop below it will run forever
+                GOLD_ASSERT(harass_type_scores[BOT_HARASS_TYPE_SALOON_INFANTRY] != HARASS_TYPE_INVALID_FOR_STRATEGY);
+
+                // If all the entity counts are 0, choose a random harass type
+                if (highest_harass_type == BOT_HARASS_TYPE_COUNT) {
+                    highest_harass_type = (BotHarassType)(lcg_rand(&bot.lcg_seed) % BOT_HARASS_TYPE_COUNT);
+
+                    // Ensure that the randomly chosen harass type is valid for this strategy
+                    while (harass_type_scores[highest_harass_type] == HARASS_TYPE_INVALID_FOR_STRATEGY) {
+                        highest_harass_type = (BotHarassType)((highest_harass_type + 1) % BOT_HARASS_TYPE_COUNT);
+                    }
+                    log_trace("BOT: chose random harass type %u", highest_harass_type);
+                }
+            }
+
+            GOLD_ASSERT(highest_harass_type != BOT_HARASS_TYPE_COUNT);
+
+            // Choose desired units based on the harass type
+            switch (highest_harass_type) {
+                case BOT_HARASS_TYPE_SALOON_INFANTRY: {
+                    uint32_t infantry_count = 4 + (lcg_rand(&bot.lcg_seed) % 4);
+                    bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (infantry_count + 1);
+                    bot.desired_entities[ENTITY_COWBOY] = infantry_count - bot.desired_entities[ENTITY_BANDIT];
                     break;
                 }
-                case BOT_STRATEGY_COUNT: {
+                case BOT_HARASS_TYPE_SALOON_WORKSHOP: {
+                    uint32_t infantry_count = 4 + (lcg_rand(&bot.lcg_seed) % 4);
+                    bot.desired_entities[ENTITY_SAPPER] = lcg_rand(&bot.lcg_seed) % (infantry_count / 1);
+                    bot.desired_entities[ENTITY_COWBOY] = infantry_count - bot.desired_entities[ENTITY_SAPPER];
+                    bot.desired_entities[ENTITY_PYRO] = lcg_rand(&bot.lcg_seed) % 3;
+                    break;
+                }
+                case BOT_HARASS_TYPE_WAGON_DROP: {
+                    if (entity_count[ENTITY_WAGON] > 1) {
+                        bot.desired_entities[ENTITY_WAGON] = 2;
+                    } else {
+                        bot.desired_entities[ENTITY_WAGON] = 1 + lcg_rand(&bot.lcg_seed) % 2;
+                    }
+
+                    uint32_t infantry_count = bot.desired_entities[ENTITY_WAGON] * entity_get_data(ENTITY_WAGON).garrison_capacity;
+                    bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (infantry_count + 1);
+                    bot.desired_entities[ENTITY_COWBOY] = infantry_count - bot.desired_entities[ENTITY_BANDIT];
+                    break;
+                }
+                case BOT_HARASS_TYPE_JOCKEYS: {
+                    bot.desired_entities[ENTITY_JOCKEY] = 4 + (lcg_rand(&bot.lcg_seed) % 5);
+                    break;
+                }
+                case BOT_HARASS_TYPE_DETECTIVES: {
+                    bot.desired_entities[ENTITY_DETECTIVE] = 2 + (lcg_rand(&bot.lcg_seed) % 2);
+                    break;
+                }
+                case BOT_HARASS_TYPE_PYROS: {
+                    bot.desired_entities[ENTITY_PYRO] = 2;
+                    break;
+                }
+                case BOT_HARASS_TYPE_COUNT: {
                     GOLD_ASSERT(false);
                     break;
                 }
             }
-
             break;
         }
         case BOT_GOAL_PUSH: {
             bot.desired_squad_type = BOT_SQUAD_TYPE_PUSH;
 
-            uint32_t push_size = 16 + ((lcg_rand(&bot.lcg_seed) % 5) * bot_get_mining_base_count(state, bot));
+            uint32_t bot_mining_base_count = bot_get_mining_base_count(state, bot);
+            uint32_t push_size = 16 + ((lcg_rand(&bot.lcg_seed) % 5) * bot_mining_base_count);
 
             switch (bot.strategy) {
                 case BOT_STRATEGY_SALOON_COOP: {
@@ -472,6 +492,15 @@ void bot_set_goal(const MatchState& state, Bot& bot, BotGoal goal) {
                     if (bot.scout_enemy_has_detectives) {
                         bot.desired_entities[ENTITY_BALLOON] = 2;
                     }
+                    break;
+                }
+                case BOT_STRATEGY_SALOON_WORKSHOP: {
+                    bot.desired_entities[ENTITY_PYRO] = 2;
+                    bot.desired_entities[ENTITY_SAPPER] = (lcg_rand(&bot.lcg_seed) % 5) * bot_mining_base_count;
+
+                    uint32_t remaining_push_size = push_size - (bot.desired_entities[ENTITY_PYRO] + bot.desired_entities[ENTITY_SAPPER]);
+                    bot.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (remaining_push_size / 2);
+                    bot.desired_entities[ENTITY_COWBOY] = remaining_push_size - bot.desired_entities[ENTITY_BANDIT];
                     break;
                 }
                 case BOT_STRATEGY_COUNT: {
@@ -1091,7 +1120,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    uint32_t hall_index = bot_find_hall_index_with_least_nearby_buildings(state, bot.player_id);
+    uint32_t hall_index = bot_find_hall_index_with_least_nearby_buildings(state, bot.player_id, building_type == ENTITY_BUNKER);
     if (hall_index == INDEX_INVALID) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
@@ -1702,6 +1731,21 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         return input;
     } // End for each infantry
     // End attack micro
+
+    // If harassing or pushing with pyros, make sure they have enough energy first
+    if (squad.type == BOT_SQUAD_TYPE_HARASS || squad.type == BOT_SQUAD_TYPE_PUSH) {
+        bool has_low_energy_pyro = false;
+        for (EntityId unit_id : unengaged_units) {
+            const Entity& unit = state.entities.get_by_id(unit_id);
+            if (unit.type == ENTITY_PYRO && unit.energy < MOLOTOV_ENERGY_COST) {
+                has_low_energy_pyro = true;
+                break;
+            }
+        }
+        if (has_low_energy_pyro) {
+            return (MatchInput) { .type = MATCH_INPUT_NONE };
+        }
+    }
 
     // Unengaged infantry micro
     // This section mostly just sorts distant infantry into a list
@@ -2682,13 +2726,13 @@ EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near
     return bot_pull_worker_off_gold(state, bot, mine_target.id);
 }
 
-uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id) {
+uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id, bool count_bunkers_only) {
     // First find all the town halls for this bot
     std::vector<uint32_t> hall_indices;
     std::vector<uint32_t> buildings_near_hall;
     for (uint32_t hall_index = 0; hall_index < state.entities.size(); hall_index++) {
         const Entity& hall = state.entities[hall_index];
-        if (hall.player_id != bot_player_id || hall.type != ENTITY_HALL || hall.mode != MODE_BUILDING_FINISHED) {
+        if (hall.player_id != bot_player_id || hall.type != ENTITY_HALL || !entity_is_selectable(hall)) {
             continue;
         }
 
@@ -2705,6 +2749,9 @@ uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state
     for (uint32_t building_index = 0; building_index < state.entities.size(); building_index++) {
         const Entity& building = state.entities[building_index];
         if (building.player_id != bot_player_id || !entity_is_building(building.type) || !entity_is_selectable(building)) {
+            continue;
+        }
+        if (count_bunkers_only && building.type != ENTITY_BUNKER) {
             continue;
         }
 
@@ -3336,6 +3383,12 @@ bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const 
 }
 
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell) {
+    if (!map_is_cell_in_bounds(state.map, cell) ||
+            map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED || 
+            map_get_tile(state.map, cell).sprite == SPRITE_TILE_WATER) {
+        return 0;
+    }
+
     int score = 0;
     std::unordered_map<EntityId, bool> entity_considered;
 
