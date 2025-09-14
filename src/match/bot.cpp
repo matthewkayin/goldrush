@@ -585,25 +585,20 @@ void bot_on_goal_finished(const MatchState& state, Bot& bot) {
 
 void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
     // Prepare the goldmines under attack list with each goldmine
-    std::unordered_map<uint32_t, bool> goldmines_under_attack;
+    std::unordered_map<uint32_t, uint32_t> hall_surrounding_goldmine;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         if (state.entities[entity_index].type != ENTITY_GOLDMINE) {
             continue;
         }
-
         EntityId hall_id = bot_find_hall_surrounding_goldmine(state, bot, state.entities[entity_index]);
-        if (hall_id == ID_NULL) {
-            continue;
-        }
-        if (state.entities.get_by_id(hall_id).player_id == bot.player_id) {
-            goldmines_under_attack[entity_index] = false;
-        }
+        uint32_t hall_index = state.entities.get_index_of(hall_id);
+        hall_surrounding_goldmine[entity_index] = hall_index;
     }
 
-    // Helper function to find the nearest goldmine to a given cell
-    std::function<uint32_t(ivec2)> get_nearest_goldmine_index = [&state, &goldmines_under_attack](ivec2 cell) {
+    // Helper function to find the nearest hall to a given cell
+    std::function<uint32_t(ivec2)> get_nearest_hall_index = [&state, &hall_surrounding_goldmine](ivec2 cell) {
         uint32_t nearest_goldmine_index = INDEX_INVALID;
-        for (auto it : goldmines_under_attack) {
+        for (auto it : hall_surrounding_goldmine) {
             if (nearest_goldmine_index == INDEX_INVALID || 
                     ivec2::manhattan_distance(cell, state.entities[it.first].cell) <
                     ivec2::manhattan_distance(cell, state.entities[nearest_goldmine_index].cell)) {
@@ -612,30 +607,32 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
         }
         GOLD_ASSERT(nearest_goldmine_index != INDEX_INVALID);
 
-        return nearest_goldmine_index;
+        return hall_surrounding_goldmine[nearest_goldmine_index];
     };
 
-    // Mark each of the goldmines that are under attack
-    // These should be goldmines we control, they represent a base being under attack
+    // Mark each of the halls that are under attack
+    std::vector<uint32_t> halls_under_attack;
+    uint32_t hall_count = 0;
     for (const Entity& entity : state.entities) {
         if (!(entity_is_building(entity.type) || entity.type == ENTITY_MINER) ||
                 !entity_is_selectable(entity) ||
-                entity.player_id != bot.player_id ||
-                entity.taking_damage_timer == 0) {
+                entity.player_id != bot.player_id) {
             continue;
         }
 
-        uint32_t nearest_goldmine_index = get_nearest_goldmine_index(entity.cell);
-        goldmines_under_attack[nearest_goldmine_index] = true;
+        if (entity.taking_damage_timer != 0) {
+            uint32_t nearest_hall_index = get_nearest_hall_index(entity.cell);
+            if (nearest_hall_index != INDEX_INVALID) {
+                halls_under_attack.push_back(nearest_hall_index);
+            }
+        }
+        if (entity.type == ENTITY_HALL) {
+            hall_count++;
+        }
     }
 
     // For each goldmine under attack, determine how to respond
-    for (auto it : goldmines_under_attack) {
-        // Filter out goldmines that aren't under attack
-        if (!it.second) {
-            continue;
-        }
-
+    for (uint32_t hall_index : halls_under_attack) {
         // Determine the strength of the attacking force
         uint32_t enemy_score = 0;
         for (const Entity& enemy : state.entities) {
@@ -646,8 +643,8 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
                 continue;
             }
 
-            uint32_t nearest_goldmine_index = get_nearest_goldmine_index(match_get_entity_target_cell(state, enemy));
-            if (nearest_goldmine_index != it.first) {
+            uint32_t nearest_hall_index = get_nearest_hall_index(match_get_entity_target_cell(state, enemy));
+            if (nearest_hall_index != hall_index) {
                 continue;
             }
 
@@ -667,7 +664,7 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
                     !entity_is_selectable(entity) ||
                     entity.player_id != bot.player_id ||
                     bot_is_entity_reserved(bot, entity_id) ||
-                    ivec2::manhattan_distance(entity.cell, state.entities[it.first].cell) > BOT_SQUAD_GATHER_DISTANCE * 2) {
+                    ivec2::manhattan_distance(entity.cell, state.entities[hall_index].cell) > BOT_SQUAD_GATHER_DISTANCE * 2) {
                 continue;
             }
 
@@ -681,10 +678,10 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
             }
 
             // Find the nearest goldmine
-            uint32_t nearest_goldmine_index = get_nearest_goldmine_index(squad.target_cell);
+            uint32_t nearest_hall_index = get_nearest_hall_index(squad.target_cell);
 
             // Ignore this squad if it's not close to the one that is attacking
-            if (nearest_goldmine_index != it.first) {
+            if (nearest_hall_index != hall_index) {
                 continue;
             }
 
@@ -710,7 +707,7 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
         // First, check to see if we have any unreserved units to create a defense squad with
         BotSquad defend_squad;
         defend_squad.type = BOT_SQUAD_TYPE_RESERVES;
-        defend_squad.target_cell = state.entities[it.first].cell;
+        defend_squad.target_cell = state.entities[hall_index].cell;
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
             const Entity& entity = state.entities[entity_index];
             EntityId entity_id = state.entities.get_id_of(entity_index);
@@ -751,7 +748,7 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
                 }
 
                 if (ivec2::manhattan_distance(state.entities[entity_index].cell, squad.target_cell) <
-                        ivec2::manhattan_distance(state.entities[entity_index].cell, state.entities[it.first].cell)) {
+                        ivec2::manhattan_distance(state.entities[entity_index].cell, state.entities[hall_index].cell)) {
                     squad_units_closer_to_target++;
                 } else {
                     squad_units_closer_to_base++;
@@ -765,7 +762,7 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
 
             // Otherwise, switch targets to defend the base
             squad.type = BOT_SQUAD_TYPE_RESERVES;
-            squad.target_cell = state.entities[it.first].cell;
+            squad.target_cell = state.entities[hall_index].cell;
             continue;
         }
 
@@ -778,7 +775,7 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
             if (entity.type != ENTITY_MINER ||
                     entity.player_id != bot.player_id ||
                     bot_is_entity_reserved(bot, entity_id) ||
-                    get_nearest_goldmine_index(entity.cell) != it.first) {
+                    get_nearest_hall_index(entity.cell) != hall_index) {
                 continue;
             }
 
@@ -796,7 +793,7 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
 
         // If there wasn't anything we should do, should we surrender?
         if (bot.should_surrender && 
-                goldmines_under_attack.size() == 1 &&
+                hall_count <= 1 &&
                 defending_score <= enemy_score / 2) {
             bot.has_surrendered = true;
         }
