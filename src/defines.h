@@ -25,7 +25,7 @@
     #define GOLD_ASSERTS_ENABLED
     #define GOLD_DEBUG_TURBO
     #define GOLD_RAND_SEED 1757413900
-    // #define GOLD_DEBUG_BOT_VISION
+    #define GOLD_DEBUG_BOT_VISION
 #endif
 #ifdef GOLD_DEBUG_CHEATS
     #define GOLD_DEBUG_FAST_BUILD
