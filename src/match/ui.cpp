@@ -1672,7 +1672,7 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
         const Entity& entity = state.match.entities[index];
         if ((!state.replay_mode && entity.player_id != network_get_player_id()) ||
             (state.replay_mode && !match_ui_is_entity_visible(state, entity)) ||
-                entity_is_unit(entity.type) ||
+                !entity_is_building(entity.type) ||
                 !entity_is_selectable(entity)) {
             continue;
         }
@@ -1687,36 +1687,40 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     }
 
     // Select enemy units
-    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
-        const Entity& entity = state.match.entities[index];
-        if ((!state.replay_mode && entity.player_id == network_get_player_id()) ||
-                !entity_is_unit(entity.type) ||
-                !entity_is_selectable(entity) ||
-                !match_ui_is_entity_visible(state, entity)) {
-            continue;
-        }
+    if (!state.replay_mode) {
+        for (uint32_t index = 0; index < state.match.entities.size(); index++) {
+            const Entity& entity = state.match.entities[index];
+            if (entity.player_id == network_get_player_id() ||
+                    !entity_is_unit(entity.type) ||
+                    !entity_is_selectable(entity) ||
+                    !match_ui_is_entity_visible(state, entity)) {
+                continue;
+            }
 
-        Rect entity_rect = entity_get_rect(entity);
-        if (entity_rect.intersects(select_rect)) {
-            selection.push_back(state.match.entities.get_id_of(index));
-            return selection;
+            Rect entity_rect = entity_get_rect(entity);
+            if (entity_rect.intersects(select_rect)) {
+                selection.push_back(state.match.entities.get_id_of(index));
+                return selection;
+            }
         }
     }
 
     // Select enemy buildings
-    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
-        const Entity& entity = state.match.entities[index];
-        if ((!state.replay_mode && entity.player_id == network_get_player_id()) ||
-                entity_is_unit(entity.type) ||
-                !entity_is_selectable(entity) ||
-                !match_ui_is_entity_visible(state, entity)) {
-            continue;
-        }
+    if (!state.replay_mode) {
+        for (uint32_t index = 0; index < state.match.entities.size(); index++) {
+            const Entity& entity = state.match.entities[index];
+            if (entity.player_id == network_get_player_id() ||
+                    entity_is_unit(entity.type) ||
+                    !entity_is_selectable(entity) ||
+                    !match_ui_is_entity_visible(state, entity)) {
+                continue;
+            }
 
-        Rect entity_rect = entity_get_rect(entity);
-        if (entity_rect.intersects(select_rect)) {
-            selection.push_back(state.match.entities.get_id_of(index));
-            return selection;
+            Rect entity_rect = entity_get_rect(entity);
+            if (entity_rect.intersects(select_rect)) {
+                selection.push_back(state.match.entities.get_id_of(index));
+                return selection;
+            }
         }
     }
 
