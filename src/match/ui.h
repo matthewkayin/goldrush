@@ -3,7 +3,7 @@
 #include "defines.h"
 #include "math/gmath.h"
 #include "noise.h"
-#include "bot.h"
+#include "bot/bot.h"
 #include "replay.h"
 #include "match/state.h"
 #include "match/input.h"

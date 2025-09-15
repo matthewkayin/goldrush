@@ -14,7 +14,6 @@
 #include "upgrade.h"
 #include "replay.h"
 #include "lcg.h"
-#include "bot.h"
 #include <algorithm>
 
 static const uint32_t TURN_OFFSET = 4;
