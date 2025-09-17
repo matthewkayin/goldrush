@@ -832,6 +832,46 @@ bool bot_squad_can_defend_against_detectives(const MatchState& state, const BotS
     return has_detection && has_damage;
 }
 
+bool bot_squad_is_engaged(const MatchState& state, const Bot& bot, const BotSquad& squad) {
+    EntityId enemy_near_squad_id = bot_find_entity((BotFindEntityParams) {
+        .state = state,
+        .filter = [&state, &bot, &squad](const Entity& enemy, EntityId enemy_id) {
+            return enemy.type != ENTITY_GOLDMINE &&
+                    state.players[enemy.player_id].team != state.players[bot.player_id].team &&
+                    entity_is_selectable(enemy) &&
+                    ivec2::manhattan_distance(enemy.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE &&
+                    match_is_entity_visible_to_player(state, enemy, bot.player_id);
+        }
+    });
+    if (enemy_near_squad_id != ID_NULL) {
+        return true;
+    }
+
+    for (EntityId entity_id : squad.entities) {
+        uint32_t entity_index = state.entities.get_index_of(entity_id);
+        if (entity_index == INDEX_INVALID || state.entities[entity_index].health == 0) {
+            continue;
+        }
+
+        const Entity& entity = state.entities[entity_index];
+        EntityId nearby_enemy_id = bot_find_entity((BotFindEntityParams) {
+            .state = state,
+            .filter = [&state, &entity](const Entity& enemy, EntityId enemy_id) {
+                return enemy.type != ENTITY_GOLDMINE &&
+                        state.players[enemy.player_id].team != state.players[entity.player_id].team &&
+                        entity_is_selectable(enemy) &&
+                        ivec2::manhattan_distance(enemy.cell, entity.cell) < BOT_SQUAD_GATHER_DISTANCE &&
+                        match_is_entity_visible_to_player(state, enemy, entity.player_id);
+            }
+        });
+        if (nearby_enemy_id != ID_NULL) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 ivec2 bot_squad_get_center(const MatchState& state, const BotSquad& squad) {
     struct CenterPoint {
         ivec2 sum;

@@ -703,11 +703,8 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
                 continue;
             }
 
-            // Find the nearest goldmine
-            uint32_t nearest_hall_index = get_nearest_hall_index(squad.target_cell);
-
-            // Ignore this squad if it's not close to the one that is attacking
-            if (nearest_hall_index != hall_index) {
+            // Ignore this squad if it's not close to the hall that is under attack
+            if (ivec2::manhattan_distance(squad.target_cell, state.entities[hall_index].cell) > BOT_SQUAD_GATHER_DISTANCE) {
                 continue;
             }
 
@@ -729,8 +726,28 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
         }
 
         // Otherwise, the base is not well defended, so let's see if there is anything we can do
+
+        // First, see if we have any idle defense squads that we can flex to defend
+        int nearest_idle_defending_squad_index = -1;
+        for (int squad_index = 0; squad_index < bot.squads.size(); squad_index++) {
+            const BotSquad& squad = bot.squads[squad_index];
+            if (squad.type != BOT_SQUAD_TYPE_DEFENSE || 
+                    ivec2::manhattan_distance(squad.target_cell, state.entities[hall_index].cell) < BOT_SQUAD_GATHER_DISTANCE ||
+                    bot_squad_is_engaged(state, bot, squad)) {
+                continue;
+            }
+            if (nearest_idle_defending_squad_index == -1 ||
+                    ivec2::manhattan_distance(squad.target_cell, state.entities[hall_index].cell) <
+                    ivec2::manhattan_distance(bot.squads[nearest_idle_defending_squad_index].target_cell, state.entities[hall_index].cell)) {
+                nearest_idle_defending_squad_index = squad_index;
+            }
+        }
+        if (nearest_idle_defending_squad_index != -1) {
+            bot.squads[nearest_idle_defending_squad_index].target_cell = state.entities[hall_index].cell;
+            continue;
+        }
         
-        // First, check to see if we have any unreserved units to create a defense squad with
+        // Next, check to see if we have any unreserved units to create a defense squad with
         BotSquad defend_squad;
         defend_squad.type = BOT_SQUAD_TYPE_RESERVES;
         defend_squad.target_cell = state.entities[hall_index].cell;

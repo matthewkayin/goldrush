@@ -10,6 +10,7 @@ bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const Bot
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);
 bool bot_squad_is_detective_harass(const MatchState& state, const BotSquad& squad);
 bool bot_squad_can_defend_against_detectives(const MatchState& state, const BotSquad& squad);
+bool bot_squad_is_engaged(const MatchState& state, const Bot& bot, const BotSquad& squad);
 ivec2 bot_squad_get_center(const MatchState& state, const BotSquad& squad);
 ivec2 bot_squad_choose_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
 ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
