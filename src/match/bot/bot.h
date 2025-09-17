@@ -22,3 +22,4 @@ bool bot_is_rally_cell_valid(const MatchState& state, ivec2 rally_cell, int rall
 ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, const Entity& building);
 MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bot);
 MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot);
+MatchInput bot_repair_burning_buildings(const MatchState& state, const Bot& bot);

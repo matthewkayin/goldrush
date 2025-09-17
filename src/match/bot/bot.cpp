@@ -81,6 +81,11 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
         }
     }
 
+    MatchInput repair_input = bot_repair_burning_buildings(state, bot);
+    if (repair_input.type != MATCH_INPUT_NONE) {
+        return repair_input;
+    }
+
     MatchInput scout_input = bot_scout(state, bot, match_time_minutes);
     if (scout_input.type != MATCH_INPUT_NONE) {
         return scout_input;
@@ -640,6 +645,7 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
             .state = state,
             .filter = [&state, &entity](const Entity& enemy, EntityId enemy_id) {
                 return entity_is_unit(enemy.type) &&
+                        entity_is_selectable(enemy) &&
                         (enemy.type == ENTITY_PYRO || entity_get_data(enemy.type).unit_data.damage != 0) &&
                         state.players[enemy.player_id].team != state.players[entity.player_id].team &&
                         match_is_entity_visible_to_player(state, enemy, entity.player_id) &&
@@ -1059,5 +1065,54 @@ MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot) {
         }
     } // End for each entity
 
+    return input;
+}
+
+MatchInput bot_repair_burning_buildings(const MatchState& state, const Bot& bot) {
+    EntityId building_in_need_of_repair_id = bot_find_entity((BotFindEntityParams) {
+        .state = state,
+        .filter = [&state, &bot](const Entity& building, EntityId building_id) {
+            if (building.player_id != bot.player_id ||
+                    building.mode != MODE_BUILDING_FINISHED ||
+                    building.health > entity_get_data(building.type).max_health / 2) {
+                return false;
+            }
+
+            EntityId existing_repairer = bot_find_entity((BotFindEntityParams) {
+                .state = state,
+                .filter = [&building_id](const Entity& repairer, EntityId repairer_id) {
+                    return repairer.target.type == TARGET_REPAIR && repairer.target.id == building_id;
+                }
+            });
+            if (existing_repairer != ID_NULL) {
+                return false;
+            }
+
+            return true;
+        }
+    });
+    if (building_in_need_of_repair_id == ID_NULL) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    const Entity& building = state.entities.get_by_id(building_in_need_of_repair_id);
+    EntityId repairer_id = bot_find_nearest_idle_worker(state, bot, building.cell);
+    if (repairer_id == ID_NULL) {
+        Target goldmine_target = match_entity_target_nearest_gold_mine(state, building);
+        if (goldmine_target.type == TARGET_ENTITY) {
+            repairer_id = bot_pull_worker_off_gold(state, bot, goldmine_target.id);
+        }
+    }
+    if (repairer_id == ID_NULL) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_REPAIR;
+    input.move.shift_command = 0;
+    input.move.target_cell = ivec2(0, 0);
+    input.move.target_id = building_in_need_of_repair_id;
+    input.move.entity_count = 1;
+    input.move.entity_ids[0] = repairer_id;
     return input;
 }
