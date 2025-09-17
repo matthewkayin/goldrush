@@ -131,9 +131,21 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         return bot_squad_return_to_nearest_base(state, bot, squad);
     }
 
+    // Check if there is a target nearby
+    EntityId enemy_near_squad_id = bot_find_entity((BotFindEntityParams) {
+        .state = state,
+        .filter = [&state, &bot, &squad](const Entity& enemy, EntityId enemy_id) {
+            return enemy.type != ENTITY_GOLDMINE &&
+                    state.players[enemy.player_id].team != state.players[bot.player_id].team &&
+                    entity_is_selectable(enemy) &&
+                    ivec2::manhattan_distance(enemy.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE &&
+                    match_is_entity_visible_to_player(state, enemy, bot.player_id);
+        }
+    });
+    bool is_enemy_near_squad = enemy_near_squad_id != ID_NULL;
+
     // Attack micro
     std::vector<EntityId> unengaged_units;
-    bool is_enemy_near_squad = false;
     for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) {
         EntityId unit_id = squad.entities[squad_entity_index];
         const Entity& unit = state.entities.get_by_id(unit_id);
@@ -313,7 +325,16 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
         // Skip units that are already garrisoning
         if (unit.target.type == TARGET_ENTITY) {
-            continue;
+            bool is_garrison_target_in_squad = false;
+            for (EntityId carrier_id : squad.entities) {
+                if (unit.target.id == carrier_id && entity_get_data(state.entities.get_by_id(carrier_id).type).garrison_capacity != 0) {
+                    is_garrison_target_in_squad = true;
+                    break;
+                }
+            }
+            if (is_garrison_target_in_squad) {
+                continue;
+            }
         } 
 
         // Pyro landmine placement

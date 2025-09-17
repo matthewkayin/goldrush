@@ -457,6 +457,14 @@ int gold_main(int argc, char** argv) {
                             break;
                         }
                     }
+
+                    if (!match_ui_is_mouse_in_ui()) {
+                        ivec2 cell = (input_get_mouse_position() + state.match.camera_offset) / TILE_SIZE;
+                        char text[256];
+                        sprintf(text, "Cell <%i, %i>", cell.x, cell.y);
+                        render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
+                        render_y++;
+                    }
                 }
 
                 render_sprite_batch();

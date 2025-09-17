@@ -1,6 +1,7 @@
 #include "scout.h"
 
 #include "util.h"
+#include "core/logger.h"
 
 void bot_scout_update(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
     // Scout goal update, done before scout death check because bot_release_scout
