@@ -5,7 +5,7 @@
 Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 
-BotGoalType bot_choose_opening_goal_type(const Bot& bot);
+BotGoalType bot_choose_opening_goal_type(Bot& bot);
 BotGoalType bot_choose_next_goal_type(const MatchState& state, const Bot& bot);
 
 BotGoal bot_goal_create(const MatchState& state, Bot& bot, BotGoalType goal_type);

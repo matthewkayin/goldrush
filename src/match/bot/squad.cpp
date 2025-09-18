@@ -127,7 +127,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     }
 
     // Retreat
-    if (squad.type == BOT_SQUAD_TYPE_PUSH && bot_squad_should_retreat(state, bot, squad)) {
+    if ((squad.type == BOT_SQUAD_TYPE_PUSH || squad.type == BOT_SQUAD_TYPE_HARASS) && bot_squad_should_retreat(state, bot, squad)) {
         return bot_squad_return_to_nearest_base(state, bot, squad);
     }
 
@@ -1218,7 +1218,6 @@ bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const 
 
     return false;
 }
-
 
 int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell) {
     if (!map_is_cell_in_bounds(state.map, cell) ||
