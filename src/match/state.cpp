@@ -948,6 +948,22 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     entity.target = match_entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
                 }
 
+                // If unit is attacking, check if there's a higher priority target nearby
+                if (entity.target.type == TARGET_ATTACK_ENTITY && !entity_check_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY)) {
+                    Target attack_target = match_entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
+                    if (attack_target.type == TARGET_ATTACK_ENTITY && attack_target.id != entity.target.id) {
+                        const Entity& attack_target_entity = state.entities.get_by_id(attack_target.id);
+
+                        uint32_t entity_target_index = state.entities.get_index_of(entity.target.id);
+
+                        if (entity_target_index == INDEX_INVALID || 
+                                match_entity_get_target_attack_priority(entity, attack_target_entity) > 
+                                match_entity_get_target_attack_priority(entity, state.entities[entity_target_index])) {
+                            entity.target = attack_target;
+                        }
+                    }
+                }
+
                 // If unit is still idle, do nothing
                 if (entity.target.type == TARGET_NONE) {
                     // If soldier is idle, charge weapon
@@ -959,6 +975,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 }
 
                 if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                    entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                     entity.target = (Target) { .type = TARGET_NONE };
                     update_finished = true;
                     break;
@@ -1116,6 +1133,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             }
                         }
                         if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                            entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                             entity.mode = MODE_UNIT_IDLE;
                             entity.target = (Target) { .type = TARGET_NONE };
                             entity.path.clear();
@@ -1302,9 +1320,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     case TARGET_ENTITY:
                     case TARGET_ATTACK_ENTITY: {
                         if (match_is_target_invalid(state, entity.target, entity.player_id)) {
-                            entity.target = (Target) {
-                                .type = TARGET_NONE
-                            };
+                            entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
+                            entity.target = (Target) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                             break;
                         }
@@ -1479,6 +1496,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             break;
                         }
 
+                        entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                         entity.mode = MODE_UNIT_IDLE;
                         entity.target = (Target) {
                             .type = TARGET_NONE
@@ -1635,6 +1653,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             case MODE_UNIT_ATTACK_WINDUP:
             case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP: {
                 if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                    entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                     entity.target = (Target) {
                         .type = TARGET_NONE
                     };
@@ -1663,6 +1682,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             }
             case MODE_COWBOY_FAN_HAMMER: {
                 if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                    entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                     entity.target = (Target) {
                         .type = TARGET_NONE
                     };
@@ -2399,6 +2419,17 @@ Target match_entity_target_nearest_hall(const MatchState& state, const Entity& e
     };
 }
 
+uint32_t match_entity_get_target_attack_priority(const Entity& entity, const Entity& target) {
+    if (target.type == ENTITY_BUNKER && !target.garrisoned_units.empty()) {
+        return 2;
+    }
+    const EntityData& target_data = entity_get_data(target.type);
+    if ((entity.type == ENTITY_MINER || entity.type == ENTITY_BANDIT) && target_data.cell_layer == CELL_LAYER_SKY) {
+        return 0;
+    }
+    return target_data.attack_priority;
+}
+
 Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& entity) {
     const EntityData& entity_data = entity_get_data(entity.type);
     // This radius makes it so that enemies can target farther than they themselves can see
@@ -2450,7 +2481,7 @@ Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& 
         }
 
         int other_dist = Rect::euclidean_distance_squared_between(entity_rect, other_rect);
-        uint32_t other_attack_priority = other_data.attack_priority;
+        uint32_t other_attack_priority = match_entity_get_target_attack_priority(entity, other); 
         if (nearest_enemy_index == INDEX_INVALID || other_attack_priority > nearest_attack_priority || (other_dist < nearest_enemy_dist && other_attack_priority == nearest_attack_priority)) {
             nearest_enemy_index = other_index;
             nearest_enemy_dist = other_dist;

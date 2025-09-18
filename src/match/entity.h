@@ -16,6 +16,7 @@ const uint32_t ENTITY_FLAG_DAMAGE_FLICKER = 2;
 const uint32_t ENTITY_FLAG_INVISIBLE = 1 << 2;
 const uint32_t ENTITY_FLAG_CHARGED = 1 << 3;
 const uint32_t ENTITY_FLAG_ON_FIRE = 1 << 4;
+const uint32_t ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY = 1 << 5;
 
 const uint32_t ENTITY_CANNOT_GARRISON = 0;
 

@@ -1204,12 +1204,7 @@ void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, i
 
 bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const Entity& infantry, const Entity& nearby_enemy) {
     if (infantry.target.type == TARGET_ATTACK_ENTITY) {
-        uint32_t target_index = state.entities.get_index_of(infantry.target.id);
-        if (target_index != INDEX_INVALID && 
-                entity_get_data(state.entities[target_index].type).attack_priority >= 
-                entity_get_data(nearby_enemy.type).attack_priority) {
-            return true;
-        }
+        return true;
     }
     if ((infantry.target.type == TARGET_ATTACK_CELL || infantry.target.type == TARGET_MOLOTOV) && 
             ivec2::manhattan_distance(infantry.target.cell, nearby_enemy.cell) < BOT_SQUAD_GATHER_DISTANCE) {

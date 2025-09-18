@@ -217,6 +217,7 @@ void match_building_dequeue(MatchState& state, Entity& building);
 bool match_is_building_supply_blocked(const MatchState& state, const Entity& building);
 Target match_entity_target_nearest_gold_mine(const MatchState& state, const Entity& entity);
 Target match_entity_target_nearest_hall(const MatchState& state, const Entity& entity);
+uint32_t match_entity_get_target_attack_priority(const Entity& entity, const Entity& target);
 Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& entity);
 void match_entity_attack_target(MatchState& state, EntityId attacker_id);
 void match_entity_on_attack(MatchState& state, EntityId attacker_id, Entity& defender);

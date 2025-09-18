@@ -478,7 +478,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .max_health = 200,
         .sight = 7,
         .armor = 1,
-        .attack_priority = 2,
+        .attack_priority = 0,
 
         .garrison_capacity = 4,
         .garrison_size = ENTITY_CANNOT_GARRISON,
@@ -725,6 +725,7 @@ void entity_set_target(Entity& entity, Target target) {
     entity.path.clear();
     entity.goldmine_id = ID_NULL;
     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, false);
+    entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, target.type == TARGET_ATTACK_ENTITY);
 
     if (entity.mode != MODE_UNIT_MOVE) {
         // Abandon current behavior in favor of new order
