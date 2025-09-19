@@ -144,6 +144,63 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     });
     bool is_enemy_near_squad = enemy_near_squad_id != ID_NULL;
 
+    if (squad.type == BOT_SQUAD_TYPE_BUNKER) {
+        for (EntityId entity_id : squad.entities) {
+            const Entity& entity = state.entities.get_by_id(entity_id);
+            if (entity.type != ENTITY_BUNKER || entity.garrisoned_units.empty()) {
+                continue;
+            }
+
+            EntityId nearby_building_under_attack_id = bot_find_entity((BotFindEntityParams) {
+                .state = state,
+                .filter = [&entity](const Entity& building, EntityId building_id) {
+                    return building.player_id == entity.player_id &&
+                            entity_is_selectable(building) &&
+                            (entity_is_building(building.type) || building.type == ENTITY_MINER) &&
+                            building.taking_damage_timer != 0 && 
+                            ivec2::manhattan_distance(building.cell, entity.cell) < BOT_SQUAD_GATHER_DISTANCE * 2;
+                }
+            });
+
+            int largest_range_in_bunker = 0;
+            for (EntityId unit_id : entity.garrisoned_units) {
+                const Entity& unit = state.entities.get_by_id(unit_id);
+                largest_range_in_bunker = std::max(largest_range_in_bunker, entity_get_data(unit.type).unit_data.range_squared);
+            }
+            EntityId enemy_in_range_of_bunker_id = bot_find_entity((BotFindEntityParams) {
+                .state = state,
+                .filter = [&state, &entity, &largest_range_in_bunker](const Entity& enemy, EntityId enemy_id) {
+                    return entity_is_unit(enemy.type) &&
+                            state.players[enemy.player_id].team != state.players[entity.player_id].team &&
+                            entity_is_selectable(enemy) &&
+                            ivec2::euclidean_distance_squared(entity.cell, enemy.cell) <= largest_range_in_bunker;
+                }
+            });
+
+            if (nearby_building_under_attack_id != ID_NULL && enemy_in_range_of_bunker_id == ID_NULL) {
+                // Change type to defense squad
+                squad.type = BOT_SQUAD_TYPE_DEFENSE;
+                squad.target_cell = state.entities.get_by_id(nearby_building_under_attack_id).cell;
+
+                // Remove bunker from squad
+                for (int squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) {
+                    if (squad.entities[squad_entity_index] == entity_id) {
+                        squad.entities[squad_entity_index] = squad.entities.back();
+                        squad.entities.pop_back();
+                        bot_release_entity(bot, entity_id);
+                    }
+                }
+
+                // Unload all units in bunker
+                MatchInput unload_input;
+                unload_input.type = MATCH_INPUT_UNLOAD;
+                unload_input.unload.carrier_count = 1;
+                unload_input.unload.carrier_ids[0] = entity_id;
+                return unload_input;
+            }
+        }
+    }
+
     // Attack micro
     std::vector<EntityId> unengaged_units;
     for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) {

@@ -711,7 +711,8 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
             if (!entity_is_unit(enemy.type) ||
                     !entity_is_selectable(enemy) ||
                     state.players[enemy.player_id].team == state.players[bot.player_id].team ||
-                    !match_is_entity_visible_to_player(state, enemy, bot.player_id)) {
+                    !match_is_entity_visible_to_player(state, enemy, bot.player_id) ||
+                    ivec2::manhattan_distance(enemy.cell, state.entities[hall_index].cell) > BOT_SQUAD_GATHER_DISTANCE * 2) {
                 continue;
             }
 
@@ -745,12 +746,14 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
 
         // Add any defending squads to the score
         for (const BotSquad& squad : bot.squads) {
-            if (squad.type != BOT_SQUAD_TYPE_BUNKER) {
+            if (!(squad.type == BOT_SQUAD_TYPE_BUNKER || 
+                    squad.type == BOT_SQUAD_TYPE_RESERVES ||
+                    squad.type == BOT_SQUAD_TYPE_DEFENSE)) {
                 continue;
             }
 
             // Ignore this squad if it's not close to the hall that is under attack
-            if (ivec2::manhattan_distance(squad.target_cell, state.entities[hall_index].cell) > BOT_SQUAD_GATHER_DISTANCE) {
+            if (ivec2::manhattan_distance(squad.target_cell, state.entities[hall_index].cell) > BOT_SQUAD_GATHER_DISTANCE * 2) {
                 continue;
             }
 
