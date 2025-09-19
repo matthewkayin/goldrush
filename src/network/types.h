@@ -82,6 +82,7 @@ enum NetworkLobbyPrivacy {
 enum NetworkEventType {
     NETWORK_EVENT_LOBBY_CONNECTION_FAILED,
     NETWORK_EVENT_LOBBY_INVALID_VERSION,
+    NETWORK_EVENT_LOBBY_FULL,
     NETWORK_EVENT_LOBBY_CONNECTED,
     NETWORK_EVENT_PLAYER_DISCONNECTED,
     NETWORK_EVENT_PLAYER_CONNECTED,
@@ -134,6 +135,7 @@ struct NetworkEvent {
 enum NetworkMessageType {
     NETWORK_MESSAGE_GREET_SERVER,
     NETWORK_MESSAGE_INVALID_VERSION,
+    NETWORK_MESSAGE_LOBBY_FULL,
     NETWORK_MESSAGE_GAME_ALREADY_STARTED,
     NETWORK_MESSAGE_WELCOME,
     NETWORK_MESSAGE_NEW_PLAYER,
@@ -143,6 +145,8 @@ enum NetworkMessageType {
     NETWORK_MESSAGE_SET_COLOR,
     NETWORK_MESSAGE_SET_MATCH_SETTING,
     NETWORK_MESSAGE_SET_TEAM,
+    NETWORK_MESSAGE_ADD_BOT,
+    NETWORK_MESSAGE_REMOVE_BOT,
     NETWORK_MESSAGE_CHAT,
     NETWORK_MESSAGE_LOAD_MATCH,
     NETWORK_MESSAGE_INPUT
@@ -175,11 +179,13 @@ struct NetworkMessageGreetClient {
 
 struct NetworkMessageSetColor {
     const uint8_t type = NETWORK_MESSAGE_SET_COLOR;
+    uint8_t player_id;
     uint8_t recolor_id;
 };
 
 struct NetworkMessageSetTeam {
     const uint8_t type = NETWORK_MESSAGE_SET_TEAM;
+    uint8_t player_id;
     uint8_t team;
 };
 
@@ -192,4 +198,16 @@ struct NetworkMessageSetMatchSetting {
     const uint8_t type = NETWORK_MESSAGE_SET_MATCH_SETTING;
     uint8_t setting;
     uint8_t value;
+};
+
+struct NetworkMessageAddBot {
+    const uint8_t type = NETWORK_MESSAGE_ADD_BOT;
+    uint8_t player_id;
+    uint8_t team;
+    uint8_t recolor_id;
+};
+
+struct NetworkMessageRemoveBot {
+    const uint8_t type = NETWORK_MESSAGE_REMOVE_BOT;
+    uint8_t player_id;
 };

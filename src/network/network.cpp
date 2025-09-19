@@ -449,12 +449,6 @@ void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
     state.players[0].status = NETWORK_PLAYER_STATUS_HOST;
     state.players[0].team = 0;
 
-    // TODO: delete
-    state.players[1].status = NETWORK_PLAYER_STATUS_BOT;
-    state.players[1].team = 1;
-    state.players[1].recolor_id = 1;
-    sprintf(state.players[1].name, "Bot");
-
     log_info("Created server.");
 }
 
@@ -511,11 +505,12 @@ void network_set_player_ready(bool ready) {
     network_host_flush(state.host);
 }
 
-void network_set_player_color(uint8_t color) {
+void network_set_player_color(uint8_t player_id, uint8_t color) {
+    state.players[player_id].recolor_id = color;
+
     NetworkMessageSetColor message;
     message.recolor_id = color;
-
-    state.players[state.player_id].recolor_id = color;
+    message.player_id = player_id;
 
     network_host_broadcast(state.host, &message, sizeof(message));
     network_host_flush(state.host);
@@ -535,10 +530,86 @@ uint8_t network_get_match_setting(uint8_t setting) {
     return state.match_settings[setting];
 }
 
-void network_set_player_team(uint8_t team) {
-    state.players[state.player_id].team = team;
+void network_set_player_team(uint8_t player_id, uint8_t team) {
+    state.players[player_id].team = team;
+
     NetworkMessageSetTeam message;
+    message.player_id = player_id;
     message.team = team;
+
+    network_host_broadcast(state.host, &message, sizeof(message));
+    network_host_flush(state.host);
+}
+
+void network_add_bot() {
+    if (network_get_player_count() == MAX_PLAYERS) {
+        log_warn("Called network_add_bot() in a full lobby.");
+        return;
+    }
+
+    // Determine bot player ID
+    uint8_t bot_player_id;
+    for (bot_player_id = 0; bot_player_id < MAX_PLAYERS; bot_player_id++) {
+        if (state.players[bot_player_id].status == NETWORK_PLAYER_STATUS_NONE) {
+            break;
+        }
+    }
+    GOLD_ASSERT(bot_player_id != MAX_PLAYERS);
+
+    // Determine bot team
+    uint8_t team0_player_count = 0;
+    uint8_t team1_player_count = 0;
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE) {
+            if (state.players[player_id].team == 0) {
+                team0_player_count++;
+            } else if (state.players[player_id].team == 1) {
+                team1_player_count++;
+            }
+        }
+    }
+    uint8_t bot_team = team0_player_count < team1_player_count ? 0 : 1;
+
+    // Determine bot color
+    uint8_t recolor_id;
+    for (recolor_id = 0; recolor_id < MAX_PLAYERS; recolor_id++) {
+        bool player_has_color = false;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (state.players[player_id].status != NETWORK_PLAYER_STATUS_NONE && state.players[player_id].recolor_id == recolor_id) {
+                player_has_color = true;
+                break;
+            }
+        }
+        if (!player_has_color) {
+            break;
+        }
+    }
+    GOLD_ASSERT(recolor_id != MAX_PLAYERS);
+
+    NetworkMessageAddBot message;
+    message.player_id = bot_player_id;
+    message.team = bot_team;
+    message.recolor_id = recolor_id;
+
+    state.players[bot_player_id].status = NETWORK_PLAYER_STATUS_BOT;
+    sprintf(state.players[bot_player_id].name, "Bot");
+    state.players[bot_player_id].team = bot_team;
+    state.players[bot_player_id].recolor_id = recolor_id;
+
+    network_host_broadcast(state.host, &message, sizeof(message));
+    network_host_flush(state.host);
+}
+
+void network_remove_bot(uint8_t player_id) {
+    if (state.players[player_id].status != NETWORK_PLAYER_STATUS_BOT) {
+        log_warn("Tried to kick non-bot player with id %u, status %u", player_id, state.players[player_id].status);
+        return;
+    }
+
+    state.players[player_id].status = NETWORK_PLAYER_STATUS_NONE;
+
+    NetworkMessageRemoveBot message;
+    message.player_id = player_id;
 
     network_host_broadcast(state.host, &message, sizeof(message));
     network_host_flush(state.host);
@@ -639,6 +710,16 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
     switch (message_type) {
         case NETWORK_MESSAGE_GREET_SERVER: {
             // Host class will handle the lobby is full scenario
+            // Check if lobby is full
+            if (network_get_player_count() == MAX_PLAYERS) {
+                log_info("Received new player but lobby is full. Rejecting client...");
+
+                uint8_t message = NETWORK_MESSAGE_LOBBY_FULL;
+                network_host_send(state.host, incoming_peer_id, &message, sizeof(message));
+                network_host_flush(state.host);
+
+                return;
+            }
 
             NetworkMessageGreetServer incoming_message;
             memcpy(&incoming_message, data, sizeof(incoming_message));
@@ -731,6 +812,17 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             network_host_send(state.host, incoming_peer_id, &response, sizeof(response));
             log_trace("Sent welcome packet to player %u", incoming_player_id);
 
+            // Notify the new player of any bots
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (state.players[player_id].status == NETWORK_PLAYER_STATUS_BOT) {
+                    NetworkMessageAddBot add_bot_message;
+                    add_bot_message.player_id = player_id;
+                    add_bot_message.team = state.players[player_id].team;
+                    add_bot_message.recolor_id = state.players[player_id].recolor_id;
+                    network_host_send(state.host, incoming_peer_id, &add_bot_message, sizeof(add_bot_message));
+                }
+            }
+
             // Build new player message
             uint8_t new_player_message[NETWORK_IP_BUFFER_SIZE + 4];
             new_player_message[0] = NETWORK_MESSAGE_NEW_PLAYER;
@@ -759,6 +851,13 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             log_info("Client version does not match the server.");
             state.events.push((NetworkEvent) {
                 .type = NETWORK_EVENT_LOBBY_INVALID_VERSION
+            });
+            break;
+        }
+        case NETWORK_MESSAGE_LOBBY_FULL: {
+            log_info("Client received lobby full from server.");
+            state.events.push((NetworkEvent) {
+                .type = NETWORK_EVENT_LOBBY_FULL
             });
             break;
         }
@@ -832,8 +931,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 return;
             }
 
-            uint8_t player_id = network_host_get_peer_player_id(state.host, incoming_peer_id); 
-            state.players[player_id].recolor_id = data[1];
+            state.players[data[1]].recolor_id = data[2];
             break;
         }
         case NETWORK_MESSAGE_SET_TEAM: {
@@ -841,9 +939,7 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                 return;
             }
 
-            uint8_t player_id = network_host_get_peer_player_id(state.host, incoming_peer_id); 
-            state.players[player_id].team = data[1];
-
+            state.players[data[1]].team = data[2];
             break;
         }
         case NETWORK_MESSAGE_CHAT: {
@@ -865,6 +961,32 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             }
 
             state.match_settings[data[1]] = data[2];
+            break;
+        }
+        case NETWORK_MESSAGE_ADD_BOT: {
+            if (!(state.status == NETWORK_STATUS_CONNECTED || state.status == NETWORK_STATUS_HOST)) {
+                return;
+            }
+
+            NetworkMessageAddBot incoming_message;
+            memcpy(&incoming_message, data, sizeof(incoming_message));
+
+            state.players[incoming_message.player_id].status = NETWORK_PLAYER_STATUS_BOT;
+            sprintf(state.players[incoming_message.player_id].name, "Bot");
+            state.players[incoming_message.player_id].team = incoming_message.team;
+            state.players[incoming_message.player_id].recolor_id = incoming_message.recolor_id;
+            break;
+        }
+        case NETWORK_MESSAGE_REMOVE_BOT: {
+            if (!(state.status == NETWORK_STATUS_CONNECTED || state.status == NETWORK_STATUS_HOST)) {
+                return;
+            }
+
+            NetworkMessageRemoveBot incoming_message;
+            memcpy(&incoming_message, data, sizeof(incoming_message));
+
+            state.players[incoming_message.player_id].status = NETWORK_PLAYER_STATUS_NONE;
+
             break;
         }
         case NETWORK_MESSAGE_LOAD_MATCH: {

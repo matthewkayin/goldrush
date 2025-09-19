@@ -127,6 +127,14 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             log_info("Menu received LOBBY_INVALID_VERSION.");
             menu_set_mode(state, MENU_MODE_LOBBYLIST);
             menu_show_status(state, "Game version does not match server.");
+            network_disconnect();
+            break;
+        }
+        case NETWORK_EVENT_LOBBY_FULL: {
+            log_info("Menu received LOBBY_FULL");
+            menu_set_mode(state, MENU_MODE_LOBBYLIST);
+            menu_show_status(state, "Lobby is full.");
+            network_disconnect();
             break;
         }
         case NETWORK_EVENT_LOBBY_CONNECTED: {
@@ -395,8 +403,18 @@ void menu_update(MenuState& state) {
                 ui_element_size(state.ui, ivec2(0, PLAYERLIST_ROW_HEIGHT));
                 ui_begin_row(state.ui, ivec2(0, 0), 0);
                     ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_NAME_WIDTH, 0));
-                    ui_element_position(state.ui, ivec2(0, 2));
-                    ui_text(state.ui, FONT_HACK_GOLD, player.name);
+                    ui_begin_row(state.ui, ivec2(0, 0), 4);
+                        ui_element_position(state.ui, ivec2(0, 2));
+                        ui_text(state.ui, FONT_HACK_GOLD, player.name);
+
+                        if (network_is_host() && player.status == NETWORK_PLAYER_STATUS_BOT) {
+                            ivec2 text_size = render_get_text_size(FONT_HACK_GOLD, player.name);
+                            ui_element_position(state.ui, ivec2(text_size.x + 4, 0));
+                            if (ui_team_picker(state.ui, 'X', false)) {
+                                network_remove_bot(player_id);
+                            }
+                        }
+                    ui_end_container(state.ui);
 
                     ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_STATUS_WIDTH, 0));
                     ui_element_position(state.ui, ivec2(0, 2));
@@ -410,15 +428,27 @@ void menu_update(MenuState& state) {
                         team_picker_char = '-';
                     }
                     ui_element_size(state.ui, ivec2(PLAYERLIST_COLUMN_TEAM_WIDTH, 0));
-                    if (ui_team_picker(state.ui, team_picker_char, !teams_enabled || player_id != network_get_player_id())) {
-                        network_set_player_team(player.team == 0 ? 1 : 0);
+                    bool team_picker_enabled = teams_enabled && 
+                                                (player_id == network_get_player_id() || 
+                                                (network_is_host() && player.status == NETWORK_PLAYER_STATUS_BOT));
+                    if (ui_team_picker(state.ui, team_picker_char, !team_picker_enabled)) {
+                        network_set_player_team(player_id, player.team == 0 ? 1 : 0);
                     }
 
                     uint32_t player_color = player.recolor_id;
-                    if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &player_color, PLAYER_COLOR_STRS, player_id != network_get_player_id())) {
-                        network_set_player_color((uint8_t)player_color);
+                    bool color_picker_enabled = player_id == network_get_player_id() || 
+                                                (network_is_host() && player.status == NETWORK_PLAYER_STATUS_BOT);
+                    if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &player_color, PLAYER_COLOR_STRS, !color_picker_enabled)) {
+                        network_set_player_color(player_id, (uint8_t)player_color);
                     }
                 ui_end_container(state.ui);
+            }
+
+            // Add bot button
+            if (network_is_host() && network_get_player_count() < MAX_PLAYERS) {
+                if (ui_slim_button(state.ui, "+ Add Bot")) {
+                    network_add_bot();
+                }
             }
         ui_end_container(state.ui);
         // End playerlist
@@ -698,7 +728,10 @@ const char* menu_get_player_status_string(NetworkPlayerStatus status) {
             return "NOT READY";
         case NETWORK_PLAYER_STATUS_HOST:
             return "HOST";
+        case NETWORK_PLAYER_STATUS_BOT:
+            return "BOT";
         default:
+            log_warn("Player status %u not handled.", status);
             return "";
     }
 }

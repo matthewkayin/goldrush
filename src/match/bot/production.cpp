@@ -314,7 +314,7 @@ uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
     }
 
     if (BOT_STRATEGY_SALOON_WORKSHOP && bot.goal.type == BOT_GOAL_PUSH && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_FAN_HAMMER)) {
-        return UPGRADE_BAYONETS;
+        return UPGRADE_FAN_HAMMER;
     }
 
     if (bot.strategy == BOT_STRATEGY_BARRACKS && bot.goal.type == BOT_GOAL_PUSH && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_BAYONETS)) {

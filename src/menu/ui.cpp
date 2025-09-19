@@ -148,6 +148,29 @@ bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally
     return clicked;
 }
 
+bool ui_slim_button(UI& state, const char* text) {
+    ivec2 origin = ui_get_container_origin(state);
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+    ivec2 button_size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
+    Rect button_rect = (Rect) {
+        .x = origin.x, .y = origin.y,
+        .w = button_size.x, .h = button_size.y
+    };
+    ui_update_container(state, ivec2(button_rect.w, button_rect.h));
+    bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && button_rect.has_point(input_get_mouse_position());
+
+    ivec2 render_pos = ivec2(button_rect.x, button_rect.y - (int)hovered);
+    ivec2 text_pos = ivec2(render_pos.x + 5, render_pos.y + 2);
+    ui_queue_sprite(state, SPRITE_UI_DROPDOWN_MINI, hovered ? ivec2(0, 4) : ivec2(0, 3), render_pos, 0);
+    ui_queue_text(state, hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, text_pos, 0);
+
+    bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
+    if (clicked) {
+        sound_play(SOUND_UI_CLICK);
+    }
+    return clicked;
+}
+
 bool ui_sprite_button(UI& state, SpriteName sprite, bool disabled, bool flip_h) {
     ivec2 origin = ui_get_container_origin(state);
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);

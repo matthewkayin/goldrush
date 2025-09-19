@@ -159,6 +159,7 @@ ivec2 ui_get_container_origin(const UI& state);
  */
 ivec2 ui_button_size(const char* text);
 
+
 /*
  * Returns the position a button so that the button is in the bottom left of the frame rect
  * @param rect
@@ -180,6 +181,15 @@ ivec2 ui_button_position_frame_bottom_right(Rect rect, const char* text);
  * @return True if the button has been clicked this frame
  */
 bool ui_button(UI& state, const char* text, ivec2 size = ivec2(-1, -1), bool center_horizontally = false);
+
+/**
+ * Creates a button, uses UI_DROPDOWN_MINI as the frame
+ * @param text The text on the button
+ * @param size If overriden, will be used as the size of the button, the text will go in the center
+ * @param center_horizontally If true, the button will be centered horizontally about its render position
+ * @return True if the button has been clicked this frame
+ */
+bool ui_slim_button(UI& state, const char* text);
 
 /**
  * Create a sprite button
