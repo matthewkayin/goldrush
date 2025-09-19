@@ -8,6 +8,7 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
+uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot);
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 
 EntityType bot_get_building_which_trains(EntityType unit_type);

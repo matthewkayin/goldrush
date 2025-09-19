@@ -73,7 +73,6 @@ struct BotGoal {
     BotGoalType type;
     BotSquadType desired_squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
-    uint32_t desired_upgrade;
 };
 
 // Bot

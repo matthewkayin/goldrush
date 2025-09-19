@@ -6,6 +6,7 @@
 #include "util.h"
 #include "production.h"
 #include "../lcg.h"
+#include "../upgrade.h"
 
 Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
@@ -42,7 +43,6 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
     // Strategy update
     if (bot_goal_should_be_abandoned(state, bot, bot.goal)) {
-        bot.goal.desired_upgrade = 0;
         memset(bot.goal.desired_entities, 0, sizeof(bot.goal.desired_entities));
     }
     if (bot_goal_is_empty(bot.goal)) {
@@ -52,7 +52,6 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
         if (bot.goal.desired_squad_type != BOT_SQUAD_TYPE_NONE) {
             bot_squad_create_from_goal(state, bot, bot.goal);
         }
-        bot.goal.desired_upgrade = 0;
         memset(bot.goal.desired_entities, 0, sizeof(bot.goal.desired_entities));
     }
 
@@ -308,7 +307,6 @@ BotGoal bot_goal_create(const MatchState& state, Bot& bot, BotGoalType goal_type
     BotGoal goal;
     goal.type = goal_type;
     memset(goal.desired_entities, 0, sizeof(goal.desired_entities));
-    goal.desired_upgrade = 0;
     goal.desired_squad_type = BOT_SQUAD_TYPE_NONE;
 
     // Count unreserved entities
@@ -575,9 +573,6 @@ bool bot_goal_should_be_abandoned(const MatchState& state, const Bot& bot, const
 }
 
 bool bot_goal_is_empty(const BotGoal& goal) {
-    if (goal.desired_upgrade != 0) {
-        return false;
-    }
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         if (goal.desired_entities[entity_type] > 0) {
             return false;

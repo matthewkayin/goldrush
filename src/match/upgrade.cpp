@@ -15,7 +15,7 @@ static const std::unordered_map<uint32_t, UpgradeData> UPGRADE_DATA = {
         .desc = "Allows Pyros to place Land Mines",
         .icon = SPRITE_BUTTON_ICON_LANDMINE,
         .gold_cost = 250,
-        .research_duration = 60
+        .research_duration = 50
     }},
     { UPGRADE_BAYONETS, (UpgradeData) {
         .name = "Bayonets",
@@ -28,29 +28,36 @@ static const std::unordered_map<uint32_t, UpgradeData> UPGRADE_DATA = {
         .name = "Private Eye",
         .desc = "Grants detection to detectives",
         .icon = SPRITE_BUTTON_ICON_PRIVATE_EYE,
-        .gold_cost = 200,
+        .gold_cost = 250,
         .research_duration = 50
     }},
     { UPGRADE_STAKEOUT, (UpgradeData) {
         .name = "Stakeout",
         .desc = "Increases detective energy",
         .icon = SPRITE_BUTTON_ICON_STAKEOUT,
-        .gold_cost = 250,
-        .research_duration = 60
+        .gold_cost = 300,
+        .research_duration = 80
     }},
     { UPGRADE_SERRATED_KNIVES, (UpgradeData) {
         .name = "Serrated Knives",
         .desc = "Makes bandit attacks inflict bleed",
         .icon = SPRITE_BUTTON_ICON_SERRATED_KNIVES,
-        .gold_cost = 250,
+        .gold_cost = 350,
         .research_duration = 60
     }},
     { UPGRADE_FAN_HAMMER, (UpgradeData) {
         .name = "Fan the Hammer",
         .desc = "Gives cowboys a triple-shot at the start of combat",
         .icon = SPRITE_BUTTON_ICON_FAN_HAMMER,
-        .gold_cost = 250,
+        .gold_cost = 350,
         .research_duration = 60
+    }},
+    { UPGRADE_TAILWIND, (UpgradeData) {
+        .name = "Tailwind",
+        .desc = "Increases balloon speed",
+        .icon = SPRITE_BUTTON_ICON_TAILWIND,
+        .gold_cost = 300,
+        .research_duration = 80
     }}
 };
 

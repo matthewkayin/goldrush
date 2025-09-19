@@ -14,8 +14,9 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot) {
         return bot_build_building(state, bot, ENTITY_HOUSE);
     }
 
-    if (bot.goal.desired_upgrade != 0) {
-        EntityType prereq_type = bot_get_building_which_researches(bot.goal.desired_upgrade);
+    uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot);
+    if (desired_upgrade != 0) {
+        EntityType prereq_type = bot_get_building_which_researches(desired_upgrade);
         EntityId prereq_id = bot_find_entity((BotFindEntityParams) {
             .state = state,
             .filter = [&bot, &prereq_type](const Entity& building, EntityId building_id) {
@@ -25,7 +26,7 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot) {
         if (prereq_id == ID_NULL) {
             return bot_build_building(state, bot, prereq_type);
         }
-        return bot_research_upgrade(state, bot, bot.goal.desired_upgrade);
+        return bot_research_upgrade(state, bot, desired_upgrade);
     }
 
     uint32_t entity_count[ENTITY_TYPE_COUNT];
@@ -280,6 +281,59 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
     return input;
 }
 
+uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
+    bool has_landmines_squad = false;
+    for (const BotSquad& squad : bot.squads) {
+        if (squad.type == BOT_SQUAD_TYPE_LANDMINES) {
+            has_landmines_squad = true;
+        }
+    }
+    if (has_landmines_squad && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_LANDMINES)) {
+        return UPGRADE_LANDMINES;
+    }
+
+    bool has_detective_squad = false;
+    for (const BotSquad& squad : bot.squads) {
+        for (EntityId entity_id : squad.entities) {
+            uint32_t entity_index = state.entities.get_index_of(entity_id);
+            if (entity_index != INDEX_INVALID && state.entities[entity_index].type == ENTITY_DETECTIVE) {
+                has_detective_squad = true;
+                break;
+            }
+        }
+        if (has_detective_squad) {
+            break;
+        }
+    }
+    if (has_detective_squad && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_PRIVATE_EYE)) {
+        return UPGRADE_PRIVATE_EYE;
+    }
+
+    if (BOT_STRATEGY_SALOON_COOP && bot.goal.type == BOT_GOAL_PUSH && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_WAR_WAGON)) {
+        return UPGRADE_WAR_WAGON;
+    }
+
+    if (BOT_STRATEGY_SALOON_WORKSHOP && bot.goal.type == BOT_GOAL_PUSH && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_FAN_HAMMER)) {
+        return UPGRADE_BAYONETS;
+    }
+
+    if (bot.strategy == BOT_STRATEGY_BARRACKS && bot.goal.type == BOT_GOAL_PUSH && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_BAYONETS)) {
+        return UPGRADE_BAYONETS;
+    }
+
+    EntityId balloon_id = bot_find_entity((BotFindEntityParams) {
+        .state = state,
+        .filter = [&bot](const Entity& entity, EntityId entity_id) {
+            return entity.type == ENTITY_BALLOON && entity.player_id == bot.player_id && entity_is_selectable(entity);
+        }
+    });
+    if (balloon_id != ID_NULL && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_TAILWIND)) {
+        return UPGRADE_TAILWIND;
+    }
+
+    return 0;
+}
+
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade) {
     GOLD_ASSERT(match_player_upgrade_is_available(state, bot.player_id, upgrade));
 
@@ -368,6 +422,7 @@ EntityType bot_get_building_which_researches(uint32_t upgrade) {
         case UPGRADE_PRIVATE_EYE:
             return ENTITY_SHERIFFS;
         case UPGRADE_LANDMINES:
+        case UPGRADE_TAILWIND:
             return ENTITY_WORKSHOP;
         default:
             GOLD_ASSERT(false);

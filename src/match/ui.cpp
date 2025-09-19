@@ -1478,6 +1478,7 @@ void match_ui_update(MatchUiState& state) {
                             state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
                             state.hotkey_group[2] = INPUT_HOTKEY_BALLOON;
                             state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
+                            state.hotkey_group[4] = INPUT_HOTKEY_RESEARCH_TAILWIND;
                             break;
                         }
                         case ENTITY_SMITH: {

@@ -292,6 +292,7 @@ void input_set_hotkey_mapping_to_default(SDL_Scancode* hotkey_mapping) {
     hotkey_mapping[INPUT_HOTKEY_PYRO] = SDL_SCANCODE_R;
     hotkey_mapping[INPUT_HOTKEY_BALLOON] = SDL_SCANCODE_B;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_LANDMINES] = SDL_SCANCODE_E;
+    hotkey_mapping[INPUT_HOTKEY_RESEARCH_TAILWIND] = SDL_SCANCODE_W;
 
     // Coop
     hotkey_mapping[INPUT_HOTKEY_WAGON] = SDL_SCANCODE_W;
