@@ -8,7 +8,6 @@
 #include <vector>
 
 enum BotStrategy {
-    BOT_STRATEGY_BANDIT_RUSH,
     BOT_STRATEGY_SALOON_HARASS
 };
 

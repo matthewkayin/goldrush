@@ -7,7 +7,14 @@ Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
     bot.player_id = player_id;
     bot.lcg_seed = lcg_seed;
-    bot.strategy = BOT_STRATEGY_BANDIT_RUSH;
+    bot.strategy = BOT_STRATEGY_SALOON_HARASS;
+
+    BotGoal opener;
+    memset(opener.desired_entities, 0, sizeof(opener.desired_entities));
+    opener.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
+    opener.desired_entities[ENTITY_WAGON] = 1;
+    opener.desired_entities[ENTITY_BANDIT] = 4;
+    bot.goals.push_back(opener);
 
     bot.scout_id = ID_NULL;
     bot.scout_enemy_has_landmines = false;
@@ -42,12 +49,6 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
             BotGoal goal;
             memset(goal.desired_entities, 0, sizeof(goal.desired_entities));
             switch (bot.strategy) {
-                case BOT_STRATEGY_BANDIT_RUSH: {
-                    goal.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
-                    goal.desired_entities[ENTITY_BANDIT] = 4;
-                    goal.desired_entities[ENTITY_WAGON] = 1;
-                    break;
-                }
                 case BOT_STRATEGY_SALOON_HARASS: {
                     if (bot_get_mining_base_count(state, bot) < 2) {
                         goal.desired_squad_type = BOT_SQUAD_TYPE_NONE;
@@ -409,7 +410,7 @@ void bot_get_desired_entities(const MatchState& state, const Bot& bot, const Bot
     }
 
     // Determine any other desired buildings based on building pre-reqs
-    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_LANDMINE; entity_type++) {
         if (desired_entities[entity_type] == 0) {
             continue;
         }
@@ -2354,7 +2355,9 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
         if (bot.scout_id == ID_NULL) {
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
-        if (bot.strategy != BOT_STRATEGY_BANDIT_RUSH) {
+        // Don't reserve scout in the early game in case we are rushing
+        // This is hacky, but we won't have a wagon-based army at this point anyways so it should work out
+        if (match_time_minutes >= 5 || state.entities.get_by_id(bot.scout_id).type != ENTITY_WAGON) {
             bot_reserve_entity(bot, bot.scout_id);
         }
     }

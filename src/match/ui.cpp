@@ -1009,6 +1009,7 @@ void match_ui_update(MatchUiState& state) {
     if (!state.replay_mode) {
         if (state.turn_timer == 0) {
             // Bot input
+            uint64_t bot_start_time = SDL_GetTicksNS();
             static const uint32_t TURNS_PER_SECOND = UPDATES_PER_SECOND / TURN_DURATION;
             uint32_t match_time_minutes = (state.turn_counter / TURNS_PER_SECOND) / 60U;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -1031,6 +1032,8 @@ void match_ui_update(MatchUiState& state) {
                     }
                 }
             }
+            double bot_duration = (double)(SDL_GetTicksNS() - bot_start_time) / (double)SDL_NS_PER_SECOND;
+            log_trace("PROFILE: bot duration %f", bot_duration);
 
             bool all_inputs_received = true;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
