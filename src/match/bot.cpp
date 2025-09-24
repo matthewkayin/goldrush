@@ -2672,6 +2672,12 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
                     bot_squad_is_engaged(state, bot, squad)) {
                 continue;
             }
+
+            // Don't send in a squad if it's far away, unless we feel pretty sure that this squad could cleanup the attack
+            if (ivec2::manhattan_distance(squad.target_cell, state.entities[hall_index].cell) > BOT_SQUAD_GATHER_DISTANCE * 2 &&
+                    squad.entities.size() < enemy_score + 8) {
+                continue;
+            }
             if (nearest_idle_defending_squad_index == -1 ||
                     ivec2::manhattan_distance(squad.target_cell, state.entities[hall_index].cell) <
                     ivec2::manhattan_distance(bot.squads[nearest_idle_defending_squad_index].target_cell, state.entities[hall_index].cell)) {
@@ -2695,7 +2701,8 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
                     entity.type == ENTITY_WAGON ||
                     !entity_is_selectable(entity) ||
                     entity.player_id != bot.player_id ||
-                    bot_is_entity_reserved(bot, entity_id)) {
+                    bot_is_entity_reserved(bot, entity_id) ||
+                    ivec2::manhattan_distance(entity.cell, state.entities[hall_index].cell) > BOT_SQUAD_GATHER_DISTANCE * 2) {
                 continue;
             }
 
