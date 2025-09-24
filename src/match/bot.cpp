@@ -2591,6 +2591,18 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
         }
     }
 
+    // Count units
+    uint32_t bot_unit_count = 0;
+    for (const Entity& entity : state.entities) {
+        if (entity.player_id == bot.player_id && entity_is_unit(entity.type) && entity.health != 0) {
+            bot_unit_count++;
+        }
+    }
+    if (bot.should_surrender && hall_count <= 1 && bot_unit_count == 0) {
+        bot.has_surrendered = true;
+        return;
+    }
+
     // For each goldmine under attack, determine how to respond
     for (uint32_t hall_index : halls_under_attack) {
         // Determine the strength of the attacking force
@@ -2723,6 +2735,10 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
             if (squad.type != BOT_SQUAD_TYPE_ATTACK) {
                 continue;
             }
+            // Don't send in a squad unless we feel pretty sure that this squad could cleanup the attack
+            if (squad.entities.size() < enemy_score + 8) {
+                continue;
+            }
 
             // Count how many units are closer to the target than they are to the under-attack base
             uint32_t squad_units_closer_to_target = 0;
@@ -2752,9 +2768,50 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
             continue;
         }
 
+        // Next, see if we can use unreserved units to mount a counter-attack
+        bool enemy_has_undefended_base = false;
+        std::unordered_map<uint32_t, uint32_t> enemy_hall_defense_score = bot_get_enemy_hall_defense_scores(state, bot);
+        for (auto it : enemy_hall_defense_score) {
+            if (it.second < 4) {
+                enemy_has_undefended_base = true;
+                break;
+            }
+        }
+        if (enemy_has_undefended_base) {
+            BotSquad counter_attack_squad;
+            counter_attack_squad.type = BOT_SQUAD_TYPE_ATTACK;
+            for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+                const Entity& entity = state.entities[entity_index];
+                EntityId entity_id = state.entities.get_id_of(entity_index);
+                if (!entity_is_unit(entity.type) ||
+                        entity.type == ENTITY_MINER ||
+                        entity.type == ENTITY_WAGON ||
+                        !entity_is_selectable(entity) ||
+                        entity.player_id != bot.player_id ||
+                        bot_is_entity_reserved(bot, entity_id)) {
+                    continue;
+                }
+
+                counter_attack_squad.entities.push_back(entity_id);
+            }
+
+            if (!counter_attack_squad.entities.empty()) {
+                counter_attack_squad.target_cell = bot_squad_choose_attack_point(state, bot, counter_attack_squad);
+                if (counter_attack_squad.target_cell.x != -1) {
+                    // Reserve all squad entities
+                    for (EntityId entity_id : counter_attack_squad.entities) {
+                        bot_reserve_entity(bot, entity_id);
+                    }
+                    bot.squads.push_back(counter_attack_squad);
+                    continue;
+                }
+            }
+        }
+
         // Finally if we're really desperate, use workers to attack
-        // We can re-use the defend_squad for this
-        GOLD_ASSERT(defend_squad.entities.empty());
+        BotSquad worker_defend_squad;
+        worker_defend_squad.type = BOT_SQUAD_TYPE_RESERVES;
+        worker_defend_squad.target_cell = state.entities[hall_index].cell;
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
             const Entity& entity = state.entities[entity_index];
             EntityId entity_id = state.entities.get_id_of(entity_index);
@@ -2766,23 +2823,16 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
                 continue;
             }
 
-            defend_squad.entities.push_back(entity_id);
+            worker_defend_squad.entities.push_back(entity_id);
         }
-        if (!defend_squad.entities.empty()) {
+        if (!worker_defend_squad.entities.empty()) {
             // Reserve all the entities
-            for (EntityId entity_id : defend_squad.entities) {
+            for (EntityId entity_id : worker_defend_squad.entities) {
                 bot_reserve_entity(bot, entity_id);
             }
 
-            bot.squads.push_back(defend_squad);
+            bot.squads.push_back(worker_defend_squad);
             continue;
-        }
-
-        // If there wasn't anything we could do, should we surrender?
-        if (bot.should_surrender && 
-                hall_count <= 1 &&
-                defending_score <= enemy_score / 2) {
-            bot.has_surrendered = true;
         }
     } // End for each goldmine under attack
 }
