@@ -8,7 +8,7 @@
 #include <vector>
 
 enum BotStrategy {
-    BOT_STRATEGY_SALOON_HARASS
+    BOT_STRATEGY_SALOON_COOP
 };
 
 enum BotSquadType {
@@ -89,6 +89,7 @@ struct Bot {
 
 Bot bot_init(uint8_t player_id, int32_t lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
+BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 
 // Production
 
@@ -129,6 +130,8 @@ bool bot_squad_can_defend_against_detectives(const MatchState& state, const BotS
 ivec2 bot_squad_get_center(const MatchState& state, const BotSquad& squad);
 ivec2 bot_squad_choose_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
 ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
+void bot_handle_base_under_attack(const MatchState& state, Bot& bot);
+bool bot_squad_is_engaged(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
 // Scout
 
