@@ -51,7 +51,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
         }
     }
 
-    bot_handle_base_under_attack(state, bot);
+    bool is_base_under_attack = bot_handle_base_under_attack(state, bot);
 
     // Production
 
@@ -60,7 +60,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
         return saturate_bases_input;
     }
 
-    if (bot_should_build_house(state, bot)) {
+    if (bot_should_build_house(state, bot) && !is_base_under_attack) {
         return bot_build_building(state, bot, ENTITY_HOUSE);
     }
 
@@ -82,7 +82,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
             return train_unit_input;
         }
     }
-    if (desired_building != ENTITY_TYPE_COUNT) {
+    if (desired_building != ENTITY_TYPE_COUNT && !is_base_under_attack) {
         MatchInput build_input = bot_build_building(state, bot, desired_building);
         if (build_input.type != MATCH_INPUT_NONE) {
             return build_input;
@@ -114,6 +114,11 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     }
 
     // Misc
+
+    MatchInput build_cancel_input = bot_cancel_in_progress_buildings(state, bot);
+    if (build_cancel_input.type != MATCH_INPUT_NONE) {
+        return build_cancel_input;
+    }
 
     MatchInput repair_input = bot_repair_burning_buildings(state, bot);
     if (repair_input.type != MATCH_INPUT_NONE) {
@@ -1315,6 +1320,7 @@ uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot) {
 
 static const int BOT_SQUAD_GATHER_DISTANCE = 16;
 static const uint32_t BOT_SQUAD_LANDMINE_MAX = 6;
+static const int BOT_UNIT_SCORE_MULTIPLIER = 4;
 
 void bot_squad_create_from_goal(const MatchState& state, Bot& bot, const BotGoal& goal) {
     BotSquad squad;
@@ -1650,70 +1656,52 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             return input;
         }
 
-        // If attacking pyros, make sure they have enough energy first
-        if (squad.type == BOT_SQUAD_TYPE_ATTACK) {
-            bool has_low_energy_pyro = false;
-            for (EntityId unit_id : unengaged_units) {
-                const Entity& unit = state.entities.get_by_id(unit_id);
-                if (unit.type == ENTITY_PYRO && unit.energy < MOLOTOV_ENERGY_COST) {
-                    has_low_energy_pyro = true;
+        // If this unit is a miner which is currently mining, tell it to snap out of it and start attacking
+        if (unit.type == ENTITY_MINER && unit.target.type == TARGET_ENTITY) {
+            MatchInput input;
+            input.type = MATCH_INPUT_MOVE_ATTACK_CELL;
+            input.move.shift_command = 0;
+            input.move.target_cell = nearby_enemy.cell;
+            input.move.target_id = ID_NULL;
+            input.move.entity_count = 1;
+            input.move.entity_ids[0] = unit_id;
+
+            // Check if other miners want to join this input
+            for (EntityId other_id : squad.entities) {
+                const Entity& other = state.entities.get_by_id(other_id);
+                if (other.type != ENTITY_MINER ||
+                        !entity_is_selectable(other) ||
+                        other.target.type != TARGET_ENTITY ||
+                        ivec2::manhattan_distance(other.cell, unit.cell) > BOT_SQUAD_GATHER_DISTANCE) {
+                    continue;
+                }
+
+                input.move.entity_ids[input.move.entity_count] = other_id;
+                input.move.entity_count++;
+                if (input.move.entity_count == SELECTION_LIMIT) {
                     break;
                 }
             }
-            if (has_low_energy_pyro) {
-                return (MatchInput) { .type = MATCH_INPUT_NONE };
-            }
+
+            return input;
         }
-
-        // Skip this infantry if it's already attacking something
-        if (bot_is_unit_already_attacking_nearby_target(state, unit, nearby_enemy)) {
-            continue;
-        }
-
-        // Infantry attack the nearby enemy
-        MatchInput input;
-        input.type = MATCH_INPUT_MOVE_ATTACK_CELL;
-        input.move.shift_command = 0;
-        input.move.target_id = ID_NULL;
-        input.move.target_cell = nearby_enemy.cell;
-        input.move.entity_count = 1;
-        input.move.entity_ids[0] = unit_id;
-
-        // See if any other units in the squad want to join in on this input
-        for (EntityId other_id : squad.entities) {
-            // Don't consider the current entity
-            if (unit_id == other_id) {
-                continue;
-            }
-
-            const Entity& other = state.entities.get_by_id(other_id);
-            // Filter out non-units
-            if (!entity_is_unit(other.type)) {
-                continue;
-            }
-            // Filter out non-attackers
-            if (entity_get_data(other.type).unit_data.damage == 0) {
-                continue;
-            }
-            // Filter out far away units
-            if (ivec2::manhattan_distance(other.cell, nearby_enemy.cell) > BOT_SQUAD_GATHER_DISTANCE) {
-                continue;
-            }
-            // Filter out units which are already busy with an important target
-            if (bot_is_unit_already_attacking_nearby_target(state, other, nearby_enemy)) {
-                continue;
-            }
-
-            input.move.entity_ids[input.move.entity_count] = other_id;
-            input.move.entity_count++;
-            if (input.move.entity_count == SELECTION_LIMIT) {
-                break;
-            }
-        } // End for each other
-
-        return input;
     } // End for each infantry
     // End attack micro
+
+    // If attacking pyros, make sure they have enough energy first
+    if (squad.type == BOT_SQUAD_TYPE_ATTACK) {
+        bool has_low_energy_pyro = false;
+        for (EntityId unit_id : unengaged_units) {
+            const Entity& unit = state.entities.get_by_id(unit_id);
+            if (unit.type == ENTITY_PYRO && unit.energy < MOLOTOV_ENERGY_COST) {
+                has_low_energy_pyro = true;
+                break;
+            }
+        }
+        if (has_low_energy_pyro) {
+            return (MatchInput) { .type = MATCH_INPUT_NONE };
+        }
+    }
 
     // Unengaged infantry micro
     // This section mostly just sorts distant infantry into a list
@@ -2098,7 +2086,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad) {
     // Score the enemy's army
-    uint32_t enemy_army_score = 0;
+    int enemy_army_score = 0;
     for (const Entity& entity : state.entities) {
         // Filter down to enemy units or bunkers which the bot can see
         if (entity.type == ENTITY_GOLDMINE ||
@@ -2126,13 +2114,21 @@ bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const Bot
     }
 
     // Score the allied army
-    uint32_t squad_score = 0;
+    int squad_score = 0;
     for (EntityId entity_id : squad.entities) {
         const Entity& entity = state.entities.get_by_id(entity_id);
         squad_score += bot_score_entity(entity);
     }
 
-    return enemy_army_score > squad_score + 8;
+    // Determine retreat threshold
+    int desired_army_lead = 0;
+    if (squad_score < 5 * BOT_UNIT_SCORE_MULTIPLIER) { 
+        desired_army_lead = 3 * BOT_UNIT_SCORE_MULTIPLIER;
+    } else if (squad_score < 9 * BOT_UNIT_SCORE_MULTIPLIER) {
+        desired_army_lead = 1 * BOT_UNIT_SCORE_MULTIPLIER;
+    }
+
+    return squad_score - enemy_army_score < desired_army_lead;
 }
 
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad) {
@@ -2532,7 +2528,7 @@ ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, co
     return path.size() < 8 ? path_start_cell : path[7];
 }
 
-void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
+bool bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
     // Prepare the goldmines under attack list with each goldmine
     std::unordered_map<uint32_t, uint32_t> hall_surrounding_goldmine;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -2600,7 +2596,7 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
     }
     if (bot.should_surrender && hall_count <= 1 && bot_unit_count == 0) {
         bot.has_surrendered = true;
-        return;
+        return true;
     }
 
     // For each goldmine under attack, determine how to respond
@@ -2835,6 +2831,8 @@ void bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
             continue;
         }
     } // End for each goldmine under attack
+
+    return !halls_under_attack.empty();
 }
 
 bool bot_squad_is_engaged(const MatchState& state, const Bot& bot, const BotSquad& squad) {
@@ -3366,7 +3364,7 @@ bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entit
     return false;
 }
 
-uint32_t bot_score_entity(const Entity& entity) {
+int bot_score_entity(const Entity& entity) {
     if (entity_is_building(entity.type) && entity.type != ENTITY_BUNKER) {
         return 0;
     }
@@ -3376,13 +3374,13 @@ uint32_t bot_score_entity(const Entity& entity) {
         case ENTITY_MINER:
             return 1;
         case ENTITY_BUNKER:
-            return entity.garrisoned_units.size() * 8;
+            return entity.garrisoned_units.size() * 2 * BOT_UNIT_SCORE_MULTIPLIER;
         case ENTITY_WAGON:
-            return entity.garrisoned_units.size() * 4;
+            return entity.garrisoned_units.size() * BOT_UNIT_SCORE_MULTIPLIER;
         case ENTITY_CANNON:
-            return 12;
+            return 3 * BOT_UNIT_SCORE_MULTIPLIER;
         default:
-            return 4;
+            return 1 * BOT_UNIT_SCORE_MULTIPLIER;
     }
 }
 
@@ -3871,6 +3869,54 @@ MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot) {
     } // End for each entity
 
     return input;
+}
+
+MatchInput bot_cancel_in_progress_buildings(const MatchState& state, const Bot& bot) {
+    for (uint32_t building_index = 0; building_index < state.entities.size(); building_index++) {
+        const Entity& building = state.entities[building_index];
+        EntityId building_id = state.entities.get_id_of(building_index);
+
+        // Filter down to bot-owned, in-progress buildings 
+        if (building.player_id != bot.player_id ||
+                building.mode != MODE_BUILDING_IN_PROGRESS) {
+            continue;
+        }
+
+        // Score how well-defended this building is
+        int nearby_ally_score = 0;
+        int nearby_enemy_score = 0;
+        for (const Entity& entity : state.entities) {
+            if (!(entity.type == ENTITY_BUNKER || entity_is_unit(entity.type)) ||
+                    entity.health == 0 ||
+                    entity.mode == MODE_BUILDING_IN_PROGRESS ||
+                    ivec2::manhattan_distance(entity.cell, building.cell) > BOT_SQUAD_GATHER_DISTANCE ||
+                    !match_is_entity_visible_to_player(state, entity, bot.player_id)) {
+                continue;
+            }
+            if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
+                nearby_ally_score += bot_score_entity(entity);
+            } else {
+                nearby_enemy_score += bot_score_entity(entity);
+            }
+        }
+
+        if (nearby_enemy_score == 0) {
+            continue;
+        }
+        if (building.health > 100 && nearby_enemy_score < 3 * BOT_UNIT_SCORE_MULTIPLIER) {
+            continue;
+        }
+        if (building.health > entity_get_data(building.type).max_health / 4 && nearby_ally_score > nearby_enemy_score) {
+            continue;
+        }
+
+        MatchInput input;
+        input.type = MATCH_INPUT_BUILD_CANCEL;
+        input.build_cancel.building_id = building_id;
+        return input;
+    }
+
+    return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
 MatchInput bot_repair_burning_buildings(const MatchState& state, const Bot& bot) {

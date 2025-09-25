@@ -130,7 +130,7 @@ bool bot_squad_can_defend_against_detectives(const MatchState& state, const BotS
 ivec2 bot_squad_get_center(const MatchState& state, const BotSquad& squad);
 ivec2 bot_squad_choose_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
 ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
-void bot_handle_base_under_attack(const MatchState& state, Bot& bot);
+bool bot_handle_base_under_attack(const MatchState& state, Bot& bot);
 bool bot_squad_is_engaged(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
 // Scout
@@ -156,7 +156,7 @@ EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& 
 bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell);
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
 
-uint32_t bot_score_entity(const Entity& entity);
+int bot_score_entity(const Entity& entity);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
 MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
 void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, ivec2 from, ivec2 to, std::vector<ivec2>* path);
@@ -168,4 +168,5 @@ bool bot_is_rally_cell_valid(const MatchState& state, ivec2 rally_cell, int rall
 ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, const Entity& building);
 MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bot);
 MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot);
+MatchInput bot_cancel_in_progress_buildings(const MatchState& state, const Bot& bot);
 MatchInput bot_repair_burning_buildings(const MatchState& state, const Bot& bot);
