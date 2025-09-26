@@ -8,7 +8,7 @@ Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
     bot.player_id = player_id;
     bot.lcg_seed = lcg_seed;
-    bot.strategy = BOT_STRATEGY_SALOON_COOP;
+    bot.strategy = BOT_STRATEGY_SALOON_WORKSHOP;
 
     BotGoal opener;
     memset(opener.desired_entities, 0, sizeof(opener.desired_entities));
@@ -62,6 +62,14 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
     if (bot_should_build_house(state, bot) && !is_base_under_attack) {
         return bot_build_building(state, bot, ENTITY_HOUSE);
+    }
+
+    uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot);
+    if (desired_upgrade != 0) {
+        MatchInput research_input = bot_research_upgrade(state, bot, desired_upgrade);
+        if (research_input.type != MATCH_INPUT_NONE) {
+            return research_input;
+        }
     }
 
     EntityType desired_unit = ENTITY_TYPE_COUNT;
@@ -311,6 +319,15 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
         return goal;
     }
     
+    // Landmines
+    if (bot.strategy == BOT_STRATEGY_SALOON_WORKSHOP) {
+        if (!bot_has_landmine_squad(bot)) {
+            goal.desired_squad_type = BOT_SQUAD_TYPE_LANDMINES;
+            goal.desired_entities[ENTITY_PYRO] = 1;
+            return goal;
+        }
+    }
+
     // If enemy has no base, then harass
     std::unordered_map<uint32_t, uint32_t> enemy_hall_defense_score = bot_get_enemy_hall_defense_scores(state, bot);
     bool should_harass = false;
@@ -358,7 +375,6 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
                 harass_type_scores[BOT_HARASS_TYPE_JOCKEYS] = entity_count[ENTITY_JOCKEY]; 
             }
 
-            /*
             if (bot.strategy == BOT_STRATEGY_SALOON_WORKSHOP) {
                 harass_type_scores[BOT_HARASS_TYPE_SALOON_WORKSHOP] = entity_count[ENTITY_COWBOY] + entity_count[ENTITY_BANDIT] + entity_count[ENTITY_SAPPER];
                 harass_type_scores[BOT_HARASS_TYPE_PYROS] = entity_count[ENTITY_PYRO];
@@ -367,7 +383,6 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
             if (bot.strategy == BOT_STRATEGY_BARRACKS) {
                 harass_type_scores[BOT_HARASS_TYPE_SOLDIERS] = entity_count[ENTITY_SOLDIER];
             }
-            */
 
             for (uint32_t harass_type = 0; harass_type < BOT_HARASS_TYPE_COUNT; harass_type++) {
                 if (harass_type_scores[harass_type] == HARASS_TYPE_INVALID_FOR_STRATEGY) {
@@ -484,6 +499,22 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
             }
             break;
         }
+        case BOT_STRATEGY_SALOON_WORKSHOP: {
+            goal.desired_entities[ENTITY_PYRO] = 2;
+            goal.desired_entities[ENTITY_SAPPER] = (lcg_rand(&bot.lcg_seed) % 5) * bot_mining_base_count;
+
+            uint32_t remaining_push_size = push_size - (goal.desired_entities[ENTITY_PYRO] + goal.desired_entities[ENTITY_SAPPER]);
+            goal.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (remaining_push_size / 2);
+            goal.desired_entities[ENTITY_COWBOY] = remaining_push_size - goal.desired_entities[ENTITY_BANDIT];
+            break;
+        }
+        case BOT_STRATEGY_BARRACKS: {
+            goal.desired_entities[ENTITY_CANNON] = 2;
+            uint32_t remaining_push_size = push_size - goal.desired_entities[ENTITY_CANNON]; 
+            goal.desired_entities[ENTITY_BANDIT] = lcg_rand(&bot.lcg_seed) % (remaining_push_size / 3);
+            goal.desired_entities[ENTITY_SOLDIER] = remaining_push_size - goal.desired_entities[ENTITY_BANDIT];
+            break;
+        }
     }
 
     if (bot.scout_enemy_has_landmines || bot.scout_enemy_has_detectives) {
@@ -491,6 +522,16 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
     }
 
     return goal;
+}
+
+uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
+    if (bot.strategy == BOT_STRATEGY_SALOON_WORKSHOP) {
+        if (bot_has_landmine_squad(bot) && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_LANDMINES)) {
+            return UPGRADE_LANDMINES;
+        }
+    }
+
+    return 0;
 }
 
 // PRODUCTION
@@ -2612,7 +2653,11 @@ bool bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
                 continue;
             }
 
-            uint32_t nearest_hall_index = get_nearest_hall_index(match_get_entity_target_cell(state, enemy));
+            ivec2 enemy_cell = enemy.cell;
+            if (!match_is_target_invalid(state, enemy.target, enemy.player_id)) {
+                enemy_cell = match_get_entity_target_cell(state, enemy);
+            }
+            uint32_t nearest_hall_index = get_nearest_hall_index(enemy_cell);
             if (nearest_hall_index != hall_index) {
                 continue;
             }
@@ -3966,4 +4011,20 @@ MatchInput bot_repair_burning_buildings(const MatchState& state, const Bot& bot)
     input.move.entity_count = 1;
     input.move.entity_ids[0] = repairer_id;
     return input;
+}
+
+bool bot_has_landmine_squad(const Bot& bot) {
+    for (const BotSquad& squad : bot.squads) {
+        if (squad.type == BOT_SQUAD_TYPE_LANDMINES) {
+            return true;
+        }
+    }
+
+    for (const BotGoal& existing_goal : bot.goals) {
+        if (existing_goal.desired_squad_type == BOT_SQUAD_TYPE_LANDMINES) {
+            return true;
+        }
+    }
+
+    return false;
 }

@@ -8,7 +8,9 @@
 #include <vector>
 
 enum BotStrategy {
-    BOT_STRATEGY_SALOON_COOP
+    BOT_STRATEGY_SALOON_COOP,
+    BOT_STRATEGY_SALOON_WORKSHOP,
+    BOT_STRATEGY_BARRACKS
 };
 
 enum BotSquadType {
@@ -90,6 +92,7 @@ struct Bot {
 Bot bot_init(uint8_t player_id, int32_t lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
+uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot);
 
 // Production
 
@@ -170,3 +173,4 @@ MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bo
 MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot);
 MatchInput bot_cancel_in_progress_buildings(const MatchState& state, const Bot& bot);
 MatchInput bot_repair_burning_buildings(const MatchState& state, const Bot& bot);
+bool bot_has_landmine_squad(const Bot& bot);
