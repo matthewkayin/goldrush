@@ -8,14 +8,7 @@ Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
     bot.player_id = player_id;
     bot.lcg_seed = lcg_seed;
-    bot.strategy = BOT_STRATEGY_SALOON_WORKSHOP;
-
-    BotGoal opener;
-    memset(opener.desired_entities, 0, sizeof(opener.desired_entities));
-    opener.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
-    opener.desired_entities[ENTITY_WAGON] = 1;
-    opener.desired_entities[ENTITY_BANDIT] = 4;
-    bot.goals.push_back(opener);
+    bot.strategy = BOT_STRATEGY_BARRACKS;
 
     bot.scout_id = ID_NULL;
     bot.scout_enemy_has_landmines = false;
@@ -32,6 +25,13 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     {
         uint32_t goal_index = 0;
         while (goal_index < bot.goals.size()) {
+            if (bot.goals[goal_index].should_be_abandoned(state, bot)) {
+                memcpy(bot.goals[goal_index].desired_entities, bot.goals.back().desired_entities, sizeof(bot.goals[goal_index].desired_entities));
+                bot.goals[goal_index].desired_squad_type = bot.goals.back().desired_squad_type;
+                bot.goals[goal_index].should_be_abandoned = bot.goals.back().should_be_abandoned;
+                bot.goals.pop_back();
+                continue;
+            }
             if (bot_goal_get_status(state, bot, bot.goals[goal_index]) == BOT_GOAL_STATUS_FINISHED) {
                 if (bot.goals[goal_index].desired_squad_type != BOT_SQUAD_TYPE_NONE) {
                     bot_squad_create_from_goal(state, bot, bot.goals[goal_index]);
@@ -40,9 +40,11 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
                 memcpy(bot.goals[goal_index].desired_entities, bot.goals.back().desired_entities, sizeof(bot.goals[goal_index].desired_entities));
                 bot.goals[goal_index].desired_squad_type = bot.goals.back().desired_squad_type;
                 bot.goals.pop_back();
-            } else {
-                goal_index++;
-            }
+                bot.goals[goal_index].should_be_abandoned = bot.goals.back().should_be_abandoned;
+                continue;
+            } 
+
+            goal_index++;
         }
         if (bot.goals.empty() || 
                 (bot.goals.size() == 1 && 
@@ -154,6 +156,9 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
     BotGoal goal;
     memset(goal.desired_entities, 0, sizeof(goal.desired_entities));
+    goal.should_be_abandoned = [](const MatchState& state, const Bot& bot) {
+        return false;
+    };
 
     // Count entities
 
@@ -228,8 +233,20 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
         if (opener_roll == 0) {
             // Bandit Rush
             goal.desired_squad_type = BOT_SQUAD_TYPE_ATTACK;
-            goal.desired_entities[ENTITY_COWBOY] = 1;
+            goal.desired_entities[ENTITY_WAGON] = 1;
             goal.desired_entities[ENTITY_BANDIT] = 4;
+            // Abandon bandit rush if the wagon is killed
+            goal.should_be_abandoned = [](const MatchState& state, const Bot& bot) {
+                const EntityId wagon_id = bot_find_entity((BotFindEntityParams) {
+                    .state = state,
+                    .filter = [&bot](const Entity& wagon, EntityId wagon_id) {
+                        return wagon.type == ENTITY_WAGON && 
+                                    wagon.player_id == bot.player_id &&
+                                    entity_is_selectable(wagon);
+                    }
+                });
+                return wagon_id != ID_NULL;
+            };
         } else if (opener_roll == 1) {
             // Fast expand
             goal.desired_squad_type = BOT_SQUAD_TYPE_NONE;
@@ -294,6 +311,22 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
         return goal;
     }
 
+    // Bunker up
+    if (bot.strategy == BOT_STRATEGY_BARRACKS) {
+        bool bot_is_bunkered_up = true;
+        for (auto it : hall_bunker_defenses) {
+            if (it.second == 0) {
+                bot_is_bunkered_up = false;
+            }
+        }
+        if (!bot_is_bunkered_up) {
+            goal.desired_squad_type = BOT_SQUAD_TYPE_DEFEND;
+            goal.desired_entities[ENTITY_COWBOY] = 4;
+            goal.desired_entities[ENTITY_BUNKER] = 1;
+            return goal;
+        }
+    }
+
     // If we are undefended, make defense squad
     if (enemy_army_size - allied_army_size > 4 * (int)player_mining_base_count[bot.player_id]) {
         goal.desired_squad_type = BOT_SQUAD_TYPE_DEFEND;
@@ -312,7 +345,7 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
     }
 
     // Expand
-    uint32_t desired_base_count = std::max(2U, max_opponent_base_count);
+    uint32_t desired_base_count = std::max(bot.strategy == BOT_STRATEGY_BARRACKS ? 3U : 2U, max_opponent_base_count);
     if (unoccupied_goldmine_count > 0 && player_mining_base_count[bot.player_id] < desired_base_count) {
         goal.desired_squad_type = BOT_SQUAD_TYPE_NONE;
         goal.desired_entities[ENTITY_HALL] = entity_count[ENTITY_HALL] + 1;
@@ -525,10 +558,15 @@ BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_t
 }
 
 uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
-    if (bot.strategy == BOT_STRATEGY_SALOON_WORKSHOP) {
-        if (bot_has_landmine_squad(bot) && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_LANDMINES)) {
-            return UPGRADE_LANDMINES;
-        }
+    if (bot.strategy == BOT_STRATEGY_SALOON_WORKSHOP && 
+            bot_has_landmine_squad(bot) && 
+            match_player_upgrade_is_available(state, bot.player_id, UPGRADE_LANDMINES)) {
+        return UPGRADE_LANDMINES;
+    }
+
+    if (bot.strategy == BOT_STRATEGY_BARRACKS &&
+            match_player_upgrade_is_available(state, bot.player_id, UPGRADE_BAYONETS)) {
+        return UPGRADE_BAYONETS;
     }
 
     return 0;

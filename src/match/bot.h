@@ -30,6 +30,7 @@ struct BotSquad {
 struct BotGoal {
     BotSquadType desired_squad_type;
     uint32_t desired_entities[ENTITY_TYPE_COUNT];
+    std::function<bool(const MatchState& state, const Bot& bot)> should_be_abandoned;
 };
 
 enum BotGoalStatus {
