@@ -8,7 +8,7 @@ Bot bot_init(uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
     bot.player_id = player_id;
     bot.lcg_seed = lcg_seed;
-    bot.strategy = BOT_STRATEGY_BARRACKS;
+    bot.strategy = (BotStrategy)(lcg_rand(&bot.lcg_seed) % BOT_STRATEGY_COUNT);
 
     bot.scout_id = ID_NULL;
     bot.scout_enemy_has_landmines = false;
