@@ -1592,7 +1592,7 @@ void match_ui_update(MatchUiState& state) {
         bool opposing_player_just_lost = false;
         memset(player_has_buildings, 0, sizeof(player_has_buildings));
         for (const Entity& entity : state.match.entities) {
-            if (entity_is_building(entity.type) && entity.mode == MODE_BUILDING_FINISHED) {
+            if (entity_is_building(entity.type) && entity.type != ENTITY_LANDMINE && entity_is_selectable(entity)) {
                 player_has_buildings[entity.player_id] = true;
             }
         }
