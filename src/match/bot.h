@@ -7,10 +7,13 @@
 #include <unordered_map>
 #include <vector>
 
+struct Bot;
+
 enum BotStrategy {
     BOT_STRATEGY_SALOON_COOP,
     BOT_STRATEGY_SALOON_WORKSHOP,
-    BOT_STRATEGY_BARRACKS
+    BOT_STRATEGY_BARRACKS,
+    BOT_STRATEGY_COUNT
 };
 
 enum BotSquadType {
