@@ -6,18 +6,20 @@
 #include <functional>
 #include <unordered_map>
 #include <vector>
+#include <array>
 
 struct Bot;
 
 enum BotStrategy {
-    BOT_STRATEGY_SALOON_COOP,
-    BOT_STRATEGY_SALOON_WORKSHOP,
-    BOT_STRATEGY_BARRACKS,
-    BOT_STRATEGY_COUNT
+    BOT_STRATEGY_BANDIT_RUSH,
+    BOT_STRATEGY_BUNKER,
+    BOT_STRATEGY_EXPAND,
+    BOT_STRATEGY_FOUR_SALOON
 };
 
+using BotEntityCount = std::array<uint32_t, ENTITY_TYPE_COUNT>;
+
 enum BotSquadType {
-    BOT_SQUAD_TYPE_NONE,
     BOT_SQUAD_TYPE_ATTACK,
     BOT_SQUAD_TYPE_DEFEND,
     BOT_SQUAD_TYPE_RESERVES,
@@ -30,16 +32,9 @@ struct BotSquad {
     std::vector<EntityId> entities;
 };
 
-struct BotGoal {
-    BotSquadType desired_squad_type;
-    uint32_t desired_entities[ENTITY_TYPE_COUNT];
-    std::function<bool(const MatchState& state, const Bot& bot)> should_be_abandoned;
-};
-
-enum BotGoalStatus {
-    BOT_GOAL_STATUS_IN_PROGRESS,
-    BOT_GOAL_STATUS_PURCHASED,
-    BOT_GOAL_STATUS_FINISHED
+struct BotDesiredSquad {
+    BotSquadType type;
+    BotEntityCount entities;
 };
 
 struct BotFindEntityParams {
@@ -78,7 +73,9 @@ struct Bot {
     bool has_surrendered;
 
     BotStrategy strategy;
-    std::vector<BotGoal> goals;
+    std::vector<BotDesiredSquad> desired_squads;
+    BotEntityCount desired_buildings;
+    BotEntityCount desired_army_ratio;
 
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotSquad> squads;
@@ -93,20 +90,21 @@ struct Bot {
     bool scout_enemy_has_detectives;
 };
 
-Bot bot_init(uint8_t player_id, int32_t lcg_seed);
+Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
-BotGoal bot_choose_next_goal(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
-uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot);
+
+// Strategy
+void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy);
+void bot_strategy_update(const MatchState& state, Bot& bot);
 
 // Production
 
-BotGoal bot_goal_create_empty();
-BotGoalStatus bot_goal_get_status(const MatchState& state, const Bot& bot, const BotGoal& goal);
 MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
-void bot_get_desired_entities(const MatchState& state, const Bot& bot, const BotGoal& goal, EntityType* desired_unit, EntityType* desired_building);
+void bot_get_desired_entities(const MatchState& state, const Bot& bot, EntityType* desired_unit, EntityType* desired_building);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
+uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot);
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 EntityType bot_get_building_which_trains(EntityType unit_type);
 EntityType bot_get_building_prereq(EntityType building_type);
@@ -122,7 +120,7 @@ uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot);
 
 // Squads
 
-void bot_squad_create_from_goal(const MatchState& state, Bot& bot, const BotGoal& goal);
+void bot_squad_create_from_entity_count(const MatchState& state, Bot& bot, BotSquadType squad_type, BotEntityCount desired_entities);
 void bot_squad_create(const MatchState& state, Bot& bot, BotSquadType type, ivec2 target_cell, std::vector<EntityId>& entities);
 void bot_squad_dissolve(Bot& bot, BotSquad& squad);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
@@ -133,10 +131,10 @@ int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const En
 ivec2 bot_find_best_molotov_cell(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 attack_point);
 bool bot_squad_is_bunker_defense(const MatchState& state, const BotSquad& squad);
 bool bot_squad_is_detective_harass(const MatchState& state, const BotSquad& squad);
-bool bot_squad_can_defend_against_detectives(const MatchState& state, const BotSquad& squad);
-ivec2 bot_squad_get_center(const MatchState& state, const BotSquad& squad);
-ivec2 bot_squad_choose_attack_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
-ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, const BotSquad& squad);
+bool bot_squad_can_defend_against_detectives(const MatchState& state, BotSquadType type, const std::vector<EntityId>& entities);
+ivec2 bot_squad_get_center_point(const MatchState& state, const std::vector<EntityId>& entities);
+ivec2 bot_squad_choose_attack_point(const MatchState& state, const Bot& bot, ivec2 squad_center);
+ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entities);
 bool bot_handle_base_under_attack(const MatchState& state, Bot& bot);
 bool bot_squad_is_engaged(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
@@ -159,6 +157,19 @@ bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id);
 void bot_reserve_entity(Bot& bot, EntityId entity_id);
 void bot_release_entity(Bot& bot, EntityId entity_id);
 
+const uint32_t BOT_COUNT_RESERVED_ENTITIES = 1;
+const uint32_t BOT_COUNT_UNRESERVED_ENTITIES = 2;
+const uint32_t BOT_COUNT_IN_PROGRESS_ENTITIES = 4;
+
+BotEntityCount bot_entity_count_empty();
+uint32_t bot_entity_count_size(const BotEntityCount& count);
+bool bot_is_entity_count_empty(const BotEntityCount& count);
+BotEntityCount bot_entity_count_add(const BotEntityCount& left, const BotEntityCount& right);
+BotEntityCount bot_entity_count_subtract(const BotEntityCount& left, const BotEntityCount& right);
+bool bot_entity_count_is_gte_to(const BotEntityCount& list, const BotEntityCount& other);
+BotEntityCount bot_count_entities(const MatchState& state, const Bot& bot, uint32_t options);
+void bot_entity_count_print(const char* message, const BotEntityCount& count);
+
 EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& bot, const Entity& goldmine);
 bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell);
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
@@ -167,7 +178,8 @@ int bot_score_entity(const Entity& entity);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
 MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
 void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, ivec2 from, ivec2 to, std::vector<ivec2>* path);
-std::unordered_map<uint32_t, uint32_t> bot_get_enemy_hall_defense_scores(const MatchState& state, const Bot& bot);
+std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchState& state, const Bot& bot);
+bool bot_enemy_has_undefended_base(const MatchState& state, const Bot& bot);
 uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot);
 
 MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot);

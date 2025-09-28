@@ -197,7 +197,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT) {
             // Randomize the seed here, that way if we have multiple bots they do not generate the same personalities / strategies
             bot_lcg_seed = lcg_rand(&bot_lcg_seed);
-            state.bots[player_id] = bot_init(player_id, bot_lcg_seed);
+            state.bots[player_id] = bot_init(state.match, player_id, bot_lcg_seed);
         }
     }
 
