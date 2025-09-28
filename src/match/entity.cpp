@@ -164,7 +164,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 1,
         
-        .gold_cost = 100,
+        .gold_cost = 150,
         .train_duration = 30,
         .max_health = 80,
         .sight = 9,
@@ -184,8 +184,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .damage = 8,
             .accuracy = 75,
             .evasion = 15,
-            .attack_cooldown = 60,
-            .range_squared = 25,
+            .attack_cooldown = 45,
+            .range_squared = 36,
             .min_range_squared = 1
         }
     }},
@@ -197,7 +197,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 1,
         
-        .gold_cost = 100,
+        .gold_cost = 125,
         .train_duration = 27,
         .max_health = 40,
         .sight = 7,
@@ -230,9 +230,9 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 1,
         
-        .gold_cost = 150,
+        .gold_cost = 225,
         .train_duration = 30,
-        .max_health = 30,
+        .max_health = 40,
         .sight = 7,
         .armor = 0,
         .attack_priority = 2,
@@ -263,7 +263,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 1,
         
-        .gold_cost = 125,
+        .gold_cost = 175,
         .train_duration = 30,
         .max_health = 40,
         .sight = 7,
@@ -296,7 +296,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 2,
         
-        .gold_cost = 200,
+        .gold_cost = 250,
         .train_duration = 45,
         .max_health = 100,
         .sight = 7,
@@ -329,7 +329,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 1,
         
-        .gold_cost = 200,
+        .gold_cost = 225,
         .train_duration = 30,
         .max_health = 25,
         .sight = 7,
@@ -525,7 +525,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 3,
         
-        .gold_cost = 150,
+        .gold_cost = 200,
         .train_duration = 0,
         .max_health = 500,
         .sight = 7,
@@ -603,7 +603,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 3,
         
-        .gold_cost = 200,
+        .gold_cost = 250,
         .train_duration = 0,
         .max_health = 560,
         .sight = 7,
