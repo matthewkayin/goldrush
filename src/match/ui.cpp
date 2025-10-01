@@ -1032,7 +1032,7 @@ void match_ui_update(MatchUiState& state) {
                     }
 
                     double bot_duration = (double)(SDL_GetTicksNS() - bot_start_time) / (double)SDL_NS_PER_SECOND;
-                    log_trace("PROFILE: bot duration %f", bot_duration);
+                    // log_trace("PROFILE: bot duration %f", bot_duration);
                 }
             }
 

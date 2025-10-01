@@ -8,13 +8,25 @@
 #include <vector>
 #include <array>
 
+const uint32_t BOT_DEFEND_COUNTERATTACK = 1;
+const uint32_t BOT_DEFEND_WITH_WORKERS = 2;
+
 struct Bot;
 
 enum BotStrategy {
-    BOT_STRATEGY_BANDIT_RUSH,
-    BOT_STRATEGY_BUNKER,
+    BOT_STRATEGY_OPENER_BANDIT_RUSH,
+    BOT_STRATEGY_OPENER_BUNKER,
     BOT_STRATEGY_EXPAND,
-    BOT_STRATEGY_FOUR_SALOON
+    BOT_STRATEGY_ATTACK
+};
+
+enum BotUnitComp {
+    BOT_UNIT_COMP_COWBOY_BANDIT,
+    BOT_UNIT_COMP_COWBOY_BANDIT_PYRO,
+    BOT_UNIT_COMP_COWBOY_SAPPER_PYRO,
+    BOT_UNIT_COMP_COWBOY_BANDIT_WAGON,
+    BOT_UNIT_COMP_JOCKEYS,
+    BOT_UNIT_COMP_SOLDIER_CANNON
 };
 
 using BotEntityCount = std::array<uint32_t, ENTITY_TYPE_COUNT>;
@@ -73,6 +85,7 @@ struct Bot {
     bool has_surrendered;
 
     BotStrategy strategy;
+    BotUnitComp unit_comp;
     std::vector<BotDesiredSquad> desired_squads;
     BotEntityCount desired_buildings;
     BotEntityCount desired_army_ratio;
@@ -94,11 +107,14 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 
 // Strategy
-void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy);
-void bot_strategy_update(const MatchState& state, Bot& bot);
+void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy, BotUnitComp unit_comp);
+void bot_strategy_update(const MatchState& state, Bot& bot, bool is_under_attack);
+bool bot_handle_base_under_attack(const MatchState& state, Bot& bot);
+void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint32_t options);
 
 // Production
 
+MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_base_under_attack);
 MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
 void bot_get_desired_entities(const MatchState& state, const Bot& bot, EntityType* desired_unit, EntityType* desired_building);
@@ -114,7 +130,7 @@ EntityId bot_pull_worker_off_gold(const MatchState& state, const Bot& bot, Entit
 EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id, bool count_bunkers_only);
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
-ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot, uint32_t existing_hall_index);
+ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot);
 ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t nearby_hall_index);
 uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot);
 
@@ -135,7 +151,6 @@ bool bot_squad_can_defend_against_detectives(const MatchState& state, BotSquadTy
 ivec2 bot_squad_get_center_point(const MatchState& state, const std::vector<EntityId>& entities);
 ivec2 bot_squad_choose_attack_point(const MatchState& state, const Bot& bot, ivec2 squad_center);
 ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entities);
-bool bot_handle_base_under_attack(const MatchState& state, Bot& bot);
 bool bot_squad_is_engaged(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
 // Scout
@@ -190,3 +205,4 @@ MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot);
 MatchInput bot_cancel_in_progress_buildings(const MatchState& state, const Bot& bot);
 MatchInput bot_repair_burning_buildings(const MatchState& state, const Bot& bot);
 bool bot_has_landmine_squad(const Bot& bot);
+bool bot_is_area_safe(const MatchState& state, const Bot& bot, ivec2 cell);
