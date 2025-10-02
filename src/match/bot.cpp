@@ -292,8 +292,16 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
 
             ivec2 next_hall_cell = bot_find_hall_location(state, bot);
             if (!bot_is_area_safe(state, bot, next_hall_cell)) {
-                log_trace("BOT: expand area is not safe. defending cell %vi", &next_hall_cell);
-                bot_defend_location(state, bot, next_hall_cell, 0);
+                EntityId nearest_goldmine_id = bot_find_best_entity((BotFindBestEntityParams) {
+                    .state = state,
+                    .filter = [](const Entity& entity, EntityId entity_id) {
+                        return entity.type == ENTITY_GOLDMINE;
+                    },
+                    .compare = bot_closest_manhattan_distance_to(next_hall_cell)
+                });
+                ivec2 goldmine_cell = state.entities.get_by_id(nearest_goldmine_id).cell;
+                log_trace("BOT: expand area is not safe. defending cell %vi", &goldmine_cell);
+                bot_defend_location(state, bot, goldmine_cell, 0);
             }
 
             break;
@@ -523,9 +531,7 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     }
     
     // Next, check to see if we have any unreserved units to create a defense squad with
-    BotSquad defend_squad;
-    defend_squad.type = BOT_SQUAD_TYPE_RESERVES;
-    defend_squad.target_cell = location;
+    std::vector<EntityId> defend_squad_entities;
     uint32_t defend_squad_score = 0;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         const Entity& entity = state.entities[entity_index];
@@ -539,18 +545,13 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
             continue;
         }
 
-        defend_squad.entities.push_back(entity_id);
+        defend_squad_entities.push_back(entity_id);
         defend_squad_score += bot_score_entity(entity);
     }
-    if (!defend_squad.entities.empty() && 
-            (ivec2::manhattan_distance(bot_squad_get_center_point(state, defend_squad.entities), location) < BOT_SQUAD_GATHER_DISTANCE * 2 ||
+    if (!defend_squad_entities.empty() && 
+            (ivec2::manhattan_distance(bot_squad_get_center_point(state, defend_squad_entities), location) < BOT_SQUAD_GATHER_DISTANCE * 2 ||
             defend_squad_score + defending_score >= enemy_score)) {
-        // Reserve all the entities
-        for (EntityId entity_id : defend_squad.entities) {
-            bot_reserve_entity(bot, entity_id);
-        }
-
-        bot.squads.push_back(defend_squad);
+        bot_squad_create(state, bot, BOT_SQUAD_TYPE_RESERVES, location, defend_squad_entities);
         return;
     }
 
@@ -595,8 +596,7 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     // Next, see if we can use unreserved units to mount a counterattack
     bool should_counterattack = (options & BOT_DEFEND_COUNTERATTACK) == BOT_DEFEND_COUNTERATTACK;
     if (should_counterattack && bot_enemy_has_undefended_base(state, bot)) {
-        BotSquad counterattack_squad;
-        counterattack_squad.type = BOT_SQUAD_TYPE_ATTACK;
+        std::vector<EntityId> counterattack_squad_entities;
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
             const Entity& entity = state.entities[entity_index];
             EntityId entity_id = state.entities.get_id_of(entity_index);
@@ -609,28 +609,19 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
                 continue;
             }
 
-            counterattack_squad.entities.push_back(entity_id);
+            counterattack_squad_entities.push_back(entity_id);
         }
 
-        if (!counterattack_squad.entities.empty()) {
-            counterattack_squad.target_cell = bot_squad_choose_attack_point(state, bot, bot_squad_get_center_point(state, counterattack_squad.entities));
-            if (counterattack_squad.target_cell.x != -1) {
-                // Reserve all squad entities
-                for (EntityId entity_id : counterattack_squad.entities) {
-                    bot_reserve_entity(bot, entity_id);
-                }
-                bot.squads.push_back(counterattack_squad);
-                return;
-            }
+        if (!counterattack_squad_entities.empty()) {
+            ivec2 counterattack_squad_target_cell = bot_squad_choose_attack_point(state, bot, bot_squad_get_center_point(state, counterattack_squad_entities));
+            bot_squad_create(state, bot, BOT_SQUAD_TYPE_ATTACK, counterattack_squad_target_cell, counterattack_squad_entities);
         }
     }
 
     // Finally if we're really desperate, use workers to attack
     bool should_defend_with_workers = (options & BOT_DEFEND_WITH_WORKERS) == BOT_DEFEND_WITH_WORKERS;
     if (should_defend_with_workers) {
-        BotSquad worker_defend_squad;
-        worker_defend_squad.type = BOT_SQUAD_TYPE_RESERVES;
-        worker_defend_squad.target_cell = location;
+        std::vector<EntityId> worker_squad_entities;
         for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
             const Entity& entity = state.entities[entity_index];
             EntityId entity_id = state.entities.get_id_of(entity_index);
@@ -642,15 +633,10 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
                 continue;
             }
 
-            worker_defend_squad.entities.push_back(entity_id);
+            worker_squad_entities.push_back(entity_id);
         }
-        if (!worker_defend_squad.entities.empty()) {
-            // Reserve all the entities
-            for (EntityId entity_id : worker_defend_squad.entities) {
-                bot_reserve_entity(bot, entity_id);
-            }
-
-            bot.squads.push_back(worker_defend_squad);
+        if (!worker_squad_entities.empty()) {
+            bot_squad_create(state, bot, BOT_SQUAD_TYPE_RESERVES, location, worker_squad_entities);
             return;
         }
     }
@@ -1514,19 +1500,42 @@ void bot_squad_create(const MatchState& state, Bot& bot, BotSquadType type, ivec
         return;
     }
 
-    BotSquad squad;
-    squad.entities = entities;
-    squad.type = type;
-    squad.target_cell = target_cell;
+    // Decide whether to create a new squad to reinforce an existing one
+    uint32_t existing_squad_index;
+    for (existing_squad_index = 0; existing_squad_index < bot.squads.size(); existing_squad_index++) {
+        if (bot.squads[existing_squad_index].type == type &&
+                ivec2::manhattan_distance(bot.squads[existing_squad_index].target_cell, target_cell) < BOT_SQUAD_GATHER_DISTANCE) {
+            break;
+        }
+    }
+
+    uint32_t squad_index;
+    bool should_reinforce_existing_squad = (type == BOT_SQUAD_TYPE_ATTACK || type == BOT_SQUAD_TYPE_DEFEND) &&
+                                            existing_squad_index < bot.squads.size();
+    if (should_reinforce_existing_squad) {
+        squad_index = existing_squad_index;
+    } else {
+        BotSquad squad;
+        squad.type = type;
+        squad.target_cell = target_cell;
+        bot.squads.push_back(squad);
+        squad_index = bot.squads.size() - 1;
+    }
+
+    BotSquad& squad = bot.squads[squad_index];
 
     // Reserve all entities
-    log_trace("BOT: -- creating squad with type %u target_cell %vi --", squad.type, &squad.target_cell);
-    for (EntityId entity_id : squad.entities) {
+    if (should_reinforce_existing_squad) {
+        log_trace("BOT: -- reinforcing squad with type %u target_cell %vi --", squad.type, &squad.target_cell);
+    } else {
+        log_trace("BOT: -- creating squad with type %u target_cell %vi --", squad.type, &squad.target_cell);
+    }
+    squad.entities.reserve(squad.entities.size() + entities.size());
+    for (EntityId entity_id : entities) {
+        squad.entities.push_back(entity_id);
         bot_reserve_entity(bot, entity_id);
     }
     log_trace("BOT: -- end squad --");
-
-    bot.squads.push_back(squad);
 }
 
 void bot_squad_dissolve(Bot& bot, BotSquad& squad) {
@@ -1569,8 +1578,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             return enemy.type != ENTITY_GOLDMINE &&
                     state.players[enemy.player_id].team != state.players[bot.player_id].team &&
                     entity_is_selectable(enemy) &&
-                    ivec2::manhattan_distance(enemy.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE &&
-                    match_is_entity_visible_to_player(state, enemy, bot.player_id);
+                    ivec2::manhattan_distance(enemy.cell, squad.target_cell) < BOT_SQUAD_GATHER_DISTANCE;
         }
     });
     bool is_enemy_near_squad = enemy_near_squad_id != ID_NULL;
@@ -1999,7 +2007,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     }
 
     // Carrier micro
-    bool squad_has_carriers = false;
     for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) { 
         EntityId carrier_id = squad.entities[squad_entity_index];
         const Entity& carrier = state.entities.get_by_id(carrier_id);
@@ -2014,8 +2021,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         if (carrier_data.garrison_capacity == 0) {
             continue;
         }
-
-        squad_has_carriers = true;
 
         // Determine position of infantry which are en-route to carrier
         ivec2 infantry_position_sum = ivec2(0, 0);
@@ -2158,8 +2163,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
     }
 
-    if ((squad.type == BOT_SQUAD_TYPE_ATTACK || squad.type == BOT_SQUAD_TYPE_RESERVES) &&
-            !squad_has_carriers && distant_infantry.empty() && !is_enemy_near_squad) {
+    if ((squad.type == BOT_SQUAD_TYPE_ATTACK || squad.type == BOT_SQUAD_TYPE_RESERVES) && !is_enemy_near_squad) {
         if (squad.type == BOT_SQUAD_TYPE_RESERVES) {
             bot_squad_dissolve(bot, squad);
             return (MatchInput) { .type = MATCH_INPUT_NONE };
