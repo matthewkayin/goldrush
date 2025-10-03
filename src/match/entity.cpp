@@ -658,7 +658,7 @@ bool entity_is_unit(EntityType type) {
 }
 
 bool entity_is_building(EntityType type) {
-    return type >= ENTITY_HALL;
+    return type >= ENTITY_HALL && type != ENTITY_TYPE_COUNT;
 }
 
 bool entity_is_selectable(const Entity& entity) {

@@ -117,7 +117,6 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
 MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_base_under_attack);
 MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
-void bot_get_desired_entities(const MatchState& state, const Bot& bot, EntityType* desired_unit, EntityType* desired_building);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
 uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot);
@@ -190,6 +189,7 @@ bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
 
 int bot_score_entity(const Entity& entity);
+int bot_score_entity_list(const MatchState& state, const std::vector<EntityId>& entity_list);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
 MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
 void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, ivec2 from, ivec2 to, std::vector<ivec2>* path);

@@ -177,6 +177,9 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy, B
         for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_LANDMINE; entity_type++) {
             GOLD_ASSERT(bot.desired_army_ratio[entity_type] == 0);
         }
+        GOLD_ASSERT(bot.desired_army_ratio[ENTITY_MINER] == 0);
+        GOLD_ASSERT(bot.desired_army_ratio[ENTITY_LANDMINE] == 0);
+        GOLD_ASSERT(bot.desired_buildings[ENTITY_LANDMINE] == 0);
     #endif
 
     // Set strategy
@@ -594,7 +597,7 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
             continue;
         }
         // Don't send in a squad unless we feel pretty sure that this squad could cleanup the attack
-        if (squad.entities.size() < enemy_score + 8) {
+        if (defending_score + bot_score_entity_list(state, squad.entities) < enemy_score + (4 * BOT_UNIT_SCORE_MULTIPLIER)) {
             continue;
         }
 
@@ -713,29 +716,118 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
             }
         }
     }
+
+    // Count entities
+    BotEntityCount entity_count = bot_entity_count_empty();
+    BotEntityCount available_building_count = bot_entity_count_empty();
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+        EntityId entity_id = state.entities.get_id_of(entity_index);
+
+        if (entity.player_id != bot.player_id || 
+                entity.health == 0 ||
+                bot_is_entity_reserved(bot, entity_id)) {
+            continue;
+        }
+
+        entity_count[entity.type]++;
+
+        // Count available production buildings
+        if (entity_is_building(entity.type) &&
+                entity.mode == MODE_BUILDING_FINISHED &&
+                entity.queue.empty()) {
+            available_building_count[entity.type]++;
+        }
+
+        // Count in-progress entities
+        if (entity.mode == MODE_BUILDING_FINISHED &&
+                !entity.queue.empty() &&
+                entity.queue.front().type == BUILDING_QUEUE_ITEM_UNIT) {
+            entity_count[entity.queue.front().unit_type]++;
+        }
+        if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD) {
+            entity_count[entity.target.build.building_type]++;
+        }
+    }
     
     uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot);
     if (desired_upgrade != 0) {
-        MatchInput research_input = bot_research_upgrade(state, bot, desired_upgrade);
-        if (research_input.type != MATCH_INPUT_NONE) {
-            return research_input;
+        EntityType building_type = bot_get_building_which_researches(desired_upgrade);
+        if (available_building_count[building_type] != 0) {
+            return bot_research_upgrade(state, bot, desired_upgrade);
         }
     }
 
-    EntityType desired_unit = ENTITY_TYPE_COUNT;
-    EntityType desired_building = ENTITY_TYPE_COUNT;
-    bot_get_desired_entities(state, bot, &desired_unit, &desired_building);
+    // Determine desired entities
+    BotEntityCount desired_entities = bot.desired_buildings;
+    for (const BotDesiredSquad& squad : bot.desired_squads) {
+        desired_entities = bot_entity_count_add(desired_entities, squad.entities);
+    }
 
-    if (desired_unit != ENTITY_TYPE_COUNT) {
-        MatchInput train_unit_input = bot_train_unit(state, bot, desired_unit);
-        if (train_unit_input.type != MATCH_INPUT_NONE) {
-            return train_unit_input;
+    const bool use_continuous_production = 
+            !bot_is_entity_count_empty(bot.desired_army_ratio) &&
+            bot.strategy != BOT_STRATEGY_OPENER_BANDIT_RUSH &&
+            bot.strategy != BOT_STRATEGY_OPENER_BUNKER;
+
+    bool is_available_building = false;
+    for (uint32_t unit_type = ENTITY_MINER + 1; unit_type < ENTITY_HALL; unit_type++) {
+        const bool bot_desires_unit = 
+                    desired_entities[unit_type] > entity_count[unit_type] ||
+                    (use_continuous_production && bot.desired_army_ratio[unit_type] != 0);
+        if (!bot_desires_unit) {
+            continue;
+        }
+
+        EntityType building_type = bot_get_building_which_trains((EntityType)unit_type);
+        if (available_building_count[building_type] != 0) {
+            is_available_building = true;
+            break;
         }
     }
-    if (desired_building != ENTITY_TYPE_COUNT && !is_base_under_attack) {
-        MatchInput build_input = bot_build_building(state, bot, desired_building);
-        if (build_input.type != MATCH_INPUT_NONE) {
-            return build_input;
+
+    // Determine desired unit
+    if (is_available_building) {
+        while (true) {
+            for (uint32_t unit_type = ENTITY_MINER + 1; unit_type < ENTITY_HALL; unit_type++) {
+                if (desired_entities[unit_type] <= entity_count[unit_type]) {
+                    continue;
+                }
+
+                EntityType building_type = bot_get_building_which_trains((EntityType)unit_type);
+                if (available_building_count[building_type] == 0) {
+                    continue;
+                }
+
+                return bot_train_unit(state, bot, (EntityType)unit_type);
+            }
+
+            // If we have an available building and we are not using continuous production,
+            // then we should have returned an entity with the first pass through the unit types
+            GOLD_ASSERT(use_continuous_production);
+
+            desired_entities = bot_entity_count_add(desired_entities, bot.desired_army_ratio);
+        }
+    }
+
+    // Determine any other desired buildings based on building pre-reqs
+    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_LANDMINE; entity_type++) {
+        if (desired_entities[entity_type] == 0) {
+            continue;
+        }
+
+        EntityType prereq = bot_get_building_prereq((EntityType)entity_type);
+        while (prereq != ENTITY_TYPE_COUNT && desired_entities[prereq] == 0) {
+            desired_entities[prereq] = 1;
+            prereq = bot_get_building_prereq((EntityType)prereq);
+        }
+    }
+
+    // Determine desired building
+    if (!is_base_under_attack) {
+        for (uint32_t building_type = ENTITY_HALL; building_type < ENTITY_TYPE_COUNT; building_type++) {
+            if (desired_entities[building_type] > entity_count[building_type]) {
+                return bot_build_building(state, bot, (EntityType)building_type);
+            }
         }
     }
 
@@ -869,57 +961,6 @@ bool bot_should_build_house(const MatchState& state, const Bot& bot) {
     }
 
     return future_max_population < MATCH_MAX_POPULATION && (int)future_max_population - (int)future_population <= 1;
-}
-
-void bot_get_desired_entities(const MatchState& state, const Bot& bot, EntityType* desired_unit, EntityType* desired_building) {
-    // Count entities
-    BotEntityCount entity_count = bot_count_entities(state, bot, BOT_COUNT_UNRESERVED_ENTITIES | BOT_COUNT_IN_PROGRESS_ENTITIES);
-
-    // Determine desired entities
-    BotEntityCount desired_entities = bot.desired_buildings;
-    for (const BotDesiredSquad& squad : bot.desired_squads) {
-        desired_entities = bot_entity_count_add(desired_entities, squad.entities);
-    }
-
-    // Check if desired entities is met already
-    if (!bot_is_entity_count_empty(bot.desired_army_ratio) && 
-            !(bot.strategy == BOT_STRATEGY_OPENER_BANDIT_RUSH || 
-             bot.strategy == BOT_STRATEGY_OPENER_BUNKER)) {
-        do {
-            desired_entities = bot_entity_count_add(desired_entities, bot.desired_army_ratio);
-        } while (bot_entity_count_is_gte_to(entity_count, desired_entities));
-    }
-
-    // Determine any other desired buildings based on building pre-reqs
-    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_LANDMINE; entity_type++) {
-        if (desired_entities[entity_type] == 0) {
-            continue;
-        }
-
-        EntityType prereq = bot_get_building_prereq((EntityType)entity_type);
-        while (prereq != ENTITY_TYPE_COUNT && desired_entities[prereq] == 0) {
-            desired_entities[prereq] = 1;
-            prereq = bot_get_building_prereq((EntityType)prereq);
-        }
-    }
-
-    // Determine desired unit
-    *desired_unit = ENTITY_TYPE_COUNT;
-    for (uint32_t unit_type = ENTITY_MINER + 1; unit_type < ENTITY_HALL; unit_type++) {
-        if (desired_entities[unit_type] > entity_count[unit_type]) {
-            *desired_unit = (EntityType)unit_type;
-            break;
-        }
-    }
-
-    // Determine desired building
-    *desired_building = ENTITY_TYPE_COUNT;
-    for (uint32_t building_type = ENTITY_HALL; building_type < ENTITY_TYPE_COUNT; building_type++) {
-        if (desired_entities[building_type] > entity_count[building_type]) {
-            *desired_building = (EntityType)building_type;
-            break;
-        }
-    }
 }
 
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type) {
@@ -3306,6 +3347,20 @@ int bot_score_entity(const Entity& entity) {
         default:
             return 1 * BOT_UNIT_SCORE_MULTIPLIER;
     }
+}
+
+int bot_score_entity_list(const MatchState& state, const std::vector<EntityId>& entity_list) {
+    int score = 0;
+
+    for (EntityId entity_id : entity_list) {
+        uint32_t entity_index = state.entities.get_index_of(entity_id);
+        if (entity_index == INDEX_INVALID) {
+            continue;
+        }
+        score += bot_score_entity(state.entities[entity_index]);
+    }
+
+    return score;
 }
 
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id) {
