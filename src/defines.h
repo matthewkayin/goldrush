@@ -42,6 +42,8 @@
 #define SELECTION_LIMIT 20U
 #define HOTKEY_GROUP_SIZE 6
 
+#define PATHFIND_ITERATION_MAX 1999
+
 typedef uint16_t EntityId;
 const EntityId ID_MAX = 4096;
 const EntityId ID_NULL = ID_MAX + 1;

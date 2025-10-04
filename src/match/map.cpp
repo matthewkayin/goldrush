@@ -1323,8 +1323,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             closest_explored = explored.size() - 1;
         }
 
-        if (explored.size() > 1999) {
-            // log_warn("Pathfinding from %vi to %vi too long, going with closest explored...", &from, &to);
+        if (explored.size() > PATHFIND_ITERATION_MAX) {
             break;
         }
 

@@ -3485,8 +3485,7 @@ void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, i
             closest_explored = explored.size() - 1;
         }
 
-        if (explored.size() > 1999) {
-            // log_warn("Pathfinding from %vi to %vi too long, going with closest explored...", &from, &to);
+        if (explored.size() > PATHFIND_ITERATION_MAX) {
             break;
         }
 
@@ -3510,10 +3509,7 @@ void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, i
             }
 
             // Don't consider if blocked, but only consider static obstacles, not buildings or units
-            Cell map_ground_cell = map_get_cell(state.map, CELL_LAYER_GROUND, child.cell);
-            if (map_ground_cell.type == CELL_BLOCKED || 
-                    map_ground_cell.type == CELL_UNREACHABLE || 
-                    (map_ground_cell.type >= CELL_DECORATION_1 && map_ground_cell.type <= CELL_DECORATION_5)) {
+            if (map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, child.cell, 1)) {
                 continue;
             }
 
@@ -3597,6 +3593,10 @@ std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchS
         }
 
         enemy_hall_defense_score[entity_index] = 0;
+    }
+
+    if (enemy_hall_defense_score.empty()) {
+        return enemy_hall_defense_score;
     }
 
     // Second pass, find all hall defenses
