@@ -221,7 +221,12 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
     // Count armies
     uint32_t allied_army_size = 0;
     uint32_t enemy_army_size = 0;
+    uint32_t bot_miner_count = 0;
     for (const Entity& entity : state.entities) {
+        if (entity.type == ENTITY_MINER && entity.player_id == bot.player_id) {
+            bot_miner_count++;
+        }
+
         if (!entity_is_unit(entity.type) ||
                 entity.type == ENTITY_MINER ||
                 entity.health == 0) {
@@ -365,8 +370,15 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                 bot_set_strategy(state, bot, BOT_STRATEGY_ATTACK, BOT_UNIT_COMP_COWBOY_BANDIT_PYRO);
             }
 
-            if (bot_unreserved_unit_count >= 32 &&
-                    allied_army_size > enemy_army_size) {
+            static uint32_t BOT_PUSH_THRESHOLD = 32;
+            bool bot_should_push = 
+                    // Push if we have a big army that is bigger than our opponent
+                    (bot_unreserved_unit_count >= BOT_PUSH_THRESHOLD && allied_army_size > enemy_army_size) || 
+                    // Push if we are maxed out
+                    match_get_player_population(state, bot.player_id) >= 98 ||
+                    // And if we have no miners and no money to get more, then attack with everything we've got
+                    (bot_miner_count == 0 && bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_MINER).gold_cost);
+            if (bot_should_push) {
                 BotEntityCount push_entity_count = bot_entity_count_empty();
                 for (uint32_t entity_type = ENTITY_MINER + 1; entity_type < ENTITY_HALL; entity_type++) {
                     if (entity_type == ENTITY_WAGON && bot.desired_army_ratio[ENTITY_WAGON] == 0) {
