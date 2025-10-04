@@ -449,6 +449,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
         case MATCH_INPUT_BUILDING_ENQUEUE: {
             // Choose the best building to enqueue out of the selection
             uint32_t building_index = INDEX_INVALID;
+            uint32_t shortest_building_queue_duration = 0;
             for (int index = 0; index < input.building_enqueue.building_count; index++) {
                 uint32_t candidate_index = state.entities.get_index_of(input.building_enqueue.building_ids[index]);
                 if (candidate_index == INDEX_INVALID ||
@@ -456,10 +457,16 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                         state.entities[candidate_index].queue.size() == BUILDING_QUEUE_MAX) {
                     continue;
                 }
+
+                uint32_t building_queue_duration = state.entities[candidate_index].timer;
+                for (uint32_t queue_index = 1; queue_index < state.entities[candidate_index].queue.size(); queue_index++) {
+                    building_queue_duration += building_queue_item_duration(state.entities[candidate_index].queue[queue_index]);
+                }
+
                 if (building_index == INDEX_INVALID || 
-                        state.entities[candidate_index].queue.size() < 
-                        state.entities[building_index].queue.size()) {
+                        building_queue_duration < shortest_building_queue_duration) {
                     building_index = candidate_index;
+                    shortest_building_queue_duration = building_queue_duration;
                 }
             }
             if (building_index == INDEX_INVALID) {
