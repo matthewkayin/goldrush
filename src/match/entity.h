@@ -224,6 +224,7 @@ ivec2 entity_get_animation_frame(const Entity& entity);
 Rect entity_goldmine_get_block_building_rect(ivec2 cell);
 bool entity_should_die(const Entity& entity);
 void entity_on_damage_taken(Entity& entity);
+bool entity_is_target_within_min_range(const Entity& entity, const Entity& target);
 
 // Building queue items
 

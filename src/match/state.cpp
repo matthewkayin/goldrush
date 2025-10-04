@@ -974,7 +974,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     break;
                 }
 
-                if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                if (match_entity_is_target_invalid(state, entity)) {
                     entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                     entity.target = (Target) { .type = TARGET_NONE };
                     update_finished = true;
@@ -1132,7 +1132,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 break;
                             }
                         }
-                        if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                        if (match_entity_is_target_invalid(state, entity)) {
                             entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                             entity.mode = MODE_UNIT_IDLE;
                             entity.target = (Target) { .type = TARGET_NONE };
@@ -1299,7 +1299,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         break;
                     }
                     case TARGET_BUILD_ASSIST: {
-                        if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                        if (match_entity_is_target_invalid(state, entity)) {
                             entity.target = (Target) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
                         }
@@ -1319,7 +1319,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     case TARGET_REPAIR:
                     case TARGET_ENTITY:
                     case TARGET_ATTACK_ENTITY: {
-                        if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                        if (match_entity_is_target_invalid(state, entity)) {
                             entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                             entity.target = (Target) { .type = TARGET_NONE };
                             entity.mode = MODE_UNIT_IDLE;
@@ -1357,21 +1357,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             }
 
                             // Check min range
-                            Rect entity_rect = (Rect) {
-                                .x = entity.cell.x, .y = entity.cell.y,
-                                .w = entity_data.cell_size, .h = entity_data.cell_size
-                            };
-                            Rect target_rect = (Rect) {
-                                .x = target.cell.x, .y = target.cell.y,
-                                .w = target_data.cell_size, .h = target_data.cell_size
-                            };
-                            // Min range is ignored when the target is in the sky
-                            // Min range is also ignored when the attacking entity is garrisoned
                             bool attack_with_bayonets = false;
-                            if (entity.garrison_id == ID_NULL && 
-                                        target_data.cell_layer != CELL_LAYER_SKY &&
-                                        Rect::euclidean_distance_squared_between(entity_rect, target_rect) < 
-                                        entity_data.unit_data.min_range_squared) {
+                            if (entity_is_target_within_min_range(entity, target)) {
                                 if (entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS)) {
                                     attack_with_bayonets = true;
                                 } else {
@@ -1544,7 +1531,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             case MODE_UNIT_BUILD_ASSIST: 
             case MODE_UNIT_REPAIR: {
                 // Stop repairing if the building is destroyed
-                if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                if (match_entity_is_target_invalid(state, entity)) {
                     entity.target = (Target) {
                         .type = TARGET_NONE
                     };
@@ -1652,7 +1639,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             }
             case MODE_UNIT_ATTACK_WINDUP:
             case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP: {
-                if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                if (match_entity_is_target_invalid(state, entity)) {
                     entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                     entity.target = (Target) {
                         .type = TARGET_NONE
@@ -1681,7 +1668,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 break;
             }
             case MODE_COWBOY_FAN_HAMMER: {
-                if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+                if (match_entity_is_target_invalid(state, entity)) {
                     entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                     entity.target = (Target) {
                         .type = TARGET_NONE
@@ -2069,6 +2056,22 @@ bool match_is_entity_visible_to_player(const MatchState& state, const Entity& en
                 }
             }
         }
+    }
+
+    return false;
+}
+
+bool match_entity_is_target_invalid(const MatchState& state, const Entity& entity) {
+    if (match_is_target_invalid(state, entity.target, entity.player_id)) {
+        return true;
+    }
+
+    // Abandon target if it is within min range so that we can hopefully acquire a better one
+    // But if they have the bayonets upgrade, then don't do this so that they can use bayonets
+    if (entity.target.type == TARGET_ATTACK_ENTITY &&
+            entity_is_target_within_min_range(entity, state.entities.get_by_id(entity.target.id)) &&
+            !(entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS))) {
+        return true;
     }
 
     return false;
@@ -2479,6 +2482,11 @@ Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& 
         }
         // Don't attack entities that the player can't see
         if (!match_is_entity_visible_to_player(state, other, entity.player_id)) {
+            continue;
+        }
+        // Don't attack entities that are within min range
+        if (entity_is_target_within_min_range(entity, other) && 
+                !(entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS))) {
             continue;
         }
         // Don't attack entities that this unit can't see

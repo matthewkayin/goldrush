@@ -206,6 +206,7 @@ SpriteName match_entity_get_sprite(const MatchState& state, const Entity& entity
 SpriteName match_entity_get_icon(const MatchState& state, EntityType type, uint8_t player_id);
 fixed match_entity_get_speed(const MatchState& state, const Entity& entity);
 bool match_is_entity_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);
+bool match_entity_is_target_invalid(const MatchState& state, const Entity& entity);
 bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id);
 bool match_has_entity_reached_target(const MatchState& state, const Entity& entity);
 ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity);

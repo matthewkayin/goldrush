@@ -914,6 +914,29 @@ void entity_on_damage_taken(Entity& entity) {
     }
 }
 
+bool entity_is_target_within_min_range(const Entity& entity, const Entity& target) {
+    const EntityData& entity_data = entity_get_data(entity.type);
+    const EntityData& target_data = entity_get_data(target.type);
+
+    // Min range is ignored when the target is in the sky
+    // Min range is also ignored when the attacking entity is garrisoned
+    if (entity.garrison_id != ID_NULL || 
+            target_data.cell_layer == CELL_LAYER_SKY) {
+        return false;
+    }
+
+    Rect entity_rect = (Rect) {
+        .x = entity.cell.x, .y = entity.cell.y,
+        .w = entity_data.cell_size, .h = entity_data.cell_size
+    };
+    Rect target_rect = (Rect) {
+        .x = target.cell.x, .y = target.cell.y,
+        .w = target_data.cell_size, .h = target_data.cell_size
+    };
+
+    return Rect::euclidean_distance_squared_between(entity_rect, target_rect) < entity_data.unit_data.min_range_squared;
+}
+
 // Building queue items
 
 uint32_t building_queue_item_duration(const BuildingQueueItem& item) {
