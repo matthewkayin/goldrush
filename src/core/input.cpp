@@ -286,6 +286,7 @@ void input_set_hotkey_mapping_to_default(SDL_Scancode* hotkey_mapping) {
     // Saloon
     hotkey_mapping[INPUT_HOTKEY_COWBOY] = SDL_SCANCODE_C;
     hotkey_mapping[INPUT_HOTKEY_BANDIT] = SDL_SCANCODE_B;
+    hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDL_SCANCODE_D;
 
     // Workshop
     hotkey_mapping[INPUT_HOTKEY_SAPPER] = SDL_SCANCODE_S;
@@ -308,7 +309,6 @@ void input_set_hotkey_mapping_to_default(SDL_Scancode* hotkey_mapping) {
     hotkey_mapping[INPUT_HOTKEY_CANNON] = SDL_SCANCODE_C;
 
     // Sheriff's Office
-    hotkey_mapping[INPUT_HOTKEY_DETECTIVE] = SDL_SCANCODE_D;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_PRIVATE_EYE] = SDL_SCANCODE_E;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_STAKEOUT] = SDL_SCANCODE_S;
 

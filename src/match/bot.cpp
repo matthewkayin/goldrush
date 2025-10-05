@@ -1244,6 +1244,7 @@ EntityType bot_get_building_which_trains(EntityType unit_type) {
             return ENTITY_HALL;
         case ENTITY_COWBOY:
         case ENTITY_BANDIT:
+        case ENTITY_DETECTIVE:
             return ENTITY_SALOON;
         case ENTITY_SAPPER:
         case ENTITY_PYRO:
@@ -1255,8 +1256,6 @@ EntityType bot_get_building_which_trains(EntityType unit_type) {
         case ENTITY_SOLDIER:
         case ENTITY_CANNON:
             return ENTITY_BARRACKS;
-        case ENTITY_DETECTIVE:
-            return ENTITY_SHERIFFS;
         default:
             GOLD_ASSERT(false);
             return ENTITY_TYPE_COUNT;

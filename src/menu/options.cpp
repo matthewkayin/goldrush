@@ -108,7 +108,7 @@ static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
         .name = "Saloon",
         .icon = SPRITE_BUTTON_ICON_SALOON,
         .hotkeys = { 
-            INPUT_HOTKEY_COWBOY, INPUT_HOTKEY_BANDIT, INPUT_HOTKEY_NONE,
+            INPUT_HOTKEY_COWBOY, INPUT_HOTKEY_BANDIT, INPUT_HOTKEY_DETECTIVE,
             INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
         }
     }},
@@ -148,8 +148,8 @@ static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
         .name = "Sheriff's Office",
         .icon = SPRITE_BUTTON_ICON_SHERIFFS,
         .hotkeys = { 
-            INPUT_HOTKEY_DETECTIVE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE,
-            INPUT_HOTKEY_RESEARCH_PRIVATE_EYE, INPUT_HOTKEY_RESEARCH_STAKEOUT, INPUT_HOTKEY_NONE
+            INPUT_HOTKEY_RESEARCH_PRIVATE_EYE, INPUT_HOTKEY_RESEARCH_STAKEOUT, INPUT_HOTKEY_NONE,
+            INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
         }
     }}
 };

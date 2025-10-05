@@ -1475,6 +1475,7 @@ void match_ui_update(MatchUiState& state) {
                         case ENTITY_SALOON: {
                             state.hotkey_group[0] = INPUT_HOTKEY_COWBOY;
                             state.hotkey_group[1] = INPUT_HOTKEY_BANDIT;
+                            state.hotkey_group[2] = INPUT_HOTKEY_DETECTIVE;
                             break;
                         }
                         case ENTITY_WORKSHOP: {
@@ -1502,9 +1503,8 @@ void match_ui_update(MatchUiState& state) {
                             break;
                         }
                         case ENTITY_SHERIFFS: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_DETECTIVE;
-                            state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_PRIVATE_EYE;
-                            state.hotkey_group[4] = INPUT_HOTKEY_RESEARCH_STAKEOUT;
+                            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_PRIVATE_EYE;
+                            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_STAKEOUT;
                             break;
                         }
                         case ENTITY_PYRO: {
