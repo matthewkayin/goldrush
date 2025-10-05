@@ -22,6 +22,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot.scout_enemy_has_landmines = false;
     bot.scout_enemy_has_detectives = false;
     bot.last_scout_time = 0;
+    bot.should_surrender = true;
 
     return bot;
 }
@@ -148,8 +149,20 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy, B
             bot.desired_army_ratio[ENTITY_JOCKEY] = 1;
             break;
         }
+        case BOT_UNIT_COMP_SOLDIER_BANDIT: {
+            bot.desired_buildings[ENTITY_BARRACKS] = 2 * mining_base_count;
+
+            bot.desired_army_ratio[ENTITY_SOLDIER] = 1;
+            bot.desired_army_ratio[ENTITY_BANDIT] = 1;
+
+            if (bot.scout_enemy_has_detectives || bot.scout_enemy_has_landmines) {
+                bot.desired_buildings[ENTITY_WORKSHOP] = 1;
+                bot.desired_army_ratio[ENTITY_BALLOON] = 1;
+            }
+            break;
+        }
         case BOT_UNIT_COMP_SOLDIER_CANNON: {
-            bot.desired_buildings[ENTITY_BARRACKS] = 4;
+            bot.desired_buildings[ENTITY_BARRACKS] = 2 * mining_base_count;
 
             bot.desired_army_ratio[ENTITY_SOLDIER] = 8;
             bot.desired_army_ratio[ENTITY_CANNON] = 1;
@@ -160,14 +173,6 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy, B
             }
             break;
         }
-    }
-
-    if (bot.desired_army_ratio[ENTITY_PYRO] != 0 && !bot_has_landmine_squad(bot)) {
-        BotDesiredSquad squad;
-        squad.type = BOT_SQUAD_TYPE_LANDMINES;
-        squad.entities = bot_entity_count_empty();
-        squad.entities[ENTITY_PYRO] = 1;
-        bot.desired_squads.push_back(squad);
     }
 
     #ifdef GOLD_DEBUG
@@ -210,6 +215,14 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy, B
             break;
         }
         case BOT_STRATEGY_ATTACK: {
+            if (bot.desired_army_ratio[ENTITY_PYRO] != 0 && !bot_has_landmine_squad(bot)) {
+                BotDesiredSquad squad;
+                squad.type = BOT_SQUAD_TYPE_LANDMINES;
+                squad.entities = bot_entity_count_empty();
+                squad.entities[ENTITY_PYRO] = 1;
+                bot.desired_squads.push_back(squad);
+            }
+
             break;
         }
     }
@@ -219,8 +232,8 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
     BotEntityCount unreserved_entity_count = bot_count_entities(state, bot, BOT_COUNT_UNRESERVED_ENTITIES);
 
     // Count armies
-    uint32_t allied_army_size = 0;
-    uint32_t enemy_army_size = 0;
+    int allied_army_score = 0;
+    int enemy_army_score = 0;
     uint32_t bot_miner_count = 0;
     for (const Entity& entity : state.entities) {
         if (entity.type == ENTITY_MINER && entity.player_id == bot.player_id) {
@@ -234,9 +247,9 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
         }
 
         if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
-            allied_army_size += bot_score_entity(entity);
+            allied_army_score += bot_score_entity(entity);
         } else {
-            enemy_army_size += bot_score_entity(entity);
+            enemy_army_score += bot_score_entity(entity);
         }
     }
 
@@ -282,7 +295,6 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
         }
         case BOT_STRATEGY_OPENER_BUNKER: {
             if (is_base_under_attack) {
-                // TODO: turtle stance?
                 bot_set_strategy(state, bot, BOT_STRATEGY_ATTACK, BOT_UNIT_COMP_COWBOY_BANDIT);
                 break;
             }
@@ -322,8 +334,122 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             break;
         }
         case BOT_STRATEGY_ATTACK: {
+            // Check if we need strategy switch for detection
+            if ((bot.scout_enemy_has_detectives || bot.scout_enemy_has_landmines) &&
+                    bot.desired_army_ratio[ENTITY_PYRO] + bot.desired_army_ratio[ENTITY_BALLOON] + bot.desired_army_ratio[ENTITY_DETECTIVE] == 0) {
+                switch (bot.unit_comp) {
+                    case BOT_UNIT_COMP_COWBOY_BANDIT:
+                    case BOT_UNIT_COMP_COWBOY_BANDIT_WAGON: {
+                        bot_set_strategy(state, bot, bot.strategy, BOT_UNIT_COMP_COWBOY_BANDIT_PYRO);
+                        break;
+                    }
+                    case BOT_UNIT_COMP_COWBOY_BANDIT_PYRO:
+                    case BOT_UNIT_COMP_COWBOY_SAPPER_PYRO: {
+                        GOLD_ASSERT(false);
+                        break;
+                    }
+                    case BOT_UNIT_COMP_JOCKEYS: {
+                        bot_set_strategy(state, bot, bot.strategy, BOT_UNIT_COMP_SOLDIER_BANDIT);
+                        break;
+                    }
+                    case BOT_UNIT_COMP_SOLDIER_BANDIT:
+                    case BOT_UNIT_COMP_SOLDIER_CANNON: {
+                        bot_set_strategy(state, bot, bot.strategy, bot.unit_comp);
+                        break;
+                    }
+                }
+
+                break;
+            }
+
+            // Count mining bases
+            uint32_t mining_base_count[MAX_PLAYERS];
+            memset(mining_base_count, 0, sizeof(mining_base_count));
+            uint32_t bot_fully_saturated_base_count = 0;
+            uint32_t unoccupied_goldmine_count = 0;
+            for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
+                const Entity& goldmine = state.entities[goldmine_index];
+                if (goldmine.type != ENTITY_GOLDMINE || goldmine.gold_held == 0) {
+                    continue;
+                }
+                EntityId hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
+                if (hall_id == ID_NULL) {
+                    unoccupied_goldmine_count++;
+                    continue;
+                }
+                const Entity& hall = state.entities.get_by_id(hall_id);
+                if (!bot_has_scouted_entity(state, bot, hall, hall_id)) {
+                    continue;
+                }
+                mining_base_count[hall.player_id]++;
+                EntityId goldmine_id = state.entities.get_id_of(goldmine_index);
+                if (hall.player_id == bot.player_id && match_get_miners_on_gold(state, goldmine_id, bot.player_id) == MATCH_MAX_MINERS_ON_GOLD) {
+                    bot_fully_saturated_base_count++;
+                }
+            }
+
+            // Count max enemy mining base
+            uint32_t max_enemy_mining_base_count = 0;
+            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                if (!state.players[player_id].active ||
+                        state.players[player_id].team == state.players[bot.player_id].team) {
+                    continue;
+                }
+                max_enemy_mining_base_count = std::max(max_enemy_mining_base_count, mining_base_count[player_id]);
+            }
+
+            // Check for expand
+            uint32_t target_base_count = std::max(2U, max_enemy_mining_base_count);
+            if (unoccupied_goldmine_count != 0 && 
+                    mining_base_count[bot.player_id] < target_base_count && 
+                    mining_base_count[bot.player_id] == bot_fully_saturated_base_count) {
+                bot_set_strategy(state, bot, BOT_STRATEGY_EXPAND, bot.unit_comp);
+                break;
+            }
+
+            // Check for tech switch
+            if (mining_base_count[bot.player_id] > 1 && 
+                    mining_base_count[bot.player_id] == bot_fully_saturated_base_count && 
+                    allied_army_score > 7 * BOT_UNIT_SCORE_MULTIPLIER) {
+                switch (bot.unit_comp) {
+                    case BOT_UNIT_COMP_COWBOY_BANDIT: {
+                        const uint32_t NEW_UNIT_COMP_COUNT = 5;
+                        BotUnitComp new_unit_comps[NEW_UNIT_COMP_COUNT] = { 
+                            BOT_UNIT_COMP_COWBOY_BANDIT_PYRO, 
+                            BOT_UNIT_COMP_COWBOY_SAPPER_PYRO, 
+                            BOT_UNIT_COMP_COWBOY_BANDIT_WAGON, 
+                            BOT_UNIT_COMP_JOCKEYS, 
+                            BOT_UNIT_COMP_SOLDIER_BANDIT 
+                        };
+                        uint32_t new_unit_comp_roll = lcg_rand(&bot.lcg_seed) % NEW_UNIT_COMP_COUNT;
+
+                        bot_set_strategy(state, bot, bot.strategy, new_unit_comps[new_unit_comp_roll]);
+                        break;
+                    }
+                    case BOT_UNIT_COMP_SOLDIER_BANDIT: {
+                        // Soldier bandit is an intermediary unit comp before we get into soldier cannon
+                        // So only switch into soldier cannon if we have some barracks setup already
+                        if (unreserved_entity_count[ENTITY_BARRACKS] == bot.desired_buildings[ENTITY_BARRACKS]) {
+                            bot_set_strategy(state, bot, bot.strategy, BOT_UNIT_COMP_SOLDIER_CANNON);
+                        }
+                        break;
+                    }
+                    case BOT_UNIT_COMP_COWBOY_BANDIT_WAGON:
+                    case BOT_UNIT_COMP_JOCKEYS:
+                    case BOT_UNIT_COMP_COWBOY_BANDIT_PYRO:
+                    case BOT_UNIT_COMP_COWBOY_SAPPER_PYRO:
+                    case BOT_UNIT_COMP_SOLDIER_CANNON: {
+                        // Don't switch out of these comps
+                        break;
+                    }
+                }
+            }
+            if (allied_army_score > enemy_army_score && bot.unit_comp == BOT_UNIT_COMP_COWBOY_BANDIT) {
+                bot_set_strategy(state, bot, BOT_STRATEGY_ATTACK, BOT_UNIT_COMP_COWBOY_BANDIT_PYRO);
+            }
+
             if (bot_unreserved_unit_count >= 4 && 
-                    allied_army_size > enemy_army_size &&
+                    allied_army_score > enemy_army_score &&
                     bot_enemy_has_undefended_base(state, bot)) {
                 
                 uint32_t max_squad_size = 8;
@@ -366,18 +492,14 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                 break;
             }
 
-            if (allied_army_size > enemy_army_size && bot.unit_comp == BOT_UNIT_COMP_COWBOY_BANDIT) {
-                bot_set_strategy(state, bot, BOT_STRATEGY_ATTACK, BOT_UNIT_COMP_COWBOY_BANDIT_PYRO);
-            }
-
             static uint32_t BOT_PUSH_THRESHOLD = 32;
             bool bot_should_push = 
                     // Push if we have a big army that is bigger than our opponent
-                    (bot_unreserved_unit_count >= BOT_PUSH_THRESHOLD && allied_army_size > enemy_army_size) || 
+                    (bot_unreserved_unit_count >= BOT_PUSH_THRESHOLD && allied_army_score > enemy_army_score) || 
                     // Push if we are maxed out
                     match_get_player_population(state, bot.player_id) >= 98 ||
                     // And if we have no miners and no money to get more, then attack with everything we've got
-                    (bot_miner_count == 0 && bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_MINER).gold_cost);
+                    (bot_unreserved_unit_count > 0 && bot_miner_count == 0 && bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_MINER).gold_cost);
             if (bot_should_push) {
                 BotEntityCount push_entity_count = bot_entity_count_empty();
                 for (uint32_t entity_type = ENTITY_MINER + 1; entity_type < ENTITY_HALL; entity_type++) {
@@ -1016,6 +1138,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
         building_location = bot_find_building_location(state, bot.player_id, state.entities[hall_index].cell + ivec2(1, 1), entity_get_data(building_type).cell_size);
     }
     if (building_location.x == -1) {
+        log_warn("BOT: building location not found for building type %s", entity_get_data(building_type).name);
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
@@ -1223,7 +1346,7 @@ uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state
     std::vector<uint32_t> buildings_near_hall;
     for (uint32_t hall_index = 0; hall_index < state.entities.size(); hall_index++) {
         const Entity& hall = state.entities[hall_index];
-        if (hall.player_id != bot_player_id || hall.type != ENTITY_HALL || !entity_is_selectable(hall)) {
+        if (hall.player_id != bot_player_id || hall.type != ENTITY_HALL || hall.mode != MODE_BUILDING_FINISHED) {
             continue;
         }
 
