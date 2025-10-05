@@ -136,7 +136,10 @@ struct Entity {
     std::vector<Target> target_queue;
     std::vector<ivec2> path;
     std::vector<BuildingQueueItem> queue;
-    ivec2 rally_point;
+    union {
+        ivec2 rally_point;
+        ivec2 attack_move_cell;
+    };
     uint32_t pathfind_attempts;
     uint32_t timer;
 

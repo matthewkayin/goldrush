@@ -780,7 +780,11 @@ EntityId match_create_entity(MatchState& state, EntityType type, ivec2 cell, uin
     entity.timer = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
                         ? 0
                         : (entity_data.max_health - entity.health);
-    entity.rally_point = ivec2(-1, -1);
+    if (entity_is_unit(type)) {
+        entity.attack_move_cell = ivec2(-1, -1);
+    } else {
+        entity.rally_point = ivec2(-1, -1);
+    }
 
     entity.animation = animation_create(ANIMATION_UNIT_IDLE);
 
@@ -971,6 +975,14 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     }
                 }
 
+                // If entity has a target attack cell, then move to it
+                if (entity.target.type == TARGET_NONE && entity.attack_move_cell.x != -1) {
+                    entity.target = (Target) {
+                        .type = TARGET_ATTACK_CELL,
+                        .cell = entity.attack_move_cell
+                    };
+                }
+
                 // If unit is still idle, do nothing
                 if (entity.target.type == TARGET_NONE) {
                     // If soldier is idle, charge weapon
@@ -1055,6 +1067,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         if (entity.target.type == TARGET_BUILD) {
                             match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_CANT_BUILD);
                         }
+                        entity.attack_move_cell = ivec2(-1, -1);
                         entity.target = (Target) { .type = TARGET_NONE };
                         entity.pathfind_attempts = 0;
                         update_finished = true;
@@ -1202,6 +1215,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     case TARGET_ATTACK_CELL:
                     case TARGET_CELL: {
                         entity.target = (Target) { .type = TARGET_NONE };
+                        entity.attack_move_cell = ivec2(-1, -1);
                         entity.mode = MODE_UNIT_IDLE;
                         break;
                     }

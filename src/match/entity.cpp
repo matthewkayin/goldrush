@@ -724,6 +724,7 @@ void entity_set_target(Entity& entity, Target target) {
     entity.target = target;
     entity.path.clear();
     entity.goldmine_id = ID_NULL;
+    entity.attack_move_cell = target.type == TARGET_ATTACK_CELL ? target.cell : ivec2(-1, -1);
     entity_set_flag(entity, ENTITY_FLAG_HOLD_POSITION, false);
     entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, target.type == TARGET_ATTACK_ENTITY);
 
