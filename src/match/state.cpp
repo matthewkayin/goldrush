@@ -967,9 +967,15 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                         uint32_t entity_target_index = state.entities.get_index_of(entity.target.id);
 
-                        if (entity_target_index == INDEX_INVALID || 
+                            // If entity target is invalid, then go with the new target
+                        if ( entity_target_index == INDEX_INVALID || 
+                                // If new target is higher priority than old target, then go with the new target
                                 match_entity_get_target_attack_priority(entity, attack_target_entity) > 
-                                match_entity_get_target_attack_priority(entity, state.entities[entity_target_index])) {
+                                match_entity_get_target_attack_priority(entity, state.entities[entity_target_index]) ||
+                                // For sappers, if the new target is closer, then go with the new target
+                                (entity.type == ENTITY_SAPPER && 
+                                    ivec2::manhattan_distance(entity.cell, state.entities[entity_target_index].cell) <
+                                    ivec2::manhattan_distance(entity.cell, attack_target_entity.cell))) {
                             entity.target = attack_target;
                         }
                     }
@@ -2431,6 +2437,10 @@ Target match_entity_target_nearest_hall(const MatchState& state, const Entity& e
 }
 
 uint32_t match_entity_get_target_attack_priority(const Entity& entity, const Entity& target) {
+    // Sappers don't care about attack priority, they treat everyone the same and explode the nearest target
+    if (entity.type == ENTITY_SAPPER) {
+        return 1;
+    }
     if (target.type == ENTITY_BUNKER && !target.garrisoned_units.empty()) {
         return 2;
     }
