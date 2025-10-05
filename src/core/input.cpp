@@ -302,7 +302,6 @@ void input_set_hotkey_mapping_to_default(SDL_Scancode* hotkey_mapping) {
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_WAGON_ARMOR] = SDL_SCANCODE_W;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_BAYONETS] = SDL_SCANCODE_B;
     hotkey_mapping[INPUT_HOTKEY_RESEARCH_SERRATED_KNIVES] = SDL_SCANCODE_S;
-    hotkey_mapping[INPUT_HOTKEY_RESEARCH_FAN_HAMMER] = SDL_SCANCODE_F;
 
     // Barracks
     hotkey_mapping[INPUT_HOTKEY_SOLDIER] = SDL_SCANCODE_S;

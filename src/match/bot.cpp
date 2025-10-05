@@ -1288,7 +1288,6 @@ EntityType bot_get_building_which_researches(uint32_t upgrade) {
     switch (upgrade) {
         case UPGRADE_WAR_WAGON:
         case UPGRADE_BAYONETS:
-        case UPGRADE_FAN_HAMMER:
         case UPGRADE_SERRATED_KNIVES:
             return ENTITY_SMITH;
         case UPGRADE_STAKEOUT:

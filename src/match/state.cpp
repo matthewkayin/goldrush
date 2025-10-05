@@ -1410,9 +1410,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                             // Begin attack windup
                             entity.direction = enum_direction_to_rect(entity.cell, target.cell, target_data.cell_size);
-                            if (entity.type == ENTITY_COWBOY && entity.fan_hammer_timer == 0 && match_player_has_upgrade(state, entity.player_id, UPGRADE_FAN_HAMMER)) {
-                                entity.mode = MODE_COWBOY_FAN_HAMMER;
-                            } else if (entity.type == ENTITY_SOLDIER && !attack_with_bayonets) {
+                            if (entity.type == ENTITY_SOLDIER && !attack_with_bayonets) {
                                 entity.mode = MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP;
                             } else {
                                 entity.mode = MODE_UNIT_ATTACK_WINDUP;
@@ -1683,25 +1681,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     if (entity.garrison_id != ID_NULL) {
                         entity.target = match_entity_target_nearest_enemy(state, entity);
                     }
-                }
-
-                update_finished = true;
-                break;
-            }
-            case MODE_COWBOY_FAN_HAMMER: {
-                if (match_entity_is_target_invalid(state, entity)) {
-                    entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
-                    entity.target = (Target) {
-                        .type = TARGET_NONE
-                    };
-                    entity.mode = MODE_UNIT_IDLE;
-                    break;
-                }
-
-                if (!animation_is_playing(entity.animation)) {
-                    entity.mode = MODE_UNIT_IDLE;
-                    entity.cooldown_timer = entity_data.unit_data.attack_cooldown;
-                    entity.fan_hammer_timer = COWBOY_FAN_HAMMER_RESET_DURATION;
                 }
 
                 update_finished = true;
@@ -1988,9 +1967,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             }
         } else if (entity.mode == MODE_MINE_PRIME) {
             match_event_play_sound(state, SOUND_MINE_PRIME, entity.position.to_ivec2());
-        } else if (entity.mode == MODE_COWBOY_FAN_HAMMER && entity.animation.frame.x == 6) {
-            match_entity_attack_target(state, entity_id);
-        }
+        } 
     }
 }
 
