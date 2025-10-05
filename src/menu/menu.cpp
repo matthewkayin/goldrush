@@ -232,6 +232,9 @@ void menu_update(MenuState& state) {
             if (ui_button(state.ui, "Multiplayer")) {
                 menu_set_mode(state, MENU_MODE_MULTIPLAYER);
             }
+            if (ui_button(state.ui, "Replays")) {
+                menu_set_mode(state, MENU_MODE_REPLAYS);
+            }
             if (ui_button(state.ui, "Options")) {
                 state.options_menu = options_menu_open();
                 menu_set_mode(state, MENU_MODE_OPTIONS);
@@ -247,9 +250,6 @@ void menu_update(MenuState& state) {
             }
             if (ui_button(state.ui, "Skirmish")) {
                 menu_show_status(state, "Coming soon!");
-            }
-            if (ui_button(state.ui, "Replays")) {
-                menu_set_mode(state, MENU_MODE_REPLAYS);
             }
             if (ui_button(state.ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_MAIN);
@@ -586,7 +586,7 @@ void menu_update(MenuState& state) {
         // Replaylist button row
         ui_begin_row(state.ui, ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
             if (ui_button(state.ui, "Back")) {
-                menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
+                menu_set_mode(state, MENU_MODE_MAIN);
             }
             if (state.lobbylist_item_selected != MENU_ITEM_NONE) {
                 if (ui_button(state.ui, "Watch")) {
