@@ -143,10 +143,14 @@ void bot_set_strategy(const MatchState& state, Bot& bot, BotStrategy strategy, B
             bot.desired_army_ratio[ENTITY_WAGON] = 1;
             break;
         }
-        case BOT_UNIT_COMP_JOCKEYS: {
-            bot.desired_buildings[ENTITY_COOP] = 2 * mining_base_count;
+        case BOT_UNIT_COMP_COWBOY_BANDIT_WAGON_JOCKEY: {
+            bot.desired_buildings[ENTITY_COOP] = mining_base_count;
+            bot.desired_buildings[ENTITY_SALOON] = mining_base_count;
 
-            bot.desired_army_ratio[ENTITY_JOCKEY] = 1;
+            bot.desired_army_ratio[ENTITY_COWBOY] = 2;
+            bot.desired_army_ratio[ENTITY_BANDIT] = 2;
+            bot.desired_army_ratio[ENTITY_WAGON] = 1;
+            bot.desired_army_ratio[ENTITY_JOCKEY] = 4;
             break;
         }
         case BOT_UNIT_COMP_SOLDIER_BANDIT: {
@@ -348,7 +352,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                         GOLD_ASSERT(false);
                         break;
                     }
-                    case BOT_UNIT_COMP_JOCKEYS: {
+                    case BOT_UNIT_COMP_COWBOY_BANDIT_WAGON_JOCKEY: {
                         bot_set_strategy(state, bot, bot.strategy, BOT_UNIT_COMP_SOLDIER_BANDIT);
                         break;
                     }
@@ -413,12 +417,11 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                     allied_army_score > 7 * BOT_UNIT_SCORE_MULTIPLIER) {
                 switch (bot.unit_comp) {
                     case BOT_UNIT_COMP_COWBOY_BANDIT: {
-                        const uint32_t NEW_UNIT_COMP_COUNT = 5;
+                        const uint32_t NEW_UNIT_COMP_COUNT = 4;
                         BotUnitComp new_unit_comps[NEW_UNIT_COMP_COUNT] = { 
                             BOT_UNIT_COMP_COWBOY_BANDIT_PYRO, 
                             BOT_UNIT_COMP_COWBOY_SAPPER_PYRO, 
                             BOT_UNIT_COMP_COWBOY_BANDIT_WAGON, 
-                            BOT_UNIT_COMP_JOCKEYS, 
                             BOT_UNIT_COMP_SOLDIER_BANDIT 
                         };
                         uint32_t new_unit_comp_roll = lcg_rand(&bot.lcg_seed) % NEW_UNIT_COMP_COUNT;
@@ -434,8 +437,14 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                         }
                         break;
                     }
-                    case BOT_UNIT_COMP_COWBOY_BANDIT_WAGON:
-                    case BOT_UNIT_COMP_JOCKEYS:
+                    case BOT_UNIT_COMP_COWBOY_BANDIT_WAGON: {
+                        // Switch from intermediate comp to full comp
+                        if (unreserved_entity_count[ENTITY_COOP] == bot.desired_buildings[ENTITY_COOP]) {
+                            bot_set_strategy(state, bot, bot.strategy, BOT_UNIT_COMP_COWBOY_BANDIT_WAGON_JOCKEY);
+                        }
+                        break;
+                    }
+                    case BOT_UNIT_COMP_COWBOY_BANDIT_WAGON_JOCKEY:
                     case BOT_UNIT_COMP_COWBOY_BANDIT_PYRO:
                     case BOT_UNIT_COMP_COWBOY_SAPPER_PYRO:
                     case BOT_UNIT_COMP_SOLDIER_CANNON: {

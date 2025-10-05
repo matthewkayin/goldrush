@@ -430,11 +430,12 @@ int gold_main(int argc, char** argv) {
 
         #ifdef GOLD_DEBUG
             if (render_debug_info) {
-                int render_y = state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY ? 20 : 0;
+                int render_x = state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY ? 24 : 0;
+                int render_y = 0;
 
                 char fps_text[32];
                 sprintf(fps_text, "FPS: %u", fps);
-                render_text(FONT_HACK_WHITE, fps_text, ivec2(0, render_y));
+                render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
                 render_y += 10;
 
                 #ifdef GOLD_DEBUG_TURBO
@@ -444,6 +445,7 @@ int gold_main(int argc, char** argv) {
                     render_y += 10;
                 #endif
 
+                /*
                 if (state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) {
                     ivec2 mouse_world_pos = input_get_mouse_position() + state.match.camera_offset;
                     for (uint32_t entity_index = 0; entity_index < state.match.match.entities.size(); entity_index++) {
@@ -466,6 +468,7 @@ int gold_main(int argc, char** argv) {
                         render_y++;
                     }
                 }
+                */
 
                 render_sprite_batch();
             }
