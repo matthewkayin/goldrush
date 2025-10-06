@@ -6,6 +6,7 @@
 #include "core/logger.h"
 #include "core/cursor.h"
 #include "core/options.h"
+#include "core/profile.h"
 #include "menu/ui.h"
 #include "menu/match_setting.h"
 #include "render/sprite.h"
@@ -123,6 +124,7 @@ MatchUiState match_ui_base_init() {
     state.camera_offset = ivec2(0, 0);
     state.select_origin = ivec2(-1, -1);
     state.is_minimap_dragging = false;
+    state.latest_alert_cell = ivec2(-1, -1);
     state.turn_timer = 0;
     state.turn_counter = 0;
     state.disconnect_timer = 0;
@@ -846,8 +848,8 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Jump to latest alert
-    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && !state.alerts.empty()) {
-        match_ui_center_camera_on_cell(state, state.alerts.back().cell);
+    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && state.latest_alert_cell.x != -1) {
+        match_ui_center_camera_on_cell(state, state.latest_alert_cell);
     }
 
     // Camera hotkeys
@@ -1018,7 +1020,7 @@ void match_ui_update(MatchUiState& state) {
                 }
 
                 if (state.inputs[player_id].empty()) {
-                    uint64_t bot_start_time = SDL_GetTicksNS();
+                    profile_begin(PROFILE_KEY_BOT);
                     std::vector<MatchInput> bot_inputs = { bot_get_turn_input(state.match, state.bots[player_id], match_time_minutes) };
                     state.inputs[player_id].push(bot_inputs);
                     // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied whenever its deciding the next one
@@ -1031,8 +1033,12 @@ void match_ui_update(MatchUiState& state) {
                         match_ui_handle_player_disconnect(state, player_id);
                     }
 
-                    double bot_duration = (double)(SDL_GetTicksNS() - bot_start_time) / (double)SDL_NS_PER_SECOND;
-                    // log_trace("PROFILE: bot duration %f", bot_duration);
+                    profile_end(PROFILE_KEY_BOT_STRATEGY);
+                    profile_end(PROFILE_KEY_BOT_PRODUCTION);
+                    profile_end(PROFILE_KEY_BOT_PRODUCTION);
+                    profile_end(PROFILE_KEY_BOT_SQUAD);
+                    profile_end(PROFILE_KEY_BOT_MISC);
+                    profile_end(PROFILE_KEY_BOT);
                 }
             }
 
@@ -1192,6 +1198,8 @@ void match_ui_update(MatchUiState& state) {
                     default:
                         break;
                 }
+                log_trace("ALERT cell %vi", &event.alert.cell);
+                state.latest_alert_cell = event.alert.cell;
 
                 Rect camera_rect = (Rect) { 
                     .x = state.camera_offset.x, 
@@ -1625,7 +1633,7 @@ void match_ui_clamp_camera(MatchUiState& state) {
 
 void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell) {
     state.camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
-    state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2);
+    state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / 2);
     match_ui_clamp_camera(state);
 }
 

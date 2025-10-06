@@ -5,6 +5,7 @@
 #include "core/cursor.h"
 #include "core/animation.h"
 #include "core/input.h"
+#include "core/profile.h"
 #include "network/network.h"
 #include "core/sound.h"
 #include "core/options.h"
@@ -271,6 +272,9 @@ int gold_main(int argc, char** argv) {
         }
         frames++;
 
+        profile_begin_frame();
+        profile_begin(PROFILE_KEY_UPDATE);
+
         // INPUT
         if (update_accumulator >= UPDATE_DURATION) {
             input_poll_events();
@@ -393,7 +397,10 @@ int gold_main(int argc, char** argv) {
 
         sound_update();
 
+        profile_end(PROFILE_KEY_UPDATE);
+
         // RENDER
+        profile_begin(PROFILE_KEY_RENDER);
         render_prepare_frame();
 
         switch (state.mode) {
@@ -438,6 +445,12 @@ int gold_main(int argc, char** argv) {
                 render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
                 render_y += 10;
 
+                for (int profile_key = 0; profile_key < PROFILE_KEY_COUNT; profile_key++) {
+                    sprintf(fps_text, "%s: %.0f%%", profile_key_str((ProfileKey)profile_key), profile_key_duration((ProfileKey)profile_key));
+                    render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
+                    render_y += 10;
+                }
+
                 #ifdef GOLD_DEBUG_TURBO
                     char turbo_text[32];
                     sprintf(turbo_text, "Playback Speed x%llu", playback_speed);
@@ -475,6 +488,9 @@ int gold_main(int argc, char** argv) {
         #endif
 
         render_present_frame();
+
+        profile_end(PROFILE_KEY_RENDER);
+        profile_end_frame();
     }
 
     network_quit();

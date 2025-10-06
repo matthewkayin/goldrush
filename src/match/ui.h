@@ -105,6 +105,7 @@ struct MatchUiState {
     std::string chat_message;
     std::vector<ChatMessage> chat;
     std::vector<Alert> alerts;
+    ivec2 latest_alert_cell;
     uint32_t sound_cooldown_timers[SOUND_COUNT];
     bool chat_cursor_visible;
     uint32_t chat_cursor_blink_timer;

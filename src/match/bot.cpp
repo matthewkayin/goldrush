@@ -1,6 +1,7 @@
 #include "bot.h"
 
 #include "core/logger.h"
+#include "core/profile.h"
 #include "upgrade.h"
 #include "lcg.h"
 
@@ -28,20 +29,26 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
 }
 
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
+    profile_begin(PROFILE_KEY_BOT_STRATEGY);
     bot_scout_update(state, bot, match_time_minutes);
 
     // Strategy
     bool is_base_under_attack = bot_handle_base_under_attack(state, bot);
     bot_strategy_update(state, bot, is_base_under_attack);
 
+    profile_end(PROFILE_KEY_BOT_STRATEGY);
+
     // Production
+    profile_begin(PROFILE_KEY_BOT_PRODUCTION);
     MatchInput production_input = bot_get_production_input(state, bot, is_base_under_attack);
     if (production_input.type != MATCH_INPUT_NONE) {
         return production_input;
     }
+    profile_end(PROFILE_KEY_BOT_PRODUCTION);
 
     // Squad
 
+    profile_begin(PROFILE_KEY_BOT_SQUAD);
     uint32_t squad_index = 0;
     while (squad_index < bot.squads.size()) {
         MatchInput input = bot_squad_update(state, bot, bot.squads[squad_index]);
@@ -56,9 +63,11 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
             return input;
         }
     }
+    profile_end(PROFILE_KEY_BOT_SQUAD);
 
     // Scout
 
+    profile_begin(PROFILE_KEY_BOT_MISC);
     MatchInput scout_input = bot_scout(state, bot, match_time_minutes);
     if (scout_input.type != MATCH_INPUT_NONE) {
         return scout_input;
@@ -90,6 +99,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     if (unload_input.type != MATCH_INPUT_NONE) {
         return unload_input;
     }
+    profile_end(PROFILE_KEY_BOT_MISC);
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
