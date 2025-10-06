@@ -119,7 +119,11 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
     switch (event.type) {
         case NETWORK_EVENT_LOBBY_CONNECTION_FAILED: {
             log_info("Menu received LOBBY_CONNECTION_FAILED.");
-            menu_set_mode(state, MENU_MODE_LOBBYLIST);
+            if (state.mode == MENU_MODE_SKIRMISH_CONNECTING) {
+                menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
+            } else {
+                menu_set_mode(state, MENU_MODE_LOBBYLIST);
+            }
             menu_show_status(state, "Connection failed.");
             break;
         }
@@ -139,7 +143,11 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
         }
         case NETWORK_EVENT_LOBBY_CONNECTED: {
             log_info("Menu received LOBBY_CONNECTED.");
-            menu_set_mode(state, MENU_MODE_LOBBY);
+            if (state.mode == MENU_MODE_SKIRMISH_CONNECTING) {
+                menu_set_mode(state, MENU_MODE_SKIRMISH_LOBBY);
+            } else {
+                menu_set_mode(state, MENU_MODE_LOBBY);
+            }
             if (network_is_host() && network_get_backend() == NETWORK_BACKEND_STEAM) {
                 menu_add_chat_message(state, "You have created a lobby. You can invite your friends using the Steam overlay (SHIFT+TAB).");
             }
@@ -249,7 +257,14 @@ void menu_update(MenuState& state) {
                 menu_show_status(state, "Coming soon!");
             }
             if (ui_button(state.ui, "Skirmish")) {
-                menu_show_status(state, "Coming soon!");
+                if (network_get_status() != NETWORK_STATUS_OFFLINE) {
+                    menu_show_status(state, "Error setting up game. Please try again.");
+                    network_disconnect();
+                } else {
+                    network_set_backend(NETWORK_BACKEND_LAN);
+                    network_open_lobby("Skirmish", NETWORK_LOBBY_PRIVACY_SINGLEPLAYER);
+                    menu_set_mode(state, MENU_MODE_SKIRMISH_CONNECTING);
+                }
             }
             if (ui_button(state.ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_MAIN);
@@ -370,7 +385,7 @@ void menu_update(MenuState& state) {
             }
         ui_end_container(state.ui);
     // End lobbylist
-    } else if (state.mode == MENU_MODE_LOBBY) {
+    } else if (state.mode == MENU_MODE_LOBBY || state.mode == MENU_MODE_SKIRMISH_LOBBY) {
         // Playerlist
         ui_frame_rect(state.ui, PLAYERLIST_RECT);
         ivec2 lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name());
@@ -504,7 +519,11 @@ void menu_update(MenuState& state) {
         ui_begin_row(state.ui, ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12, MATCH_SETTINGS_RECT.y + MATCH_SETTINGS_RECT.h + 4), 4);
             if (ui_button(state.ui, "Back")) {
                 network_disconnect();
-                menu_set_mode(state, MENU_MODE_LOBBYLIST);
+                if (state.mode == MENU_MODE_LOBBY) {
+                    menu_set_mode(state, MENU_MODE_LOBBYLIST);
+                } else if (state.mode == MENU_MODE_SKIRMISH_LOBBY) {
+                    menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
+                }
             }
             if (network_is_host()) {
                 if (ui_button(state.ui, "Start")) {

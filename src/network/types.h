@@ -76,7 +76,8 @@ struct NetworkPlayer {
 
 enum NetworkLobbyPrivacy {
     NETWORK_LOBBY_PRIVACY_PUBLIC,
-    NETWORK_LOBBY_PRIVACY_INVITE_ONLY
+    NETWORK_LOBBY_PRIVACY_INVITE_ONLY,
+    NETWORK_LOBBY_PRIVACY_SINGLEPLAYER
 };
 
 enum NetworkEventType {

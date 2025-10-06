@@ -421,7 +421,8 @@ void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
 
     if (state.backend == NETWORK_BACKEND_LAN) {
         network_lan_scanner_destroy();
-        if (!network_lan_listener_create()) {
+        // Don't create LAN listener for single player games
+        if (privacy != NETWORK_LOBBY_PRIVACY_SINGLEPLAYER && !network_lan_listener_create()) {
             network_host_destroy(state.host);
             state.events.push((NetworkEvent) {
                 .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED
