@@ -8,28 +8,18 @@
 #include <SDL3/SDL.h>
 
 struct ProfileState {
-    uint64_t frame_start_time;
-    double frame_duration;
     uint64_t key_start_time[PROFILE_KEY_COUNT];
     double key_duration[PROFILE_KEY_COUNT];
-    double last_key_duration[PROFILE_KEY_COUNT];
-    double last_total_duration;
 };
 static ProfileState state;
 
 void profile_begin_frame() {
-    static bool first_run = true;
+    static bool initialized = false;
     memset(state.key_start_time, 0, sizeof(state.key_start_time));
-    if (first_run) {
-        memset(state.last_key_duration, 0, sizeof(state.last_key_duration));
-        state.last_total_duration = 0.0;
-        first_run = false;
-    } else if (state.key_duration[PROFILE_KEY_BOT] != 0.0) {
-        memcpy(state.last_key_duration, state.key_duration, sizeof(state.key_duration));
-        state.last_total_duration = state.frame_duration;
+    if (!initialized) {
+        memset(state.key_duration, 0, sizeof(state.key_duration));
+        initialized = true;
     }
-    memset(state.key_duration, 0, sizeof(state.key_duration));
-    state.frame_start_time = SDL_GetTicksNS();
 }
 
 void profile_begin(ProfileKey key) {
@@ -44,24 +34,26 @@ void profile_end(ProfileKey key) {
     state.key_start_time[key] = 0;
 }
 
-void profile_end_frame() {
-    state.frame_duration = (double)(SDL_GetTicksNS() - state.frame_start_time) / (double)SDL_NS_PER_SECOND;
-}
-
 const char* profile_key_str(ProfileKey key) {
     switch (key) {
-        case PROFILE_KEY_RENDER: 
-            return "RENDER";
         case PROFILE_KEY_UPDATE: 
             return "UPDATE";
         case PROFILE_KEY_BOT: 
             return "BOT";
         case PROFILE_KEY_BOT_STRATEGY: 
             return "BOT STRATEGY";
+        case PROFILE_KEY_BOT_BANDIT_RUSH:
+            return "BOT BANDIT RUSH";
+        case PROFILE_KEY_BOT_BUNKER:
+            return "BOT BUNKER";
+        case PROFILE_KEY_BOT_EXPAND:
+            return "BOT EXPAND";
         case PROFILE_KEY_BOT_PRODUCTION: 
             return "BOT PRODUCTION";
         case PROFILE_KEY_BOT_SQUAD: 
             return "BOT SQUAD";
+        case PROFILE_KEY_BOT_SCOUT: 
+            return "BOT SCOUT";
         case PROFILE_KEY_BOT_MISC: 
             return "BOT MISC";
         case PROFILE_KEY_COUNT: 
@@ -70,7 +62,12 @@ const char* profile_key_str(ProfileKey key) {
 }
 
 double profile_key_duration(ProfileKey key) {
-    return (state.last_key_duration[key] / state.last_total_duration) * 100.0;
+    return state.key_duration[key];
+}
+
+double profile_key_percentage(ProfileKey key) {
+    static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
+    return (state.key_duration[key] / UPDATE_DURATION) * 100.0;
 }
 
 #else
@@ -78,8 +75,8 @@ double profile_key_duration(ProfileKey key) {
 void profile_begin_frame() {}
 void profile_begin(ProfileKey key) {}
 void profile_end(ProfileKey key) {}
-void profile_end_frame() {}
 const char* profile_key_str(ProfileKey key) { return ""; }
 double profile_key_duration(ProfileKey key) { return 0.0; }
+double profile_key_percentage(ProfileKey key) { return 0.0; }
 
 #endif

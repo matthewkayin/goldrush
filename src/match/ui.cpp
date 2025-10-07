@@ -1020,7 +1020,6 @@ void match_ui_update(MatchUiState& state) {
                 }
 
                 if (state.inputs[player_id].empty()) {
-                    profile_begin(PROFILE_KEY_BOT);
                     std::vector<MatchInput> bot_inputs = { bot_get_turn_input(state.match, state.bots[player_id], match_time_minutes) };
                     state.inputs[player_id].push(bot_inputs);
                     // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied whenever its deciding the next one
@@ -1032,13 +1031,6 @@ void match_ui_update(MatchUiState& state) {
                         match_ui_add_chat_message(state, player_id, "gg");
                         match_ui_handle_player_disconnect(state, player_id);
                     }
-
-                    profile_end(PROFILE_KEY_BOT_STRATEGY);
-                    profile_end(PROFILE_KEY_BOT_PRODUCTION);
-                    profile_end(PROFILE_KEY_BOT_PRODUCTION);
-                    profile_end(PROFILE_KEY_BOT_SQUAD);
-                    profile_end(PROFILE_KEY_BOT_MISC);
-                    profile_end(PROFILE_KEY_BOT);
                 }
             }
 

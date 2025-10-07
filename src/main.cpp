@@ -400,7 +400,6 @@ int gold_main(int argc, char** argv) {
         profile_end(PROFILE_KEY_UPDATE);
 
         // RENDER
-        profile_begin(PROFILE_KEY_RENDER);
         render_prepare_frame();
 
         switch (state.mode) {
@@ -446,7 +445,8 @@ int gold_main(int argc, char** argv) {
                 render_y += 10;
 
                 for (int profile_key = 0; profile_key < PROFILE_KEY_COUNT; profile_key++) {
-                    sprintf(fps_text, "%s: %.0f%%", profile_key_str((ProfileKey)profile_key), profile_key_duration((ProfileKey)profile_key));
+                    sprintf(fps_text, "%s: %.0f%%", profile_key_str((ProfileKey)profile_key), profile_key_percentage((ProfileKey)profile_key));
+                    // sprintf(fps_text, "%s: %f", profile_key_str((ProfileKey)profile_key), profile_key_duration((ProfileKey)profile_key));
                     render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
                     render_y += 10;
                 }
@@ -488,9 +488,6 @@ int gold_main(int argc, char** argv) {
         #endif
 
         render_present_frame();
-
-        profile_end(PROFILE_KEY_RENDER);
-        profile_end_frame();
     }
 
     network_quit();

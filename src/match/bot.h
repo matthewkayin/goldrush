@@ -130,6 +130,7 @@ EntityId bot_pull_worker_off_gold(const MatchState& state, const Bot& bot, Entit
 EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id, bool count_bunkers_only);
 ivec2 bot_find_building_location(const MatchState& state, uint8_t bot_player_id, ivec2 start_cell, int size);
+uint32_t bot_find_next_hall_goldmine_index(const MatchState& state, const Bot& bot);
 ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot);
 ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t nearby_hall_index);
 uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot);
