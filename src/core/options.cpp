@@ -18,7 +18,11 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .type = OPTION_TYPE_DROPDOWN,
         .min_value = 0,
         .max_value = RENDER_DISPLAY_COUNT,
+        #ifdef GOLD_DEBUG
+        .default_value = RENDER_DISPLAY_WINDOWED
+        #else
         .default_value = RENDER_DISPLAY_FULLSCREEN
+        #endif
     }},
     { OPTION_VSYNC, (OptionData) {
         .name = "Vsync",
