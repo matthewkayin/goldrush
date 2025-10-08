@@ -3487,6 +3487,9 @@ void match_ui_render(const MatchUiState& state) {
     for (uint32_t y = 0; y < state.match.map.height; y++) {
         for (uint32_t x = 0; x < state.match.map.width; x++) {
             int fog_value = match_ui_get_fog(state, ivec2(x, y));
+            #ifdef GOLD_DEBUG_FOG_DISABLED
+                fog_value = 1;
+            #endif
             MinimapPixel pixel;
             if (fog_value > 0) {
                 pixel = MINIMAP_PIXEL_TRANSPARENT;

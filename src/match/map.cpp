@@ -10,6 +10,7 @@
 static const int MAP_PLAYER_SPAWN_SIZE = 13;
 static const int MAP_PLAYER_SPAWN_MARGIN = 13;
 static const int8_t NOISE_LEVEL_WATER = -1;
+static const int MAP_STAIR_SPACING = 16;
 
 struct PoissonDiskParams {
     std::vector<int> avoid_values;
@@ -21,6 +22,23 @@ struct PoissonDiskParams {
 SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int32_t* lcg_seed, PoissonDiskParams& params);
+
+void map_debug_print_noise(const char* header, const Noise& noise) {
+    log_trace("--%s--", header);
+    for (int y = 0; y < noise.height; y++) {
+        char buffer[1024];
+        char* buffer_ptr = buffer;
+        for (int x = 0; x < noise.width; x++) {
+            if (noise.map[x + (y * noise.width)] == NOISE_LEVEL_WATER) {
+                buffer_ptr += sprintf(buffer_ptr, "W ");
+            } else {
+                buffer_ptr += sprintf(buffer_ptr, "%i ", noise.map[x + (y * noise.width)]);
+            }
+        }
+        log_trace("%s", buffer);
+    }
+    log_trace("--END--");
+}
 
 void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.width = noise.width;
@@ -66,6 +84,8 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
             }
         }
     }
+
+    map_debug_print_noise("WATER CLEAROUT", noise);
 
     // Widen gaps that are too narrow
     for (int y = 0; y < (int)noise.height; y++) {
@@ -177,6 +197,191 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         }
     }
 
+    // Remove lowground nooks that are too boxed in by high ground
+    // This addresses the issue where stairs are sometimes generated facing a wall
+    for (int y = 0; y < (int)noise.height; y++) {
+        for (int x = 0; x < (int)noise.width; x++) {
+            if (noise.map[x + (y * noise.width)] != 0) {
+                continue;
+            }
+
+            int highground_neighbor_count = 0;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                ivec2 neighbor = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= noise.width || neighbor.y >= noise.height) {
+                    continue;
+                }
+                if (noise.map[neighbor.x + (neighbor.y * noise.width)] > 0) {
+                    highground_neighbor_count++;
+                }
+            }
+            if (highground_neighbor_count > 2) {
+                noise.map[x + (y * noise.width)] = 1;
+            }
+        }
+    }
+
+    // Remove diagonal straights that are too long
+    // This opens up the map and prevents worst-case pathing
+    {
+        // First mark every noise tile that is a wall
+        std::vector<int> unvisited_walls(noise.width * noise.height, 0);
+        for (int y = 0; y < noise.height; y++) {
+            for (int x = 0; x < noise.width; x++) {
+                if (noise.map[x + (y * noise.width)] != 1) {
+                    continue;
+                }
+
+                bool is_wall = false;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 neighbor = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                    if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= noise.width || neighbor.y >= noise.height) {
+                        continue;
+                    }
+                    if (noise.map[neighbor.x + (neighbor.y * noise.width)] == 0) {
+                        is_wall = true;
+                        break;
+                    }
+                }
+                if (is_wall) {
+                    unvisited_walls[x + (y * noise.width)] = 1;
+                }
+            }
+        }
+
+        // Next, trace along every wall to determine if any of them are long diagonals
+        while (true) {
+            int next_wall_index;
+            for (next_wall_index = 0; next_wall_index < noise.width * noise.height; next_wall_index++) {
+                if (unvisited_walls[next_wall_index] == 1) {
+                    break;
+                }
+            }
+            // If no next wall index was found, it means that we checked all the walls already, so break out of this loop
+            if (next_wall_index == noise.width * noise.height) {
+                break;
+            }
+
+            ivec2 wall_cell = ivec2(next_wall_index % noise.width, next_wall_index / noise.width);
+            ivec2 wall_direction = ivec2(0, 0);
+            std::vector<ivec2> diagonal_cells;
+            int consecutive_adjacent_step_count = 0;
+
+            while (true) {
+                // Mark the wall as visited
+                unvisited_walls[wall_cell.x + (wall_cell.y * noise.width)] = 0;
+                diagonal_cells.push_back(wall_cell);
+
+                // Find the next step along the wall
+                int direction;
+                for (direction = 0; direction < DIRECTION_COUNT; direction++) {
+                    ivec2 neighbor = ivec2(wall_cell.x, wall_cell.y) + DIRECTION_IVEC2[direction];
+                    if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= noise.width || neighbor.y >= noise.height) {
+                        continue;
+                    }
+                    if (unvisited_walls[neighbor.x + (neighbor.y * noise.width)] == 1) {
+                        wall_cell = neighbor;
+                        break;
+                    }
+                }
+
+                // Determine the wall direction, if it has not been set yet
+                if (direction < DIRECTION_COUNT && wall_direction.x == 0 && DIRECTION_IVEC2[direction].x != 0) {
+                    wall_direction.x = DIRECTION_IVEC2[direction].x;
+                }
+                if (direction < DIRECTION_COUNT && wall_direction.y == 0 && DIRECTION_IVEC2[direction].y != 0) {
+                    wall_direction.y = DIRECTION_IVEC2[direction].y;
+                }
+
+                // Mark whether that step was diagonal or not
+                if (direction < DIRECTION_COUNT && direction % 2 == 0) {
+                    consecutive_adjacent_step_count++;
+                } else if (direction < DIRECTION_COUNT && direction % 2 == 1) {
+                    consecutive_adjacent_step_count = 0;
+                }
+
+                // Determine whether this is the end of the diagonal stretch of wall
+                if (direction == DIRECTION_COUNT || consecutive_adjacent_step_count > 3 ||
+                        DIRECTION_IVEC2[direction].x * -1 == wall_direction.x ||
+                        DIRECTION_IVEC2[direction].y * -1 == wall_direction.y) {
+                    if (ivec2::manhattan_distance(diagonal_cells.front(), diagonal_cells.back()) > MAP_STAIR_SPACING * 2 && diagonal_cells.size() > MAP_STAIR_SPACING * 2) {
+                        ivec2 stair_begin = diagonal_cells[(diagonal_cells.size() / 2) - 2];
+
+                        ivec2 stair_first_direction;
+                        ivec2 stair_second_direction;
+                        if (std::abs(diagonal_cells.front().x - diagonal_cells.back().x) > std::abs(diagonal_cells.front().y - diagonal_cells.back().y)) {
+                            stair_first_direction = ivec2(wall_direction.x, 0);
+                            stair_second_direction = ivec2(0, wall_direction.y);
+                        } else {
+                            stair_first_direction = ivec2(0, wall_direction.y);
+                            stair_second_direction = ivec2(wall_direction.x, 0);
+                        }
+                        
+                        static const int STAIR_SIZE = 5;
+                        for (int stair_index = 0; stair_index < STAIR_SIZE; stair_index++) {
+                            // Move one step in the first direction and fill in a wall
+                            ivec2 stair_cell = stair_begin + (stair_first_direction * (stair_index + 1));
+                            if (stair_cell.x < 0 || stair_cell.y < 0 || stair_cell.x == noise.width || stair_cell.y == noise.height) {
+                                log_warn("Stair within long diagonal is out-of-bounds.");
+                                continue;
+                            }
+                            noise.map[stair_cell.x + (stair_cell.y * noise.width)] = 1;
+
+                            // Now move in the second direction to rejoin the stair cell with the wall
+                            while (true) {
+                                stair_cell += stair_second_direction;
+                                if (stair_cell.x < 0 || stair_cell.y < 0 || stair_cell.x == noise.width || stair_cell.y == noise.height) {
+                                    break;
+                                }
+                                if (noise.map[stair_cell.x + (stair_cell.y * noise.width)] == 1) {
+                                    break;
+                                }
+                                noise.map[stair_cell.x + (stair_cell.y * noise.width)] = 1;
+                            }
+                        }
+
+                        // This new stair is likely protruding from the diagonal
+                        // So let's smooth it out
+                        ivec2 stair_cell = stair_begin + (stair_first_direction * STAIR_SIZE);
+                        int stair_second_step_size = 2;
+                        while (true) {
+                            stair_cell += stair_first_direction;
+                            stair_cell += stair_second_direction * stair_second_step_size;
+                            stair_second_step_size = 3;
+                            if (stair_cell.x < 0 || stair_cell.y < 0 || stair_cell.x == noise.width || stair_cell.y == noise.height) {
+                                break;
+                            }
+                            if (noise.map[stair_cell.x + (stair_cell.y * noise.width)] == 1) {
+                                break;
+                            }
+
+                            ivec2 fill_cell = stair_cell;
+                            while (true) {
+                                noise.map[fill_cell.x + (fill_cell.y * noise.width)] = 1;
+                                fill_cell += stair_second_direction;
+                                if (fill_cell.x < 0 || fill_cell.y < 0 || fill_cell.x == noise.width || fill_cell.y == noise.height) {
+                                    break;
+                                }
+                                if (noise.map[fill_cell.x + (fill_cell.y * noise.width)] == 1) {
+                                    break;
+                                }
+                            }
+                        }
+                    } // End if diagonal is too long
+
+                    diagonal_cells.clear();
+                    consecutive_adjacent_step_count = 0;
+                    wall_direction = ivec2(0, 0);
+                }
+
+                // Finally, if the wall has ended, break the loop
+                if (direction == DIRECTION_COUNT) {
+                    break;
+                }
+            } // end search of single wall
+        } // end while walls are unvisited
+    }
+
     // Remove elevation artifacts
     uint32_t elevation_artifact_count;
     const int ELEVATION_NEAR_DIST = 4;
@@ -210,6 +415,8 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
             }
         }
     } while (elevation_artifact_count != 0);
+
+    map_debug_print_noise("FINAL", noise);
 
     // Bake map tiles
     std::vector<ivec2> artifacts;
@@ -378,7 +585,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                 bool is_stair_too_close_to_other_stairs = false;
                 for (ivec2 stair_cell : stair_cells) {
                     int dist = std::min(ivec2::manhattan_distance(stair_cell, stair_min), ivec2::manhattan_distance(stair_cell, stair_max));
-                    if (dist < 16) {
+                    if (dist < MAP_STAIR_SPACING) {
                         is_stair_too_close_to_other_stairs = true;
                         break;
                     }
