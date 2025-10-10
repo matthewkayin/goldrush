@@ -11,6 +11,7 @@ static const int MAP_PLAYER_SPAWN_SIZE = 13;
 static const int MAP_PLAYER_SPAWN_MARGIN = 13;
 static const int8_t NOISE_LEVEL_WATER = -1;
 static const int MAP_STAIR_SPACING = 16;
+static const int PATHING_REGION_UNASSIGNED = -1;
 
 struct PoissonDiskParams {
     std::vector<int> avoid_values;
@@ -22,6 +23,9 @@ struct PoissonDiskParams {
 SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int32_t* lcg_seed, PoissonDiskParams& params);
+
+// TODO: delete before release build
+#ifdef GOLD_DEBUG
 
 void map_debug_print_noise(const char* header, const Noise& noise) {
     log_trace("--%s--", header);
@@ -39,6 +43,8 @@ void map_debug_print_noise(const char* header, const Noise& noise) {
     }
     log_trace("--END--");
 }
+
+#endif
 
 void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.width = noise.width;
@@ -648,6 +654,73 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
             map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)].type = (CellType)(CELL_DECORATION_1 + (lcg_rand(lcg_seed) % 5));
         }
     }
+
+    // Calculate pathfinding regions
+    map.pathing_region_count = 0;
+    map.pathing_regions = std::vector(noise.width * noise.height, PATHING_REGION_UNASSIGNED);
+    // Flood fill unassigned regions
+    for (int y = 0; y < map.height; y++) {
+        for (int x = 0; x < map.width; x++) {
+            // Filter down to unblocked, unassigned cells
+            Cell map_cell = map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y));
+            if (map_is_cell_blocked(map_cell) || map_cell.type == CELL_UNREACHABLE ||
+                    map.pathing_regions[x + (y * map.width)] != PATHING_REGION_UNASSIGNED) {
+                continue;
+            }
+
+            std::vector<ivec2> frontier;
+            frontier.push_back(ivec2(x, y));
+            while (!frontier.empty()) {
+                ivec2 next = frontier.back();
+                frontier.pop_back();
+
+                map.pathing_regions[next.x + (next.y * map.width)] = map.pathing_region_count;
+
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 child = next + DIRECTION_IVEC2[direction];
+                    if (!map_is_cell_in_bounds(map, child)) {
+                        continue;
+                    }
+                    Cell child_cell = map_get_cell(map, CELL_LAYER_GROUND, child);
+                    if (map_is_cell_blocked(child_cell) || child_cell.type == CELL_UNREACHABLE ||
+                            map.pathing_regions[child.x + (child.y * map.width)] != PATHING_REGION_UNASSIGNED) {
+                        continue;
+                    }
+                    if (map_get_tile(map, child).elevation != map_get_tile(map, next).elevation) {
+                        continue;
+                    }
+
+                    frontier.push_back(child);
+                }
+            }
+            
+            map.pathing_region_count++;
+        }
+    }
+
+    // Form connections between adjacent pathing regions
+    for (int region = 0; region < map.pathing_region_count; region++) {
+        map.pathing_region_connections[region] = std::vector<ivec2>();
+    }
+    for (int y = 0; y < map.height; y++) {
+        for (int x = 0; x < map.width; x++) {
+            int pathing_region = map.pathing_regions[x + (y * map.width)]; 
+            if (pathing_region == PATHING_REGION_UNASSIGNED) {
+                continue;
+            }
+
+            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                ivec2 neighbor = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x == map.width || neighbor.y == map.height) {
+                    continue;
+                }
+                int neighbor_pathing_region = map.pathing_regions[neighbor.x + (neighbor.y * map.width)];
+                if (neighbor_pathing_region != PATHING_REGION_UNASSIGNED && neighbor_pathing_region != pathing_region) {
+                    map.pathing_region_connections[pathing_region].push_back(neighbor);
+                }
+            }
+        }
+    }
 }
 
 bool map_is_cell_blocked(Cell cell) {
@@ -1190,11 +1263,9 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
     return exit_cell;
 }
 
-void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    // Don't bother pathing to the unit's cell
+ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
     if (from == to) {
-        path->clear();
-        return;
+        return to;
     }
 
     // Find an alternate cell for large units
@@ -1237,10 +1308,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     for (int y = to.y; y < to.y + cell_size; y++) {
         for (int x = to.x; x < to.x + cell_size; x++) {
             Cell cell = map_get_cell(map, layer, ivec2(x, y));
-            if (cell.type == CELL_BLOCKED || 
-                    cell.type == CELL_UNREACHABLE || 
-                    cell.type == CELL_BUILDING ||
-                    cell.type == CELL_UNIT) {
+            if (map_is_cell_blocked(cell) || cell.type == CELL_UNREACHABLE || cell.type == CELL_UNIT) {
                 is_target_unreachable = true;
                 // Cause break on both inner and outer loops
                 x = to.x + cell_size;
@@ -1248,87 +1316,201 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             }
         }
     }
-    if (is_target_unreachable) {
-        // Reverse pathfind to find the nearest reachable cell
-        frontier.push_back((MapPathNode) {
-            .cost = fixed::from_int(0),
-            .distance = fixed::from_int(0),
-            .parent = -1,
-            .cell = to
-        });
 
-        while (!frontier.empty()) {
-            // Find the smallest path
-            uint32_t smallest_index = 0;
-            for (uint32_t i = 1; i < frontier.size(); i++) {
-                if (frontier[i].score() < frontier[smallest_index].score()) {
-                    smallest_index = i;
-                }
+    log_trace("correcting cell %vi unreachable ? %i", &to, (int)is_target_unreachable);
+    if (!is_target_unreachable) {
+        return to;
+    }
+
+    // Reverse pathfind to find the nearest reachable cell
+    frontier.push_back((MapPathNode) {
+        .cost = fixed::from_int(0),
+        .distance = fixed::from_int(0),
+        .parent = -1,
+        .cell = to
+    });
+
+    while (!frontier.empty()) {
+        // Find the smallest path
+        uint32_t smallest_index = 0;
+        for (uint32_t i = 1; i < frontier.size(); i++) {
+            if (frontier[i].score() < frontier[smallest_index].score()) {
+                smallest_index = i;
+            }
+        }
+
+        // Pop the smallest path
+        MapPathNode smallest = frontier[smallest_index];
+        frontier[smallest_index] = frontier.back();
+        frontier.pop_back();
+
+        // If it's the solution, return it
+        if (smallest.cell == from) {
+            return smallest.cell;
+        }
+        if (!map_is_cell_rect_occupied(map, layer, smallest.cell, cell_size, from, ignore)) {
+            return smallest.cell;
+        }
+
+        // Otherwise mark this cell as explored
+        explored_indices[smallest.cell.x + (smallest.cell.y * map.width)] = 1;
+
+        // Consider all children
+        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+            MapPathNode child = (MapPathNode) {
+                .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
+                .distance = fixed::from_int(ivec2::manhattan_distance(smallest.cell + DIRECTION_IVEC2[direction], from)),
+                .parent = -1,
+                .cell = smallest.cell + DIRECTION_IVEC2[direction]
+            };
+
+            // Don't consider out of bounds children
+            if (!map_is_cell_rect_in_bounds(map, child.cell, cell_size)) {
+                continue;
             }
 
-            // Pop the smallest path
-            MapPathNode smallest = frontier[smallest_index];
-            frontier[smallest_index] = frontier.back();
-            frontier.pop_back();
-
-            // If it's the solution, return it
-            if (!map_is_cell_rect_occupied(map, layer, smallest.cell, cell_size, from, ignore)) {
-                // But first, check to see if this new "to" cell even gets us any closer to our goal
-                if (ivec2::manhattan_distance(from, to) - ivec2::manhattan_distance(smallest.cell, to) < 3) {
-                    path->clear();
-                    return;
-                }
-                to = smallest.cell;
-                break; // breaks while frontier not empty
+            // Don't consider explored indices
+            if (explored_indices[child.cell.x + (child.cell.y * map.width)] != -1) {
+                continue;
             }
 
-            // Otherwise mark this cell as explored
-            explored_indices[smallest.cell.x + (smallest.cell.y * map.width)] = 1;
-
-            // Consider all children
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                MapPathNode child = (MapPathNode) {
-                    .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
-                    .distance = fixed::from_int(ivec2::manhattan_distance(smallest.cell + DIRECTION_IVEC2[direction], to)),
-                    .parent = -1,
-                    .cell = smallest.cell + DIRECTION_IVEC2[direction]
-                };
-
-                // Don't consider out of bounds children
-                if (!map_is_cell_rect_in_bounds(map, child.cell, cell_size)) {
-                    continue;
+            // Check if it's in the frontier
+            uint32_t frontier_index;
+            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                MapPathNode& frontier_node = frontier[frontier_index];
+                if (frontier_node.cell == child.cell) {
+                    break;
                 }
-
-                // Don't consider explored indices
-                if (explored_indices[child.cell.x + (child.cell.y * map.width)] != -1) {
-                    continue;
+            }
+            // If it's in the frontier...
+            if (frontier_index < frontier.size()) {
+                // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
+                if (child.score() < frontier[frontier_index].score()) {
+                    frontier[frontier_index] = child;
                 }
+                continue;
+            }
+            // If it's not in the frontier, then add it
+            frontier.push_back(child);
+        } // End for each child / direction
+    } // End while frontier not empty
 
-                // Check if it's in the frontier
-                uint32_t frontier_index;
-                for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                    MapPathNode& frontier_node = frontier[frontier_index];
-                    if (frontier_node.cell == child.cell) {
-                        break;
-                    }
+    frontier.clear();
+    memset(&explored_indices[0], -1, map.width * map.height * sizeof(int));
+
+    return to;
+}
+
+ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size) {
+    if (from == to) {
+        return to;
+    }
+
+    if (layer == CELL_LAYER_SKY) {
+        return to;
+    }
+
+    if (map.pathing_regions[from.x + (from.y * map.width)] == map.pathing_regions[to.x + (to.y * map.width)] ||
+            map.pathing_regions[to.x + (to.y * map.width)] == PATHING_REGION_UNASSIGNED) {
+        return to;
+    }
+
+    // Region-pathing
+    bool found_region_path = false;
+    MapRegionPathNode region_path_end;
+    std::vector<MapRegionPathNode> frontier;
+    std::vector<MapRegionPathNode> explored;
+    std::vector<bool> region_is_explored = std::vector(map.pathing_region_count, false);
+
+    frontier.push_back((MapRegionPathNode) {
+        .cell = from,
+        .parent = -1,
+        .cost = 0,
+        .distance = ivec2::manhattan_distance(from, to)
+    });
+
+    while (!frontier.empty()) {
+        int smallest_index = 0;
+        for (int index = 1; index < frontier.size(); index++) {
+            if (frontier[index].score() < frontier[smallest_index].score()) {
+                smallest_index = index;
+            }
+        }
+
+        MapRegionPathNode next = frontier[smallest_index];
+        frontier[smallest_index] = frontier.back();
+        frontier.pop_back();
+
+        int region = map.pathing_regions[next.cell.x + (next.cell.y * map.width)];
+        if (region_is_explored[region]) {
+            continue;
+        }
+
+        if (map.pathing_regions[next.cell.x + (next.cell.y * map.width)] == map.pathing_regions[to.x + (to.y * map.width)]) {
+            region_path_end = next;
+            found_region_path = true;
+            break;
+        }
+
+        explored.push_back(next);
+        region_is_explored[map.pathing_regions[next.cell.x + (next.cell.y * map.width)]] = true;
+
+        for (ivec2 connection_cell : map.pathing_region_connections.at(map.pathing_regions[next.cell.x + (next.cell.y * map.width)])) {
+            MapRegionPathNode child = (MapRegionPathNode) {
+                .cell = connection_cell,
+                .parent = (int)explored.size() - 1,
+                .cost = next.cost + ivec2::manhattan_distance(next.cell, connection_cell),
+                .distance = ivec2::manhattan_distance(connection_cell, to)
+            };
+            int connection_region = map.pathing_regions[connection_cell.x + (connection_cell.y * map.width)];
+
+            int frontier_index;
+            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                if (map.pathing_regions[frontier[frontier_index].cell.x + (frontier[frontier_index].cell.y * map.width)] == connection_region) {
+                    break;
                 }
-                // If it's in the frontier...
-                if (frontier_index < frontier.size()) {
-                    // ...and the child represents a shorter version of the frontier path, then replace the frontier version with the shorter child
-                    if (child.score() < frontier[frontier_index].score()) {
-                        frontier[frontier_index] = child;
-                    }
-                    continue;
+            }
+            if (frontier_index < frontier.size()) {
+                if (child.score() < frontier[frontier_index].score()) {
+                    frontier[frontier_index] = child;
                 }
-                // If it's not in the frontier, then add it
-                frontier.push_back(child);
-            } // End for each child / direction
-        } // End while frontier not empty
+                continue;
+            }
 
-        frontier.clear();
-        memset(&explored_indices[0], -1, map.width * map.height * sizeof(int));
-    } // End if target_is_unreachable
+            frontier.push_back(child);
+        } // End for each child / connected region
+    } // End while frontier not empty
 
+    GOLD_ASSERT(found_region_path);
+    MapRegionPathNode region_current = region_path_end;
+    ivec2 target = to;
+    while (region_current.parent != -1) {
+        target = region_current.cell;
+        region_current = explored[region_current.parent];
+    }
+
+    return target;
+}
+
+void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    path->clear();
+
+    // Don't bother pathing to the unit's cell
+    if (from == to) {
+        return;
+    }
+
+    ivec2 corrected_to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
+    if (corrected_to != to && ivec2::manhattan_distance(from, corrected_to) < 3 &&
+            map_get_cell(map, layer, to).type == CELL_UNIT) {
+        return;
+    }
+    to = corrected_to;
+    to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
+
+    std::vector<MapPathNode> frontier;
+    std::vector<MapPathNode> explored;
+    std::vector<int> explored_indices = std::vector<int>(map.width * map.height, -1);
     uint32_t closest_explored = 0;
     bool found_path = false;
     MapPathNode path_end;
@@ -1434,12 +1616,12 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
     // Backtrack to build the path
     MapPathNode current = found_path ? path_end : explored[closest_explored];
-    path->clear();
     path->reserve(current.cost.integer_part() + 1);
     while (current.parent != -1) {
-        path->insert(path->begin(), current.cell);
+        path->push_back(current.cell);
         current = explored[current.parent];
     }
+    std::reverse(path->begin(), path->end());
 
     if (!path->empty()) {
         // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,

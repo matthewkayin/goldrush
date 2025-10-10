@@ -5,6 +5,7 @@
 #include "render/sprite.h"
 #include "math/gmath.h"
 #include <vector>
+#include <unordered_map>
 
 const uint32_t MAP_IGNORE_NONE = 0;
 const uint32_t MAP_IGNORE_UNITS = 1;
@@ -57,14 +58,30 @@ struct MapPathNode {
     };
 };
 
+struct MapRegionPathNode {
+    ivec2 cell;
+    int parent;
+    int cost;
+    int distance;
+
+    int score() const {
+        return cost + distance;
+    }
+};
+
 struct Map {
     uint32_t width;
     uint32_t height;
     std::vector<Tile> tiles;
     std::vector<Cell> cells[CELL_LAYER_COUNT];
+
+    int pathing_region_count;
+    std::vector<int> pathing_regions;
+    std::unordered_map<int, std::vector<ivec2>> pathing_region_connections;
 };
 
 void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
+bool map_is_cell_blocked(Cell cell);
 void map_calculate_unreachable_cells(Map& map);
 
 uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);

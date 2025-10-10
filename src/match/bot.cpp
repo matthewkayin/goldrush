@@ -3612,13 +3612,26 @@ MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entit
 }
 
 void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, ivec2 from, ivec2 to, std::vector<ivec2>* path) {
+    struct BotPathNode {
+        fixed cost;
+        fixed distance;
+        // The parent is the previous node stepped in the path to reach this node
+        // It should be an index in the explored list or -1 if it is the start node
+        int parent;
+        ivec2 cell;
+
+        fixed score() const {
+            return cost + distance;
+        };
+    };
+
     static const int CELL_SIZE = 1;
 
-    std::vector<MapPathNode> frontier;
-    std::vector<MapPathNode> explored;
+    std::vector<BotPathNode> frontier;
+    std::vector<BotPathNode> explored;
     std::vector<int> explored_indices(state.map.width * state.map.height, -1);
 
-    frontier.push_back((MapPathNode) {
+    frontier.push_back((BotPathNode) {
         .cost = fixed::from_int(0),
         .distance = fixed::from_int(ivec2::manhattan_distance(from, to)),
         .parent = -1,
@@ -3627,7 +3640,7 @@ void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, i
 
     uint32_t closest_explored = 0;
     bool found_path = false;
-    MapPathNode path_end;
+    BotPathNode path_end;
 
     while (!frontier.empty()) {
         // Find the smallest path
@@ -3639,7 +3652,7 @@ void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, i
         }
 
         // Pop the smallest path
-        MapPathNode smallest = frontier[smallest_index];
+        BotPathNode smallest = frontier[smallest_index];
         frontier[smallest_index] = frontier.back();
         frontier.pop_back();
 
@@ -3668,7 +3681,7 @@ void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, i
                                                         DIRECTION_NORTHEAST, DIRECTION_SOUTHEAST, DIRECTION_SOUTHWEST, DIRECTION_NORTHWEST };
         for (int direction_index = 0; direction_index < DIRECTION_COUNT; direction_index++) {
             int direction = CHILD_DIRECTIONS[direction_index];
-            MapPathNode child = (MapPathNode) {
+            BotPathNode child = (BotPathNode) {
                 .cost = smallest.cost + (direction % 2 == 1 ? (fixed::from_int(3) / 2) : fixed::from_int(1)),
                 .distance = fixed::from_int(ivec2::manhattan_distance(smallest.cell + DIRECTION_IVEC2[direction], to)),
                 .parent = (int)explored.size() - 1,
@@ -3722,7 +3735,7 @@ void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, i
 
             uint32_t frontier_index;
             for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                MapPathNode& frontier_node = frontier[frontier_index];
+                BotPathNode& frontier_node = frontier[frontier_index];
                 if (frontier_node.cell == child.cell) {
                     break;
                 }
@@ -3741,7 +3754,7 @@ void bot_pathfind_and_avoid_landmines(const MatchState& state, const Bot& bot, i
     } // End while not frontier empty
 
     // Backtrack to build the path
-    MapPathNode current = found_path ? path_end : explored[closest_explored];
+    BotPathNode current = found_path ? path_end : explored[closest_explored];
     path->clear();
     path->reserve(current.cost.integer_part() + 1);
     while (current.parent != -1) {
