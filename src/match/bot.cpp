@@ -17,6 +17,7 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot.lcg_seed = lcg_seed;
 
     BotStrategy opener = (BotStrategy)(lcg_rand(&bot.lcg_seed) % 3);
+    opener = BOT_STRATEGY_OPENER_BUNKER;
     bot_set_strategy(state, bot, opener, BOT_UNIT_COMP_COWBOY_BANDIT);
 
     bot.scout_id = ID_NULL;
@@ -1607,7 +1608,7 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
 
             GOLD_ASSERT(mine_exit_cell.x != -1);
             std::vector<ivec2> path;
-            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &path, MAP_IGNORE_MINERS);
+            map_pathfind_complete(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &path, MAP_IGNORE_MINERS);
             hall_score += path.size();
             hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
         }
@@ -1676,7 +1677,7 @@ ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t
     if (path_start_cell.x == -1 || path_end_cell.x == -1) {
         return bot_find_building_location(state, bot.player_id, nearby_hall_cell, entity_get_data(ENTITY_BUNKER).cell_size);
     }
-    map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    map_pathfind_complete(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
 
     ivec2 search_start_cell = path_start_cell;
     int path_index = 0;
@@ -2335,7 +2336,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         if (infantry_count != 0) {
             ivec2 infantry_center = infantry_position_sum / infantry_count;
             std::vector<ivec2> path_to_infantry_center;
-            map_pathfind(state.map, CELL_LAYER_GROUND, carrier.cell, infantry_center, 2, &path_to_infantry_center, MAP_IGNORE_UNITS);
+            map_pathfind_complete(state.map, CELL_LAYER_GROUND, carrier.cell, infantry_center, 2, &path_to_infantry_center, MAP_IGNORE_UNITS);
 
             // If the path is empty for some reason (or just a small path), then don't worry about moving this carrier
             if (path_to_infantry_center.size() < BOT_SQUAD_GATHER_DISTANCE) {
@@ -2540,7 +2541,7 @@ MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, B
     // To determine the retreat_cell, first path to the nearby base
     std::vector<ivec2> path;
     ivec2 hall_cell = state.entities.get_by_id(nearest_allied_hall_id).cell;
-    map_pathfind(state.map, CELL_LAYER_GROUND, squad.target_cell, hall_cell, 1, &path, MAP_IGNORE_UNITS);
+    map_pathfind_complete(state.map, CELL_LAYER_GROUND, squad.target_cell, hall_cell, 1, &path, MAP_IGNORE_UNITS);
 
     // Then walk backwards on the path a little so that the units do not end up right up against the town hall
     int path_index = path.size() - 1;
@@ -2911,7 +2912,7 @@ ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, co
     std::vector<ivec2> path;
     ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, entity_get_data(hall.type).cell_size, 1, nearest_enemy_building.cell, MAP_IGNORE_UNITS);
     ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_building.cell, entity_get_data(nearest_enemy_building.type).cell_size, MAP_IGNORE_UNITS);
-    map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_IGNORE_UNITS);
+    map_pathfind_complete(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_IGNORE_UNITS);
 
     return path.size() < 8 ? path_start_cell : path[7];
 }
@@ -3602,7 +3603,7 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
     ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_IGNORE_UNITS);
 
     std::vector<ivec2> path_to_hall;
-    map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, target_cell, entity_size, &path_to_hall, MAP_IGNORE_UNITS);
+    map_pathfind_complete(state.map, CELL_LAYER_GROUND, entity.cell, target_cell, entity_size, &path_to_hall, MAP_IGNORE_UNITS);
 
     static const int DISTANCE_FROM_HALL = 8;
     if (path_to_hall.size() > DISTANCE_FROM_HALL) {
@@ -3641,7 +3642,7 @@ MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entit
     ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_IGNORE_UNITS);
 
     std::vector<ivec2> path_to_hall;
-    map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, target_cell, entity_size, &path_to_hall, MAP_IGNORE_UNITS);
+    map_pathfind_complete(state.map, CELL_LAYER_GROUND, entity.cell, target_cell, entity_size, &path_to_hall, MAP_IGNORE_UNITS);
 
     static const int FLEE_DISTANCE = 16;
     if (path_to_hall.size() < FLEE_DISTANCE) {
@@ -4120,6 +4121,8 @@ MatchInput bot_cancel_in_progress_buildings(const MatchState& state, const Bot& 
                 building.mode != MODE_BUILDING_IN_PROGRESS) {
             continue;
         }
+
+        profile_log("Bot has in-progress building");
 
         // Score how well-defended this building is
         int nearby_ally_score = 0;

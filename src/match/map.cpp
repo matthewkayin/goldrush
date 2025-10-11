@@ -1307,7 +1307,6 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
         }
     }
 
-    log_trace("correcting cell %vi unreachable ? %i", &to, (int)is_target_unreachable);
     if (!is_target_unreachable) {
         return to;
     }
@@ -1391,18 +1390,20 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
     return to;
 }
 
-ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size) {
+void map_pathfind_get_region_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* region_path) {
+    region_path->clear();
+
     if (from == to) {
-        return to;
+        return;
     }
 
     if (layer == CELL_LAYER_SKY) {
-        return to;
+        return;
     }
 
     if (map.pathing_regions[from.x + (from.y * map.width)] == map.pathing_regions[to.x + (to.y * map.width)] ||
             map.pathing_regions[to.x + (to.y * map.width)] == PATHING_REGION_UNASSIGNED) {
-        return to;
+        return;
     }
 
     // Region-pathing
@@ -1497,28 +1498,18 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     MapRegionPathNode region_current = region_path_end;
     ivec2 target;
     while (region_current.parent != -1) {
-        target = region_current.cell;
+        region_path->push_back(region_current.cell);
         region_current = explored[region_current.parent];
     }
-
-    return target;
 }
 
-void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
     path->clear();
 
     // Don't bother pathing to the unit's cell
     if (from == to) {
         return;
     }
-
-    ivec2 corrected_to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
-    if (corrected_to != to && ivec2::manhattan_distance(from, corrected_to) < 3 &&
-            map_get_cell(map, layer, to).type == CELL_UNIT) {
-        return;
-    }
-    to = corrected_to;
-    to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
 
     // Find an alternate cell for large units
     if (cell_size > 1 && map_is_cell_rect_occupied(map, layer, to, cell_size, from, ignore)) {
@@ -1672,5 +1663,63 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         if ((*path)[path->size() - 1] == to && map_is_cell_rect_occupied(map, layer, to, cell_size, from, ignore)) {
             path->pop_back();
         }
+    }
+}
+
+void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    path->clear();
+
+    // Don't bother pathing to the unit's cell
+    if (from == to) {
+        return;
+    }
+
+    ivec2 corrected_to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
+    if (corrected_to != to && ivec2::manhattan_distance(from, corrected_to) < 3 &&
+            map_get_cell(map, layer, to).type == CELL_UNIT) {
+        return;
+    }
+    to = corrected_to;
+
+    std::vector<ivec2> region_path;
+    map_pathfind_get_region_path(map, layer, from, to, cell_size, &region_path);
+    if (!region_path.empty()) {
+        to = region_path.back();
+    }
+
+    map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells);
+}
+
+void map_pathfind_complete(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    path->clear();
+
+    // Don't bother pathing to the unit's cell
+    if (from == to) {
+        return;
+    }
+
+    ivec2 corrected_to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
+    if (corrected_to != to && ivec2::manhattan_distance(from, corrected_to) < 3 &&
+            map_get_cell(map, layer, to).type == CELL_UNIT) {
+        return;
+    }
+    to = corrected_to;
+
+    std::vector<ivec2> region_path;
+    map_pathfind_get_region_path(map, layer, from, to, cell_size, &region_path);
+    if (region_path.empty()) {
+        region_path.push_back(to);
+    }
+
+    std::vector<ivec2> subpath;
+    for (ivec2 cell : region_path) {
+        map_pathfind_calculate_path(map, layer, from, cell, cell_size, &subpath, ignore, ignore_cells);
+        if (subpath.empty()) {
+            break;
+        }
+        for (ivec2 subpath_cell : subpath) {
+            path->push_back(subpath_cell);
+        }
+        from = subpath.back();
     }
 }
