@@ -65,7 +65,7 @@ struct MapRegionPathNode {
     int distance;
 
     int score() const {
-        return cost + distance;
+        return cost;
     }
 };
 

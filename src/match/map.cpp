@@ -259,8 +259,6 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         }
     } while (elevation_artifact_count != 0);
 
-    map_debug_print_noise("FINAL", noise);
-
     // Bake map tiles
     std::vector<ivec2> artifacts;
     do {
@@ -441,6 +439,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                 stair_cells.push_back(stair_max);
                 for (ivec2 cell = stair_min; cell != stair_max + step_direction; cell += step_direction) {
                     SpriteName stair_tile = SPRITE_TILE_NULL;
+                    Direction stair_direction = DIRECTION_COUNT;
                     if (tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE) {
                         if (cell == stair_min) {
                             stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_LEFT;
@@ -449,6 +448,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         } else {
                             stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_CENTER;
                         }
+                        stair_direction = DIRECTION_NORTH;
                     } else if (tile.sprite == SPRITE_TILE_WALL_EAST_EDGE) {
                         if (cell == stair_min) {
                             stair_tile = SPRITE_TILE_WALL_EAST_STAIR_TOP;
@@ -457,6 +457,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         } else {
                             stair_tile = SPRITE_TILE_WALL_EAST_STAIR_CENTER;
                         }
+                        stair_direction = DIRECTION_EAST;
                     } else if (tile.sprite == SPRITE_TILE_WALL_WEST_EDGE) {
                         if (cell == stair_min) {
                             stair_tile = SPRITE_TILE_WALL_WEST_STAIR_TOP;
@@ -465,6 +466,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         } else {
                             stair_tile = SPRITE_TILE_WALL_WEST_STAIR_CENTER;
                         }
+                        stair_direction = DIRECTION_WEST;
                     } else if (tile.sprite == SPRITE_TILE_WALL_SOUTH_EDGE) {
                         if (cell == stair_min) {
                             stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_LEFT;
@@ -473,6 +475,20 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         } else {
                             stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_CENTER;
                         }
+                        stair_direction = DIRECTION_SOUTH;
+                    }
+
+                    GOLD_ASSERT(stair_direction != DIRECTION_COUNT);
+                    ivec2 stair_front_cell = cell + DIRECTION_IVEC2[stair_direction];
+                    if (stair_direction == DIRECTION_SOUTH) {
+                        stair_front_cell += DIRECTION_IVEC2[stair_direction];
+                    }
+                    if (!map_is_cell_in_bounds(map, stair_front_cell)) {
+                        continue;
+                    }
+                    SpriteName stair_front_cell_tile = map.tiles[stair_front_cell.x + (stair_front_cell.y * map.width)].sprite;
+                    if (stair_front_cell_tile < SPRITE_TILE_SAND1 || stair_front_cell_tile > SPRITE_TILE_SAND3) {
+                        continue;
                     }
 
                     map.tiles[cell.x + (cell.y * map.width)].sprite = stair_tile;
@@ -622,7 +638,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         // Generate the avoid values
         for (uint32_t index = 0; index < map.width * map.height; index++) {
             if (map.cells[CELL_LAYER_GROUND][index].type == CELL_BLOCKED || map_is_tile_ramp(map, ivec2(index % map.width, index / map.width))) {
-                params.avoid_values[index] = 4;
+                params.avoid_values[index] = 6;
             }
         }
 
@@ -1268,32 +1284,6 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
         return to;
     }
 
-    // Find an alternate cell for large units
-    if (cell_size > 1 && map_is_cell_rect_occupied(map, layer, to, cell_size, from, ignore)) {
-        ivec2 nearest_alternative;
-        int nearest_alternative_distance = -1;
-        for (int x = 0; x < cell_size; x++) {
-            for (int y = 0; y < cell_size; y++) {
-                if (x == 0 && y == 0) {
-                    continue;
-                }
-
-                ivec2 alternative = to - ivec2(x, y);
-                if (map_is_cell_rect_in_bounds(map, alternative, cell_size) &&
-                    !map_is_cell_rect_occupied(map, layer, alternative, cell_size, from, ignore)) {
-                    if (nearest_alternative_distance == -1 || ivec2::manhattan_distance(from, alternative) < nearest_alternative_distance) {
-                        nearest_alternative = alternative;
-                        nearest_alternative_distance = ivec2::manhattan_distance(from, alternative);
-                    }
-                }
-            }
-        }
-
-        if (nearest_alternative_distance != -1) {
-            to = nearest_alternative;
-        }
-    }
-
     std::vector<MapPathNode> frontier;
     std::vector<MapPathNode> explored;
     std::vector<int> explored_indices = std::vector<int>(map.width * map.height, -1);
@@ -1420,7 +1410,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     MapRegionPathNode region_path_end;
     std::vector<MapRegionPathNode> frontier;
     std::vector<MapRegionPathNode> explored;
-    std::vector<bool> region_is_explored = std::vector(map.pathing_region_count, false);
+    std::vector<bool> is_explored = std::vector(map.width * map.height, false);
 
     frontier.push_back((MapRegionPathNode) {
         .cell = from,
@@ -1441,32 +1431,54 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
         frontier[smallest_index] = frontier.back();
         frontier.pop_back();
 
-        int region = map.pathing_regions[next.cell.x + (next.cell.y * map.width)];
-        if (region_is_explored[region]) {
+        if (is_explored[next.cell.x + (next.cell.y * map.width)]) {
             continue;
         }
 
-        if (map.pathing_regions[next.cell.x + (next.cell.y * map.width)] == map.pathing_regions[to.x + (to.y * map.width)]) {
+        if (next.cell == to) {
             region_path_end = next;
             found_region_path = true;
             break;
         }
 
         explored.push_back(next);
-        region_is_explored[map.pathing_regions[next.cell.x + (next.cell.y * map.width)]] = true;
+        is_explored[next.cell.x + (next.cell.y * map.width)] = true;
 
-        for (ivec2 connection_cell : map.pathing_region_connections.at(map.pathing_regions[next.cell.x + (next.cell.y * map.width)])) {
+        int next_region = map.pathing_regions[next.cell.x + (next.cell.y * map.width)];
+        if (next_region == map.pathing_regions[to.x + (to.y * map.width)]) {
+            MapRegionPathNode child = (MapRegionPathNode) {
+                .cell = to,
+                .parent = (int)explored.size() - 1,
+                .cost = next.cost + ivec2::manhattan_distance(next.cell, to),
+                .distance = 0
+            };
+
+            int frontier_index;
+            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                if (child.cell == frontier[frontier_index].cell) {
+                    break;
+                }
+            }
+            if (frontier_index < frontier.size()) {
+                if (child.score() < frontier[frontier_index].score()) {
+                    frontier[frontier_index] = child;
+                }
+                continue;
+            }
+
+            frontier.push_back(child);
+        }
+        for (ivec2 connection_cell : map.pathing_region_connections.at(next_region)) {
             MapRegionPathNode child = (MapRegionPathNode) {
                 .cell = connection_cell,
                 .parent = (int)explored.size() - 1,
                 .cost = next.cost + ivec2::manhattan_distance(next.cell, connection_cell),
                 .distance = ivec2::manhattan_distance(connection_cell, to)
             };
-            int connection_region = map.pathing_regions[connection_cell.x + (connection_cell.y * map.width)];
 
             int frontier_index;
             for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                if (map.pathing_regions[frontier[frontier_index].cell.x + (frontier[frontier_index].cell.y * map.width)] == connection_region) {
+                if (child.cell == frontier[frontier_index].cell) {
                     break;
                 }
             }
@@ -1483,7 +1495,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
 
     GOLD_ASSERT(found_region_path);
     MapRegionPathNode region_current = region_path_end;
-    ivec2 target = to;
+    ivec2 target;
     while (region_current.parent != -1) {
         target = region_current.cell;
         region_current = explored[region_current.parent];
@@ -1507,6 +1519,32 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     }
     to = corrected_to;
     to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
+
+    // Find an alternate cell for large units
+    if (cell_size > 1 && map_is_cell_rect_occupied(map, layer, to, cell_size, from, ignore)) {
+        ivec2 nearest_alternative;
+        int nearest_alternative_distance = -1;
+        for (int x = 0; x < cell_size; x++) {
+            for (int y = 0; y < cell_size; y++) {
+                if (x == 0 && y == 0) {
+                    continue;
+                }
+
+                ivec2 alternative = to - ivec2(x, y);
+                if (map_is_cell_rect_in_bounds(map, alternative, cell_size) &&
+                    !map_is_cell_rect_occupied(map, layer, alternative, cell_size, from, ignore)) {
+                    if (nearest_alternative_distance == -1 || ivec2::manhattan_distance(from, alternative) < nearest_alternative_distance) {
+                        nearest_alternative = alternative;
+                        nearest_alternative_distance = ivec2::manhattan_distance(from, alternative);
+                    }
+                }
+            }
+        }
+
+        if (nearest_alternative_distance != -1) {
+            to = nearest_alternative;
+        }
+    }
 
     std::vector<MapPathNode> frontier;
     std::vector<MapPathNode> explored;
@@ -1569,6 +1607,11 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
             // Don't consider out of bounds children
             if (!map_is_cell_rect_in_bounds(map, child.cell, cell_size)) {
+                continue;
+            }
+
+            // Don't consider different-region children, unless they are the goal
+            if (child.cell != to && map.pathing_regions[child.cell.x + (child.cell.y * map.width)] != map.pathing_regions[from.x + (from.y * map.width)]) {
                 continue;
             }
 

@@ -20,3 +20,5 @@ void profile_end(ProfileKey key);
 const char* profile_key_str(ProfileKey key);
 double profile_key_duration(ProfileKey key);
 double profile_key_percentage(ProfileKey key);
+void profile_log(const char* message, ...);
+void profile_print_log();

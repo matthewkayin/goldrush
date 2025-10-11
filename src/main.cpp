@@ -398,6 +398,9 @@ int gold_main(int argc, char** argv) {
         sound_update();
 
         profile_end(PROFILE_KEY_UPDATE);
+        if (profile_key_percentage(PROFILE_KEY_BOT) > 5.0 || profile_key_percentage(PROFILE_KEY_UPDATE) > 100.0) {
+            profile_print_log();
+        }
 
         // RENDER
         render_prepare_frame();
@@ -443,22 +446,6 @@ int gold_main(int argc, char** argv) {
                 sprintf(fps_text, "FPS: %u", fps);
                 render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
                 render_y += 10;
-
-                if ((state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) &&
-                        !match_ui_is_mouse_in_ui()) {
-                    ivec2 cell = (input_get_mouse_position() + state.match.camera_offset) / TILE_SIZE;
-                    sprintf(fps_text, "<%i,%i>", cell.x, cell.y);
-                    render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
-                    render_y += 10;
-                }
-                /*
-                for (int profile_key = 0; profile_key < PROFILE_KEY_COUNT; profile_key++) {
-                    sprintf(fps_text, "%s: %.0f%%", profile_key_str((ProfileKey)profile_key), profile_key_percentage((ProfileKey)profile_key));
-                    // sprintf(fps_text, "%s: %f", profile_key_str((ProfileKey)profile_key), profile_key_duration((ProfileKey)profile_key));
-                    render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
-                    render_y += 10;
-                }
-                */
 
                 #ifdef GOLD_DEBUG_TURBO
                     char turbo_text[32];
