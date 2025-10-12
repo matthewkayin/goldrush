@@ -805,6 +805,8 @@ AnimationName entity_get_expected_animation(const Entity& entity) {
             return ANIMATION_UNIT_DEATH;
         case MODE_UNIT_DEATH_FADE:
             return ANIMATION_UNIT_DEATH_FADE;
+        case MODE_MINE_PRIME:
+            return ANIMATION_MINE_PRIME;
         case MODE_BUILDING_FINISHED: {
             if (entity.type == ENTITY_WORKSHOP && !entity.queue.empty() && !(entity.timer == BUILDING_QUEUE_BLOCKED || entity.timer == BUILDING_QUEUE_EXIT_BLOCKED)) {
                 return ANIMATION_WORKSHOP;
