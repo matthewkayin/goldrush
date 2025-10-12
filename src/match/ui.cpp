@@ -848,7 +848,7 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Jump to latest alert
-    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && state.latest_alert_cell.x != -1) {
+    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && state.latest_alert_cell.x != -1 && !spectator_mode) {
         match_ui_center_camera_on_cell(state, state.latest_alert_cell);
     }
 
@@ -986,7 +986,8 @@ void match_ui_update(MatchUiState& state) {
             }
 
             ui_begin_row(state.ui, ivec2(0, 0), 6);
-                if (ui_sprite_button(state.ui, state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false)) {
+                if (ui_sprite_button(state.ui, state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false) ||
+                        input_is_action_just_pressed(INPUT_ACTION_SPACE)) {
                     state.replay_paused = !state.replay_paused;
                 }
 

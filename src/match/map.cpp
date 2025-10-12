@@ -2,6 +2,7 @@
 
 #include "core/logger.h"
 #include "core/asserts.h"
+#include "core/profile.h"
 #include "render/render.h"
 #include "lcg.h"
 #include <unordered_map>
@@ -716,7 +717,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
 
     // Form connections between adjacent pathing regions
     for (int region = 0; region < map.pathing_region_count; region++) {
-        map.pathing_region_connections[region] = std::vector<ivec2>();
+        map.pathing_region_connections[region] = std::vector<MapRegionConnection>();
     }
     for (int y = 0; y < map.height; y++) {
         for (int x = 0; x < map.width; x++) {
@@ -732,7 +733,22 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                 }
                 int neighbor_pathing_region = map.pathing_regions[neighbor.x + (neighbor.y * map.width)];
                 if (neighbor_pathing_region != PATHING_REGION_UNASSIGNED && neighbor_pathing_region != pathing_region) {
-                    map.pathing_region_connections[pathing_region].push_back(neighbor);
+                    // Determine connection size
+                    int size = 1;
+                    Direction other_region_cell_direction = direction == DIRECTION_EAST || direction == DIRECTION_WEST 
+                                                                        ? DIRECTION_SOUTH 
+                                                                        : DIRECTION_EAST;
+                    ivec2 other_region_cell = ivec2(x, y) + DIRECTION_IVEC2[other_region_cell_direction];
+                    ivec2 other_neighbor_cell = other_region_cell + DIRECTION_IVEC2[direction];
+                    if (map_is_cell_in_bounds(map, other_region_cell) && map_get_pathing_region(map, other_region_cell) == pathing_region &&
+                            map_is_cell_in_bounds(map, other_neighbor_cell) && map_get_pathing_region(map, other_neighbor_cell) == neighbor_pathing_region) {
+                        size = 2;
+                    }
+
+                    map.pathing_region_connections[pathing_region].push_back((MapRegionConnection){ 
+                        .cell = neighbor,
+                        .size = size
+                    });
                 }
             }
         }
@@ -1092,8 +1108,8 @@ bool map_is_cell_rect_empty(const Map& map, CellLayer layer, ivec2 cell, int siz
 bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int size, ivec2 origin, uint32_t ignore) {
     EntityId origin_id = origin.x == -1 ? ID_NULL : map_get_cell(map, layer, origin).id;
     Rect origin_rect = (Rect) { .x = origin.x, .y = origin.y, .w = size, .h = size };
-    bool ignore_units = (ignore & MAP_IGNORE_UNITS) == MAP_IGNORE_UNITS;
-    bool ignore_miners = (ignore & MAP_IGNORE_MINERS) == MAP_IGNORE_MINERS;
+    bool ignore_units = (ignore & MAP_OPTION_IGNORE_UNITS) == MAP_OPTION_IGNORE_UNITS;
+    bool ignore_miners = (ignore & MAP_OPTION_IGNORE_MINERS) == MAP_OPTION_IGNORE_MINERS;
 
     for (int y = cell.y; y < cell.y + size; y++) {
         for (int x = cell.x; x < cell.x + size; x++) {
@@ -1279,6 +1295,10 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
     return exit_cell;
 }
 
+int map_get_pathing_region(const Map& map, ivec2 cell) {
+    return map.pathing_regions[cell.x + (cell.y * map.width)];
+}
+
 ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
     if (from == to) {
         return to;
@@ -1390,20 +1410,18 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
     return to;
 }
 
-void map_pathfind_get_region_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* region_path) {
-    region_path->clear();
-
+ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size) {
     if (from == to) {
-        return;
+        return to;
     }
 
     if (layer == CELL_LAYER_SKY) {
-        return;
+        return to;
     }
 
     if (map.pathing_regions[from.x + (from.y * map.width)] == map.pathing_regions[to.x + (to.y * map.width)] ||
             map.pathing_regions[to.x + (to.y * map.width)] == PATHING_REGION_UNASSIGNED) {
-        return;
+        return to;
     }
 
     // Region-pathing
@@ -1469,12 +1487,16 @@ void map_pathfind_get_region_path(const Map& map, CellLayer layer, ivec2 from, i
 
             frontier.push_back(child);
         }
-        for (ivec2 connection_cell : map.pathing_region_connections.at(next_region)) {
+        for (const MapRegionConnection& connection : map.pathing_region_connections.at(next_region)) {
+            if (connection.size < cell_size) {
+                continue;
+            }
+
             MapRegionPathNode child = (MapRegionPathNode) {
-                .cell = connection_cell,
+                .cell = connection.cell,
                 .parent = (int)explored.size() - 1,
-                .cost = next.cost + ivec2::manhattan_distance(next.cell, connection_cell),
-                .distance = ivec2::manhattan_distance(connection_cell, to)
+                .cost = next.cost + ivec2::manhattan_distance(next.cell, connection.cell),
+                .distance = ivec2::manhattan_distance(connection.cell, to)
             };
 
             int frontier_index;
@@ -1496,16 +1518,16 @@ void map_pathfind_get_region_path(const Map& map, CellLayer layer, ivec2 from, i
 
     GOLD_ASSERT(found_region_path);
     MapRegionPathNode region_current = region_path_end;
-    ivec2 target;
+    ivec2 target = to;
     while (region_current.parent != -1) {
-        region_path->push_back(region_current.cell);
+        target = region_current.cell;
         region_current = explored[region_current.parent];
     }
+
+    return target;
 }
 
 void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    path->clear();
-
     // Don't bother pathing to the unit's cell
     if (from == to) {
         return;
@@ -1650,76 +1672,36 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
 
     // Backtrack to build the path
     MapPathNode current = found_path ? path_end : explored[closest_explored];
-    path->reserve(current.cost.integer_part() + 1);
+    path->reserve(path->size() + current.cost.integer_part() + 1);
     while (current.parent != -1) {
         path->push_back(current.cell);
         current = explored[current.parent];
     }
     std::reverse(path->begin(), path->end());
 
-    if (!path->empty()) {
-        // Previously we allowed the algorithm to consider the target_cell even if it was blocked. This was done for efficiency's sake,
-        // but if the target_cell really is blocked, we need to remove it from the path. The unit will path as close as they can.
-        if ((*path)[path->size() - 1] == to && map_is_cell_rect_occupied(map, layer, to, cell_size, from, ignore)) {
-            path->pop_back();
-        }
-    }
+    log_trace("Pathfind iterations %u", explored.size());
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    profile_begin(PROFILE_KEY_PATHFIND);
     path->clear();
 
     // Don't bother pathing to the unit's cell
     if (from == to) {
+        profile_end(PROFILE_KEY_PATHFIND);
         return;
     }
 
     ivec2 corrected_to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
     if (corrected_to != to && ivec2::manhattan_distance(from, corrected_to) < 3 &&
             map_get_cell(map, layer, to).type == CELL_UNIT) {
+        profile_end(PROFILE_KEY_PATHFIND);
         return;
     }
     to = corrected_to;
 
-    std::vector<ivec2> region_path;
-    map_pathfind_get_region_path(map, layer, from, to, cell_size, &region_path);
-    if (!region_path.empty()) {
-        to = region_path.back();
-    }
-
+    to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
     map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells);
-}
-
-void map_pathfind_complete(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    path->clear();
-
-    // Don't bother pathing to the unit's cell
-    if (from == to) {
-        return;
-    }
-
-    ivec2 corrected_to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
-    if (corrected_to != to && ivec2::manhattan_distance(from, corrected_to) < 3 &&
-            map_get_cell(map, layer, to).type == CELL_UNIT) {
-        return;
-    }
-    to = corrected_to;
-
-    std::vector<ivec2> region_path;
-    map_pathfind_get_region_path(map, layer, from, to, cell_size, &region_path);
-    if (region_path.empty()) {
-        region_path.push_back(to);
-    }
-
-    std::vector<ivec2> subpath;
-    for (ivec2 cell : region_path) {
-        map_pathfind_calculate_path(map, layer, from, cell, cell_size, &subpath, ignore, ignore_cells);
-        if (subpath.empty()) {
-            break;
-        }
-        for (ivec2 subpath_cell : subpath) {
-            path->push_back(subpath_cell);
-        }
-        from = subpath.back();
-    }
+    double duration = profile_end(PROFILE_KEY_PATHFIND);
+    log_trace("Pathfind from %vi:%i to %vi:%i - %f", &from, map_get_pathing_region(map, from), &to, map_get_pathing_region(map, from), duration);
 }

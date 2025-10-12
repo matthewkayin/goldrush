@@ -54,7 +54,6 @@ MatchInput _bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match
     while (squad_index < bot.squads.size()) {
         MatchInput input = bot_squad_update(state, bot, bot.squads[squad_index]);
         if (bot.squads[squad_index].entities.empty()) {
-            profile_log("Squad pop back");
             bot.squads[squad_index] = bot.squads[bot.squads.size() - 1];
             bot.squads.pop_back();
         } else {
@@ -62,7 +61,6 @@ MatchInput _bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match
         }
 
         if (input.type != MATCH_INPUT_NONE) {
-            profile_log("Return squad input");
             return input;
         }
     }
@@ -73,46 +71,47 @@ MatchInput _bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match
     profile_begin(PROFILE_KEY_BOT_SCOUT);
     MatchInput scout_input = bot_scout(state, bot, match_time_minutes);
     if (scout_input.type != MATCH_INPUT_NONE) {
-        profile_log("return scout input");
         return scout_input;
     }
     profile_end(PROFILE_KEY_BOT_SCOUT);
 
     // Misc
 
-    profile_begin(PROFILE_KEY_BOT_MISC);
+    profile_begin(PROFILE_KEY_BOT_BUILD_CANCEL);
     MatchInput build_cancel_input = bot_cancel_in_progress_buildings(state, bot);
     if (build_cancel_input.type != MATCH_INPUT_NONE) {
-        profile_log("returning cancel in-progress buildings input");
         return build_cancel_input;
     }
+    profile_end(PROFILE_KEY_BOT_BUILD_CANCEL);
 
+    profile_begin(PROFILE_KEY_BOT_REPAIR);
     MatchInput repair_input = bot_repair_burning_buildings(state, bot);
     if (repair_input.type != MATCH_INPUT_NONE) {
-        profile_log("returning repair input");
         return repair_input;
     }
+    profile_end(PROFILE_KEY_BOT_REPAIR);
 
+    profile_begin(PROFILE_KEY_BOT_REIN);
     MatchInput rein_in_input = bot_rein_in_stray_units(state, bot);
     if (rein_in_input.type != MATCH_INPUT_NONE) {
-        profile_log("returning rein in input");
         return rein_in_input;
     }
+    profile_end(PROFILE_KEY_BOT_REIN);
 
+    profile_begin(PROFILE_KEY_BOT_RALLY);
     MatchInput rally_input = bot_set_rally_points(state, bot);
     if (rally_input.type != MATCH_INPUT_NONE) {
-        profile_log("returning rally input");
         return rally_input;
     }
+    profile_end(PROFILE_KEY_BOT_RALLY);
 
+    profile_begin(PROFILE_KEY_BOT_UNLOAD);
     MatchInput unload_input = bot_unload_unreserved_carriers(state, bot);
     if (unload_input.type != MATCH_INPUT_NONE) {
-        profile_log("returning unload idle carriers input");
         return unload_input;
     }
-    profile_end(PROFILE_KEY_BOT_MISC);
+    profile_end(PROFILE_KEY_BOT_UNLOAD);
 
-    profile_log("returning no input");
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
@@ -311,7 +310,6 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
         bot_unreserved_unit_count += unreserved_entity_count[entity_type];
     }
 
-    profile_log("bot_strategy_update %u", bot.strategy);
     switch (bot.strategy) {
         case BOT_STRATEGY_OPENER_BANDIT_RUSH: {
             profile_begin(PROFILE_KEY_BOT_BANDIT_RUSH);
@@ -644,8 +642,6 @@ bool bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
 }
 
 void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint32_t options) {
-    profile_log("Invoked bot_defend_location.");
-
     // Determine the strength of the attacking force
     uint32_t enemy_score = 0;
     for (const Entity& enemy : state.entities) {
@@ -867,17 +863,14 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
 MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_base_under_attack) {
     MatchInput saturate_bases_input = bot_saturate_bases(state, bot);
     if (saturate_bases_input.type != MATCH_INPUT_NONE) {
-        profile_log("Return saturate bases input");
         return saturate_bases_input;
     }
 
     if (bot_should_build_house(state, bot) && !is_base_under_attack) {
-        profile_log("Return build house input");
         return bot_build_building(state, bot, ENTITY_HOUSE);
     }
 
     if (bot.strategy == BOT_STRATEGY_EXPAND) {
-        profile_log("Production: Bot strategy expand.");
         EntityId in_progress_id = bot_find_entity((BotFindEntityParams) {
             .state = state,
             .filter = [&bot](const Entity& entity, EntityId entity_id) {
@@ -941,7 +934,6 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
     if (desired_upgrade != 0) {
         EntityType building_type = bot_get_building_which_researches(desired_upgrade);
         if (available_building_count[building_type] != 0) {
-            profile_log("Return research upgrade");
             return bot_research_upgrade(state, bot, desired_upgrade);
         }
     }
@@ -986,7 +978,6 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
                     continue;
                 }
 
-                profile_log("Return train unit");
                 return bot_train_unit(state, bot, (EntityType)unit_type);
             }
 
@@ -1015,13 +1006,11 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
     if (!is_base_under_attack) {
         for (uint32_t building_type = ENTITY_HALL; building_type < ENTITY_TYPE_COUNT; building_type++) {
             if (desired_entities[building_type] > entity_count[building_type]) {
-                profile_log("Return build building");
                 return bot_build_building(state, bot, (EntityType)building_type);
             }
         }
     }
 
-    profile_log("Return no production input");
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
@@ -1604,11 +1593,11 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
             }
 
             ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell + ivec2(1, 1), 1, hall_cell, entity_get_data(ENTITY_HALL).cell_size, true);
-            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell, entity_get_data(ENTITY_GOLDMINE).cell_size, 1, rally_cell, MAP_IGNORE_MINERS);
+            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell, entity_get_data(ENTITY_GOLDMINE).cell_size, 1, rally_cell, MAP_OPTION_IGNORE_MINERS);
 
             GOLD_ASSERT(mine_exit_cell.x != -1);
             std::vector<ivec2> path;
-            map_pathfind_complete(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &path, MAP_IGNORE_MINERS);
+            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &path, MAP_OPTION_IGNORE_MINERS);
             hall_score += path.size();
             hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
         }
@@ -1672,19 +1661,22 @@ ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t
 
     const Entity& nearest_enemy_building = state.entities.get_by_id(nearest_enemy_building_id);
     std::vector<ivec2> path;
-    ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, nearby_hall_cell, entity_get_data(ENTITY_HALL).cell_size, 1, nearest_enemy_building.cell, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
-    ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_building.cell, entity_get_data(nearest_enemy_building.type).cell_size, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, nearby_hall_cell, entity_get_data(ENTITY_HALL).cell_size, 1, nearest_enemy_building.cell, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
+    ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_building.cell, entity_get_data(nearest_enemy_building.type).cell_size, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
     if (path_start_cell.x == -1 || path_end_cell.x == -1) {
         return bot_find_building_location(state, bot.player_id, nearby_hall_cell, entity_get_data(ENTITY_BUNKER).cell_size);
     }
-    map_pathfind_complete(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_IGNORE_UNITS | MAP_IGNORE_MINERS);
+    map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
+
+    if (path.empty()) {
+        return bot_find_building_location(state, bot.player_id, nearby_hall_cell, entity_get_data(ENTITY_BUNKER).cell_size);
+    }
 
     ivec2 search_start_cell = path_start_cell;
     int path_index = 0;
     while (path_index < path.size() &&
             (ivec2::manhattan_distance(path[path_index], path_start_cell) < 17 &&
-            map_get_tile(state.map, path[path_index]).elevation == 
-            map_get_tile(state.map, path_start_cell).elevation)) {
+            map_get_pathing_region(state.map, path[path_index]) == map_get_pathing_region(state.map, path_start_cell))) {
         path_index++;
     }
     if (path_index > 1 && path_index < path.size() && path_index < path.size()) {
@@ -1855,7 +1847,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
     // Retreat
     if (squad.type == BOT_SQUAD_TYPE_ATTACK && bot_squad_should_retreat(state, bot, squad)) {
-        profile_log("Squad retreat");
         return bot_squad_return_to_nearest_base(state, bot, squad);
     }
 
@@ -1880,8 +1871,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             if (bunker.type != ENTITY_BUNKER || bunker.garrisoned_units.empty()) {
                 continue;
             }
-
-            profile_log("defend squad bunker check");
 
             // Check if an enemy is attacking nearby
             EntityId nearby_building_under_attack_id = bot_find_entity((BotFindEntityParams) {
@@ -1925,7 +1914,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 }
 
                 // Unload all units in bunker
-                profile_log("Return defend squad leave bunker input");
                 MatchInput unload_input;
                 unload_input.type = MATCH_INPUT_UNLOAD;
                 unload_input.unload.carrier_count = 1;
@@ -1989,7 +1977,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 bot_release_entity(bot, unit_id);
                 return bot_return_entity_to_nearest_hall(state, bot, unit_id);
             }
-            profile_log("considering molotov throw");
             ivec2 molotov_cell = bot_find_best_molotov_cell(state, bot, unit, nearby_enemy.cell);
             if (molotov_cell.x == -1) {
                 continue;
@@ -1998,7 +1985,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 continue;
             }
 
-            profile_log("returning molotov throw");
             MatchInput input;
             input.type = MATCH_INPUT_MOVE_MOLOTOV;
             input.move.shift_command = 0;
@@ -2018,7 +2004,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 return bot_return_entity_to_nearest_hall(state, bot, unit_id);
             }
 
-            profile_log("returning camo input");
             MatchInput input;
             input.type = MATCH_INPUT_CAMO;
             input.camo.unit_count = 1;
@@ -2071,12 +2056,10 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
                 }
             }
 
-            profile_log("returning miner attack input");
             return input;
         }
     } // End for each infantry
     // End attack micro
-    profile_log("finished attack micro, unengaged unit count %u", unengaged_units.size());
 
     // If attacking pyros, make sure they have enough energy first
     if (squad.type == BOT_SQUAD_TYPE_ATTACK) {
@@ -2236,7 +2219,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             }
         }
     } // End for each unit of unengaged units
-    profile_log("finished unengaged units. distant infantry %u distant cavalry %u", distant_infantry.size(), distant_cavalry.size());
 
     // Garrison micro
     if (!distant_infantry.empty()) {
@@ -2298,12 +2280,10 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             } // End for each infantry in infantry_id
 
             if (input.move.entity_count != 0) {
-                profile_log("returning garrison input");
                 return input;
             }
         }
     }
-    profile_log("finished garrison micro");
 
     // Carrier micro
     for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) { 
@@ -2336,7 +2316,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         if (infantry_count != 0) {
             ivec2 infantry_center = infantry_position_sum / infantry_count;
             std::vector<ivec2> path_to_infantry_center;
-            map_pathfind_complete(state.map, CELL_LAYER_GROUND, carrier.cell, infantry_center, 2, &path_to_infantry_center, MAP_IGNORE_UNITS);
+            map_pathfind(state.map, CELL_LAYER_GROUND, carrier.cell, infantry_center, 2, &path_to_infantry_center, MAP_OPTION_IGNORE_UNITS);
 
             // If the path is empty for some reason (or just a small path), then don't worry about moving this carrier
             if (path_to_infantry_center.size() < BOT_SQUAD_GATHER_DISTANCE) {
@@ -2401,7 +2381,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             continue;
         }
         if (should_unload_garrisoned_units) {
-            profile_log("returning carrier unload on location input");
             MatchInput unload_input;
             unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
             unload_input.move.shift_command = 0;
@@ -2420,7 +2399,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
 
         // If we're not on the way, then unload garrisoned units at target cell
-        profile_log("returning carrier unload input");
         MatchInput unload_input;
         unload_input.type = MATCH_INPUT_MOVE_UNLOAD;
         unload_input.move.shift_command = 0;
@@ -2430,7 +2408,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         unload_input.move.entity_count = 1;
         return unload_input;
     }
-    profile_log("finished carrier micro");
 
     // Combine the distant infantry / cavalry lists into one
     for (EntityId entity_id : distant_cavalry) {
@@ -2461,13 +2438,11 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
 
         if (input.move.entity_count != 0) {
-            profile_log("returning squad attack move input");
             return input;
         }
     }
 
     if ((squad.type == BOT_SQUAD_TYPE_ATTACK || squad.type == BOT_SQUAD_TYPE_RESERVES) && !is_enemy_near_squad) {
-        profile_log("squad finished");
         if (squad.type == BOT_SQUAD_TYPE_RESERVES) {
             bot_squad_dissolve(bot, squad);
             return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -2475,7 +2450,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         return bot_squad_return_to_nearest_base(state, bot, squad);
     }
 
-    profile_log("squad returns no input");
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
@@ -2538,17 +2512,15 @@ MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, B
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    // To determine the retreat_cell, first path to the nearby base
+    // To determine the retreat_cell, path from the nearby base
     std::vector<ivec2> path;
     ivec2 hall_cell = state.entities.get_by_id(nearest_allied_hall_id).cell;
-    map_pathfind_complete(state.map, CELL_LAYER_GROUND, squad.target_cell, hall_cell, 1, &path, MAP_IGNORE_UNITS);
+    map_pathfind(state.map, CELL_LAYER_GROUND, hall_cell, squad.target_cell, 1, &path, MAP_OPTION_IGNORE_UNITS);
 
-    // Then walk backwards on the path a little so that the units do not end up right up against the town hall
-    int path_index = path.size() - 1;
-    while (path_index >= 0 && ivec2::manhattan_distance(path[path_index], hall_cell) < BOT_SQUAD_GATHER_DISTANCE) {
-        path_index--;
-    }
-    ivec2 retreat_cell = path_index < 0 ? hall_cell : path[path_index];
+    ivec2 retreat_cell = hall_cell;
+    if (!path.empty()) {
+        retreat_cell = path[std::min((int)path.size() - 1, BOT_SQUAD_GATHER_DISTANCE)];
+    } 
 
     // Build out the input
     MatchInput retreat_input;
@@ -2910,11 +2882,14 @@ ivec2 bot_squad_choose_defense_point(const MatchState& state, const Bot& bot, co
     const Entity& nearest_enemy_building = state.entities.get_by_id(nearest_enemy_building_id);
 
     std::vector<ivec2> path;
-    ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, entity_get_data(hall.type).cell_size, 1, nearest_enemy_building.cell, MAP_IGNORE_UNITS);
-    ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_building.cell, entity_get_data(nearest_enemy_building.type).cell_size, MAP_IGNORE_UNITS);
-    map_pathfind_complete(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_IGNORE_UNITS);
+    ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, entity_get_data(hall.type).cell_size, 1, nearest_enemy_building.cell, MAP_OPTION_IGNORE_UNITS);
+    ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_building.cell, entity_get_data(nearest_enemy_building.type).cell_size, MAP_OPTION_IGNORE_UNITS);
+    map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_IGNORE_UNITS);
 
-    return path.size() < 8 ? path_start_cell : path[7];
+    if (path.empty()) {
+        return path_start_cell;
+    }
+    return path[std::min((int)path.size() - 1, 7)];
 }
 
 bool bot_squad_is_engaged(const MatchState& state, const Bot& bot, const BotSquad& squad) {
@@ -3058,10 +3033,8 @@ void bot_scout_update(const MatchState& state, Bot& bot, uint32_t match_time_min
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
     // If we have no scout, it means we're not scouting
     if (bot.scout_id == ID_NULL) {
-        profile_log("scout id is null");
         // Determine if we should begin scouting
         if (!bot_should_scout(state, bot, match_time_minutes)) {
-            profile_log("we should not scout yet");
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
 
@@ -3095,7 +3068,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
             bot.entities_to_scout.push_back(entity_id);
         }
         if (bot.entities_to_scout.empty()) {
-            profile_log("entities to scout is empty");
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
 
@@ -3117,7 +3089,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
                 return false;
             }
         });
-        profile_log("found us a scout %u", bot.scout_id);
         if (bot.scout_id == ID_NULL) {
             return (MatchInput) { .type = MATCH_INPUT_NONE };
         }
@@ -3145,7 +3116,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
 
     // Finish scout
     if (bot.entities_to_scout.empty()) {
-        profile_log("scouting finished");
         MatchInput input = bot_return_entity_to_nearest_hall(state, bot, bot.scout_id);
         bot_release_scout(bot);
         bot.last_scout_time = match_time_minutes;
@@ -3154,7 +3124,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
 
     // If we are taking damage, flee 
     if (scout.taking_damage_timer != 0) {
-        profile_log("scout taking damage");
         EntityId attacker_id = bot_find_best_entity((BotFindBestEntityParams) {
             .state = state,
             .filter = [&bot](const Entity& entity, EntityId entity_id) {
@@ -3250,7 +3219,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
 
     // If there is danger, abandon scouting this target
     if (is_danger_along_path) {
-        profile_log("scout sees danger along path");
         uint32_t entities_to_scout_index = 0;
         while (entities_to_scout_index < bot.entities_to_scout.size() &&
                     bot.entities_to_scout[entities_to_scout_index] != scout.target.id) {
@@ -3290,7 +3258,6 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    profile_log("scout return move input");
     MatchInput input;
     input.type = MATCH_INPUT_MOVE_ENTITY;
     input.move.shift_command = 0;
@@ -3582,7 +3549,6 @@ int bot_score_entity_list(const MatchState& state, const std::vector<EntityId>& 
 }
 
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id) {
-    profile_log("Invoked return to nearest hall");
     const Entity& entity = state.entities.get_by_id(entity_id);
 
     EntityId nearest_hall_id = bot_find_best_entity((BotFindBestEntityParams) {
@@ -3600,14 +3566,14 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
     }
 
     int entity_size = entity_get_data(entity.type).cell_size;
-    ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_IGNORE_UNITS);
+    ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_OPTION_IGNORE_UNITS);
 
-    std::vector<ivec2> path_to_hall;
-    map_pathfind_complete(state.map, CELL_LAYER_GROUND, entity.cell, target_cell, entity_size, &path_to_hall, MAP_IGNORE_UNITS);
+    std::vector<ivec2> path_from_hall;
+    map_pathfind(state.map, CELL_LAYER_GROUND, target_cell, entity.cell, entity_size, &path_from_hall, MAP_OPTION_IGNORE_UNITS);
 
     static const int DISTANCE_FROM_HALL = 8;
-    if (path_to_hall.size() > DISTANCE_FROM_HALL) {
-        target_cell = path_to_hall[path_to_hall.size() - DISTANCE_FROM_HALL];
+    if (!path_from_hall.empty()) {
+        target_cell = path_from_hall[std::min((int)path_from_hall.size() - 1, DISTANCE_FROM_HALL)];
     }
 
     MatchInput input;
@@ -3621,7 +3587,6 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
 }
 
 MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id) {
-    profile_log("Invoked unit flee");
     const Entity& entity = state.entities.get_by_id(entity_id);
 
     EntityId nearest_hall_id = bot_find_best_entity((BotFindBestEntityParams) {
@@ -3639,20 +3604,25 @@ MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entit
     }
 
     int entity_size = entity_get_data(entity.type).cell_size;
-    ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_IGNORE_UNITS);
-
-    std::vector<ivec2> path_to_hall;
-    map_pathfind_complete(state.map, CELL_LAYER_GROUND, entity.cell, target_cell, entity_size, &path_to_hall, MAP_IGNORE_UNITS);
+    ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_OPTION_IGNORE_UNITS);
 
     static const int FLEE_DISTANCE = 16;
-    if (path_to_hall.size() < FLEE_DISTANCE) {
+    if (ivec2::manhattan_distance(entity.cell, target_cell) < FLEE_DISTANCE &&
+            map_get_pathing_region(state.map, entity.cell) == map_get_pathing_region(state.map, target_cell)) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    std::vector<ivec2> path_from_hall;
+    map_pathfind(state.map, CELL_LAYER_GROUND, target_cell, entity.cell, entity_size, &path_from_hall, MAP_OPTION_IGNORE_UNITS);
+
+    if (path_from_hall.empty()) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
     MatchInput input;
     input.type = MATCH_INPUT_MOVE_CELL;
     input.move.shift_command = 0;
-    input.move.target_cell = path_to_hall[FLEE_DISTANCE];
+    input.move.target_cell = path_from_hall[std::min((int)path_from_hall.size() - 1, FLEE_DISTANCE)];
     input.move.target_id = ID_NULL;
     input.move.entity_ids[0] = entity_id;
     input.move.entity_count = 1;
@@ -4121,8 +4091,6 @@ MatchInput bot_cancel_in_progress_buildings(const MatchState& state, const Bot& 
                 building.mode != MODE_BUILDING_IN_PROGRESS) {
             continue;
         }
-
-        profile_log("Bot has in-progress building");
 
         // Score how well-defended this building is
         int nearby_ally_score = 0;

@@ -7,9 +7,8 @@
 #include <vector>
 #include <unordered_map>
 
-const uint32_t MAP_IGNORE_NONE = 0;
-const uint32_t MAP_IGNORE_UNITS = 1;
-const uint32_t MAP_IGNORE_MINERS = 2;
+const uint32_t MAP_OPTION_IGNORE_UNITS = 1;
+const uint32_t MAP_OPTION_IGNORE_MINERS = 2;
 
 struct Tile {
     SpriteName sprite;
@@ -69,6 +68,11 @@ struct MapRegionPathNode {
     }
 };
 
+struct MapRegionConnection {
+    ivec2 cell;
+    int size;
+};
+
 struct Map {
     uint32_t width;
     uint32_t height;
@@ -77,7 +81,7 @@ struct Map {
 
     int pathing_region_count;
     std::vector<int> pathing_regions;
-    std::unordered_map<int, std::vector<ivec2>> pathing_region_connections;
+    std::unordered_map<int, std::vector<MapRegionConnection>> pathing_region_connections;
 };
 
 void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
@@ -106,5 +110,5 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 st
 
 ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, uint32_t ignore);
 
+int map_get_pathing_region(const Map& map, ivec2 cell);
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells = NULL);
-void map_pathfind_complete(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells = NULL);
