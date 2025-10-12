@@ -4,9 +4,12 @@
 #include "core/logger.h"
 #include "core/asserts.h"
 #include <enet/enet.h>
-#include <steam/steam_api.h>
 #include <queue>
 #include <vector>
+
+#ifdef GOLD_STEAM
+    #include <steam/steam_api.h>
+#endif
 
 struct NetworkState {
     NetworkBackend backend;
@@ -14,9 +17,11 @@ struct NetworkState {
 
     NetworkHost* host;
     ENetSocket lan_scanner;
+#ifdef GOLD_STEAM
     CSteamID steam_lobby_id;
     CSteamID steam_invite_lobby_id;
     uint8_t steam_lobby_player_count;
+#endif
 
     NetworkPlayer players[MAX_PLAYERS];
     uint8_t player_id;
@@ -39,19 +44,28 @@ void network_set_players_not_ready();
 void network_handle_message(uint16_t peer_id, uint8_t* data, size_t length);
 
 bool network_init() {
+#ifdef GOLD_STEAM
     SteamNetworkingUtils()->InitRelayNetworkAccess();
     SteamAPI_ManualDispatch_Init();
+#endif
 
     if (enet_initialize() != 0) {
         log_error("Error initializing enet.");
         return false;
     }
 
+#ifdef GOLD_STEAM
     strncpy(state.username, SteamFriends()->GetPersonaName(), NETWORK_PLAYER_NAME_BUFFER_SIZE);
+#else
+    // TODO:
+    sprintf(state.username, "Username");
+#endif
 
     state.host = NULL;
     state.lan_scanner = ENET_SOCKET_NULL;
+#ifdef GOLD_STEAM
     state.steam_invite_lobby_id.Clear();
+#endif
 
     return true;
 }
@@ -75,6 +89,10 @@ void network_set_backend(NetworkBackend backend) {
 
 NetworkBackend network_get_backend() {
     return state.backend;
+}
+
+const char* network_get_username() {
+    return state.username;
 }
 
 NetworkStatus network_get_status() {
@@ -147,6 +165,7 @@ void network_service() {
         } // End while socket select
     } // End if lan scanner is not null
 
+#ifdef GOLD_STEAM
     if (state.backend == NETWORK_BACKEND_STEAM && state.status == NETWORK_STATUS_HOST && state.steam_lobby_player_count != network_get_player_count()) {
         network_steam_update_lobby_player_count();
     }
@@ -256,6 +275,7 @@ void network_service() {
 
         SteamAPI_ManualDispatch_FreeLastCallback(steam_pipe);
     } // End while steam getnextcallback
+#endif
 
     if (state.host != NULL) {
         network_host_service(state.host);
@@ -340,9 +360,13 @@ bool network_poll_events(NetworkEvent* event) {
 void network_disconnect() {
     if (state.backend == NETWORK_BACKEND_LAN && state.lan_scanner != ENET_SOCKET_NULL) {
         network_lan_scanner_destroy();
-    } else if (state.backend == NETWORK_BACKEND_STEAM && state.status == NETWORK_STATUS_HOST) {
+    } 
+#ifdef GOLD_STEAM
+    if (state.backend == NETWORK_BACKEND_STEAM && state.status == NETWORK_STATUS_HOST) {
         SteamMatchmaking()->LeaveLobby(state.steam_lobby_id);
-    } else if (state.status == NETWORK_STATUS_OFFLINE) {
+    } 
+#endif
+    if (state.status == NETWORK_STATUS_OFFLINE) {
         log_warn("network_disconnect() called while offline."); 
     }
 
@@ -360,7 +384,9 @@ void network_disconnect() {
         if (state.status == NETWORK_STATUS_HOST || 
                 state.status == NETWORK_STATUS_CONNECTING || 
                 state.status == NETWORK_STATUS_DISCONNECTING || 
+#ifdef GOLD_STEAM
                 state.backend == NETWORK_BACKEND_STEAM || 
+#endif
                 connected_peers == 0) {
             network_host_destroy(state.host);
             state.host = NULL;
@@ -396,9 +422,12 @@ void network_search_lobbies(const char* query) {
         if (enet_socket_send(state.lan_scanner, &scan_address, &send_buffer, 1) != 1) {
             log_error("Failed to scan for LAN servers.");
         }
-    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+    } 
+#ifdef GOLD_STEAM
+    if (state.backend == NETWORK_BACKEND_STEAM) {
         SteamMatchmaking()->RequestLobbyList();
     }
+#endif
 }
 
 size_t network_get_lobby_count() {
@@ -435,10 +464,13 @@ void network_open_lobby(const char* lobby_name, NetworkLobbyPrivacy privacy) {
             .type = NETWORK_EVENT_LOBBY_CONNECTED
         });
         state.status = NETWORK_STATUS_HOST;
-    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+    } 
+#ifdef GOLD_STEAM
+    if (state.backend == NETWORK_BACKEND_STEAM) {
         SteamMatchmaking()->CreateLobby(privacy == NETWORK_LOBBY_PRIVACY_PUBLIC ? k_ELobbyTypePublic : k_ELobbyTypeFriendsOnly, 2);
         state.status = NETWORK_STATUS_CONNECTING;
     }
+#endif
 
     strncpy(state.lobby_name, lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE);
 
@@ -479,12 +511,14 @@ void network_join_lobby(NetworkConnectionInfo connection_info) {
     state.status = NETWORK_STATUS_CONNECTING;
 }
 
+#ifdef GOLD_STEAM
 void network_steam_accept_invite(CSteamID lobby_id) {
     log_trace("Called network_steam_accept_invite with lobby_id %u", lobby_id.ConvertToUint64());
     state.steam_invite_lobby_id = lobby_id;
     bool success = SteamMatchmaking()->RequestLobbyData(state.steam_invite_lobby_id);
     log_trace("RequestLobbyData was a success? %i", (int)success);
 }
+#endif
 
 const char* network_get_lobby_name() {
     return state.lobby_name;
@@ -619,9 +653,12 @@ void network_remove_bot(uint8_t player_id) {
 void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
     if (state.backend == NETWORK_BACKEND_LAN) {
         network_lan_scanner_destroy();
-    } else if (state.backend == NETWORK_BACKEND_STEAM) {
+    } 
+#ifdef GOLD_STEAM
+    if (state.backend == NETWORK_BACKEND_STEAM) {
         SteamMatchmaking()->LeaveLobby(state.steam_lobby_id);
     }
+#endif
 
     // Set all players to NOT_READY so that they can re-ready themselves once they enter the match
     network_set_players_not_ready();
@@ -691,11 +728,13 @@ void network_lan_scanner_destroy() {
     }
 }
 
+#ifdef GOLD_STEAM
 void network_steam_update_lobby_player_count() {
     state.steam_lobby_player_count = network_get_player_count();
     char buffer[2] = { (char)state.steam_lobby_player_count, '\0' };
     SteamMatchmaking()->SetLobbyData(state.steam_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT, buffer);
 }
+#endif
 
 void network_set_players_not_ready() {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {

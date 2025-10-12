@@ -1,6 +1,7 @@
 #include "host.h"
 
 #include "core/logger.h"
+#include "core/asserts.h"
 
 NetworkHost* network_host_create(NetworkBackend backend) {
     NetworkHost* host = (NetworkHost*)malloc(sizeof(NetworkHost));
@@ -25,11 +26,14 @@ NetworkHost* network_host_create(NetworkBackend backend) {
             free(host);
             return NULL;
         }
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         host->steam.listen_socket = SteamNetworkingSockets()->CreateListenSocketP2P(0, 0, NULL);
         host->steam.poll_group = SteamNetworkingSockets()->CreatePollGroup();
         host->steam.peer_count = 0;
     }
+#endif
     log_trace("Created host with backend %u", backend);
 
     return host;
@@ -40,10 +44,13 @@ void network_host_destroy(NetworkHost* host) {
     delete host->events;
     if (host->backend == NETWORK_BACKEND_LAN) {
         enet_host_destroy(host->lan.host);
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         SteamNetworkingSockets()->DestroyPollGroup(host->steam.poll_group);
         SteamNetworkingSockets()->CloseListenSocket(host->steam.listen_socket);
     }
+#endif
     free(host);
 }
 
@@ -60,7 +67,9 @@ bool network_host_connect(NetworkHost* host, NetworkConnectionInfo connection_in
             log_error("Failed to connect to LAN host.");
             return false;
         }
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         log_trace("Connecting to host with steam identity %s", connection_info.steam.identity_str);
         SteamNetworkingIdentity identity;
         identity.ParseString(connection_info.steam.identity_str);
@@ -70,6 +79,7 @@ bool network_host_connect(NetworkHost* host, NetworkConnectionInfo connection_in
         host->steam.peer_count++;
         log_trace("Host has new peer with connection %u. Peer count %u", host->steam.peers[host->steam.peer_count], host->steam.peer_count);
     }
+#endif
 
     return true;
 }
@@ -81,21 +91,34 @@ NetworkConnectionInfo network_host_get_connection_info(NetworkHost* host) {
         connection_info.lan.port = host->lan.host->address.port;
         
         return connection_info;
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         NetworkConnectionInfo connection_info;
         SteamNetworkingIdentity identity;
         SteamNetworkingSockets()->GetIdentity(&identity);
         identity.ToString(connection_info.steam.identity_str, sizeof(connection_info.steam.identity_str));
         return connection_info;
     }
+#endif
+
+    GOLD_ASSERT(false);
+    NetworkConnectionInfo info;
+    return info;
 }
 
 uint16_t network_host_get_peer_count(NetworkHost* host) {
     if (host->backend == NETWORK_BACKEND_LAN) {
         return host->lan.host->peerCount;
-    } else {
+    }
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         return host->steam.peer_count;
     }
+#endif
+
+    GOLD_ASSERT(false);
+    return 0;
 }
 
 uint8_t network_host_get_peer_player_id(NetworkHost* host, uint16_t peer_id) {
@@ -105,13 +128,19 @@ uint8_t network_host_get_peer_player_id(NetworkHost* host, uint16_t peer_id) {
             return PLAYER_NONE;
         }
         return *player_id_ptr;
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         int64_t player_id = SteamNetworkingSockets()->GetConnectionUserData(host->steam.peers[peer_id]);
         if (player_id == -1) {
             return PLAYER_NONE;
         }
         return (uint8_t)player_id;
     }
+#endif
+
+    GOLD_ASSERT(false);
+    return 0;
 }
 
 void network_host_set_peer_player_id(NetworkHost* host, uint16_t peer_id, uint8_t player_id) {
@@ -119,21 +148,30 @@ void network_host_set_peer_player_id(NetworkHost* host, uint16_t peer_id, uint8_
         uint8_t* player_id_ptr = (uint8_t*)malloc(sizeof(uint8_t));
         *player_id_ptr = player_id;
         host->lan.host->peers[peer_id].data = player_id_ptr;
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         SteamNetworkingSockets()->SetConnectionUserData(host->steam.peers[peer_id], player_id);
     }
+#endif
 }
 
 bool network_host_is_peer_connected(NetworkHost* host, uint16_t peer_id) {
     if (host->backend == NETWORK_BACKEND_LAN) {
         return host->lan.host->peers[peer_id].state == ENET_PEER_STATE_CONNECTED;
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         SteamNetConnectionInfo_t connection_info;
         if (!SteamNetworkingSockets()->GetConnectionInfo(host->steam.peers[peer_id], &connection_info)) {
             return false;
         }
         return connection_info.m_eState == k_ESteamNetworkingConnectionState_Connected;
     }
+#endif
+
+    GOLD_ASSERT(false);
+    return false;
 }
 
 void network_host_disconnect_peer(NetworkHost* host, uint16_t peer_id, bool gently) {
@@ -143,12 +181,15 @@ void network_host_disconnect_peer(NetworkHost* host, uint16_t peer_id, bool gent
         } else {
             enet_peer_reset(&host->lan.host->peers[peer_id]);
         }
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         SteamNetworkingSockets()->CloseConnection(host->steam.peers[peer_id], 0, "", false);
         host->steam.peers[peer_id] = host->steam.peers[host->steam.peer_count - 1];
         host->steam.peer_count--;
         log_trace("Disconnected peer. peer count %u", host->steam.peer_count);
     }
+#endif
 }
 
 size_t network_host_buffer_peer_connection_info(NetworkHost* host, uint16_t peer_id, void* buffer) {
@@ -159,7 +200,9 @@ size_t network_host_buffer_peer_connection_info(NetworkHost* host, uint16_t peer
         connection_info.port = host->lan.host->peers[peer_id].address.port;
         memcpy(buffer, &connection_info, sizeof(connection_info));
         return sizeof(connection_info);
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         SteamNetConnectionInfo_t connection_info;
         if (!SteamNetworkingSockets()->GetConnectionInfo(host->steam.peers[peer_id], &connection_info)) {
             return 0;
@@ -168,6 +211,10 @@ size_t network_host_buffer_peer_connection_info(NetworkHost* host, uint16_t peer
         memcpy(buffer, &steam_id, sizeof(steam_id));
         return sizeof(steam_id);
     }
+#endif
+
+    GOLD_ASSERT(false);
+    return 0;
 }
 
 NetworkConnectionInfo network_parse_connection_info(NetworkBackend backend, void* buffer) {
@@ -175,41 +222,57 @@ NetworkConnectionInfo network_parse_connection_info(NetworkBackend backend, void
         NetworkConnectionInfo connection_info;
         memcpy(&connection_info.lan, buffer, sizeof(connection_info));
         return connection_info;
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (backend == NETWORK_BACKEND_STEAM) {
         NetworkConnectionInfo connection_info;
         strncpy(connection_info.steam.identity_str, (char*)buffer, sizeof(connection_info.steam.identity_str));
         return connection_info;
     }
+#endif
+
+    GOLD_ASSERT(false);
+    NetworkConnectionInfo info;
+    return info;
 }
 
 void network_host_send(NetworkHost* host, uint16_t peer_id, void* data, size_t length) {
     if (host->backend == NETWORK_BACKEND_LAN) {
         ENetPacket* packet = enet_packet_create(data, length, ENET_PACKET_FLAG_RELIABLE);
         enet_peer_send(&host->lan.host->peers[peer_id], 0, packet);
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         SteamNetworkingSockets()->SendMessageToConnection(host->steam.peers[peer_id], data, length, k_nSteamNetworkingSend_Reliable, NULL);
     }
+#endif
 }
 
 void network_host_broadcast(NetworkHost* host, void* data, size_t length) {
     if (host->backend == NETWORK_BACKEND_LAN) {
         ENetPacket* packet = enet_packet_create(data, length, ENET_PACKET_FLAG_RELIABLE);
         enet_host_broadcast(host->lan.host, 0, packet);
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         for (uint16_t peer_id = 0; peer_id < host->steam.peer_count; peer_id++) {
             SteamNetworkingSockets()->SendMessageToConnection(host->steam.peers[peer_id], data, length, k_nSteamNetworkingSend_Reliable, NULL);
         }
     }
+#endif
 }
 
 void network_host_flush(NetworkHost* host) {
     if (host->backend == NETWORK_BACKEND_LAN) {
         enet_host_flush(host->lan.host);
-    } else {
+    } 
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         for (uint16_t peer_id = 0; peer_id < host->steam.peer_count; peer_id++) {
             SteamNetworkingSockets()->FlushMessagesOnConnection(host->steam.peers[peer_id]);
         }
     }
+#endif 
 }
 
 void network_host_service(NetworkHost* host) {
@@ -255,7 +318,9 @@ void network_host_service(NetworkHost* host) {
                     break;
             }
         }
-    } else {
+    }
+#ifdef GOLD_STEAM
+    if (host->backend == NETWORK_BACKEND_STEAM) {
         SteamNetworkingMessage_t* messages[32];
         int message_count = SteamNetworkingSockets()->ReceiveMessagesOnPollGroup(host->steam.poll_group, messages, 32);
         for (int message_index = 0; message_index < message_count; message_index++) {
@@ -286,8 +351,10 @@ void network_host_service(NetworkHost* host) {
             });
         }
     }
+#endif
 }
 
+#ifdef GOLD_STEAM
 void network_host_steam_on_connection_status_changed(NetworkHost* host, SteamNetConnectionStatusChangedCallback_t* callback) {
     log_trace("Steam on_connection_status_changed connection %u status %u -> %u", callback->m_hConn, callback->m_eOldState, callback->m_info.m_eState);
 
@@ -370,6 +437,7 @@ void network_host_steam_on_connection_status_changed(NetworkHost* host, SteamNet
         }
     }
 }
+#endif
 
 bool network_host_poll_events(NetworkHost* host, NetworkHostEvent* event) {
     if (host->events->empty()) {
@@ -387,7 +455,10 @@ bool network_host_poll_events(NetworkHost* host, NetworkHostEvent* event) {
 void network_host_packet_destroy(NetworkHostPacket packet) {
     if (packet.backend == NETWORK_BACKEND_LAN) {
         enet_packet_destroy(packet.enet_packet);
-    } else if (packet.backend == NETWORK_BACKEND_STEAM) {
+    }
+#ifdef GOLD_STEAM
+    if (packet.backend == NETWORK_BACKEND_STEAM) {
         packet.steam_message->Release();
     }
+#endif
 }

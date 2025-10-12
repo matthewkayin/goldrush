@@ -3,7 +3,10 @@
 #include "match/noise.h"
 #include "menu/match_setting.h"
 #include <cstdint>
-#include <steam/steam_api.h>
+
+#ifdef GOLD_STEAM
+    #include <steam/steam_api.h>
+#endif
 
 #define NETWORK_INPUT_BUFFER_SIZE 1024
 #define NETWORK_LOBBY_NAME_BUFFER_SIZE 40
@@ -14,13 +17,17 @@
 #define NETWORK_SCANNER_PORT 6529
 #define NETWORK_BASE_PORT 6530
 
-#define NETWORK_STEAM_LOBBY_PROPERTY_NAME "name"
-#define NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY "host_identity"
-#define NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT "player_count"
+#ifdef GOLD_STEAM
+    #define NETWORK_STEAM_LOBBY_PROPERTY_NAME "name"
+    #define NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY "host_identity"
+    #define NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT "player_count"
+#endif
 
 enum NetworkBackend {
     NETWORK_BACKEND_LAN,
+#ifdef GOLD_STEAM
     NETWORK_BACKEND_STEAM
+#endif
 };
 
 enum NetworkStatus {
@@ -36,13 +43,17 @@ struct NetworkConnectionInfoLan {
     uint16_t port;
 };
 
+#ifdef GOLD_STEAM
 struct NetworkConnectionInfoSteam {
     char identity_str[SteamNetworkingIdentity::k_cchMaxString];
 };
+#endif
 
 union NetworkConnectionInfo {
     NetworkConnectionInfoLan lan;
+#ifdef GOLD_STEAM
     NetworkConnectionInfoSteam steam;
+#endif
 };
 
 struct NetworkLobby {
@@ -90,7 +101,9 @@ enum NetworkEventType {
     NETWORK_EVENT_CHAT,
     NETWORK_EVENT_MATCH_LOAD,
     NETWORK_EVENT_INPUT,
+#ifdef GOLD_STEAM
     NETWORK_EVENT_STEAM_INVITE
+#endif
 };
 
 struct NetworkEventPlayerDisconnected {

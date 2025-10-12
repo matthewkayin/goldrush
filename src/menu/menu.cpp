@@ -10,7 +10,6 @@
 #include "render/render.h"
 #include "menu/ui.h"
 #include "../util.h"
-#include <steam/steam_api.h>
 
 static const int WAGON_X_DEFAULT = 380;
 static const int WAGON_X_LOBBY = 480;
@@ -104,7 +103,7 @@ MenuState menu_init() {
     state.connection_timeout = 0;
     state.lobbylist_page = 0;
     state.lobbylist_item_selected = MENU_ITEM_NONE;
-    state.lobby_name = std::string(SteamFriends()->GetPersonaName()) + "'s Game";
+    state.lobby_name = std::string(network_get_username()) + "'s Game";
     state.lobby_privacy = NETWORK_LOBBY_PRIVACY_PUBLIC;
 
     state.mode = MENU_MODE_MAIN;
@@ -148,9 +147,11 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             } else {
                 menu_set_mode(state, MENU_MODE_LOBBY);
             }
+        #ifdef GOLD_STEAM
             if (network_is_host() && network_get_backend() == NETWORK_BACKEND_STEAM) {
                 menu_add_chat_message(state, "You have created a lobby. You can invite your friends using the Steam overlay (SHIFT+TAB).");
             }
+        #endif
             break;
         }
         case NETWORK_EVENT_CHAT: {
@@ -178,6 +179,7 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             network_send_chat(message);
             return;
         }
+        #ifdef GOLD_STEAM
         case NETWORK_EVENT_STEAM_INVITE: {
             log_info("Menu received steam invite invite");
             if (state.mode == MENU_MODE_LOBBY) {
@@ -192,6 +194,7 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event) {
             menu_set_mode(state, MENU_MODE_CONNECTING);
             return;
         }
+        #endif
         default:
             return;
     }
@@ -238,7 +241,11 @@ void menu_update(MenuState& state) {
                 menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
             }
             if (ui_button(state.ui, "Multiplayer")) {
-                menu_set_mode(state, MENU_MODE_MULTIPLAYER);
+                #ifdef GOLD_STEAM
+                    menu_set_mode(state, MENU_MODE_MULTIPLAYER);
+                #else
+                    menu_set_mode_local_network_lobbylist(state);
+                #endif
             }
             if (ui_button(state.ui, "Replays")) {
                 menu_set_mode(state, MENU_MODE_REPLAYS);
@@ -270,6 +277,7 @@ void menu_update(MenuState& state) {
                 menu_set_mode(state, MENU_MODE_MAIN);
             }
         ui_end_container(state.ui);
+#ifdef GOLD_STEAM
     } else if (state.mode == MENU_MODE_MULTIPLAYER) {
         ui_begin_column(state.ui, ivec2(BUTTON_X, BUTTON_Y), 4);
             if (ui_button(state.ui, "Online")) {
@@ -282,18 +290,13 @@ void menu_update(MenuState& state) {
                 }
             }
             if (ui_button(state.ui, "Local Network")) {
-                if (network_get_status() != NETWORK_STATUS_OFFLINE) {
-                    menu_show_status(state, "Error setting up connection. Please try again.");
-                    network_disconnect();
-                } else {
-                    network_set_backend(NETWORK_BACKEND_LAN);
-                    menu_set_mode(state, MENU_MODE_LOBBYLIST);
-                }
+                menu_set_mode_local_network_lobbylist(state);
             }
             if (ui_button(state.ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_MAIN);
             }
         ui_end_container(state.ui);
+#endif
     } else if (state.mode == MENU_MODE_CREATE_LOBBY) {
         ui_frame_rect(state.ui, LOBBY_CREATE_RECT);
         ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Create Lobby");
@@ -303,6 +306,7 @@ void menu_update(MenuState& state) {
 
         ui_begin_column(state.ui, ivec2(LOBBY_CREATE_RECT.x + 8, LOBBY_CREATE_RECT.y + 26), 6);
             ui_text_input(state.ui, "Name: ", ivec2(284, 24), &state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        #ifdef GOLD_STEAM
             if (network_get_backend() == NETWORK_BACKEND_STEAM) {
                 const SpriteInfo& dropdown_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
 
@@ -314,6 +318,7 @@ void menu_update(MenuState& state) {
                     ui_dropdown(state.ui, UI_DROPDOWN, &state.lobby_privacy, LOBBY_TYPE_STRS, false);
                 ui_end_container(state.ui);
             }
+        #endif
         ui_end_container(state.ui);
 
         ui_element_position(state.ui, ui_button_position_frame_bottom_left(LOBBY_CREATE_RECT));
@@ -372,7 +377,11 @@ void menu_update(MenuState& state) {
         // Lobbylist button row
         ui_begin_row(state.ui, ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
             if (ui_button(state.ui, "Back")) {
-                menu_set_mode(state, MENU_MODE_MULTIPLAYER);
+                #ifdef GOLD_STEAM
+                    menu_set_mode(state, MENU_MODE_MULTIPLAYER);
+                #else
+                    menu_set_mode(state, MENU_MODE_MAIN);
+                #endif
             }
             if (ui_button(state.ui, "Host")) {
                 menu_set_mode(state, MENU_MODE_CREATE_LOBBY);
@@ -682,6 +691,16 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
     } 
 }
 
+void menu_set_mode_local_network_lobbylist(MenuState& state) {
+    if (network_get_status() != NETWORK_STATUS_OFFLINE) {
+        menu_show_status(state, "Error setting up connection. Please try again.");
+        network_disconnect();
+    } else {
+        network_set_backend(NETWORK_BACKEND_LAN);
+        menu_set_mode(state, MENU_MODE_LOBBYLIST);
+    }
+}
+
 void menu_show_status(MenuState& state, const char* message) {
     strcpy(state.status_text, message);
     state.status_timer = STATUS_DURATION;
@@ -829,8 +848,10 @@ void menu_render(const MenuState& state) {
 
     // Render title
     if (state.mode == MENU_MODE_MAIN || 
-            state.mode == MENU_MODE_SINGLEPLAYER || 
-            state.mode == MENU_MODE_MULTIPLAYER) {
+        #ifdef GOLD_STEAM
+            state.mode == MENU_MODE_MULTIPLAYER || 
+        #endif
+            state.mode == MENU_MODE_SINGLEPLAYER) {
         render_sprite_frame(SPRITE_UI_TITLE, ivec2(0, 0), ivec2(24, 24), RENDER_SPRITE_NO_CULL, 0);
     }
 

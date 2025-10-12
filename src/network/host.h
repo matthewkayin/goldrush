@@ -2,8 +2,11 @@
 
 #include "types.h"
 #include <enet/enet.h>
-#include <steam/steam_api.h>
 #include <queue>
+
+#ifdef GOLD_STEAM
+    #include <steam/steam_api.h>
+#endif
 
 enum NetworkHostEventType {
     NETWORK_HOST_EVENT_CONNECTED,
@@ -17,7 +20,9 @@ struct NetworkHostPacket {
     size_t length;
     union {
         ENetPacket* enet_packet;
-        SteamNetworkingMessage_t* steam_message;
+        #ifdef GOLD_STEAM
+            SteamNetworkingMessage_t* steam_message;
+        #endif
     };
 };
 
@@ -47,19 +52,23 @@ struct NetworkLanHost {
     ENetHost* host;
 };
 
+#ifdef GOLD_STEAM
 struct NetworkSteamHost {
     HSteamListenSocket listen_socket;
     HSteamNetPollGroup poll_group;
     HSteamNetConnection peers[MAX_PLAYERS - 1];
     uint16_t peer_count;
 };
+#endif
 
 struct NetworkHost {
     NetworkBackend backend;
     std::queue<NetworkHostEvent>* events;
     union {
         NetworkLanHost lan;
+    #ifdef GOLD_STEAM
         NetworkSteamHost steam;
+    #endif
     };
 };
 
@@ -78,7 +87,9 @@ void network_host_send(NetworkHost* host, uint16_t peer_id, void* data, size_t l
 void network_host_broadcast(NetworkHost* host, void* data, size_t length);
 void network_host_flush(NetworkHost* host);
 void network_host_service(NetworkHost* host);
+#ifdef GOLD_STEAM
 void network_host_steam_on_connection_status_changed(NetworkHost* host, SteamNetConnectionStatusChangedCallback_t* callback);
+#endif
 bool network_host_poll_events(NetworkHost* host, NetworkHostEvent* event);
 
 void network_host_packet_destroy(NetworkHostPacket packet);

@@ -22,7 +22,10 @@
 #include <cstring>
 #include <ctime>
 #include <cstdlib>
-#include <steam/steam_api.h>
+
+#ifdef GOLD_STEAM
+    #include <steam/steam_api.h>
+#endif
 
 int gold_main(int argc, char** argv);
 
@@ -107,10 +110,12 @@ static GameState state;
 static int game_load_next_mode(void* ptr) {
     if (state.load_params.mode == GAME_MODE_MENU) {
         state.menu = menu_init();
-        if (state.load_params.menu.steam_invite_id != 0) {
-            network_set_backend(NETWORK_BACKEND_STEAM);
-            network_steam_accept_invite(state.load_params.menu.steam_invite_id);
-        }
+        #ifdef GOLD_STEAM
+            if (state.load_params.menu.steam_invite_id != 0) {
+                network_set_backend(NETWORK_BACKEND_STEAM);
+                network_steam_accept_invite(state.load_params.menu.steam_invite_id);
+            }
+        #endif
     } else if (state.load_params.mode == GAME_MODE_MATCH) {
         state.match = match_ui_init(state.load_params.match.lcg_seed, state.load_params.match.noise);
         free(state.load_params.match.noise.map);
@@ -133,9 +138,11 @@ void game_set_mode(LoadParams params) {
 }
 
 int gold_main(int argc, char** argv) {
-    if (SteamAPI_RestartAppIfNecessary(GOLD_STEAM_APP_ID)) {
-        return 1;
-    }
+    #ifdef GOLD_STEAM
+        if (SteamAPI_RestartAppIfNecessary(GOLD_STEAM_APP_ID)) {
+            return 1;
+        }
+    #endif
 
     char logfile_path[128];
     char* logfile_ptr = logfile_path;
@@ -185,6 +192,7 @@ int gold_main(int argc, char** argv) {
         log_info("Detected platform OSX.");
     #endif
 
+#ifdef GOLD_STEAM
     if (!SteamAPI_Init()) {
         log_error("Error initializing Steam API.");
         return -1;
@@ -193,6 +201,7 @@ int gold_main(int argc, char** argv) {
     if (steam_invite_id != 0) {
         log_trace("Got connect_lobby from sys args, steam_invite_id:%u", steam_invite_id);
     }
+#endif
 
     uint32_t window_flags = SDL_WINDOW_OPENGL;
     ivec2 window_size = ivec2(1280, 720);
@@ -490,7 +499,9 @@ int gold_main(int argc, char** argv) {
 
     SDL_DestroyWindow(window);
 
+#ifdef GOLD_STEAM
     SteamAPI_Shutdown();
+#endif
 
     TTF_Quit();
     SDL_Quit();

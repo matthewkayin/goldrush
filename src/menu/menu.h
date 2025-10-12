@@ -17,7 +17,9 @@
 enum MenuMode {
     MENU_MODE_MAIN,
     MENU_MODE_SINGLEPLAYER,
+#ifdef GOLD_STEAM
     MENU_MODE_MULTIPLAYER,
+#endif
     MENU_MODE_CREATE_LOBBY,
     MENU_MODE_LOBBYLIST,
     MENU_MODE_CONNECTING,
@@ -66,6 +68,7 @@ void menu_handle_network_event(MenuState& state, NetworkEvent event);
 void menu_update(MenuState& state);
 
 void menu_set_mode(MenuState& state, MenuMode mode);
+void menu_set_mode_local_network_lobbylist(MenuState& state);
 void menu_show_status(MenuState& state, const char* message);
 void menu_add_chat_message(MenuState& state, const char* message);
 size_t menu_get_lobbylist_page_count(size_t count);
