@@ -1678,8 +1678,6 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
         current = explored[current.parent];
     }
     std::reverse(path->begin(), path->end());
-
-    log_trace("Pathfind iterations %u", explored.size());
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
@@ -1702,6 +1700,5 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
     to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
     map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells);
-    double duration = profile_end(PROFILE_KEY_PATHFIND);
-    log_trace("Pathfind from %vi:%i to %vi:%i - %f", &from, map_get_pathing_region(map, from), &to, map_get_pathing_region(map, from), duration);
+    profile_end(PROFILE_KEY_PATHFIND);
 }

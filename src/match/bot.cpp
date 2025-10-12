@@ -3224,10 +3224,11 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
                     bot.entities_to_scout[entities_to_scout_index] != scout.target.id) {
             entities_to_scout_index++;
         }
-        GOLD_ASSERT(entities_to_scout_index < bot.entities_to_scout.size());
 
-        bot.entities_to_scout[entities_to_scout_index] = bot.entities_to_scout.back();
-        bot.entities_to_scout.pop_back();
+        if (entities_to_scout_index < bot.entities_to_scout.size()) {
+            bot.entities_to_scout[entities_to_scout_index] = bot.entities_to_scout.back();
+            bot.entities_to_scout.pop_back();
+        }
 
         // If we are moving towards our now-abandoned target, order the scout to stop
         // It will get a new order on the next iteration
