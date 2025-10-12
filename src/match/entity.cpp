@@ -35,7 +35,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 50,
         .train_duration = 20,
         .max_health = 25,
-        .sight = 7,
+        .sight = 9,
         .armor = 0,
         .attack_priority = 1,
 
@@ -68,7 +68,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 100,
         .train_duration = 25,
         .max_health = 30,
-        .sight = 7,
+        .sight = 9,
         .armor = 0,
         .attack_priority = 2,
 
@@ -134,7 +134,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 200,
         .train_duration = 38,
         .max_health = 120,
-        .sight = 9,
+        .sight = 11,
         .armor = 1,
         .attack_priority = 1,
 
@@ -167,7 +167,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 150,
         .train_duration = 30,
         .max_health = 80,
-        .sight = 9,
+        .sight = 11,
         .armor = 0,
         .attack_priority = 2,
 
@@ -233,7 +233,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 225,
         .train_duration = 30,
         .max_health = 40,
-        .sight = 7,
+        .sight = 11,
         .armor = 0,
         .attack_priority = 2,
 
@@ -266,7 +266,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 175,
         .train_duration = 30,
         .max_health = 40,
-        .sight = 7,
+        .sight = 9,
         .armor = 0,
         .attack_priority = 2,
 
@@ -299,7 +299,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 250,
         .train_duration = 45,
         .max_health = 100,
-        .sight = 7,
+        .sight = 9,
         .armor = 0,
         .attack_priority = 2,
 
@@ -332,7 +332,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 225,
         .train_duration = 30,
         .max_health = 25,
-        .sight = 7,
+        .sight = 11,
         .armor = 0,
         .attack_priority = 2,
 
@@ -365,7 +365,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 200,
         .train_duration = 30,
         .max_health = 120,
-        .sight = 11,
+        .sight = 15,
         .armor = 0,
         .attack_priority = 1,
 
@@ -398,7 +398,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 400,
         .train_duration = 0,
         .max_health = 840,
-        .sight = 9,
+        .sight = 11,
         .armor = 1,
         .attack_priority = 0,
 
@@ -424,7 +424,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 100,
         .train_duration = 0,
         .max_health = 300,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 0,
 
@@ -450,7 +450,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 150,
         .train_duration = 0,
         .max_health = 600,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 0,
 
@@ -476,7 +476,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 100,
         .train_duration = 0,
         .max_health = 200,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 0,
 
@@ -502,7 +502,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 300,
         .train_duration = 0,
         .max_health = 600,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 0,
 
@@ -528,7 +528,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 200,
         .train_duration = 0,
         .max_health = 500,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 0,
 
@@ -554,7 +554,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 250,
         .train_duration = 0,
         .max_health = 560,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 0,
 
@@ -580,7 +580,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 300,
         .train_duration = 0,
         .max_health = 600,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 0,
 
@@ -606,7 +606,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .gold_cost = 250,
         .train_duration = 0,
         .max_health = 560,
-        .sight = 7,
+        .sight = 9,
         .armor = 1,
         .attack_priority = 0,
 

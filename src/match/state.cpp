@@ -2176,7 +2176,7 @@ bool match_has_entity_reached_target(const MatchState& state, const Entity& enti
     }
 }
 
-ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity) {
+ivec2 match_get_entity_target_cell_helper(const MatchState& state, const Entity& entity) {
     switch (entity.target.type) {
         case TARGET_NONE:
             return entity.cell;
@@ -2200,8 +2200,9 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
         case TARGET_CELL:
         case TARGET_ATTACK_CELL:
         case TARGET_UNLOAD:
-        case TARGET_MOLOTOV:
+        case TARGET_MOLOTOV: {
             return entity.target.cell;
+        }
         case TARGET_ENTITY:
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {
@@ -2230,6 +2231,14 @@ ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity
             return map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_cell_size, target.cell, target_cell_size, match_is_entity_mining(state, entity) ? MAP_OPTION_IGNORE_MINERS : 0, ignore_cell);
         }
     }
+}
+
+ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity) {
+    ivec2 target_cell = match_get_entity_target_cell_helper(state, entity);
+    if (entity.type == ENTITY_BALLOON && target_cell.x != -1 && target_cell.y < 2) {
+        target_cell.y = 2;
+    }
+    return target_cell;
 }
 
 bool match_is_entity_mining(const MatchState& state, const Entity& entity) {

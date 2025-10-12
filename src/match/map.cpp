@@ -1411,14 +1411,6 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
 }
 
 ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size) {
-    if (from == to) {
-        return to;
-    }
-
-    if (layer == CELL_LAYER_SKY) {
-        return to;
-    }
-
     if (map.pathing_regions[from.x + (from.y * map.width)] == map.pathing_regions[to.x + (to.y * map.width)] ||
             map.pathing_regions[to.x + (to.y * map.width)] == PATHING_REGION_UNASSIGNED) {
         return to;
@@ -1624,7 +1616,9 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
             }
 
             // Don't consider different-region children, unless they are the goal
-            if (child.cell != to && map.pathing_regions[child.cell.x + (child.cell.y * map.width)] != map.pathing_regions[from.x + (from.y * map.width)]) {
+            if (layer == CELL_LAYER_GROUND && child.cell != to && 
+                    map.pathing_regions[child.cell.x + (child.cell.y * map.width)] != 
+                    map.pathing_regions[from.x + (from.y * map.width)]) {
                 continue;
             }
 
@@ -1698,7 +1692,9 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     }
     to = corrected_to;
 
-    to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
+    if (layer == CELL_LAYER_GROUND) {
+        to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
+    }
     map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells);
     profile_end(PROFILE_KEY_PATHFIND);
 }
