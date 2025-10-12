@@ -8,6 +8,10 @@ void network_quit();
 void network_set_backend(NetworkBackend backend);
 NetworkBackend network_get_backend();
 const char* network_get_username();
+#ifndef GOLD_STEAM
+void network_set_username(const char* value);
+bool network_is_username_set();
+#endif
 NetworkStatus network_get_status();
 bool network_is_host();
 const NetworkPlayer& network_get_player(uint8_t player_id);

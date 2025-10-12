@@ -57,8 +57,7 @@ bool network_init() {
 #ifdef GOLD_STEAM
     strncpy(state.username, SteamFriends()->GetPersonaName(), NETWORK_PLAYER_NAME_BUFFER_SIZE);
 #else
-    // TODO:
-    sprintf(state.username, "Username");
+    state.username[0] = '\0';
 #endif
 
     state.host = NULL;
@@ -94,6 +93,18 @@ NetworkBackend network_get_backend() {
 const char* network_get_username() {
     return state.username;
 }
+
+#ifndef GOLD_STEAM
+
+void network_set_username(const char* value) {
+    strncpy(state.username, value, NETWORK_PLAYER_NAME_BUFFER_SIZE - 1);
+}
+
+bool network_is_username_set() {
+    return state.username[0] != '\0';
+}
+
+#endif
 
 NetworkStatus network_get_status() {
     return state.status;

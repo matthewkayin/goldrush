@@ -6,6 +6,7 @@
 
 #include "logger.h"
 #include <SDL3/SDL.h>
+#include <cstdio>
 
 struct ProfileState {
     uint64_t key_start_time[PROFILE_KEY_COUNT];

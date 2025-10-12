@@ -19,6 +19,8 @@ enum MenuMode {
     MENU_MODE_SINGLEPLAYER,
 #ifdef GOLD_STEAM
     MENU_MODE_MULTIPLAYER,
+#else
+    MENU_MODE_USERNAME,
 #endif
     MENU_MODE_CREATE_LOBBY,
     MENU_MODE_LOBBYLIST,
@@ -45,6 +47,9 @@ struct MenuState {
     int parallax_timer;
     int parallax_cactus_offset;
 
+#ifndef GOLD_STEAM
+    std::string username;
+#endif
     std::string lobby_name;
     std::string lobby_search_query;
     std::string chat_message;

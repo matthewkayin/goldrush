@@ -50,11 +50,19 @@ static const Rect MATCH_SETTINGS_RECT = (Rect) {
     .h = PLAYERLIST_RECT.h
 };
 static const Rect LOBBY_CREATE_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (364 / 2),
+    .x = (SCREEN_WIDTH / 2) - (300 / 2),
     .y = 64,
     .w = 300,
     .h = 128
 };
+#ifndef GOLD_STEAM
+static const Rect USERNAME_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (300 / 2),
+    .y = 84,
+    .w = 300,
+    .h = 96
+};
+#endif
 
 static const int PLAYERLIST_COLUMN_X = PLAYERLIST_RECT.x + 16;
 static const int PLAYERLIST_COLUMN_Y = PLAYERLIST_RECT.y + 22;
@@ -103,10 +111,14 @@ MenuState menu_init() {
     state.connection_timeout = 0;
     state.lobbylist_page = 0;
     state.lobbylist_item_selected = MENU_ITEM_NONE;
-    state.lobby_name = std::string(network_get_username()) + "'s Game";
     state.lobby_privacy = NETWORK_LOBBY_PRIVACY_PUBLIC;
 
     state.mode = MENU_MODE_MAIN;
+#ifndef GOLD_STEAM
+    if (!network_is_username_set()) {
+        state.mode = MENU_MODE_USERNAME;
+    }
+#endif
     state.options_menu.mode = OPTIONS_MENU_CLOSED;
     state.ui = ui_init();
     menu_set_mode(state, state.mode);
@@ -234,8 +246,17 @@ void menu_update(MenuState& state) {
 
     ui_begin(state.ui);
     state.ui.input_enabled = state.mode != MENU_MODE_OPTIONS && state.mode != MENU_MODE_REPLAY_RENAME; 
+#ifndef GOLD_STEAM
+    if (state.mode == MENU_MODE_USERNAME) {
+        state.ui.input_enabled = false;
+    }
+#endif
 
-    if (state.mode == MENU_MODE_MAIN || state.mode == MENU_MODE_OPTIONS) {
+    if (state.mode == MENU_MODE_MAIN || 
+#ifndef GOLD_STEAM
+        state.mode == MENU_MODE_USERNAME ||
+#endif
+        state.mode == MENU_MODE_OPTIONS) {
         ui_begin_column(state.ui, ivec2(BUTTON_X, BUTTON_Y), 4);
             if (ui_button(state.ui, "Single Player")) {
                 menu_set_mode(state, MENU_MODE_SINGLEPLAYER);
@@ -258,6 +279,13 @@ void menu_update(MenuState& state) {
                 menu_set_mode(state, MENU_MODE_EXIT);
             }
         ui_end_container(state.ui);
+#ifndef GOLD_STEAM
+        const SpriteInfo& profile_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PROFILE);
+        ui_element_position(state.ui, ivec2(SCREEN_WIDTH - profile_button_sprite_info.frame_width - 1, 1));
+        if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_PROFILE, false, false)) {
+            menu_set_mode(state, MENU_MODE_USERNAME);
+        }
+#endif
     } else if (state.mode == MENU_MODE_SINGLEPLAYER) {
         ui_begin_column(state.ui, ivec2(BUTTON_X, BUTTON_Y), 4);
             if (ui_button(state.ui, "Campaign")) {
@@ -305,7 +333,7 @@ void menu_update(MenuState& state) {
         ui_text(state.ui, FONT_HACK_GOLD, "Create Lobby");
 
         ui_begin_column(state.ui, ivec2(LOBBY_CREATE_RECT.x + 8, LOBBY_CREATE_RECT.y + 26), 6);
-            ui_text_input(state.ui, "Name: ", ivec2(284, 24), &state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        ui_text_input(state.ui, "Name: ", ivec2(284, 24), &state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
         #ifdef GOLD_STEAM
             if (network_get_backend() == NETWORK_BACKEND_STEAM) {
                 const SpriteInfo& dropdown_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
@@ -635,6 +663,40 @@ void menu_update(MenuState& state) {
         }
     }
 
+#ifndef GOLD_STEAM
+    if (state.mode == MENU_MODE_USERNAME) {
+        ui_screen_shade(state.ui);
+        state.ui.input_enabled = true;
+
+        ui_frame_rect(state.ui, USERNAME_RECT);
+        ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Choose Your Username");
+
+        ui_element_position(state.ui, ivec2(USERNAME_RECT.x + (USERNAME_RECT.w / 2) - (header_text_size.x / 2), USERNAME_RECT.y + 6));
+        ui_text(state.ui, FONT_HACK_GOLD, "Choose Your Username");
+
+        ui_begin_column(state.ui, ivec2(USERNAME_RECT.x + 8, USERNAME_RECT.y + 26), 6);
+        ui_text_input(state.ui, "Username: ", ivec2(284, 24), &state.username, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+
+        ui_end_container(state.ui);
+
+        if (network_is_username_set()) {
+            ui_element_position(state.ui, ui_button_position_frame_bottom_left(USERNAME_RECT));
+            if (ui_button(state.ui, "Back")) {
+                menu_set_mode(state, MENU_MODE_MAIN);
+            }
+        }
+        ui_element_position(state.ui, ui_button_position_frame_bottom_right(USERNAME_RECT, "Save"));
+        if (ui_button(state.ui, "Save")) {
+            if (state.username.length() == 0) {
+                menu_show_status(state, "Please enter a username.");
+            } else {
+                network_set_username(state.username.c_str());
+                menu_set_mode(state, MENU_MODE_MAIN);
+            }
+        }
+    }
+#endif
+
     if (state.mode == MENU_MODE_REPLAY_RENAME) {
         state.ui.input_enabled = true;
         ui_screen_shade(state.ui);
@@ -688,7 +750,14 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
         menu_search_replays_folder(state);
     } else if (mode == MENU_MODE_LOBBY) {
         state.chat.clear();
-    } 
+    } else if (mode == MENU_MODE_CREATE_LOBBY) {
+        state.lobby_name = std::string(network_get_username()) + "'s Game";
+    }
+#ifndef GOLD_STEAM
+    if (mode == MENU_MODE_USERNAME) {
+        state.username = std::string(network_get_username());
+    }
+#endif
 }
 
 void menu_set_mode_local_network_lobbylist(MenuState& state) {
@@ -850,6 +919,8 @@ void menu_render(const MenuState& state) {
     if (state.mode == MENU_MODE_MAIN || 
         #ifdef GOLD_STEAM
             state.mode == MENU_MODE_MULTIPLAYER || 
+        #else
+            state.mode == MENU_MODE_USERNAME ||
         #endif
             state.mode == MENU_MODE_SINGLEPLAYER) {
         render_sprite_frame(SPRITE_UI_TITLE, ivec2(0, 0), ivec2(24, 24), RENDER_SPRITE_NO_CULL, 0);
