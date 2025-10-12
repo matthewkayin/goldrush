@@ -52,10 +52,6 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
         .path = "sword",
         .variants = 3
     }},
-    { SOUND_PUNCH, (SoundParams) {
-        .path = "punch",
-        .variants = 3
-    }},
     { SOUND_DEATH_CHICKEN, (SoundParams) {
         .path = "death_chicken",
         .variants = 4
@@ -80,16 +76,8 @@ static const std::unordered_map<SoundName, SoundParams> SOUND_PARAMS = {
         .path = "mine_insert",
         .variants = 1
     }},
-    { SOUND_MINE_ARM, (SoundParams) {
-        .path = "mine_arm",
-        .variants = 1
-    }},
     { SOUND_MINE_PRIME, (SoundParams) {
         .path = "mine_prime",
-        .variants = 1
-    }},
-    { SOUND_SMOKE, (SoundParams) {
-        .path = "smoke",
         .variants = 1
     }},
     { SOUND_THROW, (SoundParams) {
