@@ -2622,13 +2622,13 @@ int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const En
     }
     for (const Projectile& projectile : state.projectiles) {
         if (projectile.type == PROJECTILE_MOLOTOV) {
-            existing_molotov_cells.push_back(projectile.target.to_ivec2());
+            existing_molotov_cells.push_back(projectile.target.to_ivec2() / TILE_SIZE);
         }
     }
     for (ivec2 existing_molotov_cell : existing_molotov_cells) {
         int distance = ivec2::manhattan_distance(cell, existing_molotov_cell);
         if (distance < PROJECTILE_MOLOTOV_FIRE_SPREAD) {
-            score -= PROJECTILE_MOLOTOV_FIRE_SPREAD - distance;
+            score -= (PROJECTILE_MOLOTOV_FIRE_SPREAD - distance) * 5;
         }
     }
 
@@ -3201,6 +3201,20 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
                 // Mark the entity as scouted even though we haven't technically seen it yet
                 bot.is_entity_assumed_to_be_scouted[nearest_hall_to_danger_id] = true;
                 bot.is_entity_assumed_to_be_scouted[goldmine_nearest_to_hall_id] = true;
+
+                // Remove the hall and goldmine from the to-scout list
+                uint32_t entities_to_scout_index = 0;
+                while (entities_to_scout_index < bot.entities_to_scout.size()) {
+                    if (bot.entities_to_scout[entities_to_scout_index] == nearest_hall_to_danger_id ||
+                            bot.entities_to_scout[entities_to_scout_index] == goldmine_nearest_to_hall_id) {
+                        bot.entities_to_scout[entities_to_scout_index] = bot.entities_to_scout.back();
+                        bot.entities_to_scout.pop_back();
+                    } else {
+                        entities_to_scout_index++;
+                    }
+                }
+
+                break;
             }
 
             return bot_unit_flee(state, bot, bot.scout_id);
