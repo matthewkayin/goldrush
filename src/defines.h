@@ -14,7 +14,7 @@
 #endif
 
 #define APP_NAME "Gold Rush"
-#define APP_VERSION "0.7.3"
+#define APP_VERSION "0.8.0"
 
 #define GOLD_STEAM
 #ifdef GOLD_STEAM
@@ -22,7 +22,7 @@
     #define GOLD_STEAM_APP_ID 3831190
 #endif
 
-#define GOLD_DEBUG
+// #define GOLD_DEBUG
 #define GOLD_LOG_LEVEL 3
 #ifdef GOLD_DEBUG
     // #define GOLD_DEBUG_CHEATS
