@@ -1098,6 +1098,10 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
             // If we're still here, then there were no idle workers
             // So we'll create one out of the town hall
             if (bot_get_effective_gold(state, bot) >= entity_get_data(ENTITY_MINER).gold_cost && hall.queue.empty()) {
+                if (hall.rally_point.x == -1) {
+                    bot.buildings_to_set_rally_points.push(hall_id);
+                }
+
                 MatchInput input;
                 input.type = MATCH_INPUT_BUILDING_ENQUEUE;
                 input.building_enqueue.item_type = (uint8_t)BUILDING_QUEUE_ITEM_UNIT;
@@ -1220,6 +1224,8 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
     if (bot_get_effective_gold(state, bot) < entity_get_data(unit_type).gold_cost) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
+
+    bot.buildings_to_set_rally_points.push(building_id);
 
     MatchInput input;
     input.type = MATCH_INPUT_BUILDING_ENQUEUE;
@@ -3882,24 +3888,14 @@ uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot) {
     return mining_base_count;
 }
 
-MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot) {
-    for (uint32_t building_index = 0; building_index < state.entities.size(); building_index++) {
-        const Entity& building = state.entities[building_index];
-        EntityId building_id = state.entities.get_id_of(building_index);
+MatchInput bot_set_rally_points(const MatchState& state, Bot& bot) {
+    while (!bot.buildings_to_set_rally_points.empty()) {
+        EntityId building_id = bot.buildings_to_set_rally_points.front();
+        bot.buildings_to_set_rally_points.pop();
+        const Entity& building = state.entities.get_by_id(building_id);
 
-        // Filter down to allied buildings which are training a unit
-        if (building.player_id != bot.player_id ||
-                !entity_is_selectable(building) ||
-                building.queue.empty() || building.queue.front().type != BUILDING_QUEUE_ITEM_UNIT) {
-            continue;
-        }
-
-        // Halls only need their rally point set once
-        if (building.type == ENTITY_HALL && building.rally_point.x != -1) {
-            continue;
-        }
-
-        // Set hall rally point
+        // Choose rally point
+        ivec2 rally_point;
         if (building.type == ENTITY_HALL) {
             EntityId goldmine_id = bot_find_best_entity((BotFindBestEntityParams) {
                 .state = state,
@@ -3909,29 +3905,25 @@ MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot) {
                 .compare = bot_closest_manhattan_distance_to(building.cell)
             });
 
-            MatchInput rally_input;
-            rally_input.type = MATCH_INPUT_RALLY;
-            rally_input.rally.building_count = 1;
-            rally_input.rally.building_ids[0] = building_id;
-            rally_input.rally.rally_point = (state.entities.get_by_id(goldmine_id).cell * TILE_SIZE) + ivec2((3 * TILE_SIZE) / 2, (3 * TILE_SIZE) / 2);
-            return rally_input;
+            rally_point = (state.entities.get_by_id(goldmine_id).cell * TILE_SIZE) + ivec2((3 * TILE_SIZE) / 2, (3 * TILE_SIZE) / 2);
+        } else {
+            ivec2 rally_cell = bot_choose_building_rally_point(state, bot, building);
+            if (rally_cell.x == -1) {
+                continue;
+            }
+            rally_point = cell_center(rally_cell).to_ivec2();
         }
 
-        ivec2 rally_cell = bot_choose_building_rally_point(state, bot, building);
-        if (rally_cell.x == -1) {
-            continue;
-        }
-        ivec2 rally_point = cell_center(rally_cell).to_ivec2();
         if (building.rally_point == rally_point) {
             continue;
         }
 
-        MatchInput input;
-        input.type = MATCH_INPUT_RALLY;
-        input.rally.building_ids[0] = building_id;
-        input.rally.building_count = 1;
-        input.rally.rally_point = rally_point;
-        return input;
+        MatchInput rally_input;
+        rally_input.type = MATCH_INPUT_RALLY;
+        rally_input.rally.building_count = 1;
+        rally_input.rally.building_ids[0] = building_id;
+        rally_input.rally.rally_point = rally_point;
+        return rally_input;
     } // End for each building
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };

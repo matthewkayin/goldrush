@@ -102,6 +102,8 @@ struct Bot {
     std::unordered_map<EntityId, bool> is_entity_assumed_to_be_scouted;
     bool scout_enemy_has_landmines;
     bool scout_enemy_has_detectives;
+
+    std::queue<EntityId> buildings_to_set_rally_points;
 };
 
 Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
@@ -199,7 +201,7 @@ std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchS
 bool bot_enemy_has_undefended_base(const MatchState& state, const Bot& bot);
 uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot);
 
-MatchInput bot_set_rally_points(const MatchState& state, const Bot& bot);
+MatchInput bot_set_rally_points(const MatchState& state, Bot& bot);
 bool bot_is_rally_cell_valid(const MatchState& state, ivec2 rally_cell, int rally_margin);
 ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, const Entity& building);
 MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bot);
