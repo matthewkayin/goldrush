@@ -17,10 +17,10 @@ RC_FILES :=
 
 ifeq ($(RELEASE),true)
 	COMPILER_FLAGS += -O3
+	DEFINES += -DGOLD_RELEASE
 else
 	COMPILER_FLAGS += -O0 -g
 	LINKER_FLAGS += -g
-	DEFINES += -DGOLD_RELEASE
 endif
 
 ifeq ($(OS),Windows_NT)

@@ -2033,6 +2033,10 @@ bool match_is_entity_visible_to_player(const MatchState& state, const Entity& en
         return false;
     }
 
+#ifdef GOLD_DEBUG_FOG_DISABLED
+    return true;
+#endif
+
     uint8_t player_team = state.players[player_id].team;
     if (entity.type != ENTITY_GOLDMINE && state.players[entity.player_id].team == player_team) {
         return true;

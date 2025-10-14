@@ -11,14 +11,7 @@ void match_setting_init() {
         .values = { "Disabled", "Enabled" },
         .value_count = MATCH_SETTING_TEAMS_COUNT
     };
-    MATCH_SETTING_DATA[MATCH_SETTING_MAP_SIZE] = (MatchSettingData) {
-        .name = "Map Size",
-        .values = { "Small", "Medium", "Large" },
-        .value_count = MATCH_SETTING_MAP_SIZE_COUNT
-    };
 };
-
-
 
 const MatchSettingData& match_setting_data(MatchSetting setting) {
     return MATCH_SETTING_DATA.at(setting);

@@ -190,6 +190,11 @@ int gold_main(int argc, char** argv) {
     #elif defined(PLATFORM_OSX)
         log_info("Detected platform OSX.");
     #endif
+    #ifdef GOLD_DEBUG
+        log_info("Debug build.");
+    #else
+        log_info("Release build.");
+    #endif
 
 #ifdef GOLD_STEAM
     if (!SteamAPI_Init()) {
@@ -280,8 +285,11 @@ int gold_main(int argc, char** argv) {
         }
         frames++;
 
-        // INPUT
-        if (update_accumulator >= UPDATE_DURATION) {
+        // UPDATE
+        while (update_accumulator >= UPDATE_DURATION) {
+            update_accumulator -= UPDATE_DURATION;
+
+            // INPUT
             input_poll_events();
             if (input_user_requests_exit()) {
                 if (network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_HOST) {
@@ -291,14 +299,7 @@ int gold_main(int argc, char** argv) {
                 break;
             }
 
-            /*
-            #ifdef GOLD_DEBUG
-                if (input_is_action_just_pressed(INPUT_ACTION_F3)) {
-                    render_debug_info = !render_debug_info;
-                }
-            #endif
-            */
-
+            // NETWORK
             network_service();
             NetworkEvent event;
             while (state.mode != GAME_MODE_LOADING && network_poll_events(&event)) {
@@ -327,12 +328,8 @@ int gold_main(int argc, char** argv) {
                     }
                 }
             }
-        }
 
-        // UPDATE
-        while (update_accumulator >= UPDATE_DURATION) {
-            update_accumulator -= UPDATE_DURATION;
-
+            // UPDATE
             switch (state.mode) {
                 case GAME_MODE_MENU: {
                     menu_update(state.menu);
@@ -350,7 +347,7 @@ int gold_main(int argc, char** argv) {
 
                         // Generate noise for map generation
                         uint64_t noise_seed = (uint64_t)lcg_seed;
-                        uint32_t map_width = 128;
+                        uint32_t map_width = MAP_SIZE;
                         uint32_t map_height = map_width;
                         Noise noise = noise_generate(noise_seed, map_width, map_height);
 

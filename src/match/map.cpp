@@ -508,6 +508,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         } // End for each x
     } // End for each pass
     // End create ramps
+    log_trace("Generated ramps.");
 
     // Block all walls and water
     for (uint32_t index = 0; index < map.width * map.height; index++) {
@@ -616,6 +617,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         }
     }
     // End determine player spawns
+    log_trace("Determined player spawns.");
 
     // Generate gold mines
     PoissonDiskParams params = (PoissonDiskParams) {
@@ -632,7 +634,6 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
             ivec2 mine_cell = player_spawns[player_id];
             goldmine_cells.push_back(mine_cell);
             params.avoid_values[mine_cell.x + (mine_cell.y * map.width)] = params.disk_radius;
-
         }
 
         // Generate the avoid values
@@ -649,6 +650,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         }
     }
     // End generate gold mines
+    log_trace("Generated gold mines.");
 
     // Generate decorations
     {
@@ -1524,7 +1526,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     return target;
 }
 
-void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells, bool limit_region) {
     // Don't bother pathing to the unit's cell
     if (from == to) {
         return;
@@ -1621,7 +1623,7 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
             }
 
             // Don't consider different-region children, unless they are the goal
-            if (layer == CELL_LAYER_GROUND && child.cell != to && 
+            if (limit_region && layer == CELL_LAYER_GROUND && child.cell != to && 
                     map.pathing_regions[child.cell.x + (child.cell.y * map.width)] != 
                     map.pathing_regions[from.x + (from.y * map.width)]) {
                 continue;
@@ -1687,15 +1689,16 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         return;
     }
 
-    ivec2 corrected_to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
-    if (corrected_to != to && ivec2::manhattan_distance(from, corrected_to) < 3 &&
-            map_get_cell(map, layer, to).type == CELL_UNIT) {
+    ivec2 original_to = to;
+    to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
+    if (to != original_to && ivec2::manhattan_distance(from, to) < 3 &&
+            map_get_cell(map, layer, original_to).type == CELL_UNIT) {
         return;
     }
-    to = corrected_to;
 
+    original_to = to;
     if (layer == CELL_LAYER_GROUND) {
         to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
     }
-    map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells);
+    map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells, to != original_to);
 }
