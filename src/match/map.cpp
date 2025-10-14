@@ -2,7 +2,6 @@
 
 #include "core/logger.h"
 #include "core/asserts.h"
-#include "core/profile.h"
 #include "render/render.h"
 #include "lcg.h"
 #include <unordered_map>
@@ -1417,7 +1416,9 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     }
 
     // Region-pathing
+#ifdef GOLD_ASSERTS_ENABLED
     bool found_region_path = false;
+#endif
     MapRegionPathNode region_path_end;
     std::vector<MapRegionPathNode> frontier;
     std::vector<MapRegionPathNode> explored;
@@ -1448,7 +1449,9 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
 
         if (next.cell == to) {
             region_path_end = next;
+        #ifdef GOLD_ASSERTS_ENABLED
             found_region_path = true;
+        #endif
             break;
         }
 
@@ -1508,7 +1511,9 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
         } // End for each child / connected region
     } // End while frontier not empty
 
+#ifdef GOLD_ASSERTS_ENABLED
     GOLD_ASSERT(found_region_path);
+#endif
     MapRegionPathNode region_current = region_path_end;
     ivec2 target = to;
     while (region_current.parent != -1) {
@@ -1675,19 +1680,16 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    profile_begin(PROFILE_KEY_PATHFIND);
     path->clear();
 
     // Don't bother pathing to the unit's cell
     if (from == to) {
-        profile_end(PROFILE_KEY_PATHFIND);
         return;
     }
 
     ivec2 corrected_to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
     if (corrected_to != to && ivec2::manhattan_distance(from, corrected_to) < 3 &&
             map_get_cell(map, layer, to).type == CELL_UNIT) {
-        profile_end(PROFILE_KEY_PATHFIND);
         return;
     }
     to = corrected_to;
@@ -1696,5 +1698,4 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
     }
     map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells);
-    profile_end(PROFILE_KEY_PATHFIND);
 }

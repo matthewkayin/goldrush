@@ -1,7 +1,6 @@
 #include "bot.h"
 
 #include "core/logger.h"
-#include "core/profile.h"
 #include "upgrade.h"
 #include "lcg.h"
 
@@ -29,27 +28,21 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     return bot;
 }
 
-MatchInput _bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
-    profile_begin(PROFILE_KEY_BOT_STRATEGY);
+MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
     bot_scout_update(state, bot, match_time_minutes);
 
     // Strategy
     bool is_base_under_attack = bot_handle_base_under_attack(state, bot);
     bot_strategy_update(state, bot, is_base_under_attack);
 
-    profile_end(PROFILE_KEY_BOT_STRATEGY);
-
     // Production
-    profile_begin(PROFILE_KEY_BOT_PRODUCTION);
     MatchInput production_input = bot_get_production_input(state, bot, is_base_under_attack);
     if (production_input.type != MATCH_INPUT_NONE) {
         return production_input;
     }
-    profile_end(PROFILE_KEY_BOT_PRODUCTION);
 
     // Squad
 
-    profile_begin(PROFILE_KEY_BOT_SQUAD);
     uint32_t squad_index = 0;
     while (squad_index < bot.squads.size()) {
         MatchInput input = bot_squad_update(state, bot, bot.squads[squad_index]);
@@ -64,65 +57,42 @@ MatchInput _bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match
             return input;
         }
     }
-    profile_end(PROFILE_KEY_BOT_SQUAD);
 
     // Scout
 
-    profile_begin(PROFILE_KEY_BOT_SCOUT);
     MatchInput scout_input = bot_scout(state, bot, match_time_minutes);
     if (scout_input.type != MATCH_INPUT_NONE) {
         return scout_input;
     }
-    profile_end(PROFILE_KEY_BOT_SCOUT);
 
     // Misc
 
-    profile_begin(PROFILE_KEY_BOT_BUILD_CANCEL);
     MatchInput build_cancel_input = bot_cancel_in_progress_buildings(state, bot);
     if (build_cancel_input.type != MATCH_INPUT_NONE) {
         return build_cancel_input;
     }
-    profile_end(PROFILE_KEY_BOT_BUILD_CANCEL);
 
-    profile_begin(PROFILE_KEY_BOT_REPAIR);
     MatchInput repair_input = bot_repair_burning_buildings(state, bot);
     if (repair_input.type != MATCH_INPUT_NONE) {
         return repair_input;
     }
-    profile_end(PROFILE_KEY_BOT_REPAIR);
 
-    profile_begin(PROFILE_KEY_BOT_REIN);
     MatchInput rein_in_input = bot_rein_in_stray_units(state, bot);
     if (rein_in_input.type != MATCH_INPUT_NONE) {
         return rein_in_input;
     }
-    profile_end(PROFILE_KEY_BOT_REIN);
 
-    profile_begin(PROFILE_KEY_BOT_RALLY);
     MatchInput rally_input = bot_set_rally_points(state, bot);
     if (rally_input.type != MATCH_INPUT_NONE) {
         return rally_input;
     }
-    profile_end(PROFILE_KEY_BOT_RALLY);
 
-    profile_begin(PROFILE_KEY_BOT_UNLOAD);
     MatchInput unload_input = bot_unload_unreserved_carriers(state, bot);
     if (unload_input.type != MATCH_INPUT_NONE) {
         return unload_input;
     }
-    profile_end(PROFILE_KEY_BOT_UNLOAD);
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
-}
-
-MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
-    profile_begin(PROFILE_KEY_BOT);
-    MatchInput input = _bot_get_turn_input(state, bot, match_time_minutes);
-    for (int key = PROFILE_KEY_BOT_STRATEGY; key < PROFILE_KEY_COUNT; key++) {
-        profile_end((ProfileKey)key);
-    }
-    profile_end(PROFILE_KEY_BOT);
-    return input;
 }
 
 // STRATEGY
@@ -312,7 +282,6 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
 
     switch (bot.strategy) {
         case BOT_STRATEGY_OPENER_BANDIT_RUSH: {
-            profile_begin(PROFILE_KEY_BOT_BANDIT_RUSH);
             // Abandon rush if wagon has died
             EntityId wagon_id = bot_find_entity((BotFindEntityParams) {
                 .state = state,
@@ -327,25 +296,20 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             if (bot.desired_squads.empty()) {
                 bot_set_strategy(state, bot, BOT_STRATEGY_EXPAND, bot.unit_comp);
             }
-            profile_end(PROFILE_KEY_BOT_BANDIT_RUSH);
             break;
         }
         case BOT_STRATEGY_OPENER_BUNKER: {
-            profile_begin(PROFILE_KEY_BOT_BUNKER);
             if (is_base_under_attack) {
                 bot_set_strategy(state, bot, BOT_STRATEGY_ATTACK, BOT_UNIT_COMP_COWBOY_BANDIT);
-                profile_end(PROFILE_KEY_BOT_BUNKER);
                 break;
             }
 
             if (bot.desired_squads.empty()) {
                 bot_set_strategy(state, bot, BOT_STRATEGY_EXPAND, bot.unit_comp);
             }
-            profile_end(PROFILE_KEY_BOT_BUNKER);
             break;
         }
         case BOT_STRATEGY_EXPAND: {
-            profile_begin(PROFILE_KEY_BOT_EXPAND);
             EntityId in_progress_hall_id = bot_find_entity((BotFindEntityParams) {
                 .state = state,
                 .filter = [&bot](const Entity& entity, EntityId entity_id) {
@@ -356,7 +320,6 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             });
             if (in_progress_hall_id != ID_NULL) {
                 bot_set_strategy(state, bot, BOT_STRATEGY_ATTACK, bot.unit_comp);
-                profile_end(PROFILE_KEY_BOT_EXPAND);
                 break;
             }
 
@@ -370,7 +333,6 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             if (!bot_is_area_safe(state, bot, goldmine_cell)) {
                 bot_defend_location(state, bot, goldmine_cell, 0);
             }
-            profile_end(PROFILE_KEY_BOT_EXPAND);
 
             break;
         }

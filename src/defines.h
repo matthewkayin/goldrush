@@ -22,7 +22,9 @@
     #define GOLD_STEAM_APP_ID 3831190
 #endif
 
-// #define GOLD_DEBUG
+#ifndef GOLD_RELEASE
+    #define GOLD_DEBUG
+#endif
 #define GOLD_LOG_LEVEL 3
 #ifdef GOLD_DEBUG
     // #define GOLD_DEBUG_CHEATS
@@ -31,7 +33,6 @@
     #define GOLD_RAND_SEED 1759836016
     // #define GOLD_DEBUG_BOT_VISION
     // #define GOLD_DEBUG_FOG_DISABLED
-    #define GOLD_PROFILE_ENABLED
 #endif
 #ifdef GOLD_DEBUG_CHEATS
     #define GOLD_DEBUG_FAST_BUILD

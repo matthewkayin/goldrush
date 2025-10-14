@@ -10,10 +10,18 @@ LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
-COMPILER_FLAGS := -std=c++17 -g -Wall -O0
-LINKER_FLAGS := -g
+COMPILER_FLAGS := -std=c++17 -Wall
+LINKER_FLAGS :=
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 RC_FILES :=
+
+ifeq ($(RELEASE),true)
+	COMPILER_FLAGS += -O3
+else
+	COMPILER_FLAGS += -O0 -g
+	LINKER_FLAGS += -g
+	DEFINES += -DGOLD_RELEASE
+endif
 
 ifeq ($(OS),Windows_NT)
 	BUILD_PLATFORM := win64
@@ -29,7 +37,7 @@ ifeq ($(OS),Windows_NT)
 	DIRECTORIES += \vendor $(subst $(DIR),,$(shell dir vendor /S /AD /B | findstr /i vendor)) # Get all directories under vendor.
 
 # ws2_32 and winmm are linked for enet
-	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_image -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -llibcurl -ldbghelp
+	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_image -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -ldbghelp
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
@@ -45,7 +53,6 @@ else
 	DIRECTORIES += $(shell find vendor -type d)
 
 	LINKER_FLAGS += $(shell pkg-config --libs --static libenet)
-	LINKER_FLAGS += $(shell pkg-config --libs --static libcurl)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-image)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-ttf)
@@ -69,8 +76,9 @@ endif
 osx-bundle:
 ifeq ($(BUILD_PLATFORM),osx)
 	@./appify.sh -s $(BUILD_DIR)/gold -i icon.icns
-	@mv $(ASSEMBLY).app $(BUILD_DIR)/$(ASSEMBLY).app
-	@cp -a ./res/ $(BUILD_DIR)/$(ASSEMBLY).app/Contents/Resources/
+	@mv $(ASSEMBLY).app $(BUILD_DIR)/Gold\ Rush.app
+	@cp -a ./res/ $(BUILD_DIR)/Gold\ Rush.app/Contents/Resources/
+	@cp -a ./lib/osx/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
 endif
 
 .PHONY: scaffold

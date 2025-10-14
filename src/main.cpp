@@ -5,7 +5,6 @@
 #include "core/cursor.h"
 #include "core/animation.h"
 #include "core/input.h"
-#include "core/profile.h"
 #include "network/network.h"
 #include "core/sound.h"
 #include "core/options.h"
@@ -281,9 +280,6 @@ int gold_main(int argc, char** argv) {
         }
         frames++;
 
-        profile_begin_frame();
-        profile_begin(PROFILE_KEY_UPDATE);
-
         // INPUT
         if (update_accumulator >= UPDATE_DURATION) {
             input_poll_events();
@@ -405,11 +401,6 @@ int gold_main(int argc, char** argv) {
         }
 
         sound_update();
-
-        profile_end(PROFILE_KEY_UPDATE);
-        if (profile_key_percentage(PROFILE_KEY_BOT) > 5.0 || profile_key_percentage(PROFILE_KEY_UPDATE) > 100.0) {
-            profile_print_log();
-        }
 
         // RENDER
         render_prepare_frame();

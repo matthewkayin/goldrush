@@ -6,7 +6,6 @@
 #include "core/logger.h"
 #include "core/cursor.h"
 #include "core/options.h"
-#include "core/profile.h"
 #include "menu/ui.h"
 #include "menu/match_setting.h"
 #include "render/sprite.h"
