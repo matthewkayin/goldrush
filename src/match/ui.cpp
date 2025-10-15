@@ -72,8 +72,8 @@ static const ivec2 MATCH_UI_GARRISON_ICON_POSITIONS[4] = {
     MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(72 * 3, 0)
 };
 
-static const int HEALTHBAR_HEIGHT = 4;
-static const int HEALTHBAR_PADDING = 3;
+static const int HEALTHBAR_HEIGHT = 8;
+static const int HEALTHBAR_PADDING = 7;
 
 static const size_t CHAT_MAX_LENGTH = 64;
 static const uint32_t CHAT_MESSAGE_DURATION = 180;
@@ -538,7 +538,8 @@ void match_ui_handle_input(MatchUiState& state) {
             Rect icon_rect = (Rect) {
                 .x = UI_BUILDING_QUEUE_POSITIONS[building_queue_index].x,
                 .y = UI_BUILDING_QUEUE_POSITIONS[building_queue_index].y,
-                .w = icon_sprite_info.frame_width, .h = icon_sprite_info.frame_height
+                .w = icon_sprite_info.frame_width * 2, 
+                .h = icon_sprite_info.frame_height * 2
             };
             if (icon_rect.has_point(input_get_mouse_position())) {
                 state.input_queue.push_back((MatchInput) {
@@ -572,8 +573,8 @@ void match_ui_handle_input(MatchUiState& state) {
                 Rect icon_rect = (Rect) {
                     .x = MATCH_UI_GARRISON_ICON_POSITIONS[index].x,
                     .y = MATCH_UI_GARRISON_ICON_POSITIONS[index].y,
-                    .w = icon_sprite_info.frame_width,
-                    .h = icon_sprite_info.frame_height
+                    .w = icon_sprite_info.frame_width * 2,
+                    .h = icon_sprite_info.frame_height * 2
                 };
                 if (icon_rect.has_point(input_get_mouse_position())) {
                     state.input_queue.push_back((MatchInput) {
@@ -647,7 +648,7 @@ void match_ui_handle_input(MatchUiState& state) {
             // But only do this if the goldmine has been explored, otherwise we would reveal to players that there is a goldmine where they clicked
             const Entity& goldmine = state.match.entities.get_by_id(cell.id);
             if (match_is_cell_rect_explored(state.match, state.match.players[network_get_player_id()].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
-                input.rally.rally_point = (goldmine.cell * TILE_SIZE) + ivec2(23, 16);
+                input.rally.rally_point = (goldmine.cell * TILE_SIZE) + ivec2(46, 32);
                 state.move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
                 state.move_animation_entity_id = cell.id;
                 state.move_animation_position = goldmine.cell * TILE_SIZE;
@@ -1190,7 +1191,6 @@ void match_ui_update(MatchUiState& state) {
                     default:
                         break;
                 }
-                log_trace("ALERT cell %vi", &event.alert.cell);
                 state.latest_alert_cell = event.alert.cell;
 
                 Rect camera_rect = (Rect) { 
@@ -2382,7 +2382,7 @@ void match_ui_render(const MatchUiState& state) {
         const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
         Rect render_rect = (Rect) {
             .x = params.position.x, .y = params.position.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
         };
 
         if (entity.bleed_timer != 0) {
@@ -2442,7 +2442,7 @@ void match_ui_render(const MatchUiState& state) {
 
             Rect render_rect = (Rect) {
                 .x = params.position.x, .y = params.position.y,
-                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+                .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
             };
             if (!render_rect.intersects(SCREEN_RECT)) {
                 continue;
@@ -2464,7 +2464,7 @@ void match_ui_render(const MatchUiState& state) {
             RenderSpriteParams params = (RenderSpriteParams) {
                 .sprite = SPRITE_RALLY_FLAG,
                 .frame = state.rally_flag_animation.frame,
-                .position = building.rally_point - ivec2(4, 15) - state.camera_offset,
+                .position = building.rally_point - ivec2(8, 30) - state.camera_offset,
                 .options = 0,
                 .recolor_id = state.match.players[building.player_id].recolor_id
             };
@@ -2620,11 +2620,11 @@ void match_ui_render(const MatchUiState& state) {
             char counter_text[4];
             sprintf(counter_text, "%u", miner_count);
             ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, counter_text);
-            text_size.x += miner_icon_info.frame_width;
-            ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 6) + ivec2(0, icon_y_offset);
-            render_text(miner_count > MATCH_MAX_MINERS_ON_GOLD ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2(miner_icon_info.frame_width + 2, 0));
+            text_size.x += miner_icon_info.frame_width * 2;
+            ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 12) + ivec2(0, icon_y_offset);
+            render_text(miner_count > MATCH_MAX_MINERS_ON_GOLD ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2((miner_icon_info.frame_width * 2) + 4, 0));
             render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[player_id].recolor_id);
-            icon_y_offset -= miner_icon_info.frame_height + 1;
+            icon_y_offset -= (miner_icon_info.frame_height * 2) + 2;
         }
     }
 
@@ -2857,7 +2857,7 @@ void match_ui_render(const MatchUiState& state) {
             .w = std::abs(state.select_origin.x - mouse_world_pos.x),
             .h = std::abs(state.select_origin.y - mouse_world_pos.y)
         };
-        render_draw_rect(select_rect, RENDER_COLOR_WHITE);
+        render_draw_rect(select_rect, RENDER_COLOR_WHITE, 2);
     }
 
     #ifdef GOLD_DEBUG
@@ -2916,8 +2916,8 @@ void match_ui_render(const MatchUiState& state) {
         SpriteName button_icon = match_entity_get_icon(state.match, most_common_entity_type, network_get_player_id());
         const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_CONTROL_GROUP);
         ivec2 render_pos = ivec2(BOTTOM_PANEL_RECT.x, BOTTOM_PANEL_RECT.y) + ivec2(2, 0) + ivec2((3 + sprite_info.frame_width) * control_group_index, -32);
-        render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(button_icon, ivec2(button_frame, 0), render_pos + ivec2(1, 0), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0, 1);
+        render_sprite_frame(button_icon, ivec2(button_frame, 0), render_pos + ivec2(1, 0), RENDER_SPRITE_NO_CULL, 0, 1);
         char control_group_number_text[4];
         sprintf(control_group_number_text, "%u", control_group_index == 9 ? 0 : control_group_index + 1);
         render_text(font, control_group_number_text, render_pos + ivec2(3, -9));
@@ -2930,7 +2930,7 @@ void match_ui_render(const MatchUiState& state) {
     // UI Status message
     if (state.status_timer != 0) {
         int status_message_width = render_get_text_size(FONT_HACK_WHITE, state.status_message.c_str()).x;
-        render_text(FONT_HACK_WHITE, state.status_message.c_str(), ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 148));
+        render_text(FONT_HACK_WHITE, state.status_message.c_str(), ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 266));
     }
     
     // Hotkeys
@@ -2951,7 +2951,7 @@ void match_ui_render(const MatchUiState& state) {
             hframe = 2;
         } else if (!(state.is_minimap_dragging || match_ui_is_selecting(state)) && hotkey_rect.has_point(input_get_mouse_position())) {
             hframe = 1;
-            hotkey_position.y--;
+            hotkey_position.y -= 2;
         }
 
         render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), hotkey_position, RENDER_SPRITE_NO_CULL, 0);
@@ -3176,7 +3176,7 @@ void match_ui_render(const MatchUiState& state) {
             char health_text[16];
             sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
             ivec2 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
-            ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
+            ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2) + ivec2(0, 1); 
             render_text(FONT_HACK_WHITE, health_text, health_text_position);
 
             uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
@@ -3283,8 +3283,8 @@ void match_ui_render(const MatchUiState& state) {
                 Rect icon_rect = (Rect) {
                     .x = UI_BUILDING_QUEUE_POSITIONS[building_queue_index].x,
                     .y = UI_BUILDING_QUEUE_POSITIONS[building_queue_index].y,
-                    .w = icon_sprite_info.frame_width,
-                    .h = icon_sprite_info.frame_height
+                    .w = icon_sprite_info.frame_width * 2,
+                    .h = icon_sprite_info.frame_height * 2
                 };
                 SpriteName item_sprite;
                 switch (building.queue[building_queue_index].type) {
@@ -3299,21 +3299,21 @@ void match_ui_render(const MatchUiState& state) {
                 }
                 bool hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
                                     icon_rect.has_point(input_get_mouse_position());
-                render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
-                render_sprite_frame(item_sprite, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)hovered), RENDER_SPRITE_NO_CULL, 0);
+                render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
+                render_sprite_frame(item_sprite, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
             }
 
             // Render building queue progress bar
             if (building.timer == BUILDING_QUEUE_BLOCKED) {
-                render_text(FONT_WESTERN8_GOLD, "Build more houses.", ivec2(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 2, UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
+                render_text(FONT_WESTERN8_GOLD, "Build more houses.", ivec2(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 2, UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 24));
             } else if (building.timer == BUILDING_QUEUE_EXIT_BLOCKED) {
-                render_text(FONT_WESTERN8_GOLD, "Exit is blocked.", ivec2(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 2, UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 12));
+                render_text(FONT_WESTERN8_GOLD, "Exit is blocked.", ivec2(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.x + 2, UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.y - 24));
             } else {
                 int item_duration = (int)building_queue_item_duration(building.queue[0]);
                 Rect building_queue_progress_bar_subrect = UI_BUILDING_QUEUE_PROGRESS_BAR_RECT;
                 building_queue_progress_bar_subrect.w = (UI_BUILDING_QUEUE_PROGRESS_BAR_RECT.w * (item_duration - (int)building.timer) / item_duration);
                 render_fill_rect(building_queue_progress_bar_subrect, RENDER_COLOR_WHITE);
-                render_draw_rect(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT, RENDER_COLOR_OFFBLACK);
+                render_draw_rect(UI_BUILDING_QUEUE_PROGRESS_BAR_RECT, RENDER_COLOR_OFFBLACK, 2);
             }
         }
     }
@@ -3336,8 +3336,8 @@ void match_ui_render(const MatchUiState& state) {
                 Rect icon_rect = (Rect) {
                     .x = MATCH_UI_GARRISON_ICON_POSITIONS[index].x,
                     .y = MATCH_UI_GARRISON_ICON_POSITIONS[index].y,
-                    .w = icon_sprite_info.frame_width,
-                    .h = icon_sprite_info.frame_height
+                    .w = icon_sprite_info.frame_width * 2,
+                    .h = icon_sprite_info.frame_height * 2
                 };
                 match_ui_render_entity_icon(state, garrisoned_unit, icon_rect);
                 index++;
@@ -3611,17 +3611,6 @@ void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 s
         return;
     }
 
-    render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK);
-    healthbar_rect.x++;
-    healthbar_rect.y++;
-    healthbar_rect.w -= 2;
-    healthbar_rect.h -= 2;
-    render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK);
-    healthbar_rect.x++;
-    healthbar_rect.y++;
-    healthbar_rect.w -= 2;
-    healthbar_rect.h -= 2;
-
     Rect healthbar_subrect = healthbar_rect;
     healthbar_subrect.w = (healthbar_subrect.w * amount) / max;
     
@@ -3637,11 +3626,12 @@ void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 s
     }
 
     render_fill_rect(healthbar_subrect, healthbar_color);
+    render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK, 2);
 
     if (type == RENDER_GARRISON_BAR) {
         for (int line_index = 1; line_index < max; line_index++) {
             int line_x = healthbar_rect.x + ((healthbar_rect.w * line_index) / max);
-            render_line(ivec2(line_x, healthbar_rect.y), ivec2(line_x, healthbar_rect.y + healthbar_rect.h - 1), RENDER_COLOR_OFFBLACK);
+            render_line(ivec2(line_x, healthbar_rect.y), ivec2(line_x, healthbar_rect.y + healthbar_rect.h), RENDER_COLOR_OFFBLACK, 2);
         }
     }
 }
@@ -3680,8 +3670,10 @@ RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& stat
                 params.options |= RENDER_SPRITE_FLIP_H;
             }
         } else {
-            params.position.x -= sprite_info.frame_width / 2;
-            params.position.y -= sprite_info.frame_height / 2;
+            // This is actually (frame_width * 2) / 2
+            // It's times 2 because we doubled the resolution, divided by 2 because we're centering the sprite manually for some reason
+            params.position.x -= sprite_info.frame_width;
+            params.position.y -= sprite_info.frame_height;
             if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
                 if (entity.mode == MODE_UNIT_BALLOON_DEATH) {
                     params.position.y += ((int)entity.timer * ENTITY_SKY_POSITION_Y_OFFSET) / (int)ENTITY_BALLOON_DEATH_DURATION;
@@ -3720,14 +3712,14 @@ void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& stat
     ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state.camera_offset;
     if (entity_data.max_health != 0) {
         match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
-        healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+        healthbar_position.y += HEALTHBAR_HEIGHT + 2;
     }
 
     // Render garrison bar
     if (entity_data.garrison_capacity != 0 && (entity.type == ENTITY_GOLDMINE || state.replay_mode || 
             state.match.players[entity.player_id].team == state.match.players[network_get_player_id()].team)) {
         match_ui_render_healthbar(RENDER_GARRISON_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
-        healthbar_position.y += HEALTHBAR_HEIGHT + 1;
+        healthbar_position.y += HEALTHBAR_HEIGHT + 2;
     } 
     // Render energy bar
     uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
@@ -3743,7 +3735,7 @@ void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity
 
     render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)icon_hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
     render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)icon_hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
-    ivec2 healthbar_position = ivec2(icon_rect.x + 1, icon_rect.y + 54 - (int)icon_hovered);
+    ivec2 healthbar_position = ivec2(icon_rect.x + 1, icon_rect.y + 54 - ((int)icon_hovered * 2));
     ivec2 healthbar_size = ivec2(60, 8);
     uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
     if (entity_is_unit(entity.type) && entity_max_energy != 0) {

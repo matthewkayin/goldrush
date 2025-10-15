@@ -45,7 +45,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 200),
+            .speed = fixed::from_int_and_raw_decimal(1, 145),
             .max_energy = 0,
 
             .attack_sound = SOUND_PICKAXE,
@@ -78,7 +78,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 200),
+            .speed = fixed::from_int_and_raw_decimal(1, 145),
             .max_energy = 0,
 
             .attack_sound = SOUND_GUN,
@@ -111,7 +111,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 225),
+            .speed = fixed::from_int_and_raw_decimal(1, 195),
             .max_energy = 0,
 
             .attack_sound = SOUND_SWORD,
@@ -144,7 +144,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 2,
-            .speed = fixed::from_int_and_raw_decimal(1, 20),
+            .speed = fixed::from_int_and_raw_decimal(2, 40),
             .max_energy = 0,
 
             .attack_sound = SOUND_PICKAXE,
@@ -177,7 +177,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 2,
-            .speed = fixed::from_int_and_raw_decimal(1, 40),
+            .speed = fixed::from_int_and_raw_decimal(2, 80),
             .max_energy = 0,
 
             .attack_sound = SOUND_GUN,
@@ -210,7 +210,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 225),
+            .speed = fixed::from_int_and_raw_decimal(1, 195),
             .max_energy = 0,
 
             .attack_sound = SOUND_PICKAXE,
@@ -243,7 +243,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 200),
+            .speed = fixed::from_int_and_raw_decimal(1, 145),
             .max_energy = 120,
 
             .attack_sound = SOUND_PICKAXE,
@@ -276,7 +276,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 170),
+            .speed = fixed::from_int_and_raw_decimal(1, 85),
             .max_energy = 0,
 
             .attack_sound = SOUND_MUSKET,
@@ -309,7 +309,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 2,
-            .speed = fixed::from_int_and_raw_decimal(0, 140),
+            .speed = fixed::from_int_and_raw_decimal(1, 25),
             .max_energy = 0,
 
             .attack_sound = SOUND_CANNON,
@@ -342,7 +342,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 170),
+            .speed = fixed::from_int_and_raw_decimal(1, 85),
             .max_energy = 80,
 
             .attack_sound = SOUND_PISTOL_SILENCED,
@@ -375,7 +375,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
 
         .unit_data = (EntityDataUnit) {
             .population_cost = 1,
-            .speed = fixed::from_int_and_raw_decimal(0, 80),
+            .speed = fixed::from_int_and_raw_decimal(0, 160),
             .max_energy = 0,
 
             .attack_sound = SOUND_PISTOL_SILENCED,
@@ -407,8 +407,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 16, 23, 7 },
-            .builder_positions_y = { 43, 25, 22 },
+            .builder_positions_x = { 32, 46, 14 },
+            .builder_positions_y = { 86, 50, 44 },
             .builder_flip_h = { false, true, false },
             .options = BUILDING_CAN_RALLY
         }
@@ -433,8 +433,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 3, 16, -4 },
-            .builder_positions_y = { 15, 15, 3 },
+            .builder_positions_x = { 6, 32, -8 },
+            .builder_positions_y = { 30, 30, 6 },
             .builder_flip_h = { false, true, false },
             .options = 0
         }
@@ -459,8 +459,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 6, 27, 9 },
-            .builder_positions_y = { 32, 27, 9 },
+            .builder_positions_x = { 12, 54, 18 },
+            .builder_positions_y = { 64, 54, 18 },
             .builder_flip_h = { false, true, false },
             .options = BUILDING_CAN_RALLY
         }
@@ -485,8 +485,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 1, 14, 5 },
-            .builder_positions_y = { 15, 9, -3 },
+            .builder_positions_x = { 2, 28, 10 },
+            .builder_positions_y = { 30, 18, -6 },
             .builder_flip_h = { false, true, false },
             .options = 0
         }
@@ -511,8 +511,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 3, 16, 6 },
-            .builder_positions_y = { 29, 13, 7 },
+            .builder_positions_x = { 6, 32, 12 },
+            .builder_positions_y = { 58, 26, 14 },
             .builder_flip_h = { false, true, false },
             .options = BUILDING_CAN_RALLY
         }
@@ -537,8 +537,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 9, 27, 26 },
-            .builder_positions_y = { 24, 18, 4 },
+            .builder_positions_x = { 18, 54, 52 },
+            .builder_positions_y = { 48, 36, 8 },
             .builder_flip_h = { false, true, true },
             .options = BUILDING_CAN_RALLY
         }
@@ -563,8 +563,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 10, 28, 28 },
-            .builder_positions_y = { 29, 17, 4 },
+            .builder_positions_x = { 20, 56, 56 },
+            .builder_positions_y = { 58, 34, 8 },
             .builder_flip_h = { false, true, true },
             .options = BUILDING_CAN_RALLY
         }
@@ -589,8 +589,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 6, 27, 3 },
-            .builder_positions_y = { 27, 7, 3 },
+            .builder_positions_x = { 12, 54, 6 },
+            .builder_positions_y = { 54, 14, 6 },
             .builder_flip_h = { false, true, false },
             .options = BUILDING_CAN_RALLY
         }
@@ -615,8 +615,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .has_detection = false,
 
         .building_data = (EntityDataBuilding) {
-            .builder_positions_x = { 6, 27, 14 },
-            .builder_positions_y = { 27, 7, 1 },
+            .builder_positions_x = { 12, 54, 28 },
+            .builder_positions_y = { 54, 14, 2 },
             .builder_flip_h = { false, true, false },
             .options = BUILDING_CAN_RALLY
         }

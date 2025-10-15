@@ -1157,7 +1157,7 @@ ivec2 render_get_text_size(FontName name, const char* text, float scale) {
     return size * scale;
 }
 
-void render_line(ivec2 start, ivec2 end, RenderColor color) {
+void render_line(ivec2 start, ivec2 end, RenderColor color, int thickness) {
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
     Rect src_rect = (Rect) {
         .x = sprite_info.frame_width * color,
@@ -1167,12 +1167,12 @@ void render_line(ivec2 start, ivec2 end, RenderColor color) {
     };
     Rect dst_rect = (Rect) {
         .x = start.x, .y = start.y,
-        .w = 1, .h = end.y - start.y
+        .w = thickness, .h = end.y - start.y
     };
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 
-void render_draw_rect(Rect rect, RenderColor color) {
+void render_draw_rect(Rect rect, RenderColor color, int thickness) {
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
     Rect src_rect = (Rect) {
         .x = sprite_info.frame_width * color,
@@ -1182,16 +1182,16 @@ void render_draw_rect(Rect rect, RenderColor color) {
     };
     Rect dst_rect = (Rect) {
         .x = rect.x, .y = rect.y,
-        .w = 1, .h = rect.h
+        .w = thickness, .h = rect.h
     };
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
-    dst_rect.x = rect.x + rect.w - 1;
+    dst_rect.x = rect.x + rect.w - thickness;
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
     dst_rect.x = rect.x;
     dst_rect.w = rect.w;
-    dst_rect.h = 1;
+    dst_rect.h = thickness;
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
-    dst_rect.y = rect.y + rect.h - 1;
+    dst_rect.y = rect.y + rect.h - thickness;
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 

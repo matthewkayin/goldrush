@@ -131,10 +131,10 @@ bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally
         } else if (frame == frame_count - 1) {
             hframe = 2;
         }
-        ui_queue_sprite(state, SPRITE_UI_MENU_BUTTON, ivec2(hframe, (int)hovered), ivec2(button_rect.x + (frame * 16), button_rect.y - (int)hovered), 0);
+        ui_queue_sprite(state, SPRITE_UI_MENU_BUTTON, ivec2(hframe, (int)hovered), ivec2(button_rect.x + (frame * 16), button_rect.y - ((int)hovered * 2)), 0);
     }
 
-    ivec2 text_pos = ivec2(button_rect.x + 10, button_rect.y + 6 - (int)hovered);
+    ivec2 text_pos = ivec2(button_rect.x + 10, button_rect.y + 6 - ((int)hovered * 2));
     if (center_horizontally) {
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
         text_pos.x = button_rect.x + (button_rect.w / 2) - (text_size.x / 2);
@@ -159,7 +159,7 @@ bool ui_slim_button(UI& state, const char* text) {
     ui_update_container(state, ivec2(button_rect.w, button_rect.h));
     bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && button_rect.has_point(input_get_mouse_position());
 
-    ivec2 render_pos = ivec2(button_rect.x, button_rect.y - (int)hovered);
+    ivec2 render_pos = ivec2(button_rect.x, button_rect.y - ((int)hovered * 2));
     ivec2 text_pos = ivec2(render_pos.x + 10, render_pos.y + 4);
     ui_queue_sprite(state, SPRITE_UI_DROPDOWN_MINI, hovered ? ivec2(0, 4) : ivec2(0, 3), render_pos, 0);
     ui_queue_text(state, hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, text_pos, 0);
@@ -214,9 +214,9 @@ bool ui_icon_button(UI& state, SpriteName sprite, bool selected) {
         hframe = 1;
     }
 
-    ui_queue_sprite(state, SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
+    ui_queue_sprite(state, SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), origin - ivec2(0, ((int)hovered * 2)), 0);
     if (sprite != UI_ICON_BUTTON_EMPTY) {
-        ui_queue_sprite(state, sprite, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
+        ui_queue_sprite(state, sprite, ivec2(hframe, 0), origin - ivec2(0, ((int)hovered * 2)), 0);
     }
 
     bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
@@ -271,10 +271,10 @@ bool ui_text_frame(UI& state, const char* text, bool disabled) {
         } else if (frame == frame_count - 1) {
             hframe = 2;
         }
-        ui_queue_sprite(state, SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), ivec2(origin.x + (frame * sprite_info.frame_width * 2), origin.y - (int)hovered), 0);
+        ui_queue_sprite(state, SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), ivec2(origin.x + (frame * sprite_info.frame_width * 2), origin.y - ((int)hovered * 2)), 0);
     }
 
-    ui_queue_text(state, hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + (rect.w / 2) - (text_size.x / 2), rect.y + 1 -(int)hovered), 0);
+    ui_queue_text(state, hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + (rect.w / 2) - (text_size.x / 2), rect.y + 1 - ((int)hovered * 2)), 0);
 
     bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
