@@ -13,7 +13,7 @@
 #include "network/network.h"
 #include <string>
 
-#define MATCH_UI_HEIGHT 88
+#define MATCH_UI_HEIGHT 176
 #define MATCH_UI_CONTROL_GROUP_COUNT 10
 #define MATCH_UI_CONTROL_GROUP_NONE -1
 #define MATCH_UI_CAMERA_HOTKEY_COUNT 6

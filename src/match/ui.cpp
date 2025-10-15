@@ -23,7 +23,7 @@ static const uint32_t UI_STATUS_DURATION = 60;
 
 static const int MATCH_CAMERA_DRAG_MARGIN = 4;
 static const Rect SCREEN_RECT = (Rect) { .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT };
-static const Rect MINIMAP_RECT = (Rect) { .x = 4, .y = SCREEN_HEIGHT - 132, .w = 128, .h = 128 };
+static const Rect MINIMAP_RECT = (Rect) { .x = 8, .y = SCREEN_HEIGHT - 264, .w = 256, .h = 256 };
 static const int SOUND_LISTEN_MARGIN = 128;
 static const Rect SOUND_LISTEN_RECT = (Rect) {
     .x = -SOUND_LISTEN_MARGIN,
@@ -38,10 +38,10 @@ static const uint32_t UI_ALERT_TOTAL_DURATION = UI_ALERT_DURATION + UI_ALERT_LIN
 static const int UI_ATTACK_ALERT_DISTANCE = 20;
 static const uint32_t MATCH_UI_DOUBLE_CLICK_DURATION = 30;
 
-static const int MATCH_UI_BUTTON_X = SCREEN_WIDTH - 132 + 14; 
-static const int MATCH_UI_BUTTON_Y = SCREEN_HEIGHT - MATCH_UI_HEIGHT + 10;
-static const int MATCH_UI_BUTTON_PADDING_X = 32 + 4;
-static const int MATCH_UI_BUTTON_PADDING_Y = 32 + 6;
+static const int MATCH_UI_BUTTON_X = SCREEN_WIDTH - 264 + 28; 
+static const int MATCH_UI_BUTTON_Y = SCREEN_HEIGHT - MATCH_UI_HEIGHT + 20;
+static const int MATCH_UI_BUTTON_PADDING_X = 64 + 8;
+static const int MATCH_UI_BUTTON_PADDING_Y = 64 + 12;
 static const ivec2 MATCH_UI_BUTTON_POSITIONS[HOTKEY_GROUP_SIZE] = {
     ivec2(MATCH_UI_BUTTON_X, MATCH_UI_BUTTON_Y),
     ivec2(MATCH_UI_BUTTON_X + MATCH_UI_BUTTON_PADDING_X, MATCH_UI_BUTTON_Y),
@@ -50,26 +50,26 @@ static const ivec2 MATCH_UI_BUTTON_POSITIONS[HOTKEY_GROUP_SIZE] = {
     ivec2(MATCH_UI_BUTTON_X + MATCH_UI_BUTTON_PADDING_X, MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y),
     ivec2(MATCH_UI_BUTTON_X + (2 * MATCH_UI_BUTTON_PADDING_X), MATCH_UI_BUTTON_Y + MATCH_UI_BUTTON_PADDING_Y)
 };
-static const ivec2 SELECTION_LIST_TOP_LEFT = ivec2(164, 284);
-static const ivec2 BUILDING_QUEUE_TOP_LEFT = ivec2(320, 284);
+static const ivec2 SELECTION_LIST_TOP_LEFT = ivec2(328, 568);
+static const ivec2 BUILDING_QUEUE_TOP_LEFT = ivec2(640, 568);
 static const ivec2 UI_BUILDING_QUEUE_POSITIONS[BUILDING_QUEUE_MAX] = {
     BUILDING_QUEUE_TOP_LEFT,
-    BUILDING_QUEUE_TOP_LEFT + ivec2(0, 35),
-    BUILDING_QUEUE_TOP_LEFT + ivec2(36, 35),
-    BUILDING_QUEUE_TOP_LEFT + ivec2(36 * 2, 35),
-    BUILDING_QUEUE_TOP_LEFT + ivec2(36 * 3, 35)
+    BUILDING_QUEUE_TOP_LEFT + ivec2(0, 70),
+    BUILDING_QUEUE_TOP_LEFT + ivec2(72, 70),
+    BUILDING_QUEUE_TOP_LEFT + ivec2(72 * 2, 70),
+    BUILDING_QUEUE_TOP_LEFT + ivec2(72 * 3, 70)
 };
 static const Rect UI_BUILDING_QUEUE_PROGRESS_BAR_RECT = (Rect) {
-    .x = 320 + 36,
-    .y = 284 + 24,
-    .w = 104, .h = 6
+    .x = 640 + 72,
+    .y = 568 + 48,
+    .w = 208, .h = 12
 };
-static const ivec2 MATCH_UI_GARRISON_ICON_TOP_LEFT = ivec2(320, 284 + 18);
+static const ivec2 MATCH_UI_GARRISON_ICON_TOP_LEFT = ivec2(640, 568 + 36);
 static const ivec2 MATCH_UI_GARRISON_ICON_POSITIONS[4] = {
     MATCH_UI_GARRISON_ICON_TOP_LEFT,
-    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(36, 0),
-    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(36 * 2, 0),
-    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(36 * 3, 0)
+    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(72, 0),
+    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(72 * 2, 0),
+    MATCH_UI_GARRISON_ICON_TOP_LEFT + ivec2(72 * 3, 0)
 };
 
 static const int HEALTHBAR_HEIGHT = 4;
@@ -82,34 +82,34 @@ static const uint32_t CHAT_CURSOR_BLINK_DURATION = 30;
 static const int PARTICLE_SMOKE_CELL_SIZE = 7;
 
 static const uint32_t DISCONNECT_GRACE = 10;
-static const int DISCONNECT_FRAME_WIDTH = 200;
+static const int DISCONNECT_FRAME_WIDTH = 400;
 static const Rect DISCONNECT_FRAME_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (DISCONNECT_FRAME_WIDTH / 2), .y = 32,
-    .w = DISCONNECT_FRAME_WIDTH, .h = 200
+    .x = (SCREEN_WIDTH / 2) - (DISCONNECT_FRAME_WIDTH / 2), .y = 64,
+    .w = DISCONNECT_FRAME_WIDTH, .h = 300
 };
 
-static const ivec2 MENU_BUTTON_POSITION = ivec2(1, 1);
-static const int MENU_WIDTH = 150;
+static const ivec2 MENU_BUTTON_POSITION = ivec2(2, 2);
+static const int MENU_WIDTH = 300;
 static const Rect MENU_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (MENU_WIDTH / 2), .y = 64,
-    .w = MENU_WIDTH, .h = 144
+    .x = (SCREEN_WIDTH / 2) - (MENU_WIDTH / 2), .y = 128,
+    .w = MENU_WIDTH, .h = 288
 };
 
 static const Rect BOTTOM_PANEL_RECT = (Rect) {
-    .x = 136, .y = SCREEN_HEIGHT - MATCH_UI_HEIGHT,
-    .w = 372, .h = MATCH_UI_HEIGHT
+    .x = 272, .y = SCREEN_HEIGHT - MATCH_UI_HEIGHT,
+    .w = 744, .h = MATCH_UI_HEIGHT
 };
 static const Rect BUTTON_PANEL_RECT = (Rect) {
     .x = BOTTOM_PANEL_RECT.x + BOTTOM_PANEL_RECT.w,
-    .y = SCREEN_HEIGHT - 106,
-    .w = 132, .h = 106
+    .y = SCREEN_HEIGHT - 212,
+    .w = 264, .h = 212
 };
 static const Rect REPLAY_PANEL_RECT = (Rect) {
     .x = BOTTOM_PANEL_RECT.x + BOTTOM_PANEL_RECT.w,
-    .y = SCREEN_HEIGHT - 116,
-    .w = 132, .h = 116
+    .y = SCREEN_HEIGHT - 232,
+    .w = 264, .h = 232
 };
-static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 31, BUTTON_PANEL_RECT.y + 9);
+static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 62, BUTTON_PANEL_RECT.y + 18);
 
 static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
 static const uint32_t REPLAY_CHECKPOINT_FREQ = 32;
@@ -354,7 +354,7 @@ void match_ui_handle_input(MatchUiState& state) {
             ivec2 hotkey_position = MATCH_UI_BUTTON_POSITIONS[hotkey_index];
             Rect hotkey_rect = (Rect) {
                 .x = hotkey_position.x, .y = hotkey_position.y,
-                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+                .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
             };
 
             if ((input_is_action_just_pressed(hotkey) && !input_is_text_input_active()) || (
@@ -884,7 +884,7 @@ void match_ui_update(MatchUiState& state) {
     const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
     Rect menu_button_rect = (Rect) {
         .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
-        .w = menu_button_sprite_info.frame_width, .h = menu_button_sprite_info.frame_height 
+        .w = menu_button_sprite_info.frame_width * 2, .h = menu_button_sprite_info.frame_height * 2
     };
     if (!(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
             ((menu_button_rect.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) || input_is_action_just_pressed(INPUT_ACTION_MATCH_MENU))) {
@@ -912,15 +912,15 @@ void match_ui_update(MatchUiState& state) {
 
         const char* header_text = match_ui_get_menu_header_text(state.mode);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
-        ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 10);
+        ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 20);
         ui_element_position(state.ui, text_pos);
         ui_text(state.ui, FONT_WESTERN8_GOLD, header_text);
 
-        ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 32);
+        ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 64);
         if (state.mode != MATCH_UI_MODE_MENU) {
-            column_position.y += 11;
+            column_position.y += 22;
         }
-        ui_begin_column(state.ui, column_position, 5);
+        ui_begin_column(state.ui, column_position, 10);
             ivec2 button_size = ui_button_size("Return to Menu");
             if (state.mode == MATCH_UI_MODE_MENU) {
                 if (ui_button(state.ui, "Leave Match", button_size, true)) {
@@ -1993,8 +1993,8 @@ bool match_ui_building_can_be_placed(const MatchUiState& state) {
 }
 
 Rect match_ui_get_selection_list_item_rect(uint32_t selection_index) {
-    ivec2 pos = SELECTION_LIST_TOP_LEFT + ivec2(((selection_index % 10) * 34) - 12, (selection_index / 10) * 34);
-    return (Rect) { .x = pos.x, .y = pos.y, .w = 32, .h = 32 };
+    ivec2 pos = SELECTION_LIST_TOP_LEFT + ivec2(((selection_index % 10) * 68) - 24, (selection_index / 10) * 68);
+    return (Rect) { .x = pos.x, .y = pos.y, .w = 64, .h = 64 };
 }
 
 void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const char* message) {
@@ -2866,7 +2866,7 @@ void match_ui_render(const MatchUiState& state) {
 
     // UI frames
     const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
-    render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height), 0, 0);
+    render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height * 2), 0, 0);
     render_ninepatch(SPRITE_UI_FRAME_BOLTS, BOTTOM_PANEL_RECT);
     if (state.replay_mode) {
         render_ninepatch(SPRITE_UI_FRAME_BOLTS, REPLAY_PANEL_RECT);
@@ -2944,7 +2944,7 @@ void match_ui_render(const MatchUiState& state) {
         ivec2 hotkey_position = MATCH_UI_BUTTON_POSITIONS[hotkey_index];
         Rect hotkey_rect = (Rect) { 
             .x = hotkey_position.x, .y = hotkey_position.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height 
+            .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
         };
         int hframe = 0;
         if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
@@ -2965,8 +2965,8 @@ void match_ui_render(const MatchUiState& state) {
             Rect hotkey_rect = (Rect) {
                 .x = MATCH_UI_BUTTON_POSITIONS[hotkey_hovered_index].x,
                 .y = MATCH_UI_BUTTON_POSITIONS[hotkey_hovered_index].y,
-                .w = 32,
-                .h = 32
+                .w = 64,
+                .h = 64
             };
             if (hotkey_rect.has_point(input_get_mouse_position())) {
                 break;
@@ -3056,8 +3056,8 @@ void match_ui_render(const MatchUiState& state) {
                 if (tooltip_has_desc) {
                     tooltip_text_width = std::max(tooltip_text_width, render_get_text_size(FONT_HACK_OFFBLACK, tooltip_desc).x);
                 }
-                int tooltip_min_width = 10 + tooltip_text_width;
-                int tooltip_cell_width = tooltip_min_width / 8;
+                int tooltip_min_width = 20 + tooltip_text_width;
+                int tooltip_cell_width = tooltip_min_width / 16;
                 int tooltip_cell_height = 3;
                 if (tooltip_gold_cost != 0 || tooltip_energy_cost != 0) {
                     tooltip_cell_height += 2;
@@ -3065,12 +3065,12 @@ void match_ui_render(const MatchUiState& state) {
                 if (tooltip_has_desc) {
                     tooltip_cell_height += 2;
                 }
-                if (tooltip_min_width % 8 != 0) {
+                if (tooltip_min_width % 16 != 0) {
                     tooltip_cell_width++;
                 }
                 ivec2 tooltip_top_left = ivec2(
-                    SCREEN_WIDTH - (tooltip_cell_width * 8) - 2,
-                    BUTTON_PANEL_RECT.y - (tooltip_cell_height * 8) - 2
+                    SCREEN_WIDTH - (tooltip_cell_width * 16) - 3,
+                    BUTTON_PANEL_RECT.y - (tooltip_cell_height * 16) - 4
                 );
                 for (int y = 0; y < tooltip_cell_height; y++) {
                     for (int x = 0; x < tooltip_cell_width; x++) {
@@ -3090,41 +3090,41 @@ void match_ui_render(const MatchUiState& state) {
                             frame.y = 1;
                         }
 
-                        render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, frame, tooltip_top_left + (ivec2(x, y) * 8), RENDER_SPRITE_NO_CULL, 0);
+                        render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, frame, tooltip_top_left + (ivec2(x, y) * 16), RENDER_SPRITE_NO_CULL, 0);
                     }
                 }
 
                 // Render tooltip text
-                int tooltip_item_y = 5;
-                render_text(FONT_WESTERN8_OFFBLACK, tooltip_text, tooltip_top_left + ivec2(5, tooltip_item_y));
-                tooltip_item_y = 21;
+                int tooltip_item_y = 10;
+                render_text(FONT_WESTERN8_OFFBLACK, tooltip_text, tooltip_top_left + ivec2(10, tooltip_item_y));
+                tooltip_item_y = 42;
                 if (tooltip_has_desc) {
-                    render_text(FONT_HACK_OFFBLACK, tooltip_desc, tooltip_top_left + ivec2(5, 5 + 16));
-                    tooltip_item_y = 35;
+                    render_text(FONT_HACK_OFFBLACK, tooltip_desc, tooltip_top_left + ivec2(10, 10 + 32));
+                    tooltip_item_y = 70;
                 }
 
                 // Render gold icon and text
                 if (tooltip_gold_cost != 0) {
-                    render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5, tooltip_item_y), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), tooltip_top_left + ivec2(10, tooltip_item_y), RENDER_SPRITE_NO_CULL, 0);
                     char gold_text[4];
                     sprintf(gold_text, "%u", tooltip_gold_cost);
-                    render_text(FONT_WESTERN8_OFFBLACK, gold_text, tooltip_top_left + ivec2(23, tooltip_item_y));
+                    render_text(FONT_WESTERN8_OFFBLACK, gold_text, tooltip_top_left + ivec2(46, tooltip_item_y));
                 }
 
                 // Render population icon and text
                 if (tooltip_population_cost != 0) {
-                    render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5 + 18 + 32, tooltip_item_y - 2), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), tooltip_top_left + ivec2(10 + 36 + 64, tooltip_item_y - 4), RENDER_SPRITE_NO_CULL, 0);
                     char population_text[4];
                     sprintf(population_text, "%u", tooltip_population_cost);
-                    render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + ivec2(5 + 18 + 32 + 22, tooltip_item_y + 2));
+                    render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + ivec2(10 + 36 + 64 + 44, tooltip_item_y + 4));
                 }
 
                 // Render energy text
                 if (tooltip_energy_cost != 0) {
-                    render_sprite_frame(SPRITE_UI_ENERGY_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5, tooltip_item_y), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(SPRITE_UI_ENERGY_ICON, ivec2(0, 0), tooltip_top_left + ivec2(10, tooltip_item_y), RENDER_SPRITE_NO_CULL, 0);
                     char energy_text[4];
                     sprintf(energy_text, "%u", tooltip_energy_cost);
-                    render_text(FONT_WESTERN8_OFFBLACK, energy_text, tooltip_top_left + ivec2(22, tooltip_item_y));
+                    render_text(FONT_WESTERN8_OFFBLACK, energy_text, tooltip_top_left + ivec2(44, tooltip_item_y));
                 }
             } 
         }
@@ -3139,8 +3139,8 @@ void match_ui_render(const MatchUiState& state) {
         // Entity name
         const SpriteInfo& frame_sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, entity_data.name);
-        int frame_count = (text_size.x / frame_sprite_info.frame_width) + 1;
-        if (text_size.x % frame_sprite_info.frame_width != 0) {
+        int frame_count = (text_size.x / (frame_sprite_info.frame_width * 2)) + 1;
+        if (text_size.x % (frame_sprite_info.frame_width * 2) != 0) {
             frame_count++;
         }
         for (int frame = 0; frame < frame_count; frame++) {
@@ -3150,27 +3150,27 @@ void match_ui_render(const MatchUiState& state) {
             } else if (frame == frame_count - 1) {
                 hframe = 2;
             }
-            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), SELECTION_LIST_TOP_LEFT + ivec2(frame * frame_sprite_info.frame_width, 0), RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), SELECTION_LIST_TOP_LEFT + ivec2(frame * frame_sprite_info.frame_width * 2, 0), RENDER_SPRITE_NO_CULL, 0);
         }
-        ivec2 frame_size = ivec2(frame_count * frame_sprite_info.frame_width, frame_sprite_info.frame_height);
+        ivec2 frame_size = ivec2(frame_count * frame_sprite_info.frame_width * 2, frame_sprite_info.frame_height * 2);
         render_text(FONT_WESTERN8_OFFBLACK, entity_data.name, SELECTION_LIST_TOP_LEFT + ivec2((frame_size.x / 2) - (text_size.x / 2), 0));
 
         // Entity icon
-        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 18), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 36), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 36), RENDER_SPRITE_NO_CULL, 0);
 
         if (entity.type == ENTITY_GOLDMINE) {
             if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
-                render_text(FONT_HACK_WHITE, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(36, 20));
+                render_text(FONT_HACK_WHITE, "Collapsed!", SELECTION_LIST_TOP_LEFT + ivec2(72, 40));
             } else {
                 char gold_left_str[8];
                 sprintf(gold_left_str, "%u", entity.gold_held);
-                render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(36, 20), RENDER_SPRITE_NO_CULL, 0);
-                render_text(FONT_HACK_WHITE, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(36 + render_get_sprite_info(SPRITE_UI_GOLD_ICON).frame_width + 2, 20 + 1));
+                render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(72, 40), RENDER_SPRITE_NO_CULL, 0);
+                render_text(FONT_HACK_WHITE, gold_left_str, SELECTION_LIST_TOP_LEFT + ivec2(72 + (render_get_sprite_info(SPRITE_UI_GOLD_ICON).frame_width * 2) + 4, 42));
             }
         } else {
-            ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(34, 18 + 2);
-            ivec2 healthbar_size = ivec2(64, 12);
+            ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(68, 36 + 4);
+            ivec2 healthbar_size = ivec2(128, 24);
             match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 
             char health_text[16];
@@ -3181,7 +3181,7 @@ void match_ui_render(const MatchUiState& state) {
 
             uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
             if (entity_is_unit(entity.type) && entity_max_energy != 0)  {
-                healthbar_position += ivec2(0, healthbar_size.y + 1);
+                healthbar_position += ivec2(0, healthbar_size.y + 2);
                 match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
                 sprintf(health_text, "%i/%i", entity.energy, entity_max_energy);
                 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
@@ -3360,29 +3360,29 @@ void match_ui_render(const MatchUiState& state) {
         // Rendering from right to left here
 
         // Population text
-        render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 2);
+        render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 4);
         char population_text[8];
         sprintf(population_text, "%u/%u", match_get_player_population(state.match, player_id), match_get_player_max_population(state.match, player_id));
-        render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, resource_base_y + 3));
+        render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, resource_base_y + 6));
 
         // Population icon
-        render_x -= (population_icon_sprite_info.frame_width + 2);
+        render_x -= ((population_icon_sprite_info.frame_width * 2) + 4);
         render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y), RENDER_SPRITE_NO_CULL, 0);
 
         // Gold text
-        render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 2);
+        render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 4);
         char gold_text[8];
         sprintf(gold_text, "%u", state.displayed_gold_amounts[player_id]);
-        render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, resource_base_y + 3));
+        render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, resource_base_y + 6));
 
         // Gold icon
-        render_x -= (gold_icon_sprite_info.frame_width + 2);
-        render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y + 2), RENDER_SPRITE_NO_CULL, 0);
+        render_x -= ((gold_icon_sprite_info.frame_width * 2) + 4);
+        render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y + 4), RENDER_SPRITE_NO_CULL, 0);
 
         // Player name
         if (state.replay_mode) {
-            render_x -= (render_get_text_size(FONT_HACK_WHITE, state.match.players[player_id].name).x + 2);
-            render_text((FontName)(FONT_HACK_PLAYER0 + state.match.players[player_id].recolor_id), state.match.players[player_id].name, ivec2(render_x, resource_base_y + 3));
+            render_x -= (render_get_text_size(FONT_HACK_WHITE, state.match.players[player_id].name).x + 4);
+            render_text((FontName)(FONT_HACK_PLAYER0 + state.match.players[player_id].recolor_id), state.match.players[player_id].name, ivec2(render_x, resource_base_y + 6));
         }
 
         resource_base_y += population_icon_sprite_info.frame_height;
@@ -3393,7 +3393,7 @@ void match_ui_render(const MatchUiState& state) {
         const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
         Rect menu_button_rect = (Rect) {
             .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
-            .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
         };
         bool hovered = state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER || (
                             !(state.is_minimap_dragging || match_ui_is_selecting(state)) && menu_button_rect.has_point(input_get_mouse_position()));
@@ -3611,8 +3611,19 @@ void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 s
         return;
     }
 
+    render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK);
+    healthbar_rect.x++;
+    healthbar_rect.y++;
+    healthbar_rect.w -= 2;
+    healthbar_rect.h -= 2;
+    render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK);
+    healthbar_rect.x++;
+    healthbar_rect.y++;
+    healthbar_rect.w -= 2;
+    healthbar_rect.h -= 2;
+
     Rect healthbar_subrect = healthbar_rect;
-    healthbar_subrect.w = (healthbar_rect.w * amount) / max;
+    healthbar_subrect.w = (healthbar_subrect.w * amount) / max;
     
     RenderColor healthbar_color;
     if (type == RENDER_GARRISON_BAR) {
@@ -3626,7 +3637,6 @@ void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 s
     }
 
     render_fill_rect(healthbar_subrect, healthbar_color);
-    render_draw_rect(healthbar_rect, RENDER_COLOR_OFFBLACK);
 
     if (type == RENDER_GARRISON_BAR) {
         for (int line_index = 1; line_index < max; line_index++) {
@@ -3731,14 +3741,14 @@ void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity
     bool icon_hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) &&
                             icon_rect.has_point(input_get_mouse_position());
 
-    render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
-    render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - (int)icon_hovered), RENDER_SPRITE_NO_CULL, 0);
-    ivec2 healthbar_position = ivec2(icon_rect.x + 1, icon_rect.y + 27 - (int)icon_hovered);
-    ivec2 healthbar_size = ivec2(30, 4);
+    render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)icon_hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
+    render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)icon_hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
+    ivec2 healthbar_position = ivec2(icon_rect.x + 1, icon_rect.y + 54 - (int)icon_hovered);
+    ivec2 healthbar_size = ivec2(60, 8);
     uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
     if (entity_is_unit(entity.type) && entity_max_energy != 0) {
         match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
-        healthbar_position -= ivec2(0, healthbar_size.y + 1);
+        healthbar_position -= ivec2(0, healthbar_size.y + 2);
     }
     match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 }
