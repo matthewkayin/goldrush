@@ -5,16 +5,16 @@
 #include "match/hotkey.h" 
 #include <unordered_map>
 
-static const int OPTIONS_MENU_WIDTH = 364;
-static const int OPTIONS_MENU_HEIGHT = 300;
+static const int OPTIONS_MENU_WIDTH = 728;
+static const int OPTIONS_MENU_HEIGHT = 600;
 static const Rect OPTIONS_FRAME_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (OPTIONS_MENU_WIDTH / 2),
     .y = (SCREEN_HEIGHT / 2) - (OPTIONS_MENU_HEIGHT / 2),
     .w = OPTIONS_MENU_WIDTH, 
     .h = OPTIONS_MENU_HEIGHT
 };
-static const ivec2 BACK_BUTTON_POSITION = ivec2(OPTIONS_FRAME_RECT.x + 16, OPTIONS_FRAME_RECT.y + OPTIONS_FRAME_RECT.h - 21 - 8);
-static const ivec2 SAVE_BUTTON_POSITION = ivec2(OPTIONS_FRAME_RECT.x + OPTIONS_FRAME_RECT.w - 16 - 56, OPTIONS_FRAME_RECT.y + OPTIONS_FRAME_RECT.h - 21 - 8);
+static const ivec2 BACK_BUTTON_POSITION = ivec2(OPTIONS_FRAME_RECT.x + 32, OPTIONS_FRAME_RECT.y + OPTIONS_FRAME_RECT.h - 42 - 16);
+static const ivec2 SAVE_BUTTON_POSITION = ivec2(OPTIONS_FRAME_RECT.x + OPTIONS_FRAME_RECT.w - 32 - 112, OPTIONS_FRAME_RECT.y + OPTIONS_FRAME_RECT.h - 42 - 16);
 
 static const std::unordered_map<OptionName, std::vector<std::string>> OPTION_VALUE_STRINGS = {
     { OPTION_DISPLAY, { "Windowed", "Fullscreen", "Borderless" }},
@@ -184,15 +184,15 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
     }
 
     if (state.mode == OPTIONS_MENU_OPEN) {
-        ui_begin_column(ui, ivec2(OPTIONS_FRAME_RECT.x + 8, OPTIONS_FRAME_RECT.y + 16), 25);
+        ui_begin_column(ui, ivec2(OPTIONS_FRAME_RECT.x + 16, OPTIONS_FRAME_RECT.y + 32), 50);
             const SpriteInfo& dropdown_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
             for (uint32_t option = 0; option < OPTION_COUNT; option++) {
                 const OptionData& option_data = option_get_data((OptionName)option);
                 ui_begin_row(ui, ivec2(0, 0), 0);
-                    ui_element_position(ui, ivec2(0, 3));
+                    ui_element_position(ui, ivec2(0, 6));
                     ui_text(ui, FONT_WESTERN8_GOLD, option_data.name);
 
-                    ui_element_position(ui, ivec2(OPTIONS_FRAME_RECT.w - 16 - dropdown_info.frame_width, 0));
+                    ui_element_position(ui, ivec2(OPTIONS_FRAME_RECT.w - 32 - (dropdown_info.frame_width * 2), 0));
                     uint32_t value = option_get_value((OptionName)option);
                     if (option_data.type == OPTION_TYPE_DROPDOWN) {
                         if (ui_dropdown(ui, UI_DROPDOWN, &value, OPTION_VALUE_STRINGS.at((OptionName)option), false)) {
@@ -208,11 +208,11 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
 
             // Hotkeys row
             ui_begin_row(ui, ivec2(0, 0), 0);
-                ui_element_position(ui, ivec2(0, 3));
+                ui_element_position(ui, ivec2(0, 6));
                 ui_text(ui, FONT_WESTERN8_GOLD, "Hotkeys");
 
                 ivec2 edit_button_size = ui_button_size("Edit");
-                ui_element_position(ui, ivec2(OPTIONS_FRAME_RECT.w - 16 - edit_button_size.x, 0));
+                ui_element_position(ui, ivec2(OPTIONS_FRAME_RECT.w - 32 - edit_button_size.x, 0));
                 if (ui_button(ui, "Edit")) {
                     state.mode = OPTIONS_MENU_HOTKEYS;
                     for (int input = INPUT_HOTKEY_NONE; input < INPUT_ACTION_COUNT; input++) {
@@ -225,12 +225,12 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
             ui_end_container(ui);
         ui_end_container(ui);
     } else if (state.mode == OPTIONS_MENU_HOTKEYS) {
-        ui_begin_row(ui, ivec2(OPTIONS_FRAME_RECT.x + 16, OPTIONS_FRAME_RECT.y + 16), -4);
-            ui_begin_column(ui, ivec2(0, 0), 4);
+        ui_begin_row(ui, ivec2(OPTIONS_FRAME_RECT.x + 32, OPTIONS_FRAME_RECT.y + 32), -8);
+            ui_begin_column(ui, ivec2(0, 0), 8);
                 ui_text(ui, FONT_HACK_GOLD, "Hotkey Groups:");
                 int hotkey_group = 0;
                 while (hotkey_group < HOTKEY_GROUP_COUNT) {
-                    ui_begin_row(ui, ivec2(0, 0), 4);
+                    ui_begin_row(ui, ivec2(0, 0), 8);
                     for (int column = 0; column < 3; column++) {
                         const HotkeyGroup& group = HOTKEY_GROUPS.at((HotkeyGroupName)hotkey_group);
                         if (ui_icon_button(ui, group.icon, hotkey_group == state.hotkey_group_selected)) {
@@ -247,7 +247,7 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
                 }
 
                 ui_text(ui, FONT_HACK_GOLD, "Use Preset:");
-                ui_begin_row(ui, ivec2(0, 0), 4);
+                ui_begin_row(ui, ivec2(0, 0), 8);
                 if (ui_button(ui, "Default")) {
                     input_set_hotkey_mapping_to_default(state.hotkey_pending_changes);
                     state.save_status = options_menu_has_unsaved_hotkey_changes(state)
@@ -264,13 +264,13 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
             ui_end_container(ui);
             if (state.hotkey_group_selected != HOTKEY_GROUP_NONE) {
                 const HotkeyGroup& group = HOTKEY_GROUPS.at((HotkeyGroupName)state.hotkey_group_selected);
-                ui_element_size(ui, ivec2(36 * 3, 0));
-                ui_begin_column(ui, ivec2(0, 0), 4);
+                ui_element_size(ui, ivec2(36 * 3 * 2, 0));
+                ui_begin_column(ui, ivec2(0, 0), 8);
                     ui_text(ui, FONT_HACK_GOLD, group.name);
 
                     // Hotkey rows
                     for (int hotkey_row = 0; hotkey_row < 2; hotkey_row++) {
-                        ui_begin_row(ui, ivec2(0, 0), 4);
+                        ui_begin_row(ui, ivec2(0, 0), 8);
                             for (int hotkey_index = (hotkey_row * 3); hotkey_index < (hotkey_row * 3) + 3; hotkey_index++) {
                                 SpriteName icon_button_sprite = group.hotkeys[hotkey_index] == INPUT_HOTKEY_NONE
                                                                     ? UI_ICON_BUTTON_EMPTY
@@ -301,7 +301,7 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
                         hotkey_text_ptr += sprintf(hotkey_text_ptr, ")");
                         ui_text(ui, FONT_HACK_GOLD,  hotkey_text);
                         ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, "Press any key to");
-                        ui_element_size(ui, ivec2(text_size.x, text_size.y - 4));
+                        ui_element_size(ui, ivec2(text_size.x, text_size.y - 8));
                         ui_text(ui, FONT_HACK_WHITE, "Press any key to");
                         ui_text(ui, FONT_HACK_WHITE, "change this hotkey.");
 
@@ -320,7 +320,7 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
         if (state.save_status != OPTIONS_MENU_SAVE_STATUS_NONE) {
             const char* status_text = options_menu_get_save_status_str(state.save_status);
             ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, status_text);
-            ivec2 text_pos = ivec2(OPTIONS_FRAME_RECT.x + OPTIONS_FRAME_RECT.w - 16 - text_size.x, SAVE_BUTTON_POSITION.y - 4 - text_size.y);
+            ivec2 text_pos = ivec2(OPTIONS_FRAME_RECT.x + OPTIONS_FRAME_RECT.w - 32 - text_size.x, SAVE_BUTTON_POSITION.y - 8 - text_size.y);
             ui_element_position(ui, text_pos);
             ui_text(ui, FONT_HACK_WHITE, status_text);
         }

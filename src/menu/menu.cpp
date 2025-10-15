@@ -15,7 +15,7 @@ static const int WAGON_X_DEFAULT = 380;
 static const int WAGON_X_LOBBY = 480;
 static const int PARALLAX_TIMER_DURATION = 2;
 
-static const int MENU_TILE_WIDTH = (SCREEN_WIDTH / TILE_SIZE) * 2;
+static const int MENU_TILE_WIDTH = (SCREEN_WIDTH / TILE_SIZE) * 4;
 static const int MENU_TILE_HEIGHT = 2;
 static const ivec2 MENU_DECORATION_COORDS[3] = { 
     ivec2(680, -8), 
@@ -31,45 +31,45 @@ static const ivec2 CLOUD_COORDS[CLOUD_COUNT] = {
 };
 static const int CLOUD_FRAME_X[CLOUD_COUNT] = { 0, 1, 2, 2, 1, 1};
 
-static const int BUTTON_X = 44;
-static const int BUTTON_Y = 128;
+static const int BUTTON_X = 88;
+static const int BUTTON_Y = 256;
 
 static const Rect LOBBYLIST_RECT = (Rect) {
-    .x = 36, .y = 32, .w = 432, .h = 200
+    .x = 72, .y = 64, .w = 864, .h = 400
 };
 static const Rect PLAYERLIST_RECT = (Rect) {
-    .x = 16, .y = 4, .w = 432, .h = 128
+    .x = 32, .y = 8, .w = 864, .h = 256
 };
 static const Rect LOBBY_CHAT_RECT = (Rect) {
-    .x = 16, .y = 136, .w = 432, .h = 158
+    .x = 32, .y = 272, .w = 864, .h = 316
 };
 static const Rect MATCH_SETTINGS_RECT = (Rect) {
     .x = PLAYERLIST_RECT.x + PLAYERLIST_RECT.w + 4,
     .y = PLAYERLIST_RECT.y,
-    .w = 172,
+    .w = 344,
     .h = PLAYERLIST_RECT.h
 };
 static const Rect LOBBY_CREATE_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (300 / 2),
-    .y = 64,
-    .w = 300,
-    .h = 128
+    .x = (SCREEN_WIDTH / 2) - (600 / 2),
+    .y = 128,
+    .w = 600,
+    .h = 256
 };
 #ifndef GOLD_STEAM
 static const Rect USERNAME_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (300 / 2),
-    .y = 84,
-    .w = 300,
-    .h = 96
+    .x = (SCREEN_WIDTH / 2) - (600 / 2),
+    .y = 168,
+    .w = 600,
+    .h = 192
 };
 #endif
 
-static const int PLAYERLIST_COLUMN_X = PLAYERLIST_RECT.x + 16;
-static const int PLAYERLIST_COLUMN_Y = PLAYERLIST_RECT.y + 22;
-static const int PLAYERLIST_COLUMN_NAME_WIDTH = 200;
-static const int PLAYERLIST_COLUMN_STATUS_WIDTH = 64;
-static const int PLAYERLIST_COLUMN_TEAM_WIDTH = 56;
-static const int PLAYERLIST_ROW_HEIGHT = 20;
+static const int PLAYERLIST_COLUMN_X = PLAYERLIST_RECT.x + 32;
+static const int PLAYERLIST_COLUMN_Y = PLAYERLIST_RECT.y + 44;
+static const int PLAYERLIST_COLUMN_NAME_WIDTH = 400;
+static const int PLAYERLIST_COLUMN_STATUS_WIDTH = 128;
+static const int PLAYERLIST_COLUMN_TEAM_WIDTH = 112;
+static const int PLAYERLIST_ROW_HEIGHT = 40;
 
 static const uint32_t STATUS_DURATION = 2 * 60; 
 static const uint32_t CONNECTION_TIMEOUT = 5 * 60;
@@ -329,20 +329,20 @@ void menu_update(MenuState& state) {
         ui_frame_rect(state.ui, LOBBY_CREATE_RECT);
         ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Create Lobby");
 
-        ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.x + (LOBBY_CREATE_RECT.w / 2) - (header_text_size.x / 2), LOBBY_CREATE_RECT.y + 6));
+        ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.x + (LOBBY_CREATE_RECT.w / 2) - (header_text_size.x / 2), LOBBY_CREATE_RECT.y + 12));
         ui_text(state.ui, FONT_HACK_GOLD, "Create Lobby");
 
-        ui_begin_column(state.ui, ivec2(LOBBY_CREATE_RECT.x + 8, LOBBY_CREATE_RECT.y + 26), 6);
-        ui_text_input(state.ui, "Name: ", ivec2(284, 24), &state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        ui_begin_column(state.ui, ivec2(LOBBY_CREATE_RECT.x + 16, LOBBY_CREATE_RECT.y + 52), 12);
+        ui_text_input(state.ui, "Name: ", ivec2(568, 48), &state.lobby_name, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
         #ifdef GOLD_STEAM
             if (network_get_backend() == NETWORK_BACKEND_STEAM) {
                 const SpriteInfo& dropdown_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
 
                 ui_begin_row(state.ui, ivec2(0, 0), 0);
-                    ui_element_position(state.ui, ivec2(0, 3));
+                    ui_element_position(state.ui, ivec2(0, 6));
                     ui_text(state.ui, FONT_WESTERN8_GOLD, "Privacy:");
 
-                    ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.w - 16 - dropdown_info.frame_width, 0));
+                    ui_element_position(state.ui, ivec2(LOBBY_CREATE_RECT.w - 32 - (dropdown_info.frame_width * 2), 0));
                     ui_dropdown(state.ui, UI_DROPDOWN, &state.lobby_privacy, LOBBY_TYPE_STRS, false);
                 ui_end_container(state.ui);
             }
@@ -372,8 +372,8 @@ void menu_update(MenuState& state) {
         }
 
         // Lobby list search and top buttons
-        ui_begin_row(state.ui, ivec2(44, 4), 4);
-            ui_text_input(state.ui, "Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        ui_begin_row(state.ui, ivec2(88, 8), 8);
+            ui_text_input(state.ui, "Search: ", ivec2(600, 48), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
             if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_REFRESH, false, false)) {
                 network_search_lobbies(state.lobby_search_query.c_str());
                 state.lobbylist_page = 0;
@@ -396,7 +396,7 @@ void menu_update(MenuState& state) {
             sprintf(lobby_text, "%s %s (%u/%u) %s", selected ? "*" : " ", lobby.name, lobby.player_count, MAX_PLAYERS, selected ? "*" : " ");
 
             ivec2 text_frame_size = ui_text_frame_size(lobby_text);
-            ui_element_position(state.ui, ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
+            ui_element_position(state.ui, ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 24 + (40 * (lobby_index - base_index))));
             if (ui_text_frame(state.ui, lobby_text, false)) {
                 state.lobbylist_item_selected = lobby_index;
             }
@@ -426,7 +426,7 @@ void menu_update(MenuState& state) {
         // Playerlist
         ui_frame_rect(state.ui, PLAYERLIST_RECT);
         ivec2 lobby_name_text_size = render_get_text_size(FONT_HACK_GOLD, network_get_lobby_name());
-        ui_element_position(state.ui, ivec2(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y + 6));
+        ui_element_position(state.ui, ivec2(PLAYERLIST_RECT.x + (PLAYERLIST_RECT.w / 2) - (lobby_name_text_size.x / 2), PLAYERLIST_RECT.y + 12));
         ui_text(state.ui, FONT_HACK_GOLD, network_get_lobby_name());
 
         ui_begin_column(state.ui, ivec2(PLAYERLIST_COLUMN_X, PLAYERLIST_COLUMN_Y), 0);
@@ -511,14 +511,14 @@ void menu_update(MenuState& state) {
         ui_element_position(state.ui, ivec2(MATCH_SETTINGS_RECT.x + (MATCH_SETTINGS_RECT.w / 2) - (match_settings_text_size.x / 2), MATCH_SETTINGS_RECT.y + 6));
         ui_text(state.ui, FONT_HACK_GOLD, "Settings");
 
-        ui_begin_column(state.ui, ivec2(MATCH_SETTINGS_RECT.x + 8, MATCH_SETTINGS_RECT.y + 22), 4);
+        ui_begin_column(state.ui, ivec2(MATCH_SETTINGS_RECT.x + 16, MATCH_SETTINGS_RECT.y + 44), 8);
             int dropdown_width = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI).frame_width;
-            const int setting_name_element_size = MATCH_SETTINGS_RECT.w - 16 - dropdown_width;
+            const int setting_name_element_size = MATCH_SETTINGS_RECT.w - 32 - (dropdown_width * 2);
             for (int index = 0; index < MATCH_SETTING_COUNT; index++) {
                 const MatchSettingData& setting_data = match_setting_data((MatchSetting)index);
                 ui_begin_row(state.ui, ivec2(0, 0), 0);
                     ui_element_size(state.ui, ivec2(setting_name_element_size, 0));
-                    ui_element_position(state.ui, ivec2(0, 2));
+                    ui_element_position(state.ui, ivec2(0, 4));
                     ui_text(state.ui, FONT_HACK_GOLD, setting_data.name);
 
                     uint32_t match_setting_value = network_get_match_setting(index);
@@ -532,15 +532,15 @@ void menu_update(MenuState& state) {
         // Chat
         ui_frame_rect(state.ui, LOBBY_CHAT_RECT);
         // Chat messages
-        ui_begin_column(state.ui, ivec2(LOBBY_CHAT_RECT.x + 16, LOBBY_CHAT_RECT.y + 8), 0);
+        ui_begin_column(state.ui, ivec2(LOBBY_CHAT_RECT.x + 32, LOBBY_CHAT_RECT.y + 16), 0);
             for (const std::string& message : state.chat) {
                 ui_text(state.ui, FONT_HACK_GOLD, message.c_str());
             }
         ui_end_container(state.ui);
 
         // Chat input
-        ui_element_position(state.ui, ivec2(24, 128 + 158 + 8 + 4));
-        ui_text_input(state.ui, "Chat: ", ivec2(432 - 16, 24), &state.chat_message, MENU_CHAT_MAX_MESSAGE_LENGTH);
+        ui_element_position(state.ui, ivec2(48, 596));
+        ui_text_input(state.ui, "Chat: ", ivec2(832, 48), &state.chat_message, MENU_CHAT_MAX_MESSAGE_LENGTH);
         if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active()) {
             if (!state.chat_message.empty()) {
                 char chat_message[128];
@@ -553,7 +553,7 @@ void menu_update(MenuState& state) {
         }
 
         // Lobby buttons
-        ui_begin_row(state.ui, ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 12, MATCH_SETTINGS_RECT.y + MATCH_SETTINGS_RECT.h + 4), 4);
+        ui_begin_row(state.ui, ivec2(LOBBY_CHAT_RECT.x + LOBBY_CHAT_RECT.w + 24, MATCH_SETTINGS_RECT.y + MATCH_SETTINGS_RECT.h + 8), 8);
             if (ui_button(state.ui, "Back")) {
                 network_disconnect();
                 if (state.mode == MENU_MODE_LOBBY) {
@@ -611,8 +611,8 @@ void menu_update(MenuState& state) {
         }
 
         // Search and top buttons
-        ui_begin_row(state.ui, ivec2(44, 4), 4);
-            ui_text_input(state.ui, "Search: ", ivec2(300, 24), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        ui_begin_row(state.ui, ivec2(88, 8), 8);
+            ui_text_input(state.ui, "Search: ", ivec2(600, 48), &state.lobby_search_query, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
             if (ui_sprite_button(state.ui, SPRITE_UI_BUTTON_REFRESH, false, false)) {
                 menu_search_replays_folder(state);
                 state.lobbylist_page = 0;
@@ -633,14 +633,14 @@ void menu_update(MenuState& state) {
             sprintf(replay_text, "%s %s %s", selected ? "*" : " ", state.replay_filenames[lobby_index].c_str(), selected ? "*" : " ");
 
             ivec2 text_frame_size = ui_text_frame_size(replay_text);
-            ui_element_position(state.ui, ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 12 + (20 * (lobby_index - base_index))));
+            ui_element_position(state.ui, ivec2(LOBBYLIST_RECT.x + (LOBBYLIST_RECT.w / 2) - (text_frame_size.x / 2), LOBBYLIST_RECT.y + 24 + (40 * (lobby_index - base_index))));
             if (ui_text_frame(state.ui, replay_text, false)) {
                 state.lobbylist_item_selected = lobby_index;
             }
         }
 
         // Replaylist button row
-        ui_begin_row(state.ui, ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 4), 4); 
+        ui_begin_row(state.ui, ivec2(BUTTON_X, LOBBYLIST_RECT.y + LOBBYLIST_RECT.h + 8), 8); 
             if (ui_button(state.ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_MAIN);
             }
@@ -674,8 +674,8 @@ void menu_update(MenuState& state) {
         ui_element_position(state.ui, ivec2(USERNAME_RECT.x + (USERNAME_RECT.w / 2) - (header_text_size.x / 2), USERNAME_RECT.y + 6));
         ui_text(state.ui, FONT_HACK_GOLD, "Choose Your Username");
 
-        ui_begin_column(state.ui, ivec2(USERNAME_RECT.x + 8, USERNAME_RECT.y + 26), 6);
-        ui_text_input(state.ui, "Username: ", ivec2(284, 24), &state.username, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        ui_begin_column(state.ui, ivec2(USERNAME_RECT.x + 32, USERNAME_RECT.y + 112), 12);
+        ui_text_input(state.ui, "Username: ", ivec2(568, 48), &state.username, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
 
         ui_end_container(state.ui);
 
@@ -700,10 +700,10 @@ void menu_update(MenuState& state) {
     if (state.mode == MENU_MODE_REPLAY_RENAME) {
         state.ui.input_enabled = true;
         ui_screen_shade(state.ui);
-        ui_begin_column(state.ui, ivec2((SCREEN_WIDTH / 2) - 150, (SCREEN_HEIGHT / 2) - 64), 4);
-            ui_text_input(state.ui, "Rename: ", ivec2(300, 24), &state.replay_rename, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
+        ui_begin_column(state.ui, ivec2((SCREEN_WIDTH / 2) - 300, (SCREEN_HEIGHT / 2) - 128), 8);
+            ui_text_input(state.ui, "Rename: ", ivec2(600, 48), &state.replay_rename, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
 
-            ui_begin_row(state.ui, ivec2(0, 0), 4);
+            ui_begin_row(state.ui, ivec2(0, 0), 8);
                 if (ui_button(state.ui, "Back")) {
                     state.mode = MENU_MODE_REPLAYS;
                 }
@@ -748,7 +748,7 @@ void menu_set_mode(MenuState& state, MenuMode mode) {
     } else if (mode == MENU_MODE_REPLAYS) {
         state.lobby_search_query = "";
         menu_search_replays_folder(state);
-    } else if (mode == MENU_MODE_LOBBY) {
+    } else if (mode == MENU_MODE_LOBBY || mode == MENU_MODE_SKIRMISH_LOBBY) {
         state.chat.clear();
     } else if (mode == MENU_MODE_CREATE_LOBBY) {
         state.lobby_name = std::string(network_get_username()) + "'s Game";
@@ -859,7 +859,7 @@ void menu_render(const MenuState& state) {
                 .h = sprite_info.frame_height
             };
             Rect dst_rect = (Rect) {
-                .x = (x * TILE_SIZE * 2) - state.parallax_x,
+                .x = (x * TILE_SIZE * 2) - (state.parallax_x * 2),
                 .y = SCREEN_HEIGHT - ((MENU_TILE_HEIGHT - y) * TILE_SIZE * 2),
                 .w = TILE_SIZE * 2,
                 .h = TILE_SIZE * 2
@@ -887,10 +887,10 @@ void menu_render(const MenuState& state) {
         .h = sprite_wagon_info.frame_height
     };
     Rect wagon_dst_rect = (Rect) {
-        .x = state.wagon_x,
-        .y = SCREEN_HEIGHT - 88,
-        .w = wagon_src_rect.w * 2,
-        .h = wagon_src_rect.h * 2
+        .x = state.wagon_x * 2,
+        .y = SCREEN_HEIGHT - 176,
+        .w = wagon_src_rect.w * 4,
+        .h = wagon_src_rect.h * 4
     };
     render_sprite(SPRITE_UNIT_WAGON, wagon_src_rect, wagon_dst_rect, RENDER_SPRITE_NO_CULL);
 
@@ -907,10 +907,10 @@ void menu_render(const MenuState& state) {
             .h = cloud_sprite_info.frame_height
         };
         Rect dst_rect = (Rect) {
-            .x = CLOUD_COORDS[index].x - state.parallax_cloud_x,
-            .y = CLOUD_COORDS[index].y,
-            .w = src_rect.w * 2,
-            .h = src_rect.h * 2
+            .x = (CLOUD_COORDS[index].x - state.parallax_cloud_x) * 2,
+            .y = CLOUD_COORDS[index].y * 2,
+            .w = src_rect.w * 4,
+            .h = src_rect.h * 4
         };
         render_sprite(SPRITE_UI_CLOUDS, src_rect, dst_rect, 0);
     }
@@ -923,7 +923,7 @@ void menu_render(const MenuState& state) {
             state.mode == MENU_MODE_USERNAME ||
         #endif
             state.mode == MENU_MODE_SINGLEPLAYER) {
-        render_sprite_frame(SPRITE_UI_TITLE, ivec2(0, 0), ivec2(24, 24), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(SPRITE_UI_TITLE, ivec2(0, 0), ivec2(42, 42), RENDER_SPRITE_NO_CULL, 0, 2);
     }
 
     // Render version
@@ -964,7 +964,7 @@ void menu_render_decoration(const MenuState& state, int index) {
         .h = sprite_info.frame_height
     };
     Rect dst_rect = (Rect) {
-        .x = MENU_DECORATION_COORDS[index].x - state.parallax_x,
+        .x = (2 * MENU_DECORATION_COORDS[index].x) - (state.parallax_x * 2),
         .y = SCREEN_HEIGHT - (MENU_TILE_HEIGHT * TILE_SIZE * 2) + MENU_DECORATION_COORDS[index].y,
         .w = TILE_SIZE * 2,
         .h = TILE_SIZE * 2

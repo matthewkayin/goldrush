@@ -429,7 +429,7 @@ SDL_Surface* render_recolor_surface(SDL_Surface* sprite_surface, bool recolor_lo
 }
 
 SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params) {
-    SDL_Surface* tile_surface = SDL_CreateSurface(TILE_SIZE, TILE_SIZE, tileset_surface->format);
+    SDL_Surface* tile_surface = SDL_CreateSurface(TILE_SRC_SIZE, TILE_SRC_SIZE, tileset_surface->format);
     if (tile_surface == NULL) {
         log_error("Could not create single tile surface: %s", SDL_GetError());
         return NULL;
@@ -438,12 +438,12 @@ SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, con
     SDL_Rect src_rect = (SDL_Rect) { 
         .x = params.tile.source_x, 
         .y = params.tile.source_y,
-        .w = TILE_SIZE,
-        .h = TILE_SIZE
+        .w = TILE_SRC_SIZE,
+        .h = TILE_SRC_SIZE
     };
     SDL_Rect dst_rect = (SDL_Rect) {
         .x = 0, .y = 0,
-        .w = TILE_SIZE, .h = TILE_SIZE
+        .w = TILE_SRC_SIZE, .h = TILE_SRC_SIZE
     };
 
     SDL_BlitSurface(tileset_surface, &src_rect, tile_surface, &dst_rect);
@@ -452,7 +452,7 @@ SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, con
 }
 
 SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params) {
-    SDL_Surface* tile_surface = SDL_CreateSurface(TILE_SIZE * AUTOTILE_HFRAMES, TILE_SIZE * AUTOTILE_VFRAMES, tileset_surface->format);
+    SDL_Surface* tile_surface = SDL_CreateSurface(TILE_SRC_SIZE * AUTOTILE_HFRAMES, TILE_SRC_SIZE * AUTOTILE_VFRAMES, tileset_surface->format);
     if (tile_surface == NULL) {
         log_error("Could not create auto tile surface: %s", SDL_GetError());
         return NULL;
@@ -485,18 +485,18 @@ SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const
         // Each unique autotile is formed by sampling corners off of the source tile
         // https://gamedev.stackexchange.com/questions/46594/elegant-autotiling
         for (uint32_t edge = 0; edge < 4; edge++) {
-            ivec2 edge_source_pos = ivec2(params.tile.source_x, params.tile.source_y) + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SIZE / 2));
+            ivec2 edge_source_pos = ivec2(params.tile.source_x, params.tile.source_y) + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SRC_SIZE / 2));
             SDL_Rect subtile_src_rect = (SDL_Rect) {
                 .x = edge_source_pos.x,
                 .y = edge_source_pos.y,
-                .w = TILE_SIZE / 2,
-                .h = TILE_SIZE / 2
+                .w = TILE_SRC_SIZE / 2,
+                .h = TILE_SRC_SIZE / 2
             };
             SDL_Rect subtile_dst_rect = (SDL_Rect) {
-                .x = (autotile_frame.x * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SIZE / 2)),
-                .y = (autotile_frame.y * TILE_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SIZE / 2)),
-                .w = TILE_SIZE / 2,
-                .h = TILE_SIZE / 2
+                .x = (autotile_frame.x * TILE_SRC_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SRC_SIZE / 2)),
+                .y = (autotile_frame.y * TILE_SRC_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SRC_SIZE / 2)),
+                .w = TILE_SRC_SIZE / 2,
+                .h = TILE_SRC_SIZE / 2
             };
 
             SDL_BlitSurface(tileset_surface, &subtile_src_rect, tile_surface, &subtile_dst_rect);
@@ -772,8 +772,8 @@ bool render_load_sprites() {
                         sprite_info.hframes = AUTOTILE_HFRAMES;
                         sprite_info.vframes = AUTOTILE_VFRAMES;
                     }
-                    sprite_info.frame_width = TILE_SIZE;
-                    sprite_info.frame_height = TILE_SIZE;
+                    sprite_info.frame_width = TILE_SRC_SIZE;
+                    sprite_info.frame_height = TILE_SRC_SIZE;
                 } else if (params.strategy == SPRITE_IMPORT_SWATCH) {
                     sprite_info.hframes = RENDER_COLOR_COUNT;
                     sprite_info.vframes = 1;
@@ -929,7 +929,7 @@ const SpriteInfo& render_get_sprite_info(SpriteName name) {
     return state.sprite_info[name];
 }
 
-void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id) {
+void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id, int scale) {
     const SpriteInfo& sprite_info = render_get_sprite_info(name);
     GOLD_ASSERT(frame.x <= sprite_info.frame_width && frame.y <= sprite_info.frame_height);
 
@@ -942,13 +942,13 @@ void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t 
     Rect dst_rect = (Rect) { 
         .x = position.x, 
         .y = position.y, 
-        .w = sprite_info.frame_width,
-        .h = sprite_info.frame_height
+        .w = sprite_info.frame_width * scale,
+        .h = sprite_info.frame_height * scale
     };
     render_sprite(name, src_rect, dst_rect, options);
 }
 
-void render_ninepatch(SpriteName sprite, Rect rect) {
+void render_ninepatch(SpriteName sprite, Rect rect, int scale) {
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
 
     Rect src_rect = (Rect) {
@@ -960,8 +960,8 @@ void render_ninepatch(SpriteName sprite, Rect rect) {
     Rect dst_rect = (Rect) {
         .x = rect.x,
         .y = rect.y,
-        .w = sprite_info.frame_width,
-        .h = sprite_info.frame_height
+        .w = sprite_info.frame_width * scale,
+        .h = sprite_info.frame_height * scale
     };
 
     // Top left
@@ -969,55 +969,55 @@ void render_ninepatch(SpriteName sprite, Rect rect) {
 
     // Top right
     src_rect.x = 0 + (2 * sprite_info.frame_width);
-    dst_rect.x = rect.x + rect.w - sprite_info.frame_width;
+    dst_rect.x = rect.x + rect.w - (sprite_info.frame_width * scale);
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom left
     src_rect.x = 0;
     src_rect.y = 0 + (2 * sprite_info.frame_height);
     dst_rect.x = rect.x;
-    dst_rect.y = rect.y + rect.h - sprite_info.frame_height;
+    dst_rect.y = rect.y + rect.h - (sprite_info.frame_height * scale);
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom right
     src_rect.x = 0 + (2 * sprite_info.frame_width);
-    dst_rect.x = rect.x + rect.w - sprite_info.frame_width;
+    dst_rect.x = rect.x + rect.w - (sprite_info.frame_width * scale);
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Top edge
     src_rect.x = 0 + sprite_info.frame_width;
     src_rect.y = 0;
-    dst_rect.x = rect.x + sprite_info.frame_width;
+    dst_rect.x = rect.x + (sprite_info.frame_width * 2);
     dst_rect.y = rect.y;
-    dst_rect.w = (rect.x + rect.w - sprite_info.frame_width) - dst_rect.x;
+    dst_rect.w = (rect.x + rect.w - (sprite_info.frame_width * scale)) - dst_rect.x;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom edge
     src_rect.y = 0 + (2 * sprite_info.frame_height);
-    dst_rect.y = (rect.y + rect.h - sprite_info.frame_height);
+    dst_rect.y = (rect.y + rect.h - (sprite_info.frame_height * scale));
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Left edge
     src_rect.x = 0;
     src_rect.y = 0 + sprite_info.frame_height;
     dst_rect.x = rect.x;
-    dst_rect.w = sprite_info.frame_width;
-    dst_rect.y = rect.y + sprite_info.frame_height;
-    dst_rect.h = (rect.y + rect.h - sprite_info.frame_height) - dst_rect.y;
+    dst_rect.w = sprite_info.frame_width * scale;
+    dst_rect.y = rect.y + (sprite_info.frame_height * scale);
+    dst_rect.h = (rect.y + rect.h - (sprite_info.frame_height * scale)) - dst_rect.y;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Right edge
     src_rect.x = 0 + (2 * sprite_info.frame_width);
-    dst_rect.x = rect.x + rect.w - sprite_info.frame_width;
+    dst_rect.x = rect.x + rect.w - (sprite_info.frame_width * scale);
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Center
     src_rect.x = 0 + sprite_info.frame_width;
     src_rect.y = 0 + sprite_info.frame_height;
-    dst_rect.x = rect.x + sprite_info.frame_width;
-    dst_rect.y = rect.y + sprite_info.frame_height;
-    dst_rect.w = (rect.x + rect.w - sprite_info.frame_width) - dst_rect.x;
-    dst_rect.h = (rect.y + rect.h - sprite_info.frame_height) - dst_rect.y;
+    dst_rect.x = rect.x + (sprite_info.frame_width * scale);
+    dst_rect.y = rect.y + (sprite_info.frame_height * scale);
+    dst_rect.w = (rect.x + rect.w - (sprite_info.frame_width * scale)) - dst_rect.x;
+    dst_rect.h = (rect.y + rect.h - (sprite_info.frame_height * scale)) - dst_rect.y;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 
@@ -1085,7 +1085,7 @@ void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t opt
     });
 }
 
-void render_text(FontName name, const char* text, ivec2 position) {
+void render_text(FontName name, const char* text, ivec2 position, float scale) {
     ivec2 glyph_position = position;
     size_t text_index = 0;
 
@@ -1098,10 +1098,10 @@ void render_text(FontName name, const char* text, ivec2 position) {
             glyph_index = (int)('|' - FONT_FIRST_CHAR);
         }
 
-        float position_top = (float)(SCREEN_HEIGHT - (glyph_position.y + state.fonts[name].glyphs[glyph_index].bearing_y));
-        float position_bottom = position_top - (float)state.fonts[name].glyph_height;
-        float position_left = (float)(glyph_position.x + state.fonts[name].glyphs[glyph_index].bearing_x);
-        float position_right = position_left + (float)state.fonts[name].glyph_width;
+        float position_top = (float)(SCREEN_HEIGHT - (glyph_position.y + (state.fonts[name].glyphs[glyph_index].bearing_y * scale)));
+        float position_bottom = position_top - ((float)state.fonts[name].glyph_height * scale);
+        float position_left = (float)(glyph_position.x + (state.fonts[name].glyphs[glyph_index].bearing_x * scale));
+        float position_right = position_left + ((float)state.fonts[name].glyph_width * scale);
 
         ivec2 glyph_frame = ivec2(glyph_index % FONT_HFRAMES, glyph_index / FONT_HFRAMES);
         float tex_coord_left = (float)(state.fonts[name].atlas_x + (glyph_frame.x * state.fonts[name].glyph_width)) / (float)ATLAS_WIDTH;
@@ -1135,12 +1135,12 @@ void render_text(FontName name, const char* text, ivec2 position) {
             .tex_coord = { tex_coord_right, tex_coord_bottom, font_atlas }
         });
 
-        glyph_position.x += state.fonts[name].glyphs[glyph_index].advance;
+        glyph_position.x += state.fonts[name].glyphs[glyph_index].advance * scale;
         text_index++;
     }
 }
 
-ivec2 render_get_text_size(FontName name, const char* text) {
+ivec2 render_get_text_size(FontName name, const char* text, float scale) {
     ivec2 size = ivec2(0, state.fonts[name].glyph_height);
     size_t text_index = 0;
 
@@ -1154,7 +1154,7 @@ ivec2 render_get_text_size(FontName name, const char* text) {
         text_index++;
     }
 
-    return size;
+    return size * scale;
 }
 
 void render_line(ivec2 start, ivec2 end, RenderColor color) {

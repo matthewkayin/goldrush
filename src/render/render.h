@@ -7,6 +7,7 @@
 
 #define AUTOTILE_HFRAMES 8
 #define AUTOTILE_VFRAMES 6
+#define TILE_SRC_SIZE 16
 
 enum RenderDisplay {
     RENDER_DISPLAY_WINDOWED,
@@ -99,11 +100,11 @@ void render_sprite_batch();
 void render_prepare_frame();
 void render_present_frame();
 const SpriteInfo& render_get_sprite_info(SpriteName name);
-void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id);
-void render_ninepatch(SpriteName sprite, Rect rect);
+void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t options, int recolor_id, int scale = 2);
+void render_ninepatch(SpriteName sprite, Rect rect, int scale = 2);
 void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t options);
-void render_text(FontName name, const char* text, ivec2 position);
-ivec2 render_get_text_size(FontName name, const char* text);
+void render_text(FontName name, const char* text, ivec2 position, float scale = 2.0f);
+ivec2 render_get_text_size(FontName name, const char* text, float scale = 2.0f);
 void render_line(ivec2 start, ivec2 end, RenderColor color);
 void render_draw_rect(Rect rect, RenderColor color);
 void render_fill_rect(Rect rect, RenderColor color);
