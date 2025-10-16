@@ -2488,7 +2488,7 @@ void match_ui_render(const MatchUiState& state) {
     for (const Entity& entity : state.match.entities) {
         if (entity.type == ENTITY_BALLOON && entity.mode != MODE_UNIT_DEATH_FADE &&
                 match_ui_is_entity_visible(state, entity)) {
-            render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), entity.position.to_ivec2() + ivec2(-5, 3) - state.camera_offset, 0, 0);
+            render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), entity.position.to_ivec2() + ivec2(-10, 6) - state.camera_offset, 0, 0);
         }
     }
 

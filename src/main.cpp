@@ -421,14 +421,14 @@ int gold_main(int argc, char** argv) {
                     .h = sprite_info.frame_height
                 };
                 Rect dst_rect = (Rect) {
-                    .x = (SCREEN_WIDTH / 2) - sprite_info.frame_width,
-                    .y = (SCREEN_HEIGHT / 2) - sprite_info.frame_height - 4,
-                    .w = sprite_info.frame_width * 2,
-                    .h = sprite_info.frame_height * 2
+                    .x = (SCREEN_WIDTH / 2) - (sprite_info.frame_width * 2),
+                    .y = (SCREEN_HEIGHT / 2) - (sprite_info.frame_height * 2) - 8,
+                    .w = sprite_info.frame_width * 4,
+                    .h = sprite_info.frame_height * 4
                 };
                 render_sprite(SPRITE_MINER_BUILDING, src_rect, dst_rect, 0);
                 ivec2 text_size = render_get_text_size(FONT_HACK_WHITE, "Loading...");
-                render_text(FONT_HACK_WHITE, "Loading...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), (SCREEN_HEIGHT / 2) + sprite_info.frame_height + 4));
+                render_text(FONT_HACK_WHITE, "Loading...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), (SCREEN_HEIGHT / 2) + (sprite_info.frame_height * 2) + 8));
                 render_sprite_batch();
                 break;
             }
@@ -436,7 +436,7 @@ int gold_main(int argc, char** argv) {
 
         #ifdef GOLD_DEBUG
             if (render_debug_info) {
-                int render_x = state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY ? 24 : 0;
+                int render_x = state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY ? 42 : 0;
                 int render_y = 0;
 
                 char fps_text[32];
