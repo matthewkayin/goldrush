@@ -72,15 +72,6 @@ ifeq ($(BUILD_PLATFORM),win64)
 	-@setlocal enableextensions enabledelayedexpansion && xcopy $(LIB_DIR) $(BUILD_DIR)
 endif
 
-.PHONY: osx-bundle
-osx-bundle:
-ifeq ($(BUILD_PLATFORM),osx)
-	@./appify.sh -s $(BUILD_DIR)/gold -i icon.icns
-	@mv $(ASSEMBLY).app $(BUILD_DIR)/Gold\ Rush.app
-	@cp -a ./res/ $(BUILD_DIR)/Gold\ Rush.app/Contents/Resources/
-	@cp -a ./lib/osx/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
-endif
-
 .PHONY: scaffold
 scaffold:
 	@echo Scaffolding...
@@ -125,4 +116,27 @@ $(OBJ_DIR)/%.cpp.o: %.cpp # compile .c to .c.o object
 ifeq ($(BUILD_PLATFORM),win64)
 $(OBJ_DIR)/%.rc.res: %.rc # Windows resource scripts
 	@rc -fo $@ $^
+endif
+
+.PHONY: osx-bundle
+osx-bundle:
+ifeq ($(BUILD_PLATFORM),osx)
+	@./appify.sh -s $(BUILD_DIR)/gold -i icon.icns
+	@mv $(ASSEMBLY).app $(BUILD_DIR)/Gold\ Rush.app
+	@cp -a ./res/ $(BUILD_DIR)/Gold\ Rush.app/Contents/Resources/
+	@cp -a ./lib/osx/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
+endif
+
+.PHONY: win-zip
+win-zip:
+ifeq ($(BUILD_PLATFORM),win64)
+	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\sprite
+	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\sprite $(BUILD_DIR)\sprite
+	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\shader
+	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\shader $(BUILD_DIR)\shader
+	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\font
+	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\font $(BUILD_DIR)\font
+	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\sfx
+	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\sfx $(BUILD_DIR)\sfx
+	-@setlocal enableextensions enabledelayedexpansion && cd $(BUILD_DIR) && tar.exe -acvf dist.zip gold.exe *.dll *.lib font sfx shader sprite
 endif
