@@ -1632,8 +1632,8 @@ void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell) {
 bool match_ui_is_mouse_in_ui() {
     ivec2 mouse_position = input_get_mouse_position();
     return (mouse_position.y >= SCREEN_HEIGHT - MATCH_UI_HEIGHT) ||
-           (mouse_position.x <= 136 && mouse_position.y >= SCREEN_HEIGHT - 136) ||
-           (mouse_position.x >= SCREEN_WIDTH - 132 && mouse_position.y >= SCREEN_HEIGHT - 106);
+           (mouse_position.x <= 272 && mouse_position.y >= SCREEN_HEIGHT - 272) ||
+           (mouse_position.x >= SCREEN_WIDTH - 264 && mouse_position.y >= SCREEN_HEIGHT - 212);
 }
 
 bool match_ui_is_targeting(const MatchUiState& state) {

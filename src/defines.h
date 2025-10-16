@@ -27,7 +27,7 @@
 #endif
 #define GOLD_LOG_LEVEL 3
 #ifdef GOLD_DEBUG
-    #define GOLD_DEBUG_CHEATS
+    // #define GOLD_DEBUG_CHEATS
     #define GOLD_ASSERTS_ENABLED
     // #define GOLD_DEBUG_TURBO
     // #define GOLD_RAND_SEED 1760437756
@@ -48,7 +48,6 @@
 #define PLAYER_NONE MAX_PLAYERS
 #define SELECTION_LIMIT 20U
 #define HOTKEY_GROUP_SIZE 6
-#define MAP_SIZE 128
 
 #define PATHFIND_ITERATION_MAX 1999
 

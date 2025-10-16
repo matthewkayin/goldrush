@@ -347,7 +347,7 @@ int gold_main(int argc, char** argv) {
 
                         // Generate noise for map generation
                         uint64_t noise_seed = (uint64_t)lcg_seed;
-                        uint32_t map_width = MAP_SIZE;
+                        uint32_t map_width = match_setting_get_map_size((MatchSettingMapSizeValue)network_get_match_setting(MATCH_SETTING_MAP_SIZE));
                         uint32_t map_height = map_width;
                         Noise noise = noise_generate(noise_seed, map_width, map_height);
 
