@@ -2390,8 +2390,8 @@ void match_ui_render(const MatchUiState& state) {
             RenderSpriteParams bleed_params = (RenderSpriteParams) {
                 .sprite = SPRITE_PARTICLE_BLEED,
                 .frame = entity.bleed_animation.frame,
-                .position = ivec2(render_rect.x + (render_rect.w / 2) - (bleed_sprite_info.frame_width / 2), 
-                                  render_rect.y + (render_rect.h / 2) - (bleed_sprite_info.frame_height / 2)),
+                .position = ivec2(render_rect.x + (render_rect.w / 2) - bleed_sprite_info.frame_width, 
+                                  render_rect.y + (render_rect.h / 2) - bleed_sprite_info.frame_height),
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_id = 0
             };
@@ -2860,6 +2860,9 @@ void match_ui_render(const MatchUiState& state) {
         render_draw_rect(select_rect, RENDER_COLOR_WHITE, 2);
     }
 
+    // Hide UI when we are in theater mode
+    // The closing curly braces are in another #ifdef GOLD_DEBUG further down, 
+    // so you have to delete them both if you want to delete this
     #ifdef GOLD_DEBUG
     if (!state.theater_mode) {
     #endif
@@ -2915,16 +2918,16 @@ void match_ui_render(const MatchUiState& state) {
 
         SpriteName button_icon = match_entity_get_icon(state.match, most_common_entity_type, network_get_player_id());
         const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_CONTROL_GROUP);
-        ivec2 render_pos = ivec2(BOTTOM_PANEL_RECT.x, BOTTOM_PANEL_RECT.y) + ivec2(2, 0) + ivec2((3 + sprite_info.frame_width) * control_group_index, -32);
-        render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0, 1);
-        render_sprite_frame(button_icon, ivec2(button_frame, 0), render_pos + ivec2(1, 0), RENDER_SPRITE_NO_CULL, 0, 1);
+        ivec2 render_pos = ivec2(BOTTOM_PANEL_RECT.x, BOTTOM_PANEL_RECT.y) + ivec2(4, 0) + ivec2((6 + (sprite_info.frame_width * 2)) * control_group_index, -64);
+        render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0, 2);
+        render_sprite_frame(button_icon, ivec2(button_frame, 0), render_pos + ivec2(2, 0), RENDER_SPRITE_NO_CULL, 0, 2);
         char control_group_number_text[4];
         sprintf(control_group_number_text, "%u", control_group_index == 9 ? 0 : control_group_index + 1);
-        render_text(font, control_group_number_text, render_pos + ivec2(3, -9));
+        render_text(font, control_group_number_text, render_pos + ivec2(6, -18));
         char control_group_count_text[4];
         sprintf(control_group_count_text, "%u", entity_count);
         ivec2 count_text_size = render_get_text_size(font, control_group_count_text);
-        render_text(font, control_group_count_text, render_pos + ivec2(32 - count_text_size.x, 23 - count_text_size.y));
+        render_text(font, control_group_count_text, render_pos + ivec2(64 - count_text_size.x, 46 - count_text_size.y));
     }
 
     // UI Status message
@@ -3204,9 +3207,9 @@ void match_ui_render(const MatchUiState& state) {
                 stat_count++;
             }
 
-            ivec2 stat_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 18 + 34); 
+            ivec2 stat_position = SELECTION_LIST_TOP_LEFT + ivec2(0, 36 + 68); 
             ivec2 stat_positions[2];
-            const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_DETECTION).frame_width;
+            const int STAT_ICON_SIZE = render_get_sprite_info(SPRITE_UI_STAT_ICON_DETECTION).frame_width * 2;
             int STAT_TEXT_PADDING = 2;
 
             for (int stat_index = 0; stat_index < stat_count; stat_index++) {
@@ -3235,14 +3238,14 @@ void match_ui_render(const MatchUiState& state) {
 
                 // Determine tooltip size
                 ivec2 tooltip_text_size = render_get_text_size(FONT_HACK_OFFBLACK, tooltip_text);
-                int tooltip_width = tooltip_text_size.x + tooltip_info.frame_width;
-                int tooltip_frame_count = tooltip_width / tooltip_info.frame_width;
-                if (tooltip_width % tooltip_info.frame_width != 0) {
+                int tooltip_width = tooltip_text_size.x + (tooltip_info.frame_width * 2);
+                int tooltip_frame_count = tooltip_width / (tooltip_info.frame_width * 2);
+                if (tooltip_width % (tooltip_info.frame_width * 2) != 0) {
                     tooltip_frame_count++;
                 }
 
                 // Determine tooltip position
-                ivec2 tooltip_pos = stat_positions[stat_hovered] + ivec2(STAT_ICON_SIZE - 2, -((tooltip_info.frame_height * 2) - 2));
+                ivec2 tooltip_pos = stat_positions[stat_hovered] + ivec2(STAT_ICON_SIZE - 4, -((tooltip_info.frame_height * 4) - 4));
 
                 // Render tooltip background
                 for (int frame_x = 0; frame_x < tooltip_frame_count; frame_x++) {
@@ -3253,12 +3256,12 @@ void match_ui_render(const MatchUiState& state) {
                         hframe = 2;
                     }
 
-                    render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, ivec2(hframe, 0), tooltip_pos + ivec2(tooltip_info.frame_width * frame_x, 0), RENDER_SPRITE_NO_CULL, 0);
-                    render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, ivec2(hframe, 2), tooltip_pos + ivec2(tooltip_info.frame_width * frame_x, tooltip_info.frame_height), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, ivec2(hframe, 0), tooltip_pos + ivec2(tooltip_info.frame_width * 2 * frame_x, 0), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(SPRITE_UI_TOOLTIP_FRAME, ivec2(hframe, 2), tooltip_pos + ivec2(tooltip_info.frame_width * 2 * frame_x, tooltip_info.frame_height * 2), RENDER_SPRITE_NO_CULL, 0);
                 }
 
                 // Render tooltip text
-                render_text(FONT_HACK_OFFBLACK, tooltip_text, tooltip_pos + ivec2(4, 2));
+                render_text(FONT_HACK_OFFBLACK, tooltip_text, tooltip_pos + ivec2(8, 4));
             }
         }
     } else {
@@ -3404,15 +3407,15 @@ void match_ui_render(const MatchUiState& state) {
     if (state.disconnect_timer > DISCONNECT_GRACE) {
         render_ninepatch(SPRITE_UI_FRAME, DISCONNECT_FRAME_RECT);
         ivec2 text_size = render_get_text_size(FONT_HACK_GOLD, "Waiting for players...");
-        render_text(FONT_HACK_GOLD, "Waiting for players...", ivec2(DISCONNECT_FRAME_RECT.x + (DISCONNECT_FRAME_RECT.w / 2) - (text_size.x / 2), DISCONNECT_FRAME_RECT.y + 8));
-        int player_text_y = 32;
+        render_text(FONT_HACK_GOLD, "Waiting for players...", ivec2(DISCONNECT_FRAME_RECT.x + (DISCONNECT_FRAME_RECT.w / 2) - (text_size.x / 2), DISCONNECT_FRAME_RECT.y + 16));
+        int player_text_y = 64;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE || !(state.inputs[player_id].empty() || state.inputs[player_id].front().empty())) {
                 continue;
             }
 
             render_text(FONT_HACK_GOLD, network_get_player(player_id).name, ivec2(DISCONNECT_FRAME_RECT.x + 16, DISCONNECT_FRAME_RECT.y + player_text_y));
-            player_text_y += 16;
+            player_text_y += 32;
         }
     }
 

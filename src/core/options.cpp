@@ -49,8 +49,8 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .name = "Camera Speed",
         .type = OPTION_TYPE_SLIDER,
         .min_value = 1,
-        .max_value = 31,
-        .default_value = 16
+        .max_value = 63,
+        .default_value = 32
     }}
 };
 

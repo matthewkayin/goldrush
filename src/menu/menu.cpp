@@ -937,15 +937,15 @@ void menu_render(const MenuState& state) {
     // Status text
     if (state.status_timer != 0) {
         ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, state.status_text);
-        int rect_width = text_size.x + 32;
-        render_ninepatch(SPRITE_UI_FRAME, (Rect) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 80, .w = rect_width, .h = 32 });
-        render_text(FONT_HACK_GOLD, state.status_text, ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 80 + 16 - (text_size.y / 2)));
+        int rect_width = text_size.x + 64;
+        render_ninepatch(SPRITE_UI_FRAME, (Rect) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 160, .w = rect_width, .h = 64 });
+        render_text(FONT_HACK_GOLD, state.status_text, ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 160 + 32 - (text_size.y / 2)));
     }
     if (state.mode == MENU_MODE_CONNECTING) {
         ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, "Connecting...");
-        int rect_width = text_size.x + 32;
-        render_ninepatch(SPRITE_UI_FRAME, (Rect) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 80, .w = rect_width, .h = 32 });
-        render_text(FONT_HACK_GOLD, "Connecting...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 80 + 16 - (text_size.y / 2)));
+        int rect_width = text_size.x + 64;
+        render_ninepatch(SPRITE_UI_FRAME, (Rect) { .x = (SCREEN_WIDTH / 2) - (rect_width / 2), .y = 160, .w = rect_width, .h = 64 });
+        render_text(FONT_HACK_GOLD, "Connecting...", ivec2((SCREEN_WIDTH / 2) - (text_size.x / 2), 160 + 32 - (text_size.y / 2)));
     }
 
     render_sprite_batch();
