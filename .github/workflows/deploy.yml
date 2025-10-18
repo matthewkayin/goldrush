@@ -94,7 +94,7 @@ jobs:
           username: ${{ secrets.STEAM_USERNAME }}
           configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
           appId: 3831190
-          buildDescription: v0.8.0
+          buildDescription: v0.8.1
           rootPath: bin
           depot1Path: goldrush_windows
           depot2Path: goldrush_macos
