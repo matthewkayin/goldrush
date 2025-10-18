@@ -187,8 +187,8 @@ int gold_main(int argc, char** argv) {
     log_info("Initializing %s %s.", APP_NAME, APP_VERSION);
     #if defined(PLATFORM_WIN32)
         log_info("Detected platform WIN32.");
-    #elif defined(PLATFORM_OSX)
-        log_info("Detected platform OSX.");
+    #elif defined(PLATFORM_MACOS)
+        log_info("Detected platform MACOS.");
     #endif
     #ifdef GOLD_DEBUG
         log_info("Debug build.");

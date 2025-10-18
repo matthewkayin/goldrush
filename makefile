@@ -42,9 +42,9 @@ ifeq ($(OS),Windows_NT)
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
-		BUILD_PLATFORM := osx
+		BUILD_PLATFORM := macos
 		EXTENSION :=
-# Use -Wno-deprecated-declarations on OSX because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
+# Use -Wno-deprecated-declarations on MacOS because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 		COMPILER_FLAGS += -Wno-deprecated-declarations
 	endif
 
@@ -57,7 +57,7 @@ else
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-image)
 	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-ttf)
-	LINKER_FLAGS += -Llib/osx -lsteam_api
+	LINKER_FLAGS += -Llib/macos -lsteam_api
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
@@ -96,6 +96,8 @@ endif
 
 .PHONY: compile
 compile: #compile .c files
+	@echo Compiler flags $(COMPILER_FLAGS)
+	@echo Defines $(DEFINES)
 	@echo Compiling...
 
 .PHONY: clean
@@ -119,13 +121,13 @@ $(OBJ_DIR)/%.rc.res: %.rc # Windows resource scripts
 	@rc -fo $@ $^
 endif
 
-.PHONY: osx-bundle
-osx-bundle:
-ifeq ($(BUILD_PLATFORM),osx)
+.PHONY: macos-bundle
+macos-bundle:
+ifeq ($(BUILD_PLATFORM),macos)
 	@./appify.sh -s $(BUILD_DIR)/gold -i icon.icns
 	@mv $(ASSEMBLY).app $(BUILD_DIR)/Gold\ Rush.app
 	@cp -a ./res/ $(BUILD_DIR)/Gold\ Rush.app/Contents/Resources/
-	@cp -a ./lib/osx/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
+	@cp -a ./lib/macos/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
 endif
 
 .PHONY: win-zip

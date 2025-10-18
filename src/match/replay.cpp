@@ -28,7 +28,7 @@ FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players
     sprintf(replay_subpath, "latest.rep");
     #ifdef GOLD_DEBUG
         if (use_arg_replay_file) {
-            filesystem_get_replay_path(replay_subpath, arg_replay_file);
+            strncpy(replay_subpath, arg_replay_file, 128);
         }
     #endif
 

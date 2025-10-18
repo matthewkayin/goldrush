@@ -968,10 +968,10 @@ void match_ui_update(MatchUiState& state) {
             options_menu_update(state.options_menu, state.ui);
         }
     } else if (state.replay_mode) {
-        ui_begin_column(state.ui, ivec2(BUTTON_PANEL_RECT.x + 8, BUTTON_PANEL_RECT.y + 4), 2);
+        ui_begin_column(state.ui, ivec2(BUTTON_PANEL_RECT.x + 16, BUTTON_PANEL_RECT.y + 8), 4);
             ui_element_size(state.ui, ivec2(0, 32));
-            ui_begin_row(state.ui, ivec2(0, 0), 4);
-                ui_element_position(state.ui, ivec2(0, 2));
+            ui_begin_row(state.ui, ivec2(0, 0), 8);
+                ui_element_position(state.ui, ivec2(0, 4));
                 ui_text(state.ui, FONT_HACK_WHITE, "Fog:");
 
                 ui_element_position(state.ui, ivec2(render_get_text_size(FONT_HACK_WHITE, "Fog:").x, 0));
@@ -985,7 +985,7 @@ void match_ui_update(MatchUiState& state) {
                 match_ui_replay_scrub(state, position);
             }
 
-            ui_begin_row(state.ui, ivec2(0, 0), 6);
+            ui_begin_row(state.ui, ivec2(0, 0), 12);
                 if (ui_sprite_button(state.ui, state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false) ||
                         input_is_action_just_pressed(INPUT_ACTION_SPACE)) {
                     state.replay_paused = !state.replay_paused;
@@ -997,7 +997,7 @@ void match_ui_update(MatchUiState& state) {
                 uint32_t seconds_total = (uint32_t)((match_ui_replay_end_of_tape(state) - 1) * UPDATE_DURATION);
                 Time time_total = Time::from_seconds(seconds_total);
                 char time_text[16];
-                ui_element_position(state.ui, ivec2(0, 2));
+                ui_element_position(state.ui, ivec2(0, 4));
                 sprintf(time_text, "%i:%02i:%02i/%i:%02i:%02i", time_elapsed.hours, time_elapsed.minutes, time_elapsed.seconds, time_total.hours, time_total.minutes, time_total.seconds);
                 ui_text(state.ui, FONT_HACK_WHITE, time_text);
             ui_end_container(state.ui);
@@ -2072,7 +2072,9 @@ const char* match_ui_get_menu_header_text(MatchUiMode mode) {
 }
 
 void match_ui_leave_match(MatchUiState& state, bool exit_program) {
-    network_disconnect();
+    if (!state.replay_mode) {
+        network_disconnect();
+    }
     state.mode = exit_program ? MATCH_UI_MODE_EXIT_PROGRAM : MATCH_UI_MODE_LEAVE_MATCH;
     replay_file_close(state.replay_file);
 }
@@ -3388,7 +3390,7 @@ void match_ui_render(const MatchUiState& state) {
             render_text((FontName)(FONT_HACK_PLAYER0 + state.match.players[player_id].recolor_id), state.match.players[player_id].name, ivec2(render_x, resource_base_y + 6));
         }
 
-        resource_base_y += population_icon_sprite_info.frame_height;
+        resource_base_y += population_icon_sprite_info.frame_height * 2;
     }
 
     // Menu button icon

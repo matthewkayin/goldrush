@@ -14,6 +14,8 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     Bot bot;
     bot.player_id = player_id;
     bot.lcg_seed = lcg_seed;
+    bot.should_surrender = true;
+    bot.has_surrendered = false;
 
     BotStrategy opener = (BotStrategy)(lcg_rand(&bot.lcg_seed) % 3);
     opener = BOT_STRATEGY_OPENER_BUNKER;
@@ -23,7 +25,6 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot.scout_enemy_has_landmines = false;
     bot.scout_enemy_has_detectives = false;
     bot.last_scout_time = 0;
-    bot.should_surrender = true;
 
     return bot;
 }

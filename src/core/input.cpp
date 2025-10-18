@@ -134,7 +134,7 @@ void input_poll_events() {
                         break;
                     case SDL_SCANCODE_LCTRL:
                     case SDL_SCANCODE_RCTRL:
-                    #ifdef PLATFORM_OSX
+                    #ifdef PLATFORM_MACOS
                     case SDL_SCANCODE_LGUI:
                     case SDL_SCANCODE_RGUI:
                     #endif
