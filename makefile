@@ -45,7 +45,7 @@ else
 		BUILD_PLATFORM := macos
 		EXTENSION :=
 # Use -Wno-deprecated-declarations on MacOS because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
-		COMPILER_FLAGS += -Wno-deprecated-declarations
+		COMPILER_FLAGS += -Wno-deprecated-declarations -mmacos-version-min=14.5
 	endif
 
 	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))
@@ -53,11 +53,7 @@ else
 	DIRECTORIES := $(shell find src -type d)
 	DIRECTORIES += $(shell find vendor -type d)
 
-	LINKER_FLAGS += $(shell pkg-config --libs --static libenet)
-	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3)
-	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-image)
-	LINKER_FLAGS += $(shell pkg-config --libs --static sdl3-ttf)
-	LINKER_FLAGS += -Llib/macos -lsteam_api
+	LINKER_FLAGS += -Llib/macos $(shell pkg-config --libs --static libenet) -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_image -framework SDL3_ttf
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
@@ -87,6 +83,7 @@ endif
 
 .PHONY: link
 link: scaffold $(OBJ_FILES) # link
+	@echo Linker flags $(LINKER_FLAGS)
 	@echo Linking $(ASSEMBLY)...
 ifeq ($(BUILD_PLATFORM),win64)
 	@clang++ $(OBJ_FILES) -o $(BUILD_DIR)\$(ASSEMBLY)$(EXTENSION) $(LINKER_FLAGS)
@@ -128,6 +125,8 @@ ifeq ($(BUILD_PLATFORM),macos)
 	@mv $(ASSEMBLY).app $(BUILD_DIR)/Gold\ Rush.app
 	@cp -a ./res/ $(BUILD_DIR)/Gold\ Rush.app/Contents/Resources/
 	@cp -a ./lib/macos/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
+	@mkdir $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks
+	@cp -r ./lib/macos/*.framework $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks/
 endif
 
 .PHONY: win-zip
