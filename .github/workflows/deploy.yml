@@ -1,0 +1,101 @@
+name: Steam Deploy
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build_windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Scaffold
+        shell: cmd
+        run: |
+          make scaffold
+
+      - name: Prep
+        shell: cmd
+        run: |
+          make prep
+
+      - name: Build
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          clang++ -v
+          make RELEASE=true
+
+      - name: Bundle
+        shell: cmd
+        run: |
+          make win-zip
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldrush_windows
+          path: bin/goldrush_windows.zip
+
+  build_macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install sdl3 sdl3_image sdl3_ttf enet
+
+      - name: Scaffold
+        run: |
+          make scaffold
+
+      - name: Prep
+        run: |
+          make prep
+
+      - name: Build
+        run: |
+          clang++ -v
+          make RELEASE=true
+
+      - name: Bundle
+        run: |
+          make osx-bundle
+          zip -vr ./bin/goldrush_macos.zip ./bin/Gold\ Rush.app/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldrush_macos
+          path: bin/goldrush_macos.zip
+    
+  deploy:
+    needs: [build_windows, build_macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v5
+
+      - name: Unzip Artifacts
+        run: |
+          mkdir bin
+          mkdir ./bin/goldrush_windows
+          unzip ./goldrush_windows/goldrush_windows.zip -d ./bin/goldrush_windows
+          mkdir ./bin/goldrush_macos
+          unzip ./goldrush_macos/goldrush_macos.zip -d ./bin/goldrush_macos
+
+      - name: Deploy 
+        uses: game-ci/steam-deploy@v3
+        with:
+          username: ${{ secrets.STEAM_USERNAME }}
+          configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
+          appId: 3831190
+          buildDescription: v0.8.0
+          rootPath: bin
+          depot1Path: goldrush_windows
+          depot2Path: goldrush_macos
+          releaseBranch: prerelease

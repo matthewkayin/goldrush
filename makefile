@@ -11,7 +11,7 @@ BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor
 COMPILER_FLAGS := -std=c++17 -Wall
-LINKER_FLAGS :=
+LINKER_FLAGS := -std=c++17
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 RC_FILES :=
 
@@ -24,6 +24,7 @@ else
 endif
 
 ifeq ($(OS),Windows_NT)
+	SHELL := cmd.exe
 	BUILD_PLATFORM := win64
 	EXTENSION := .exe
 	LIB_DIR := lib\win64
@@ -138,5 +139,5 @@ ifeq ($(BUILD_PLATFORM),win64)
 	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\font $(BUILD_DIR)\font
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\sfx
 	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\sfx $(BUILD_DIR)\sfx
-	-@setlocal enableextensions enabledelayedexpansion && cd $(BUILD_DIR) && tar.exe -acvf dist.zip gold.exe *.dll *.lib font sfx shader sprite
+	-@setlocal enableextensions enabledelayedexpansion && cd $(BUILD_DIR) && tar.exe -acvf goldrush_windows.zip gold.exe *.dll *.lib font sfx shader sprite
 endif
