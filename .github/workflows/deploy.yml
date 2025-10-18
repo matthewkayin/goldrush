@@ -65,7 +65,6 @@ jobs:
       - name: Bundle
         run: |
           make macos-bundle
-          zip -vr ./bin/goldrush_macos.zip ./bin/Gold\ Rush.app/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

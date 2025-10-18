@@ -131,6 +131,7 @@ ifeq ($(BUILD_PLATFORM),macos)
 	@cp -a ./lib/macos/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
 	@mkdir $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks
 	@cp -r ./lib/macos/*.framework $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks/
+	@cd $(BUILD_DIR) && zip -vr ./goldrush_macos.zip ./Gold\ Rush.app/
 endif
 
 .PHONY: win-zip
