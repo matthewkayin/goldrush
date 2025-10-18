@@ -2458,7 +2458,7 @@ bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const Bot
     }
 
     if (squad_score < enemy_army_score) {
-        log_trace("BOT: squad with size %u first entity %u is retreating. squad score %u enemy army score %u desired lead %u", squad.entities.size(), squad.entities[0], squad_score, enemy_army_score);
+        log_trace("BOT: squad with size %u first entity %u is retreating. squad score %u enemy army score %u", squad.entities.size(), squad.entities[0], squad_score, enemy_army_score);
     }
 
     return squad_score < enemy_army_score;
