@@ -153,6 +153,5 @@ endif
 ifeq ($(BUILD_PLATFORM),linux)
 	@cp -a ./res/* $(BUILD_DIR)/
 	@cp -a ./lib/linux64/* $(BUILD_DIR)/
-	@cp 
 	@tar -czvf goldrush_linux.tar.gz -C bin .
 endif
