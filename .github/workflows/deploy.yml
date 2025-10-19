@@ -81,7 +81,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install -y libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev libenet7
+          apt-get install -y libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev libenet7 libenet-dev
 
       - name: Scaffold
         run: |
