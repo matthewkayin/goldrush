@@ -54,7 +54,7 @@ else
 	endif
 	ifeq ($(UNAME_S),Linux)
 		BUILD_PLATFORM := linux
-		LINKER_FLAGS += -lSDL3 -lSDL3_image -lSDL3_ttf -lenet -lsteam_api
+		LINKER_FLAGS += -Llib/linux64 -lSDL3 -lSDL3_image -lSDL3_ttf -lenet -lsteam_api
 	endif
 
 	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))
@@ -152,5 +152,7 @@ ifeq ($(BUILD_PLATFORM),macos)
 endif
 ifeq ($(BUILD_PLATFORM),linux)
 	@cp -a ./res/* $(BUILD_DIR)/
+	@cp -a ./lib/linux64/* $(BUILD_DIR)/
+	@cp 
 	@tar -czvf goldrush_linux.tar.gz -C bin .
 endif
