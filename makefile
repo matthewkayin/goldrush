@@ -57,7 +57,7 @@ else
 	DIRECTORIES := $(shell find src -type d)
 	DIRECTORIES += $(shell find vendor -type d)
 
-	LINKER_FLAGS += -Llib/macos $(shell pkg-config --libs --static libenet) -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_image -framework SDL3_ttf
+	LINKER_FLAGS += -Llib/macos -lenet -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_image -framework SDL3_ttf
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
@@ -108,9 +108,11 @@ ifeq ($(BUILD_PLATFORM),win64)
 	if exist $(BUILD_DIR)\$(ASSEMBLY)$(EXTENSION) del $(BUILD_DIR)\$(ASSEMBLY)$(EXTENSION)
 	rmdir /s /q $(OBJ_DIR)
 else
-	@rm -rf $(BUILD_DIR)/$(ASSEMBLY)$(EXTENSION)
-	@rm -rf $(BUILD_DIR)/$(ASSEMBLY).app
 	@rm -rf $(OBJ_DIR)
+	@rm -rf $(BUILD_DIR)/$(ASSEMBLY)$(EXTENSION)
+endif
+ifeq ($(BUILD_PLATFORM),macos)
+	@rm -rf $(BUILD_DIR)/Gold\ Rush.app
 endif
 
 $(OBJ_DIR)/%.cpp.o: %.cpp # compile .c to .c.o object
@@ -131,6 +133,7 @@ ifeq ($(BUILD_PLATFORM),macos)
 	@cp -a ./lib/macos/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
 	@mkdir $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks
 	@cp -r ./lib/macos/*.framework $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks/
+	@install_name_tool -add_rpath @executable_path/../Frameworks $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/gold
 	@cd $(BUILD_DIR) && zip -vr ./goldrush_macos.zip ./Gold\ Rush.app/
 endif
 
