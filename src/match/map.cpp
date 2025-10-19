@@ -24,28 +24,6 @@ SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int32_t* lcg_seed, PoissonDiskParams& params);
 
-// TODO: delete before release build
-#ifdef GOLD_DEBUG
-
-void map_debug_print_noise(const char* header, const Noise& noise) {
-    log_trace("--%s--", header);
-    for (int y = 0; y < noise.height; y++) {
-        char buffer[1024];
-        char* buffer_ptr = buffer;
-        for (int x = 0; x < noise.width; x++) {
-            if (noise.map[x + (y * noise.width)] == NOISE_LEVEL_WATER) {
-                buffer_ptr += sprintf(buffer_ptr, "W ");
-            } else {
-                buffer_ptr += sprintf(buffer_ptr, "%i ", noise.map[x + (y * noise.width)]);
-            }
-        }
-        log_trace("%s", buffer);
-    }
-    log_trace("--END--");
-}
-
-#endif
-
 void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.width = noise.width;
     map.height = noise.height;

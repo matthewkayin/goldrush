@@ -21,7 +21,7 @@
 #define GOLD_STEAM
 #ifdef GOLD_STEAM
     // #define GOLD_STEAM_APP_ID 3774270U
-    #define GOLD_STEAM_APP_ID 3831190
+    #define GOLD_STEAM_APP_ID 3831190U
 #endif
 
 #ifndef GOLD_RELEASE

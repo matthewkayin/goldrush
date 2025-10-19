@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <vector> 
 #include <string>
+#include <cstdint>
 
 enum MatchSetting {
     MATCH_SETTING_TEAMS,

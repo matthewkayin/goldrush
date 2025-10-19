@@ -112,7 +112,9 @@ static int game_load_next_mode(void* ptr) {
         #ifdef GOLD_STEAM
             if (state.load_params.menu.steam_invite_id != 0) {
                 network_set_backend(NETWORK_BACKEND_STEAM);
-                network_steam_accept_invite(state.load_params.menu.steam_invite_id);
+                CSteamID steam_id;
+                steam_id.SetFromUint64(state.load_params.menu.steam_invite_id);
+                network_steam_accept_invite(steam_id);
             }
         #endif
     } else if (state.load_params.mode == GAME_MODE_MATCH) {
