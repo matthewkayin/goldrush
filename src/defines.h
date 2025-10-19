@@ -11,6 +11,8 @@
     #endif
 #elif __APPLE__
     #define PLATFORM_MACOS 1
+#elif defined(__linux__) || defined(__gnu_linux__)
+    #define PLATFORM_LINUX 1
 #endif
 
 #define APP_NAME "Gold Rush"

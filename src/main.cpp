@@ -189,6 +189,8 @@ int gold_main(int argc, char** argv) {
         log_info("Detected platform WIN32.");
     #elif defined(PLATFORM_MACOS)
         log_info("Detected platform MACOS.");
+    #elif defined(PLATFORM_LINUX)
+        log_info("Detected platform LINUX.");
     #endif
     #ifdef GOLD_DEBUG
         log_info("Debug build.");

@@ -50,14 +50,17 @@ else
 		EXTENSION :=
 # Use -Wno-deprecated-declarations on MacOS because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 		COMPILER_FLAGS += -Wno-deprecated-declarations -mmacos-version-min=14.5
+		LINKER_FLAGS += -Llib/macos -lenet -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_image -framework SDL3_ttf
+	endif
+	ifeq ($(UNAME_S),Linux)
+		BUILD_PLATFORM := linux
+		LINKER_FLAGS += -lSDL3 -lSDL3_image -lSDL3_ttf -lenet -lsteam_api
 	endif
 
 	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))
 	SRC_FILES += $(shell find vendor -type f \( -name "*.cpp" -o -name "*.mm" \))
 	DIRECTORIES := $(shell find src -type d)
 	DIRECTORIES += $(shell find vendor -type d)
-
-	LINKER_FLAGS += -Llib/macos -lenet -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_image -framework SDL3_ttf
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
@@ -124,21 +127,8 @@ $(OBJ_DIR)/%.rc.res: %.rc # Windows resource scripts
 	@rc -fo $@ $^
 endif
 
-.PHONY: macos-bundle
-macos-bundle:
-ifeq ($(BUILD_PLATFORM),macos)
-	@./appify.sh -s $(BUILD_DIR)/gold -i icon.icns
-	@mv $(ASSEMBLY).app $(BUILD_DIR)/Gold\ Rush.app
-	@cp -a ./res/ $(BUILD_DIR)/Gold\ Rush.app/Contents/Resources/
-	@cp -a ./lib/macos/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
-	@mkdir $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks
-	@cp -r ./lib/macos/*.framework $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks/
-	@install_name_tool -add_rpath @executable_path/../Frameworks $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/gold
-	@cd $(BUILD_DIR) && zip -vr ./goldrush_macos.zip ./Gold\ Rush.app/
-endif
-
-.PHONY: win-zip
-win-zip:
+.PHONY: bundle
+bundle:
 ifeq ($(BUILD_PLATFORM),win64)
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\sprite
 	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\sprite $(BUILD_DIR)\sprite
@@ -149,4 +139,18 @@ ifeq ($(BUILD_PLATFORM),win64)
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\sfx
 	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\sfx $(BUILD_DIR)\sfx
 	-@setlocal enableextensions enabledelayedexpansion && cd $(BUILD_DIR) && tar.exe -acvf goldrush_windows.zip gold.exe *.dll *.lib font sfx shader sprite
+endif
+ifeq ($(BUILD_PLATFORM),macos)
+	@./appify.sh -s $(BUILD_DIR)/gold -i icon.icns
+	@mv $(ASSEMBLY).app $(BUILD_DIR)/Gold\ Rush.app
+	@cp -a ./res/ $(BUILD_DIR)/Gold\ Rush.app/Contents/Resources/
+	@cp -a ./lib/macos/ $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/
+	@mkdir $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks
+	@cp -r ./lib/macos/*.framework $(BUILD_DIR)/Gold\ Rush.app/Contents/Frameworks/
+	@install_name_tool -add_rpath @executable_path/../Frameworks $(BUILD_DIR)/Gold\ Rush.app/Contents/MacOS/gold
+	@cd $(BUILD_DIR) && zip -vr ./goldrush_macos.zip ./Gold\ Rush.app/
+endif
+ifeq ($(BUILD_PLATFORM),linux)
+	@cp -a ./res/* $(BUILD_DIR)/
+	@tar -czvf goldrush_linux.tar.gz -C bin .
 endif
