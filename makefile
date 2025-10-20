@@ -54,7 +54,7 @@ else
 	endif
 	ifeq ($(UNAME_S),Linux)
 		BUILD_PLATFORM := linux
-		LINKER_FLAGS += -lSDL3 -lSDL3_image -lSDL3_ttf -ldl -Llib/linux64 -Wl,-rpath='$ORIGIN' -lenet -lsteam_api
+		LINKER_FLAGS += -lSDL3 -lSDL3_image -lSDL3_ttf -ldl -Llib/linux64 -Wl,-rpath,'$ORIGIN' -lenet -lsteam_api
 	endif
 
 	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))
