@@ -54,7 +54,7 @@ else
 	endif
 	ifeq ($(UNAME_S),Linux)
 		BUILD_PLATFORM := linux
-		LINKER_FLAGS += -lSDL3 -lSDL3_image -lSDL3_ttf -ldl -Llib/linux64 -Wl,-rpath,'$ORIGIN' -lenet -lsteam_api
+		LINKER_FLAGS += -lSDL3 -lSDL3_image -lSDL3_ttf -ldl -Llib/linux64 -lenet -lsteam_api
 	endif
 
 	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))
@@ -151,6 +151,9 @@ ifeq ($(BUILD_PLATFORM),macos)
 	@cd $(BUILD_DIR) && zip -vr ./goldrush_macos.zip ./Gold\ Rush.app/
 endif
 ifeq ($(BUILD_PLATFORM),linux)
+	@echo Setting rpath...
+	@patchelf --set-rpath '$ORIGIN' $(BUILD_DIR)/gold
+	@patchelf --print-rpath $(BUILD_DIR)/gold
 	@cp -a ./res/* $(BUILD_DIR)/
 	@cp -a ./lib/linux64/* $(BUILD_DIR)/
 	@tar -czvf goldrush_linux.tar.gz -C $(BUILD_DIR) .
