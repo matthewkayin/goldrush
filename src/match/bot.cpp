@@ -3818,6 +3818,10 @@ std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchS
 
         uint32_t nearest_hall_index = INDEX_INVALID;
         for (auto it : enemy_hall_defense_score) {
+            if (ivec2::manhattan_distance(entity.cell, state.entities[it.first].cell) < BOT_SQUAD_GATHER_DISTANCE * 2) {
+                continue;
+            }
+
             if (nearest_hall_index == INDEX_INVALID ||
                     ivec2::manhattan_distance(entity.cell, state.entities[it.first].cell) <
                     ivec2::manhattan_distance(entity.cell, state.entities[nearest_hall_index].cell)) {
@@ -3825,7 +3829,10 @@ std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchS
             }
         }
 
-        GOLD_ASSERT(nearest_hall_index != INDEX_INVALID);
+        if (nearest_hall_index == INDEX_INVALID) {
+            continue;
+        }
+
         if (entity.type == ENTITY_LANDMINE) {
             enemy_hall_defense_score[nearest_hall_index] += 2;
         } else {
