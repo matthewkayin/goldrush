@@ -265,17 +265,9 @@ int gold_main(int argc, char** argv) {
         // TIMEKEEP
         uint64_t current_time = SDL_GetTicksNS();
         #ifdef GOLD_DEBUG_TURBO
-        if (input_is_action_just_pressed(INPUT_ACTION_TURBO)) {
-            if (playback_speed == 1) {
-                playback_speed = 4;
-            } else {
-                playback_speed = 1;
-            }
-        } 
-
-        update_accumulator += (current_time - last_time) * playback_speed;
+            update_accumulator += (current_time - last_time) * playback_speed;
         #else
-        update_accumulator += current_time - last_time;
+            update_accumulator += current_time - last_time;
         #endif
         last_time = current_time;
 
@@ -295,6 +287,16 @@ int gold_main(int argc, char** argv) {
 
             // INPUT
             input_poll_events();
+            #ifdef GOLD_DEBUG_TURBO
+                if (input_is_action_just_pressed(INPUT_ACTION_TURBO)) {
+                    if (playback_speed == 1) {
+                        playback_speed = 4;
+                    } else {
+                        playback_speed = 1;
+                    }
+                } 
+            #endif
+
             if (input_user_requests_exit()) {
                 if (network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_HOST) {
                     network_disconnect();
@@ -446,13 +448,13 @@ int gold_main(int argc, char** argv) {
                 char fps_text[32];
                 sprintf(fps_text, "FPS: %u", fps);
                 render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
-                render_y += 10;
+                render_y += 20;
 
                 #ifdef GOLD_DEBUG_TURBO
                     char turbo_text[32];
                     sprintf(turbo_text, "Playback Speed x%llu", playback_speed);
                     render_text(FONT_HACK_WHITE, turbo_text, ivec2(0, render_y));
-                    render_y += 10;
+                    render_y += 20;
                 #endif
 
                 if (state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) {
@@ -464,7 +466,7 @@ int gold_main(int argc, char** argv) {
                             char text[256];
                             sprintf(text, "ID %u Name %s", state.match.match.entities.get_id_of(entity_index), entity_get_data(entity.type).name);
                             render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
-                            render_y += 10;
+                            render_y += 20;
                             break;
                         }
                     }
@@ -474,7 +476,7 @@ int gold_main(int argc, char** argv) {
                         char text[256];
                         sprintf(text, "Cell <%i, %i>", cell.x, cell.y);
                         render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
-                        render_y++;
+                        render_y += 20;
                     }
                 }
 
