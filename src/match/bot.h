@@ -93,7 +93,7 @@ struct Bot {
 
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotSquad> squads;
-    std::unordered_map<EntityId, int> retreat_entry;
+    std::unordered_map<EntityId, std::vector<EntityId>> retreat_memory;
 
     EntityId scout_id;
     uint32_t last_scout_time;
@@ -144,7 +144,7 @@ void bot_squad_create_from_entity_count(const MatchState& state, Bot& bot, BotSq
 void bot_squad_create(const MatchState& state, Bot& bot, BotSquadType type, ivec2 target_cell, std::vector<EntityId>& entities);
 void bot_squad_dissolve(Bot& bot, BotSquad& squad);
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
-int bot_squad_score_nearby_enemy_army(const MatchState& state, const Bot& bot, const BotSquad& squad);
+std::vector<EntityId> bot_squad_get_nearby_enemy_army(const MatchState& state, const Bot& bot, const BotSquad& squad);
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad);
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);
 bool bot_is_unit_already_attacking_nearby_target(const MatchState& state, const Entity& infantry, const Entity& nearby_enemy);

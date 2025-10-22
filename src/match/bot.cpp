@@ -1835,8 +1835,8 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         Cell cell = map_get_cell(state.map, CELL_LAYER_GROUND, squad.target_cell);
         if (cell.type == CELL_BUILDING) {
             EntityId target_hall_id = map_get_cell(state.map, CELL_LAYER_GROUND, squad.target_cell).id;
-            bot.retreat_entry[target_hall_id] = bot_squad_score_nearby_enemy_army(state, bot, squad);
-            log_trace("BOT: retreating, hall %u enemy army score %i", target_hall_id, bot.retreat_entry[target_hall_id]);
+            bot.retreat_memory[target_hall_id] = bot_squad_get_nearby_enemy_army(state, bot, squad);
+            log_trace("BOT: retreating, hall %u enemy army score %i", target_hall_id, bot_score_entity_list(state, bot.retreat_memory[target_hall_id]));
         }
         return bot_squad_return_to_nearest_base(state, bot, squad);
     }
@@ -1864,14 +1864,14 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             }
 
             // Check if an enemy is attacking nearby
-            EntityId nearby_building_under_attack_id = bot_find_entity((BotFindEntityParams) {
+            EntityId nearby_miner_under_attack_id = bot_find_entity((BotFindEntityParams) {
                 .state = state,
-                .filter = [&bunker](const Entity& building, EntityId building_id) {
-                    return building.player_id == bunker.player_id &&
-                            entity_is_selectable(building) &&
-                            (entity_is_building(building.type) || building.type == ENTITY_MINER) &&
-                            building.taking_damage_timer != 0 && 
-                            ivec2::manhattan_distance(building.cell, bunker.cell) < BOT_SQUAD_GATHER_DISTANCE * 2;
+                .filter = [&bunker](const Entity& miner, EntityId miner_id) {
+                    return miner.player_id == bunker.player_id &&
+                            entity_is_selectable(miner) &&
+                            miner.type == ENTITY_MINER &&
+                            miner.taking_damage_timer != 0 && 
+                            ivec2::manhattan_distance(miner.cell, bunker.cell) < BOT_SQUAD_GATHER_DISTANCE * 2;
                 }
             });
 
@@ -1892,8 +1892,10 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             });
 
             // If we're under attack, but we can't shoot the enemies, then exit the bunker to defend
-            if (nearby_building_under_attack_id != ID_NULL && enemy_in_range_of_bunker_id == ID_NULL) {
-                squad.target_cell = state.entities.get_by_id(nearby_building_under_attack_id).cell;
+            if (nearby_miner_under_attack_id != ID_NULL && enemy_in_range_of_bunker_id == ID_NULL) {
+                // Change to reserves type so that they will be free after they finish defending against the attack
+                squad.type = BOT_SQUAD_TYPE_RESERVES;
+                squad.target_cell = state.entities.get_by_id(nearby_miner_under_attack_id).cell;
 
                 // Remove bunker from squad
                 for (int squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) {
@@ -2444,9 +2446,12 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
-int bot_squad_score_nearby_enemy_army(const MatchState& state, const Bot& bot, const BotSquad& squad) {
-    int enemy_army_score = 0;
-    for (const Entity& entity : state.entities) {
+std::vector<EntityId> bot_squad_get_nearby_enemy_army(const MatchState& state, const Bot& bot, const BotSquad& squad) {
+    std::vector<EntityId> enemy_army;
+
+    for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
+        const Entity& entity = state.entities[entity_index];
+
         // Filter down to enemy units or bunkers which the bot can see
         if (entity.type == ENTITY_GOLDMINE ||
                 (entity_is_building(entity.type) && entity.type != ENTITY_BUNKER) ||
@@ -2468,15 +2473,15 @@ int bot_squad_score_nearby_enemy_army(const MatchState& state, const Bot& bot, c
             continue;
         }
 
-        enemy_army_score += bot_score_entity(entity);
+        enemy_army.push_back(state.entities.get_id_of(entity_index));
     }
 
-    return enemy_army_score;
+    return enemy_army;
 }
 
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad) {
     // Score the enemy's army
-    int enemy_army_score = bot_squad_score_nearby_enemy_army(state, bot, squad);
+    int enemy_army_score = bot_score_entity_list(state, bot_squad_get_nearby_enemy_army(state, bot, squad));
 
     // Score the allied army
     int squad_score = 0;
@@ -3871,9 +3876,11 @@ std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchS
     // Add retreat entries to defense score
     for (auto it : enemy_hall_defense_score) {
         EntityId hall_id = state.entities.get_id_of(it.first);
-        if (bot.retreat_entry.find(hall_id) != bot.retreat_entry.end() && bot.retreat_entry.at(hall_id) > it.second) {
-            enemy_hall_defense_score[it.first] = bot.retreat_entry.at(hall_id);
+        if (bot.retreat_memory.find(hall_id) == bot.retreat_memory.end()) {
+            continue;
         }
+        int retreat_memory_score = bot_score_entity_list(state, bot.retreat_memory.at(hall_id));
+        enemy_hall_defense_score[it.first] = std::max(enemy_hall_defense_score[it.first], retreat_memory_score);
     }
 
     return enemy_hall_defense_score;

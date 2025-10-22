@@ -2151,33 +2151,37 @@ bool match_has_entity_reached_target(const MatchState& state, const Entity& enti
         case TARGET_ENTITY:
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {
-            const Entity& reference_entity = entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id);
-            int reference_entity_size = entity_get_data(reference_entity.type).cell_size;
-            Rect entity_rect = (Rect) {
-                .x = reference_entity.cell.x, .y = reference_entity.cell.y,
-                .w = reference_entity_size, .h = reference_entity_size
-            };
-
             const Entity& target = state.entities.get_by_id(entity.target.id);
-            int target_size = entity_get_data(target.type).cell_size;
-            Rect target_rect = (Rect) {
-                .x = target.cell.x, .y = target.cell.y,
-                .w = target_size, .h = target_size
-            };
-
-            if (entity.target.type != TARGET_ATTACK_ENTITY && (entity.type == ENTITY_BALLOON || target.type == ENTITY_BALLOON)) {
-                return entity.cell == match_get_entity_target_cell(state, entity);
-            }
-
-            int entity_range_squared = entity_get_data(entity.type).unit_data.range_squared;
-            return entity.target.type != TARGET_ATTACK_ENTITY || entity_range_squared == 1
-                        ? entity_rect.is_adjacent_to(target_rect)
-                        : Rect::euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
+            return match_entity_is_target_in_range(state, entity, target);
         }
         case TARGET_MOLOTOV: {
             return ivec2::euclidean_distance_squared(entity.cell, entity.target.cell) <= MOLOTOV_RANGE_SQUARED;
         }
     }
+}
+
+bool match_entity_is_target_in_range(const MatchState& state, const Entity& entity, const Entity& target) {
+    const Entity& reference_entity = entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id);
+    int reference_entity_size = entity_get_data(reference_entity.type).cell_size;
+    Rect entity_rect = (Rect) {
+        .x = reference_entity.cell.x, .y = reference_entity.cell.y,
+        .w = reference_entity_size, .h = reference_entity_size
+    };
+
+    int target_size = entity_get_data(target.type).cell_size;
+    Rect target_rect = (Rect) {
+        .x = target.cell.x, .y = target.cell.y,
+        .w = target_size, .h = target_size
+    };
+
+    if (entity.target.type != TARGET_ATTACK_ENTITY && (entity.type == ENTITY_BALLOON || target.type == ENTITY_BALLOON)) {
+        return entity.cell == match_get_entity_target_cell(state, entity);
+    }
+
+    int entity_range_squared = entity_get_data(entity.type).unit_data.range_squared;
+    return entity.target.type != TARGET_ATTACK_ENTITY || entity_range_squared == 1
+                ? entity_rect.is_adjacent_to(target_rect)
+                : Rect::euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
 }
 
 ivec2 match_get_entity_target_cell_helper(const MatchState& state, const Entity& entity) {

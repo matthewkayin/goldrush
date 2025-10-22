@@ -20,7 +20,7 @@ ifneq ($(APP_VERSION),)
 endif
 
 ifeq ($(RELEASE),true)
-	COMPILER_FLAGS += -O3
+	COMPILER_FLAGS += -O2
 	DEFINES += -DGOLD_RELEASE
 else
 	COMPILER_FLAGS += -O0 -g
