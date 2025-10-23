@@ -152,39 +152,63 @@ struct SoundData {
 };
 
 struct SoundState {
+    SDL_AudioDeviceID audio_device;
     SDL_AudioStream* streams[SFX_STREAM_COUNT];
     SDL_AudioStream* fire_stream;
+
     std::vector<SoundData> sounds;
     int sound_index[SOUND_COUNT];
+
     bool is_fire_loop_playing;
 };
 static SoundState state;
 
 bool sound_init() {
-    SDL_AudioSpec desired_spec;
-    desired_spec.format = SDL_AUDIO_S16;
-    desired_spec.channels = 2;
-    desired_spec.freq = 44100;
-    for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
-        state.streams[stream] = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired_spec, NULL, NULL);
-        if (state.streams[stream] == NULL) {
-            log_error("Error opening audio stream: %s", SDL_GetError());
-            return false;
-        }
-        SDL_ResumeAudioStreamDevice(state.streams[stream]);
-    }
-    state.fire_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired_spec, NULL, NULL);
-    if (state.fire_stream == NULL) {
-        log_error("Error opening fire audio stream: %s", SDL_GetError());
+    // Open audio device
+    state.audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+    if (state.audio_device == 0) {
+        log_error("Couldn't open audio device: %s", SDL_GetError());
         return false;
     }
-    SDL_ResumeAudioStreamDevice(state.fire_stream);
 
+    // Get device format
+    SDL_AudioSpec device_audio_spec;
+    if (!SDL_GetAudioDeviceFormat(state.audio_device, &device_audio_spec, NULL)) {
+        log_error("Couldn't get audio device format: %s", SDL_GetError());
+        return false;
+    }
+
+    // Create and bind SFX audio streams
+    for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
+        state.streams[stream] = SDL_CreateAudioStream(&device_audio_spec, NULL);
+        if (!state.streams[stream]) {
+            log_error("Couldn't create audio stream: %s", SDL_GetError());
+            return false;
+        }
+    }
+    if (!SDL_BindAudioStreams(state.audio_device, state.streams, SFX_STREAM_COUNT)) {
+        log_error("Couldn't bind audio streams: %s", SDL_GetError());
+        return false;
+    }
+
+    // Create and bind fire audio stream
+    state.fire_stream = SDL_CreateAudioStream(&device_audio_spec, NULL);
+    if (!state.fire_stream) {
+        log_error("Couldn't create fire audio stream: %s", SDL_GetError());
+        return false;
+    }
+    if (!SDL_BindAudioStream(state.audio_device, state.fire_stream)) {
+        log_error("Couldn't find fire audio stream: %s", SDL_GetError());
+        return false;
+    }
+
+    // Load sound data
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
         const SoundParams& params = SOUND_PARAMS.at((SoundName)sound);
         state.sound_index[sound] = state.sounds.size();
 
         for (int variant = 0; variant < params.variants; variant++) {
+            // Determine sound subpath
             char sound_subpath[128];
             if (params.variants == 1) {
                 sprintf(sound_subpath, "sfx/%s.wav", params.path);
@@ -192,9 +216,11 @@ bool sound_init() {
                 sprintf(sound_subpath, "sfx/%s%i.wav", params.path, variant + 1);
             }
 
+            // Determine sound full path
             char sound_path[256];
             filesystem_get_resource_path(sound_path, sound_subpath);
 
+            // Load the sound variant
             SoundData sound_variant;
             SDL_AudioSpec sound_spec;
             if (!SDL_LoadWAV(sound_path, &sound_spec, &sound_variant.buffer, &sound_variant.length)) {
@@ -202,10 +228,11 @@ bool sound_init() {
                 return false;
             }
 
-            if (sound_spec.format != desired_spec.format || sound_spec.channels != desired_spec.channels || sound_spec.freq != desired_spec.freq) {
+            // Convert sound as required
+            if (sound_spec.format != device_audio_spec.format || sound_spec.channels != device_audio_spec.channels || sound_spec.freq != device_audio_spec.freq) {
                 uint8_t* converted_data;
                 int converted_length;
-                if (!SDL_ConvertAudioSamples(&sound_spec, sound_variant.buffer, sound_variant.length, &desired_spec, &converted_data, &converted_length)) {
+                if (!SDL_ConvertAudioSamples(&sound_spec, sound_variant.buffer, sound_variant.length, &device_audio_spec, &converted_data, &converted_length)) {
                     log_error("Failed to convert sound.");
                     return false;
                 }
@@ -215,23 +242,32 @@ bool sound_init() {
             }
 
             state.sounds.push_back(sound_variant);
-        }
-    }
+        } // End for each variant
+    } // End for each sound
 
-    state.is_fire_loop_playing = false;
-    log_info("Initialized sound.");
+    // Begin audio playback
+    SDL_ResumeAudioDevice(state.audio_device);
+
+    log_info("Audio device %s format: %i freq: %i channels: %i", SDL_GetAudioDeviceName(state.audio_device), device_audio_spec.format, device_audio_spec.freq, device_audio_spec.channels);
 
     return true;
 }
 
 void sound_quit() {
+    SDL_PauseAudioDevice(state.audio_device);
+
+    // Free all audio streams
     for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
         SDL_DestroyAudioStream(state.streams[stream]);
     }
     SDL_DestroyAudioStream(state.fire_stream);
+
+    // Free all sound data
     for (SoundData sound_data : state.sounds) {
         SDL_free(sound_data.buffer);
     }
+
+    SDL_CloseAudioDevice(state.audio_device);
 
     log_info("Quit sound.");
 }
@@ -255,9 +291,12 @@ void sound_update() {
 }
 
 void sound_play(SoundName sound) { 
+    // Determine the index of the audio stream to play the sound on
+    // We will choose the stream with the least amount of data queued
+    // in order to avoid cutting off a sound mid-playback
     int available_stream = 0;
     int min_data_available = SDL_GetAudioStreamQueued(state.streams[0]);
-    for (int stream = 0; stream < SFX_STREAM_COUNT; stream++) {
+    for (int stream = 1; stream < SFX_STREAM_COUNT; stream++) {
         int stream_data_available = SDL_GetAudioStreamQueued(state.streams[stream]);
         if (stream_data_available < min_data_available) {
             available_stream = stream;
