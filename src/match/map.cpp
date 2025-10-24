@@ -1504,14 +1504,14 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     return target;
 }
 
-void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells, bool limit_region) {
+void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells, bool limit_region) {
     // Don't bother pathing to the unit's cell
     if (from == to) {
         return;
     }
 
     // Find an alternate cell for large units
-    if (cell_size > 1 && map_is_cell_rect_occupied(map, layer, to, cell_size, from, ignore)) {
+    if (cell_size > 1 && map_is_cell_rect_occupied(map, layer, to, cell_size, from, options)) {
         ivec2 nearest_alternative;
         int nearest_alternative_distance = -1;
         for (int x = 0; x < cell_size; x++) {
@@ -1522,7 +1522,7 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
 
                 ivec2 alternative = to - ivec2(x, y);
                 if (map_is_cell_rect_in_bounds(map, alternative, cell_size) &&
-                    !map_is_cell_rect_occupied(map, layer, alternative, cell_size, from, ignore)) {
+                    !map_is_cell_rect_occupied(map, layer, alternative, cell_size, from, options)) {
                     if (nearest_alternative_distance == -1 || ivec2::manhattan_distance(from, alternative) < nearest_alternative_distance) {
                         nearest_alternative = alternative;
                         nearest_alternative_distance = ivec2::manhattan_distance(from, alternative);
@@ -1541,6 +1541,7 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
     std::vector<int> explored_indices = std::vector<int>(map.width * map.height, -1);
     uint32_t closest_explored = 0;
     bool found_path = false;
+    bool avoid_landmines = (options & MAP_OPTION_AVOID_LANDMINES) == MAP_OPTION_AVOID_LANDMINES;
     MapPathNode path_end;
 
     frontier.push_back((MapPathNode) {
@@ -1608,9 +1609,30 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
             }
 
             // Skip occupied cells (unless the child is the goal. this avoids worst-case pathing)
-            if (map_is_cell_rect_occupied(map, layer, child.cell, cell_size, from, ignore) &&
+            if (map_is_cell_rect_occupied(map, layer, child.cell, cell_size, from, options) &&
                 !(child.cell == to && ivec2::manhattan_distance(smallest.cell, child.cell) == 1)) {
                 continue;
+            }
+
+            // If set in options, skip cells that are too close to landmines
+            if (avoid_landmines) {
+                bool is_cell_too_close_to_landmine = false;
+                for (int y = child.cell.y - 1; y < child.cell.y + 2; y++) {
+                    for (int x = child.cell.x - 1; x < child.cell.x + 2; x++) {
+                        ivec2 cell = ivec2(x, y);
+                        if (!map_is_cell_in_bounds(map, cell)) {
+                            continue;
+                        }
+
+                        Cell map_underground_cell = map_get_cell(map, CELL_LAYER_UNDERGROUND, cell);
+                        if (map_underground_cell.type == CELL_BUILDING) {
+                            is_cell_too_close_to_landmine = true;
+                        }
+                    }
+                }
+                if (is_cell_too_close_to_landmine) {
+                    continue;
+                }
             }
 
             // Don't allow diagonal movement through cracks

@@ -9,6 +9,7 @@
 
 const uint32_t MAP_OPTION_IGNORE_UNITS = 1;
 const uint32_t MAP_OPTION_IGNORE_MINERS = 2;
+const uint32_t MAP_OPTION_AVOID_LANDMINES = 4;
 
 struct Tile {
     SpriteName sprite;
@@ -111,4 +112,4 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 st
 ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, uint32_t ignore);
 
 int map_get_pathing_region(const Map& map, ivec2 cell);
-void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells = NULL);
+void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells = NULL);

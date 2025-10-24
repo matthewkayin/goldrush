@@ -1028,7 +1028,7 @@ void match_ui_update(MatchUiState& state) {
                         state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
                     }
 
-                    if (state.bots[player_id].has_surrendered) {
+                    if (bot_has_surrendered(state.bots[player_id])) {
                         match_ui_add_chat_message(state, player_id, "gg");
                         match_ui_handle_player_disconnect(state, player_id);
                     }
