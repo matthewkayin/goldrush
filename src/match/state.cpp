@@ -2325,10 +2325,11 @@ void match_entity_building_finish(MatchState& state, EntityId building_id) {
 
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         Entity& entity = state.entities[entity_index];
+
         if (!entity_is_unit(entity.type)) {
             continue;
         }
-        if (entity.target.id != building_id || !(entity.target.type == TARGET_BUILD || entity.target.type == TARGET_REPAIR)) {
+        if (!(entity.mode == MODE_UNIT_BUILD || entity.mode == MODE_UNIT_REPAIR|| entity.mode == MODE_UNIT_BUILD_ASSIST) || entity.target.id != building_id) {
             continue;
         }
 
@@ -2338,7 +2339,7 @@ void match_entity_building_finish(MatchState& state, EntityId building_id) {
             if (entity.mode != MODE_UNIT_IDLE) {
                 match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_BUILDING_EXIT_BLOCKED);
             }
-        } else if (entity.mode == MODE_UNIT_REPAIR || entity.mode == MODE_UNIT_BUILD_ASSIST) {
+        } else {
             entity.mode = MODE_UNIT_IDLE;
         }
 
