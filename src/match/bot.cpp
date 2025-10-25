@@ -394,7 +394,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             
             // Decide whether to tech switch
             // Easy: Tech switch even on one base (since otherwise it would never tech switch)
-            if ((mining_base_count[bot.player_id] > 1 || bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) && 
+            if (bot_fully_saturated_base_count > 0 &&
                     mining_base_count[bot.player_id] == bot_fully_saturated_base_count &&
                     allied_army_score > 7 * BOT_UNIT_SCORE) {
                 switch (bot.unit_comp) {
@@ -409,6 +409,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                         uint32_t new_unit_comp_roll = lcg_rand(&bot.lcg_seed) % NEW_UNIT_COMP_COUNT;
 
                         bot.unit_comp = new_unit_comps[new_unit_comp_roll];
+                        bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT_PYRO;
                         break;
                     }
                     case BOT_UNIT_COMP_SOLDIER_BANDIT: {
@@ -862,6 +863,7 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
     // Count entities
     BotEntityCount entity_count = bot_entity_count_empty();
     BotEntityCount available_building_count = bot_entity_count_empty();
+    uint32_t in_progress_production_building_count = 0;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         const Entity& entity = state.entities[entity_index];
         EntityId entity_id = state.entities.get_id_of(entity_index);
@@ -889,6 +891,9 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
         }
         if (entity.type == ENTITY_MINER && entity.target.type == TARGET_BUILD) {
             entity_count[entity.target.build.building_type]++;
+            if (entity.target.build.building_type != ENTITY_HOUSE) {
+                in_progress_production_building_count++;
+            }
         }
     }
 
@@ -906,6 +911,19 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
     bot_get_desired_buildings_and_army_ratio(state, bot, desired_entities, desired_army_ratio);
     for (const BotDesiredSquad& squad : bot.desired_squads) {
         desired_entities = bot_entity_count_add(desired_entities, squad.entities);
+    }
+
+    // Check if we should be teching up
+    bool bot_desires_tech = false;
+    bool bot_should_prefer_tech_over_units = false;
+    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        if (entity_count[entity_type] < desired_entities[entity_type]) {
+            bot_desires_tech = true;
+            break;
+        }
+    }
+    if (bot.unit_comp != BOT_UNIT_COMP_COWBOY_BANDIT && bot_desires_tech && in_progress_production_building_count == 0) {
+        bot_should_prefer_tech_over_units = true;
     }
 
     // Determine if we have an available building
@@ -926,7 +944,7 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
     }
 
     // Train desired unit
-    if (is_available_building) {
+    if (is_available_building && !bot_should_prefer_tech_over_units) {
         while (true) {
             for (uint32_t unit_type = ENTITY_MINER + 1; unit_type < ENTITY_HALL; unit_type++) {
                 if (desired_entities[unit_type] <= entity_count[unit_type]) {
@@ -2277,8 +2295,10 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
             // Pathfind to that base so that we place mines close to where the enemies would be coming in
             ivec2 enemy_base_cell = state.entities.get_by_id(nearest_enemy_hall_id).cell;
+            ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, 4, 1, enemy_base_cell, MAP_OPTION_IGNORE_UNITS);
+            ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, enemy_base_cell, 4, MAP_OPTION_IGNORE_UNITS);
             std::vector<ivec2> path;
-            map_pathfind(state.map, CELL_LAYER_GROUND, hall.cell, enemy_base_cell, 1, &path, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS | MAP_OPTION_AVOID_LANDMINES);
+            map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS | MAP_OPTION_AVOID_LANDMINES);
 
             // Find the place along the path that is within the base radius
             int path_index = 0;
@@ -3741,7 +3761,12 @@ MatchInput bot_set_rally_points(const MatchState& state, Bot& bot) {
     return (MatchInput) { .type = MATCH_INPUT_NONE };
 }
 
-bool bot_is_rally_cell_valid(const MatchState& state, ivec2 rally_cell, int rally_margin) {
+bool bot_is_rally_cell_valid(const MatchState& state, ivec2 rally_cell, int rally_margin, Rect origin_rect) {
+    ivec2 origin = Rect::cell_in_a_nearest_to_b(origin_rect, (Rect) { .x = rally_cell.x, .y = rally_cell.y, .w = 1, .h = 1 });
+    if (ivec2::manhattan_distance(rally_cell, origin) < 8) {
+        return false;
+    }
+
     for (int y = rally_cell.y - rally_margin; y < rally_cell.y + rally_margin + 1; y++) {
         for (int x = rally_cell.x - rally_margin; x < rally_cell.x + rally_margin + 1; x++) {
             ivec2 cell = ivec2(x, y);
@@ -3766,6 +3791,13 @@ ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, c
     std::vector<bool> explored(state.map.width * state.map.height, false);
     frontier.push_back(building.cell);
     ivec2 fallback_rally_point = ivec2(-1, -1);
+    int building_cell_size = entity_get_data(building.type).cell_size;
+    Rect building_rect = (Rect) { 
+        .x = building.cell.x,
+        .y = building.cell.y,
+        .w = building_cell_size,
+        .h = building_cell_size
+    };
 
     while (!frontier.empty()) {
         ivec2 next = frontier[0];
@@ -3776,10 +3808,10 @@ ivec2 bot_choose_building_rally_point(const MatchState& state, const Bot& bot, c
         }
 
         static const int RALLY_MARGIN = 4;
-        if (bot_is_rally_cell_valid(state, next, RALLY_MARGIN)) {
+        if (bot_is_rally_cell_valid(state, next, RALLY_MARGIN, building_rect)) {
             return next;
         }
-        if (fallback_rally_point.x == -1 && bot_is_rally_cell_valid(state, next, 2)) {
+        if (fallback_rally_point.x == -1 && bot_is_rally_cell_valid(state, next, 2, building_rect)) {
             fallback_rally_point = next;
         }
 
