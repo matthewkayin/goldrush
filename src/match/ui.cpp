@@ -889,10 +889,10 @@ void match_ui_update(MatchUiState& state) {
     };
     if (!(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
             ((menu_button_rect.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) || input_is_action_just_pressed(INPUT_ACTION_MATCH_MENU))) {
-        if (state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER) {
+        if (state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER || state.mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP) {
             state.options_menu.mode = OPTIONS_MENU_CLOSED;
             state.mode = MATCH_UI_MODE_NONE;
-        } else {
+        } else if (state.mode != MATCH_UI_MODE_MATCH_OVER_DEFEAT && state.mode != MATCH_UI_MODE_MATCH_OVER_VICTORY) {
             state.mode = MATCH_UI_MODE_MENU;
             input_stop_text_input();
         }

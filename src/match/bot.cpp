@@ -1839,7 +1839,8 @@ void bot_squad_create_from_entity_count(const MatchState& state, Bot& bot, BotSq
             target_cell = state.entities.get_by_id(nearest_hall_id).cell;
             break;
         }
-        case BOT_SQUAD_TYPE_RESERVES: {
+        case BOT_SQUAD_TYPE_RESERVES: 
+        case BOT_SQUAD_TYPE_RETURN: {
             GOLD_ASSERT(false);
             break;
         }
@@ -2540,9 +2541,18 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
     }
 
-    if ((squad.type == BOT_SQUAD_TYPE_ATTACK || squad.type == BOT_SQUAD_TYPE_RESERVES) && !is_enemy_near_squad) {
+    if (squad.type == BOT_SQUAD_TYPE_RESERVES && !is_enemy_near_squad) {
         bot_squad_dissolve(bot, squad);
         return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+    if (squad.type == BOT_SQUAD_TYPE_ATTACK && !is_enemy_near_squad) {
+        squad.type = BOT_SQUAD_TYPE_RETURN;
+    }
+    if (squad.type == BOT_SQUAD_TYPE_RETURN && is_enemy_near_squad) {
+        squad.type = BOT_SQUAD_TYPE_ATTACK;
+    }
+    if (squad.type == BOT_SQUAD_TYPE_RETURN) {
+        return bot_squad_return_to_nearest_base(state, bot, squad);
     }
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
