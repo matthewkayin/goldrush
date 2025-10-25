@@ -16,7 +16,12 @@ void match_setting_init() {
         .values = { "Small", "Medium", "Large", "Giant" },
         .value_count = MATCH_SETTING_TEAMS_COUNT
     };
-};
+    MATCH_SETTING_DATA[MATCH_SETTING_DIFFICULTY] = (MatchSettingData) {
+        .name = "Difficulty",
+        .values = { "Easy", "Moderate", "Hard" },
+        .value_count = MATCH_SETTING_DIFFICULTY_COUNT
+    };
+}
 
 const MatchSettingData& match_setting_data(MatchSetting setting) {
     return MATCH_SETTING_DATA.at(setting);

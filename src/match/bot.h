@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "state.h"
 #include "entity.h"
+#include "menu/match_setting.h"
 #include <unordered_map>
 #include <array>
 #include <functional>
@@ -85,6 +86,7 @@ struct Bot {
     uint8_t player_id;
     int32_t lcg_seed;
     BotMode mode;
+    MatchSettingDifficultyValue difficulty;
 
     BotUnitComp unit_comp;
     std::queue<EntityId> buildings_to_set_rally_points;
@@ -103,7 +105,7 @@ struct Bot {
     uint32_t scout_info;
 };
 
-Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed);
+Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyValue difficulty, int32_t lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes);
 bool bot_has_surrendered(const Bot& bot);
 

@@ -9,6 +9,7 @@ static const uint32_t BOT_DEFEND_WITH_WORKERS = 2;
 
 static const uint32_t BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES = 1;
 static const uint32_t BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES = 2;
+static const uint32_t BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED = 1 << 2;
 
 static const int BOT_UNIT_SCORE = 4;
 static const int BOT_UNIT_SCORE_IN_BUNKER = 6;
@@ -17,12 +18,32 @@ static const int BOT_SQUAD_GATHER_DISTANCE = 16;
 static const uint32_t BOT_MAX_LANDMINES_PER_BASE = 6;
 static const uint32_t BOT_HARASS_SQUAD_MAX_SIZE = 8;
 
-Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
+Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyValue difficulty, int32_t lcg_seed) {
     Bot bot;
 
     bot.player_id = player_id;
     bot.lcg_seed = lcg_seed;
-    bot.mode = (BotMode)(lcg_rand(&bot.lcg_seed) % 3);
+    bot.difficulty = difficulty;
+    log_trace("BOT: created with difficulty %u", difficulty);
+
+    // Determine bot opener
+    // On easy: always open bunker
+    // On moderate: 50% bunker, 25% bandit rush, 25% expand first
+    // On hard: 33% each opener
+    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+        bot.mode = BOT_MODE_OPENER_BUNKER;
+    } else if (bot.difficulty == MATCH_SETTING_DIFFICULTY_MODERATE) {
+        int bot_mode_roll = lcg_rand(&bot.lcg_seed) % 4;
+        if (bot_mode_roll < 2) {
+            bot.mode = BOT_MODE_OPENER_BUNKER;
+        } else if (bot_mode_roll == 3) {
+            bot.mode = BOT_MODE_OPENER_BANDIT_RUSH;
+        } else {
+            bot.mode = BOT_MODE_EXPAND;
+        }
+    } else {
+        bot.mode = (BotMode)(lcg_rand(&bot.lcg_seed) % 3);
+    }
 
     bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT;
 
@@ -43,6 +64,9 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     // Strategy
 
     bool is_base_under_attack = bot_handle_base_under_attack(state, bot);
+    if (is_base_under_attack) {
+        bot_scout_set_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED, true);
+    }
     bot_strategy_update(state, bot, is_base_under_attack);
 
     // Production
@@ -233,7 +257,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             // If we have a squad, we can assume it is the rush squad
             // Switch to expand mode
             if (!bot.squads.empty()) {
-                bot.mode = BOT_MODE_EXPAND;
+                bot.mode = bot.difficulty == MATCH_SETTING_DIFFICULTY_HARD ? BOT_MODE_EXPAND : BOT_MODE_ATTACK;
                 break;
             }
 
@@ -260,7 +284,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             // If we have a squad, we can assume it is the bunker squad
             // Switch to expand mode
             if (!bot.squads.empty()) {
-                bot.mode = BOT_MODE_EXPAND;
+                bot.mode = bot.difficulty == MATCH_SETTING_DIFFICULTY_HARD ? BOT_MODE_EXPAND : BOT_MODE_ATTACK;
                 break;
             }
 
@@ -312,6 +336,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             uint32_t mining_base_count[MAX_PLAYERS];
             memset(mining_base_count, 0, sizeof(mining_base_count));
             uint32_t bot_fully_saturated_base_count = 0;
+            uint32_t bot_goldmines_low_on_gold_count = 0;
             uint32_t unoccupied_goldmine_count = 0;
             for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
                 const Entity& goldmine = state.entities[goldmine_index];
@@ -332,6 +357,9 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                 if (hall.player_id == bot.player_id && match_get_miners_on_gold(state, goldmine_id, bot.player_id) == MATCH_MAX_MINERS_ON_GOLD) {
                     bot_fully_saturated_base_count++;
                 }
+                if (hall.player_id == bot.player_id && goldmine.gold_held < 1000) {
+                    bot_goldmines_low_on_gold_count++;
+                }
             }
 
             // Count max enemy mining base
@@ -345,7 +373,18 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             }
 
             // Decide whether to expand
-            uint32_t target_base_count = std::max(2U, max_enemy_mining_base_count);
+            // Easy: Maintain only one base
+            // Moderate: Maintain two bases
+            // Hard: Maintain two, but keep up with opponent if they take more than that
+            uint32_t target_base_count;
+            if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+                target_base_count = 1U;
+            } else if (bot.difficulty == MATCH_SETTING_DIFFICULTY_MODERATE) {
+                target_base_count = 2U;
+            } else {
+                target_base_count = std::max(2U, max_enemy_mining_base_count);
+            } 
+            target_base_count += bot_goldmines_low_on_gold_count;
             if (unoccupied_goldmine_count != 0 && 
                     mining_base_count[bot.player_id] < target_base_count && 
                     mining_base_count[bot.player_id] == bot_fully_saturated_base_count) {
@@ -354,7 +393,8 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             }
             
             // Decide whether to tech switch
-            if (mining_base_count[bot.player_id] > 1 && 
+            // Easy: Tech switch even on one base (since otherwise it would never tech switch)
+            if ((mining_base_count[bot.player_id] > 1 || bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) && 
                     mining_base_count[bot.player_id] == bot_fully_saturated_base_count &&
                     allied_army_score > 7 * BOT_UNIT_SCORE) {
                 switch (bot.unit_comp) {
@@ -445,18 +485,22 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             }
 
             // Harass / Push
+            // Easy: Don't attack unless player has attacked us first
+            // Moderate: Push but don't harass
+            // Hard: Harass if possible, then push
             const int least_defended_hall_score = bot_get_least_defended_enemy_hall_score(state, bot);
-            const int bot_minimum_attack_threshold = least_defended_hall_score < BOT_UNIT_SCORE_FULL_BUNKER 
+            const int bot_minimum_attack_threshold = least_defended_hall_score < BOT_UNIT_SCORE_FULL_BUNKER && bot.difficulty == MATCH_SETTING_DIFFICULTY_HARD
                                             ? BOT_UNIT_SCORE_FULL_BUNKER 
                                             : 32 * BOT_UNIT_SCORE;
             const int bot_attack_threshold = std::max(least_defended_hall_score + (BOT_UNIT_SCORE * 4), bot_minimum_attack_threshold);
             const bool should_attack = 
+                    (bot.difficulty != MATCH_SETTING_DIFFICULTY_EASY || bot_scout_check_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED)) &&
                     // Attack if we have a bigger army than our opponent
-                    (bot_unreserved_unit_score > bot_attack_threshold && allied_army_score > enemy_army_score) ||
+                    ((bot_unreserved_unit_score > bot_attack_threshold && allied_army_score > enemy_army_score) ||
                     // Attack if we are maxed out
                     match_get_player_population(state, bot.player_id) >= 98 ||
                     // And if we have no miners and no money to get more, then attack with everything we've got
-                    (bot_unreserved_unit_score > 0 && bot_miner_count == 0 && bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_MINER).gold_cost);
+                    (bot_unreserved_unit_score > 0 && bot_miner_count == 0 && bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_MINER).gold_cost));
             if (should_attack) {
                 BotEntityCount attack_entity_count = bot_entity_count_empty();
                 for (uint32_t entity_type = ENTITY_MINER + 1; entity_type < ENTITY_HALL; entity_type++) {
@@ -544,7 +588,7 @@ bool bot_is_area_safe(const MatchState& state, const Bot& bot, ivec2 cell) {
             return entity.type != ENTITY_GOLDMINE &&
                     entity_is_selectable(entity) &&
                     state.players[entity.player_id].team != state.players[bot.player_id].team &&
-                    ivec2::manhattan_distance(entity.cell, cell) < BOT_SQUAD_GATHER_DISTANCE * 2;
+                    ivec2::manhattan_distance(entity.cell, cell) < BOT_SQUAD_GATHER_DISTANCE;
         }
     });
 
@@ -934,7 +978,7 @@ void bot_get_desired_buildings_and_army_ratio(const MatchState& state, const Bot
     desired_buildings = bot_entity_count_empty();
     desired_army_ratio = bot_entity_count_empty();
 
-    uint32_t mining_base_count = bot_get_mining_base_count(state, bot);
+    const uint32_t mining_base_count = bot_get_mining_base_count(state, bot);
 
     switch (bot.unit_comp) {
         case BOT_UNIT_COMP_COWBOY_BANDIT: {
@@ -1240,9 +1284,29 @@ uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
         return UPGRADE_LANDMINES;
     }
 
+    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+        return 0;
+    }
+
     if (bot.unit_comp == BOT_UNIT_COMP_SOLDIER_CANNON &&
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_BAYONETS)) {
         return UPGRADE_BAYONETS;
+    }
+
+    if (bot.unit_comp == BOT_UNIT_COMP_COWBOY_BANDIT_WAGON_JOCKEY &&
+            match_player_upgrade_is_available(state, bot.player_id, UPGRADE_WAR_WAGON)) {
+        return UPGRADE_WAR_WAGON;
+    }
+
+    BotEntityCount desired_buildings, desired_army_ratio;
+    bot_get_desired_buildings_and_army_ratio(state, bot, desired_buildings, desired_army_ratio);
+
+    if (desired_army_ratio[ENTITY_BANDIT] != 0 && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_SERRATED_KNIVES)) {
+        return UPGRADE_SERRATED_KNIVES;
+    }
+
+    if (desired_army_ratio[ENTITY_BALLOON] != 0 && match_player_upgrade_is_available(state, bot.player_id, UPGRADE_TAILWIND)) {
+        return UPGRADE_TAILWIND;
     }
 
     return 0;
@@ -1573,7 +1637,8 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
             .w = HALL_SIZE, .h = HALL_SIZE
         };
         // If the area is blocked (by a cactus, for example) then don't build there
-        if (!map_is_cell_rect_in_bounds(state.map, hall_cell, HALL_SIZE) || map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, hall_cell, HALL_SIZE)) {
+        if (!map_is_cell_rect_in_bounds(state.map, hall_cell, HALL_SIZE) || map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, hall_cell, HALL_SIZE) ||
+                map_get_pathing_region(state.map, hall_cell) != map_get_pathing_region(state.map, state.entities[nearest_goldmine_index].cell)) {
             hall_score = -1;
         } else {
             // Check for obstacles (including stairs) in a rect around where the hall would be
@@ -2476,11 +2541,8 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     }
 
     if ((squad.type == BOT_SQUAD_TYPE_ATTACK || squad.type == BOT_SQUAD_TYPE_RESERVES) && !is_enemy_near_squad) {
-        if (squad.type == BOT_SQUAD_TYPE_RESERVES) {
-            bot_squad_dissolve(bot, squad);
-            return (MatchInput) { .type = MATCH_INPUT_NONE };
-        }
-        return bot_squad_return_to_nearest_base(state, bot, squad);
+        bot_squad_dissolve(bot, squad);
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -2520,6 +2582,11 @@ std::vector<EntityId> bot_squad_get_nearby_enemy_army(const MatchState& state, c
 }
 
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad) {
+    // Don't retreat on easy mode
+    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+        return false;
+    }
+
     // Score the enemy's army
     std::vector<EntityId> nearby_enemy_army = bot_squad_get_nearby_enemy_army(state, bot, squad);
     int enemy_army_score = bot_score_entity_list(state, bot, nearby_enemy_army);
@@ -2531,13 +2598,9 @@ bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const Bot
         squad_score += bot_score_entity(state, bot, entity, entity_id);
     }
 
-    if (squad_score < enemy_army_score) {
-        log_trace("BOT: squad with size %u first entity %u is retreating. squad score %u enemy army score %u", squad.entities.size(), squad.entities[0], squad_score, enemy_army_score);
-        log_trace("BOT: -- enemy army --");
-        for (EntityId entity_id : nearby_enemy_army) {
-            log_trace("%u %s", entity_id, entity_get_data(state.entities.get_by_id(entity_id).type).name);
-        }
-        log_trace("BOT: -- end --");
+    // On moderate difficulty, retreat less willingly
+    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_MODERATE) {
+        squad_score += 4 * BOT_UNIT_SCORE;
     }
 
     return squad_score < enemy_army_score;
@@ -3009,21 +3072,23 @@ void bot_scout_update(const MatchState& state, Bot& bot, uint32_t match_time_min
     }
 
     // Check for invisible units
-    for (const Entity& entity : state.entities) {
-        if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
-            continue;
-        }
-        if (entity.type == ENTITY_PYRO || 
-                (entity.type == ENTITY_LANDMINE && 
-                match_is_entity_visible_to_player(state, entity, bot.player_id))) {
-            bot_scout_set_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES, true);
-            break;
-        }
-        if (entity.type == ENTITY_SHERIFFS ||
-                (entity.type == ENTITY_DETECTIVE && 
-                match_is_entity_visible_to_player(state, entity, bot.player_id))) {
-            bot_scout_set_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES, true);
-            break;
+    if (bot.difficulty != MATCH_SETTING_DIFFICULTY_EASY) {
+        for (const Entity& entity : state.entities) {
+            if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
+                continue;
+            }
+            if (entity.type == ENTITY_PYRO || 
+                    (entity.type == ENTITY_LANDMINE && 
+                    match_is_entity_visible_to_player(state, entity, bot.player_id))) {
+                bot_scout_set_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES, true);
+                break;
+            }
+            if (entity.type == ENTITY_SHERIFFS ||
+                    (entity.type == ENTITY_DETECTIVE && 
+                    match_is_entity_visible_to_player(state, entity, bot.player_id))) {
+                bot_scout_set_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES, true);
+                break;
+            }
         }
     }
 
@@ -3599,7 +3664,7 @@ MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot) {
                 return entity_is_building(building.type) &&
                         entity_is_selectable(building) &&
                         entity.player_id == building.player_id &&
-                        ivec2::manhattan_distance(entity.cell, building.cell) < BOT_SQUAD_GATHER_DISTANCE * 2;
+                        ivec2::manhattan_distance(entity.cell, building.cell) < BOT_SQUAD_GATHER_DISTANCE;
             }
         });
         if (nearby_allied_building_id != ID_NULL) {
