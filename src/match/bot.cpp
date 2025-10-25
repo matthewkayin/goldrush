@@ -409,7 +409,9 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                         uint32_t new_unit_comp_roll = lcg_rand(&bot.lcg_seed) % NEW_UNIT_COMP_COUNT;
 
                         bot.unit_comp = new_unit_comps[new_unit_comp_roll];
-                        bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT_PYRO;
+                        #ifdef GOLD_DEBUG
+                            bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT_PYRO;
+                        #endif
                         break;
                     }
                     case BOT_UNIT_COMP_SOLDIER_BANDIT: {

@@ -241,7 +241,7 @@ int gold_main(int argc, char** argv) {
 
     bool is_running = true;
     #ifdef GOLD_DEBUG
-        bool render_debug_info = true;
+        bool render_debug_info = false;
     #endif
     const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
     uint64_t last_time = SDL_GetTicksNS();
