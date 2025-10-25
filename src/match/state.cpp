@@ -1060,7 +1060,14 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
 
                 // Pathfind
                 if (!used_ideal_mining_path) {
-                    map_pathfind(state.map, entity_data.cell_layer, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, match_is_entity_mining(state, entity) ? MAP_OPTION_IGNORE_MINERS : 0);
+                    uint32_t pathfind_options = 0;
+                    if (match_is_entity_mining(state, entity)) {
+                        pathfind_options |= MAP_OPTION_IGNORE_MINERS;
+                    }
+                    if (entity.target.type == TARGET_CELL && entity.pathfind_attempts == 0) {
+                        pathfind_options |= MAP_OPTION_ALLOW_PATH_SQUIRRELING;
+                    }
+                    map_pathfind(state.map, entity_data.cell_layer, entity.cell, match_get_entity_target_cell(state, entity), entity_data.cell_size, &entity.path, pathfind_options);
                 }
 
                 // Check path

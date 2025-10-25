@@ -1691,8 +1691,9 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
     ivec2 original_to = to;
     to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
+    bool allow_squirreling = (ignore & MAP_OPTION_ALLOW_PATH_SQUIRRELING) == MAP_OPTION_ALLOW_PATH_SQUIRRELING;
     if (to != original_to && ivec2::manhattan_distance(from, to) < 3 &&
-            map_get_cell(map, layer, original_to).type == CELL_UNIT) {
+            map_get_cell(map, layer, original_to).type == CELL_UNIT && !allow_squirreling) {
         return;
     }
 

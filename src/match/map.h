@@ -9,7 +9,8 @@
 
 const uint32_t MAP_OPTION_IGNORE_UNITS = 1;
 const uint32_t MAP_OPTION_IGNORE_MINERS = 2;
-const uint32_t MAP_OPTION_AVOID_LANDMINES = 4;
+const uint32_t MAP_OPTION_AVOID_LANDMINES = 1 << 2;
+const uint32_t MAP_OPTION_ALLOW_PATH_SQUIRRELING = 1 << 3;
 
 struct Tile {
     SpriteName sprite;
