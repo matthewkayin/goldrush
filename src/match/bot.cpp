@@ -23,8 +23,6 @@ Bot bot_init(const MatchState& state, uint8_t player_id, int32_t lcg_seed) {
     bot.player_id = player_id;
     bot.lcg_seed = lcg_seed;
     bot.mode = (BotMode)(lcg_rand(&bot.lcg_seed) % 3);
-    // TODO: remove me
-    bot.mode = BOT_MODE_OPENER_BUNKER;
 
     bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT;
 
