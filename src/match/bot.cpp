@@ -24,7 +24,6 @@ Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyV
     bot.player_id = player_id;
     bot.lcg_seed = lcg_seed;
     bot.difficulty = difficulty;
-    log_trace("BOT: created with difficulty %u", difficulty);
 
     // Determine bot opener
     // On easy: always open bunker
@@ -51,16 +50,6 @@ Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyV
     bot.scout_id = ID_NULL;
     bot.last_scout_time = 0;
     bot.scout_info = 0;
-
-    EntityId pyro_id = bot_find_entity((BotFindEntityParams) {
-        .state = state,
-        .filter = [&bot](const Entity& entity, EntityId entity_id) {
-            return entity.type == ENTITY_PYRO && entity.player_id == bot.player_id;
-        }
-    });
-    std::vector<EntityId> entity_list;
-    entity_list.push_back(pyro_id);
-    bot_squad_create(state, bot, BOT_SQUAD_TYPE_LANDMINES, state.entities.get_by_id(pyro_id).cell, entity_list);
 
     return bot;
 }
