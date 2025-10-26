@@ -3381,8 +3381,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
     for (uint32_t path_index = 0; path_index < scout.path.size(); path_index += DANGER_RADIUS) {
         for (const BotScoutDanger& danger : bot.scout_danger) {
             ivec2 danger_cell = bot_scout_danger_get_cell(state, danger);
-            if (ivec2::manhattan_distance(scout.path[path_index], danger_cell) < DANGER_RADIUS * 2 &&
-                    map_get_tile(state.map, scout.path[path_index]).elevation == map_get_tile(state.map, danger_cell).elevation) {
+            if (ivec2::manhattan_distance(scout.path[path_index], danger_cell) < DANGER_RADIUS * 2) {
                 is_danger_along_path = true;
             }
         }
