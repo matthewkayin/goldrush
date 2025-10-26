@@ -501,7 +501,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                     // Attack if we have a bigger army than our opponent
                     ((bot_unreserved_unit_score > bot_attack_threshold && allied_army_score > enemy_army_score) ||
                     // Attack if we are maxed out
-                    match_get_player_population(state, bot.player_id) >= 98 ||
+                    (bot_unreserved_unit_score > 0 && match_get_player_population(state, bot.player_id) >= 98) ||
                     // And if we have no miners and no money to get more, then attack with everything we've got
                     (bot_unreserved_unit_score > 0 && bot_miner_count == 0 && bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_MINER).gold_cost));
             if (should_attack) {
@@ -1829,6 +1829,12 @@ void bot_squad_create_from_entity_count(const MatchState& state, Bot& bot, BotSq
             bot_release_scout(bot);
             break;
         }
+    }
+
+    if (entity_list.empty()) {
+        log_warn("bot_squad_create_from_entity_count entity list is empty");
+        GOLD_ASSERT(false);
+        return;
     }
 
     ivec2 target_cell = ivec2(-1, -1);
