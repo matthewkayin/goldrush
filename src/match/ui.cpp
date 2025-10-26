@@ -1969,24 +1969,44 @@ bool match_ui_building_can_be_placed(const MatchUiState& state) {
     // Check individual squares in the building's rect to make sure they are valid
     for (int y = building_cell.y; y < building_cell.y + entity_data.cell_size; y++) {
         for (int x = building_cell.x; x < building_cell.x + entity_data.cell_size; x++) {
-            ivec2 cell = ivec2(x, y);
-            // Check that no entities are occupying the building rect
-            if ((cell != miner_cell && map_get_cell(state.match.map, CELL_LAYER_GROUND, cell).type != CELL_EMPTY)) {
-                return false;
-            } 
-            // Check that we're not building on a ramp
-            if (map_is_tile_ramp(state.match.map, cell)) {
-                return false;
-            } 
-            // Check that we're not building on top of a landmine
-            if (map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, cell).type != CELL_EMPTY) {
-                return false;
-            }
-            // Check that we're not building on hidden fog
-            if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell) == FOG_HIDDEN) {
+            if (!match_ui_is_building_place_cell_valid(state, miner_cell, ivec2(x, y))) {
                 return false;
             }
         }
+    }
+
+    return true;
+}
+
+bool match_ui_is_building_place_cell_valid(const MatchUiState& state, ivec2 miner_cell, ivec2 cell) {
+    // Check that no entities are occupying the building rect
+    Cell map_ground_cell = map_get_cell(state.match.map, CELL_LAYER_GROUND, cell);
+    if (map_ground_cell.type == CELL_UNIT || map_ground_cell.type == CELL_MINER || map_ground_cell.type == CELL_BUILDING) {
+        // If the entity is not visible to the player, then we will ignore the fact that it's blocking the building
+        if (cell != miner_cell &&
+                (match_is_entity_visible_to_player(state.match, state.match.entities.get_by_id(map_ground_cell.id), network_get_player_id()) ||
+                (map_ground_cell.type == CELL_BUILDING && state.match.remembered_entities[network_get_player_id()].find(map_ground_cell.id) != state.match.remembered_entities[network_get_player_id()].end()))) {
+            return false;
+        }
+    } else if (map_ground_cell.type != CELL_EMPTY) {
+        return false;
+    }
+
+    // Check that we're not building on a ramp
+    if (map_is_tile_ramp(state.match.map, cell)) {
+        return false;
+    } 
+
+    // Check that we're not building on top of a landmine
+    Cell map_underground_cell = map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, cell);
+    if (map_underground_cell.type == CELL_BUILDING && 
+            match_is_entity_visible_to_player(state.match, state.match.entities.get_by_id(map_underground_cell.id), network_get_player_id())) {
+        return false;
+    }
+
+    // Check that we're not building on hidden fog
+    if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell) == FOG_HIDDEN) {
+        return false;
     }
 
     return true;
@@ -2767,22 +2787,11 @@ void match_ui_render(const MatchUiState& state) {
         render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state.camera_offset, RENDER_SPRITE_NO_CULL, state.match.players[network_get_player_id()].recolor_id);
 
         // Then draw the green / red squares
-        bool is_placement_out_of_bounds = building_cell.x + building_data.cell_size > (int)state.match.map.width ||
-                                          building_cell.y + building_data.cell_size > (int)state.match.map.height;
         ivec2 miner_cell = state.match.entities.get_by_id(match_get_nearest_builder(state.match, state.selection, building_cell)).cell;
         for (int y = building_cell.y; y < building_cell.y + building_data.cell_size; y++) {
             for (int x = building_cell.x; x < building_cell.x + building_data.cell_size; x++) {
                 ivec2 cell = ivec2(x, y);
-                // Don't allow buildings out of bounds
-                bool is_cell_red = is_placement_out_of_bounds ||
-                    // Don't allow buildings in hidden fog
-                    match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell) == FOG_HIDDEN ||
-                    // Don't allow buildings on ramps
-                    map_is_tile_ramp(state.match.map, cell) ||
-                    // Don't allow buildings on top of units (unless it's the unit who will be building the building)
-                    (cell != miner_cell && map_get_cell(state.match.map, CELL_LAYER_GROUND, cell).type != CELL_EMPTY) ||
-                    // Don't allow buildigns on top of landmines
-                    map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, cell).type != CELL_EMPTY;
+                bool is_cell_red = !match_ui_is_building_place_cell_valid(state, miner_cell, cell);
                 
                 // Don't allow buildings too close to goldmines
                 if (state.building_type == ENTITY_HALL) {
