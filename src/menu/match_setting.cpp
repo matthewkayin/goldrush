@@ -13,7 +13,7 @@ void match_setting_init() {
     };
     MATCH_SETTING_DATA[MATCH_SETTING_MAP_SIZE] = (MatchSettingData) {
         .name = "Map Size",
-        .values = { "Small", "Medium", "Large", "Giant" },
+        .values = { "Small", "Medium", "Large" },
         .value_count = MATCH_SETTING_TEAMS_COUNT
     };
     MATCH_SETTING_DATA[MATCH_SETTING_DIFFICULTY] = (MatchSettingData) {
@@ -30,13 +30,11 @@ const MatchSettingData& match_setting_data(MatchSetting setting) {
 uint32_t match_setting_get_map_size(MatchSettingMapSizeValue value) {
     switch (value) {
         case MATCH_SETTING_MAP_SIZE_SMALL:
-            return 128;
+            return 96;
         case MATCH_SETTING_MAP_SIZE_MEDIUM:
-            return 164;
+            return 128;
         case MATCH_SETTING_MAP_SIZE_LARGE:
-            return 196;
-        case MATCH_SETTING_MAP_SIZE_GIANT:
-            return 228;
+            return 160;
         case MATCH_SETTING_MAP_SIZE_COUNT: {
             GOLD_ASSERT(false);
             return 0;
