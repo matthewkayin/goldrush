@@ -61,7 +61,7 @@ static const std::unordered_map<RenderColor, SDL_Color> RENDER_COLOR_VALUES = {
     { RENDER_COLOR_DARK_GRAY, (SDL_Color) { .r = 94, .g = 88, .b = 89, .a = 255 }},
     { RENDER_COLOR_BLUE, (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 }},
     { RENDER_COLOR_DIM_BLUE, (SDL_Color) { .r = 70, .g = 100, .b = 115, .a = 255 }},
-    { RENDER_COLOR_LIGHT_BLUE, (SDL_Color) { .r = 125, .g = 181, .b = 164, .a = 255 }},
+    { RENDER_COLOR_LIGHT_BLUE, (SDL_Color) { .r = 134, .g = 191, .b = 186, .a = 255 }},
     { RENDER_COLOR_RED, (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }},
     { RENDER_COLOR_RED_TRANSPARENT, (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 128 }},
     { RENDER_COLOR_LIGHT_RED, (SDL_Color) { .r = 219, .g = 151, .b = 114, .a = 255 }},
