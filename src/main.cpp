@@ -287,6 +287,11 @@ int gold_main(int argc, char** argv) {
 
             // INPUT
             input_poll_events();
+            #ifdef GOLD_DEBUG
+                if (input_is_action_just_pressed(INPUT_ACTION_F3) && !input_is_action_pressed(INPUT_ACTION_SHIFT)) {
+                    render_debug_info = !render_debug_info;
+                }
+            #endif
             #ifdef GOLD_DEBUG_TURBO
                 if (input_is_action_just_pressed(INPUT_ACTION_TURBO)) {
                     if (playback_speed == 1) {

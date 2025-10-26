@@ -97,6 +97,7 @@ struct Bot {
     std::vector<BotSquad> squads;
     std::unordered_map<EntityId, BotRetreatMemory> retreat_memory;
     std::unordered_map<EntityId, int> bunker_garrison_count_memory;
+    uint32_t landmine_check_time;
 
     EntityId scout_id;
     uint32_t last_scout_time;
@@ -147,7 +148,7 @@ std::vector<EntityId> bot_create_entity_list_from_entity_count(const MatchState&
 void bot_squad_create_from_entity_count(const MatchState& state, Bot& bot, BotSquadType squad_type, BotEntityCount desired_entities);
 void bot_squad_create(const MatchState& state, Bot& bot, BotSquadType type, ivec2 target_cell, std::vector<EntityId>& entities);
 void bot_squad_dissolve(Bot& bot, BotSquad& squad);
-MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
+MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_time_minutes);
 std::vector<EntityId> bot_squad_get_nearby_enemy_army(const MatchState& state, const Bot& bot, const BotSquad& squad);
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad);
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);

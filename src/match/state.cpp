@@ -83,6 +83,10 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, 0);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
+            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, 0);
+            EntityId pyro_id = match_create_entity(state, ENTITY_PYRO, exit_cell, player_id);
+            match_grant_player_upgrade(state, player_id, UPGRADE_LANDMINES);
+            state.entities.get_by_id(pyro_id).energy = entity_get_data(ENTITY_PYRO).unit_data.max_energy;
 
             // Place scout
             {
