@@ -1,6 +1,8 @@
 name: Steam Deploy
 
 on: 
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -26,7 +28,7 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
           clang++ -v
-          make RELEASE=true
+          make RELEASE_VERSION=${{ github.event.release.tag_name }}
 
       - name: Bundle
         shell: cmd
@@ -56,7 +58,7 @@ jobs:
       - name: Build
         run: |
           clang++ -v
-          make RELEASE=true
+          make RELEASE_VERSION=${{ github.event.release.tag_name }}
 
       - name: Bundle
         run: |
@@ -89,7 +91,7 @@ jobs:
 
       - name: Build
         run: |
-          make RELEASE=true
+          make RELEASE_VERSION=${{ github.event.release.tag_name }}
 
       - name: Bundle
         run: |
@@ -126,7 +128,7 @@ jobs:
           username: ${{ secrets.STEAM_USERNAME }}
           configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
           appId: 3831190
-          buildDescription: v0.8.1
+          buildDescription: ${{ github.event.release.tag_name }}
           rootPath: bin
           depot1Path: goldrush_windows
           depot2Path: goldrush_macos

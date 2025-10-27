@@ -15,16 +15,16 @@ LINKER_FLAGS := -std=c++17
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 RC_FILES :=
 
-ifneq ($(APP_VERSION),)
-	DEFINES += -DAPP_VERSION=$(APP_VERSION)
+ifneq ($(RELEASE_VERSION),)
+	DEFINES += -DRELEASE_VERSION=\"$(RELEASE_VERSION)\"
 endif
 
-ifeq ($(RELEASE),true)
-	COMPILER_FLAGS += -O2
-	DEFINES += -DGOLD_RELEASE
-else
+ifeq ($(RELEASE_VERSION),)
 	COMPILER_FLAGS += -O0 -g
 	LINKER_FLAGS += -g
+else
+	COMPILER_FLAGS += -O2
+	DEFINES += -DGOLD_RELEASE
 endif
 
 ifeq ($(OS),Windows_NT)
@@ -51,7 +51,7 @@ else
 # Use -Wno-deprecated-declarations on MacOS because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 		COMPILER_FLAGS += -Wno-deprecated-declarations -mmacos-version-min=14.5
 		LINKER_FLAGS += -Llib/macos -lenet -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_image -framework SDL3_ttf
-		ifeq ($(RELEASE),)
+		ifeq ($(RELEASE_VERSION),)
 			LINKER_FLAGS += -rpath ../lib/macos
 		endif
 	endif

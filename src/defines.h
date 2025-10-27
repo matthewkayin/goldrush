@@ -16,7 +16,11 @@
 #endif
 
 #define APP_NAME "Gold Rush"
-#define APP_VERSION "0.8.2"
+#ifdef RELEASE_VERSION
+    #define APP_VERSION RELEASE_VERSION
+#else
+    #define APP_VERSION "dev"
+#endif
 
 #define GOLD_STEAM
 #ifdef GOLD_STEAM
