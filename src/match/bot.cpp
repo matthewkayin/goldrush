@@ -4,6 +4,8 @@
 #include "upgrade.h"
 #include "core/logger.h"
 
+#include <tracy/tracy/Tracy.hpp>
+
 static const uint32_t BOT_DEFEND_COUNTERATTACK = 1;
 static const uint32_t BOT_DEFEND_WITH_WORKERS = 2;
 
@@ -55,6 +57,8 @@ Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyV
 }
 
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
+    ZoneScoped;
+
     if (bot.mode == BOT_MODE_SURRENDER) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
@@ -137,6 +141,8 @@ bool bot_has_surrendered(const Bot& bot) {
 // STRATEGY
 
 void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_attack) {
+    ZoneScoped;
+
     // Count unreserved entities
     BotEntityCount unreserved_entity_count = bot_entity_count_empty();
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -522,6 +528,8 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
 }
 
 bool bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
+    ZoneScoped;
+
     // Prepare the goldmines under attack list with each goldmine
     std::unordered_map<uint32_t, uint32_t> hall_surrounding_goldmine;
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -824,6 +832,8 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
 // PRODUCTION
 
 MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_base_under_attack) {
+    ZoneScoped;
+
     MatchInput saturate_bases_input = bot_saturate_bases(state, bot);
     if (saturate_bases_input.type != MATCH_INPUT_NONE) {
         return saturate_bases_input;
@@ -1931,6 +1941,8 @@ void bot_squad_dissolve(Bot& bot, BotSquad& squad) {
 }
 
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_time_minutes) {
+    ZoneScoped;
+
     // Remove dead units
     {
         uint32_t squad_entity_index = 0;
@@ -3191,6 +3203,8 @@ void bot_scout_update(const MatchState& state, Bot& bot, uint32_t match_time_min
 }
 
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minutes) {
+    ZoneScoped;
+
     // If we have no scout, it means we're not scouting
     if (bot.scout_id == ID_NULL) {
         // Determine if we should begin scouting

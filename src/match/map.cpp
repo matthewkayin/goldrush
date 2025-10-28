@@ -4,6 +4,7 @@
 #include "core/asserts.h"
 #include "render/render.h"
 #include "lcg.h"
+#include <tracy/tracy/Tracy.hpp>
 #include <unordered_map>
 #include <algorithm>
 
@@ -1390,6 +1391,8 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
 }
 
 ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size) {
+    ZoneScoped;
+
     if (map.pathing_regions[from.x + (from.y * map.width)] == map.pathing_regions[to.x + (to.y * map.width)] ||
             map.pathing_regions[to.x + (to.y * map.width)] == PATHING_REGION_UNASSIGNED) {
         return to;
@@ -1505,6 +1508,8 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
 }
 
 void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells, bool limit_region) {
+    ZoneScoped;
+
     // Don't bother pathing to the unit's cell
     if (from == to) {
         return;
@@ -1682,6 +1687,8 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    ZoneScoped;
+
     path->clear();
 
     // Don't bother pathing to the unit's cell

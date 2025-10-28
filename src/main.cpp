@@ -18,6 +18,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
+#include <tracy/tracy/Tracy.hpp>
 #include <cstring>
 #include <ctime>
 #include <cstdlib>
@@ -490,6 +491,8 @@ int gold_main(int argc, char** argv) {
         #endif
 
         render_present_frame();
+
+        FrameMark;
     }
 
     network_quit();

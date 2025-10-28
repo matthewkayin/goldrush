@@ -9,7 +9,7 @@ DIR := $(subst /,\,${CURDIR})
 LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
-INCLUDE_FLAGS := -Isrc -Ivendor
+INCLUDE_FLAGS := -Isrc -Ivendor -Ivendor/tracy
 COMPILER_FLAGS := -std=c++17 -Wall
 LINKER_FLAGS := -std=c++17
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
@@ -36,10 +36,8 @@ ifeq ($(OS),Windows_NT)
 # Make does not offer a recursive wildcard function, so here's one:
 	rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 	SRC_FILES := $(call rwildcard,src/,*.cpp) # Get all .c files
-	SRC_FILES += $(call rwildcard,vendor/,*.cpp) # Get all .c files
 	RC_FILES := src/win_icon.rc
 	DIRECTORIES := \src $(subst $(DIR),,$(shell dir src /S /AD /B | findstr /i src)) # Get all directories under src.
-	DIRECTORIES += \vendor $(subst $(DIR),,$(shell dir vendor /S /AD /B | findstr /i vendor)) # Get all directories under vendor.
 
 # ws2_32 and winmm are linked for enet
 	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_image -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -ldbghelp
@@ -61,9 +59,7 @@ else
 	endif
 
 	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))
-	SRC_FILES += $(shell find vendor -type f \( -name "*.cpp" -o -name "*.mm" \))
 	DIRECTORIES := $(shell find src -type d)
-	DIRECTORIES += $(shell find vendor -type d)
 endif
 
 OBJ_FILES := $(SRC_FILES:%=$(OBJ_DIR)/%.o) # Get all compiled .c.o objects for engine
