@@ -76,6 +76,12 @@ struct ChatMessage {
     uint8_t player_id;
 };
 
+enum FireCellRender {
+    FIRE_CELL_DO_NOT_RENDER,
+    FIRE_CELL_RENDER_BELOW,
+    FIRE_CELL_RENDER_ABOVE
+};
+
 struct MatchUiState {
     MatchUiMode mode;
     uint32_t turn_timer;
@@ -189,3 +195,4 @@ void match_ui_render_entity_move_animation(const MatchUiState& state, const Enti
 void match_ui_render_particle(const MatchUiState& state, const Particle& particle);
 bool match_ui_should_render_hotkey_toggled(const MatchUiState& state, InputAction hotkey);
 const char* match_ui_render_get_stat_tooltip(SpriteName sprite);
+FireCellRender match_ui_get_fire_cell_render(const MatchUiState& state, const Fire& fire);

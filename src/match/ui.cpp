@@ -2378,13 +2378,9 @@ void match_ui_render(const MatchUiState& state) {
 
     // Fires
     for (const Fire& fire : state.match.fires) {
-        if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
-            continue;
+        if (match_ui_get_fire_cell_render(state, fire) == FIRE_CELL_RENDER_BELOW) {
+            render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);
         }
-        if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
-            continue;
-        }
-        render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);
     }
 
     // Entities
@@ -2535,14 +2531,9 @@ void match_ui_render(const MatchUiState& state) {
 
     // Fires above units
     for (const Fire& fire : state.match.fires) {
-        if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
-            continue;
+        if (match_ui_get_fire_cell_render(state, fire) == FIRE_CELL_RENDER_ABOVE) {
+            render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);
         }
-        CellType fire_cell_type = map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type;
-        if (!(fire_cell_type == CELL_UNIT || fire_cell_type == CELL_MINER)) {
-            continue;
-        }
-        render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);
     }
 
     // Smith and workshop smoke animations
@@ -3822,4 +3813,37 @@ const char* match_ui_render_get_stat_tooltip(SpriteName sprite) {
             log_warn("Unhandled stat tooltip icon of %u", sprite);
             return "";
     }
+}
+
+FireCellRender match_ui_get_fire_cell_render(const MatchUiState& state, const Fire& fire) {
+    if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
+        return FIRE_CELL_DO_NOT_RENDER;
+    }
+    Cell map_fire_cell = map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell);
+    if (map_fire_cell.type == CELL_EMPTY) {
+        return FIRE_CELL_RENDER_BELOW;
+    }
+    if (map_fire_cell.type == CELL_BUILDING) {
+        return FIRE_CELL_DO_NOT_RENDER;
+    }
+    if (map_fire_cell.type >= CELL_DECORATION_1 && map_fire_cell.type <= CELL_DECORATION_5) {
+        return FIRE_CELL_RENDER_ABOVE;
+    }
+    if (!(map_fire_cell.type == CELL_UNIT || map_fire_cell.type == CELL_MINER)) {
+        return FIRE_CELL_DO_NOT_RENDER;
+    }
+
+    const Entity& unit = state.match.entities.get_by_id(map_fire_cell.id);
+
+    if (unit.mode == MODE_UNIT_DEATH_FADE) {
+        return FIRE_CELL_RENDER_ABOVE;
+    }
+    bool is_bottom_row = fire.cell.y == unit.cell.y + (entity_get_data(unit.type).cell_size - 1);
+    if (!is_bottom_row) {
+        return FIRE_CELL_RENDER_BELOW;
+    }
+    if (unit.mode == MODE_UNIT_MOVE && DIRECTION_IVEC2[unit.direction].y == -1) {
+        return FIRE_CELL_RENDER_BELOW;
+    }
+    return FIRE_CELL_RENDER_ABOVE;
 }

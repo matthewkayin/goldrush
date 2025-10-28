@@ -21,7 +21,7 @@
 #   endif
 #endif
 
-#ifdef GOLD_ASSERTS_ENABLED
+#ifdef GOLD_DEBUG
     void report_assertion_failure(const char* expression, const char* message, const char* file, int32_t line);
 
 #   define GOLD_ASSERT(expr)                                             \
