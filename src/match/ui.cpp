@@ -1155,7 +1155,7 @@ void match_ui_update(MatchUiState& state) {
                 if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
                     break;
                 }
-                if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && network_get_player(event.alert.player_id).team != network_get_player(network_get_player_id()).team) ||
+                if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && state.match.players[event.alert.player_id].team != state.match.players[network_get_player_id()].team) ||
                     (event.alert.type != MATCH_ALERT_TYPE_ATTACK && event.alert.player_id != network_get_player_id())) {
                     break;
                 }
