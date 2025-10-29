@@ -588,11 +588,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                 log_error("Unable to find valid spawn point for spawn direction %i", spawn_direction);
                 spawn_point = start;
             }
-            int spawn_index = lcg_rand(lcg_seed) % MAX_PLAYERS;
-            while (player_spawns[spawn_index].x != -1) {
-                spawn_index = (spawn_index + 1) % MAX_PLAYERS;
-            }
-            player_spawns[spawn_index] = spawn_point;
+            player_spawns[player_id] = spawn_point;
         }
     }
     // End determine player spawns

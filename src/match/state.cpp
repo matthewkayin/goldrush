@@ -42,9 +42,9 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
     #endif
     state.lcg_seed = lcg_seed;
     log_info("Set random seed to %i", lcg_seed);
-    std::vector<ivec2> player_spawns;
+    std::vector<ivec2> map_spawn_points;
     std::vector<ivec2> goldmine_cells;
-    map_init(state.map, noise, &state.lcg_seed, player_spawns, goldmine_cells);
+    map_init(state.map, noise, &state.lcg_seed, map_spawn_points, goldmine_cells);
     memcpy(state.players, players, sizeof(state.players));
 
     state.fire_cells = std::vector<int>(state.map.width * state.map.height, 0);
@@ -59,6 +59,59 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
         state.fog[team] = std::vector<int>(state.map.width * state.map.height, FOG_HIDDEN);
         state.detection[team] = std::vector<int>(state.map.width * state.map.height, 0);
     }
+
+    // Determine player spawns
+    ivec2 player_spawns[MAX_PLAYERS];
+    uint32_t team_player_count[MAX_PLAYERS];
+    bool is_spawn_point_available[MAX_PLAYERS];
+    memset(team_player_count, 0, sizeof(team_player_count));
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        player_spawns[player_id] = ivec2(-1, -1);
+        team_player_count[state.players[player_id].team]++;
+        is_spawn_point_available[player_id] = true;
+    }
+
+    int spawn_point_index = lcg_rand(&state.lcg_seed) % MAX_PLAYERS;
+    while (true) {
+        // Find the biggest team without a spawn point
+        uint32_t biggest_team = MAX_PLAYERS;
+        for (uint32_t team = 0; team < MAX_PLAYERS; team++) {
+            if (team_player_count[team] == 0) {
+                continue;
+            }
+            if (biggest_team == MAX_PLAYERS || team_player_count[team] > team_player_count[biggest_team]) {
+                biggest_team = team;
+            }
+        }
+
+        // If no team found, then exit
+        if (biggest_team == MAX_PLAYERS) {
+            break;
+        }
+
+        int team_spawn_point_index = spawn_point_index;
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            if (!state.players[player_id].active || state.players[player_id].team != biggest_team) {
+                continue;
+            }
+
+            while (!is_spawn_point_available[team_spawn_point_index]) {
+                team_spawn_point_index = (team_spawn_point_index + 1) % MAX_PLAYERS;
+            }
+
+            player_spawns[player_id] = map_spawn_points[team_spawn_point_index];
+            is_spawn_point_available[team_spawn_point_index] = false;
+        }
+
+        team_player_count[biggest_team] = 0;
+        spawn_point_index = (spawn_point_index + 2) % MAX_PLAYERS;
+    }
+
+    #ifdef GOLD_DEBUG
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            GOLD_ASSERT(!(state.players[player_id].active && player_spawns[player_id].x == -1));
+        }
+    #endif
 
     // Init players
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
