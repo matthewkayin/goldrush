@@ -77,13 +77,14 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                 continue;
             }
 
-            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                 ivec2 wall = ivec2(x, y) + DIRECTION_IVEC2[direction];
                 if (!map_is_cell_in_bounds(map, wall)) {
                     continue;
                 }
                 if (noise.map[wall.x + (wall.y * noise.width)] > noise.map[x + (y * noise.width)]) {
-                    for (int step = 0; step < 3; step++) {
+                    const int STEP_COUNT = direction % 2 == 0 ? 3 : 1;
+                    for (int step = 0; step < STEP_COUNT; step++) {
                         ivec2 opposite = ivec2(x, y) - (DIRECTION_IVEC2[direction] * (step + 1));
                         if (map_is_cell_in_bounds(map, opposite) && noise.map[opposite.x + (opposite.y * noise.width)] > noise.map[x + (y * noise.width)]) {
                             noise.map[opposite.x + (opposite.y * noise.width)] = noise.map[x + (y * noise.width)];
@@ -200,6 +201,53 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
             }
             if (highground_neighbor_count > 2) {
                 noise.map[x + (y * noise.width)] = 1;
+            }
+        }
+    }
+
+    // Remove narrow lowground gaps around the edge of the map
+    for (int y = 0; y < (int)noise.height; y++) {
+        for (int x = 0; x < (int)noise.width; x++) {
+            /*
+             * Only consider lowground tiles on the edge of the map
+             *
+             * But don't consider the exact corners of the map because they will be handled by the edges
+             * For example, in the below picture, there is a highground tile that is too close to the top-left corner
+             * But the narrow-gap removal along the top and left edge will take care of it
+             * 
+             * 000
+             * 011
+             * 011
+             */
+
+            bool is_on_x_edge = x == 0 || x == noise.width - 1;
+            bool is_on_y_edge = y == 0 || y == noise.height - 1;
+            bool is_on_corner = is_on_x_edge && is_on_y_edge;
+            if ((!is_on_x_edge && !is_on_y_edge) ||
+                    is_on_corner ||
+                    noise.map[x + (y * noise.width)] != 0) {
+                continue;
+            }
+
+            // Determine adjacent direction
+            Direction adjacent_direction;
+            if (x == 0) {
+                adjacent_direction = DIRECTION_EAST;
+            } else if (x == noise.width - 1) {
+                adjacent_direction = DIRECTION_WEST;
+            } else if (y == 0) {
+                adjacent_direction = DIRECTION_SOUTH;
+            } else if (y == noise.height - 1) {
+                adjacent_direction = DIRECTION_NORTH;
+            } else {
+                adjacent_direction = DIRECTION_COUNT;
+            }
+            GOLD_ASSERT(adjacent_direction != DIRECTION_COUNT);
+
+            ivec2 adjacent_cell = ivec2(x, y) + DIRECTION_IVEC2[adjacent_direction];
+            GOLD_ASSERT(map_is_cell_in_bounds(map, adjacent_cell));
+            if (noise.map[adjacent_cell.x + (adjacent_cell.y * noise.width)] > noise.map[x + (y * noise.width)]) {
+                noise.map[adjacent_cell.x + (adjacent_cell.y * noise.width)] = 0;
             }
         }
     }
@@ -1494,11 +1542,17 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     GOLD_ASSERT(found_region_path);
 #endif
     MapRegionPathNode region_current = region_path_end;
+    char region_path_str[512];
+    char* region_path_str_ptr = region_path_str;
+
     ivec2 target = to;
+    region_path_str_ptr += sprintf(region_path_str_ptr, "<%i, %i> <= ", target.x, target.y);
     while (region_current.parent != -1) {
         target = region_current.cell;
+        region_path_str_ptr += sprintf(region_path_str_ptr, "<%i, %i> <= ", target.x, target.y);
         region_current = explored[region_current.parent];
     }
+    log_trace("REGION PATH %s", region_path_str);
 
     return target;
 }

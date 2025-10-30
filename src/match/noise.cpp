@@ -175,11 +175,9 @@ Noise noise_generate(uint64_t seed, uint32_t width, uint32_t height) {
                 noise.map[x + (y * noise.width)] = -1;
             } else if (perlin_result < 0.6) {
                 noise.map[x + (y * noise.width)] = 0;
-            } else if (perlin_result < 0.8) {
-                noise.map[x + (y * noise.width)] = 1;
             } else {
-                noise.map[x + (y * noise.width)] = 2;
-            }
+                noise.map[x + (y * noise.width)] = 1;
+            } 
         }
     }
 

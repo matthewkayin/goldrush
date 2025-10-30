@@ -465,12 +465,10 @@ int gold_main(int argc, char** argv) {
 
                 if (state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) {
                     ivec2 mouse_world_pos = input_get_mouse_position() + state.match.camera_offset;
-                    uint32_t mouse_hover_entity_index = INDEX_INVALID;
                     for (uint32_t entity_index = 0; entity_index < state.match.match.entities.size(); entity_index++) {
                         const Entity& entity = state.match.match.entities[entity_index];
                         Rect entity_rect = entity_get_rect(entity);
                         if (entity_rect.has_point(mouse_world_pos)) {
-                            mouse_hover_entity_index = entity_index;
                             char text[256];
                             sprintf(text, "ID %u Name %s", state.match.match.entities.get_id_of(entity_index), entity_get_data(entity.type).name);
                             render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
@@ -485,6 +483,14 @@ int gold_main(int argc, char** argv) {
                         sprintf(text, "Cell <%i, %i>", cell.x, cell.y);
                         render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
                         render_y += 20;
+
+                        Rect cell_rect = (Rect) {
+                            .x = (cell.x * TILE_SIZE) - state.match.camera_offset.x,
+                            .y = (cell.y * TILE_SIZE) - state.match.camera_offset.y,
+                            .w = TILE_SIZE,
+                            .h = TILE_SIZE
+                        };
+                        render_draw_rect(cell_rect, RENDER_COLOR_RED, 1);
                     }
                 }
 
