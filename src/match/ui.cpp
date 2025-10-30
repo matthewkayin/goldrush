@@ -13,6 +13,7 @@
 #include "hotkey.h"
 #include "upgrade.h"
 #include "replay.h"
+#include <tracy/tracy/Tracy.hpp>
 #include "lcg.h"
 #include <algorithm>
 
@@ -865,6 +866,8 @@ void match_ui_handle_input(MatchUiState& state) {
 }
 
 void match_ui_update(MatchUiState& state) {
+    ZoneScoped;
+
     if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
         if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
             network_set_player_ready(true);
@@ -2236,6 +2239,8 @@ size_t match_ui_replay_end_of_tape(const MatchUiState& state) {
 // RENDER
 
 void match_ui_render(const MatchUiState& state) {
+    ZoneScoped;
+
     std::vector<RenderSpriteParams> above_fog_sprite_params;
     std::vector<RenderSpriteParams> ysort_params;
 

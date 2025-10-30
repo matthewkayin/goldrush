@@ -5,6 +5,7 @@
 #include "hotkey.h"
 #include "lcg.h"
 #include "upgrade.h"
+#include <tracy/tracy/Tracy.hpp>
 #include <algorithm>
 
 #ifdef GOLD_DEBUG_CHEATS
@@ -653,6 +654,8 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 }
 
 void match_update(MatchState& state) {
+    ZoneScoped;
+
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         match_entity_update(state, entity_index);
@@ -922,6 +925,8 @@ EntityId match_create_goldmine(MatchState& state, ivec2 cell, uint32_t gold_left
 }
 
 void match_entity_update(MatchState& state, uint32_t entity_index) {
+    ZoneScoped;
+
     EntityId entity_id = state.entities.get_id_of(entity_index);
     Entity& entity = state.entities[entity_index];
     const EntityData& entity_data = entity_get_data(entity.type);
@@ -1009,12 +1014,12 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 // If unit is idle, try to find a nearby target
                 if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && 
                         entity_data.unit_data.damage != 0) {
-                    entity.target = match_entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
+                    entity.target = match_entity_target_nearest_enemy(state, entity); 
                 }
 
                 // If unit is attacking, check if there's a higher priority target nearby
                 if (entity.target.type == TARGET_ATTACK_ENTITY && !entity_check_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY)) {
-                    Target attack_target = match_entity_target_nearest_enemy(state, entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id));
+                    Target attack_target = match_entity_target_nearest_enemy(state, entity);
                     if (attack_target.type == TARGET_ATTACK_ENTITY && attack_target.id != entity.target.id) {
                         const Entity& attack_target_entity = state.entities.get_by_id(attack_target.id);
 
@@ -1742,11 +1747,6 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         entity.cooldown_timer = entity_data.unit_data.attack_cooldown + lcg_rand(&state.lcg_seed) % 4;
                         entity.mode = MODE_UNIT_IDLE;
                     }
-
-                    // If garrisoned, re-asses targets
-                    if (entity.garrison_id != ID_NULL) {
-                        entity.target = match_entity_target_nearest_enemy(state, entity);
-                    }
                 }
 
                 update_finished = true;
@@ -2212,7 +2212,7 @@ bool match_has_entity_reached_target(const MatchState& state, const Entity& enti
         case TARGET_ATTACK_ENTITY:
         case TARGET_REPAIR: {
             const Entity& target = state.entities.get_by_id(entity.target.id);
-            return match_entity_is_target_in_range(state, entity, target);
+            return match_entity_is_target_in_range(state, entity, target, entity.target.type);
         }
         case TARGET_MOLOTOV: {
             return ivec2::euclidean_distance_squared(entity.cell, entity.target.cell) <= MOLOTOV_RANGE_SQUARED;
@@ -2220,7 +2220,7 @@ bool match_has_entity_reached_target(const MatchState& state, const Entity& enti
     }
 }
 
-bool match_entity_is_target_in_range(const MatchState& state, const Entity& entity, const Entity& target) {
+bool match_entity_is_target_in_range(const MatchState& state, const Entity& entity, const Entity& target, TargetType target_type) {
     const Entity& reference_entity = entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id);
     int reference_entity_size = entity_get_data(reference_entity.type).cell_size;
     Rect entity_rect = (Rect) {
@@ -2239,7 +2239,7 @@ bool match_entity_is_target_in_range(const MatchState& state, const Entity& enti
     }
 
     int entity_range_squared = entity_get_data(entity.type).unit_data.range_squared;
-    return entity.target.type != TARGET_ATTACK_ENTITY || entity_range_squared == 1
+    return target_type != TARGET_ATTACK_ENTITY || entity_range_squared == 1
                 ? entity_rect.is_adjacent_to(target_rect)
                 : Rect::euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
 }
@@ -2530,19 +2530,20 @@ uint32_t match_entity_get_target_attack_priority(const Entity& entity, const Ent
 }
 
 Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& entity) {
-    const EntityData& entity_data = entity_get_data(entity.type);
+    const Entity& reference_entity = entity.garrison_id == ID_NULL ? entity : state.entities.get_by_id(entity.garrison_id);
+    const EntityData& reference_entity_data = entity_get_data(reference_entity.type);
     // This radius makes it so that enemies can target farther than they themselves can see
     // But the enemies player will still need to have vision of the unit before the entity
     // attacks it. This prevents entities from just standing there while their friends are
     // in a fight
     static const int ENTITY_TARGET_RADIUS = 16;
     Rect entity_rect = (Rect) { 
-        .x = entity.cell.x, .y = entity.cell.y, 
-        .w = entity_data.cell_size, .h = entity_data.cell_size
+        .x = reference_entity.cell.x, .y = reference_entity.cell.y, 
+        .w = reference_entity_data.cell_size, .h = reference_entity_data.cell_size
     };
     Rect entity_sight_rect = (Rect) {
-        .x = entity.cell.x - ENTITY_TARGET_RADIUS,
-        .y = entity.cell.y - ENTITY_TARGET_RADIUS,
+        .x = reference_entity.cell.x - ENTITY_TARGET_RADIUS,
+        .y = reference_entity.cell.y - ENTITY_TARGET_RADIUS,
         .w = 2 * ENTITY_TARGET_RADIUS,
         .h = 2 * ENTITY_TARGET_RADIUS
     };
@@ -2573,6 +2574,10 @@ Target match_entity_target_nearest_enemy(const MatchState& state, const Entity& 
         // Don't attack entities that are within min range
         if (entity_is_target_within_min_range(entity, other) && 
                 !(entity.type == ENTITY_SOLDIER && match_player_has_upgrade(state, entity.player_id, UPGRADE_BAYONETS))) {
+            continue;
+        }
+        // If garrisoned, don't attack entities that are outside of our range
+        if (entity.garrison_id != ID_NULL && !match_entity_is_target_in_range(state, entity, other, TARGET_ATTACK_ENTITY)) {
             continue;
         }
         // Don't attack entities that this unit can't see

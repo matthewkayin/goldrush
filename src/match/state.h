@@ -209,7 +209,7 @@ bool match_is_entity_visible_to_player(const MatchState& state, const Entity& en
 bool match_entity_is_target_invalid(const MatchState& state, const Entity& entity);
 bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id);
 bool match_has_entity_reached_target(const MatchState& state, const Entity& entity);
-bool match_entity_is_target_in_range(const MatchState& state, const Entity& entity, const Entity& target);
+bool match_entity_is_target_in_range(const MatchState& state, const Entity& entity, const Entity& target, TargetType target_type);
 ivec2 match_get_entity_target_cell(const MatchState& state, const Entity& entity);
 bool match_is_entity_mining(const MatchState& state, const Entity& entity);
 EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell);
