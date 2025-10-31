@@ -82,6 +82,14 @@ enum FireCellRender {
     FIRE_CELL_RENDER_ABOVE
 };
 
+#ifdef GOLD_DEBUG
+enum DebugFog {
+    DEBUG_FOG_ENABLED,
+    DEBUG_FOG_BOT_VISION,
+    DEBUG_FOG_DISABLED
+};
+#endif
+
 struct MatchUiState {
     MatchUiMode mode;
     uint32_t turn_timer;
@@ -140,6 +148,7 @@ struct MatchUiState {
 
     #ifdef GOLD_DEBUG
         bool theater_mode;
+        DebugFog debug_fog;
     #endif
 };
 

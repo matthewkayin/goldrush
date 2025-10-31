@@ -20,7 +20,7 @@ enum InputAction {
     INPUT_ACTION_F6,
     INPUT_ACTION_F7,
     INPUT_ACTION_F8,
-    #ifdef GOLD_DEBUG_TURBO
+    #ifdef GOLD_DEBUG
     INPUT_ACTION_TURBO,
     #endif
     INPUT_ACTION_MATCH_MENU,

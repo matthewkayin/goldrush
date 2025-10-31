@@ -143,7 +143,7 @@ void input_poll_events() {
                     case SDL_SCANCODE_SPACE:
                         state.current[INPUT_ACTION_SPACE] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    #ifdef GOLD_DEBUG_TURBO
+                    #ifdef GOLD_DEBUG
                     case SDL_SCANCODE_F9:
                         state.current[INPUT_ACTION_TURBO] = event.type == SDL_EVENT_KEY_DOWN;
                         break;

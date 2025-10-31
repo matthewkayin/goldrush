@@ -252,6 +252,73 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         }
     }
 
+    // Remove highground areas that are not big enough for wagons to stand on
+    std::vector<bool> is_highground_floor(noise.width * noise.height, false);
+    for (int y = 0; y < (int)noise.height; y++) {
+        for (int x = 0; x < (int)noise.width; x++) {
+            if (noise.map[x + (y * noise.width)] != 1) {
+                continue;
+            }
+
+            is_highground_floor[x + (y * noise.width)] = true;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                if (!map_is_cell_in_bounds(map, adjacent) || noise.map[adjacent.x + (adjacent.y * noise.width)] == 1) {
+                    continue;
+                }
+                is_highground_floor[x + (y * noise.width)] = false;
+            }
+        }
+    }
+
+    std::vector<bool> is_2x2_highground_floor(noise.width * noise.height, false);
+    for (int y = 0; y < (int)noise.height; y++) {
+        for (int x = 0; x < (int)noise.width; x++) {
+            if (!is_highground_floor[x + (y * noise.width)]) {
+                continue;
+            }
+
+            uint32_t neighbors = 0;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                if (map_is_cell_in_bounds(map, adjacent) && is_highground_floor[adjacent.x + (adjacent.y * noise.width)]) {
+                    neighbors += DIRECTION_MASK[direction];
+                }
+            }
+            for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                int prev_direction = direction - 1;
+                int next_direction = direction + 1 == DIRECTION_COUNT ? 0 : direction + 1;
+                uint32_t adjacent_neighbors = DIRECTION_MASK[prev_direction] | DIRECTION_MASK[next_direction];
+                if (map_is_cell_in_bounds(map, adjacent) && 
+                        is_highground_floor[adjacent.x + (adjacent.y * noise.width)] &&
+                        (neighbors & adjacent_neighbors) == adjacent_neighbors) {
+                    is_2x2_highground_floor[x + (y * noise.width)] = true;
+                }
+            }
+        }
+    }
+
+    for (int y = 0; y < (int)noise.height; y++) {
+        for (int x = 0; x < (int)noise.width; x++) {
+            if (noise.map[x + (y * map.width)] != 1) {
+                continue;
+            }
+
+            bool has_adjacent_2x2_floor = false;
+            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                if (map_is_cell_in_bounds(map, adjacent) && is_2x2_highground_floor[adjacent.x + (adjacent.y * noise.width)]) {
+                    has_adjacent_2x2_floor = true;
+                }
+            }
+
+            if (!has_adjacent_2x2_floor) {
+                noise.map[x + (y * map.width)] = 0;
+            }
+        }
+    }
+
     // Remove elevation artifacts
     uint32_t elevation_artifact_count;
     const int ELEVATION_NEAR_DIST = 4;
@@ -1542,17 +1609,11 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     GOLD_ASSERT(found_region_path);
 #endif
     MapRegionPathNode region_current = region_path_end;
-    char region_path_str[512];
-    char* region_path_str_ptr = region_path_str;
-
     ivec2 target = to;
-    region_path_str_ptr += sprintf(region_path_str_ptr, "<%i, %i> <= ", target.x, target.y);
     while (region_current.parent != -1) {
         target = region_current.cell;
-        region_path_str_ptr += sprintf(region_path_str_ptr, "<%i, %i> <= ", target.x, target.y);
         region_current = explored[region_current.parent];
     }
-    log_trace("REGION PATH %s", region_path_str);
 
     return target;
 }

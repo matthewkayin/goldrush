@@ -251,7 +251,7 @@ int gold_main(int argc, char** argv) {
     uint32_t frames = 0;
     uint32_t fps = 0;
 
-    #ifdef GOLD_DEBUG_TURBO
+    #ifdef GOLD_DEBUG
     uint64_t playback_speed = 1;
     #endif
 
@@ -265,7 +265,7 @@ int gold_main(int argc, char** argv) {
     while (is_running) {
         // TIMEKEEP
         uint64_t current_time = SDL_GetTicksNS();
-        #ifdef GOLD_DEBUG_TURBO
+        #ifdef GOLD_DEBUG
             update_accumulator += (current_time - last_time) * playback_speed;
         #else
             update_accumulator += current_time - last_time;
@@ -293,7 +293,7 @@ int gold_main(int argc, char** argv) {
                     render_debug_info = !render_debug_info;
                 }
             #endif
-            #ifdef GOLD_DEBUG_TURBO
+            #ifdef GOLD_DEBUG
                 if (input_is_action_just_pressed(INPUT_ACTION_TURBO)) {
                     if (playback_speed == 1) {
                         playback_speed = 4;
@@ -456,7 +456,7 @@ int gold_main(int argc, char** argv) {
                 render_text(FONT_HACK_WHITE, fps_text, ivec2(render_x, render_y));
                 render_y += 20;
 
-                #ifdef GOLD_DEBUG_TURBO
+                #ifdef GOLD_DEBUG
                     char turbo_text[32];
                     sprintf(turbo_text, "Playback Speed x%llu", playback_speed);
                     render_text(FONT_HACK_WHITE, turbo_text, ivec2(0, render_y));
@@ -470,7 +470,7 @@ int gold_main(int argc, char** argv) {
                         Rect entity_rect = entity_get_rect(entity);
                         if (entity_rect.has_point(mouse_world_pos)) {
                             char text[256];
-                            sprintf(text, "ID %u Name %s", state.match.match.entities.get_id_of(entity_index), entity_get_data(entity.type).name);
+                            sprintf(text, "ID %u Name %s Visible ? %i", state.match.match.entities.get_id_of(entity_index), entity_get_data(entity.type).name, match_ui_is_entity_visible(state.match, entity));;
                             render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
                             render_y += 20;
                             break;

@@ -113,7 +113,7 @@ static const Rect REPLAY_PANEL_RECT = (Rect) {
 static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 62, BUTTON_PANEL_RECT.y + 18);
 
 static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
-static const uint32_t REPLAY_CHECKPOINT_FREQ = 32;
+static const uint32_t REPLAY_CHECKPOINT_FREQ = 128;
 static const uint32_t REPLAY_FOG_NONE = 0;
 
 // INIT
@@ -142,6 +142,7 @@ MatchUiState match_ui_base_init() {
 
     #ifdef GOLD_DEBUG
         state.theater_mode = false;
+        state.debug_fog = DEBUG_FOG_ENABLED;
     #endif
 
     memset(state.displayed_gold_amounts, 0, sizeof(state.displayed_gold_amounts));
@@ -330,6 +331,19 @@ void match_ui_handle_input(MatchUiState& state) {
     // End chat
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active() && !state.replay_mode) {
         if (!state.chat_message.empty()) {
+            #ifdef GOLD_DEBUG
+                if (state.chat_message == "/fog disable") {
+                    state.debug_fog = DEBUG_FOG_DISABLED;
+                } else if (state.chat_message == "/fog enable") {
+                    state.debug_fog = DEBUG_FOG_ENABLED;
+                } else if (state.chat_message == "/fog bot vision") {
+                    state.debug_fog = DEBUG_FOG_BOT_VISION;
+                } else if (state.chat_message == "/gold") {
+                    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                        state.match.players[player_id].gold += 5000;
+                    }
+                }
+            #endif
             network_send_chat(state.chat_message.c_str());
             match_ui_add_chat_message(state, network_get_player_id(), state.chat_message.c_str());
         }
@@ -2117,12 +2131,16 @@ bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity)
 
         return false;
     } else {
-        #ifdef GOLD_DEBUG_BOT_VISION
-            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
-                        match_is_entity_visible_to_player(state.match, entity, player_id)) {
-                    return true;
+        #ifdef GOLD_DEBUG
+            if (state.debug_fog == DEBUG_FOG_BOT_VISION) {
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
+                            match_is_entity_visible_to_player(state.match, entity, player_id)) {
+                        return true;
+                    }
                 }
+            } else if (state.debug_fog == DEBUG_FOG_DISABLED) {
+                return true;
             }
         #endif
         return match_is_entity_visible_to_player(state.match, entity, network_get_player_id());
@@ -2144,12 +2162,16 @@ bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int c
 
         return false;
     } else {
-        #ifdef GOLD_DEBUG_BOT_VISION
-            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
-                        match_is_cell_rect_revealed(state.match, state.match.players[player_id].team, cell, cell_size)) {
-                    return true;
+        #ifdef GOLD_DEBUG
+            if (state.debug_fog == DEBUG_FOG_BOT_VISION) {
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
+                            match_is_cell_rect_revealed(state.match, state.match.players[player_id].team, cell, cell_size)) {
+                        return true;
+                    }
                 }
+            } else if (state.debug_fog == DEBUG_FOG_DISABLED) {
+                return true;
             }
         #endif
         return match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, cell, cell_size);
@@ -2180,23 +2202,27 @@ int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
 
         return fog_value;
     } else {
-        #ifdef GOLD_DEBUG_BOT_VISION
-            int fog_value = FOG_HIDDEN;
-            for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if ((network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT || network_get_player_id() == player_id)) {
-                    int player_fog_value = match_get_fog(state.match, state.match.players[player_id].team, cell);
+        #ifdef GOLD_DEBUG
+            if (state.debug_fog == DEBUG_FOG_BOT_VISION) {
+                int fog_value = FOG_HIDDEN;
+                for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                    if ((network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT || network_get_player_id() == player_id)) {
+                        int player_fog_value = match_get_fog(state.match, state.match.players[player_id].team, cell);
 
-                    // If at least one player has revealed fog, then return a revealed fog value
-                    if (player_fog_value > 0) {
-                        return 1;
-                    }
-                    // If set the returned value to explored, but keep iterating in case we get a revealed value
-                    if (player_fog_value == FOG_EXPLORED) {
-                        fog_value = FOG_EXPLORED;
+                        // If at least one player has revealed fog, then return a revealed fog value
+                        if (player_fog_value > 0) {
+                            return 1;
+                        }
+                        // If set the returned value to explored, but keep iterating in case we get a revealed value
+                        if (player_fog_value == FOG_EXPLORED) {
+                            fog_value = FOG_EXPLORED;
+                        }
                     }
                 }
+                return fog_value;
+            } else if (state.debug_fog == DEBUG_FOG_DISABLED) {
+                return 1;
             }
-            return fog_value;
         #endif
         return match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell);
     }
@@ -2759,12 +2785,14 @@ void match_ui_render(const MatchUiState& state) {
                     }
                 }
                 int autotile_index = map_neighbors_to_autotile_index(neighbors);
-                #ifndef GOLD_DEBUG_FOG_DISABLED
-                    render_sprite_frame(
-                            fog_pass == 0 ? SPRITE_FOG_EXPLORED : SPRITE_FOG_HIDDEN, 
-                            ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES), 
-                            base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                #ifdef GOLD_DEBUG
+                    if (state.debug_fog == DEBUG_FOG_DISABLED) {
+                        continue;
+                    }
                 #endif
+                render_sprite_frame(fog_pass == 0 ? SPRITE_FOG_EXPLORED : SPRITE_FOG_HIDDEN, 
+                        ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES), 
+                        base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
             }
         }
     }
@@ -2834,7 +2862,7 @@ void match_ui_render(const MatchUiState& state) {
     // UI Chat
     for (uint32_t chat_index = 0; chat_index < state.chat.size(); chat_index++) {
         const ChatMessage& message = state.chat[state.chat.size() - chat_index - 1];
-        ivec2 message_pos = ivec2(16, MINIMAP_RECT.y - 48 - (chat_index * 16));
+        ivec2 message_pos = ivec2(32, MINIMAP_RECT.y - 96 - (chat_index * 32));
         if (message.player_id != PLAYER_NONE) {
             const MatchPlayer& player = state.match.players[message.player_id];
             char player_text[40];
@@ -2847,10 +2875,10 @@ void match_ui_render(const MatchUiState& state) {
     if (input_is_text_input_active()) {
         char prompt_str[128];
         sprintf(prompt_str, "Chat: %s", state.chat_message.c_str());
-        render_text(FONT_HACK_WHITE, prompt_str, ivec2(16, MINIMAP_RECT.y - 32));
+        render_text(FONT_HACK_WHITE, prompt_str, ivec2(32, MINIMAP_RECT.y - 64));
         if (state.chat_cursor_visible) {
             int prompt_width = render_get_text_size(FONT_HACK_WHITE, prompt_str).x;
-            ivec2 cursor_pos = ivec2(16 + prompt_width - 2, MINIMAP_RECT.y - 33);
+            ivec2 cursor_pos = ivec2(32 + prompt_width - 2, MINIMAP_RECT.y - 65);
             render_text(FONT_HACK_WHITE, "|", cursor_pos);
         }
     }
@@ -3497,8 +3525,10 @@ void match_ui_render(const MatchUiState& state) {
     for (uint32_t y = 0; y < state.match.map.height; y++) {
         for (uint32_t x = 0; x < state.match.map.width; x++) {
             int fog_value = match_ui_get_fog(state, ivec2(x, y));
-            #ifdef GOLD_DEBUG_FOG_DISABLED
-                fog_value = 1;
+            #ifdef GOLD_DEBUG
+                if (state.debug_fog == DEBUG_FOG_DISABLED) {
+                    fog_value = 1;
+                }
             #endif
             MinimapPixel pixel;
             if (fog_value > 0) {

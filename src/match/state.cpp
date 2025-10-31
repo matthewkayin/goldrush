@@ -8,11 +8,7 @@
 #include <tracy/tracy/Tracy.hpp>
 #include <algorithm>
 
-#ifdef GOLD_DEBUG_CHEATS
-static const uint32_t MATCH_PLAYER_STARTING_GOLD = 5000;
-#else
 static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
-#endif
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
 static const uint32_t UNIT_ENERGY_REGEN_DURATION = 64;
 static const uint32_t UNIT_REPAIR_RATE = 4;
@@ -1600,14 +1596,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     // Building tick
                     Entity& building = state.entities[building_index];
 
-                    #ifdef GOLD_DEBUG_FAST_BUILD
-                        int building_max_health = entity_get_data(building.type).max_health;
-                        building.health = std::min(building.health + 20, building_max_health);
-                        building.timer = building.timer >= 20 ? building.timer - 20 : 0; 
-                    #else
-                        building.health++;
-                        building.timer--;
-                    #endif
+                    building.health++;
+                    building.timer--;
                     if (building.timer == 0) {
                         match_entity_building_finish(state, entity.target.id);
                     } else {
@@ -1835,11 +1825,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                     }
 
                     if (entity.timer != BUILDING_QUEUE_BLOCKED && entity.timer != BUILDING_QUEUE_EXIT_BLOCKED) {
-                        #ifdef GOLD_DEBUG_FAST_TRAIN
-                            entity.timer = std::max((int)entity.timer - 10, 0);
-                        #else
-                            entity.timer--;
-                        #endif
+                        entity.timer--;
                     }
 
                     if ((entity.timer == 0 && entity.queue[0].type == BUILDING_QUEUE_ITEM_UNIT) || 
@@ -2092,10 +2078,6 @@ bool match_is_entity_visible_to_player(const MatchState& state, const Entity& en
     if (entity.garrison_id != ID_NULL) {
         return false;
     }
-
-#ifdef GOLD_DEBUG_FOG_DISABLED
-    return true;
-#endif
 
     uint8_t player_team = state.players[player_id].team;
     if (entity.type != ENTITY_GOLDMINE && state.players[entity.player_id].team == player_team) {
