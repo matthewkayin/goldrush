@@ -33,7 +33,7 @@
 #endif
 #define GOLD_LOG_LEVEL 3
 #ifdef GOLD_DEBUG
-    // #define GOLD_RAND_SEED 1761902870
+    #define GOLD_RAND_SEED 1761918351
 #endif
 
 #define TRACY_ENABLE

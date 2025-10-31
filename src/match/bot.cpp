@@ -3443,6 +3443,10 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
     GOLD_ASSERT(unscouted_entity_id != ID_NULL);
 
     if (scout.target.type == TARGET_ENTITY && scout.target.id == unscouted_entity_id) {
+        // This fixes a bug where two bots got their scouts deadlocked
+        if (scout.pathfind_attempts == 2) {
+            return bot_return_entity_to_nearest_hall(state, bot, bot.scout_id);
+        }
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
