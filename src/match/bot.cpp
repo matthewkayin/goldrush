@@ -2325,7 +2325,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, 4, 1, enemy_base_cell, MAP_OPTION_IGNORE_UNITS);
             ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, enemy_base_cell, 4, MAP_OPTION_IGNORE_UNITS);
             std::vector<ivec2> path;
-            map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS | MAP_OPTION_AVOID_LANDMINES);
+            map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_AVOID_LANDMINES);
 
             // Find the place along the path that is within the base radius
             int path_index = 0;
@@ -2794,8 +2794,9 @@ int bot_get_molotov_cell_score(const MatchState& state, const Bot& bot, const En
 }
 
 ivec2 bot_find_best_molotov_cell(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 attack_point) {
+    static const int MINIMUM_MOLOTOV_CELL_SCORE = 4;
     ivec2 best_molotov_cell = ivec2(-1, -1);
-    int best_molotov_cell_score = 0;
+    int best_molotov_cell_score = MINIMUM_MOLOTOV_CELL_SCORE - 1;
 
     for (int y = attack_point.y - BOT_SQUAD_GATHER_DISTANCE; y < attack_point.y + BOT_SQUAD_GATHER_DISTANCE; y++) {
         for (int x = attack_point.x - BOT_SQUAD_GATHER_DISTANCE; x < attack_point.x + BOT_SQUAD_GATHER_DISTANCE; x++) {
@@ -3658,7 +3659,7 @@ MatchInput bot_repair_burning_buildings(const MatchState& state, const Bot& bot)
         .filter = [&state, &bot](const Entity& building, EntityId building_id) {
             if (building.player_id != bot.player_id ||
                     building.mode != MODE_BUILDING_FINISHED ||
-                    building.health > entity_get_data(building.type).max_health / 2) {
+                    !entity_check_flag(building, ENTITY_FLAG_ON_FIRE)) {
                 return false;
             }
 
