@@ -491,6 +491,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                 // bot_squad_create should reinforce the existing squad
                 std::vector<EntityId> reinforcements = bot_create_entity_list_from_entity_count(state, bot, reinforce_entity_count);
                 bot_squad_create(state, bot, BOT_SQUAD_TYPE_ATTACK, bot.squads[attack_squad_index].target_cell, reinforcements);
+                return;
             }
 
             // Harass / Push
