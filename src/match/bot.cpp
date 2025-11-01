@@ -571,7 +571,9 @@ bool bot_handle_base_under_attack(const MatchState& state, Bot& bot) {
             .filter = [&state, &entity](const Entity& enemy, EntityId enemy_id) {
                 return entity_is_unit(enemy.type) &&
                         entity_is_selectable(enemy) &&
-                        (enemy.type == ENTITY_PYRO || entity_get_data(enemy.type).unit_data.damage != 0) &&
+                        (enemy.type == ENTITY_PYRO || 
+                            (enemy.type == ENTITY_WAGON && !enemy.garrisoned_units.empty()) ||
+                            entity_get_data(enemy.type).unit_data.damage != 0) &&
                         state.players[enemy.player_id].team != state.players[entity.player_id].team &&
                         match_is_entity_visible_to_player(state, enemy, entity.player_id) &&
                         ivec2::manhattan_distance(entity.cell, enemy.cell) < BOT_SQUAD_GATHER_DISTANCE;
