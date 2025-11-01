@@ -113,54 +113,54 @@ static const Rect REPLAY_PANEL_RECT = (Rect) {
 static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 62, BUTTON_PANEL_RECT.y + 18);
 
 static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
-static const uint32_t REPLAY_CHECKPOINT_FREQ = 128;
+static const uint32_t REPLAY_CHECKPOINT_FREQ = 32;
 static const uint32_t REPLAY_FOG_NONE = 0;
 
 // INIT
 
-MatchUiState match_ui_base_init() {
-    MatchUiState state;
+MatchUiState* match_ui_base_init() {
+    MatchUiState* state = new MatchUiState();
 
-    state.camera_offset = ivec2(0, 0);
-    state.select_origin = ivec2(-1, -1);
-    state.is_minimap_dragging = false;
-    state.latest_alert_cell = ivec2(-1, -1);
-    state.turn_timer = 0;
-    state.turn_counter = 0;
-    state.disconnect_timer = 0;
-    state.status_timer = 0;
-    state.control_group_selected = MATCH_UI_CONTROL_GROUP_NONE;
-    state.double_click_timer = 0;
-    state.control_group_double_tap_timer = 0;
-    state.chat_cursor_blink_timer = 0;
-    state.chat_cursor_visible = false;
-    memset(state.sound_cooldown_timers, 0, sizeof(state.sound_cooldown_timers));
-    state.rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
-    state.building_fire_animation = animation_create(ANIMATION_FIRE_BURN);
-    state.options_menu.mode = OPTIONS_MENU_CLOSED;
-    state.ui = ui_init();
+    state->camera_offset = ivec2(0, 0);
+    state->select_origin = ivec2(-1, -1);
+    state->is_minimap_dragging = false;
+    state->latest_alert_cell = ivec2(-1, -1);
+    state->turn_timer = 0;
+    state->turn_counter = 0;
+    state->disconnect_timer = 0;
+    state->status_timer = 0;
+    state->control_group_selected = MATCH_UI_CONTROL_GROUP_NONE;
+    state->double_click_timer = 0;
+    state->control_group_double_tap_timer = 0;
+    state->chat_cursor_blink_timer = 0;
+    state->chat_cursor_visible = false;
+    memset(state->sound_cooldown_timers, 0, sizeof(state->sound_cooldown_timers));
+    state->rally_flag_animation = animation_create(ANIMATION_RALLY_FLAG);
+    state->building_fire_animation = animation_create(ANIMATION_FIRE_BURN);
+    state->options_menu.mode = OPTIONS_MENU_CLOSED;
+    state->ui = ui_init();
 
     #ifdef GOLD_DEBUG
-        state.theater_mode = false;
-        state.debug_fog = DEBUG_FOG_ENABLED;
+        state->theater_mode = false;
+        state->debug_fog = DEBUG_FOG_ENABLED;
     #endif
 
-    memset(state.displayed_gold_amounts, 0, sizeof(state.displayed_gold_amounts));
+    memset(state->displayed_gold_amounts, 0, sizeof(state->displayed_gold_amounts));
 
     for (int index = 0; index < HOTKEY_GROUP_SIZE; index++) {
-        state.hotkey_group[index] = INPUT_HOTKEY_NONE;
+        state->hotkey_group[index] = INPUT_HOTKEY_NONE;
     }
 
     for (int index = 0; index < MATCH_UI_CAMERA_HOTKEY_COUNT; index++) {
-        state.camera_hotkeys[index] = ivec2(-1, -1);
+        state->camera_hotkeys[index] = ivec2(-1, -1);
     }
 
     return state;
 }
 
-MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
-    MatchUiState state = match_ui_base_init();
-    state.mode = MATCH_UI_MODE_NOT_STARTED;
+MatchUiState* match_ui_init(int32_t lcg_seed, Noise& noise) {
+    MatchUiState* state = match_ui_base_init();
+    state->mode = MATCH_UI_MODE_NOT_STARTED;
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
@@ -179,9 +179,9 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
                                         : player_id;
         players[player_id].recolor_id = network_player.recolor_id;
     }
-    state.replay_file = replay_file_open(lcg_seed, noise, players);
-    state.replay_mode = false;
-    state.match = match_init(lcg_seed, noise, players);
+    state->replay_file = replay_file_open(lcg_seed, noise, players);
+    state->replay_mode = false;
+    state->match = match_init(lcg_seed, noise, players);
 
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -190,7 +190,7 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         }
 
         for (uint8_t i = 0; i < TURN_OFFSET - 1; i++) {
-            state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
+            state->inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
         }
     }
 
@@ -200,12 +200,12 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
         if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT) {
             // Randomize the seed here, that way if we have multiple bots they do not generate the same personalities / strategies
             bot_lcg_seed = lcg_rand(&bot_lcg_seed);
-            state.bots[player_id] = bot_init(state.match, player_id, (MatchSettingDifficultyValue)network_get_match_setting(MATCH_SETTING_DIFFICULTY), bot_lcg_seed);
+            state->bots[player_id] = bot_init(state->match, player_id, (MatchSettingDifficultyValue)network_get_match_setting(MATCH_SETTING_DIFFICULTY), bot_lcg_seed);
         }
     }
 
     // Init camera
-    for (const Entity& entity : state.match.entities) {
+    for (const Entity& entity : state->match.entities) {
         if (entity.type == ENTITY_MINER && entity.player_id == network_get_player_id()) {
             match_ui_center_camera_on_cell(state, entity.cell);
             break;
@@ -215,50 +215,83 @@ MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise) {
     return state;
 }
 
-MatchUiState match_ui_init_from_replay(const char* replay_path) {
-    MatchUiState state = match_ui_base_init();
-    state.mode = MATCH_UI_MODE_NONE;
-    state.replay_mode = true;
-    state.replay_paused = false;
-    // Because we are not saving any replay data
-    state.replay_file = NULL;
+static int match_ui_load_replay_checkpoints(void* state_ptr) {
+    MatchUiState* state = (MatchUiState*)state_ptr;
 
-    replay_file_read(replay_path, &state.match, state.replay_inputs, &state.replay_chatlog);
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        log_trace("player %u input count %u", player_id, state.replay_inputs[player_id].size());
-    }
-    state.replay_checkpoints.reserve(((match_ui_replay_end_of_tape(state) + 1) / REPLAY_CHECKPOINT_FREQ) + 1);
-    state.replay_checkpoints.push_back(state.match);
+    while (state->replay_loading_turn_counter < match_ui_replay_end_of_tape(state)) {
+        match_ui_replay_begin_turn(state, state->replay_loading_match_state, state->replay_loading_turn_counter);
+        match_update(state->replay_loading_match_state);
+        state->replay_loading_match_state.events.clear();
 
-    while (state.turn_counter < match_ui_replay_end_of_tape(state)) {
-        match_ui_replay_begin_turn(state);
-        match_update(state.match);
-        state.match.events.clear();
-        state.turn_counter++;
-
-        if (state.turn_counter % REPLAY_CHECKPOINT_FREQ == 0) {
-            state.replay_checkpoints.push_back(state.match);
+        SDL_LockMutex(state->replay_loading_turn_counter_mutex);
+        state->replay_loading_turn_counter++;
+        if (state->replay_loading_turn_counter % REPLAY_CHECKPOINT_FREQ == 0) {
+            state->replay_checkpoints.push_back(state->replay_loading_match_state);
         }
+        SDL_UnlockMutex(state->replay_loading_turn_counter_mutex);
+
+
+        if (SDL_TryLockMutex(state->replay_loading_early_exit_mutex)) {
+            bool should_break = state->replay_loading_early_exit;
+            SDL_UnlockMutex(state->replay_loading_early_exit_mutex);
+            if (should_break) {
+                break;
+            }
+        } 
+    }
+
+    return 0;
+}
+
+MatchUiState* match_ui_init_from_replay(const char* replay_path) {
+    MatchUiState* state = match_ui_base_init();
+    state->mode = MATCH_UI_MODE_NONE;
+    state->replay_mode = true;
+    state->replay_paused = false;
+    // Because we are not saving any replay data
+    state->replay_file = NULL;
+
+    replay_file_read(replay_path, &state->match, state->replay_inputs, &state->replay_chatlog);
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        log_trace("player %u input count %u", player_id, state->replay_inputs[player_id].size());
+    }
+    state->replay_checkpoints.reserve(((match_ui_replay_end_of_tape(state) + 1) / REPLAY_CHECKPOINT_FREQ) + 1);
+    state->replay_checkpoints.push_back(state->match);
+
+
+    state->replay_loading_turn_counter_mutex = SDL_CreateMutex();
+    state->replay_loading_turn_counter = 0;
+    state->replay_loaded_turn_counter = 0;
+
+    state->replay_loading_early_exit_mutex = SDL_CreateMutex();
+    state->replay_loading_early_exit = false;
+
+    state->replay_loading_match_state = state->match;
+    state->replay_loading_thread = SDL_CreateThread(match_ui_load_replay_checkpoints, "replay_loading_thread", state);
+    if (!state->replay_loading_thread) {
+        log_error("Error creating loading thread %s", SDL_GetError());
+        // TODO: return false somehow when cannot open thread
+        // also return false somehow when replay file cannot be read properly
     }
 
     match_ui_replay_scrub(state, 0);
 
     // Init replay fog picker
-    state.replay_fog_index = 1;
-    state.replay_fog_player_ids.push_back(PLAYER_NONE);
-    state.replay_fog_texts.push_back("None");
-    state.replay_fog_player_ids.push_back(PLAYER_NONE);
-    state.replay_fog_texts.push_back("Everyone");
+    state->replay_fog_index = 1;
+    state->replay_fog_player_ids.push_back(PLAYER_NONE);
+    state->replay_fog_texts.push_back("None");
+    state->replay_fog_player_ids.push_back(PLAYER_NONE);
+    state->replay_fog_texts.push_back("Everyone");
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state.match.players[player_id].active) {
+        if (!state->match.players[player_id].active) {
             continue;
         }
-        state.replay_fog_player_ids.push_back(player_id);
-        state.replay_fog_texts.push_back(state.match.players[player_id].name);
+        state->replay_fog_player_ids.push_back(player_id);
+        state->replay_fog_texts.push_back(state->match.players[player_id].name);
     }
 
     // Init camera
-    for (const Entity& entity : state.match.entities) {
+    for (const Entity& entity : state->match.entities) {
         if (entity.type == ENTITY_MINER && entity.player_id == 0) {
             match_ui_center_camera_on_cell(state, entity.cell);
             break;
@@ -270,7 +303,7 @@ MatchUiState match_ui_init_from_replay(const char* replay_path) {
 
 // HANDLE EVENT
 
-void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
+void match_ui_handle_network_event(MatchUiState* state, NetworkEvent event) {
     switch (event.type) {
         case NETWORK_EVENT_INPUT: {
             // Deserialize input
@@ -283,7 +316,7 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
                 inputs.push_back(match_input_deserialize(in_buffer, in_buffer_head));
             }
 
-            state.inputs[event.input.player_id].push(inputs);
+            state->inputs[event.input.player_id].push(inputs);
             break;
         }
         case NETWORK_EVENT_CHAT: {
@@ -302,14 +335,14 @@ void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event) {
 // UPDATE
 
 // This function returns after it handles a single input to avoid double input happening
-void match_ui_handle_input(MatchUiState& state) {
-    bool spectator_mode = state.replay_mode || !state.match.players[network_get_player_id()].active;
+void match_ui_handle_input(MatchUiState* state) {
+    bool spectator_mode = state->replay_mode || !state->match.players[network_get_player_id()].active;
 
     /*
     #ifdef GOLD_DEBUG
         if (input_is_action_just_pressed(INPUT_ACTION_F4)) {
-            state.theater_mode = !state.theater_mode;
-            if (state.theater_mode) {
+            state->theater_mode = !state->theater_mode;
+            if (state->theater_mode) {
                 SDL_HideCursor();
             } else {
                 SDL_ShowCursor();
@@ -319,33 +352,33 @@ void match_ui_handle_input(MatchUiState& state) {
     */
 
     // Begin chat
-    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active() && !state.replay_mode) {
-        state.chat_message = "";
-        state.chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
-        state.chat_cursor_visible = false;
-        input_start_text_input(&state.chat_message, CHAT_MAX_LENGTH);
+    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active() && !state->replay_mode) {
+        state->chat_message = "";
+        state->chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
+        state->chat_cursor_visible = false;
+        input_start_text_input(&state->chat_message, CHAT_MAX_LENGTH);
         sound_play(SOUND_UI_CLICK);
         return;
     }
 
     // End chat
-    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active() && !state.replay_mode) {
-        if (!state.chat_message.empty()) {
+    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active() && !state->replay_mode) {
+        if (!state->chat_message.empty()) {
             #ifdef GOLD_DEBUG
-                if (state.chat_message == "/fog disable") {
-                    state.debug_fog = DEBUG_FOG_DISABLED;
-                } else if (state.chat_message == "/fog enable") {
-                    state.debug_fog = DEBUG_FOG_ENABLED;
-                } else if (state.chat_message == "/fog bot vision") {
-                    state.debug_fog = DEBUG_FOG_BOT_VISION;
-                } else if (state.chat_message == "/gold") {
+                if (state->chat_message == "/fog disable") {
+                    state->debug_fog = DEBUG_FOG_DISABLED;
+                } else if (state->chat_message == "/fog enable") {
+                    state->debug_fog = DEBUG_FOG_ENABLED;
+                } else if (state->chat_message == "/fog bot vision") {
+                    state->debug_fog = DEBUG_FOG_BOT_VISION;
+                } else if (state->chat_message == "/gold") {
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                        state.match.players[player_id].gold += 5000;
+                        state->match.players[player_id].gold += 5000;
                     }
                 }
             #endif
-            network_send_chat(state.chat_message.c_str());
-            match_ui_add_chat_message(state, network_get_player_id(), state.chat_message.c_str());
+            network_send_chat(state->chat_message.c_str());
+            match_ui_add_chat_message(state, network_get_player_id(), state->chat_message.c_str());
         }
         sound_play(SOUND_UI_CLICK);
         input_stop_text_input();
@@ -354,14 +387,14 @@ void match_ui_handle_input(MatchUiState& state) {
     // Hotkey click
     if (!spectator_mode) {
         for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-            InputAction hotkey = state.hotkey_group[hotkey_index];
+            InputAction hotkey = state->hotkey_group[hotkey_index];
             if (hotkey == INPUT_HOTKEY_NONE) {
                 continue;
             }
-            if (state.is_minimap_dragging || match_ui_is_selecting(state)) {
+            if (state->is_minimap_dragging || match_ui_is_selecting(state)) {
                 continue;
             }
-            if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
+            if (!match_does_player_meet_hotkey_requirements(state->match, network_get_player_id(), hotkey)) {
                 continue;
             }
 
@@ -380,36 +413,36 @@ void match_ui_handle_input(MatchUiState& state) {
                 if (hotkey_info.type == HOTKEY_BUTTON_ACTION || hotkey_info.type == HOTKEY_BUTTON_TOGGLED_ACTION) {
                     switch (hotkey) {
                         case INPUT_HOTKEY_ATTACK: {
-                            state.mode = MATCH_UI_MODE_TARGET_ATTACK;
+                            state->mode = MATCH_UI_MODE_TARGET_ATTACK;
                             break;
                         }
                         case INPUT_HOTKEY_BUILD: {
-                            state.mode = MATCH_UI_MODE_BUILD;
+                            state->mode = MATCH_UI_MODE_BUILD;
                             break;
                         }
                         case INPUT_HOTKEY_BUILD2: {
-                            state.mode = MATCH_UI_MODE_BUILD2;
+                            state->mode = MATCH_UI_MODE_BUILD2;
                             break;
                         }
                         case INPUT_HOTKEY_CANCEL: {
                             if (match_ui_is_in_submenu(state) || match_ui_is_targeting(state)) {
-                                state.mode = MATCH_UI_MODE_NONE;
-                            } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE) {
-                                state.mode = MATCH_UI_MODE_NONE;
-                            } else if (state.selection.size() == 1) { 
-                                const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
+                                state->mode = MATCH_UI_MODE_NONE;
+                            } else if (state->mode == MATCH_UI_MODE_BUILDING_PLACE) {
+                                state->mode = MATCH_UI_MODE_NONE;
+                            } else if (state->selection.size() == 1) { 
+                                const Entity& entity = state->match.entities.get_by_id(state->selection[0]);
                                 if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
-                                    state.input_queue.push_back((MatchInput) {
+                                    state->input_queue.push_back((MatchInput) {
                                         .type = MATCH_INPUT_BUILD_CANCEL,
                                         .build_cancel = (MatchInputBuildCancel) {
-                                            .building_id = state.selection[0]
+                                            .building_id = state->selection[0]
                                         }
                                     });
                                 } else if (entity.mode == MODE_BUILDING_FINISHED && !entity.queue.empty()) {
-                                    state.input_queue.push_back((MatchInput) {
+                                    state->input_queue.push_back((MatchInput) {
                                         .type = MATCH_INPUT_BUILDING_DEQUEUE,
                                         .building_dequeue = (MatchInputBuildingDequeue) {
-                                            .building_id = state.selection[0],
+                                            .building_id = state->selection[0],
                                             .index = BUILDING_DEQUEUE_POP_FRONT
                                         }
                                     });
@@ -421,46 +454,46 @@ void match_ui_handle_input(MatchUiState& state) {
                         case INPUT_HOTKEY_DEFEND: {
                             MatchInput input;
                             input.type = hotkey == INPUT_HOTKEY_STOP ? MATCH_INPUT_STOP : MATCH_INPUT_DEFEND;
-                            input.stop.entity_count = (uint8_t)state.selection.size();
-                            memcpy(&input.stop.entity_ids, &state.selection[0], input.stop.entity_count * sizeof(EntityId));
-                            state.input_queue.push_back(input);
+                            input.stop.entity_count = (uint8_t)state->selection.size();
+                            memcpy(&input.stop.entity_ids, &state->selection[0], input.stop.entity_count * sizeof(EntityId));
+                            state->input_queue.push_back(input);
                             break;
                         }
                         case INPUT_HOTKEY_REPAIR: {
-                            state.mode = MATCH_UI_MODE_TARGET_REPAIR;
+                            state->mode = MATCH_UI_MODE_TARGET_REPAIR;
                             break;
                         }
                         case INPUT_HOTKEY_UNLOAD: {
-                            if (entity_is_unit(state.match.entities.get_by_id(state.selection[0]).type)) {
-                                state.mode = MATCH_UI_MODE_TARGET_UNLOAD;
+                            if (entity_is_unit(state->match.entities.get_by_id(state->selection[0]).type)) {
+                                state->mode = MATCH_UI_MODE_TARGET_UNLOAD;
                             } else {
                                 MatchInput input;
                                 input.type = MATCH_INPUT_UNLOAD;
-                                input.unload.carrier_count = (uint8_t)state.selection.size();
-                                memcpy(&input.unload.carrier_ids, &state.selection[0], input.unload.carrier_count * sizeof(EntityId));
-                                state.input_queue.push_back(input);
+                                input.unload.carrier_count = (uint8_t)state->selection.size();
+                                memcpy(&input.unload.carrier_ids, &state->selection[0], input.unload.carrier_count * sizeof(EntityId));
+                                state->input_queue.push_back(input);
                             }
                             break;
                         }
                         case INPUT_HOTKEY_MOLOTOV: {
-                            if (!match_ui_selection_has_enough_energy(state, state.selection, MOLOTOV_ENERGY_COST)) {
+                            if (!match_ui_selection_has_enough_energy(state, state->selection, MOLOTOV_ENERGY_COST)) {
                                 match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
                                 break;
                             }
-                            state.mode = MATCH_UI_MODE_TARGET_MOLOTOV;
+                            state->mode = MATCH_UI_MODE_TARGET_MOLOTOV;
                             break;
                         }
                         case INPUT_HOTKEY_CAMO: {
-                            bool activate = !entity_check_flag(state.match.entities.get_by_id(state.selection[0]), ENTITY_FLAG_INVISIBLE);
-                            if (activate && !match_ui_selection_has_enough_energy(state, state.selection, CAMO_ENERGY_COST)) {
+                            bool activate = !entity_check_flag(state->match.entities.get_by_id(state->selection[0]), ENTITY_FLAG_INVISIBLE);
+                            if (activate && !match_ui_selection_has_enough_energy(state, state->selection, CAMO_ENERGY_COST)) {
                                 match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
                                 break;
                             }
                             MatchInput input;
                             input.type = activate ? MATCH_INPUT_CAMO : MATCH_INPUT_DECAMO;
-                            input.camo.unit_count = (uint8_t)state.selection.size();
-                            memcpy(&input.camo.unit_ids, &state.selection[0], input.camo.unit_count * sizeof(EntityId));
-                            state.input_queue.push_back(input);
+                            input.camo.unit_count = (uint8_t)state->selection.size();
+                            memcpy(&input.camo.unit_ids, &state->selection[0], input.camo.unit_count * sizeof(EntityId));
+                            state->input_queue.push_back(input);
                             break;
                         }
                         default:
@@ -469,13 +502,13 @@ void match_ui_handle_input(MatchUiState& state) {
                 } else if (hotkey_info.type == HOTKEY_BUTTON_BUILD) {
                     const EntityData& building_data = entity_get_data(hotkey_info.entity_type);
                     bool costs_energy = (building_data.building_data.options & BUILDING_COSTS_ENERGY) == BUILDING_COSTS_ENERGY;
-                    if (costs_energy && !match_ui_selection_has_enough_energy(state, state.selection, building_data.gold_cost)) {
+                    if (costs_energy && !match_ui_selection_has_enough_energy(state, state->selection, building_data.gold_cost)) {
                         match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_ENERGY);
-                    } else if (!costs_energy && state.match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
+                    } else if (!costs_energy && state->match.players[network_get_player_id()].gold < entity_get_data(hotkey_info.entity_type).gold_cost) {
                         match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
                     } else {
-                        state.mode = MATCH_UI_MODE_BUILDING_PLACE;
-                        state.building_type = hotkey_info.entity_type;
+                        state->mode = MATCH_UI_MODE_BUILDING_PLACE;
+                        state->building_type = hotkey_info.entity_type;
                     }
                 } else if (hotkey_info.type == HOTKEY_BUTTON_TRAIN || hotkey_info.type == HOTKEY_BUTTON_RESEARCH) {
                     // Build the queue item
@@ -491,8 +524,8 @@ void match_ui_handle_input(MatchUiState& state) {
 
                     // Check to make sure at least one building queue has room
                     bool are_building_queues_full = true;
-                    for (EntityId building_id : state.selection) {
-                        const Entity& building = state.match.entities.get_by_id(building_id);
+                    for (EntityId building_id : state->selection) {
+                        const Entity& building = state->match.entities.get_by_id(building_id);
                         if (building.queue.size() < BUILDING_QUEUE_MAX) {
                             are_building_queues_full = false;
                         }
@@ -500,11 +533,11 @@ void match_ui_handle_input(MatchUiState& state) {
 
                     if (are_building_queues_full) {
                         match_ui_show_status(state, MATCH_UI_STATUS_BUILDING_QUEUE_FULL);
-                    } else if (state.match.players[network_get_player_id()].gold < building_queue_item_cost(item)) {
+                    } else if (state->match.players[network_get_player_id()].gold < building_queue_item_cost(item)) {
                         match_ui_show_status(state, MATCH_UI_STATUS_NOT_ENOUGH_GOLD);
                     } else {
                         if (match_ui_is_in_submenu(state)) {
-                            state.mode = MATCH_UI_MODE_NONE;
+                            state->mode = MATCH_UI_MODE_NONE;
                         }
                         MatchInput input;
                         input.type = MATCH_INPUT_BUILDING_ENQUEUE;
@@ -512,9 +545,9 @@ void match_ui_handle_input(MatchUiState& state) {
                         input.building_enqueue.item_subtype = item.type == BUILDING_QUEUE_ITEM_UNIT
                                                                 ? (uint32_t)item.unit_type
                                                                 : item.upgrade;
-                        input.building_enqueue.building_count = (uint8_t)state.selection.size();
-                        memcpy(&input.building_enqueue.building_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
-                        state.input_queue.push_back(input);
+                        input.building_enqueue.building_count = (uint8_t)state->selection.size();
+                        memcpy(&input.building_enqueue.building_ids, &state->selection[0], state->selection.size() * sizeof(EntityId));
+                        state->input_queue.push_back(input);
                     }
                 } 
 
@@ -525,16 +558,16 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Selection list click
-    if (state.selection.size() > 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
-        !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
-        for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+    if (state->selection.size() > 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+        !(state->is_minimap_dragging || match_ui_is_selecting(state))) {
+        for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
             Rect icon_rect = match_ui_get_selection_list_item_rect(selection_index);
             if (icon_rect.has_point(input_get_mouse_position())) {
                 if (input_is_action_pressed(INPUT_ACTION_SHIFT)) {
-                    state.selection.erase(state.selection.begin() + selection_index);
+                    state->selection.erase(state->selection.begin() + selection_index);
                 } else {
                     std::vector<EntityId> selection;
-                    selection.push_back(state.selection[selection_index]);
+                    selection.push_back(state->selection[selection_index]);
                     match_ui_set_selection(state, selection);
                 }
                 sound_play(SOUND_UI_CLICK);
@@ -544,10 +577,10 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Building queue click
-    if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+    if (state->selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !spectator_mode &&
-            !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
-        const Entity& building = state.match.entities.get_by_id(state.selection[0]);
+            !(state->is_minimap_dragging || match_ui_is_selecting(state))) {
+        const Entity& building = state->match.entities.get_by_id(state->selection[0]);
         const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
         for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
             Rect icon_rect = (Rect) {
@@ -557,10 +590,10 @@ void match_ui_handle_input(MatchUiState& state) {
                 .h = icon_sprite_info.frame_height * 2
             };
             if (icon_rect.has_point(input_get_mouse_position())) {
-                state.input_queue.push_back((MatchInput) {
+                state->input_queue.push_back((MatchInput) {
                     .type = MATCH_INPUT_BUILDING_DEQUEUE,
                     .building_dequeue = (MatchInputBuildingDequeue) {
-                        .building_id = state.selection[0],
+                        .building_id = state->selection[0],
                         .index = (uint8_t)building_queue_index
                     }
                 });
@@ -571,15 +604,15 @@ void match_ui_handle_input(MatchUiState& state) {
     }
 
     // Garrisoned unit click
-    if (state.selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+    if (state->selection.size() == 1 && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !spectator_mode &&
-            !(state.is_minimap_dragging || match_ui_is_selecting(state))) {
-        const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
+            !(state->is_minimap_dragging || match_ui_is_selecting(state))) {
+        const Entity& carrier = state->match.entities.get_by_id(state->selection[0]);
         if (carrier.type == ENTITY_GOLDMINE || carrier.player_id == network_get_player_id()) {
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             int index = 0;
             for (EntityId entity_id : carrier.garrisoned_units) {
-                const Entity& garrisoned_unit = state.match.entities.get_by_id(entity_id);
+                const Entity& garrisoned_unit = state->match.entities.get_by_id(entity_id);
                 // We have to make this check here because goldmines might have both allied and enemy units in them
                 if (garrisoned_unit.player_id != network_get_player_id()) {
                     continue;
@@ -592,7 +625,7 @@ void match_ui_handle_input(MatchUiState& state) {
                     .h = icon_sprite_info.frame_height * 2
                 };
                 if (icon_rect.has_point(input_get_mouse_position())) {
-                    state.input_queue.push_back((MatchInput) {
+                    state->input_queue.push_back((MatchInput) {
                         .type = MATCH_INPUT_SINGLE_UNLOAD,
                         .single_unload = (MatchInputSingleUnload) {
                             .entity_id = entity_id
@@ -613,9 +646,9 @@ void match_ui_handle_input(MatchUiState& state) {
         InputAction action_required = match_ui_is_targeting(state) ? INPUT_ACTION_LEFT_CLICK : INPUT_ACTION_RIGHT_CLICK;
         bool is_action_pressed = input_is_action_just_pressed(action_required);
         // Check that a move command can be executed in the current UI state
-        bool is_movement_allowed = state.mode != MATCH_UI_MODE_BUILDING_PLACE && 
-                                  !state.is_minimap_dragging && 
-                                  match_ui_get_selection_type(state, state.selection) 
+        bool is_movement_allowed = state->mode != MATCH_UI_MODE_BUILDING_PLACE && 
+                                  !state->is_minimap_dragging && 
+                                  match_ui_get_selection_type(state, state->selection) 
                                         == MATCH_UI_SELECTION_UNITS;
         // Check that the mouse is either in the world or in the minimap
         bool is_mouse_in_position = !match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position());
@@ -628,13 +661,13 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Set building rally
     if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK) && 
-            match_ui_get_selection_type(state, state.selection) == MATCH_UI_SELECTION_BUILDINGS &&
+            match_ui_get_selection_type(state, state->selection) == MATCH_UI_SELECTION_BUILDINGS &&
             !spectator_mode &&
-            !(state.is_minimap_dragging || match_ui_is_selecting(state) || match_ui_is_targeting(state)) &&
+            !(state->is_minimap_dragging || match_ui_is_selecting(state) || match_ui_is_targeting(state)) &&
             (!match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position()))) {
         // Check to make sure that all buildings can rally
-        for (EntityId id : state.selection) {
-            const Entity& entity = state.match.entities.get_by_id(id);
+        for (EntityId id : state->selection) {
+            const Entity& entity = state->match.entities.get_by_id(id);
             if (entity.mode == MODE_BUILDING_IN_PROGRESS) {
                 return;
             }
@@ -650,31 +683,31 @@ void match_ui_handle_input(MatchUiState& state) {
         // Determine rally point
         if (match_ui_is_mouse_in_ui()) {
             ivec2 minimap_pos = input_get_mouse_position() - ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y);
-            input.rally.rally_point = ivec2((state.match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-                                            (state.match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+            input.rally.rally_point = ivec2((state->match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                                            (state->match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         } else {
-            input.rally.rally_point = input_get_mouse_position() + state.camera_offset;
+            input.rally.rally_point = input_get_mouse_position() + state->camera_offset;
         }
 
         // Check if rallied onto gold
-        Cell cell = map_get_cell(state.match.map, CELL_LAYER_GROUND, input.rally.rally_point / TILE_SIZE);
+        Cell cell = map_get_cell(state->match.map, CELL_LAYER_GROUND, input.rally.rally_point / TILE_SIZE);
         if (cell.type == CELL_GOLDMINE) {
             // If they rallied onto their gold, adjust their rally point and play an animation to clearly indicate that units will rally out to the mine
             // But only do this if the goldmine has been explored, otherwise we would reveal to players that there is a goldmine where they clicked
-            const Entity& goldmine = state.match.entities.get_by_id(cell.id);
-            if (match_is_cell_rect_explored(state.match, state.match.players[network_get_player_id()].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
+            const Entity& goldmine = state->match.entities.get_by_id(cell.id);
+            if (match_is_cell_rect_explored(state->match, state->match.players[network_get_player_id()].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
                 input.rally.rally_point = (goldmine.cell * TILE_SIZE) + ivec2(46, 32);
-                state.move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
-                state.move_animation_entity_id = cell.id;
-                state.move_animation_position = goldmine.cell * TILE_SIZE;
+                state->move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
+                state->move_animation_entity_id = cell.id;
+                state->move_animation_position = goldmine.cell * TILE_SIZE;
             }
         }
 
         // Add buildings to rally point input
-        input.rally.building_count = state.selection.size();
-        memcpy(&input.rally.building_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
+        input.rally.building_count = state->selection.size();
+        memcpy(&input.rally.building_ids, &state->selection[0], state->selection.size() * sizeof(EntityId));
 
-        state.input_queue.push_back(input);
+        state->input_queue.push_back(input);
         sound_play(SOUND_FLAG_THUMP);
 
         return;
@@ -682,18 +715,18 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Begin minimap drag
     if (MINIMAP_RECT.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-        state.is_minimap_dragging = true;
+        state->is_minimap_dragging = true;
         return;
     } 
     // End minimap drag
-    if (state.is_minimap_dragging && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
-        state.is_minimap_dragging = false;
+    if (state->is_minimap_dragging && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
+        state->is_minimap_dragging = false;
         return;
     }
 
     // Building placement
-    if (state.mode == MATCH_UI_MODE_BUILDING_PLACE && 
-            !state.is_minimap_dragging && 
+    if (state->mode == MATCH_UI_MODE_BUILDING_PLACE && 
+            !state->is_minimap_dragging && 
             !match_ui_is_mouse_in_ui() && 
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         if (!match_ui_building_can_be_placed(state)) {
@@ -704,14 +737,14 @@ void match_ui_handle_input(MatchUiState& state) {
         MatchInput input;
         input.type = MATCH_INPUT_BUILD;
         input.build.shift_command = input_is_action_pressed(INPUT_ACTION_SHIFT);
-        input.build.building_type = state.building_type;
-        input.build.entity_count = state.selection.size();
-        memcpy(&input.build.entity_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
-        input.build.target_cell = match_ui_get_building_cell(entity_get_data(state.building_type).cell_size, state.camera_offset);
-        state.input_queue.push_back(input);
+        input.build.building_type = state->building_type;
+        input.build.entity_count = state->selection.size();
+        memcpy(&input.build.entity_ids, &state->selection[0], state->selection.size() * sizeof(EntityId));
+        input.build.target_cell = match_ui_get_building_cell(entity_get_data(state->building_type).cell_size, state->camera_offset);
+        state->input_queue.push_back(input);
 
         if (!input.build.shift_command) {
-            state.mode = MATCH_UI_MODE_NONE;
+            state->mode = MATCH_UI_MODE_NONE;
         }
 
         sound_play(SOUND_BUILDING_PLACE);
@@ -720,28 +753,28 @@ void match_ui_handle_input(MatchUiState& state) {
 
     // Begin selecting
     if (!match_ui_is_mouse_in_ui() && 
-            (state.mode == MATCH_UI_MODE_NONE || match_ui_is_in_submenu(state)) &&
+            (state->mode == MATCH_UI_MODE_NONE || match_ui_is_in_submenu(state)) &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
-        state.select_origin = input_get_mouse_position() + state.camera_offset;
+        state->select_origin = input_get_mouse_position() + state->camera_offset;
         return;
     }
     // End selecting
     if (match_ui_is_selecting(state) && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
-        ivec2 world_pos = input_get_mouse_position() + state.camera_offset;
+        ivec2 world_pos = input_get_mouse_position() + state->camera_offset;
         Rect select_rect = (Rect) {
-            .x = std::min(world_pos.x, state.select_origin.x),
-            .y = std::min(world_pos.y, state.select_origin.y),
-            .w = std::max(1, std::abs(state.select_origin.x - world_pos.x)),
-            .h = std::max(1, std::abs(state.select_origin.y - world_pos.y)),
+            .x = std::min(world_pos.x, state->select_origin.x),
+            .y = std::min(world_pos.y, state->select_origin.y),
+            .w = std::max(1, std::abs(state->select_origin.x - world_pos.x)),
+            .h = std::max(1, std::abs(state->select_origin.y - world_pos.y)),
         };
 
         std::vector<EntityId> selection = match_ui_create_selection(state, select_rect);
-        state.select_origin = ivec2(-1, -1);
-        state.control_group_selected = MATCH_UI_CONTROL_GROUP_NONE;
+        state->select_origin = ivec2(-1, -1);
+        state->control_group_selected = MATCH_UI_CONTROL_GROUP_NONE;
 
         // Append selection
         if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
-            MatchUiSelectionType current_selection_type = match_ui_get_selection_type(state, state.selection);
+            MatchUiSelectionType current_selection_type = match_ui_get_selection_type(state, state->selection);
             // Don't append selection if selection is not allied units or buildings
             if (!(current_selection_type == MATCH_UI_SELECTION_UNITS || current_selection_type == MATCH_UI_SELECTION_BUILDINGS)) {
                 return;
@@ -751,33 +784,33 @@ void match_ui_handle_input(MatchUiState& state) {
                 return;
             }
             for (EntityId incoming_id : selection) {
-                if (std::find(state.selection.begin(), state.selection.end(), incoming_id) == state.selection.end()) {
-                    state.selection.push_back(incoming_id);
+                if (std::find(state->selection.begin(), state->selection.end(), incoming_id) == state->selection.end()) {
+                    state->selection.push_back(incoming_id);
                 }
             }
 
-            match_ui_set_selection(state, state.selection);
+            match_ui_set_selection(state, state->selection);
             return;
         }
 
         if (selection.size() == 1) {
-            if (state.double_click_timer == 0) {
-                state.double_click_timer = MATCH_UI_DOUBLE_CLICK_DURATION;
-            } else if (state.selection.size() == 1 && state.selection[0] == selection[0] &&
-                        state.match.entities.get_by_id(state.selection[0]).player_id == network_get_player_id()) {
-                EntityType selected_type = state.match.entities.get_by_id(state.selection[0]).type;
+            if (state->double_click_timer == 0) {
+                state->double_click_timer = MATCH_UI_DOUBLE_CLICK_DURATION;
+            } else if (state->selection.size() == 1 && state->selection[0] == selection[0] &&
+                        state->match.entities.get_by_id(state->selection[0]).player_id == network_get_player_id()) {
+                EntityType selected_type = state->match.entities.get_by_id(state->selection[0]).type;
                 selection.clear();
 
-                for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
-                    if (state.match.entities[entity_index].type != selected_type || state.match.entities[entity_index].player_id != network_get_player_id()) {
+                for (uint32_t entity_index = 0; entity_index < state->match.entities.size(); entity_index++) {
+                    if (state->match.entities[entity_index].type != selected_type || state->match.entities[entity_index].player_id != network_get_player_id()) {
                         continue;
                     }
 
-                    Rect entity_rect = entity_get_rect(state.match.entities[entity_index]);
-                    entity_rect.x -= state.camera_offset.x;
-                    entity_rect.y -= state.camera_offset.y;
+                    Rect entity_rect = entity_get_rect(state->match.entities[entity_index]);
+                    entity_rect.x -= state->camera_offset.x;
+                    entity_rect.y -= state->camera_offset.y;
                     if (SCREEN_RECT.intersects(entity_rect)) {
-                        selection.push_back(state.match.entities.get_id_of(entity_index));
+                        selection.push_back(state->match.entities.get_id_of(entity_index));
                     }
                 }
             }
@@ -799,25 +832,25 @@ void match_ui_handle_input(MatchUiState& state) {
             int control_group_index = number_key_pressed;
             // Set control group
             if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
-                if (state.selection.empty() || state.match.entities.get_by_id(state.selection[0]).player_id != network_get_player_id()) {
+                if (state->selection.empty() || state->match.entities.get_by_id(state->selection[0]).player_id != network_get_player_id()) {
                     return;
                 }
 
-                state.control_groups[control_group_index] = state.selection;
-                state.control_group_selected = control_group_index;
+                state->control_groups[control_group_index] = state->selection;
+                state->control_group_selected = control_group_index;
                 return;
             }
 
             // Append control group
             if (input_is_action_pressed(INPUT_ACTION_SHIFT)) {
-                if (state.selection.empty() || state.match.entities.get_by_id(state.selection[0]).player_id != network_get_player_id()) {
+                if (state->selection.empty() || state->match.entities.get_by_id(state->selection[0]).player_id != network_get_player_id()) {
                     return;
                 }
                 
-                for (EntityId entity_id : state.selection) {
-                    if (std::find(state.control_groups[control_group_index].begin(), state.control_groups[control_group_index].end(), entity_id) 
-                            == state.control_groups[control_group_index].end()) {
-                        state.control_groups[control_group_index].push_back(entity_id);
+                for (EntityId entity_id : state->selection) {
+                    if (std::find(state->control_groups[control_group_index].begin(), state->control_groups[control_group_index].end(), entity_id) 
+                            == state->control_groups[control_group_index].end()) {
+                        state->control_groups[control_group_index].push_back(entity_id);
                     }
                 }
 
@@ -825,11 +858,11 @@ void match_ui_handle_input(MatchUiState& state) {
             }
 
             // Snap to control group
-            if (state.control_group_double_tap_timer != 0 && state.control_group_selected == control_group_index) {
+            if (state->control_group_double_tap_timer != 0 && state->control_group_selected == control_group_index) {
                 ivec2 group_min;
                 ivec2 group_max;
-                for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
-                    const Entity& entity = state.match.entities.get_by_id(state.selection[selection_index]);
+                for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
+                    const Entity& entity = state->match.entities.get_by_id(state->selection[selection_index]);
                     if (selection_index == 0) {
                         group_min = entity.cell;
                         group_max = entity.cell;
@@ -852,37 +885,37 @@ void match_ui_handle_input(MatchUiState& state) {
             }
 
             // Select control group
-            if (!state.control_groups[control_group_index].empty()) {
-                match_ui_set_selection(state, state.control_groups[control_group_index]);
-                if (!state.selection.empty()) {
-                    state.control_group_double_tap_timer = MATCH_UI_DOUBLE_CLICK_DURATION;
-                    state.control_group_selected = control_group_index;
+            if (!state->control_groups[control_group_index].empty()) {
+                match_ui_set_selection(state, state->control_groups[control_group_index]);
+                if (!state->selection.empty()) {
+                    state->control_group_double_tap_timer = MATCH_UI_DOUBLE_CLICK_DURATION;
+                    state->control_group_selected = control_group_index;
                 }
             }
         }
     }
 
     // Jump to latest alert
-    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && state.latest_alert_cell.x != -1 && !spectator_mode) {
-        match_ui_center_camera_on_cell(state, state.latest_alert_cell);
+    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && state->latest_alert_cell.x != -1 && !spectator_mode) {
+        match_ui_center_camera_on_cell(state, state->latest_alert_cell);
     }
 
     // Camera hotkeys
     for (int index = 0; index < MATCH_UI_CAMERA_HOTKEY_COUNT; index++) {
         if (input_is_action_just_pressed((InputAction)(INPUT_ACTION_F1 + index))) {
             if (input_is_action_pressed(INPUT_ACTION_SHIFT)) {
-                state.camera_hotkeys[index] = state.camera_offset;
-            } else if (state.camera_hotkeys[index].x != -1) {
-                state.camera_offset = state.camera_hotkeys[index];
+                state->camera_hotkeys[index] = state->camera_offset;
+            } else if (state->camera_hotkeys[index].x != -1) {
+                state->camera_offset = state->camera_hotkeys[index];
             }
         }
     }
 }
 
-void match_ui_update(MatchUiState& state) {
+void match_ui_update(MatchUiState* state) {
     ZoneScoped;
 
-    if (state.mode == MATCH_UI_MODE_NOT_STARTED) {
+    if (state->mode == MATCH_UI_MODE_NOT_STARTED) {
         if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
             network_set_player_ready(true);
         }
@@ -894,7 +927,7 @@ void match_ui_update(MatchUiState& state) {
             }
         }
         // If we reached here, then all players are ready
-        state.mode = MATCH_UI_MODE_NONE;
+        state->mode = MATCH_UI_MODE_NONE;
         log_info("Match started.");
     }
 
@@ -904,13 +937,13 @@ void match_ui_update(MatchUiState& state) {
         .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
         .w = menu_button_sprite_info.frame_width * 2, .h = menu_button_sprite_info.frame_height * 2
     };
-    if (!(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
+    if (!(state->is_minimap_dragging || match_ui_is_selecting(state)) && 
             ((menu_button_rect.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) || input_is_action_just_pressed(INPUT_ACTION_MATCH_MENU))) {
-        if (state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER || state.mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP) {
-            state.options_menu.mode = OPTIONS_MENU_CLOSED;
-            state.mode = MATCH_UI_MODE_NONE;
-        } else if (state.mode != MATCH_UI_MODE_MATCH_OVER_DEFEAT && state.mode != MATCH_UI_MODE_MATCH_OVER_VICTORY) {
-            state.mode = MATCH_UI_MODE_MENU;
+        if (state->mode == MATCH_UI_MODE_MENU || state->mode == MATCH_UI_MODE_MENU_SURRENDER || state->mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP) {
+            state->options_menu.mode = OPTIONS_MENU_CLOSED;
+            state->mode = MATCH_UI_MODE_NONE;
+        } else if (state->mode != MATCH_UI_MODE_MATCH_OVER_DEFEAT && state->mode != MATCH_UI_MODE_MATCH_OVER_VICTORY) {
+            state->mode = MATCH_UI_MODE_MENU;
             input_stop_text_input();
         }
         sound_play(SOUND_UI_CLICK);
@@ -919,133 +952,144 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Menu
-    ui_begin(state.ui);
-    if (match_ui_is_in_menu(state.mode)) {
-        if (state.is_minimap_dragging) {
-            state.is_minimap_dragging = false;
+    ui_begin(state->ui);
+    if (match_ui_is_in_menu(state->mode)) {
+        if (state->is_minimap_dragging) {
+            state->is_minimap_dragging = false;
         }
 
-        state.ui.input_enabled = state.options_menu.mode == OPTIONS_MENU_CLOSED;
-        ui_frame_rect(state.ui, MENU_RECT);
+        state->ui.input_enabled = state->options_menu.mode == OPTIONS_MENU_CLOSED;
+        ui_frame_rect(state->ui, MENU_RECT);
 
-        const char* header_text = match_ui_get_menu_header_text(state.mode);
+        const char* header_text = match_ui_get_menu_header_text(state->mode);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
         ivec2 text_pos = ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (text_size.x / 2), MENU_RECT.y + 20);
-        ui_element_position(state.ui, text_pos);
-        ui_text(state.ui, FONT_WESTERN8_GOLD, header_text);
+        ui_element_position(state->ui, text_pos);
+        ui_text(state->ui, FONT_WESTERN8_GOLD, header_text);
 
         ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 64);
-        if (state.mode != MATCH_UI_MODE_MENU) {
+        if (state->mode != MATCH_UI_MODE_MENU) {
             column_position.y += 22;
         }
-        ui_begin_column(state.ui, column_position, 10);
+        ui_begin_column(state->ui, column_position, 10);
             ivec2 button_size = ui_button_size("Return to Menu");
-            if (state.mode == MATCH_UI_MODE_MENU) {
-                if (ui_button(state.ui, "Leave Match", button_size, true)) {
+            if (state->mode == MATCH_UI_MODE_MENU) {
+                if (ui_button(state->ui, "Leave Match", button_size, true)) {
                     if (match_ui_is_surrender_required_to_leave(state)) {
-                        state.mode = MATCH_UI_MODE_MENU_SURRENDER;
+                        state->mode = MATCH_UI_MODE_MENU_SURRENDER;
                     } else {
                         match_ui_leave_match(state, false);
                     }
                 }
-                if (ui_button(state.ui, "Exit Program", button_size, true)) {
+                if (ui_button(state->ui, "Exit Program", button_size, true)) {
                     if (match_ui_is_surrender_required_to_leave(state)) {
-                        state.mode = MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP;
+                        state->mode = MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP;
                     } else {
                         match_ui_leave_match(state, true);
                     }
                 }
-                if (ui_button(state.ui, "Options", button_size, true)) {
-                    state.options_menu = options_menu_open();
+                if (ui_button(state->ui, "Options", button_size, true)) {
+                    state->options_menu = options_menu_open();
                 }
-                if (ui_button(state.ui, "Back", button_size, true)) {
-                    state.mode = MATCH_UI_MODE_NONE;
+                if (ui_button(state->ui, "Back", button_size, true)) {
+                    state->mode = MATCH_UI_MODE_NONE;
                 }
-            } else if (state.mode == MATCH_UI_MODE_MENU_SURRENDER || state.mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP) {
-                if (ui_button(state.ui, "Yes", button_size, true)) {
-                    match_ui_leave_match(state, state.mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP);
+            } else if (state->mode == MATCH_UI_MODE_MENU_SURRENDER || state->mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP) {
+                if (ui_button(state->ui, "Yes", button_size, true)) {
+                    match_ui_leave_match(state, state->mode == MATCH_UI_MODE_MENU_SURRENDER_TO_DESKTOP);
                 }
-                if (ui_button(state.ui, "Back", button_size, true)) {
-                    state.mode = MATCH_UI_MODE_MENU;
+                if (ui_button(state->ui, "Back", button_size, true)) {
+                    state->mode = MATCH_UI_MODE_MENU;
                 }
-            } else if (state.mode == MATCH_UI_MODE_MATCH_OVER_VICTORY || state.mode == MATCH_UI_MODE_MATCH_OVER_DEFEAT) {
-                if (ui_button(state.ui, "Keep Playing", button_size, true)) {
-                    state.mode = MATCH_UI_MODE_NONE;
+            } else if (state->mode == MATCH_UI_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_UI_MODE_MATCH_OVER_DEFEAT) {
+                if (ui_button(state->ui, "Keep Playing", button_size, true)) {
+                    state->mode = MATCH_UI_MODE_NONE;
                 }
-                if (ui_button(state.ui, "Return to Menu", button_size, true)) {
+                if (ui_button(state->ui, "Return to Menu", button_size, true)) {
                     match_ui_leave_match(state, false);
                 }
-                if (ui_button(state.ui, "Exit Program", button_size, true)) {
+                if (ui_button(state->ui, "Exit Program", button_size, true)) {
                     match_ui_leave_match(state, true);
                 }
             }
-        ui_end_container(state.ui);
+        ui_end_container(state->ui);
 
-        if (state.options_menu.mode != OPTIONS_MENU_CLOSED) {
-            options_menu_update(state.options_menu, state.ui);
+        if (state->options_menu.mode != OPTIONS_MENU_CLOSED) {
+            options_menu_update(state->options_menu, state->ui);
         }
-    } else if (state.replay_mode) {
-        ui_begin_column(state.ui, ivec2(BUTTON_PANEL_RECT.x + 16, BUTTON_PANEL_RECT.y + 8), 4);
-            ui_element_size(state.ui, ivec2(0, 32));
-            ui_begin_row(state.ui, ivec2(0, 0), 8);
-                ui_element_position(state.ui, ivec2(0, 4));
-                ui_text(state.ui, FONT_HACK_WHITE, "Fog:");
+    } else if (state->replay_mode) {
+        // Loading thread handling
+        if (SDL_TryLockMutex(state->replay_loading_turn_counter_mutex)) {
+            state->replay_loaded_turn_counter = state->replay_loading_turn_counter;
+            SDL_UnlockMutex(state->replay_loading_turn_counter_mutex);
+        }
+        if (state->replay_loading_thread != NULL && SDL_GetThreadState(state->replay_loading_thread) == SDL_THREAD_COMPLETE) {
+            // Clean up the thread
+            SDL_WaitThread(state->replay_loading_thread, NULL);
+            state->replay_loading_thread = NULL;
+        }
 
-                ui_element_position(state.ui, ivec2(render_get_text_size(FONT_HACK_WHITE, "Fog:").x, 0));
-                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.replay_fog_index, state.replay_fog_texts, false);
-            ui_end_container(state.ui);
+        ui_begin_column(state->ui, ivec2(BUTTON_PANEL_RECT.x + 16, BUTTON_PANEL_RECT.y + 8), 4);
+            ui_element_size(state->ui, ivec2(0, 32));
+            ui_begin_row(state->ui, ivec2(0, 0), 8);
+                ui_element_position(state->ui, ivec2(0, 4));
+                ui_text(state->ui, FONT_HACK_WHITE, "Fog:");
 
-            uint32_t position = state.turn_counter;
-            if (ui_slider(state.ui, &position, 0, match_ui_replay_end_of_tape(state), UI_SLIDER_DISPLAY_NO_VALUE)) {
-                state.selection.clear();
-                state.chat.clear();
+                ui_element_position(state->ui, ivec2(render_get_text_size(FONT_HACK_WHITE, "Fog:").x, 0));
+                ui_dropdown(state->ui, UI_DROPDOWN_MINI, &state->replay_fog_index, state->replay_fog_texts, false);
+            ui_end_container(state->ui);
+
+            uint32_t position = state->turn_counter;
+            if (ui_slider(state->ui, &position, &state->replay_loaded_turn_counter, 0, match_ui_replay_end_of_tape(state), UI_SLIDER_DISPLAY_NO_VALUE)) {
+                state->selection.clear();
+                state->chat.clear();
                 match_ui_replay_scrub(state, position);
             }
 
-            ui_begin_row(state.ui, ivec2(0, 0), 12);
-                if (ui_sprite_button(state.ui, state.replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false) ||
+            ui_begin_row(state->ui, ivec2(0, 0), 12);
+                if (ui_sprite_button(state->ui, state->replay_paused ? SPRITE_UI_REPLAY_PLAY : SPRITE_UI_REPLAY_PAUSE, false, false) ||
                         input_is_action_just_pressed(INPUT_ACTION_SPACE)) {
-                    state.replay_paused = !state.replay_paused;
+                    state->replay_paused = !state->replay_paused;
                 }
 
                 // Time elapsed text
-                uint32_t seconds_elapsed = state.turn_counter == 0 ? 0 : (uint32_t)((state.turn_counter - 1) * UPDATE_DURATION);
+                uint32_t seconds_elapsed = state->turn_counter == 0 ? 0 : (uint32_t)((state->turn_counter - 1) * UPDATE_DURATION);
                 Time time_elapsed = Time::from_seconds(seconds_elapsed);
                 uint32_t seconds_total = (uint32_t)((match_ui_replay_end_of_tape(state) - 1) * UPDATE_DURATION);
                 Time time_total = Time::from_seconds(seconds_total);
                 char time_text[16];
-                ui_element_position(state.ui, ivec2(0, 4));
+                ui_element_position(state->ui, ivec2(0, 4));
                 sprintf(time_text, "%i:%02i:%02i/%i:%02i:%02i", time_elapsed.hours, time_elapsed.minutes, time_elapsed.seconds, time_total.hours, time_total.minutes, time_total.seconds);
-                ui_text(state.ui, FONT_HACK_WHITE, time_text);
-            ui_end_container(state.ui);
-        ui_end_container(state.ui);
+                ui_text(state->ui, FONT_HACK_WHITE, time_text);
+            ui_end_container(state->ui);
+        ui_end_container(state->ui);
     }
 
-    if (state.mode == MATCH_UI_MODE_LEAVE_MATCH || state.mode == MATCH_UI_MODE_EXIT_PROGRAM) {
+    if (state->mode == MATCH_UI_MODE_LEAVE_MATCH || state->mode == MATCH_UI_MODE_EXIT_PROGRAM) {
         return;
     }
 
     // Turn loop
-    if (!state.replay_mode) {
-        if (state.turn_timer == 0) {
+    if (!state->replay_mode) {
+        if (state->turn_timer == 0) {
             // Bot input
             static const uint32_t TURNS_PER_SECOND = UPDATES_PER_SECOND / TURN_DURATION;
-            uint32_t match_time_minutes = (state.turn_counter / TURNS_PER_SECOND) / 60U;
+            uint32_t match_time_minutes = (state->turn_counter / TURNS_PER_SECOND) / 60U;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                 if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT ||
-                        !state.match.players[player_id].active) {
+                        !state->match.players[player_id].active) {
                     continue;
                 }
 
-                if (state.inputs[player_id].empty()) {
-                    std::vector<MatchInput> bot_inputs = { bot_get_turn_input(state.match, state.bots[player_id], match_time_minutes) };
-                    state.inputs[player_id].push(bot_inputs);
+                if (state->inputs[player_id].empty()) {
+                    std::vector<MatchInput> bot_inputs = { bot_get_turn_input(state->match, state->bots[player_id], match_time_minutes) };
+                    state->inputs[player_id].push(bot_inputs);
                     // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied whenever its deciding the next one
                     for (int index = 0; index < TURN_OFFSET - 1; index++) {
-                        state.inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
+                        state->inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
                     }
 
-                    if (bot_has_surrendered(state.bots[player_id])) {
+                    if (bot_has_surrendered(state->bots[player_id])) {
                         match_ui_add_chat_message(state, player_id, "gg");
                         match_ui_handle_player_disconnect(state, player_id);
                     }
@@ -1054,125 +1098,125 @@ void match_ui_update(MatchUiState& state) {
 
             bool all_inputs_received = true;
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (!state.match.players[player_id].active) {
+                if (!state->match.players[player_id].active) {
                     continue;
                 }
 
-                if (state.inputs[player_id].empty() || state.inputs[player_id].front().empty()) {
+                if (state->inputs[player_id].empty() || state->inputs[player_id].front().empty()) {
                     all_inputs_received = false;
                     continue;
                 }
             }
 
             if (!all_inputs_received) {
-                state.disconnect_timer++;
+                state->disconnect_timer++;
                 return;
             }
 
             // Reset the disconnect timer if we recevied inputs
-            state.disconnect_timer = 0;
+            state->disconnect_timer = 0;
 
             // All inputs received. Begin next turn
-            state.turn_timer = TURN_DURATION;
-            state.turn_counter++;
+            state->turn_timer = TURN_DURATION;
+            state->turn_counter++;
 
             // Handle input
             for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-                if (!state.match.players[player_id].active) {
-                    replay_file_write_inputs(state.replay_file, player_id, NULL);
+                if (!state->match.players[player_id].active) {
+                    replay_file_write_inputs(state->replay_file, player_id, NULL);
                     continue;
                 }
 
-                replay_file_write_inputs(state.replay_file, player_id, &state.inputs[player_id].front());
+                replay_file_write_inputs(state->replay_file, player_id, &state->inputs[player_id].front());
 
-                for (const MatchInput& input : state.inputs[player_id].front()) {
-                    match_handle_input(state.match, input);
+                for (const MatchInput& input : state->inputs[player_id].front()) {
+                    match_handle_input(state->match, input);
                     if (input.type != MATCH_INPUT_NONE) {
                         char debug_buffer[512];
                         char* out_ptr = debug_buffer;
-                        out_ptr += sprintf(out_ptr, "TURN %u PLAYER %u ", state.turn_counter, player_id);
+                        out_ptr += sprintf(out_ptr, "TURN %u PLAYER %u ", state->turn_counter, player_id);
                         match_input_print(out_ptr, input);
                         log_info(debug_buffer);
                     }
                 }
-                state.inputs[player_id].pop();
+                state->inputs[player_id].pop();
             }
 
             // Flush input
-            if (state.match.players[network_get_player_id()].active) {
+            if (state->match.players[network_get_player_id()].active) {
                 // Always send at least one input per turn
-                if (state.input_queue.empty()) {
-                    state.input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
+                if (state->input_queue.empty()) {
+                    state->input_queue.push_back((MatchInput) { .type = MATCH_INPUT_NONE });
                 } 
 
                 // Serialize the inputs
                 uint8_t out_buffer[NETWORK_INPUT_BUFFER_SIZE];
                 size_t out_buffer_length = 1;
-                for (const MatchInput& input : state.input_queue) {
+                for (const MatchInput& input : state->input_queue) {
                     match_input_serialize(out_buffer, out_buffer_length, input);
                     GOLD_ASSERT(out_buffer_length <= NETWORK_INPUT_BUFFER_SIZE);
                 }
-                state.inputs[network_get_player_id()].push(state.input_queue);
-                state.input_queue.clear();
+                state->inputs[network_get_player_id()].push(state->input_queue);
+                state->input_queue.clear();
 
                 // Send inputs to other players
                 network_send_input(out_buffer, out_buffer_length);
             }
         } // End if tick timer is 0
 
-        state.turn_timer--;
+        state->turn_timer--;
     } // End if not replay_mode
 
-    if (state.replay_mode && !state.replay_paused && state.turn_counter < match_ui_replay_end_of_tape(state)) {
-        match_ui_replay_begin_turn(state);
-        state.turn_counter++;
+    if (state->replay_mode && !state->replay_paused && state->turn_counter < match_ui_replay_end_of_tape(state)) {
+        match_ui_replay_begin_turn(state, state->match, state->turn_counter);
+        state->turn_counter++;
 
         // Chatlog
-        if (state.turn_counter % TURN_DURATION == 0) {
-            uint32_t turn_index = state.turn_counter / TURN_DURATION;
-            for (const ReplayChatMessage& message : state.replay_chatlog) {
+        if (state->turn_counter % TURN_DURATION == 0) {
+            uint32_t turn_index = state->turn_counter / TURN_DURATION;
+            for (const ReplayChatMessage& message : state->replay_chatlog) {
                 if (message.turn == turn_index) {
                     match_ui_add_chat_message(state, message.player_id, message.message);
                 }
             }
         }
 
-        if (state.turn_counter == match_ui_replay_end_of_tape(state)) {
-            state.replay_paused = true;
+        if (state->turn_counter == match_ui_replay_end_of_tape(state)) {
+            state->replay_paused = true;
         }
     }
 
-    if (!match_ui_is_in_menu(state.mode)) {
+    if (!match_ui_is_in_menu(state->mode)) {
         match_ui_handle_input(state);
     }
 
     // Match update
-    if (!state.replay_mode || !state.replay_paused) {
-        match_update(state.match);
+    if (!state->replay_mode || !state->replay_paused) {
+        match_update(state->match);
     }
 
     // Match events
-    for (const MatchEvent& event : state.match.events) {
+    for (const MatchEvent& event : state->match.events) {
         switch (event.type) {
             case MATCH_EVENT_SOUND: {
-                if (state.sound_cooldown_timers[event.sound.sound] != 0) {
+                if (state->sound_cooldown_timers[event.sound.sound] != 0) {
                     break;
                 }
                 if (!match_ui_is_cell_rect_revealed(state, event.sound.position / TILE_SIZE, 1)) {
                     break;
                 }
-                if (SOUND_LISTEN_RECT.has_point(event.sound.position - state.camera_offset)) {
+                if (SOUND_LISTEN_RECT.has_point(event.sound.position - state->camera_offset)) {
                     sound_play(event.sound.sound);
-                    state.sound_cooldown_timers[event.sound.sound] = SOUND_COOLDOWN_DURATION;
+                    state->sound_cooldown_timers[event.sound.sound] = SOUND_COOLDOWN_DURATION;
                 }
                 
                 break;
             }
             case MATCH_EVENT_ALERT: {
-                if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
+                if (state->replay_mode || !state->match.players[network_get_player_id()].active) {
                     break;
                 }
-                if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && state.match.players[event.alert.player_id].team != state.match.players[network_get_player_id()].team) ||
+                if ((event.alert.type == MATCH_ALERT_TYPE_ATTACK && state->match.players[event.alert.player_id].team != state->match.players[network_get_player_id()].team) ||
                     (event.alert.type != MATCH_ALERT_TYPE_ATTACK && event.alert.player_id != network_get_player_id())) {
                     break;
                 }
@@ -1180,7 +1224,7 @@ void match_ui_update(MatchUiState& state) {
                 // Check if an existing attack alert already exists nearby
                 if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
                     bool is_existing_attack_alert_nearby = false;
-                    for (const Alert& existing_alert : state.alerts) {
+                    for (const Alert& existing_alert : state->alerts) {
                         if (existing_alert.pixel == MINIMAP_PIXEL_WHITE && ivec2::manhattan_distance(existing_alert.cell, event.alert.cell) < UI_ATTACK_ALERT_DISTANCE) {
                             is_existing_attack_alert_nearby = true;
                             break;
@@ -1208,11 +1252,11 @@ void match_ui_update(MatchUiState& state) {
                     default:
                         break;
                 }
-                state.latest_alert_cell = event.alert.cell;
+                state->latest_alert_cell = event.alert.cell;
 
                 Rect camera_rect = (Rect) { 
-                    .x = state.camera_offset.x, 
-                    .y = state.camera_offset.y, 
+                    .x = state->camera_offset.x, 
+                    .y = state->camera_offset.y, 
                     .w = SCREEN_WIDTH, 
                     .h = SCREEN_HEIGHT 
                 };
@@ -1232,10 +1276,10 @@ void match_ui_update(MatchUiState& state) {
                 } else if (event.alert.type == MATCH_ALERT_TYPE_MINE_COLLAPSE) {
                     pixel = MINIMAP_PIXEL_GOLD;
                 } else {
-                    pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.match.players[network_get_player_id()].recolor_id);
+                    pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match.players[network_get_player_id()].recolor_id);
                 }
 
-                state.alerts.push_back((Alert) {
+                state->alerts.push_back((Alert) {
                     .pixel = pixel,
                     .cell = event.alert.cell,
                     .cell_size = event.alert.cell_size,
@@ -1251,16 +1295,16 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_SELECTION_HANDOFF: {
-                if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
+                if (state->replay_mode || !state->match.players[network_get_player_id()].active) {
                     break;
                 }
                 if (event.selection_handoff.player_id != network_get_player_id()) {
                     break;
                 }
 
-                if (state.selection.size() == 1 && state.selection[0] == event.selection_handoff.to_deselect) {
-                    if (match_ui_is_in_menu(state.mode)) {
-                        state.selection.clear();
+                if (state->selection.size() == 1 && state->selection[0] == event.selection_handoff.to_deselect) {
+                    if (match_ui_is_in_menu(state->mode)) {
+                        state->selection.clear();
                     } else {
                         std::vector<EntityId> new_selection;
                         new_selection.push_back(event.selection_handoff.to_select);
@@ -1270,7 +1314,7 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_STATUS: {
-                if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
+                if (state->replay_mode || !state->match.players[network_get_player_id()].active) {
                     break;
                 }
                 if (network_get_player_id() == event.status.player_id) {
@@ -1279,7 +1323,7 @@ void match_ui_update(MatchUiState& state) {
                 break;
             }
             case MATCH_EVENT_RESEARCH_COMPLETE: {
-                if (state.replay_mode || !state.match.players[network_get_player_id()].active) {
+                if (state->replay_mode || !state->match.players[network_get_player_id()].active) {
                     break;
                 }
                 if (event.research_complete.player_id != network_get_player_id()) {
@@ -1293,7 +1337,7 @@ void match_ui_update(MatchUiState& state) {
             }
         }
     }
-    state.match.events.clear();
+    state->match.events.clear();
 
     // Camera drag
     if (!match_ui_is_selecting(state)) {
@@ -1308,55 +1352,55 @@ void match_ui_update(MatchUiState& state) {
         } else if (input_get_mouse_position().y > SCREEN_HEIGHT - MATCH_CAMERA_DRAG_MARGIN) {
             camera_drag_direction.y = 1;
         }
-        state.camera_offset += camera_drag_direction * option_get_value(OPTION_CAMERA_SPEED);
+        state->camera_offset += camera_drag_direction * option_get_value(OPTION_CAMERA_SPEED);
         match_ui_clamp_camera(state);
     }
 
     // Minimap drag
-    if (state.is_minimap_dragging) {
+    if (state->is_minimap_dragging) {
         ivec2 minimap_pos = ivec2(
             std::clamp(input_get_mouse_position().x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w),
             std::clamp(input_get_mouse_position().y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
         ivec2 map_pos = ivec2(
-            (state.match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-            (state.match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+            (state->match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+            (state->match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         match_ui_center_camera_on_cell(state, map_pos / TILE_SIZE);
     }
 
     // Update timers and animations
-    if (animation_is_playing(state.move_animation)) {
-        animation_update(state.move_animation);
+    if (animation_is_playing(state->move_animation)) {
+        animation_update(state->move_animation);
     }
-    animation_update(state.rally_flag_animation);
-    animation_update(state.building_fire_animation);
-    if (state.status_timer != 0) {
-        state.status_timer--;
+    animation_update(state->rally_flag_animation);
+    animation_update(state->building_fire_animation);
+    if (state->status_timer != 0) {
+        state->status_timer--;
     }
-    if (state.double_click_timer != 0) {
-        state.double_click_timer--;
+    if (state->double_click_timer != 0) {
+        state->double_click_timer--;
     }
-    if (state.control_group_double_tap_timer != 0) {
-        state.control_group_double_tap_timer--;
+    if (state->control_group_double_tap_timer != 0) {
+        state->control_group_double_tap_timer--;
     }
     for (int sound = 0; sound < SOUND_COUNT; sound++) {
-        if (state.sound_cooldown_timers[sound] != 0) {
-            state.sound_cooldown_timers[sound]--;
+        if (state->sound_cooldown_timers[sound] != 0) {
+            state->sound_cooldown_timers[sound]--;
         }
     }
     if (input_is_text_input_active()) {
-        state.chat_cursor_blink_timer--;
-        if (state.chat_cursor_blink_timer == 0) {
-            state.chat_cursor_visible = !state.chat_cursor_visible;
-            state.chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
+        state->chat_cursor_blink_timer--;
+        if (state->chat_cursor_blink_timer == 0) {
+            state->chat_cursor_visible = !state->chat_cursor_visible;
+            state->chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
         }
     }
 
     // Update displayed gold amounts
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (!state.match.players[player_id].active) {
+        if (!state->match.players[player_id].active) {
             continue;
         } 
-        int difference = std::abs((int)state.displayed_gold_amounts[player_id] - (int)state.match.players[player_id].gold);
+        int difference = std::abs((int)state->displayed_gold_amounts[player_id] - (int)state->match.players[player_id].gold);
         int step = 1;
         if (difference > 100) {
             step = 10;
@@ -1365,20 +1409,20 @@ void match_ui_update(MatchUiState& state) {
         } else if (difference > 1) {
             step = 2;
         }
-        if (state.displayed_gold_amounts[player_id] < state.match.players[player_id].gold) {
-            state.displayed_gold_amounts[player_id] += step;
-        } else if (state.displayed_gold_amounts[player_id] > state.match.players[player_id].gold) {
-            state.displayed_gold_amounts[player_id] -= step;
+        if (state->displayed_gold_amounts[player_id] < state->match.players[player_id].gold) {
+            state->displayed_gold_amounts[player_id] += step;
+        } else if (state->displayed_gold_amounts[player_id] > state->match.players[player_id].gold) {
+            state->displayed_gold_amounts[player_id] -= step;
         }
     }
 
     // Update alerts
     {
         uint32_t alert_index = 0;
-        while (alert_index < state.alerts.size()) {
-            state.alerts[alert_index].timer--;
-            if (state.alerts[alert_index].timer == 0) {
-                state.alerts.erase(state.alerts.begin() + alert_index);
+        while (alert_index < state->alerts.size()) {
+            state->alerts[alert_index].timer--;
+            if (state->alerts[alert_index].timer == 0) {
+                state->alerts.erase(state->alerts.begin() + alert_index);
             } else {
                 alert_index++;
             }
@@ -1386,10 +1430,10 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Update chat
-    for (uint32_t chat_index = 0; chat_index < state.chat.size(); chat_index++) {
-        state.chat[chat_index].timer--;
-        if (state.chat[chat_index].timer == 0) {
-            state.chat.erase(state.chat.begin() + chat_index);
+    for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
+        state->chat[chat_index].timer--;
+        if (state->chat[chat_index].timer == 0) {
+            state->chat.erase(state->chat.begin() + chat_index);
             chat_index--;
         }
     }
@@ -1397,10 +1441,10 @@ void match_ui_update(MatchUiState& state) {
     // Clear hidden units from selection
     {
         uint32_t selection_index = 0;
-        while (selection_index < state.selection.size()) {
-            Entity& selected_entity = state.match.entities.get_by_id(state.selection[selection_index]);
+        while (selection_index < state->selection.size()) {
+            Entity& selected_entity = state->match.entities.get_by_id(state->selection[selection_index]);
             if (!entity_is_selectable(selected_entity) || !match_ui_is_entity_visible(state, selected_entity)) {
-                state.selection.erase(state.selection.begin() + selection_index);
+                state->selection.erase(state->selection.begin() + selection_index);
             } else {
                 selection_index++;
             }
@@ -1409,42 +1453,42 @@ void match_ui_update(MatchUiState& state) {
 
     // Update cursor
     cursor_set(match_ui_is_targeting(state) && (!match_ui_is_mouse_in_ui() || MINIMAP_RECT.has_point(input_get_mouse_position())) ? CURSOR_TARGET : CURSOR_DEFAULT);
-    if ((match_ui_is_targeting(state) || state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_in_submenu(state)) && state.selection.empty()) {
-        state.mode = MATCH_UI_MODE_NONE;
+    if ((match_ui_is_targeting(state) || state->mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_in_submenu(state)) && state->selection.empty()) {
+        state->mode = MATCH_UI_MODE_NONE;
     }
 
     // Update UI buttons
-    if (!state.replay_mode) {
+    if (!state->replay_mode) {
         for (uint32_t index = 0; index < HOTKEY_GROUP_SIZE; index++) {
-            state.hotkey_group[index] = INPUT_HOTKEY_NONE;
+            state->hotkey_group[index] = INPUT_HOTKEY_NONE;
         }
-        if (state.mode == MATCH_UI_MODE_BUILD) {
-            state.hotkey_group[0] = INPUT_HOTKEY_HALL;
-            state.hotkey_group[1] = INPUT_HOTKEY_HOUSE;
-            state.hotkey_group[2] = INPUT_HOTKEY_SALOON;
-            state.hotkey_group[3] = INPUT_HOTKEY_BUNKER;
-            state.hotkey_group[4] = INPUT_HOTKEY_WORKSHOP;
-            state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
-        } else if (state.mode == MATCH_UI_MODE_BUILD2) {
-            state.hotkey_group[0] = INPUT_HOTKEY_SMITH;
-            state.hotkey_group[1] = INPUT_HOTKEY_COOP;
-            state.hotkey_group[2] = INPUT_HOTKEY_BARRACKS;
-            state.hotkey_group[3] = INPUT_HOTKEY_SHERIFFS;
-            state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
-        } else if (state.mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_targeting(state)) {
-            state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
-        } else if (!state.selection.empty()) {
-            Entity& first_entity = state.match.entities.get_by_id(state.selection[0]);
-            if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS && state.selection.size() == 1) {
-                state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+        if (state->mode == MATCH_UI_MODE_BUILD) {
+            state->hotkey_group[0] = INPUT_HOTKEY_HALL;
+            state->hotkey_group[1] = INPUT_HOTKEY_HOUSE;
+            state->hotkey_group[2] = INPUT_HOTKEY_SALOON;
+            state->hotkey_group[3] = INPUT_HOTKEY_BUNKER;
+            state->hotkey_group[4] = INPUT_HOTKEY_WORKSHOP;
+            state->hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+        } else if (state->mode == MATCH_UI_MODE_BUILD2) {
+            state->hotkey_group[0] = INPUT_HOTKEY_SMITH;
+            state->hotkey_group[1] = INPUT_HOTKEY_COOP;
+            state->hotkey_group[2] = INPUT_HOTKEY_BARRACKS;
+            state->hotkey_group[3] = INPUT_HOTKEY_SHERIFFS;
+            state->hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+        } else if (state->mode == MATCH_UI_MODE_BUILDING_PLACE || match_ui_is_targeting(state)) {
+            state->hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+        } else if (!state->selection.empty()) {
+            Entity& first_entity = state->match.entities.get_by_id(state->selection[0]);
+            if (first_entity.player_id == network_get_player_id() && first_entity.mode == MODE_BUILDING_IN_PROGRESS && state->selection.size() == 1) {
+                state->hotkey_group[5] = INPUT_HOTKEY_CANCEL;
             } else if (first_entity.player_id == network_get_player_id()) {
                 bool is_selection_uniform = true;
                 bool has_garrisoned_units = !first_entity.garrisoned_units.empty();
                 if (first_entity.mode == MODE_BUILDING_IN_PROGRESS) {
                     is_selection_uniform = false;
                 }
-                for (uint32_t selection_index = 1; selection_index < state.selection.size(); selection_index++) {
-                    const Entity& entity = state.match.entities.get_by_id(state.selection[selection_index]);
+                for (uint32_t selection_index = 1; selection_index < state->selection.size(); selection_index++) {
+                    const Entity& entity = state->match.entities.get_by_id(state->selection[selection_index]);
                     if (!entity.garrisoned_units.empty()) {
                         has_garrisoned_units = true;
                     }
@@ -1466,71 +1510,71 @@ void match_ui_update(MatchUiState& state) {
                 }
 
                 if (entity_is_unit(first_entity.type)) {
-                    state.hotkey_group[0] = INPUT_HOTKEY_ATTACK;
-                    state.hotkey_group[1] = INPUT_HOTKEY_STOP;
-                    state.hotkey_group[2] = INPUT_HOTKEY_DEFEND;
+                    state->hotkey_group[0] = INPUT_HOTKEY_ATTACK;
+                    state->hotkey_group[1] = INPUT_HOTKEY_STOP;
+                    state->hotkey_group[2] = INPUT_HOTKEY_DEFEND;
                 }
-                if (entity_is_building(first_entity.type) && !first_entity.queue.empty() && state.selection.size() == 1) {
-                    state.hotkey_group[5] = INPUT_HOTKEY_CANCEL;
+                if (entity_is_building(first_entity.type) && !first_entity.queue.empty() && state->selection.size() == 1) {
+                    state->hotkey_group[5] = INPUT_HOTKEY_CANCEL;
                 }
 
                 if (is_selection_uniform) {
                     if (has_garrisoned_units) {
-                        state.hotkey_group[3] = INPUT_HOTKEY_UNLOAD;
+                        state->hotkey_group[3] = INPUT_HOTKEY_UNLOAD;
                     }
                     switch (first_entity.type) {
                         case ENTITY_MINER: {
-                            state.hotkey_group[3] = INPUT_HOTKEY_REPAIR;
-                            state.hotkey_group[4] = INPUT_HOTKEY_BUILD;
-                            state.hotkey_group[5] = INPUT_HOTKEY_BUILD2;
+                            state->hotkey_group[3] = INPUT_HOTKEY_REPAIR;
+                            state->hotkey_group[4] = INPUT_HOTKEY_BUILD;
+                            state->hotkey_group[5] = INPUT_HOTKEY_BUILD2;
                             break;
                         }
                         case ENTITY_HALL: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_MINER;
+                            state->hotkey_group[0] = INPUT_HOTKEY_MINER;
                             break;
                         }
                         case ENTITY_SALOON: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_COWBOY;
-                            state.hotkey_group[1] = INPUT_HOTKEY_BANDIT;
-                            state.hotkey_group[2] = INPUT_HOTKEY_DETECTIVE;
+                            state->hotkey_group[0] = INPUT_HOTKEY_COWBOY;
+                            state->hotkey_group[1] = INPUT_HOTKEY_BANDIT;
+                            state->hotkey_group[2] = INPUT_HOTKEY_DETECTIVE;
                             break;
                         }
                         case ENTITY_WORKSHOP: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_SAPPER;
-                            state.hotkey_group[1] = INPUT_HOTKEY_PYRO;
-                            state.hotkey_group[2] = INPUT_HOTKEY_BALLOON;
-                            state.hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
-                            state.hotkey_group[4] = INPUT_HOTKEY_RESEARCH_TAILWIND;
+                            state->hotkey_group[0] = INPUT_HOTKEY_SAPPER;
+                            state->hotkey_group[1] = INPUT_HOTKEY_PYRO;
+                            state->hotkey_group[2] = INPUT_HOTKEY_BALLOON;
+                            state->hotkey_group[3] = INPUT_HOTKEY_RESEARCH_LANDMINES;
+                            state->hotkey_group[4] = INPUT_HOTKEY_RESEARCH_TAILWIND;
                             break;
                         }
                         case ENTITY_SMITH: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_SERRATED_KNIVES;
-                            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_BAYONETS;
-                            state.hotkey_group[2] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
+                            state->hotkey_group[0] = INPUT_HOTKEY_RESEARCH_SERRATED_KNIVES;
+                            state->hotkey_group[1] = INPUT_HOTKEY_RESEARCH_BAYONETS;
+                            state->hotkey_group[2] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
                             break;
                         }
                         case ENTITY_COOP: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_JOCKEY;
-                            state.hotkey_group[1] = INPUT_HOTKEY_WAGON;
+                            state->hotkey_group[0] = INPUT_HOTKEY_JOCKEY;
+                            state->hotkey_group[1] = INPUT_HOTKEY_WAGON;
                             break;
                         }
                         case ENTITY_BARRACKS: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_SOLDIER;
-                            state.hotkey_group[1] = INPUT_HOTKEY_CANNON;
+                            state->hotkey_group[0] = INPUT_HOTKEY_SOLDIER;
+                            state->hotkey_group[1] = INPUT_HOTKEY_CANNON;
                             break;
                         }
                         case ENTITY_SHERIFFS: {
-                            state.hotkey_group[0] = INPUT_HOTKEY_RESEARCH_PRIVATE_EYE;
-                            state.hotkey_group[1] = INPUT_HOTKEY_RESEARCH_STAKEOUT;
+                            state->hotkey_group[0] = INPUT_HOTKEY_RESEARCH_PRIVATE_EYE;
+                            state->hotkey_group[1] = INPUT_HOTKEY_RESEARCH_STAKEOUT;
                             break;
                         }
                         case ENTITY_PYRO: {
-                            state.hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
-                            state.hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
+                            state->hotkey_group[3] = INPUT_HOTKEY_MOLOTOV;
+                            state->hotkey_group[4] = INPUT_HOTKEY_LANDMINE;
                             break;
                         }
                         case ENTITY_DETECTIVE: {
-                            state.hotkey_group[3] = INPUT_HOTKEY_CAMO;
+                            state->hotkey_group[3] = INPUT_HOTKEY_CAMO;
                             break;
                         }
                         default:
@@ -1540,28 +1584,28 @@ void match_ui_update(MatchUiState& state) {
             }
         }
         for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-            if (state.hotkey_group[hotkey_index] == INPUT_HOTKEY_NONE) {
+            if (state->hotkey_group[hotkey_index] == INPUT_HOTKEY_NONE) {
                 continue;
             }
-            const HotkeyButtonInfo& info = hotkey_get_button_info(state.hotkey_group[hotkey_index]);
-            if (info.type == HOTKEY_BUTTON_RESEARCH && !match_player_upgrade_is_available(state.match, network_get_player_id(), info.upgrade)) {
-                state.hotkey_group[hotkey_index] = INPUT_HOTKEY_NONE;
+            const HotkeyButtonInfo& info = hotkey_get_button_info(state->hotkey_group[hotkey_index]);
+            if (info.type == HOTKEY_BUTTON_RESEARCH && !match_player_upgrade_is_available(state->match, network_get_player_id(), info.upgrade)) {
+                state->hotkey_group[hotkey_index] = INPUT_HOTKEY_NONE;
             }
         }
     }
 
     // Play fire sound effects
     bool is_fire_on_screen = false;
-    for (const Fire& fire : state.match.fires) {
+    for (const Fire& fire : state->match.fires) {
         if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
             continue;
         }
-        if (map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
+        if (map_get_cell(state->match.map, CELL_LAYER_GROUND, fire.cell).type != CELL_EMPTY) {
             continue;
         }
         Rect fire_rect = (Rect) {
-            .x = (fire.cell.x * TILE_SIZE) - state.camera_offset.x,
-            .y = (fire.cell.y * TILE_SIZE) - state.camera_offset.y,
+            .x = (fire.cell.x * TILE_SIZE) - state->camera_offset.x,
+            .y = (fire.cell.y * TILE_SIZE) - state->camera_offset.y,
             .w = TILE_SIZE,
             .h = TILE_SIZE
         };
@@ -1571,7 +1615,7 @@ void match_ui_update(MatchUiState& state) {
         }
     }
     if (!is_fire_on_screen) {
-        for (const Entity& entity : state.match.entities) {
+        for (const Entity& entity : state->match.entities) {
             if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
                 continue;
             }
@@ -1583,7 +1627,7 @@ void match_ui_update(MatchUiState& state) {
             }
 
             RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
-            const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
+            const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state->match, entity));
             Rect render_rect = (Rect) {
                 .x = params.position.x, .y = params.position.y,
                 .w = sprite_info.frame_width, .h = sprite_info.frame_height
@@ -1603,46 +1647,46 @@ void match_ui_update(MatchUiState& state) {
     }
 
     // Check win conditions
-    if (!state.replay_mode) {
+    if (!state->replay_mode) {
         bool player_has_buildings[MAX_PLAYERS];
         bool opposing_player_just_lost = false;
         memset(player_has_buildings, 0, sizeof(player_has_buildings));
-        for (const Entity& entity : state.match.entities) {
+        for (const Entity& entity : state->match.entities) {
             if (entity_is_building(entity.type) && entity.type != ENTITY_LANDMINE && entity_is_selectable(entity)) {
                 player_has_buildings[entity.player_id] = true;
             }
         }
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state.match.players[player_id].active && !player_has_buildings[player_id]) {
-                state.match.players[player_id].active = false;
+            if (state->match.players[player_id].active && !player_has_buildings[player_id]) {
+                state->match.players[player_id].active = false;
 
                 char defeat_message[128];
-                sprintf(defeat_message, "%s has been defeated.", state.match.players[player_id].name);
+                sprintf(defeat_message, "%s has been defeated.", state->match.players[player_id].name);
                 match_ui_add_chat_message(state, PLAYER_NONE, defeat_message);
 
                 if (player_id == network_get_player_id()) {
-                    state.mode = MATCH_UI_MODE_MATCH_OVER_DEFEAT;
+                    state->mode = MATCH_UI_MODE_MATCH_OVER_DEFEAT;
                 } else {
                     opposing_player_just_lost = true;
                 }
             }
         }
         if (opposing_player_just_lost && !match_ui_is_opponent_in_match(state)) {
-            state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
+            state->mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
         }
     }
 }
 
 // UPDATE FUNCTIONS
 
-void match_ui_clamp_camera(MatchUiState& state) {
-    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, ((int)state.match.map.width * TILE_SIZE) - SCREEN_WIDTH);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, ((int)state.match.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_UI_HEIGHT);
+void match_ui_clamp_camera(MatchUiState* state) {
+    state->camera_offset.x = std::clamp(state->camera_offset.x, 0, ((int)state->match.map.width * TILE_SIZE) - SCREEN_WIDTH);
+    state->camera_offset.y = std::clamp(state->camera_offset.y, 0, ((int)state->match.map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_UI_HEIGHT);
 }
 
-void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell) {
-    state.camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
-    state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / 2);
+void match_ui_center_camera_on_cell(MatchUiState* state, ivec2 cell) {
+    state->camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    state->camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / 2);
     match_ui_clamp_camera(state);
 }
 
@@ -1653,26 +1697,26 @@ bool match_ui_is_mouse_in_ui() {
            (mouse_position.x >= SCREEN_WIDTH - 264 && mouse_position.y >= SCREEN_HEIGHT - 212);
 }
 
-bool match_ui_is_targeting(const MatchUiState& state) {
-    return state.mode >= MATCH_UI_MODE_TARGET_ATTACK && state.mode < MATCH_UI_MODE_CHAT;
+bool match_ui_is_targeting(const MatchUiState* state) {
+    return state->mode >= MATCH_UI_MODE_TARGET_ATTACK && state->mode < MATCH_UI_MODE_CHAT;
 }
 
-bool match_ui_is_in_submenu(const MatchUiState& state) {
-    return state.mode == MATCH_UI_MODE_BUILD || state.mode == MATCH_UI_MODE_BUILD2; 
+bool match_ui_is_in_submenu(const MatchUiState* state) {
+    return state->mode == MATCH_UI_MODE_BUILD || state->mode == MATCH_UI_MODE_BUILD2; 
 }
 
-bool match_ui_is_selecting(const MatchUiState& state) {
-    return state.select_origin.x != -1;
+bool match_ui_is_selecting(const MatchUiState* state) {
+    return state->select_origin.x != -1;
 }
 
-std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect select_rect) {
+std::vector<EntityId> match_ui_create_selection(const MatchUiState* state, Rect select_rect) {
     std::vector<EntityId> selection;
 
     // Select player units
-    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
-        const Entity& entity = state.match.entities[index];
-        if ((!state.replay_mode && entity.player_id != network_get_player_id()) ||
-            (state.replay_mode && !match_ui_is_entity_visible(state, entity)) ||
+    for (uint32_t index = 0; index < state->match.entities.size(); index++) {
+        const Entity& entity = state->match.entities[index];
+        if ((!state->replay_mode && entity.player_id != network_get_player_id()) ||
+            (state->replay_mode && !match_ui_is_entity_visible(state, entity)) ||
                 !entity_is_unit(entity.type) ||
                 !entity_is_selectable(entity)) {
             continue;
@@ -1680,7 +1724,7 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
-            selection.push_back(state.match.entities.get_id_of(index));
+            selection.push_back(state->match.entities.get_id_of(index));
         }
     }
     if (!selection.empty()) {
@@ -1688,10 +1732,10 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     }
 
     // Select player buildings
-    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
-        const Entity& entity = state.match.entities[index];
-        if ((!state.replay_mode && entity.player_id != network_get_player_id()) ||
-            (state.replay_mode && !match_ui_is_entity_visible(state, entity)) ||
+    for (uint32_t index = 0; index < state->match.entities.size(); index++) {
+        const Entity& entity = state->match.entities[index];
+        if ((!state->replay_mode && entity.player_id != network_get_player_id()) ||
+            (state->replay_mode && !match_ui_is_entity_visible(state, entity)) ||
                 !entity_is_building(entity.type) ||
                 !entity_is_selectable(entity)) {
             continue;
@@ -1699,7 +1743,7 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
-            selection.push_back(state.match.entities.get_id_of(index));
+            selection.push_back(state->match.entities.get_id_of(index));
         }
     }
     if (!selection.empty()) {
@@ -1707,9 +1751,9 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     }
 
     // Select enemy units
-    if (!state.replay_mode) {
-        for (uint32_t index = 0; index < state.match.entities.size(); index++) {
-            const Entity& entity = state.match.entities[index];
+    if (!state->replay_mode) {
+        for (uint32_t index = 0; index < state->match.entities.size(); index++) {
+            const Entity& entity = state->match.entities[index];
             if (entity.player_id == network_get_player_id() ||
                     !entity_is_unit(entity.type) ||
                     !entity_is_selectable(entity) ||
@@ -1719,16 +1763,16 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
 
             Rect entity_rect = entity_get_rect(entity);
             if (entity_rect.intersects(select_rect)) {
-                selection.push_back(state.match.entities.get_id_of(index));
+                selection.push_back(state->match.entities.get_id_of(index));
                 return selection;
             }
         }
     }
 
     // Select enemy buildings
-    if (!state.replay_mode) {
-        for (uint32_t index = 0; index < state.match.entities.size(); index++) {
-            const Entity& entity = state.match.entities[index];
+    if (!state->replay_mode) {
+        for (uint32_t index = 0; index < state->match.entities.size(); index++) {
+            const Entity& entity = state->match.entities[index];
             if (entity.player_id == network_get_player_id() ||
                     entity_is_unit(entity.type) ||
                     !entity_is_selectable(entity) ||
@@ -1738,15 +1782,15 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
 
             Rect entity_rect = entity_get_rect(entity);
             if (entity_rect.intersects(select_rect)) {
-                selection.push_back(state.match.entities.get_id_of(index));
+                selection.push_back(state->match.entities.get_id_of(index));
                 return selection;
             }
         }
     }
 
     // Select gold mines
-    for (uint32_t index = 0; index < state.match.entities.size(); index++) {
-        const Entity& entity = state.match.entities[index];
+    for (uint32_t index = 0; index < state->match.entities.size(); index++) {
+        const Entity& entity = state->match.entities[index];
         if (entity.type != ENTITY_GOLDMINE ||
                 !match_ui_is_entity_visible(state, entity)) {
             continue;
@@ -1754,7 +1798,7 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
 
         Rect entity_rect = entity_get_rect(entity);
         if (entity_rect.intersects(select_rect)) {
-            selection.push_back(state.match.entities.get_id_of(index));
+            selection.push_back(state->match.entities.get_id_of(index));
             return selection;
         }
     }
@@ -1763,31 +1807,31 @@ std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect 
     return selection;
 }
 
-void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selection) {
-    state.selection = selection;
+void match_ui_set_selection(MatchUiState* state, std::vector<EntityId>& selection) {
+    state->selection = selection;
 
-    for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
-        uint32_t entity_index = state.match.entities.get_index_of(state.selection[selection_index]);
-        if (entity_index == INDEX_INVALID || !entity_is_selectable(state.match.entities[entity_index])) {
-            state.selection.erase(state.selection.begin() + selection_index);
+    for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
+        uint32_t entity_index = state->match.entities.get_index_of(state->selection[selection_index]);
+        if (entity_index == INDEX_INVALID || !entity_is_selectable(state->match.entities[entity_index])) {
+            state->selection.erase(state->selection.begin() + selection_index);
             selection_index--;
             continue;
         }
     }
 
-    while (state.selection.size() > SELECTION_LIMIT) {
-        state.selection.pop_back();
+    while (state->selection.size() > SELECTION_LIMIT) {
+        state->selection.pop_back();
     }
 
-    state.mode = MATCH_UI_MODE_NONE;
+    state->mode = MATCH_UI_MODE_NONE;
 }
 
-MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, const std::vector<EntityId>& selection) {
+MatchUiSelectionType match_ui_get_selection_type(const MatchUiState* state, const std::vector<EntityId>& selection) {
     if (selection.empty()) {
         return MATCH_UI_SELECTION_NONE;
     }
 
-    const Entity& entity = state.match.entities.get_by_id(selection[0]);
+    const Entity& entity = state->match.entities.get_by_id(selection[0]);
     if (entity_is_unit(entity.type)) {
         if (entity.player_id == network_get_player_id()) {
             return MATCH_UI_SELECTION_UNITS;
@@ -1805,9 +1849,9 @@ MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, cons
     }
 }
 
-bool match_ui_selection_has_enough_energy(const MatchUiState& state, const std::vector<EntityId>& selection, uint32_t cost) {
+bool match_ui_selection_has_enough_energy(const MatchUiState* state, const std::vector<EntityId>& selection, uint32_t cost) {
     for (EntityId id : selection) {
-        if (state.match.entities.get_by_id(id).energy >= cost) {
+        if (state->match.entities.get_by_id(id).energy >= cost) {
             return true;
             break;
         }
@@ -1816,15 +1860,15 @@ bool match_ui_selection_has_enough_energy(const MatchUiState& state, const std::
     return false;
 }
 
-void match_ui_order_move(MatchUiState& state) {
+void match_ui_order_move(MatchUiState* state) {
     // Determine move target
     ivec2 move_target;
     if (match_ui_is_mouse_in_ui()) {
         ivec2 minimap_pos = input_get_mouse_position() - ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y);
-        move_target = ivec2((state.match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-                            (state.match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+        move_target = ivec2((state->match.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+                            (state->match.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
     } else {
-        move_target = input_get_mouse_position() + state.camera_offset;
+        move_target = input_get_mouse_position() + state->camera_offset;
     }
 
     // Create move input
@@ -1836,20 +1880,20 @@ void match_ui_order_move(MatchUiState& state) {
     bool input_move_target_is_balloon = false;
 
     // Checks if clicked on entity
-    uint8_t player_team = state.match.players[network_get_player_id()].team;
-    int fog_value = match_get_fog(state.match, state.match.players[network_get_player_id()].team, input.move.target_cell);
+    uint8_t player_team = state->match.players[network_get_player_id()].team;
+    int fog_value = match_get_fog(state->match, state->match.players[network_get_player_id()].team, input.move.target_cell);
     // If clicked on hidden fog or the minimap, then don't check for entity click
     if (fog_value != FOG_HIDDEN && !match_ui_is_mouse_in_ui()) {
-        for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
-            const Entity& entity = state.match.entities[entity_index];
+        for (uint32_t entity_index = 0; entity_index < state->match.entities.size(); entity_index++) {
+            const Entity& entity = state->match.entities[entity_index];
             // Can't select units under explored fog
             if (fog_value == FOG_EXPLORED && entity_is_unit(entity.type)) {
                 continue;
             }
             // Non-units *can* be selected under explored fog, but only if we have explored that the building exists
             if (fog_value == FOG_EXPLORED) {
-                auto it = state.match.remembered_entities[player_team].find(state.match.entities.get_id_of(entity_index));
-                if (it == state.match.remembered_entities[player_team].end()) {
+                auto it = state->match.remembered_entities[player_team].find(state->match.entities.get_id_of(entity_index));
+                if (it == state->match.remembered_entities[player_team].end()) {
                     continue;
                 }
             }
@@ -1858,35 +1902,35 @@ void match_ui_order_move(MatchUiState& state) {
                 continue;
             }
             // Don't target invisible units (unless we have detection)
-            if (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state.match.detection[player_team][input.move.target_cell.x + (input.move.target_cell.y * state.match.map.width)] == 0) {
+            if (entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && state->match.detection[player_team][input.move.target_cell.x + (input.move.target_cell.y * state->match.map.width)] == 0) {
                 continue;
             }
 
-            Rect entity_rect = entity_get_rect(state.match.entities[entity_index]);
+            Rect entity_rect = entity_get_rect(state->match.entities[entity_index]);
             if (entity_rect.has_point(move_target)) {
                 if (input.move.target_id == ID_NULL || 
-                        (state.match.entities[entity_index].type == ENTITY_BALLOON && !input_move_target_is_balloon)) {
-                    input.move.target_id = state.match.entities.get_id_of(entity_index);
-                    input_move_target_is_balloon = state.match.entities[entity_index].type == ENTITY_BALLOON;
+                        (state->match.entities[entity_index].type == ENTITY_BALLOON && !input_move_target_is_balloon)) {
+                    input.move.target_id = state->match.entities.get_id_of(entity_index);
+                    input_move_target_is_balloon = state->match.entities[entity_index].type == ENTITY_BALLOON;
                 }
                 if (fog_value == FOG_EXPLORED) {
-                    remembered_entity_id = state.match.entities.get_id_of(entity_index);
+                    remembered_entity_id = state->match.entities.get_id_of(entity_index);
                 }
             }
         }
     }
 
-    if (state.mode == MATCH_UI_MODE_TARGET_UNLOAD) {
+    if (state->mode == MATCH_UI_MODE_TARGET_UNLOAD) {
         input.type = MATCH_INPUT_MOVE_UNLOAD;
-    } else if (state.mode == MATCH_UI_MODE_TARGET_REPAIR) {
+    } else if (state->mode == MATCH_UI_MODE_TARGET_REPAIR) {
         input.type = MATCH_INPUT_MOVE_REPAIR;
-    } else if (state.mode == MATCH_UI_MODE_TARGET_MOLOTOV) {
+    } else if (state->mode == MATCH_UI_MODE_TARGET_MOLOTOV) {
         input.type = MATCH_INPUT_MOVE_MOLOTOV;
-    } else if (input.move.target_id != ID_NULL && state.match.entities.get_by_id(input.move.target_id).type != ENTITY_GOLDMINE &&
-               (state.mode == MATCH_UI_MODE_TARGET_ATTACK || 
-                state.match.players[state.match.entities.get_by_id(input.move.target_id).player_id].team != state.match.players[network_get_player_id()].team)) {
+    } else if (input.move.target_id != ID_NULL && state->match.entities.get_by_id(input.move.target_id).type != ENTITY_GOLDMINE &&
+               (state->mode == MATCH_UI_MODE_TARGET_ATTACK || 
+                state->match.players[state->match.entities.get_by_id(input.move.target_id).player_id].team != state->match.players[network_get_player_id()].team)) {
         input.type = MATCH_INPUT_MOVE_ATTACK_ENTITY;
-    } else if (input.move.target_id == ID_NULL && state.mode == MATCH_UI_MODE_TARGET_ATTACK) {
+    } else if (input.move.target_id == ID_NULL && state->mode == MATCH_UI_MODE_TARGET_ATTACK) {
         input.type = MATCH_INPUT_MOVE_ATTACK_CELL;
     } else if (input.move.target_id != ID_NULL) {
         input.type = MATCH_INPUT_MOVE_ENTITY;
@@ -1895,16 +1939,16 @@ void match_ui_order_move(MatchUiState& state) {
     }
 
     // Populate move input entity ids
-    input.move.entity_count = state.selection.size();
-    memcpy(input.move.entity_ids, &state.selection[0], state.selection.size() * sizeof(EntityId));
+    input.move.entity_count = state->selection.size();
+    memcpy(input.move.entity_ids, &state->selection[0], state->selection.size() * sizeof(EntityId));
 
     if (input.type == MATCH_INPUT_MOVE_REPAIR) {
         bool is_repair_target_valid = true;
         if (input.move.target_id == ID_NULL) {
             is_repair_target_valid = false;
         } else {
-            const Entity& repair_target = state.match.entities.get_by_id(input.move.target_id);
-            if (state.match.players[repair_target.player_id].team != state.match.players[network_get_player_id()].team || 
+            const Entity& repair_target = state->match.entities.get_by_id(input.move.target_id);
+            if (state->match.players[repair_target.player_id].team != state->match.players[network_get_player_id()].team || 
                     !entity_is_building(repair_target.type)) {
                 is_repair_target_valid = false;
             }
@@ -1912,40 +1956,40 @@ void match_ui_order_move(MatchUiState& state) {
 
         if (!is_repair_target_valid) {
             match_ui_show_status(state, MATCH_UI_STATUS_REPAIR_TARGET_INVALID);
-            state.mode = MATCH_UI_MODE_NONE;
+            state->mode = MATCH_UI_MODE_NONE;
             return;
         }
     }
 
-    state.input_queue.push_back(input);
+    state->input_queue.push_back(input);
 
     // Play animation
     if (remembered_entity_id != ID_NULL) {
-        EntityType remembered_entity_type = state.match.remembered_entities[player_team][remembered_entity_id].type;
-        state.move_animation = animation_create(remembered_entity_type == ENTITY_GOLDMINE
+        EntityType remembered_entity_type = state->match.remembered_entities[player_team][remembered_entity_id].type;
+        state->move_animation = animation_create(remembered_entity_type == ENTITY_GOLDMINE
                                                         ? ANIMATION_UI_MOVE_ENTITY 
                                                         : ANIMATION_UI_MOVE_ATTACK_ENTITY);
-        state.move_animation_position = cell_center(input.move.target_cell).to_ivec2();
-        state.move_animation_entity_id = remembered_entity_id;
+        state->move_animation_position = cell_center(input.move.target_cell).to_ivec2();
+        state->move_animation_entity_id = remembered_entity_id;
     } else if (input.type == MATCH_INPUT_MOVE_CELL || input.type == MATCH_INPUT_MOVE_ATTACK_CELL || input.type == MATCH_INPUT_MOVE_UNLOAD || input.type == MATCH_INPUT_MOVE_MOLOTOV) {
-        state.move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
-        state.move_animation_position = move_target;
-        state.move_animation_entity_id = ID_NULL;
+        state->move_animation = animation_create(ANIMATION_UI_MOVE_CELL);
+        state->move_animation_position = move_target;
+        state->move_animation_entity_id = ID_NULL;
     } else {
-        state.move_animation = animation_create(input.type == MATCH_INPUT_MOVE_ATTACK_ENTITY ? ANIMATION_UI_MOVE_ATTACK_ENTITY : ANIMATION_UI_MOVE_ENTITY);
-        state.move_animation_position = cell_center(input.move.target_cell).to_ivec2();
-        state.move_animation_entity_id = input.move.target_id;
+        state->move_animation = animation_create(input.type == MATCH_INPUT_MOVE_ATTACK_ENTITY ? ANIMATION_UI_MOVE_ATTACK_ENTITY : ANIMATION_UI_MOVE_ENTITY);
+        state->move_animation_position = cell_center(input.move.target_cell).to_ivec2();
+        state->move_animation_entity_id = input.move.target_id;
     }
 
     // Reset UI mode if targeting
     if (match_ui_is_targeting(state) && !input_is_action_pressed(INPUT_ACTION_SHIFT)) {
-        state.mode = MATCH_UI_MODE_NONE;
+        state->mode = MATCH_UI_MODE_NONE;
     }
 }
 
-void match_ui_show_status(MatchUiState& state, const char* message) {
-    state.status_message = std::string(message);
-    state.status_timer = UI_STATUS_DURATION;
+void match_ui_show_status(MatchUiState* state, const char* message) {
+    state->status_message = std::string(message);
+    state->status_timer = UI_STATUS_DURATION;
 }
 
 ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset) {
@@ -1956,24 +2000,24 @@ ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset) {
     return building_cell;
 }
 
-bool match_ui_building_can_be_placed(const MatchUiState& state) {
-    const EntityData& entity_data = entity_get_data(state.building_type);
-    ivec2 building_cell = match_ui_get_building_cell(entity_data.cell_size, state.camera_offset);
-    ivec2 miner_cell = state.match.entities.get_by_id(match_get_nearest_builder(state.match, state.selection, building_cell)).cell;
+bool match_ui_building_can_be_placed(const MatchUiState* state) {
+    const EntityData& entity_data = entity_get_data(state->building_type);
+    ivec2 building_cell = match_ui_get_building_cell(entity_data.cell_size, state->camera_offset);
+    ivec2 miner_cell = state->match.entities.get_by_id(match_get_nearest_builder(state->match, state->selection, building_cell)).cell;
 
     // Check that the building is in bounds
-    if (!map_is_cell_rect_in_bounds(state.match.map, building_cell, entity_data.cell_size)) {
+    if (!map_is_cell_rect_in_bounds(state->match.map, building_cell, entity_data.cell_size)) {
         return false;
     }
 
     // If building a hall, check that it is not too close to goldmines
-    if (state.building_type == ENTITY_HALL) {
+    if (state->building_type == ENTITY_HALL) {
         Rect building_rect = (Rect) {
             .x = building_cell.x, .y = building_cell.y,
             .w = entity_data.cell_size, .h = entity_data.cell_size
         };
 
-        for (const Entity& entity : state.match.entities) {
+        for (const Entity& entity : state->match.entities) {
             if (entity.type == ENTITY_GOLDMINE) {
                 Rect goldmine_block_rect = entity_goldmine_get_block_building_rect(entity.cell);
                 if (building_rect.intersects(goldmine_block_rect)) {
@@ -1995,14 +2039,14 @@ bool match_ui_building_can_be_placed(const MatchUiState& state) {
     return true;
 }
 
-bool match_ui_is_building_place_cell_valid(const MatchUiState& state, ivec2 miner_cell, ivec2 cell) {
+bool match_ui_is_building_place_cell_valid(const MatchUiState* state, ivec2 miner_cell, ivec2 cell) {
     // Check that no entities are occupying the building rect
-    Cell map_ground_cell = map_get_cell(state.match.map, CELL_LAYER_GROUND, cell);
+    Cell map_ground_cell = map_get_cell(state->match.map, CELL_LAYER_GROUND, cell);
     if (map_ground_cell.type == CELL_UNIT || map_ground_cell.type == CELL_MINER || map_ground_cell.type == CELL_BUILDING) {
         // If the entity is not visible to the player, then we will ignore the fact that it's blocking the building
         if (cell != miner_cell &&
-                (match_is_entity_visible_to_player(state.match, state.match.entities.get_by_id(map_ground_cell.id), network_get_player_id()) ||
-                (map_ground_cell.type == CELL_BUILDING && state.match.remembered_entities[network_get_player_id()].find(map_ground_cell.id) != state.match.remembered_entities[network_get_player_id()].end()))) {
+                (match_is_entity_visible_to_player(state->match, state->match.entities.get_by_id(map_ground_cell.id), network_get_player_id()) ||
+                (map_ground_cell.type == CELL_BUILDING && state->match.remembered_entities[network_get_player_id()].find(map_ground_cell.id) != state->match.remembered_entities[network_get_player_id()].end()))) {
             return false;
         }
     } else if (map_ground_cell.type != CELL_EMPTY) {
@@ -2010,19 +2054,19 @@ bool match_ui_is_building_place_cell_valid(const MatchUiState& state, ivec2 mine
     }
 
     // Check that we're not building on a ramp
-    if (map_is_tile_ramp(state.match.map, cell)) {
+    if (map_is_tile_ramp(state->match.map, cell)) {
         return false;
     } 
 
     // Check that we're not building on top of a landmine
-    Cell map_underground_cell = map_get_cell(state.match.map, CELL_LAYER_UNDERGROUND, cell);
+    Cell map_underground_cell = map_get_cell(state->match.map, CELL_LAYER_UNDERGROUND, cell);
     if (map_underground_cell.type == CELL_BUILDING && 
-            match_is_entity_visible_to_player(state.match, state.match.entities.get_by_id(map_underground_cell.id), network_get_player_id())) {
+            match_is_entity_visible_to_player(state->match, state->match.entities.get_by_id(map_underground_cell.id), network_get_player_id())) {
         return false;
     }
 
     // Check that we're not building on hidden fog
-    if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell) == FOG_HIDDEN) {
+    if (match_get_fog(state->match, state->match.players[network_get_player_id()].team, cell) == FOG_HIDDEN) {
         return false;
     }
 
@@ -2034,23 +2078,23 @@ Rect match_ui_get_selection_list_item_rect(uint32_t selection_index) {
     return (Rect) { .x = pos.x, .y = pos.y, .w = 64, .h = 64 };
 }
 
-void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const char* message) {
+void match_ui_add_chat_message(MatchUiState* state, uint8_t player_id, const char* message) {
     ChatMessage chat_message = (ChatMessage) {
         .message = std::string(message),
         .timer = CHAT_MESSAGE_DURATION,
         .player_id = player_id
     };
-    if (state.chat.size() == CHAT_MAX_LINES) {
-        state.chat.erase(state.chat.begin());
+    if (state->chat.size() == CHAT_MAX_LINES) {
+        state->chat.erase(state->chat.begin());
     }
-    state.chat.push_back(chat_message);
+    state->chat.push_back(chat_message);
 
-    if (!state.replay_mode) {
-        replay_file_write_chat(state.replay_file, player_id, state.turn_counter, message);
+    if (!state->replay_mode) {
+        replay_file_write_chat(state->replay_file, player_id, state->turn_counter, message);
     }
 }
 
-void match_ui_handle_player_disconnect(MatchUiState& state, uint8_t player_id) {
+void match_ui_handle_player_disconnect(MatchUiState* state, uint8_t player_id) {
     char message[128];
     sprintf(message, "%s left the game.", network_get_player(player_id).name);
     match_ui_add_chat_message(state, PLAYER_NONE, message);
@@ -2058,21 +2102,21 @@ void match_ui_handle_player_disconnect(MatchUiState& state, uint8_t player_id) {
     // Show the victory banner to other players when this player leaves,
     // but only if the player was still active. If they are not active, it means they've 
     // been defeated already, so don't show the victory banner for that player
-    if (state.match.players[player_id].active) {
-        state.match.players[player_id].active = false;
-        if (state.match.players[network_get_player_id()].active && !match_ui_is_opponent_in_match(state)) {
-            state.mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
+    if (state->match.players[player_id].active) {
+        state->match.players[player_id].active = false;
+        if (state->match.players[network_get_player_id()].active && !match_ui_is_opponent_in_match(state)) {
+            state->mode = MATCH_UI_MODE_MATCH_OVER_VICTORY;
         }
     }
 
 }
 
-bool match_ui_is_opponent_in_match(const MatchUiState& state) {
+bool match_ui_is_opponent_in_match(const MatchUiState* state) {
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state.match.players[network_get_player_id()].team == state.match.players[player_id].team) {
+        if (state->match.players[network_get_player_id()].team == state->match.players[player_id].team) {
             continue;
         }
-        if (state.match.players[player_id].active) {
+        if (state->match.players[player_id].active) {
             return true;
         }
     }
@@ -2080,8 +2124,8 @@ bool match_ui_is_opponent_in_match(const MatchUiState& state) {
     return false;
 }
 
-bool match_ui_is_surrender_required_to_leave(const MatchUiState& state) {
-    return !state.replay_mode && state.match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state);
+bool match_ui_is_surrender_required_to_leave(const MatchUiState* state) {
+    return !state->replay_mode && state->match.players[network_get_player_id()].active && match_ui_is_opponent_in_match(state);
 }
 
 bool match_ui_is_in_menu(MatchUiMode mode) {
@@ -2108,23 +2152,32 @@ const char* match_ui_get_menu_header_text(MatchUiMode mode) {
     }
 }
 
-void match_ui_leave_match(MatchUiState& state, bool exit_program) {
-    if (!state.replay_mode) {
+void match_ui_leave_match(MatchUiState* state, bool exit_program) {
+    if (state->replay_mode) {
+        SDL_LockMutex(state->replay_loading_early_exit_mutex);
+        state->replay_loading_early_exit = true;
+        SDL_UnlockMutex(state->replay_loading_early_exit_mutex);
+
+        SDL_WaitThread(state->replay_loading_thread, NULL);
+
+        SDL_DestroyMutex(state->replay_loading_turn_counter_mutex);
+        SDL_DestroyMutex(state->replay_loading_early_exit_mutex);
+    } else {
         network_disconnect();
     }
-    state.mode = exit_program ? MATCH_UI_MODE_EXIT_PROGRAM : MATCH_UI_MODE_LEAVE_MATCH;
-    replay_file_close(state.replay_file);
+    state->mode = exit_program ? MATCH_UI_MODE_EXIT_PROGRAM : MATCH_UI_MODE_LEAVE_MATCH;
+    replay_file_close(state->replay_file);
 }
 
-bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity) {
-    if (state.replay_mode) {
-        if (state.replay_fog_index == REPLAY_FOG_NONE) {
+bool match_ui_is_entity_visible(const MatchUiState* state, const Entity& entity) {
+    if (state->replay_mode) {
+        if (state->replay_fog_index == REPLAY_FOG_NONE) {
             return 1;
         }
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if ((state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
-                    state.replay_fog_player_ids[state.replay_fog_index] == player_id) &&
-                    match_is_entity_visible_to_player(state.match, entity, player_id)) {
+            if ((state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE ||
+                    state->replay_fog_player_ids[state->replay_fog_index] == player_id) &&
+                    match_is_entity_visible_to_player(state->match, entity, player_id)) {
                 return true;
             }
         }
@@ -2132,30 +2185,30 @@ bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity)
         return false;
     } else {
         #ifdef GOLD_DEBUG
-            if (state.debug_fog == DEBUG_FOG_BOT_VISION) {
+            if (state->debug_fog == DEBUG_FOG_BOT_VISION) {
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
-                            match_is_entity_visible_to_player(state.match, entity, player_id)) {
+                            match_is_entity_visible_to_player(state->match, entity, player_id)) {
                         return true;
                     }
                 }
-            } else if (state.debug_fog == DEBUG_FOG_DISABLED) {
+            } else if (state->debug_fog == DEBUG_FOG_DISABLED) {
                 return true;
             }
         #endif
-        return match_is_entity_visible_to_player(state.match, entity, network_get_player_id());
+        return match_is_entity_visible_to_player(state->match, entity, network_get_player_id());
     }
 }
 
-bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size) {
-    if (state.replay_mode) {
-        if (state.replay_fog_index == REPLAY_FOG_NONE) {
+bool match_ui_is_cell_rect_revealed(const MatchUiState* state, ivec2 cell, int cell_size) {
+    if (state->replay_mode) {
+        if (state->replay_fog_index == REPLAY_FOG_NONE) {
             return true;
         }
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if ((state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
-                    state.replay_fog_player_ids[state.replay_fog_index] == player_id) &&
-                    match_is_cell_rect_revealed(state.match, state.match.players[player_id].team, cell, cell_size)) {
+            if ((state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE ||
+                    state->replay_fog_player_ids[state->replay_fog_index] == player_id) &&
+                    match_is_cell_rect_revealed(state->match, state->match.players[player_id].team, cell, cell_size)) {
                 return true;
             }
         }
@@ -2163,31 +2216,31 @@ bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int c
         return false;
     } else {
         #ifdef GOLD_DEBUG
-            if (state.debug_fog == DEBUG_FOG_BOT_VISION) {
+            if (state->debug_fog == DEBUG_FOG_BOT_VISION) {
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT &&
-                            match_is_cell_rect_revealed(state.match, state.match.players[player_id].team, cell, cell_size)) {
+                            match_is_cell_rect_revealed(state->match, state->match.players[player_id].team, cell, cell_size)) {
                         return true;
                     }
                 }
-            } else if (state.debug_fog == DEBUG_FOG_DISABLED) {
+            } else if (state->debug_fog == DEBUG_FOG_DISABLED) {
                 return true;
             }
         #endif
-        return match_is_cell_rect_revealed(state.match, state.match.players[network_get_player_id()].team, cell, cell_size);
+        return match_is_cell_rect_revealed(state->match, state->match.players[network_get_player_id()].team, cell, cell_size);
     }
 }
 
-int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
-    if (state.replay_mode) {
-        if (state.replay_fog_index == REPLAY_FOG_NONE) {
+int match_ui_get_fog(const MatchUiState* state, ivec2 cell) {
+    if (state->replay_mode) {
+        if (state->replay_fog_index == REPLAY_FOG_NONE) {
             return 1;
         }
         int fog_value = FOG_HIDDEN;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE ||
-                    state.replay_fog_player_ids[state.replay_fog_index] == player_id) {
-                int player_fog_value = match_get_fog(state.match, state.match.players[player_id].team, cell);
+            if (state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE ||
+                    state->replay_fog_player_ids[state->replay_fog_index] == player_id) {
+                int player_fog_value = match_get_fog(state->match, state->match.players[player_id].team, cell);
                 // If at least one player has revealed fog, then return a revealed fog value
                 if (player_fog_value > 0) {
                     return 1;
@@ -2203,11 +2256,11 @@ int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
         return fog_value;
     } else {
         #ifdef GOLD_DEBUG
-            if (state.debug_fog == DEBUG_FOG_BOT_VISION) {
+            if (state->debug_fog == DEBUG_FOG_BOT_VISION) {
                 int fog_value = FOG_HIDDEN;
                 for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                     if ((network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT || network_get_player_id() == player_id)) {
-                        int player_fog_value = match_get_fog(state.match, state.match.players[player_id].team, cell);
+                        int player_fog_value = match_get_fog(state->match, state->match.players[player_id].team, cell);
 
                         // If at least one player has revealed fog, then return a revealed fog value
                         if (player_fog_value > 0) {
@@ -2220,58 +2273,60 @@ int match_ui_get_fog(const MatchUiState& state, ivec2 cell) {
                     }
                 }
                 return fog_value;
-            } else if (state.debug_fog == DEBUG_FOG_DISABLED) {
+            } else if (state->debug_fog == DEBUG_FOG_DISABLED) {
                 return 1;
             }
         #endif
-        return match_get_fog(state.match, state.match.players[network_get_player_id()].team, cell);
+        return match_get_fog(state->match, state->match.players[network_get_player_id()].team, cell);
     }
 }
 
-void match_ui_replay_begin_turn(MatchUiState& state) {
-    if (state.turn_counter % TURN_DURATION == 0) {
-        uint32_t input_index = state.turn_counter / TURN_DURATION;
+void match_ui_replay_begin_turn(MatchUiState* state, MatchState& match_state, uint32_t turn_counter) {
+    if (turn_counter % TURN_DURATION == 0) {
+        uint32_t input_index = turn_counter / TURN_DURATION;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            for (const MatchInput& input : state.replay_inputs[player_id][input_index]) {
-                match_handle_input(state.match, input);
+            for (const MatchInput& input : state->replay_inputs[player_id][input_index]) {
+                match_handle_input(match_state, input);
             }
         }
     }
 }
 
-void match_ui_replay_scrub(MatchUiState& state, uint32_t position) {
-    if (state.turn_counter == position) {
+void match_ui_replay_scrub(MatchUiState* state, uint32_t position) {
+    if (state->turn_counter == position || position > state->replay_loaded_turn_counter) {
         return;
     }
 
-    if (position < state.turn_counter || (position > state.turn_counter && position - state.turn_counter > REPLAY_CHECKPOINT_FREQ)) {
+    if (position < state->turn_counter || (position > state->turn_counter && position - state->turn_counter > REPLAY_CHECKPOINT_FREQ)) {
         uint32_t nearest_checkpoint = position / REPLAY_CHECKPOINT_FREQ;
-        state.match = state.replay_checkpoints[nearest_checkpoint];
-        state.turn_counter = nearest_checkpoint * REPLAY_CHECKPOINT_FREQ;
+        SDL_LockMutex(state->replay_loading_turn_counter_mutex);
+        state->match = state->replay_checkpoints[nearest_checkpoint];
+        SDL_UnlockMutex(state->replay_loading_turn_counter_mutex);
+        state->turn_counter = nearest_checkpoint * REPLAY_CHECKPOINT_FREQ;
     }
 
-    while (state.turn_counter < position) {
-        match_ui_replay_begin_turn(state);
-        match_update(state.match);
-        state.match.events.clear();
-        state.turn_counter++;
+    while (state->turn_counter < position) {
+        match_ui_replay_begin_turn(state, state->match, state->turn_counter);
+        match_update(state->match);
+        state->match.events.clear();
+        state->turn_counter++;
     }
 }
 
-size_t match_ui_replay_end_of_tape(const MatchUiState& state) {
-    return (state.replay_inputs[0].size() * 4) - 1;
+size_t match_ui_replay_end_of_tape(const MatchUiState* state) {
+    return (state->replay_inputs[0].size() * 4) - 1;
 }
 
 // RENDER
 
-void match_ui_render(const MatchUiState& state) {
+void match_ui_render(const MatchUiState* state) {
     ZoneScoped;
 
     std::vector<RenderSpriteParams> above_fog_sprite_params;
     std::vector<RenderSpriteParams> ysort_params;
 
-    ivec2 base_pos = ivec2(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
-    ivec2 base_coords = ivec2(state.camera_offset.x / TILE_SIZE, state.camera_offset.y / TILE_SIZE);
+    ivec2 base_pos = ivec2(-(state->camera_offset.x % TILE_SIZE), -(state->camera_offset.y % TILE_SIZE));
+    ivec2 base_coords = ivec2(state->camera_offset.x / TILE_SIZE, state->camera_offset.y / TILE_SIZE);
     ivec2 max_visible_tiles = ivec2(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT - MATCH_UI_HEIGHT) / TILE_SIZE);
     if (base_pos.x != 0) {
         max_visible_tiles.x++;
@@ -2285,8 +2340,8 @@ void match_ui_render(const MatchUiState& state) {
         // Render map
         for (int y = 0; y < max_visible_tiles.y; y++) {
             for (int x = 0; x < max_visible_tiles.x; x++) {
-                int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.match.map.width);
-                Tile tile = state.match.map.tiles[map_index];
+                int map_index = (base_coords.x + x) + ((base_coords.y + y) * state->match.map.width);
+                Tile tile = state->match.map.tiles[map_index];
 
                 RenderSpriteParams tile_params = (RenderSpriteParams) {
                     .sprite = tile.sprite,
@@ -2296,7 +2351,7 @@ void match_ui_render(const MatchUiState& state) {
                     .recolor_id = 0
                 };
 
-                bool should_render_on_ground_level = (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_WATER) || map_is_tile_ramp(state.match.map, base_coords + ivec2(x, y));
+                bool should_render_on_ground_level = (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_WATER) || map_is_tile_ramp(state->match.map, base_coords + ivec2(x, y));
                 if (!(tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_WATER) && elevation == 0) {
                     render_sprite_frame(SPRITE_TILE_SAND1, ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                 }
@@ -2305,7 +2360,7 @@ void match_ui_render(const MatchUiState& state) {
                 } 
 
                 // Decorations
-                Cell cell = state.match.map.cells[CELL_LAYER_GROUND][map_index];
+                Cell cell = state->match.map.cells[CELL_LAYER_GROUND][map_index];
                 if (cell.type >= CELL_DECORATION_1 && cell.type <= CELL_DECORATION_5 && tile.elevation == elevation) {
                     ysort_params.push_back((RenderSpriteParams) {
                         .sprite = SPRITE_DECORATION,
@@ -2321,14 +2376,14 @@ void match_ui_render(const MatchUiState& state) {
         // For each cell layer
         for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
             // Dead entities
-            for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
-                const Entity& entity = state.match.entities[entity_index];
+            for (uint32_t entity_index = 0; entity_index < state->match.entities.size(); entity_index++) {
+                const Entity& entity = state->match.entities[entity_index];
                 const EntityData& entity_data = entity_get_data(entity.type);
                 if (!(entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED)) {
                     continue;
                 }
                 if (entity_data.cell_layer != cell_layer || 
-                        entity_get_elevation(entity, state.match.map) != elevation) {
+                        entity_get_elevation(entity, state->match.map) != elevation) {
                     continue;
                 }
                 if (!match_ui_is_entity_visible(state, entity)) {
@@ -2340,46 +2395,46 @@ void match_ui_render(const MatchUiState& state) {
             }
 
             // Select rings and healthbars
-            for (EntityId id : state.selection) {
-                const Entity& entity = state.match.entities.get_by_id(id);
+            for (EntityId id : state->selection) {
+                const Entity& entity = state->match.entities.get_by_id(id);
                 const EntityData& entity_data = entity_get_data(entity.type);
                 if (entity_data.cell_layer != cell_layer || 
-                        entity_get_elevation(entity, state.match.map) != elevation) {
+                        entity_get_elevation(entity, state->match.map) != elevation) {
                     continue;
                 }
                 match_ui_render_entity_select_rings_and_healthbars(state, entity);
             }
 
             // Move animation
-            if (animation_is_playing(state.move_animation) &&
-                    map_get_tile(state.match.map, state.move_animation_position / TILE_SIZE).elevation == elevation) {
-                if (state.move_animation.name == ANIMATION_UI_MOVE_CELL && cell_layer == CELL_LAYER_GROUND) {
+            if (animation_is_playing(state->move_animation) &&
+                    map_get_tile(state->match.map, state->move_animation_position / TILE_SIZE).elevation == elevation) {
+                if (state->move_animation.name == ANIMATION_UI_MOVE_CELL && cell_layer == CELL_LAYER_GROUND) {
                     RenderSpriteParams params = (RenderSpriteParams) {
                         .sprite = SPRITE_UI_MOVE,
-                        .frame = state.move_animation.frame,
-                        .position = state.move_animation_position - state.camera_offset,
+                        .frame = state->move_animation.frame,
+                        .position = state->move_animation_position - state->camera_offset,
                         .options = RENDER_SPRITE_CENTERED,
                         .recolor_id = 0
                     };
-                    ivec2 ui_move_cell = state.move_animation_position / TILE_SIZE;
-                    if (match_get_fog(state.match, state.match.players[network_get_player_id()].team, ui_move_cell) > 0) {
+                    ivec2 ui_move_cell = state->move_animation_position / TILE_SIZE;
+                    if (match_get_fog(state->match, state->match.players[network_get_player_id()].team, ui_move_cell) > 0) {
                         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
                     } else {
                         above_fog_sprite_params.push_back(params);
                     }
-                } else if (state.move_animation.frame.x % 2 == 0) {
-                    uint32_t entity_index = state.match.entities.get_index_of(state.move_animation_entity_id);
+                } else if (state->move_animation.frame.x % 2 == 0) {
+                    uint32_t entity_index = state->match.entities.get_index_of(state->move_animation_entity_id);
                     if (entity_index != INDEX_INVALID) {
-                        const Entity& entity = state.match.entities[entity_index];
+                        const Entity& entity = state->match.entities[entity_index];
                         if (entity_get_data(entity.type).cell_layer == cell_layer) {
                             match_ui_render_entity_move_animation(state, entity);
                         }
                     } else if (cell_layer == CELL_LAYER_GROUND) {
-                        auto it = state.match.remembered_entities[state.match.players[network_get_player_id()].team].find(state.move_animation_entity_id);
-                        if (it != state.match.remembered_entities[state.match.players[network_get_player_id()].team].end()) {
+                        auto it = state->match.remembered_entities[state->match.players[network_get_player_id()].team].find(state->move_animation_entity_id);
+                        if (it != state->match.remembered_entities[state->match.players[network_get_player_id()].team].end()) {
                             ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
 
-                            render_sprite_frame(match_ui_get_entity_select_ring(it->second.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+                            render_sprite_frame(match_ui_get_entity_select_ring(it->second.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
                         }
                     }
                 }
@@ -2387,10 +2442,10 @@ void match_ui_render(const MatchUiState& state) {
 
             // Underground entities
             if (cell_layer == CELL_LAYER_UNDERGROUND) {
-                for (const Entity& entity : state.match.entities) {
+                for (const Entity& entity : state->match.entities) {
                     const EntityData& entity_data = entity_get_data(entity.type);
                     if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
-                            entity_get_elevation(entity, state.match.map) != elevation) {
+                            entity_get_elevation(entity, state->match.map) != elevation) {
                         continue;
                     }
                     if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
@@ -2408,15 +2463,15 @@ void match_ui_render(const MatchUiState& state) {
     } // End for each elevation
 
     // Fires
-    for (const Fire& fire : state.match.fires) {
+    for (const Fire& fire : state->match.fires) {
         if (match_ui_get_fire_cell_render(state, fire) == FIRE_CELL_RENDER_BELOW) {
-            render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);
+            render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state->camera_offset, 0, 0);
         }
     }
 
     // Entities
-    for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
-        const Entity& entity = state.match.entities[entity_index];
+    for (uint32_t entity_index = 0; entity_index < state->match.entities.size(); entity_index++) {
+        const Entity& entity = state->match.entities[entity_index];
         const EntityData& entity_data = entity_get_data(entity.type);
         if (entity.mode == MODE_UNIT_DEATH_FADE || 
                 entity.mode == MODE_BUILDING_DESTROYED ||
@@ -2428,7 +2483,7 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
-        const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
+        const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state->match, entity));
         Rect render_rect = (Rect) {
             .x = params.position.x, .y = params.position.y,
             .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
@@ -2463,16 +2518,16 @@ void match_ui_render(const MatchUiState& state) {
 
     // Remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state.replay_mode && 
-                !(state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE || 
-                 state.replay_fog_player_ids[state.replay_fog_index] == player_id)) {
+        if (state->replay_mode && 
+                !(state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE || 
+                 state->replay_fog_player_ids[state->replay_fog_index] == player_id)) {
             continue;
         }
-        if (!state.replay_mode && player_id != network_get_player_id()) {
+        if (!state->replay_mode && player_id != network_get_player_id()) {
             continue;
         }
 
-        for (auto it : state.match.remembered_entities[state.match.players[player_id].team]) {
+        for (auto it : state->match.remembered_entities[state->match.players[player_id].team]) {
             // Don't draw the remembered entity if we can see it, otherwise we will double draw them
             if (match_ui_is_cell_rect_revealed(state, it.second.cell, it.second.cell_size)) {
                 continue;
@@ -2484,7 +2539,7 @@ void match_ui_render(const MatchUiState& state) {
             RenderSpriteParams params = (RenderSpriteParams) {
                 .sprite = entity_data.sprite,
                 .frame = it.second.frame,
-                .position = (it.second.cell * TILE_SIZE) - state.camera_offset,
+                .position = (it.second.cell * TILE_SIZE) - state->camera_offset,
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_id = it.second.recolor_id
             };
@@ -2502,20 +2557,20 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // Rally points
-    uint32_t selection_type = match_ui_get_selection_type(state, state.selection);
-    if (selection_type == MATCH_UI_SELECTION_BUILDINGS || (state.replay_mode && selection_type == MATCH_UI_SELECTION_ENEMY_BUILDING)) {
-        for (EntityId id : state.selection) {
-            const Entity& building = state.match.entities.get_by_id(id);
+    uint32_t selection_type = match_ui_get_selection_type(state, state->selection);
+    if (selection_type == MATCH_UI_SELECTION_BUILDINGS || (state->replay_mode && selection_type == MATCH_UI_SELECTION_ENEMY_BUILDING)) {
+        for (EntityId id : state->selection) {
+            const Entity& building = state->match.entities.get_by_id(id);
             if (building.mode != MODE_BUILDING_FINISHED || building.rally_point.x == -1) {
                 continue;
             }
 
             RenderSpriteParams params = (RenderSpriteParams) {
                 .sprite = SPRITE_RALLY_FLAG,
-                .frame = state.rally_flag_animation.frame,
-                .position = building.rally_point - ivec2(8, 30) - state.camera_offset,
+                .frame = state->rally_flag_animation.frame,
+                .position = building.rally_point - ivec2(8, 30) - state->camera_offset,
                 .options = 0,
-                .recolor_id = state.match.players[building.player_id].recolor_id
+                .recolor_id = state->match.players[building.player_id].recolor_id
             };
 
             ivec2 rally_cell = building.rally_point / TILE_SIZE;
@@ -2534,15 +2589,15 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // Balloon shadows
-    for (const Entity& entity : state.match.entities) {
+    for (const Entity& entity : state->match.entities) {
         if (entity.type == ENTITY_BALLOON && entity.mode != MODE_UNIT_DEATH_FADE &&
                 match_ui_is_entity_visible(state, entity)) {
-            render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), entity.position.to_ivec2() + ivec2(-10, 6) - state.camera_offset, 0, 0);
+            render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), entity.position.to_ivec2() + ivec2(-10, 6) - state->camera_offset, 0, 0);
         }
     }
 
     // Building fires
-    for (const Entity& entity : state.match.entities) {
+    for (const Entity& entity : state->match.entities) {
         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
             continue;
         }
@@ -2555,20 +2610,20 @@ void match_ui_render(const MatchUiState& state) {
 
         const EntityData& entity_data = entity_get_data(entity.type);
         for (int x = entity.cell.x; x < entity.cell.x + entity_data.cell_size; x++) {
-            ivec2 fire_position = (ivec2(x, entity.cell.y + entity_data.cell_size - 1) * TILE_SIZE) - state.camera_offset;
-            render_sprite_frame(SPRITE_PARTICLE_FIRE, state.building_fire_animation.frame, fire_position, 0, 0);
+            ivec2 fire_position = (ivec2(x, entity.cell.y + entity_data.cell_size - 1) * TILE_SIZE) - state->camera_offset;
+            render_sprite_frame(SPRITE_PARTICLE_FIRE, state->building_fire_animation.frame, fire_position, 0, 0);
         }
     }
 
     // Fires above units
-    for (const Fire& fire : state.match.fires) {
+    for (const Fire& fire : state->match.fires) {
         if (match_ui_get_fire_cell_render(state, fire) == FIRE_CELL_RENDER_ABOVE) {
-            render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state.camera_offset, 0, 0);
+            render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state->camera_offset, 0, 0);
         }
     }
 
     // Smith and workshop smoke animations
-    for (const Entity& entity : state.match.entities) {
+    for (const Entity& entity : state->match.entities) {
         if (!match_ui_is_entity_visible(state, entity)) {
             continue;
         }
@@ -2600,21 +2655,21 @@ void match_ui_render(const MatchUiState& state) {
             }
             if (hframe != -1) {
                 Rect building_rect = entity_get_rect(entity);
-                ivec2 steam_position = ivec2(building_rect.x, building_rect.y) + (ivec2(building_rect.w, building_rect.h) / 2) - state.camera_offset;
+                ivec2 steam_position = ivec2(building_rect.x, building_rect.y) + (ivec2(building_rect.w, building_rect.h) / 2) - state->camera_offset;
                 render_sprite_frame(SPRITE_WORKSHOP_STEAM, ivec2(hframe, 0), steam_position, RENDER_SPRITE_CENTERED, 0);
             }
         } else if (entity.type == ENTITY_SMITH && entity.animation.name != ANIMATION_UNIT_IDLE) {
-            render_sprite_frame(SPRITE_BUILDING_SMITH_ANIMATION, entity.animation.frame, entity.position.to_ivec2() - ivec2(0, 16) - state.camera_offset, 0, 0);
+            render_sprite_frame(SPRITE_BUILDING_SMITH_ANIMATION, entity.animation.frame, entity.position.to_ivec2() - ivec2(0, 16) - state->camera_offset, 0, 0);
         }
     }
 
     // Ground particles
-    for (const Particle& particle : state.match.particles[PARTICLE_LAYER_GROUND]) {
+    for (const Particle& particle : state->match.particles[PARTICLE_LAYER_GROUND]) {
         match_ui_render_particle(state, particle);
     }
 
     // Projectiles
-    for (const Projectile& projectile : state.match.projectiles) {
+    for (const Projectile& projectile : state->match.projectiles) {
         if (!match_ui_is_cell_rect_revealed(state, projectile.position.to_ivec2() / TILE_SIZE, 1)) {
             continue;
         }
@@ -2622,12 +2677,12 @@ void match_ui_render(const MatchUiState& state) {
         if (projectile.position.x > projectile.target.x) {
             options |= RENDER_SPRITE_FLIP_H;
         }
-        render_sprite_frame(SPRITE_PROJECTILE_MOLOTOV, ivec2(0, 0), projectile.position.to_ivec2() - state.camera_offset, options, 0);
+        render_sprite_frame(SPRITE_PROJECTILE_MOLOTOV, ivec2(0, 0), projectile.position.to_ivec2() - state->camera_offset, options, 0);
     }
 
     // Miners on gold counter
-    for (uint32_t entity_index = 0; entity_index < state.match.entities.size(); entity_index++) {
-        const Entity& entity = state.match.entities[entity_index];
+    for (uint32_t entity_index = 0; entity_index < state->match.entities.size(); entity_index++) {
+        const Entity& entity = state->match.entities[entity_index];
         // Make sure the entity is actually a goldmine
         if (entity.type != ENTITY_GOLDMINE || entity.mode != MODE_GOLDMINE) {
             continue;
@@ -2638,8 +2693,8 @@ void match_ui_render(const MatchUiState& state) {
         }
         // Make sure the goldmine is actually on screen
         Rect entity_rect = entity_get_rect(entity);
-        entity_rect.x -= state.camera_offset.x;
-        entity_rect.y -= state.camera_offset.y;
+        entity_rect.x -= state->camera_offset.x;
+        entity_rect.y -= state->camera_offset.y;
         if (!SCREEN_RECT.intersects(entity_rect)) {
             continue;
         }
@@ -2647,16 +2702,16 @@ void match_ui_render(const MatchUiState& state) {
         const SpriteInfo& miner_icon_info = render_get_sprite_info(SPRITE_UI_MINER_ICON);
         int icon_y_offset = 0;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (!state.replay_mode && player_id != network_get_player_id()) {
+            if (!state->replay_mode && player_id != network_get_player_id()) {
                 continue;
             }
 
             // Count how many miners are mining from this mine
-            EntityId entity_id = state.match.entities.get_id_of(entity_index);
+            EntityId entity_id = state->match.entities.get_id_of(entity_index);
             if (player_id == PLAYER_NONE) {
                 continue;
             }
-            uint32_t miner_count = match_get_miners_on_gold(state.match, entity_id, player_id);
+            uint32_t miner_count = match_get_miners_on_gold(state->match, entity_id, player_id);
             if (miner_count == 0) {
                 continue;
             }
@@ -2667,14 +2722,14 @@ void match_ui_render(const MatchUiState& state) {
             text_size.x += miner_icon_info.frame_width * 2;
             ivec2 text_pos = ivec2(entity_rect.x + (entity_rect.w / 2) - (text_size.x / 2), entity_rect.y + 12) + ivec2(0, icon_y_offset);
             render_text(miner_count > MATCH_MAX_MINERS_ON_GOLD ? FONT_HACK_PLAYER1 : FONT_HACK_WHITE, counter_text, text_pos + ivec2((miner_icon_info.frame_width * 2) + 4, 0));
-            render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state.match.players[player_id].recolor_id);
+            render_sprite_frame(SPRITE_UI_MINER_ICON, ivec2(0, 0), text_pos, RENDER_SPRITE_NO_CULL, state->match.players[player_id].recolor_id);
             icon_y_offset -= (miner_icon_info.frame_height * 2) + 2;
         }
     }
 
     // Sky entities select rings
-    for (EntityId entity_id : state.selection) {
-        const Entity& entity = state.match.entities.get_by_id(entity_id);
+    for (EntityId entity_id : state->selection) {
+        const Entity& entity = state->match.entities.get_by_id(entity_id);
         const EntityData& entity_data = entity_get_data(entity.type);
         if (entity_data.cell_layer != CELL_LAYER_SKY) {
             continue;
@@ -2683,12 +2738,12 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // Sky entity move animation
-    if (animation_is_playing(state.move_animation) && 
-            state.move_animation.name != ANIMATION_UI_MOVE_CELL &&
-            state.move_animation.frame.x % 2 == 0) {
-        uint32_t entity_index = state.match.entities.get_index_of(state.move_animation_entity_id);
+    if (animation_is_playing(state->move_animation) && 
+            state->move_animation.name != ANIMATION_UI_MOVE_CELL &&
+            state->move_animation.frame.x % 2 == 0) {
+        uint32_t entity_index = state->match.entities.get_index_of(state->move_animation_entity_id);
         if (entity_index != INDEX_INVALID) {
-            const Entity& entity = state.match.entities[entity_index];
+            const Entity& entity = state->match.entities[entity_index];
             if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
                 match_ui_render_entity_move_animation(state, entity);
             }
@@ -2697,7 +2752,7 @@ void match_ui_render(const MatchUiState& state) {
 
     // Sky entities
     ysort_params.clear();
-    for (const Entity& entity : state.match.entities) {
+    for (const Entity& entity : state->match.entities) {
         const EntityData& entity_data = entity_get_data(entity.type);
         if (entity.mode == MODE_UNIT_DEATH_FADE || 
                 entity.mode == MODE_BUILDING_DESTROYED ||
@@ -2709,7 +2764,7 @@ void match_ui_render(const MatchUiState& state) {
         }
 
         RenderSpriteParams params = match_ui_create_entity_render_params(state, entity);
-        const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
+        const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state->match, entity));
         Rect render_rect = (Rect) {
             .x = params.position.x, .y = params.position.y,
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
@@ -2737,7 +2792,7 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // Sky particles
-    for (const Particle& particle : state.match.particles[PARTICLE_LAYER_SKY]) {
+    for (const Particle& particle : state->match.particles[PARTICLE_LAYER_SKY]) {
         match_ui_render_particle(state, particle);
     }
 
@@ -2757,7 +2812,7 @@ void match_ui_render(const MatchUiState& state) {
                 uint32_t neighbors = 0;
                 for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
                     ivec2 neighbor_cell = fog_cell + DIRECTION_IVEC2[direction];
-                    if (!map_is_cell_in_bounds(state.match.map, neighbor_cell)) {
+                    if (!map_is_cell_in_bounds(state->match.map, neighbor_cell)) {
                         neighbors += DIRECTION_MASK[direction];
                         continue;
                     }
@@ -2775,7 +2830,7 @@ void match_ui_render(const MatchUiState& state) {
                         (neighbors & DIRECTION_MASK[next_direction]) != DIRECTION_MASK[next_direction]) {
                         continue;
                     }
-                    if (!map_is_cell_in_bounds(state.match.map, neighbor_cell)) {
+                    if (!map_is_cell_in_bounds(state->match.map, neighbor_cell)) {
                         neighbors += DIRECTION_MASK[direction];
                         continue;
                     }
@@ -2786,7 +2841,7 @@ void match_ui_render(const MatchUiState& state) {
                 }
                 int autotile_index = map_neighbors_to_autotile_index(neighbors);
                 #ifdef GOLD_DEBUG
-                    if (state.debug_fog == DEBUG_FOG_DISABLED) {
+                    if (state->debug_fog == DEBUG_FOG_DISABLED) {
                         continue;
                     }
                 #endif
@@ -2803,23 +2858,23 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // UI Building Placement
-    if (state.mode == MATCH_UI_MODE_BUILDING_PLACE && !match_ui_is_mouse_in_ui()) {
-        const EntityData& building_data = entity_get_data(state.building_type);
+    if (state->mode == MATCH_UI_MODE_BUILDING_PLACE && !match_ui_is_mouse_in_ui()) {
+        const EntityData& building_data = entity_get_data(state->building_type);
 
         // First draw the building
-        ivec2 building_cell = match_ui_get_building_cell(building_data.cell_size, state.camera_offset);
-        render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state.camera_offset, RENDER_SPRITE_NO_CULL, state.match.players[network_get_player_id()].recolor_id);
+        ivec2 building_cell = match_ui_get_building_cell(building_data.cell_size, state->camera_offset);
+        render_sprite_frame(building_data.sprite, ivec2(3, 0), (building_cell * TILE_SIZE) - state->camera_offset, RENDER_SPRITE_NO_CULL, state->match.players[network_get_player_id()].recolor_id);
 
         // Then draw the green / red squares
-        ivec2 miner_cell = state.match.entities.get_by_id(match_get_nearest_builder(state.match, state.selection, building_cell)).cell;
+        ivec2 miner_cell = state->match.entities.get_by_id(match_get_nearest_builder(state->match, state->selection, building_cell)).cell;
         for (int y = building_cell.y; y < building_cell.y + building_data.cell_size; y++) {
             for (int x = building_cell.x; x < building_cell.x + building_data.cell_size; x++) {
                 ivec2 cell = ivec2(x, y);
                 bool is_cell_red = !match_ui_is_building_place_cell_valid(state, miner_cell, cell);
                 
                 // Don't allow buildings too close to goldmines
-                if (state.building_type == ENTITY_HALL) {
-                    for (const Entity& goldmine : state.match.entities) {
+                if (state->building_type == ENTITY_HALL) {
+                    for (const Entity& goldmine : state->match.entities) {
                         if (goldmine.type == ENTITY_GOLDMINE && entity_goldmine_get_block_building_rect(goldmine.cell).has_point(cell)) {
                             is_cell_red = true;
                             break;
@@ -2829,8 +2884,8 @@ void match_ui_render(const MatchUiState& state) {
 
                 RenderColor cell_color = is_cell_red ? RENDER_COLOR_RED_TRANSPARENT : RENDER_COLOR_GREEN_TRANSPARENT;
                 Rect cell_rect = (Rect) {
-                    .x = (x * TILE_SIZE) - state.camera_offset.x,
-                    .y = (y * TILE_SIZE) - state.camera_offset.y,
+                    .x = (x * TILE_SIZE) - state->camera_offset.x,
+                    .y = (y * TILE_SIZE) - state->camera_offset.y,
                     .w = TILE_SIZE,
                     .h = TILE_SIZE
                 };
@@ -2841,11 +2896,11 @@ void match_ui_render(const MatchUiState& state) {
     // End UI building placement
 
     // UI queued building placements
-    for (EntityId entity_id : state.selection) {
-        const Entity& entity = state.match.entities.get_by_id(entity_id);
+    for (EntityId entity_id : state->selection) {
+        const Entity& entity = state->match.entities.get_by_id(entity_id);
         // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
         if (!entity_is_unit(entity.type) || 
-                (!state.replay_mode && entity.player_id != network_get_player_id())) {
+                (!state->replay_mode && entity.player_id != network_get_player_id())) {
             break;
         }
 
@@ -2860,11 +2915,11 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // UI Chat
-    for (uint32_t chat_index = 0; chat_index < state.chat.size(); chat_index++) {
-        const ChatMessage& message = state.chat[state.chat.size() - chat_index - 1];
+    for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
+        const ChatMessage& message = state->chat[state->chat.size() - chat_index - 1];
         ivec2 message_pos = ivec2(32, MINIMAP_RECT.y - 96 - (chat_index * 32));
         if (message.player_id != PLAYER_NONE) {
-            const MatchPlayer& player = state.match.players[message.player_id];
+            const MatchPlayer& player = state->match.players[message.player_id];
             char player_text[40];
             sprintf(player_text, "%s: ", player.name);
             render_text((FontName)(FONT_HACK_PLAYER0 + player.recolor_id), player_text, message_pos);
@@ -2874,9 +2929,9 @@ void match_ui_render(const MatchUiState& state) {
     }
     if (input_is_text_input_active()) {
         char prompt_str[128];
-        sprintf(prompt_str, "Chat: %s", state.chat_message.c_str());
+        sprintf(prompt_str, "Chat: %s", state->chat_message.c_str());
         render_text(FONT_HACK_WHITE, prompt_str, ivec2(32, MINIMAP_RECT.y - 64));
-        if (state.chat_cursor_visible) {
+        if (state->chat_cursor_visible) {
             int prompt_width = render_get_text_size(FONT_HACK_WHITE, prompt_str).x;
             ivec2 cursor_pos = ivec2(32 + prompt_width - 2, MINIMAP_RECT.y - 65);
             render_text(FONT_HACK_WHITE, "|", cursor_pos);
@@ -2885,12 +2940,12 @@ void match_ui_render(const MatchUiState& state) {
 
     // Select rect
     if (match_ui_is_selecting(state)) {
-        ivec2 mouse_world_pos = ivec2(input_get_mouse_position().x, std::min(input_get_mouse_position().y, SCREEN_HEIGHT - MATCH_UI_HEIGHT)) + state.camera_offset;
+        ivec2 mouse_world_pos = ivec2(input_get_mouse_position().x, std::min(input_get_mouse_position().y, SCREEN_HEIGHT - MATCH_UI_HEIGHT)) + state->camera_offset;
         Rect select_rect = (Rect) {
-            .x = std::min(state.select_origin.x, mouse_world_pos.x) - state.camera_offset.x, 
-            .y = std::min(state.select_origin.y, mouse_world_pos.y) - state.camera_offset.y,
-            .w = std::abs(state.select_origin.x - mouse_world_pos.x),
-            .h = std::abs(state.select_origin.y - mouse_world_pos.y)
+            .x = std::min(state->select_origin.x, mouse_world_pos.x) - state->camera_offset.x, 
+            .y = std::min(state->select_origin.y, mouse_world_pos.y) - state->camera_offset.y,
+            .w = std::abs(state->select_origin.x - mouse_world_pos.x),
+            .h = std::abs(state->select_origin.y - mouse_world_pos.y)
         };
         render_draw_rect(select_rect, RENDER_COLOR_WHITE, 2);
     }
@@ -2899,14 +2954,14 @@ void match_ui_render(const MatchUiState& state) {
     // The closing curly braces are in another #ifdef GOLD_DEBUG further down, 
     // so you have to delete them both if you want to delete this
     #ifdef GOLD_DEBUG
-    if (!state.theater_mode) {
+    if (!state->theater_mode) {
     #endif
 
     // UI frames
     const SpriteInfo& minimap_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
     render_sprite_frame(SPRITE_UI_MINIMAP, ivec2(0, 0), ivec2(0, SCREEN_HEIGHT - minimap_sprite_info.frame_height * 2), 0, 0);
     render_ninepatch(SPRITE_UI_FRAME_BOLTS, BOTTOM_PANEL_RECT);
-    if (state.replay_mode) {
+    if (state->replay_mode) {
         render_ninepatch(SPRITE_UI_FRAME_BOLTS, REPLAY_PANEL_RECT);
     } else {
         render_ninepatch(SPRITE_UI_FRAME_BOLTS, BUTTON_PANEL_RECT);
@@ -2921,13 +2976,13 @@ void match_ui_render(const MatchUiState& state) {
         EntityType most_common_entity_type = ENTITY_MINER;
         entity_occurances[ENTITY_MINER] = 0;
 
-        for (EntityId id : state.control_groups[control_group_index]) {
-            uint32_t entity_index = state.match.entities.get_index_of(id);
-            if (entity_index == INDEX_INVALID || !entity_is_selectable(state.match.entities[entity_index])) {
+        for (EntityId id : state->control_groups[control_group_index]) {
+            uint32_t entity_index = state->match.entities.get_index_of(id);
+            if (entity_index == INDEX_INVALID || !entity_is_selectable(state->match.entities[entity_index])) {
                 continue;
             }
 
-            EntityType entity_type = state.match.entities[entity_index].type;
+            EntityType entity_type = state->match.entities[entity_index].type;
             auto occurances_it = entity_occurances.find(entity_type);
             if (occurances_it == entity_occurances.end()) {
                 entity_occurances[entity_type] = 1;
@@ -2946,12 +3001,12 @@ void match_ui_render(const MatchUiState& state) {
 
         int button_frame = 0;
         FontName font = FONT_M3X6_OFFBLACK;
-        if (state.control_group_selected != control_group_index) {
+        if (state->control_group_selected != control_group_index) {
             font = FONT_M3X6_DARKBLACK;
             button_frame = 2;
         }
 
-        SpriteName button_icon = match_entity_get_icon(state.match, most_common_entity_type, network_get_player_id());
+        SpriteName button_icon = match_entity_get_icon(state->match, most_common_entity_type, network_get_player_id());
         const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_CONTROL_GROUP);
         ivec2 render_pos = ivec2(BOTTOM_PANEL_RECT.x, BOTTOM_PANEL_RECT.y) + ivec2(4, 0) + ivec2((6 + (sprite_info.frame_width * 2)) * control_group_index, -64);
         render_sprite_frame(SPRITE_UI_CONTROL_GROUP, ivec2(button_frame, 0), render_pos, RENDER_SPRITE_NO_CULL, 0, 2);
@@ -2966,14 +3021,14 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // UI Status message
-    if (state.status_timer != 0) {
-        int status_message_width = render_get_text_size(FONT_HACK_WHITE, state.status_message.c_str()).x;
-        render_text(FONT_HACK_WHITE, state.status_message.c_str(), ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 266));
+    if (state->status_timer != 0) {
+        int status_message_width = render_get_text_size(FONT_HACK_WHITE, state->status_message.c_str()).x;
+        render_text(FONT_HACK_WHITE, state->status_message.c_str(), ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 266));
     }
     
     // Hotkeys
     for (uint32_t hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
-        InputAction hotkey = state.hotkey_group[hotkey_index];
+        InputAction hotkey = state->hotkey_group[hotkey_index];
         if (hotkey == INPUT_HOTKEY_NONE) {
             continue;
         }
@@ -2985,9 +3040,9 @@ void match_ui_render(const MatchUiState& state) {
             .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
         };
         int hframe = 0;
-        if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey)) {
+        if (!match_does_player_meet_hotkey_requirements(state->match, network_get_player_id(), hotkey)) {
             hframe = 2;
-        } else if (!(state.is_minimap_dragging || match_ui_is_selecting(state)) && hotkey_rect.has_point(input_get_mouse_position())) {
+        } else if (!(state->is_minimap_dragging || match_ui_is_selecting(state)) && hotkey_rect.has_point(input_get_mouse_position())) {
             hframe = 1;
             hotkey_position.y -= 2;
         }
@@ -2997,7 +3052,7 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // UI Tooltip
-    if (!(state.is_minimap_dragging || match_ui_is_selecting(state))) {
+    if (!(state->is_minimap_dragging || match_ui_is_selecting(state))) {
         uint32_t hotkey_hovered_index;
         for (hotkey_hovered_index = 0; hotkey_hovered_index < HOTKEY_GROUP_SIZE; hotkey_hovered_index++) {
             Rect hotkey_rect = (Rect) {
@@ -3013,7 +3068,7 @@ void match_ui_render(const MatchUiState& state) {
 
         // If we are actually hovering a hotkey
         if (hotkey_hovered_index != HOTKEY_GROUP_SIZE) {
-            InputAction hotkey_hovered = state.hotkey_group[hotkey_hovered_index];
+            InputAction hotkey_hovered = state->hotkey_group[hotkey_hovered_index];
             if (hotkey_hovered != INPUT_HOTKEY_NONE) {
                 const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey_hovered);
 
@@ -3068,7 +3123,7 @@ void match_ui_render(const MatchUiState& state) {
                     }
                 }
 
-                if (!match_does_player_meet_hotkey_requirements(state.match, network_get_player_id(), hotkey_hovered)) {
+                if (!match_does_player_meet_hotkey_requirements(state->match, network_get_player_id(), hotkey_hovered)) {
                     switch (hotkey_info.requirements.type) {
                         case HOTKEY_REQUIRES_NONE: {
                             GOLD_ASSERT(false);
@@ -3170,8 +3225,8 @@ void match_ui_render(const MatchUiState& state) {
     // End render tooltip
 
     // UI Selection list
-    if (state.selection.size() == 1) {
-        const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
+    if (state->selection.size() == 1) {
+        const Entity& entity = state->match.entities.get_by_id(state->selection[0]);
         const EntityData& entity_data = entity_get_data(entity.type);
 
         // Entity name
@@ -3195,7 +3250,7 @@ void match_ui_render(const MatchUiState& state) {
 
         // Entity icon
         render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 36), RENDER_SPRITE_NO_CULL, 0);
-        render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 36), RENDER_SPRITE_NO_CULL, 0);
+        render_sprite_frame(match_entity_get_icon(state->match, entity.type, entity.player_id), ivec2(0, 0), SELECTION_LIST_TOP_LEFT + ivec2(0, 36), RENDER_SPRITE_NO_CULL, 0);
 
         if (entity.type == ENTITY_GOLDMINE) {
             if (entity.mode == MODE_GOLDMINE_COLLAPSED) {
@@ -3217,7 +3272,7 @@ void match_ui_render(const MatchUiState& state) {
             ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2) + ivec2(0, 1); 
             render_text(FONT_HACK_WHITE, health_text, health_text_position);
 
-            uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
+            uint32_t entity_max_energy = match_entity_get_max_energy(state->match, entity);
             if (entity_is_unit(entity.type) && entity_max_energy != 0)  {
                 healthbar_position += ivec2(0, healthbar_size.y + 2);
                 match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
@@ -3231,7 +3286,7 @@ void match_ui_render(const MatchUiState& state) {
             int stat_count = 0;
 
             // Detection
-            if (match_entity_has_detection(state.match, entity)) {
+            if (match_entity_has_detection(state->match, entity)) {
                 stat_icons[stat_count] = SPRITE_UI_STAT_ICON_DETECTION;
                 stat_count++;
             }
@@ -3300,21 +3355,21 @@ void match_ui_render(const MatchUiState& state) {
             }
         }
     } else {
-        for (uint32_t selection_index = 0; selection_index < state.selection.size(); selection_index++) {
+        for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
             match_ui_render_entity_icon(
                 state, 
-                state.match.entities.get_by_id(state.selection[selection_index]), 
+                state->match.entities.get_by_id(state->selection[selection_index]), 
                 match_ui_get_selection_list_item_rect(selection_index));
         }
     }
     // End UI Selection List
 
     // UI Building queues
-    if (state.selection.size() == 1) {
-        const Entity& building = state.match.entities.get_by_id(state.selection[0]);
+    if (state->selection.size() == 1) {
+        const Entity& building = state->match.entities.get_by_id(state->selection[0]);
         if (entity_is_building(building.type) && 
                 !building.queue.empty() &&
-                (state.replay_mode || building.player_id == network_get_player_id())) {
+                (state->replay_mode || building.player_id == network_get_player_id())) {
             // Render building queue icon buttons
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             for (uint32_t building_queue_index = 0; building_queue_index < building.queue.size(); building_queue_index++) {
@@ -3327,7 +3382,7 @@ void match_ui_render(const MatchUiState& state) {
                 SpriteName item_sprite;
                 switch (building.queue[building_queue_index].type) {
                     case BUILDING_QUEUE_ITEM_UNIT: {
-                        item_sprite = match_entity_get_icon(state.match, building.queue[building_queue_index].unit_type, building.player_id);
+                        item_sprite = match_entity_get_icon(state->match, building.queue[building_queue_index].unit_type, building.player_id);
                         break;
                     }
                     case BUILDING_QUEUE_ITEM_UPGRADE: {
@@ -3335,7 +3390,7 @@ void match_ui_render(const MatchUiState& state) {
                         break;
                     }
                 }
-                bool hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) && 
+                bool hovered = !(state->is_minimap_dragging || match_ui_is_selecting(state)) && 
                                     icon_rect.has_point(input_get_mouse_position());
                 render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
                 render_sprite_frame(item_sprite, ivec2(hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
@@ -3357,17 +3412,17 @@ void match_ui_render(const MatchUiState& state) {
     }
 
     // UI Garrisoned units
-    if (state.selection.size() == 1) {
-        const Entity& carrier = state.match.entities.get_by_id(state.selection[0]);
+    if (state->selection.size() == 1) {
+        const Entity& carrier = state->match.entities.get_by_id(state->selection[0]);
         if (carrier.type == ENTITY_GOLDMINE || 
-                state.replay_mode ||
+                state->replay_mode ||
                 carrier.player_id == network_get_player_id()) {
             const SpriteInfo& icon_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
             int index = 0;
             for (EntityId entity_id : carrier.garrisoned_units) {
-                const Entity& garrisoned_unit = state.match.entities.get_by_id(entity_id);
+                const Entity& garrisoned_unit = state->match.entities.get_by_id(entity_id);
                 // We have to make this check here because goldmines might have both allied and enemy units in them
-                if (!state.replay_mode && garrisoned_unit.player_id != network_get_player_id()) {
+                if (!state->replay_mode && garrisoned_unit.player_id != network_get_player_id()) {
                     continue;
                 }
 
@@ -3388,8 +3443,8 @@ void match_ui_render(const MatchUiState& state) {
     const SpriteInfo& gold_icon_sprite_info = render_get_sprite_info(SPRITE_UI_GOLD_ICON);
     int resource_base_y = 0;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if ((!state.replay_mode && player_id != network_get_player_id()) || 
-                (state.replay_mode && !state.match.players[player_id].active)) {
+        if ((!state->replay_mode && player_id != network_get_player_id()) || 
+                (state->replay_mode && !state->match.players[player_id].active)) {
             continue;
         }
 
@@ -3400,7 +3455,7 @@ void match_ui_render(const MatchUiState& state) {
         // Population text
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 4);
         char population_text[8];
-        sprintf(population_text, "%u/%u", match_get_player_population(state.match, player_id), match_get_player_max_population(state.match, player_id));
+        sprintf(population_text, "%u/%u", match_get_player_population(state->match, player_id), match_get_player_max_population(state->match, player_id));
         render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, resource_base_y + 6));
 
         // Population icon
@@ -3410,7 +3465,7 @@ void match_ui_render(const MatchUiState& state) {
         // Gold text
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 4);
         char gold_text[8];
-        sprintf(gold_text, "%u", state.displayed_gold_amounts[player_id]);
+        sprintf(gold_text, "%u", state->displayed_gold_amounts[player_id]);
         render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, resource_base_y + 6));
 
         // Gold icon
@@ -3418,9 +3473,9 @@ void match_ui_render(const MatchUiState& state) {
         render_sprite_frame(SPRITE_UI_GOLD_ICON, ivec2(0, 0), ivec2(render_x, resource_base_y + 4), RENDER_SPRITE_NO_CULL, 0);
 
         // Player name
-        if (state.replay_mode) {
-            render_x -= (render_get_text_size(FONT_HACK_WHITE, state.match.players[player_id].name).x + 4);
-            render_text((FontName)(FONT_HACK_PLAYER0 + state.match.players[player_id].recolor_id), state.match.players[player_id].name, ivec2(render_x, resource_base_y + 6));
+        if (state->replay_mode) {
+            render_x -= (render_get_text_size(FONT_HACK_WHITE, state->match.players[player_id].name).x + 4);
+            render_text((FontName)(FONT_HACK_PLAYER0 + state->match.players[player_id].recolor_id), state->match.players[player_id].name, ivec2(render_x, resource_base_y + 6));
         }
 
         resource_base_y += population_icon_sprite_info.frame_height * 2;
@@ -3433,19 +3488,19 @@ void match_ui_render(const MatchUiState& state) {
             .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
             .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
         };
-        bool hovered = state.mode == MATCH_UI_MODE_MENU || state.mode == MATCH_UI_MODE_MENU_SURRENDER || (
-                            !(state.is_minimap_dragging || match_ui_is_selecting(state)) && menu_button_rect.has_point(input_get_mouse_position()));
+        bool hovered = state->mode == MATCH_UI_MODE_MENU || state->mode == MATCH_UI_MODE_MENU_SURRENDER || (
+                            !(state->is_minimap_dragging || match_ui_is_selecting(state)) && menu_button_rect.has_point(input_get_mouse_position()));
         render_sprite_frame(SPRITE_UI_BUTTON_BURGER, ivec2((int)hovered, 0), MENU_BUTTON_POSITION, RENDER_SPRITE_NO_CULL, 0);
     }
 
     // UI Disconnect frame
-    if (state.disconnect_timer > DISCONNECT_GRACE) {
+    if (state->disconnect_timer > DISCONNECT_GRACE) {
         render_ninepatch(SPRITE_UI_FRAME, DISCONNECT_FRAME_RECT);
         ivec2 text_size = render_get_text_size(FONT_HACK_GOLD, "Waiting for players...");
         render_text(FONT_HACK_GOLD, "Waiting for players...", ivec2(DISCONNECT_FRAME_RECT.x + (DISCONNECT_FRAME_RECT.w / 2) - (text_size.x / 2), DISCONNECT_FRAME_RECT.y + 16));
         int player_text_y = 64;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE || !(state.inputs[player_id].empty() || state.inputs[player_id].front().empty())) {
+            if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_NONE || !(state->inputs[player_id].empty() || state->inputs[player_id].front().empty())) {
                 continue;
             }
 
@@ -3461,15 +3516,15 @@ void match_ui_render(const MatchUiState& state) {
     render_sprite_batch();
 
     #ifdef GOLD_DEBUG
-    if (!state.theater_mode) {
+    if (!state->theater_mode) {
     #endif
 
     // MINIMAP
     // Minimap tiles
-    for (uint32_t y = 0; y < state.match.map.height; y++) {
-        for (uint32_t x = 0; x < state.match.map.width; x++) {
+    for (uint32_t y = 0; y < state->match.map.height; y++) {
+        for (uint32_t x = 0; x < state->match.map.width; x++) {
             MinimapPixel pixel; 
-            Tile tile = map_get_tile(state.match.map, ivec2(x, y));
+            Tile tile = map_get_tile(state->match.map, ivec2(x, y));
             if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
                 pixel = MINIMAP_PIXEL_SAND;
             } else if (tile.sprite == SPRITE_TILE_WATER) {
@@ -3481,7 +3536,7 @@ void match_ui_render(const MatchUiState& state) {
         }
     }
     // Minimap entities
-    for (const Entity& entity : state.match.entities) {
+    for (const Entity& entity : state->match.entities) {
         if (!entity_is_selectable(entity) || !match_ui_is_entity_visible(state, entity)) {
             continue;
         }
@@ -3492,7 +3547,7 @@ void match_ui_render(const MatchUiState& state) {
         } else if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
             pixel = MINIMAP_PIXEL_WHITE;
         } else {
-            pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.match.players[entity.player_id].recolor_id);
+            pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match.players[entity.player_id].recolor_id);
         }
         int entity_cell_size = entity_get_data(entity.type).cell_size;
         Rect entity_rect = (Rect) {
@@ -3503,16 +3558,16 @@ void match_ui_render(const MatchUiState& state) {
     }
     // Minimap remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state.replay_mode && 
-                !(state.replay_fog_player_ids[state.replay_fog_index] == PLAYER_NONE || 
-                 state.replay_fog_player_ids[state.replay_fog_index] == player_id)) {
+        if (state->replay_mode && 
+                !(state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE || 
+                 state->replay_fog_player_ids[state->replay_fog_index] == player_id)) {
             continue;
         }
-        if (!state.replay_mode && player_id != network_get_player_id()) {
+        if (!state->replay_mode && player_id != network_get_player_id()) {
             continue;
         }
 
-        for (auto it : state.match.remembered_entities[state.match.players[player_id].team]) {
+        for (auto it : state->match.remembered_entities[state->match.players[player_id].team]) {
             Rect entity_rect = (Rect) {
                 .x = it.second.cell.x, .y = it.second.cell.y,
                 .w = it.second.cell_size, .h = it.second.cell_size
@@ -3522,11 +3577,11 @@ void match_ui_render(const MatchUiState& state) {
         }
     }
     // Minimap fog of war
-    for (uint32_t y = 0; y < state.match.map.height; y++) {
-        for (uint32_t x = 0; x < state.match.map.width; x++) {
+    for (uint32_t y = 0; y < state->match.map.height; y++) {
+        for (uint32_t x = 0; x < state->match.map.width; x++) {
             int fog_value = match_ui_get_fog(state, ivec2(x, y));
             #ifdef GOLD_DEBUG
-                if (state.debug_fog == DEBUG_FOG_DISABLED) {
+                if (state->debug_fog == DEBUG_FOG_DISABLED) {
                     fog_value = 1;
                 }
             #endif
@@ -3543,7 +3598,7 @@ void match_ui_render(const MatchUiState& state) {
         }
     }
     // Minimap alerts
-    for (const Alert& alert : state.alerts) {
+    for (const Alert& alert : state->alerts) {
         if (alert.timer <= UI_ALERT_LINGER_DURATION) {
             continue;
         }
@@ -3563,15 +3618,15 @@ void match_ui_render(const MatchUiState& state) {
     }
     // Minimap camera rect
     Rect camera_rect = (Rect) {
-        .x = state.camera_offset.x / TILE_SIZE,
-        .y = state.camera_offset.y / TILE_SIZE,
+        .x = state->camera_offset.x / TILE_SIZE,
+        .y = state->camera_offset.y / TILE_SIZE,
         .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
         .h = ((SCREEN_HEIGHT - MATCH_UI_HEIGHT) / TILE_SIZE) - 1
     };
     render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
-    render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.match.map.width, state.match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
+    render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match.map.width, state->match.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 
-    ui_render(state.ui);
+    ui_render(state->ui);
     #ifdef GOLD_DEBUG
     }
     #endif
@@ -3601,10 +3656,10 @@ SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking) {
     return select_ring;
 }
 
-SpriteName match_ui_hotkey_get_sprite(const MatchUiState& state, InputAction hotkey, bool show_toggled) {
+SpriteName match_ui_hotkey_get_sprite(const MatchUiState* state, InputAction hotkey, bool show_toggled) {
     const HotkeyButtonInfo& info = hotkey_get_button_info(hotkey);
     if (info.type == HOTKEY_BUTTON_BUILD || info.type == HOTKEY_BUTTON_TRAIN) {
-        return match_entity_get_icon(state.match, info.entity_type, network_get_player_id());
+        return match_entity_get_icon(state->match, info.entity_type, network_get_player_id());
     } else {
         return hotkey_get_sprite(hotkey, show_toggled);
     }
@@ -3676,36 +3731,36 @@ void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 s
     }
 }
 
-void match_ui_render_target_build(const MatchUiState& state, const Target& target, uint8_t player_id) {
+void match_ui_render_target_build(const MatchUiState* state, const Target& target, uint8_t player_id) {
     const EntityData& building_data = entity_get_data(target.build.building_type);
     Rect building_rect = (Rect) {
-        .x = (target.build.building_cell.x * TILE_SIZE) - state.camera_offset.x,
-        .y = (target.build.building_cell.y * TILE_SIZE) - state.camera_offset.y,
+        .x = (target.build.building_cell.x * TILE_SIZE) - state->camera_offset.x,
+        .y = (target.build.building_cell.y * TILE_SIZE) - state->camera_offset.y,
         .w = building_data.cell_size * TILE_SIZE,
         .h = building_data.cell_size * TILE_SIZE
     };
-    render_sprite_frame(building_data.sprite, ivec2(3, 0), ivec2(building_rect.x, building_rect.y), 0, state.match.players[player_id].recolor_id);
+    render_sprite_frame(building_data.sprite, ivec2(3, 0), ivec2(building_rect.x, building_rect.y), 0, state->match.players[player_id].recolor_id);
     render_fill_rect(building_rect, RENDER_COLOR_GREEN_TRANSPARENT);
 }
 
-RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& state, const Entity& entity) {
+RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState* state, const Entity& entity) {
     RenderSpriteParams params = (RenderSpriteParams) {
-        .sprite = match_entity_get_sprite(state.match, entity),
+        .sprite = match_entity_get_sprite(state->match, entity),
         .frame = entity_get_animation_frame(entity),
-        .position = entity.position.to_ivec2() - state.camera_offset,
+        .position = entity.position.to_ivec2() - state->camera_offset,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state.match.players[entity.player_id].recolor_id
+        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state->match.players[entity.player_id].recolor_id
     };
-    const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state.match, entity));
+    const SpriteInfo& sprite_info = render_get_sprite_info(match_entity_get_sprite(state->match, entity));
     if (entity_is_unit(entity.type)) {
         if (entity.mode == MODE_UNIT_BUILD) {
-            const Entity& building = state.match.entities.get_by_id(entity.target.id);
+            const Entity& building = state->match.entities.get_by_id(entity.target.id);
             const EntityData& building_data = entity_get_data(building.type);
             int building_hframe = entity_get_animation_frame(building).x;
             params.position = building.position.to_ivec2() + 
                                 ivec2(building_data.building_data.builder_positions_x[building_hframe],
                                     building_data.building_data.builder_positions_y[building_hframe])
-                                - state.camera_offset;
+                                - state->camera_offset;
             if (building_data.building_data.builder_flip_h[building_hframe]) {
                 params.options |= RENDER_SPRITE_FLIP_H;
             }
@@ -3730,54 +3785,54 @@ RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& stat
     return params;
 }
 
-void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& state, const Entity& entity) {
+void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState* state, const Entity& entity) {
     const EntityData& entity_data = entity_get_data(entity.type);
     Rect entity_rect = entity_get_rect(entity);
 
     // Render select ring
-    bool use_red_select_ring = state.replay_mode || entity.type == ENTITY_GOLDMINE 
+    bool use_red_select_ring = state->replay_mode || entity.type == ENTITY_GOLDMINE 
                                     ? false 
-                                    : state.match.players[entity.player_id].team != state.match.players[network_get_player_id()].team;
+                                    : state->match.players[entity.player_id].team != state->match.players[network_get_player_id()].team;
     SpriteName select_ring_sprite = match_ui_get_entity_select_ring(entity.type, use_red_select_ring);
     ivec2 entity_center_position = entity_is_unit(entity.type) 
             ? entity.position.to_ivec2()
             : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
-    entity_center_position -= state.camera_offset;
+    entity_center_position -= state->camera_offset;
     if (entity_data.cell_layer == CELL_LAYER_SKY) {
         entity_center_position.y += ENTITY_SKY_POSITION_Y_OFFSET;
     }
     render_sprite_frame(select_ring_sprite, ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
 
     // Render healthbar
-    ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state.camera_offset;
+    ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state->camera_offset;
     if (entity_data.max_health != 0) {
         match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
         healthbar_position.y += HEALTHBAR_HEIGHT + 2;
     }
 
     // Render garrison bar
-    if (entity_data.garrison_capacity != 0 && (entity.type == ENTITY_GOLDMINE || state.replay_mode || 
-            state.match.players[entity.player_id].team == state.match.players[network_get_player_id()].team)) {
+    if (entity_data.garrison_capacity != 0 && (entity.type == ENTITY_GOLDMINE || state->replay_mode || 
+            state->match.players[entity.player_id].team == state->match.players[network_get_player_id()].team)) {
         match_ui_render_healthbar(RENDER_GARRISON_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
         healthbar_position.y += HEALTHBAR_HEIGHT + 2;
     } 
     // Render energy bar
-    uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
+    uint32_t entity_max_energy = match_entity_get_max_energy(state->match, entity);
     if (entity_is_unit(entity.type) && entity_max_energy != 0) {
         match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.energy, (int)entity_max_energy);
     }
 }
 
-void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity, Rect icon_rect) {
+void match_ui_render_entity_icon(const MatchUiState* state, const Entity& entity, Rect icon_rect) {
     const EntityData& entity_data = entity_get_data(entity.type);
-    bool icon_hovered = !(state.is_minimap_dragging || match_ui_is_selecting(state)) &&
+    bool icon_hovered = !(state->is_minimap_dragging || match_ui_is_selecting(state)) &&
                             icon_rect.has_point(input_get_mouse_position());
 
     render_sprite_frame(SPRITE_UI_ICON_BUTTON, ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)icon_hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
-    render_sprite_frame(match_entity_get_icon(state.match, entity.type, entity.player_id), ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)icon_hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
+    render_sprite_frame(match_entity_get_icon(state->match, entity.type, entity.player_id), ivec2(icon_hovered ? 1 : 0, 0), ivec2(icon_rect.x, icon_rect.y - ((int)icon_hovered * 2)), RENDER_SPRITE_NO_CULL, 0);
     ivec2 healthbar_position = ivec2(icon_rect.x + 1, icon_rect.y + 54 - ((int)icon_hovered * 2));
     ivec2 healthbar_size = ivec2(60, 8);
-    uint32_t entity_max_energy = match_entity_get_max_energy(state.match, entity);
+    uint32_t entity_max_energy = match_entity_get_max_energy(state->match, entity);
     if (entity_is_unit(entity.type) && entity_max_energy != 0) {
         match_ui_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
         healthbar_position -= ivec2(0, healthbar_size.y + 2);
@@ -3785,27 +3840,27 @@ void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity
     match_ui_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 }
 
-void match_ui_render_entity_move_animation(const MatchUiState& state, const Entity& entity) {
+void match_ui_render_entity_move_animation(const MatchUiState* state, const Entity& entity) {
     Rect entity_rect = entity_get_rect(entity);
     ivec2 entity_center_position = entity_is_unit(entity.type) 
             ? entity.position.to_ivec2()
             : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
-    entity_center_position -= state.camera_offset;
+    entity_center_position -= state->camera_offset;
     if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
         entity_center_position.y += ENTITY_SKY_POSITION_Y_OFFSET;
     }
 
-    render_sprite_frame(match_ui_get_entity_select_ring(entity.type, state.move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+    render_sprite_frame(match_ui_get_entity_select_ring(entity.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
 }
 
-void match_ui_render_particle(const MatchUiState& state, const Particle& particle) {
+void match_ui_render_particle(const MatchUiState* state, const Particle& particle) {
     // Check if particle can be seen by player
     if (particle.animation.name == ANIMATION_PARTICLE_SMOKE) {
         ivec2 particle_top_left_cell = (particle.position / TILE_SIZE) - ivec2((PARTICLE_SMOKE_CELL_SIZE - 1) / 2, (PARTICLE_SMOKE_CELL_SIZE - 1) / 2);
         bool particle_is_revealed = false;
         for (int y = particle_top_left_cell.y; y < particle_top_left_cell.y + PARTICLE_SMOKE_CELL_SIZE; y++) {
             for (int x = particle_top_left_cell.x; x < particle_top_left_cell.x + PARTICLE_SMOKE_CELL_SIZE; x++) {
-                if (map_is_cell_in_bounds(state.match.map, ivec2(x, y)) && match_get_fog(state.match, state.match.players[network_get_player_id()].team, ivec2(x, y)) > 0) {
+                if (map_is_cell_in_bounds(state->match.map, ivec2(x, y)) && match_get_fog(state->match, state->match.players[network_get_player_id()].team, ivec2(x, y)) > 0) {
                     particle_is_revealed = true;
                     break;
                 }
@@ -3821,16 +3876,16 @@ void match_ui_render_particle(const MatchUiState& state, const Particle& particl
         return;
     }
 
-    render_sprite_frame(particle.sprite, ivec2(particle.animation.frame.x, particle.vframe), particle.position - state.camera_offset, RENDER_SPRITE_CENTERED, 0);
+    render_sprite_frame(particle.sprite, ivec2(particle.animation.frame.x, particle.vframe), particle.position - state->camera_offset, RENDER_SPRITE_CENTERED, 0);
 }
 
-bool match_ui_should_render_hotkey_toggled(const MatchUiState& state, InputAction hotkey) {
+bool match_ui_should_render_hotkey_toggled(const MatchUiState* state, InputAction hotkey) {
     const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
     if (hotkey_info.type != HOTKEY_BUTTON_TOGGLED_ACTION) {
         return false;
     }
 
-    const Entity& entity = state.match.entities.get_by_id(state.selection[0]);
+    const Entity& entity = state->match.entities.get_by_id(state->selection[0]);
     if (hotkey == INPUT_HOTKEY_CAMO && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
         return true;
     }
@@ -3850,11 +3905,11 @@ const char* match_ui_render_get_stat_tooltip(SpriteName sprite) {
     }
 }
 
-FireCellRender match_ui_get_fire_cell_render(const MatchUiState& state, const Fire& fire) {
+FireCellRender match_ui_get_fire_cell_render(const MatchUiState* state, const Fire& fire) {
     if (!match_ui_is_cell_rect_revealed(state, fire.cell, 1)) {
         return FIRE_CELL_DO_NOT_RENDER;
     }
-    Cell map_fire_cell = map_get_cell(state.match.map, CELL_LAYER_GROUND, fire.cell);
+    Cell map_fire_cell = map_get_cell(state->match.map, CELL_LAYER_GROUND, fire.cell);
     if (map_fire_cell.type == CELL_EMPTY) {
         return FIRE_CELL_RENDER_BELOW;
     }
@@ -3868,7 +3923,7 @@ FireCellRender match_ui_get_fire_cell_render(const MatchUiState& state, const Fi
         return FIRE_CELL_DO_NOT_RENDER;
     }
 
-    const Entity& unit = state.match.entities.get_by_id(map_fire_cell.id);
+    const Entity& unit = state->match.entities.get_by_id(map_fire_cell.id);
 
     if (unit.mode == MODE_UNIT_DEATH_FADE) {
         return FIRE_CELL_RENDER_ABOVE;

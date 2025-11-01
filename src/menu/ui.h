@@ -61,6 +61,7 @@ struct UiRenderNinepatch {
 
 struct UiRenderRect {
     Rect rect;
+    int thickness;
     RenderColor color;
 };
 
@@ -284,12 +285,13 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
  * Creates a slider
  * @param slider_id Needed for state keeping, should be a unique ID per slider
  * @param value Pointer to the value. Will be modified when user changes the value.
+ * @param buffered_value Pointer to the buffered value. Can be NULL, in which case no buffered value will be rendered.
  * @param min The minimum value of the slider
  * @param max The maximum value of the slider
  * @param display Determines how the slider should render the value text
  * @return True if the slider value has changed
  */
-bool ui_slider(UI& state, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display);
+bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t min, uint32_t max, UiSliderDisplay display);
 
 /**
  * Creates a screenshot frame

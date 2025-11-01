@@ -99,7 +99,7 @@ struct LoadParams {
 
 struct GameState {
     GameMode mode;
-    MatchUiState match;
+    MatchUiState* match_ui = NULL;
     MenuState menu;
     LoadParams load_params;
     SDL_Thread* loading_thread;
@@ -119,10 +119,10 @@ static int game_load_next_mode(void* ptr) {
             }
         #endif
     } else if (state.load_params.mode == GAME_MODE_MATCH) {
-        state.match = match_ui_init(state.load_params.match.lcg_seed, state.load_params.match.noise);
+        state.match_ui = match_ui_init(state.load_params.match.lcg_seed, state.load_params.match.noise);
         free(state.load_params.match.noise.map);
     } else if (state.load_params.mode == GAME_MODE_REPLAY) {
-        state.match = match_ui_init_from_replay(state.load_params.replay.filename);
+        state.match_ui = match_ui_init_from_replay(state.load_params.replay.filename);
     }
 
     return 0;
@@ -332,7 +332,7 @@ int gold_main(int argc, char** argv) {
                     }
                     case GAME_MODE_MATCH: 
                     case GAME_MODE_REPLAY: {
-                        match_ui_handle_network_event(state.match, event);
+                        match_ui_handle_network_event(state.match_ui, event);
                         break;
                     }
                     case GAME_MODE_LOADING: {
@@ -382,8 +382,10 @@ int gold_main(int argc, char** argv) {
                 }
                 case GAME_MODE_MATCH:
                 case GAME_MODE_REPLAY: {
-                    match_ui_update(state.match);
-                    if (state.match.mode == MATCH_UI_MODE_LEAVE_MATCH) {
+                    match_ui_update(state.match_ui);
+                    if (state.match_ui->mode == MATCH_UI_MODE_LEAVE_MATCH) {
+                        delete state.match_ui;
+                        state.match_ui = NULL;
                         sound_end_fire_loop();
                         game_set_mode((LoadParams) {
                             .mode = GAME_MODE_MENU,
@@ -391,7 +393,9 @@ int gold_main(int argc, char** argv) {
                                 .steam_invite_id = 0
                             }
                         });
-                    } else if (state.match.mode == MATCH_UI_MODE_EXIT_PROGRAM) {
+                    } else if (state.match_ui->mode == MATCH_UI_MODE_EXIT_PROGRAM) {
+                        delete state.match_ui;
+                        state.match_ui = NULL;
                         sound_end_fire_loop();
                         is_running = false;
                     }
@@ -408,6 +412,10 @@ int gold_main(int argc, char** argv) {
                 }
             }
         }
+        // If no longer running after update, early exit so as to avoid rendering with freed memory
+        if (!is_running) {
+            break;
+        }
 
         sound_update();
 
@@ -421,7 +429,7 @@ int gold_main(int argc, char** argv) {
             }
             case GAME_MODE_MATCH: 
             case GAME_MODE_REPLAY: {
-                match_ui_render(state.match);
+                match_ui_render(state.match_ui);
                 break;
             }
             case GAME_MODE_LOADING: {
@@ -464,13 +472,13 @@ int gold_main(int argc, char** argv) {
                 #endif
 
                 if (state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) {
-                    ivec2 mouse_world_pos = input_get_mouse_position() + state.match.camera_offset;
-                    for (uint32_t entity_index = 0; entity_index < state.match.match.entities.size(); entity_index++) {
-                        const Entity& entity = state.match.match.entities[entity_index];
+                    ivec2 mouse_world_pos = input_get_mouse_position() + state.match_ui->camera_offset;
+                    for (uint32_t entity_index = 0; entity_index < state.match_ui->match.entities.size(); entity_index++) {
+                        const Entity& entity = state.match_ui->match.entities[entity_index];
                         Rect entity_rect = entity_get_rect(entity);
                         if (entity_rect.has_point(mouse_world_pos)) {
                             char text[256];
-                            sprintf(text, "ID %u Name %s Visible ? %i", state.match.match.entities.get_id_of(entity_index), entity_get_data(entity.type).name, match_ui_is_entity_visible(state.match, entity));;
+                            sprintf(text, "ID %u Name %s Visible ? %i", state.match_ui->match.entities.get_id_of(entity_index), entity_get_data(entity.type).name, match_ui_is_entity_visible(state.match_ui, entity));;
                             render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
                             render_y += 20;
                             break;
@@ -478,15 +486,15 @@ int gold_main(int argc, char** argv) {
                     }
 
                     if (!match_ui_is_mouse_in_ui()) {
-                        ivec2 cell = (input_get_mouse_position() + state.match.camera_offset) / TILE_SIZE;
+                        ivec2 cell = (input_get_mouse_position() + state.match_ui->camera_offset) / TILE_SIZE;
                         char text[256];
                         sprintf(text, "Cell <%i, %i>", cell.x, cell.y);
                         render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
                         render_y += 20;
 
                         Rect cell_rect = (Rect) {
-                            .x = (cell.x * TILE_SIZE) - state.match.camera_offset.x,
-                            .y = (cell.y * TILE_SIZE) - state.match.camera_offset.y,
+                            .x = (cell.x * TILE_SIZE) - state.match_ui->camera_offset.x,
+                            .y = (cell.y * TILE_SIZE) - state.match_ui->camera_offset.y,
                             .w = TILE_SIZE,
                             .h = TILE_SIZE
                         };

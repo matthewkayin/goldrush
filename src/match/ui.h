@@ -82,6 +82,11 @@ enum FireCellRender {
     FIRE_CELL_RENDER_ABOVE
 };
 
+struct ReplayLoadingThreadState {
+    MatchState match_state;
+    uint32_t turn_counter;
+};
+
 #ifdef GOLD_DEBUG
 enum DebugFog {
     DEBUG_FOG_ENABLED,
@@ -137,14 +142,27 @@ struct MatchUiState {
     UI ui;
 
     bool replay_mode;
+    bool replay_paused;
+
     FILE* replay_file;
+
     uint32_t replay_fog_index;
     std::vector<std::string> replay_fog_texts;
     std::vector<uint8_t> replay_fog_player_ids;
-    bool replay_paused;
+
     std::vector<MatchState> replay_checkpoints;
     std::vector<std::vector<MatchInput>> replay_inputs[MAX_PLAYERS];
     std::vector<ReplayChatMessage> replay_chatlog;
+
+    SDL_Thread* replay_loading_thread;
+    MatchState replay_loading_match_state;
+
+    SDL_Mutex* replay_loading_turn_counter_mutex;
+    uint32_t replay_loading_turn_counter;
+    uint32_t replay_loaded_turn_counter;
+
+    SDL_Mutex* replay_loading_early_exit_mutex;
+    bool replay_loading_early_exit;
 
     #ifdef GOLD_DEBUG
         bool theater_mode;
@@ -152,56 +170,56 @@ struct MatchUiState {
     #endif
 };
 
-MatchUiState match_ui_init(int32_t lcg_seed, Noise& noise);
-MatchUiState match_ui_init_from_replay(const char* replay_path);
-void match_ui_handle_network_event(MatchUiState& state, NetworkEvent event);
-void match_ui_handle_input(MatchUiState& state);
-void match_ui_update(MatchUiState& state);
+MatchUiState* match_ui_init(int32_t lcg_seed, Noise& noise);
+MatchUiState* match_ui_init_from_replay(const char* replay_path);
+void match_ui_handle_network_event(MatchUiState* state, NetworkEvent event);
+void match_ui_handle_input(MatchUiState* state);
+void match_ui_update(MatchUiState* state);
 
-void match_ui_clamp_camera(MatchUiState& state);
-void match_ui_center_camera_on_cell(MatchUiState& state, ivec2 cell);
+void match_ui_clamp_camera(MatchUiState* state);
+void match_ui_center_camera_on_cell(MatchUiState* state, ivec2 cell);
 bool match_ui_is_mouse_in_ui();
-bool match_ui_is_targeting(const MatchUiState& state);
-bool match_ui_is_in_submenu(const MatchUiState& state);
-bool match_ui_is_selecting(const MatchUiState& state);
-std::vector<EntityId> match_ui_create_selection(const MatchUiState& state, Rect rect);
-void match_ui_set_selection(MatchUiState& state, std::vector<EntityId>& selection);
-MatchUiSelectionType match_ui_get_selection_type(const MatchUiState& state, const std::vector<EntityId>& selection);
-bool match_ui_selection_has_enough_energy(const MatchUiState& state, const std::vector<EntityId>& selection, uint32_t cost);
-void match_ui_order_move(MatchUiState& state);
-void match_ui_show_status(MatchUiState& state, const char* message);
+bool match_ui_is_targeting(const MatchUiState* state);
+bool match_ui_is_in_submenu(const MatchUiState* state);
+bool match_ui_is_selecting(const MatchUiState* state);
+std::vector<EntityId> match_ui_create_selection(const MatchUiState* state, Rect rect);
+void match_ui_set_selection(MatchUiState* state, std::vector<EntityId>& selection);
+MatchUiSelectionType match_ui_get_selection_type(const MatchUiState* state, const std::vector<EntityId>& selection);
+bool match_ui_selection_has_enough_energy(const MatchUiState* state, const std::vector<EntityId>& selection, uint32_t cost);
+void match_ui_order_move(MatchUiState* state);
+void match_ui_show_status(MatchUiState* state, const char* message);
 ivec2 match_ui_get_building_cell(int building_size, ivec2 camera_offset);
-bool match_ui_building_can_be_placed(const MatchUiState& state);
-bool match_ui_is_building_place_cell_valid(const MatchUiState& state, ivec2 miner_cell, ivec2 cell);
+bool match_ui_building_can_be_placed(const MatchUiState* state);
+bool match_ui_is_building_place_cell_valid(const MatchUiState* state, ivec2 miner_cell, ivec2 cell);
 Rect match_ui_get_selection_list_item_rect(uint32_t selection_index);
-void match_ui_add_chat_message(MatchUiState& state, uint8_t player_id, const char* message);
-void match_ui_handle_player_disconnect(MatchUiState& state, uint8_t player_id);
-bool match_ui_is_opponent_in_match(const MatchUiState& state);
-bool match_ui_is_surrender_required_to_leave(const MatchUiState& state);
+void match_ui_add_chat_message(MatchUiState* state, uint8_t player_id, const char* message);
+void match_ui_handle_player_disconnect(MatchUiState* state, uint8_t player_id);
+bool match_ui_is_opponent_in_match(const MatchUiState* state);
+bool match_ui_is_surrender_required_to_leave(const MatchUiState* state);
 bool match_ui_is_in_menu(MatchUiMode mode);
 const char* match_ui_get_menu_header_text(MatchUiMode mode);
-void match_ui_leave_match(MatchUiState& state, bool exit_program);
-bool match_ui_is_entity_visible(const MatchUiState& state, const Entity& entity);
-bool match_ui_is_cell_rect_revealed(const MatchUiState& state, ivec2 cell, int cell_size);
-int match_ui_get_fog(const MatchUiState& state, ivec2 cell);
+void match_ui_leave_match(MatchUiState* state, bool exit_program);
+bool match_ui_is_entity_visible(const MatchUiState* state, const Entity& entity);
+bool match_ui_is_cell_rect_revealed(const MatchUiState* state, ivec2 cell, int cell_size);
+int match_ui_get_fog(const MatchUiState* state, ivec2 cell);
 
-void match_ui_replay_begin_turn(MatchUiState& state);
-void match_ui_replay_scrub(MatchUiState& state, uint32_t position);
-size_t match_ui_replay_end_of_tape(const MatchUiState& state);
+void match_ui_replay_begin_turn(MatchUiState* state, MatchState& match_state, uint32_t turn_counter);
+void match_ui_replay_scrub(MatchUiState* state, uint32_t position);
+size_t match_ui_replay_end_of_tape(const MatchUiState* state);
 
-void match_ui_render(const MatchUiState& state);
+void match_ui_render(const MatchUiState* state);
 
 SpriteName match_ui_get_entity_select_ring(EntityType type, bool attacking);
-SpriteName match_ui_hotkey_get_sprite(const MatchUiState& state, InputAction hotkey, bool show_toggled);
+SpriteName match_ui_hotkey_get_sprite(const MatchUiState* state, InputAction hotkey, bool show_toggled);
 int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_ui_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max);
-void match_ui_render_target_build(const MatchUiState& state, const Target& target, uint8_t player_id);
-RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState& state, const Entity& entity);
-void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState& state, const Entity& entity);
-void match_ui_render_entity_icon(const MatchUiState& state, const Entity& entity, Rect icon_rect);
-void match_ui_render_entity_move_animation(const MatchUiState& state, const Entity& entity);
-void match_ui_render_particle(const MatchUiState& state, const Particle& particle);
-bool match_ui_should_render_hotkey_toggled(const MatchUiState& state, InputAction hotkey);
+void match_ui_render_target_build(const MatchUiState* state, const Target& target, uint8_t player_id);
+RenderSpriteParams match_ui_create_entity_render_params(const MatchUiState* state, const Entity& entity);
+void match_ui_render_entity_select_rings_and_healthbars(const MatchUiState* state, const Entity& entity);
+void match_ui_render_entity_icon(const MatchUiState* state, const Entity& entity, Rect icon_rect);
+void match_ui_render_entity_move_animation(const MatchUiState* state, const Entity& entity);
+void match_ui_render_particle(const MatchUiState* state, const Particle& particle);
+bool match_ui_should_render_hotkey_toggled(const MatchUiState* state, InputAction hotkey);
 const char* match_ui_render_get_stat_tooltip(SpriteName sprite);
-FireCellRender match_ui_get_fire_cell_render(const MatchUiState& state, const Fire& fire);
+FireCellRender match_ui_get_fire_cell_render(const MatchUiState* state, const Fire& fire);

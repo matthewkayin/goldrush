@@ -16,7 +16,7 @@ int ui_get_next_text_input_id(UI& state);
 void ui_queue_text(UI& state, FontName font, const char* text, ivec2 position, int z_index);
 void ui_queue_sprite(UI& state, SpriteName sprite, ivec2 frame, ivec2 position, int z_index, bool flip_h = false);
 void ui_queue_ninepatch(UI& state, SpriteName sprite, Rect rect, int z_index);
-void ui_queue_draw_rect(UI& state, Rect rect, RenderColor color, int z_index);
+void ui_queue_draw_rect(UI& state, Rect rect, int thickness, RenderColor color, int z_index);
 void ui_queue_fill_rect(UI& state, Rect rect, RenderColor color, int z_index);
 
 UI ui_init() {
@@ -510,7 +510,7 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
     return false;
 }
 
-bool ui_slider(UI& state, uint32_t* value, uint32_t min, uint32_t max, UiSliderDisplay display) {
+bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t min, uint32_t max, UiSliderDisplay display) {
     static const int VALUE_STR_PADDING = 8;
     static const int SLIDER_HEIGHT = 10;
     static const int NOTCH_WIDTH = 10;
@@ -563,13 +563,17 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t min, uint32_t max, UiSliderD
         .h = notch_rect.h - 4
     };
 
+    if (buffered_value != NULL) {
+        Rect slider_buffered_subrect = (Rect) {
+            .x = slider_rect.x + 2, 
+            .y = slider_rect.y,
+            .w = ((slider_rect.w - 4) * ((int)*buffered_value - (int)min)) / (int)max,
+            .h = slider_rect.h
+        };
+        ui_queue_fill_rect(state, slider_buffered_subrect, RENDER_COLOR_WHITE, 0);
+    }
     ui_queue_fill_rect(state, slider_subrect, RENDER_COLOR_GOLD, 0);
-    ui_queue_draw_rect(state, slider_rect, RENDER_COLOR_OFFBLACK, 0);
-    slider_rect.x++;
-    slider_rect.y++;
-    slider_rect.w -= 2;
-    slider_rect.h -= 2;
-    ui_queue_draw_rect(state, slider_rect, RENDER_COLOR_OFFBLACK, 0);
+    ui_queue_draw_rect(state, slider_rect, 2, RENDER_COLOR_OFFBLACK, 0);
     ui_queue_fill_rect(state, notch_rect, RENDER_COLOR_OFFBLACK, 0);
     ui_queue_fill_rect(state, notch_subrect, RENDER_COLOR_GOLD, 0);
 
@@ -616,7 +620,7 @@ bool ui_screenshot_frame(UI& state, ivec2 size) {
 
     bool hovered = state.input_enabled && frame_rect.has_point(input_get_mouse_position());
     if (hovered) {
-        ui_queue_draw_rect(state, frame_rect, RENDER_COLOR_WHITE, 0);
+        ui_queue_draw_rect(state, frame_rect, 2, RENDER_COLOR_WHITE, 0);
     }
 
     bool clicked = hovered && state.element_selected == UI_ELEMENT_NONE && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
@@ -647,7 +651,7 @@ void ui_render(const UI& state) {
                     break;
                 }
                 case UI_RENDER_DRAW_RECT: {
-                    render_draw_rect(render.rect.rect, render.rect.color);
+                    render_draw_rect(render.rect.rect, render.rect.color, render.rect.thickness);
                     break;
                 }
                 case UI_RENDER_FILL_RECT: {
@@ -737,11 +741,12 @@ void ui_queue_ninepatch(UI& state, SpriteName sprite, Rect rect, int z_index) {
     });
 }
 
-void ui_queue_draw_rect(UI& state, Rect rect, RenderColor color, int z_index) {
+void ui_queue_draw_rect(UI& state, Rect rect, int thickness, RenderColor color, int z_index) {
     state.render_queue[z_index].push_back((UiRender) {
         .type = UI_RENDER_DRAW_RECT,
         .rect = (UiRenderRect) {
             .rect = rect,
+            .thickness = thickness,
             .color = color
         }
     });
@@ -752,6 +757,8 @@ void ui_queue_fill_rect(UI& state, Rect rect, RenderColor color, int z_index) {
         .type = UI_RENDER_FILL_RECT,
         .rect = (UiRenderRect) {
             .rect = rect,
+            // Thickness is not used here, but is populated because it's the same struct as render_draw_rect
+            .thickness = 0, 
             .color = color
         }
     });
