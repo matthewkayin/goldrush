@@ -91,6 +91,8 @@ struct Bot {
 
     BotUnitComp unit_comp;
     std::queue<EntityId> buildings_to_set_rally_points;
+    uint32_t macro_cycle_timer;
+    uint32_t macro_cycle_count;
 
     std::unordered_map<EntityId, bool> is_entity_reserved;
     std::vector<BotDesiredSquad> desired_squads;
@@ -120,13 +122,13 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
 
 // Production
 
-MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_base_under_attack);
+MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_base_under_attack, uint32_t match_time_minutes);
 void bot_get_desired_buildings_and_army_ratio(const MatchState& state, const Bot& bot, BotEntityCount& desired_buildings, BotEntityCount& desired_army_ratio);
 bool bot_should_use_continuous_production(const Bot& bot);
 MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
-MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type);
+MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type, uint32_t match_time_minutes);
 uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot);
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 EntityType bot_get_building_which_trains(EntityType unit_type);

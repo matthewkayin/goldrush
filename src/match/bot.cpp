@@ -20,6 +20,9 @@ static const int BOT_SQUAD_GATHER_DISTANCE = 16;
 static const uint32_t BOT_MAX_LANDMINES_PER_BASE = 6;
 static const uint32_t BOT_HARASS_SQUAD_MAX_SIZE = 8;
 
+static const uint32_t BOT_MACRO_COOLDOWN_EASY = 2;
+static const uint32_t BOT_MACRO_COOLDOWN_MODERATE = 1;
+
 Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyValue difficulty, int32_t lcg_seed) {
     Bot bot;
 
@@ -48,6 +51,8 @@ Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyV
 
     bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT;
 
+    bot.macro_cycle_timer = 0;
+    bot.macro_cycle_count = 0;
     bot.landmine_check_time = 0;
     bot.scout_id = ID_NULL;
     bot.last_scout_time = 0;
@@ -75,7 +80,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
     // Production
 
-    MatchInput production_input = bot_get_production_input(state, bot, is_base_under_attack);
+    MatchInput production_input = bot_get_production_input(state, bot, is_base_under_attack, match_time_minutes);
     if (production_input.type != MATCH_INPUT_NONE) {
         return production_input;
     }
@@ -505,12 +510,15 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
             const int bot_attack_threshold = std::max(least_defended_hall_score + (BOT_UNIT_SCORE * 4), bot_minimum_attack_threshold);
             const bool should_attack = 
                     (bot.difficulty != MATCH_SETTING_DIFFICULTY_EASY || bot_scout_check_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED)) &&
+                    bot_unreserved_unit_score > 0 &&
                     // Attack if we have a bigger army than our opponent
                     ((bot_unreserved_unit_score > bot_attack_threshold && allied_army_score > enemy_army_score) ||
                     // Attack if we are maxed out
-                    (bot_unreserved_unit_score > 0 && match_get_player_population(state, bot.player_id) >= 98) ||
+                    (match_get_player_population(state, bot.player_id) >= 98) ||
                     // And if we have no miners and no money to get more, then attack with everything we've got
-                    (bot_unreserved_unit_score > 0 && bot_miner_count == 0 && bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_MINER).gold_cost));
+                    (bot_miner_count == 0 && bot_get_effective_gold(state, bot) < entity_get_data(ENTITY_MINER).gold_cost) ||
+                    // Also if we have no mining bases and there are no bases for us to take, then attack with everything we've got
+                    (mining_base_count[bot.player_id] == 0 && unoccupied_goldmine_count == 0));
             if (should_attack) {
                 BotEntityCount attack_entity_count = bot_entity_count_empty();
                 for (uint32_t entity_type = ENTITY_MINER + 1; entity_type < ENTITY_HALL; entity_type++) {
@@ -834,7 +842,7 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
 
 // PRODUCTION
 
-MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_base_under_attack) {
+MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_base_under_attack, uint32_t match_time_minutes) {
     ZoneScoped;
 
     MatchInput saturate_bases_input = bot_saturate_bases(state, bot);
@@ -959,7 +967,7 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
     }
 
     // Train desired unit
-    if (is_available_building && !bot_should_prefer_tech_over_units) {
+    if (is_available_building && !bot_should_prefer_tech_over_units && match_time_minutes > bot.macro_cycle_timer) {
         while (true) {
             for (uint32_t unit_type = ENTITY_MINER + 1; unit_type < ENTITY_HALL; unit_type++) {
                 if (desired_entities[unit_type] <= entity_count[unit_type]) {
@@ -971,7 +979,7 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, bool is_b
                     continue;
                 }
 
-                return bot_train_unit(state, bot, (EntityType)unit_type);
+                return bot_train_unit(state, bot, (EntityType)unit_type, match_time_minutes);
             }
 
             // If we have an available building and we are not using continuous production,
@@ -1277,7 +1285,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
     return input;
 }
 
-MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type) {
+MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type, uint32_t match_time_minutes) {
     GOLD_ASSERT(unit_type != ENTITY_TYPE_COUNT && entity_is_unit(unit_type));
 
     // Find building to train unit
@@ -1301,6 +1309,14 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
     }
 
     bot.buildings_to_set_rally_points.push(building_id);
+
+    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY || bot.difficulty == MATCH_SETTING_DIFFICULTY_MODERATE) {
+        bot.macro_cycle_count++;
+        if (bot.macro_cycle_count >= bot_get_mining_base_count(state, bot) * 2) {
+            bot.macro_cycle_timer = match_time_minutes + (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY ? BOT_MACRO_COOLDOWN_EASY : BOT_MACRO_COOLDOWN_MODERATE);
+            bot.macro_cycle_count = 0;
+        }
+    } 
 
     MatchInput input;
     input.type = MATCH_INPUT_BUILDING_ENQUEUE;
