@@ -488,7 +488,7 @@ int gold_main(int argc, char** argv) {
                     if (!match_ui_is_mouse_in_ui()) {
                         ivec2 cell = (input_get_mouse_position() + state.match_ui->camera_offset) / TILE_SIZE;
                         char text[256];
-                        sprintf(text, "Cell <%i, %i>", cell.x, cell.y);
+                        sprintf(text, "Cell <%i, %i> Region %i", cell.x, cell.y, state.match_ui->match.map.pathing_regions[cell.x + (cell.y * state.match_ui->match.map.width)]);
                         render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
                         render_y += 20;
 

@@ -37,7 +37,7 @@
 #endif
 
 #define TRACY_ENABLE
-#define TRACY_NO_CALLSTACK
+// #define TRACY_NO_CALLSTACK
 
 #define UPDATES_PER_SECOND 60
 #define SCREEN_WIDTH 1280

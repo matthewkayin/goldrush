@@ -2193,7 +2193,7 @@ bool match_ui_is_entity_visible(const MatchUiState* state, const Entity& entity)
                     }
                 }
             } else if (state->debug_fog == DEBUG_FOG_DISABLED) {
-                return true;
+                return entity.garrison_id == ID_NULL;
             }
         #endif
         return match_is_entity_visible_to_player(state->match, entity, network_get_player_id());
@@ -2461,6 +2461,21 @@ void match_ui_render(const MatchUiState* state) {
             }
         } // End for each cell layer
     } // End for each elevation
+
+    for (auto it : state->match.map.pathing_region_connections) {
+        for (const MapRegionConnection& connection : it.second) {
+            Rect rect = (Rect) {
+                .x = (connection.cell.x * TILE_SIZE) - state->camera_offset.x,
+                .y = (connection.cell.y * TILE_SIZE) - state->camera_offset.y,
+                .w = TILE_SIZE,
+                .h = TILE_SIZE
+            };
+            if (!SCREEN_RECT.intersects(rect)) {
+                continue;
+            }
+            render_draw_rect(rect, RENDER_COLOR_LIGHT_BLUE, 2);
+        }
+    }
 
     // Fires
     for (const Fire& fire : state->match.fires) {

@@ -825,14 +825,10 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                 int neighbor_pathing_region = map.pathing_regions[neighbor.x + (neighbor.y * map.width)];
                 if (neighbor_pathing_region != PATHING_REGION_UNASSIGNED && neighbor_pathing_region != pathing_region) {
                     // Determine connection size
+                    // The connection size will be either 1 or 2, and it indicates how much space is available at a connection cell
+                    // If the size is 1, then it means this connection is too small to be used by a 2x2 unit and should be ignored when pathing for units of that size
                     int size = 1;
-                    Direction other_region_cell_direction = direction == DIRECTION_EAST || direction == DIRECTION_WEST 
-                                                                        ? DIRECTION_SOUTH 
-                                                                        : DIRECTION_EAST;
-                    ivec2 other_region_cell = ivec2(x, y) + DIRECTION_IVEC2[other_region_cell_direction];
-                    ivec2 other_neighbor_cell = other_region_cell + DIRECTION_IVEC2[direction];
-                    if (map_is_cell_in_bounds(map, other_region_cell) && map_get_pathing_region(map, other_region_cell) == pathing_region &&
-                            map_is_cell_in_bounds(map, other_neighbor_cell) && map_get_pathing_region(map, other_neighbor_cell) == neighbor_pathing_region) {
+                    if (map_is_cell_rect_in_bounds(map, neighbor, 2) && !map_is_cell_rect_blocked(map, neighbor, 2)) {
                         size = 2;
                     }
 
@@ -851,6 +847,18 @@ bool map_is_cell_blocked(Cell cell) {
                 cell.type == CELL_BUILDING || 
                 cell.type == CELL_GOLDMINE ||
                 (cell.type >= CELL_DECORATION_1 && cell.type <= CELL_DECORATION_5);
+}
+
+bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size) {
+    for (int y = cell.y; y < cell.y + cell_size; y++) {
+        for (int x = cell.x; x < cell.x + cell_size; x++) {
+            if (map_is_cell_blocked(map_get_cell(map, CELL_LAYER_GROUND, cell))) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 void map_calculate_unreachable_cells(Map& map) {
@@ -1390,7 +1398,7 @@ int map_get_pathing_region(const Map& map, ivec2 cell) {
     return map.pathing_regions[cell.x + (cell.y * map.width)];
 }
 
-ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
     if (from == to) {
         return to;
     }
@@ -1405,20 +1413,9 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
         }
     }
 
-    bool is_target_unreachable = false;
-    for (int y = to.y; y < to.y + cell_size; y++) {
-        for (int x = to.x; x < to.x + cell_size; x++) {
-            Cell cell = map_get_cell(map, layer, ivec2(x, y));
-            if (map_is_cell_blocked(cell) || cell.type == CELL_UNREACHABLE || cell.type == CELL_UNIT) {
-                is_target_unreachable = true;
-                // Cause break on both inner and outer loops
-                x = to.x + cell_size;
-                y = to.y + cell_size;
-            }
-        }
-    }
-
-    if (!is_target_unreachable) {
+    Cell cell = map_get_cell(map, layer, to);
+    if (!(map_is_cell_blocked(cell) || cell.type == CELL_UNREACHABLE || cell.type == CELL_UNIT)) {
+        // Target is reachable, so don't reverse pathfind
         return to;
     }
 
@@ -1448,7 +1445,7 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
         if (smallest.cell == from) {
             return smallest.cell;
         }
-        if (!map_is_cell_rect_occupied(map, layer, smallest.cell, cell_size, from, ignore)) {
+        if (!map_is_cell_rect_occupied(map, layer, smallest.cell, 1, from, ignore)) {
             return smallest.cell;
         }
 
@@ -1465,7 +1462,7 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
             };
 
             // Don't consider out of bounds children
-            if (!map_is_cell_rect_in_bounds(map, child.cell, cell_size)) {
+            if (!map_is_cell_rect_in_bounds(map, child.cell, 1)) {
                 continue;
             }
 
@@ -1808,7 +1805,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     }
 
     ivec2 original_to = to;
-    to = map_pathfind_correct_target(map, layer, from, to, cell_size, ignore, ignore_cells);
+    to = map_pathfind_correct_target(map, layer, from, to, ignore, ignore_cells);
     bool allow_squirreling = (ignore & MAP_OPTION_ALLOW_PATH_SQUIRRELING) == MAP_OPTION_ALLOW_PATH_SQUIRRELING;
     if (to != original_to && ivec2::manhattan_distance(from, to) < 3 &&
             map_get_cell(map, layer, original_to).type == CELL_UNIT && !allow_squirreling) {

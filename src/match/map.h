@@ -88,6 +88,7 @@ struct Map {
 
 void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
 bool map_is_cell_blocked(Cell cell);
+bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size);
 void map_calculate_unreachable_cells(Map& map);
 
 uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
