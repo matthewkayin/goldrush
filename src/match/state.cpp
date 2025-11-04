@@ -133,6 +133,8 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
                 ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, 0);
                 match_create_entity(state, ENTITY_MINER, exit_cell, player_id);
             }
+            ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, hall.cell, hall_data.cell_size, entity_get_data(ENTITY_MINER).cell_size, mine.cell, 0);
+            match_create_entity(state, ENTITY_COWBOY, exit_cell, player_id);
 
             // Place scout
             {
@@ -991,6 +993,12 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
     while (!update_finished) {
         switch (entity.mode) {
             case MODE_UNIT_IDLE: {
+                // Do nothing if inactive
+                if (!state.players[entity.player_id].active) {
+                    update_finished = true;
+                    break;
+                }
+
                 // Do nothing if unit is garrisoned
                 if (entity.garrison_id != ID_NULL) {
                     const Entity& carrier = state.entities.get_by_id(entity.garrison_id);
@@ -1200,6 +1208,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             for (Entity& mine : state.entities) {
                                 if (mine.type != ENTITY_LANDMINE || mine.health == 0 || mine.mode != MODE_BUILDING_FINISHED || 
                                         state.players[mine.player_id].team == state.players[entity.player_id].team ||
+                                        !state.players[mine.player_id].active ||
                                         std::abs(entity.cell.x - mine.cell.x) > 1 || std::abs(entity.cell.y - mine.cell.y) > 1) {
                                     continue;
                                 }
@@ -1208,6 +1217,13 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                                 mine.mode = MODE_MINE_PRIME;
                                 entity_set_flag(mine, ENTITY_FLAG_INVISIBLE, false);
                             }
+                        }
+                        // If inactive, set to idle
+                        if (!state.players[entity.player_id].active) {
+                            entity.target = (Target) { .type = TARGET_NONE };
+                            entity.path.clear();
+                            entity.mode = MODE_UNIT_IDLE;
+                            break;
                         }
                         if (entity.target.type == TARGET_ATTACK_CELL) {
                             Target attack_target = match_entity_target_nearest_enemy(state, entity);
@@ -1719,7 +1735,7 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
             }
             case MODE_UNIT_ATTACK_WINDUP:
             case MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP: {
-                if (match_entity_is_target_invalid(state, entity)) {
+                if (match_entity_is_target_invalid(state, entity) || !state.players[entity.player_id].active) {
                     entity_set_flag(entity, ENTITY_FLAG_ATTACK_SPECIFIC_ENTITY, false);
                     entity.target = (Target) {
                         .type = TARGET_NONE
@@ -1817,6 +1833,11 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                 break;
             }
             case MODE_BUILDING_FINISHED: {
+                if (!state.players[entity.player_id].active) {
+                    entity.queue.clear();
+                    update_finished = true;
+                    break;
+                }
                 if (!entity.queue.empty() && entity.timer != 0) {
                     if (entity.timer == BUILDING_QUEUE_BLOCKED && !match_is_building_supply_blocked(state, entity)) {
                         entity.timer = building_queue_item_duration(entity.queue[0]);

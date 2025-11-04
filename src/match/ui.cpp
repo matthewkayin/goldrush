@@ -375,6 +375,10 @@ void match_ui_handle_input(MatchUiState* state) {
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                         state->match.players[player_id].gold += 5000;
                     }
+                } else if (state->chat_message == "/pathing connections on") {
+                    state->debug_view_pathing_connections = true;
+                } else if (state->chat_message == "/pathing connections off") {
+                    state->debug_view_pathing_connections = false;
                 }
             #endif
             network_send_chat(state->chat_message.c_str());
@@ -2462,20 +2466,24 @@ void match_ui_render(const MatchUiState* state) {
         } // End for each cell layer
     } // End for each elevation
 
-    for (auto it : state->match.map.pathing_region_connections) {
-        for (const MapRegionConnection& connection : it.second) {
-            Rect rect = (Rect) {
-                .x = (connection.cell.x * TILE_SIZE) - state->camera_offset.x,
-                .y = (connection.cell.y * TILE_SIZE) - state->camera_offset.y,
-                .w = TILE_SIZE,
-                .h = TILE_SIZE
-            };
-            if (!SCREEN_RECT.intersects(rect)) {
-                continue;
+    #ifdef GOLD_DEBUG
+        if (state->debug_view_pathing_connections) {
+            for (auto it : state->match.map.pathing_region_connections) {
+                for (const MapRegionConnection& connection : it.second) {
+                    Rect rect = (Rect) {
+                        .x = (connection.cell.x * TILE_SIZE) - state->camera_offset.x,
+                        .y = (connection.cell.y * TILE_SIZE) - state->camera_offset.y,
+                        .w = TILE_SIZE,
+                        .h = TILE_SIZE
+                    };
+                    if (!SCREEN_RECT.intersects(rect)) {
+                        continue;
+                    }
+                    render_draw_rect(rect, RENDER_COLOR_LIGHT_BLUE, 2);
+                }
             }
-            render_draw_rect(rect, RENDER_COLOR_LIGHT_BLUE, 2);
         }
-    }
+    #endif
 
     // Fires
     for (const Fire& fire : state->match.fires) {

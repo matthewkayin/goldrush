@@ -4146,6 +4146,7 @@ std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchS
         EntityId entity_id = state.entities.get_id_of(entity_index);
         if (state.players[entity.player_id].team == 
                 state.players[bot.player_id].team ||
+                !state.players[entity.player_id].active ||
                 entity.type != ENTITY_HALL ||
                 !entity_is_selectable(entity) ||
                 !bot_has_scouted_entity(state, bot, entity, entity_id)) {

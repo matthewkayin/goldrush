@@ -167,6 +167,7 @@ struct MatchUiState {
     #ifdef GOLD_DEBUG
         bool theater_mode;
         DebugFog debug_fog;
+        bool debug_view_pathing_connections;
     #endif
 };
 
