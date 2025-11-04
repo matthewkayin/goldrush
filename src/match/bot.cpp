@@ -410,19 +410,16 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                     allied_army_score > 7 * BOT_UNIT_SCORE) {
                 switch (bot.unit_comp) {
                     case BOT_UNIT_COMP_COWBOY_BANDIT: {
-                        const uint32_t NEW_UNIT_COMP_COUNT = 4;
-                        BotUnitComp new_unit_comps[NEW_UNIT_COMP_COUNT] = { 
+                        static const int NEW_UNIT_COMP_COUNT = 4;
+                        static const BotUnitComp new_unit_comps[NEW_UNIT_COMP_COUNT] = { 
                             BOT_UNIT_COMP_COWBOY_BANDIT_PYRO, 
                             BOT_UNIT_COMP_COWBOY_SAPPER_PYRO, 
                             BOT_UNIT_COMP_COWBOY_BANDIT_WAGON, 
                             BOT_UNIT_COMP_SOLDIER_BANDIT 
                         };
-                        uint32_t new_unit_comp_roll = lcg_rand(&bot.lcg_seed) % NEW_UNIT_COMP_COUNT;
+                        int new_unit_comp_roll = lcg_rand(&bot.lcg_seed) % NEW_UNIT_COMP_COUNT;
 
                         bot.unit_comp = new_unit_comps[new_unit_comp_roll];
-                        #ifdef GOLD_DEBUG
-                            bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT_PYRO;
-                        #endif
                         break;
                     }
                     case BOT_UNIT_COMP_SOLDIER_BANDIT: {
@@ -493,9 +490,24 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                     unreserved_entity_count[entity_type] = 0;
                 }
 
-                // bot_squad_create should reinforce the existing squad
+                // Gather reinforcements list
                 std::vector<EntityId> reinforcements = bot_create_entity_list_from_entity_count(state, bot, reinforce_entity_count);
-                bot_squad_create(state, bot, BOT_SQUAD_TYPE_ATTACK, bot.squads[attack_squad_index].target_cell, reinforcements);
+                // Filter out low-energy pyros
+                uint32_t reinforcements_index = 0;
+                while (reinforcements_index < reinforcements.size()) {
+                    EntityId entity_id = reinforcements[reinforcements_index];
+                    const Entity& entity = state.entities.get_by_id(entity_id);
+                    if (entity.type == ENTITY_PYRO && entity.energy < MOLOTOV_ENERGY_COST) {
+                        reinforcements[reinforcements_index] = reinforcements.back();
+                        reinforcements.pop_back();
+                    } else {
+                        reinforcements_index++;
+                    }
+                }
+                // bot_squad_create should reinforce the existing squad
+                if (!reinforcements.empty()) {
+                    bot_squad_create(state, bot, BOT_SQUAD_TYPE_ATTACK, bot.squads[attack_squad_index].target_cell, reinforcements);
+                }
                 return;
             }
 
