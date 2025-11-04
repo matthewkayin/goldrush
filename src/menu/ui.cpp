@@ -470,8 +470,10 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
         // Render all the dropdown items
         int item_hovered = -1;
         for (int index = 0; index < (int)items.size(); index++) {
+            int dropdown_direction = origin.y + (size.y * (items.size() + 1)) > SCREEN_HEIGHT ? -1 : 1;
+
             Rect item_rect = (Rect) {
-                .x = origin.x, .y = origin.y + (size.y * (index + 1)),
+                .x = origin.x, .y = origin.y + ((size.y * (index + 1)) * dropdown_direction),
                 .w = size.x, .h = size.y
             };
             bool item_is_hovered = state.input_enabled && item_rect.has_point(input_get_mouse_position());
