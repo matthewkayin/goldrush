@@ -115,6 +115,7 @@ static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 62, BUTTON
 static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
 static const uint32_t REPLAY_CHECKPOINT_FREQ = 32;
 static const uint32_t REPLAY_FOG_NONE = 0;
+static const uint32_t REPLAY_FOG_EVERYONE = 1;
 
 // INIT
 
@@ -2542,8 +2543,8 @@ void match_ui_render(const MatchUiState* state) {
     // Remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (state->replay_mode && 
-                !(state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE || 
-                 state->replay_fog_player_ids[state->replay_fog_index] == player_id)) {
+                (state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE || 
+                 state->replay_fog_player_ids[state->replay_fog_index] != player_id)) {
             continue;
         }
         if (!state->replay_mode && player_id != network_get_player_id()) {
