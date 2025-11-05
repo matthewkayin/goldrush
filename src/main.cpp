@@ -123,6 +123,11 @@ static int game_load_next_mode(void* ptr) {
         free(state.load_params.match.noise.map);
     } else if (state.load_params.mode == GAME_MODE_REPLAY) {
         state.match_ui = match_ui_init_from_replay(state.load_params.replay.filename);
+        if (state.match_ui == NULL) {
+            state.load_params.mode = GAME_MODE_MENU;
+            state.menu.mode = MENU_MODE_REPLAYS;
+            menu_show_status(state.menu, "Error opening replay file.");
+        }
     }
 
     return 0;

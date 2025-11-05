@@ -252,7 +252,10 @@ MatchUiState* match_ui_init_from_replay(const char* replay_path) {
     // Because we are not saving any replay data
     state->replay_file = NULL;
 
-    replay_file_read(replay_path, &state->match, state->replay_inputs, &state->replay_chatlog);
+    if (!replay_file_read(replay_path, &state->match, state->replay_inputs, &state->replay_chatlog)) {
+        delete state;
+        return NULL;
+    }
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         log_trace("player %u input count %u", player_id, state->replay_inputs[player_id].size());
     }
@@ -271,8 +274,8 @@ MatchUiState* match_ui_init_from_replay(const char* replay_path) {
     state->replay_loading_thread = SDL_CreateThread(match_ui_load_replay_checkpoints, "replay_loading_thread", state);
     if (!state->replay_loading_thread) {
         log_error("Error creating loading thread %s", SDL_GetError());
-        // TODO: return false somehow when cannot open thread
-        // also return false somehow when replay file cannot be read properly
+        delete state;
+        return NULL;
     }
 
     match_ui_replay_scrub(state, 0);
@@ -2542,9 +2545,10 @@ void match_ui_render(const MatchUiState* state) {
 
     // Remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state->replay_mode && 
-                (state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE || 
-                 state->replay_fog_player_ids[state->replay_fog_index] != player_id)) {
+        if (state->replay_mode && (state->replay_fog_index == 0 || state->replay_fog_index == 1)) {
+            break;
+        }
+        if (state->replay_mode && state->replay_fog_player_ids[state->replay_fog_index] != player_id) {
             continue;
         }
         if (!state->replay_mode && player_id != network_get_player_id()) {
@@ -3582,9 +3586,10 @@ void match_ui_render(const MatchUiState* state) {
     }
     // Minimap remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        if (state->replay_mode && 
-                !(state->replay_fog_player_ids[state->replay_fog_index] == PLAYER_NONE || 
-                 state->replay_fog_player_ids[state->replay_fog_index] == player_id)) {
+        if (state->replay_mode && (state->replay_fog_index == 0 || state->replay_fog_index == 0)) {
+            break;
+        }
+        if (state->replay_mode && state->replay_fog_player_ids[state->replay_fog_index] != player_id) {
             continue;
         }
         if (!state->replay_mode && player_id != network_get_player_id()) {

@@ -5,6 +5,7 @@
 #include "core/filesystem.h"
 #include "core/logger.h"
 
+static const uint32_t REPLAY_FILE_SIGNATURE = 0x46591214;
 static const uint8_t REPLAY_FILE_VERSION = 0;
 
 // The header of each replay block is made up of the type (first four bits) followed by the player id (second four bits)

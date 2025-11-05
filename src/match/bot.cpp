@@ -420,6 +420,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                         int new_unit_comp_roll = lcg_rand(&bot.lcg_seed) % NEW_UNIT_COMP_COUNT;
 
                         bot.unit_comp = new_unit_comps[new_unit_comp_roll];
+                        log_trace("BOT: tech switched %u", bot.unit_comp);
                         break;
                     }
                     case BOT_UNIT_COMP_SOLDIER_BANDIT: {
@@ -4158,7 +4159,6 @@ std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchS
         EntityId entity_id = state.entities.get_id_of(entity_index);
         if (state.players[entity.player_id].team == 
                 state.players[bot.player_id].team ||
-                !state.players[entity.player_id].active ||
                 entity.type != ENTITY_HALL ||
                 !entity_is_selectable(entity) ||
                 !bot_has_scouted_entity(state, bot, entity, entity_id)) {
