@@ -115,7 +115,6 @@ static const ivec2 WANTED_SIGN_POSITION = ivec2(BUTTON_PANEL_RECT.x + 62, BUTTON
 static const double UPDATE_DURATION = 1.0 / UPDATES_PER_SECOND;
 static const uint32_t REPLAY_CHECKPOINT_FREQ = 32;
 static const uint32_t REPLAY_FOG_NONE = 0;
-static const uint32_t REPLAY_FOG_EVERYONE = 1;
 
 // INIT
 

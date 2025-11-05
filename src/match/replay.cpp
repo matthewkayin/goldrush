@@ -6,7 +6,7 @@
 #include "core/logger.h"
 
 static const uint32_t REPLAY_FILE_SIGNATURE = 0x46591214;
-static const uint8_t REPLAY_FILE_VERSION = 0;
+static const uint32_t REPLAY_FILE_VERSION = 0;
 
 // The header of each replay block is made up of the type (first four bits) followed by the player id (second four bits)
 static const uint8_t REPLAY_BLOCK_HEADER_TYPE_MASK = 0xF0;
@@ -42,8 +42,11 @@ FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players
         return NULL;
     }
 
+    // Signature
+    fwrite(&REPLAY_FILE_SIGNATURE, 1, sizeof(uint32_t), file);
+
     // Version byte
-    fwrite(&REPLAY_FILE_VERSION, 1, sizeof(uint8_t), file);
+    fwrite(&REPLAY_FILE_VERSION, 1, sizeof(uint32_t), file);
 
     // LCG seed
     fwrite(&lcg_seed, 1, sizeof(int32_t), file);
@@ -123,9 +126,18 @@ bool replay_file_read(const char* path, MatchState* state, std::vector<std::vect
         return false;
     }
 
-    // Version byte
-    uint8_t replay_version;
-    fread(&replay_version, 1, sizeof(uint8_t), file);
+    // Signature
+    uint32_t replay_signature;
+    fread(&replay_signature, 1, sizeof(uint32_t), file);
+    if (replay_signature != REPLAY_FILE_SIGNATURE) {
+        log_error("Replay file signature was invalid %s.", replay_file_path);
+        fclose(file);
+        return false;
+    }
+
+    // Version
+    uint32_t replay_version;
+    fread(&replay_version, 1, sizeof(uint32_t), file);
     log_trace("Replay version: %u", replay_version);
 
     // LCG seed

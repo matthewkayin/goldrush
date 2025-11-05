@@ -410,17 +410,19 @@ void bot_strategy_update(const MatchState& state, Bot& bot, bool is_base_under_a
                     allied_army_score > 7 * BOT_UNIT_SCORE) {
                 switch (bot.unit_comp) {
                     case BOT_UNIT_COMP_COWBOY_BANDIT: {
-                        static const int NEW_UNIT_COMP_COUNT = 4;
-                        static const BotUnitComp new_unit_comps[NEW_UNIT_COMP_COUNT] = { 
-                            BOT_UNIT_COMP_COWBOY_BANDIT_PYRO, 
-                            BOT_UNIT_COMP_COWBOY_SAPPER_PYRO, 
-                            BOT_UNIT_COMP_COWBOY_BANDIT_WAGON, 
-                            BOT_UNIT_COMP_SOLDIER_BANDIT 
-                        };
-                        int new_unit_comp_roll = lcg_rand(&bot.lcg_seed) % NEW_UNIT_COMP_COUNT;
+                        int unmodded_unit_comp_roll = lcg_rand(&bot.lcg_seed);
+                        int new_unit_comp_roll = unmodded_unit_comp_roll % 6;
+                        if (new_unit_comp_roll == 0) {
+                            bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT_PYRO;
+                        } else if (new_unit_comp_roll == 1) {
+                            bot.unit_comp = BOT_UNIT_COMP_COWBOY_SAPPER_PYRO;
+                        } else if (new_unit_comp_roll < 4) {
+                            bot.unit_comp = BOT_UNIT_COMP_COWBOY_BANDIT_WAGON;
+                        } else if (new_unit_comp_roll < 6) {
+                            bot.unit_comp = BOT_UNIT_COMP_SOLDIER_BANDIT;
+                        }
 
-                        bot.unit_comp = new_unit_comps[new_unit_comp_roll];
-                        log_trace("BOT: tech switched %u", bot.unit_comp);
+                        log_trace("BOT: tech switched unmodded roll %i modded roll %i new comp %u", unmodded_unit_comp_roll, new_unit_comp_roll, bot.unit_comp);
                         break;
                     }
                     case BOT_UNIT_COMP_SOLDIER_BANDIT: {
@@ -3418,7 +3420,13 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
                 break;
             }
 
-            return bot_unit_flee(state, bot, bot.scout_id);
+            MatchInput flee_input = bot_unit_flee(state, bot, bot.scout_id);
+            // Check whether scout is already fleeing so that we don't spam flee input
+            if (flee_input.type == MATCH_INPUT_MOVE_CELL && scout.target.type == TARGET_CELL &&
+                        ivec2::manhattan_distance(flee_input.move.target_cell, scout.target.cell) < BOT_SQUAD_GATHER_DISTANCE) {
+                return (MatchInput) { .type = MATCH_INPUT_NONE };
+            }
+            return flee_input;
         }
     }
 

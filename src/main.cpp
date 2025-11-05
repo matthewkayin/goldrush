@@ -483,7 +483,7 @@ int gold_main(int argc, char** argv) {
                         Rect entity_rect = entity_get_rect(entity);
                         if (entity_rect.has_point(mouse_world_pos)) {
                             char text[256];
-                            sprintf(text, "ID %u Name %s Visible ? %i", state.match_ui->match.entities.get_id_of(entity_index), entity_get_data(entity.type).name, match_ui_is_entity_visible(state.match_ui, entity));;
+                            sprintf(text, "ID %u Name %s", state.match_ui->match.entities.get_id_of(entity_index), entity_get_data(entity.type).name);
                             render_text(FONT_HACK_WHITE, text, ivec2(0, render_y));
                             render_y += 20;
                             break;
