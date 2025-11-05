@@ -33,11 +33,11 @@
 #endif
 #define GOLD_LOG_LEVEL 3
 #ifdef GOLD_DEBUG
-    #define GOLD_RAND_SEED 1762346070
+    #define GOLD_RAND_SEED 1762362814
 #endif
 
 #define TRACY_ENABLE
-// #define TRACY_NO_CALLSTACK
+#define TRACY_NO_CALLSTACK
 
 #define UPDATES_PER_SECOND 60
 #define SCREEN_WIDTH 1280

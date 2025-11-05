@@ -517,6 +517,24 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                     stair_length--;
                 }
 
+                Direction stair_direction = DIRECTION_COUNT;
+                if (tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE) {
+                    stair_direction = DIRECTION_NORTH;
+                } else if (tile.sprite == SPRITE_TILE_WALL_EAST_EDGE) {
+                    stair_direction = DIRECTION_EAST;
+                } else if (tile.sprite == SPRITE_TILE_WALL_WEST_EDGE) {
+                    stair_direction = DIRECTION_WEST;
+                } else if (tile.sprite == SPRITE_TILE_WALL_SOUTH_EDGE) {
+                    stair_direction = DIRECTION_SOUTH;
+                }
+                GOLD_ASSERT(stair_direction != DIRECTION_COUNT);
+
+                int stair_mouth_cell_distance = stair_direction == DIRECTION_SOUTH ? 4 : 3;
+                ivec2 stair_mouth_cell = stair_min + (DIRECTION_IVEC2[stair_direction] * stair_mouth_cell_distance);
+                if (!map_is_cell_in_bounds(map, stair_mouth_cell)) {
+                    continue;
+                }
+
                 bool is_stair_too_close_to_other_stairs = false;
                 for (ivec2 stair_cell : stair_cells) {
                     int dist = std::min(ivec2::manhattan_distance(stair_cell, stair_min), ivec2::manhattan_distance(stair_cell, stair_max));
@@ -533,7 +551,6 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                 stair_cells.push_back(stair_max);
                 for (ivec2 cell = stair_min; cell != stair_max + step_direction; cell += step_direction) {
                     SpriteName stair_tile = SPRITE_TILE_NULL;
-                    Direction stair_direction = DIRECTION_COUNT;
                     if (tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE) {
                         if (cell == stair_min) {
                             stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_LEFT;
@@ -542,7 +559,6 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         } else {
                             stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_CENTER;
                         }
-                        stair_direction = DIRECTION_NORTH;
                     } else if (tile.sprite == SPRITE_TILE_WALL_EAST_EDGE) {
                         if (cell == stair_min) {
                             stair_tile = SPRITE_TILE_WALL_EAST_STAIR_TOP;
@@ -551,7 +567,6 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         } else {
                             stair_tile = SPRITE_TILE_WALL_EAST_STAIR_CENTER;
                         }
-                        stair_direction = DIRECTION_EAST;
                     } else if (tile.sprite == SPRITE_TILE_WALL_WEST_EDGE) {
                         if (cell == stair_min) {
                             stair_tile = SPRITE_TILE_WALL_WEST_STAIR_TOP;
@@ -560,7 +575,6 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         } else {
                             stair_tile = SPRITE_TILE_WALL_WEST_STAIR_CENTER;
                         }
-                        stair_direction = DIRECTION_WEST;
                     } else if (tile.sprite == SPRITE_TILE_WALL_SOUTH_EDGE) {
                         if (cell == stair_min) {
                             stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_LEFT;
@@ -569,10 +583,8 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                         } else {
                             stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_CENTER;
                         }
-                        stair_direction = DIRECTION_SOUTH;
                     }
 
-                    GOLD_ASSERT(stair_direction != DIRECTION_COUNT);
                     ivec2 stair_front_cell = cell + DIRECTION_IVEC2[stair_direction];
                     if (stair_direction == DIRECTION_SOUTH) {
                         stair_front_cell += DIRECTION_IVEC2[stair_direction];
