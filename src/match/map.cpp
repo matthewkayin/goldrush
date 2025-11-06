@@ -70,7 +70,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         }
     }
 
-    // Widen gaps that are too narrow
+    // Widen narrow gaps
     for (int y = 0; y < (int)noise.height; y++) {
         for (int x = 0; x < (int)noise.width; x++) {
             if (noise.map[x + (y * noise.width)] == NOISE_LEVEL_WATER || noise.map[x + (y * noise.width)] == 2) {
@@ -79,11 +79,8 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
 
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                 ivec2 wall = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                if (!map_is_cell_in_bounds(map, wall)) {
-                    continue;
-                }
-                if (noise.map[wall.x + (wall.y * noise.width)] > noise.map[x + (y * noise.width)]) {
-                    const int STEP_COUNT = direction % 2 == 0 ? 3 : 1;
+                if (!map_is_cell_in_bounds(map, wall) || noise.map[wall.x + (wall.y * noise.width)] > noise.map[x + (y * noise.width)]) {
+                    const int STEP_COUNT = direction % 2 == 0 ? 3 : 2;
                     for (int step = 0; step < STEP_COUNT; step++) {
                         ivec2 opposite = ivec2(x, y) - (DIRECTION_IVEC2[direction] * (step + 1));
                         if (map_is_cell_in_bounds(map, opposite) && noise.map[opposite.x + (opposite.y * noise.width)] > noise.map[x + (y * noise.width)]) {
@@ -95,7 +92,7 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         }
     }
 
-    // Remove lowground areas that are too small
+    // Remove small lowground areas
     {
         std::vector<int> map_tile_islands(noise.width * noise.height, -1);
         std::vector<int> island_size;
@@ -148,7 +145,6 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         // End assign noise tiles to islands
 
         for (int island_index = 0; island_index < island_size.size(); island_index++) {
-            log_trace("Island index %u size %u", island_index, island_size[island_index]);
             // Big islands are fine as they are
             if (island_size[island_index] > 15) {
                 continue;
@@ -180,9 +176,8 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
             }
         }
     }
-
-    // Remove lowground nooks that are too boxed in by high ground
-    // This addresses the issue where stairs are sometimes generated facing a wall
+    
+    // Remove lowground nooks
     for (int y = 0; y < (int)noise.height; y++) {
         for (int x = 0; x < (int)noise.width; x++) {
             if (noise.map[x + (y * noise.width)] != 0) {
@@ -205,116 +200,74 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
         }
     }
 
-    // Remove narrow lowground gaps around the edge of the map
-    for (int y = 0; y < (int)noise.height; y++) {
-        for (int x = 0; x < (int)noise.width; x++) {
-            /*
-             * Only consider lowground tiles on the edge of the map
-             *
-             * But don't consider the exact corners of the map because they will be handled by the edges
-             * For example, in the below picture, there is a highground tile that is too close to the top-left corner
-             * But the narrow-gap removal along the top and left edge will take care of it
-             * 
-             * 000
-             * 011
-             * 011
-             */
-
-            bool is_on_x_edge = x == 0 || x == noise.width - 1;
-            bool is_on_y_edge = y == 0 || y == noise.height - 1;
-            bool is_on_corner = is_on_x_edge && is_on_y_edge;
-            if ((!is_on_x_edge && !is_on_y_edge) ||
-                    is_on_corner ||
-                    noise.map[x + (y * noise.width)] != 0) {
-                continue;
-            }
-
-            // Determine adjacent direction
-            Direction adjacent_direction;
-            if (x == 0) {
-                adjacent_direction = DIRECTION_EAST;
-            } else if (x == noise.width - 1) {
-                adjacent_direction = DIRECTION_WEST;
-            } else if (y == 0) {
-                adjacent_direction = DIRECTION_SOUTH;
-            } else if (y == noise.height - 1) {
-                adjacent_direction = DIRECTION_NORTH;
-            } else {
-                adjacent_direction = DIRECTION_COUNT;
-            }
-            GOLD_ASSERT(adjacent_direction != DIRECTION_COUNT);
-
-            ivec2 adjacent_cell = ivec2(x, y) + DIRECTION_IVEC2[adjacent_direction];
-            GOLD_ASSERT(map_is_cell_in_bounds(map, adjacent_cell));
-            if (noise.map[adjacent_cell.x + (adjacent_cell.y * noise.width)] > noise.map[x + (y * noise.width)]) {
-                noise.map[adjacent_cell.x + (adjacent_cell.y * noise.width)] = 0;
-            }
-        }
-    }
-
-    // Remove highground areas that are not big enough for wagons to stand on
-    std::vector<bool> is_highground_floor(noise.width * noise.height, false);
-    for (int y = 0; y < (int)noise.height; y++) {
-        for (int x = 0; x < (int)noise.width; x++) {
-            if (noise.map[x + (y * noise.width)] != 1) {
-                continue;
-            }
-
-            is_highground_floor[x + (y * noise.width)] = true;
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                if (!map_is_cell_in_bounds(map, adjacent) || noise.map[adjacent.x + (adjacent.y * noise.width)] == 1) {
+    // Remove highground areas that are too small for wagons
+    {
+        // First mark all of the highground floor (i.e. non-ground) tiles
+        std::vector<bool> is_highground_floor(noise.width * noise.height, false);
+        for (int y = 0; y < (int)noise.height; y++) {
+            for (int x = 0; x < (int)noise.width; x++) {
+                if (noise.map[x + (y * noise.width)] != 1) {
                     continue;
                 }
-                is_highground_floor[x + (y * noise.width)] = false;
-            }
-        }
-    }
 
-    std::vector<bool> is_2x2_highground_floor(noise.width * noise.height, false);
-    for (int y = 0; y < (int)noise.height; y++) {
-        for (int x = 0; x < (int)noise.width; x++) {
-            if (!is_highground_floor[x + (y * noise.width)]) {
-                continue;
-            }
-
-            uint32_t neighbors = 0;
-            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                if (map_is_cell_in_bounds(map, adjacent) && is_highground_floor[adjacent.x + (adjacent.y * noise.width)]) {
-                    neighbors += DIRECTION_MASK[direction];
-                }
-            }
-            for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
-                ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                int prev_direction = direction - 1;
-                int next_direction = direction + 1 == DIRECTION_COUNT ? 0 : direction + 1;
-                uint32_t adjacent_neighbors = DIRECTION_MASK[prev_direction] | DIRECTION_MASK[next_direction];
-                if (map_is_cell_in_bounds(map, adjacent) && 
-                        is_highground_floor[adjacent.x + (adjacent.y * noise.width)] &&
-                        (neighbors & adjacent_neighbors) == adjacent_neighbors) {
-                    is_2x2_highground_floor[x + (y * noise.width)] = true;
+                is_highground_floor[x + (y * noise.width)] = true;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                    ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                    if (!map_is_cell_in_bounds(map, adjacent) || noise.map[adjacent.x + (adjacent.y * noise.width)] == 1) {
+                        continue;
+                    }
+                    is_highground_floor[x + (y * noise.width)] = false;
                 }
             }
         }
-    }
 
-    for (int y = 0; y < (int)noise.height; y++) {
-        for (int x = 0; x < (int)noise.width; x++) {
-            if (noise.map[x + (y * map.width)] != 1) {
-                continue;
-            }
+        // Then mark all of the highground floors that can be occupied by a 2x2 unit
+        std::vector<bool> is_2x2_highground_floor(noise.width * noise.height, false);
+        for (int y = 0; y < (int)noise.height; y++) {
+            for (int x = 0; x < (int)noise.width; x++) {
+                if (!is_highground_floor[x + (y * noise.width)]) {
+                    continue;
+                }
 
-            bool has_adjacent_2x2_floor = false;
-            for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                if (map_is_cell_in_bounds(map, adjacent) && is_2x2_highground_floor[adjacent.x + (adjacent.y * noise.width)]) {
-                    has_adjacent_2x2_floor = true;
+                uint32_t neighbors = 0;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                    if (map_is_cell_in_bounds(map, adjacent) && is_highground_floor[adjacent.x + (adjacent.y * noise.width)]) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                    int prev_direction = direction - 1;
+                    int next_direction = direction + 1 == DIRECTION_COUNT ? 0 : direction + 1;
+                    uint32_t adjacent_neighbors = DIRECTION_MASK[prev_direction] | DIRECTION_MASK[next_direction];
+                    if (map_is_cell_in_bounds(map, adjacent) && 
+                            is_highground_floor[adjacent.x + (adjacent.y * noise.width)] &&
+                            (neighbors & adjacent_neighbors) == adjacent_neighbors) {
+                        is_2x2_highground_floor[x + (y * noise.width)] = true;
+                    }
                 }
             }
+        }
 
-            if (!has_adjacent_2x2_floor) {
-                noise.map[x + (y * map.width)] = 0;
+        // Finally, remove any walls that do not have a 2x2 occupiable floor surrounding them
+        for (int y = 0; y < (int)noise.height; y++) {
+            for (int x = 0; x < (int)noise.width; x++) {
+                if (noise.map[x + (y * map.width)] != 1) {
+                    continue;
+                }
+
+                bool has_adjacent_2x2_floor = false;
+                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                    ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                    if (map_is_cell_in_bounds(map, adjacent) && is_2x2_highground_floor[adjacent.x + (adjacent.y * noise.width)]) {
+                        has_adjacent_2x2_floor = true;
+                    }
+                }
+
+                if (!has_adjacent_2x2_floor) {
+                    noise.map[x + (y * map.width)] = 0;
+                }
             }
         }
     }
