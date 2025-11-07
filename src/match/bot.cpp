@@ -3486,6 +3486,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_time_minu
     if (scout.target.type == TARGET_ENTITY && scout.target.id == unscouted_entity_id) {
         // This fixes a bug where two bots got their scouts deadlocked
         if (scout.pathfind_attempts == 2) {
+            log_trace("BOT %u: pathfind attempts is 2", bot.player_id);
             return bot_return_entity_to_nearest_hall(state, bot, bot.scout_id);
         }
         return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -3589,6 +3590,7 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
         target_cell = path_from_hall[std::min((int)path_from_hall.size() - 1, DISTANCE_FROM_HALL)];
     }
 
+    log_trace("BOT %u: return entity to nearest hall", bot.player_id);
     MatchInput input;
     input.type = MATCH_INPUT_MOVE_CELL;
     input.move.shift_command = 0;
@@ -3632,6 +3634,7 @@ MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entit
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
+    log_trace("BOT %u: unit flee", bot.player_id);
     MatchInput input;
     input.type = MATCH_INPUT_MOVE_CELL;
     input.move.shift_command = 0;

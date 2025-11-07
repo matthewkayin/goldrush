@@ -2471,11 +2471,23 @@ void match_ui_render(const MatchUiState* state) {
 
     #ifdef GOLD_DEBUG
         if (state->debug_view_pathing_connections) {
-            for (auto it : state->match.map.pathing_region_connections) {
-                for (const MapRegionConnection& connection : it.second) {
+            for (const MapRegionConnection& connection : state->match.map.pathing_region_connections) {
+                for (const ivec2& cell : connection.left) {
                     Rect rect = (Rect) {
-                        .x = (connection.cell.x * TILE_SIZE) - state->camera_offset.x,
-                        .y = (connection.cell.y * TILE_SIZE) - state->camera_offset.y,
+                        .x = (cell.x * TILE_SIZE) - state->camera_offset.x,
+                        .y = (cell.y * TILE_SIZE) - state->camera_offset.y,
+                        .w = TILE_SIZE,
+                        .h = TILE_SIZE
+                    };
+                    if (!SCREEN_RECT.intersects(rect)) {
+                        continue;
+                    }
+                    render_draw_rect(rect, RENDER_COLOR_LIGHT_BLUE, 2);
+                }
+                for (const ivec2& cell : connection.right) {
+                    Rect rect = (Rect) {
+                        .x = (cell.x * TILE_SIZE) - state->camera_offset.x,
+                        .y = (cell.y * TILE_SIZE) - state->camera_offset.y,
                         .w = TILE_SIZE,
                         .h = TILE_SIZE
                     };

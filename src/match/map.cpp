@@ -762,6 +762,9 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
                     if (map_get_tile(map, child).elevation != map_get_tile(map, next).elevation) {
                         continue;
                     }
+                    if (std::abs(x - child.x) > 64 || std::abs(y - child.y) > 64) {
+                        continue;
+                    }
 
                     frontier.push_back(child);
                 }
@@ -772,36 +775,63 @@ void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& pla
     }
 
     // Form connections between adjacent pathing regions
-    for (int region = 0; region < map.pathing_region_count; region++) {
-        map.pathing_region_connections[region] = std::vector<MapRegionConnection>();
+    map.pathing_region_connections.reserve(map.pathing_region_count);
+    for (int index = 0; index < map.pathing_region_count; index++) {
+        map.pathing_region_connection_indices.push_back(std::vector<int>());
     }
+    std::vector<bool> is_connection_cell_explored(map.width * map.height, false);
     for (int y = 0; y < map.height; y++) {
         for (int x = 0; x < map.width; x++) {
             int pathing_region = map.pathing_regions[x + (y * map.width)]; 
             if (pathing_region == PATHING_REGION_UNASSIGNED) {
                 continue;
             }
+            if (is_connection_cell_explored[x + (y * map.width)]) {
+                continue;
+            }
 
             for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                ivec2 neighbor = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                // Check that the neighbor is valid
+                ivec2 cell = ivec2(x, y);
+                ivec2 neighbor = cell + DIRECTION_IVEC2[direction];
                 if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x == map.width || neighbor.y == map.height) {
                     continue;
                 }
                 int neighbor_pathing_region = map.pathing_regions[neighbor.x + (neighbor.y * map.width)];
-                if (neighbor_pathing_region != PATHING_REGION_UNASSIGNED && neighbor_pathing_region != pathing_region) {
-                    // Determine connection size
-                    // The connection size will be either 1 or 2, and it indicates how much space is available at a connection cell
-                    // If the size is 1, then it means this connection is too small to be used by a 2x2 unit and should be ignored when pathing for units of that size
-                    int size = 1;
-                    if (map_is_cell_rect_in_bounds(map, neighbor, 2) && !map_is_cell_rect_blocked(map, neighbor, 2)) {
-                        size = 2;
-                    }
-
-                    map.pathing_region_connections[pathing_region].push_back((MapRegionConnection){ 
-                        .cell = neighbor,
-                        .size = size
-                    });
+                if (neighbor_pathing_region == PATHING_REGION_UNASSIGNED || neighbor_pathing_region == pathing_region) {
+                    continue;
                 }
+
+                /*
+                 * Since the neighbor is valid, we can start creating a connection
+                 *
+                 * To do this, we will start with the left_cell (our original cell) and the right_cell (our neighbor cell)
+                 * And step adjacent to the cells to find all the other cells that are a part of this connection
+                 * 
+                 * Since we are considering cells from y downward and x rightward, we can assume that
+                 * for horizontal connections (direction WEST to EAST) the adjacent cells will be SOUTH and 
+                 * for vertical connections (direction NORTH to SOUTH) the adjacent cells with be EAST
+                 */
+                MapRegionConnection connection;
+                int adjacent_direction = direction == DIRECTION_WEST || direction == DIRECTION_EAST ? DIRECTION_SOUTH : DIRECTION_EAST;
+                ivec2 left_cell = cell; 
+                ivec2 right_cell = neighbor;
+                while (map_is_cell_in_bounds(map, left_cell) && map_is_cell_in_bounds(map, right_cell) &&
+                            map_get_pathing_region(map, left_cell) == pathing_region &&
+                            map_get_pathing_region(map, right_cell) == neighbor_pathing_region) {
+                    connection.left.push_back(left_cell);
+                    connection.right.push_back(right_cell);
+                    is_connection_cell_explored[left_cell.x + (left_cell.y * map.width)] = true;
+                    is_connection_cell_explored[right_cell.x + (right_cell.y * map.width)] = true;
+
+                    left_cell += DIRECTION_IVEC2[adjacent_direction];
+                    right_cell += DIRECTION_IVEC2[adjacent_direction];
+                }
+
+                map.pathing_region_connections.push_back(connection);
+                int connection_index = map.pathing_region_connections.size() - 1;
+                map.pathing_region_connection_indices[pathing_region].push_back(connection_index);
+                map.pathing_region_connection_indices[neighbor_pathing_region].push_back(connection_index);
             }
         }
     }
@@ -817,7 +847,7 @@ bool map_is_cell_blocked(Cell cell) {
 bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size) {
     for (int y = cell.y; y < cell.y + cell_size; y++) {
         for (int x = cell.x; x < cell.x + cell_size; x++) {
-            if (map_is_cell_blocked(map_get_cell(map, CELL_LAYER_GROUND, cell))) {
+            if (map_is_cell_blocked(map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y)))) {
                 return true;
             }
         }
@@ -1472,25 +1502,25 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     }
 
     // Region-pathing
-#ifdef GOLD_ASSERTS_ENABLED
+#ifdef GOLD_DEBUG
     bool found_region_path = false;
 #endif
     MapRegionPathNode region_path_end;
     std::vector<MapRegionPathNode> frontier;
     std::vector<MapRegionPathNode> explored;
-    std::vector<bool> is_explored = std::vector(map.width * map.height, false);
+    std::vector<bool> is_connection_explored = std::vector(map.pathing_region_connections.size(), false);
 
     frontier.push_back((MapRegionPathNode) {
         .cell = from,
+        .connection = -1,
         .parent = -1,
         .cost = 0,
-        .distance = ivec2::manhattan_distance(from, to)
     });
 
     while (!frontier.empty()) {
         int smallest_index = 0;
         for (int index = 1; index < frontier.size(); index++) {
-            if (frontier[index].score() < frontier[smallest_index].score()) {
+            if (frontier[index].cost < frontier[smallest_index].cost) {
                 smallest_index = index;
             }
         }
@@ -1499,28 +1529,30 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
         frontier[smallest_index] = frontier.back();
         frontier.pop_back();
 
-        if (is_explored[next.cell.x + (next.cell.y * map.width)]) {
-            continue;
-        }
-
         if (next.cell == to) {
             region_path_end = next;
-        #ifdef GOLD_ASSERTS_ENABLED
+        #ifdef GOLD_DEBUG
             found_region_path = true;
         #endif
             break;
         }
 
-        explored.push_back(next);
-        is_explored[next.cell.x + (next.cell.y * map.width)] = true;
+        if (next.connection != -1 && is_connection_explored[next.connection]) {
+            continue;
+        }
 
-        int next_region = map.pathing_regions[next.cell.x + (next.cell.y * map.width)];
-        if (next_region == map.pathing_regions[to.x + (to.y * map.width)]) {
+        explored.push_back(next);
+        if (next.connection != -1) {
+            is_connection_explored[next.connection] = true;
+        }
+
+        int next_region = map_get_pathing_region(map, next.cell);
+        if (next_region == map_get_pathing_region(map, to)) {
             MapRegionPathNode child = (MapRegionPathNode) {
                 .cell = to,
+                .connection = -1,
                 .parent = (int)explored.size() - 1,
                 .cost = next.cost + ivec2::manhattan_distance(next.cell, to),
-                .distance = 0
             };
 
             int frontier_index;
@@ -1530,7 +1562,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
                 }
             }
             if (frontier_index < frontier.size()) {
-                if (child.score() < frontier[frontier_index].score()) {
+                if (child.cost < frontier[frontier_index].cost) {
                     frontier[frontier_index] = child;
                 }
                 continue;
@@ -1538,26 +1570,47 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
 
             frontier.push_back(child);
         }
-        for (const MapRegionConnection& connection : map.pathing_region_connections.at(next_region)) {
-            if (connection.size < cell_size) {
+        for (int connection_index : map.pathing_region_connection_indices[next_region]) {
+            if (is_connection_explored[connection_index]) {
+                continue;
+            }
+
+            // Find the nearest connection cell
+            ivec2 nearest_connection_cell = ivec2(-1, -1);
+            // Choose from among the connection cells that are not in the region we're currently in
+            const MapRegionConnection& connection = map.pathing_region_connections[connection_index];
+            const std::vector<ivec2>& connection_cells = map_get_pathing_region(map, connection.left[0]) == next_region ? connection.right : connection.left;
+            for (ivec2 cell : connection_cells) {
+                if (cell_size == 2 && (!map_is_cell_rect_in_bounds(map, cell, 2) || map_is_cell_rect_blocked(map, cell, 2))) {
+                    continue;
+                }
+                if (nearest_connection_cell.x == -1 || ivec2::manhattan_distance(next.cell, cell) < ivec2::manhattan_distance(next.cell, nearest_connection_cell)) {
+                    nearest_connection_cell = cell;
+                }
+            }
+
+            // If the nearest cell is -1, -1, it means that connected_region is connected to next_region,
+            // but we could not find a connected cell, which probably means that the available connection
+            // cells are too small for the unit that is currently pathing
+            if (nearest_connection_cell.x == -1) {
                 continue;
             }
 
             MapRegionPathNode child = (MapRegionPathNode) {
-                .cell = connection.cell,
+                .cell = nearest_connection_cell,
+                .connection = connection_index,
                 .parent = (int)explored.size() - 1,
-                .cost = next.cost + ivec2::manhattan_distance(next.cell, connection.cell),
-                .distance = ivec2::manhattan_distance(connection.cell, to)
+                .cost = ivec2::manhattan_distance(next.cell, nearest_connection_cell),
             };
 
             int frontier_index;
             for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                if (child.cell == frontier[frontier_index].cell) {
+                if (connection_index == frontier[frontier_index].connection) {
                     break;
                 }
             }
             if (frontier_index < frontier.size()) {
-                if (child.score() < frontier[frontier_index].score()) {
+                if (child.cost < frontier[frontier_index].cost) {
                     frontier[frontier_index] = child;
                 }
                 continue;
@@ -1567,7 +1620,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
         } // End for each child / connected region
     } // End while frontier not empty
 
-#ifdef GOLD_ASSERTS_ENABLED
+#ifdef GOLD_DEBUG
     GOLD_ASSERT(found_region_path);
 #endif
     MapRegionPathNode region_current = region_path_end;

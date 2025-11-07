@@ -61,18 +61,14 @@ struct MapPathNode {
 
 struct MapRegionPathNode {
     ivec2 cell;
+    int connection;
     int parent;
     int cost;
-    int distance;
-
-    int score() const {
-        return cost;
-    }
 };
 
 struct MapRegionConnection {
-    ivec2 cell;
-    int size;
+    std::vector<ivec2> left;
+    std::vector<ivec2> right;
 };
 
 struct Map {
@@ -83,7 +79,8 @@ struct Map {
 
     int pathing_region_count;
     std::vector<int> pathing_regions;
-    std::unordered_map<int, std::vector<MapRegionConnection>> pathing_region_connections;
+    std::vector<std::vector<int>> pathing_region_connection_indices;
+    std::vector<MapRegionConnection> pathing_region_connections;
 };
 
 void map_init(Map& map, Noise& noise, int32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
@@ -114,5 +111,6 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 st
 ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, uint32_t ignore);
 
 int map_get_pathing_region(const Map& map, ivec2 cell);
+
 void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells, bool limit_region);
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells = NULL);
