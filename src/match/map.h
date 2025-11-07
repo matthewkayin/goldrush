@@ -64,6 +64,9 @@ struct MapRegionPathNode {
     int connection;
     int parent;
     int cost;
+    int score(const ivec2& target) {
+        return cost + ivec2::manhattan_distance(cell, target);
+    }
 };
 
 struct MapRegionConnection {

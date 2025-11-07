@@ -1520,7 +1520,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
     while (!frontier.empty()) {
         int smallest_index = 0;
         for (int index = 1; index < frontier.size(); index++) {
-            if (frontier[index].cost < frontier[smallest_index].cost) {
+            if (frontier[index].score(to) < frontier[smallest_index].score(to)) {
                 smallest_index = index;
             }
         }
@@ -1562,7 +1562,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
                 }
             }
             if (frontier_index < frontier.size()) {
-                if (child.cost < frontier[frontier_index].cost) {
+                if (child.score(to) < frontier[frontier_index].score(to)) {
                     frontier[frontier_index] = child;
                 }
                 continue;
@@ -1600,7 +1600,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
                 .cell = nearest_connection_cell,
                 .connection = connection_index,
                 .parent = (int)explored.size() - 1,
-                .cost = ivec2::manhattan_distance(next.cell, nearest_connection_cell),
+                .cost = next.cost + ivec2::manhattan_distance(next.cell, nearest_connection_cell)
             };
 
             int frontier_index;
@@ -1610,7 +1610,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
                 }
             }
             if (frontier_index < frontier.size()) {
-                if (child.cost < frontier[frontier_index].cost) {
+                if (child.score(to) < frontier[frontier_index].score(to)) {
                     frontier[frontier_index] = child;
                 }
                 continue;
