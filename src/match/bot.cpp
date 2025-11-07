@@ -1725,12 +1725,8 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
                 }
             }
 
-            ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell + ivec2(1, 1), 1, hall_cell, entity_get_data(ENTITY_HALL).cell_size, true);
-            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, state.entities[nearest_goldmine_index].cell, entity_get_data(ENTITY_GOLDMINE).cell_size, 1, rally_cell, MAP_OPTION_IGNORE_MINERS);
-
-            GOLD_ASSERT(mine_exit_cell.x != -1);
             std::vector<ivec2> path;
-            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &path, MAP_OPTION_IGNORE_MINERS);
+            map_get_ideal_mine_exit_path(state.map, state.entities[nearest_goldmine_index].cell, hall_cell, &path);
             hall_score += path.size();
             hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
         }

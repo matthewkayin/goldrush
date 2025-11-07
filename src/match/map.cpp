@@ -1266,7 +1266,7 @@ ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
                     map_get_tile(map, cell).elevation == map_get_tile(map, mine_cell).elevation &&
                     (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist);
         }
-        // after the initial check, check the surrounding cells
+        // check the surrounding cells
         if (cell_is_valid) {
             const int STAIR_RADIUS = 2;
             for (int x = cell.x - STAIR_RADIUS; x < cell.x + start_size + STAIR_RADIUS + 1; x++) {
@@ -1274,13 +1274,35 @@ ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
                     if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
                         continue;
                     }
-                    if (map_is_tile_ramp(map, ivec2(x, y)) || map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y)).type != CELL_EMPTY) {
+                    if (map_is_tile_ramp(map, ivec2(x, y))) {
                         cell_is_valid = false;
                         break;
                     }
                 }
                 if (!cell_is_valid) {
                     break;
+                }
+            }
+        }
+        // check that the mining path is unobstructed
+        if (cell_is_valid) {
+            std::vector<ivec2> mine_exit_path;
+            map_get_ideal_mine_exit_path(map, mine_cell, cell, &mine_exit_path);
+
+            if (mine_exit_path.empty()) {
+                cell_is_valid = false;
+            }
+
+            for (ivec2 path_cell : mine_exit_path) {
+                for (int y = path_cell.y - 1; y < path_cell.y + 2; y++) {
+                    for (int x = path_cell.x - 1; x < path_cell.x + 2; x++) {
+                        if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
+                            continue;
+                        }
+                        if (map_is_cell_blocked(map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y)))) {
+                            cell_is_valid = false;
+                        }
+                    }
                 }
             }
         }
@@ -1636,6 +1658,9 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
 void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells, bool limit_region) {
     ZoneScoped;
 
+    static const int EXPLORED_INDEX_NOT_EXPLORED = -1;
+    static const int EXPLORED_INDEX_IGNORE_CELL = -2;
+
     // Don't bother pathing to the unit's cell
     if (from == to) {
         return;
@@ -1669,11 +1694,18 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
 
     std::vector<MapPathNode> frontier;
     std::vector<MapPathNode> explored;
-    std::vector<int> explored_indices = std::vector<int>(map.width * map.height, -1);
+    std::vector<int> explored_indices = std::vector<int>(map.width * map.height, EXPLORED_INDEX_NOT_EXPLORED);
     uint32_t closest_explored = 0;
     bool found_path = false;
     bool avoid_landmines = (options & MAP_OPTION_AVOID_LANDMINES) == MAP_OPTION_AVOID_LANDMINES;
     MapPathNode path_end;
+
+    // Fill the ignore cells into explored indices array so that we can do a constant time lookup to see if a cell should be ignored
+    if (ignore_cells != NULL) {
+        for (ivec2 ignore_cell : *ignore_cells) {
+            explored_indices[ignore_cell.x + (ignore_cell.y * map.width)] = EXPLORED_INDEX_IGNORE_CELL;
+        }
+    }
 
     frontier.push_back((MapPathNode) {
         .cost = fixed::from_int(0),
@@ -1766,6 +1798,11 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
                 }
             }
 
+            // Ignore ignore_cells
+            if (explored_indices[child.cell.x + (child.cell.y * map.width)] == EXPLORED_INDEX_IGNORE_CELL) {
+                continue;
+            }
+
             // Don't allow diagonal movement through cracks
             if (direction % 2 == 0) {
                 is_adjacent_direction_blocked[direction / 2] = false;
@@ -1778,7 +1815,7 @@ void map_pathfind_calculate_path(const Map& map, CellLayer layer, ivec2 from, iv
             }
 
             // Don't consider already explored children
-            if (explored_indices[child.cell.x + (child.cell.y * map.width)] != -1) {
+            if (explored_indices[child.cell.x + (child.cell.y * map.width)] != EXPLORED_INDEX_NOT_EXPLORED) {
                 continue;
             }
 
@@ -1835,4 +1872,13 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
     }
     map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells, to != original_to);
+}
+
+void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path) {
+    ivec2 rally_cell = map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, mine_cell + ivec2(1, 1), 1, hall_cell, 4, MAP_OPTION_IGNORE_MINERS);
+    ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, rally_cell, MAP_OPTION_IGNORE_MINERS);
+    GOLD_ASSERT(mine_exit_cell.x != -1);
+
+    map_pathfind_calculate_path(map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, path, MAP_OPTION_IGNORE_MINERS, NULL, false);
+    path->push_back(mine_exit_cell);
 }

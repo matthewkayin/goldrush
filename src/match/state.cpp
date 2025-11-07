@@ -1098,13 +1098,8 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                         Target hall_target = match_entity_target_nearest_hall(state, entity);
                         if (hall_target.type == TARGET_ENTITY) {
                             const Entity& hall = state.entities.get_by_id(hall_target.id);
-                            ivec2 rally_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, mine.cell + ivec2(1, 1), 1, hall.cell, entity_get_data(hall.type).cell_size, MAP_OPTION_IGNORE_MINERS);
-                            ivec2 mine_exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, mine.cell, entity_get_data(mine.type).cell_size, entity_data.cell_size, rally_cell, MAP_OPTION_IGNORE_MINERS);
-
-                            GOLD_ASSERT(mine_exit_cell.x != -1);
                             std::vector<ivec2> mine_exit_path;
-                            map_pathfind(state.map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, &mine_exit_path, MAP_OPTION_IGNORE_MINERS);
-                            mine_exit_path.push_back(mine_exit_cell);
+                            map_get_ideal_mine_exit_path(state.map, mine.cell, hall.cell, &mine_exit_path);
 
                             map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), 1, &entity.path, MAP_OPTION_IGNORE_MINERS, &mine_exit_path);
                             used_ideal_mining_path = true;

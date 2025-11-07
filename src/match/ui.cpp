@@ -378,10 +378,8 @@ void match_ui_handle_input(MatchUiState* state) {
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                         state->match.players[player_id].gold += 5000;
                     }
-                } else if (state->chat_message == "/pathing connections on") {
-                    state->debug_view_pathing_connections = true;
-                } else if (state->chat_message == "/pathing connections off") {
-                    state->debug_view_pathing_connections = false;
+                } else if (state->chat_message == "/pathc") {
+                    state->debug_view_pathing_connections = !state->debug_view_pathing_connections;
                 }
             #endif
             network_send_chat(state->chat_message.c_str());
