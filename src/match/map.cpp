@@ -1879,6 +1879,7 @@ void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_ce
     ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, rally_cell, MAP_OPTION_IGNORE_MINERS);
     GOLD_ASSERT(mine_exit_cell.x != -1);
 
+    path->clear();
     map_pathfind_calculate_path(map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, path, MAP_OPTION_IGNORE_MINERS, NULL, false);
     path->push_back(mine_exit_cell);
 }

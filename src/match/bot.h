@@ -212,3 +212,4 @@ bool bot_has_desired_squad_of_type(const Bot& bot, BotSquadType type);
 std::unordered_map<uint32_t, int> bot_get_enemy_hall_defense_scores(const MatchState& state, const Bot& bot);
 int bot_get_least_defended_enemy_hall_score(const MatchState& state, const Bot& bot);
 uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot);
+ivec2 bot_get_unoccupied_cell_near_hall(const MatchState& state, const Bot& bot, ivec2 hall_cell);

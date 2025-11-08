@@ -1101,8 +1101,10 @@ void match_entity_update(MatchState& state, uint32_t entity_index) {
                             std::vector<ivec2> mine_exit_path;
                             map_get_ideal_mine_exit_path(state.map, mine.cell, hall.cell, &mine_exit_path);
 
-                            map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), 1, &entity.path, MAP_OPTION_IGNORE_MINERS, &mine_exit_path);
-                            used_ideal_mining_path = true;
+                            if (mine_exit_path.size() < 8) {
+                                map_pathfind(state.map, CELL_LAYER_GROUND, entity.cell, match_get_entity_target_cell(state, entity), 1, &entity.path, MAP_OPTION_IGNORE_MINERS, &mine_exit_path);
+                                used_ideal_mining_path = true;
+                            }
                         }
                     }
                 }

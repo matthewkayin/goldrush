@@ -2718,15 +2718,8 @@ MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, B
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    // To determine the retreat_cell, path from the nearby base
-    std::vector<ivec2> path;
-    ivec2 hall_cell = state.entities.get_by_id(nearest_allied_hall_id).cell;
-    map_pathfind(state.map, CELL_LAYER_GROUND, hall_cell, squad.target_cell, 1, &path, MAP_OPTION_IGNORE_UNITS);
-
-    ivec2 retreat_cell = hall_cell;
-    if (!path.empty()) {
-        retreat_cell = path[std::min((int)path.size() - 1, BOT_SQUAD_GATHER_DISTANCE)];
-    } 
+    ivec2 nearest_hall_cell = state.entities.get_by_id(nearest_allied_hall_id).cell;
+    ivec2 retreat_cell = bot_get_unoccupied_cell_near_hall(state, bot, nearest_hall_cell);
 
     // Build out the input
     MatchInput retreat_input;
@@ -3577,14 +3570,7 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
 
     int entity_size = entity_get_data(entity.type).cell_size;
     ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_OPTION_IGNORE_UNITS);
-
-    std::vector<ivec2> path_from_hall;
-    map_pathfind(state.map, CELL_LAYER_GROUND, target_cell, entity.cell, entity_size, &path_from_hall, MAP_OPTION_IGNORE_UNITS);
-
-    static const int DISTANCE_FROM_HALL = 8;
-    if (!path_from_hall.empty()) {
-        target_cell = path_from_hall[std::min((int)path_from_hall.size() - 1, DISTANCE_FROM_HALL)];
-    }
+    target_cell = bot_get_unoccupied_cell_near_hall(state, bot, target_cell);
 
     log_trace("BOT %u: return entity to nearest hall", bot.player_id);
     MatchInput input;
@@ -4278,4 +4264,58 @@ uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot) {
     }
 
     return mining_base_count;
+}
+
+ivec2 bot_get_unoccupied_cell_near_hall(const MatchState& state, const Bot& bot, ivec2 hall_cell) {
+    EntityId goldmine_id = bot_find_best_entity((BotFindBestEntityParams) {
+        .state = state,
+        .filter = [](const Entity& goldmine, EntityId goldmine_id) {
+            return goldmine.type == ENTITY_GOLDMINE;
+        },
+        .compare = bot_closest_manhattan_distance_to(hall_cell)
+    });
+    ivec2 goldmine_cell = state.entities.get_by_id(goldmine_id).cell;
+
+    // To determine the retreat_cell, search around the nearby base
+    std::vector<ivec2> frontier;
+    std::vector<bool> is_explored(state.map.width * state.map.height, false);
+
+    frontier.push_back(hall_cell - ivec2(1, 1));
+    ivec2 retreat_cell = ivec2(-1, -1);
+    while (!frontier.empty()) {
+        ivec2 next = frontier.back();
+        frontier.pop_back();
+
+        if (is_explored[next.x + (next.y * state.map.width)]) {
+            continue;
+        }
+
+        if (ivec2::manhattan_distance(next, hall_cell) > BOT_SQUAD_GATHER_DISTANCE &&
+                ivec2::manhattan_distance(next, goldmine_cell) > BOT_SQUAD_GATHER_DISTANCE &&
+                map_is_cell_rect_in_bounds(state.map, next - ivec2(1, 1), 3) &&
+                !map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, next - ivec2(1, 1), 3)) {
+            retreat_cell = next;
+            break;
+        }
+
+        is_explored[next.x + (next.y * state.map.width)] = true;
+
+        for (int direction = 0; direction < 4; direction += 2) {
+            ivec2 child = next + DIRECTION_IVEC2[direction];
+
+            if (!map_is_cell_in_bounds(state.map, child)) {
+                continue;
+            }
+
+            frontier.push_back(child);
+        }
+    }
+
+    GOLD_ASSERT(retreat_cell.x != -1);
+    if (retreat_cell.x == -1) {
+        retreat_cell = hall_cell - ivec2(BOT_SQUAD_GATHER_DISTANCE, 0);
+        retreat_cell.x = std::max(0, retreat_cell.x);
+    }
+
+    return retreat_cell;
 }
