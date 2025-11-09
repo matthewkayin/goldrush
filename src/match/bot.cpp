@@ -2515,7 +2515,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             }
 
             // If the carrier is already en-route to the infantry, then don't worry about moving the carrier
-            ivec2 carrier_target_cell = carrier.target.type == TARGET_CELL ? carrier.target.cell : carrier.cell;
             if (ivec2::manhattan_distance(carrier_target_cell, path_to_infantry_center.back()) < BOT_SQUAD_GATHER_DISTANCE) {
                 continue;
             }

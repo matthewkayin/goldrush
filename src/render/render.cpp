@@ -27,6 +27,8 @@
 #include <vector>
 #include <algorithm>
 #include <unordered_map>
+#include <tracy/tracy/Tracy.hpp>
+#include <tracy/tracy/TracyOpenGL.hpp>
 
 struct SpriteVertex {
     float position[2];
@@ -142,6 +144,7 @@ bool render_init(SDL_Window* window) {
         log_error("Error loading OpenGL.");
         return false;
     }
+    TracyGpuContext;
 
     GLint max_texture_size;
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
@@ -884,6 +887,9 @@ void render_sprite_batch() {
     }
     GOLD_ASSERT(state.sprite_vertices.size() <= MAX_BATCH_VERTICES);
 
+    ZoneScoped;
+    TracyGpuZone("Render Sprite Batch");
+
     // Buffer sprite batch data
     glBindVertexArray(state.sprite_vao);
     glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
@@ -923,6 +929,8 @@ void render_present_frame() {
     glBindVertexArray(0);
 
     SDL_GL_SwapWindow(state.window);
+
+    TracyGpuCollect;
 }
 
 const SpriteInfo& render_get_sprite_info(SpriteName name) {
@@ -1237,6 +1245,8 @@ void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel)
 }
 
 void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
+    ZoneScoped;
+
     float position_left = (float)position.x;
     float position_right = (float)(position.x + dst_size.x);
     float position_top = (float)(SCREEN_HEIGHT - position.y);
@@ -1303,6 +1313,7 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
         }
     };
 
+    TracyGpuZone("Render Minimap");
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, state.minimap_texture_pixels);

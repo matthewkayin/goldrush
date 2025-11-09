@@ -3724,6 +3724,7 @@ int match_ui_ysort_render_params_partition(std::vector<RenderSpriteParams>& para
 }
 
 void match_ui_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high) {
+    ZoneScoped;
     if (low < high) {
         int partition_index = match_ui_ysort_render_params_partition(params, low, high);
         match_ui_ysort_render_params(params, low, partition_index - 1);
