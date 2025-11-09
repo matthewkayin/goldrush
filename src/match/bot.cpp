@@ -2499,6 +2499,13 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
         // Move toward en-route infantry
         if (infantry_count != 0) {
             ivec2 infantry_center = infantry_position_sum / infantry_count;
+
+            // If the carrier is already close to the infantry, then don't worry about moving
+            ivec2 carrier_target_cell = carrier.target.type == TARGET_CELL ? carrier.target.cell : carrier.cell;
+            if (ivec2::manhattan_distance(carrier_target_cell, infantry_center) < BOT_SQUAD_GATHER_DISTANCE) {
+                continue;
+            }
+
             std::vector<ivec2> path_to_infantry_center;
             map_pathfind(state.map, CELL_LAYER_GROUND, carrier.cell, infantry_center, 2, &path_to_infantry_center, MAP_OPTION_IGNORE_UNITS);
 
@@ -2507,10 +2514,9 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
                 continue;
             }
 
-            // If the carrier is already en-route to the midpoint, then don't worry about moving the carrier
-            ivec2 path_midpoint = path_to_infantry_center[path_to_infantry_center.size() / 2];
+            // If the carrier is already en-route to the infantry, then don't worry about moving the carrier
             ivec2 carrier_target_cell = carrier.target.type == TARGET_CELL ? carrier.target.cell : carrier.cell;
-            if (ivec2::manhattan_distance(carrier_target_cell, path_midpoint) < BOT_SQUAD_GATHER_DISTANCE * 2) {
+            if (ivec2::manhattan_distance(carrier_target_cell, path_to_infantry_center.back()) < BOT_SQUAD_GATHER_DISTANCE) {
                 continue;
             }
 
@@ -2520,9 +2526,9 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             input.type = MATCH_INPUT_MOVE_CELL;
             input.move.shift_command = 0;
             input.move.target_id = ID_NULL;
-            input.move.target_cell = path_midpoint;
+            input.move.target_cell = path_to_infantry_center.back();
             input.move.entity_ids[0] = carrier_id;
-            input.move.entity_count++;
+            input.move.entity_count = 1;
             return input;
         } // End if infantry count != 0
 
