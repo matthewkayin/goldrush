@@ -138,7 +138,11 @@ int gold_main(int argc, char** argv) {
 
         char fps_text[16];
         sprintf(fps_text, "FPS: %u", fps);
-        render_text(FONT_HACK, fps_text, ivec2(10, 10), RENDER_COLOR_WHITE);
+        render_text(FONT_HACK_WHITE, fps_text, ivec2(10, 10));
+
+        render_vertical_line(50, 100, 200, RENDER_COLOR_WHITE);
+        render_fill_rect({ .x = 400, .y = 200, .w = 20, .h = 40 }, RENDER_COLOR_RED);
+        render_draw_rect({ .x = 200, .y = 200, .w = 20, .h = 40 }, RENDER_COLOR_GREEN);
 
         render_present_frame();
     }
