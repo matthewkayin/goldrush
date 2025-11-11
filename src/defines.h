@@ -25,4 +25,6 @@
 
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
+#define UPDATES_PER_SECOND 60
 #define MAX_PLAYERS 4
+#define TILE_SIZE 32

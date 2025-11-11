@@ -25,7 +25,7 @@ std::string filesystem_get_data_path() {
 
 std::string filesystem_get_resource_path() {
     #ifdef GOLD_DEBUG
-        return std::string("../");
+        return std::string("../res/");
     #else
         return std::string(SDL_GetBasePath());
     #endif

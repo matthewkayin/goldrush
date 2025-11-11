@@ -11,17 +11,10 @@ bool logger_init(const char* logfile_path) {
     std::string log_folder_path = filesystem_get_data_path() + "/logs/";
     SDL_CreateDirectory(log_folder_path.c_str());
 
-    // Create logfile path
-    std::string path;
-    if (logfile_path != NULL) {
-        path = std::string(logfile_path);
-    } else {
-        path = filesystem_get_timestamp_str() + std::string(".log");
-    }
-    path = log_folder_path + path;
+    std::string logfile_full_path = log_folder_path + logfile_path;
 
     // Open logfile
-    logfile = fopen(path.c_str(), "w");
+    logfile = fopen(logfile_full_path.c_str(), "w");
     if (logfile == NULL) {
         log_error("Unable to open log file for writing.");
         return false;
@@ -41,7 +34,7 @@ void logger_output(LogLevel log_level, const char* message, ...) {
 
     __builtin_va_list arg_ptr;
     va_start(arg_ptr, message);
-    vsnprintf(out_message, MESSAGE_BUFFER_LENGTH, message, out_message);
+    vsnprintf(out_message, MESSAGE_BUFFER_LENGTH, message, arg_ptr);
     va_end(arg_ptr);
 
     const char* LOG_PREFIX[4] = { "ERROR", "WARN", "INFO", "DEBUG" };
