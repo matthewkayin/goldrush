@@ -7,10 +7,16 @@
 #include "core/options.h"
 #include "network/network.h"
 #include "render/render.h"
+#include "menu/menu.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
 #include <string>
+#include <ctime>
+
+#ifdef GOLD_STEAM
+    #include <steam/steam_api.h>
+#endif
 
 int gold_main(int argc, char** argv);
 
@@ -53,7 +59,39 @@ int main(int argc, char** argv) {
 }
 #endif
 
+static const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
+
+enum GameMode {
+    GAME_MODE_NONE,
+    GAME_MODE_MENU,
+    GAME_MODE_MATCH
+};
+
+struct GameState {
+    GameMode mode = GAME_MODE_NONE;
+    MenuState* menu_state = nullptr;
+};
+
+void game_set_mode(GameState& state, GameMode next_mode) {
+    if (next_mode == GAME_MODE_MENU) {
+        state.menu_state = menu_init();
+    }
+
+    if (state.mode == GAME_MODE_MENU) {
+        delete state.menu_state;
+        state.menu_state = nullptr;
+    }
+
+    state.mode = next_mode;
+}
+
 int gold_main(int argc, char** argv) {
+    #ifdef GOLD_STEAM
+        if (SteamAPI_RestartAppIfNecessary(GOLD_STEAM_APP_ID)) {
+            return 1;
+        }
+    #endif
+
     std::string logfile_path = filesystem_get_timestamp_str() + ".log";
 
     // Parse system arguments
@@ -68,13 +106,17 @@ int gold_main(int argc, char** argv) {
 
     // Init SDL
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-        return -1;
+        return 1;
     }
     if (!TTF_Init()) {
-        return -1;
+        return 1;
     }
 
-    logger_init(logfile_path.c_str());
+    filesystem_create_required_folders();
+
+    if (!logger_init(logfile_path.c_str())) {
+        return 1;
+    }
 
     // Log initialization messages
     log_info("Initializing %s %s.", APP_NAME, APP_VERSION);
@@ -97,27 +139,34 @@ int gold_main(int argc, char** argv) {
     // Init subsystems
     if (!render_init(window)) {
         logger_quit();
-        return -1;
+        return 1;
     }
     if (!cursor_init()) {
         logger_quit();
-        return -1;
+        return 1;
     }
     if (!sound_init()) {
         logger_quit();
-        return -1;
+        return 1;
     }
+    if (!network_init()) {
+        logger_quit();
+        return 1;
+    }
+    input_init(window);
     options_load();
+    srand((uint32_t)time(0));
 
-    bool is_running = true;
-    const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
     uint64_t last_time = SDL_GetTicksNS();
     uint64_t last_second = last_time;
     uint64_t update_accumulator = 0;
     uint32_t frames = 0;
     uint32_t fps = 0;
 
-    while (is_running) {
+    GameState state;
+    game_set_mode(state, GAME_MODE_MENU);
+
+    while (!input_user_requests_exit()) {
         // Timekeep
         uint64_t current_time = SDL_GetTicksNS();
         update_accumulator += current_time - last_time;
@@ -137,15 +186,34 @@ int gold_main(int argc, char** argv) {
             // Input
             input_poll_events();
 
-            if (input_user_requests_exit()) {
-                is_running = false;
-                break;
-            }
-
             // Network
             network_service();
             NetworkEvent event;
             while (network_poll_events(&event)) {
+                switch (state.mode) {
+                    case GAME_MODE_NONE: 
+                        break;
+                    case GAME_MODE_MENU: {
+                        menu_handle_network_event(state.menu_state, event);
+                        break;
+                    }
+                    case GAME_MODE_MATCH: {
+                        break;
+                    }
+                }
+            }
+
+            // Update
+            switch (state.mode) {
+                case GAME_MODE_NONE:
+                    break;
+                case GAME_MODE_MENU: {
+                    menu_update(state.menu_state);
+                    break;
+                }
+                case GAME_MODE_MATCH: {
+                    break;
+                }
             }
         }
 
@@ -154,19 +222,30 @@ int gold_main(int argc, char** argv) {
         // Render
         render_prepare_frame();
 
-        render_sprite_frame(SPRITE_UNIT_WAGON, ivec2(0, 0), ivec2(100, 100), 0, 0);
-        render_sprite_frame(SPRITE_UNIT_WAGON, ivec2(0, 0), ivec2(200, 200), 0, 2);
-
-        char fps_text[16];
-        sprintf(fps_text, "FPS: %u", fps);
-        render_text(FONT_HACK_WHITE, fps_text, ivec2(10, 10));
-
-        render_vertical_line(50, 100, 200, RENDER_COLOR_WHITE);
-        render_fill_rect({ .x = 400, .y = 200, .w = 20, .h = 40 }, RENDER_COLOR_RED);
-        render_draw_rect({ .x = 200, .y = 200, .w = 20, .h = 40 }, RENDER_COLOR_GREEN);
+        switch (state.mode) {
+            case GAME_MODE_NONE:
+                break;
+            case GAME_MODE_MENU: {
+                menu_render(state.menu_state);
+                break;
+            }
+            case GAME_MODE_MATCH: {
+                break;
+            }
+        }
 
         render_present_frame();
     }
+
+    // Disconnect the network
+    if (network_get_status() == NETWORK_STATUS_CONNECTED || network_get_status() == NETWORK_STATUS_HOST) {
+        network_disconnect();
+    }
+
+    // Delete the current game sub-state
+    game_set_mode(state, GAME_MODE_NONE);
+
+    options_save();
 
     // Quit subsystems
     network_quit();
@@ -174,6 +253,15 @@ int gold_main(int argc, char** argv) {
     cursor_quit();
     render_quit();
     logger_quit();
+
+#ifdef GOLD_STEAM
+    SteamAPI_Shutdown();
+#endif
+
+    TTF_Quit();
+    SDL_Quit();
+
+    log_info("%s quit gracefully.", APP_NAME);
 
     return 0;
 }

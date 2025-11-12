@@ -3,6 +3,7 @@
 #include "defines.h"
 #include <SDL3/SDL.h>
 #include <ctime>
+#include <vector>
 
 std::string filesystem_get_timestamp_str() {
     time_t _time = time(NULL);
@@ -29,4 +30,14 @@ std::string filesystem_get_resource_path() {
     #else
         return std::string(SDL_GetBasePath());
     #endif
+}
+
+void filesystem_create_required_folders() {
+    std::vector<std::string> folder_paths;
+    folder_paths.push_back(filesystem_get_data_path() + "logs/");
+    folder_paths.push_back(filesystem_get_data_path() + "replays/");
+
+    for (const std::string& path : folder_paths) {
+        SDL_CreateDirectory(path.c_str());
+    }
 }

@@ -16,6 +16,7 @@ struct AnimationData {
 };
 
 static std::unordered_map<AnimationName, AnimationData> ANIMATION_DATA;
+static bool initialized = false;
 
 std::vector<AnimationFrame> animation_frame_range(int start_hframe, int end_hframe, uint32_t duration) {
     std::vector<AnimationFrame> frames;
@@ -231,9 +232,15 @@ void animation_init() {
         .frames = animation_frame_range(2, 3, 8),
         .loops = ANIMATION_LOOPS_INDEFINITELY
     };
+
+    initialized = true;
 }
 
 Animation animation_create(AnimationName name) {
+    if (!initialized) {
+        animation_init();
+    }
+
     auto it = ANIMATION_DATA.find(name);
     GOLD_ASSERT(it != ANIMATION_DATA.end());
 

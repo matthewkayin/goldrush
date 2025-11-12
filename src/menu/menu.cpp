@@ -101,8 +101,9 @@ bool string_ends_with(const std::string& str, const char* suffix) {
 void menu_search_replays_folder(MenuState* state) {
     state->replay_filenames.clear();
     std::string replay_folder_path = filesystem_get_data_path() + "replays";
-    SDL_EnumerateDirectory(replay_folder_path.c_str(), menu_on_replay_file_found, (void*)&state);
+    SDL_EnumerateDirectory(replay_folder_path.c_str(), menu_on_replay_file_found, (void*)state);
 }
+
 
 MenuState* menu_init() {
     MenuState* state = new MenuState();
@@ -286,7 +287,7 @@ void menu_update(MenuState* state) {
         ui_end_container(state->ui);
 #ifndef GOLD_STEAM
         const SpriteInfo& profile_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_PROFILE);
-        ui_element_position(state->ui, ivec2(SCREEN_WIDTH - profile_button_sprite_info.frame_width - 1, 1));
+        ui_element_position(state->ui, ivec2(SCREEN_WIDTH - (profile_button_sprite_info.frame_width * 2) - 2, 2));
         if (ui_sprite_button(state->ui, SPRITE_UI_BUTTON_PROFILE, false, false)) {
             menu_set_mode(state, MENU_MODE_USERNAME);
         }
@@ -676,10 +677,10 @@ void menu_update(MenuState* state) {
         ui_frame_rect(state->ui, USERNAME_RECT);
         ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Choose Your Username");
 
-        ui_element_position(state->ui, ivec2(USERNAME_RECT.x + (USERNAME_RECT.w / 2) - (header_text_size.x / 2), USERNAME_RECT.y + 6));
+        ui_element_position(state->ui, ivec2(USERNAME_RECT.x + (USERNAME_RECT.w / 2) - (header_text_size.x / 2), USERNAME_RECT.y + 12));
         ui_text(state->ui, FONT_HACK_GOLD, "Choose Your Username");
 
-        ui_begin_column(state->ui, ivec2(USERNAME_RECT.x + 32, USERNAME_RECT.y + 112), 12);
+        ui_begin_column(state->ui, ivec2(USERNAME_RECT.x + 16, USERNAME_RECT.y + 64), 12);
         ui_text_input(state->ui, "Username: ", ivec2(568, 48), &state->username, NETWORK_LOBBY_NAME_BUFFER_SIZE - 1);
 
         ui_end_container(state->ui);

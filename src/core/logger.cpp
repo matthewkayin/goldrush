@@ -7,13 +7,8 @@
 static FILE* logfile;
 
 bool logger_init(const char* logfile_path) {
-    // Create log folder
-    std::string log_folder_path = filesystem_get_data_path() + "/logs/";
-    SDL_CreateDirectory(log_folder_path.c_str());
-
-    std::string logfile_full_path = log_folder_path + logfile_path;
-
     // Open logfile
+    std::string logfile_full_path = filesystem_get_data_path() + "logs/" + logfile_path;
     logfile = fopen(logfile_full_path.c_str(), "w");
     if (logfile == NULL) {
         log_error("Unable to open log file for writing.");
