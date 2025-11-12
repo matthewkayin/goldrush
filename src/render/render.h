@@ -105,7 +105,7 @@ void render_draw_rect(Rect rect, RenderColor color);
 void render_fill_rect(Rect rect, RenderColor color);
 void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t options);
 void render_text(FontName name, const char* text, ivec2 position);
-ivec2 render_get_text_size(FontName name, const char* text, float scale);
+ivec2 render_get_text_size(FontName name, const char* text);
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel);
 void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
 void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);

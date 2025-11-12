@@ -1,14 +1,14 @@
 #pragma once
 
 #include "defines.h"
-#include "defines.h"
+#include "core/asserts.h"
 #include <cmath>
 
 // from https://github.com/chmike/fpsqrt/blob/master/fpsqrt.c
 // sqrt_i64 computes the squrare root of a 64bit integer and returns
 // a 64bit integer value. It requires that v is positive.
-inline int64_t sqrt_i64(uint64_t v) {
-    uint64_t b = ((uint64_t)1)<<62, q = 0, r = v;
+inline int64_t sqrt_i64(int64_t v) {
+    uint64_t b = ((uint64_t)1)<<62, q = 0, r = (uint64_t)v;
     while (b > r)
         b >>= 2;
     while( b > 0 ) {
@@ -20,15 +20,16 @@ inline int64_t sqrt_i64(uint64_t v) {
         }
         b >>= 2;
     }
-    return q;
+    GOLD_ASSERT(q <= INT64_MAX);
+    return (int64_t)q;
 }
 
 struct fixed {
-    static const size_t integer_bits = 24;
-    static const size_t fractional_bits = 8;
-    static const int32_t scale_factor = (int32_t)1 << fractional_bits;
+    static const int32_t integer_bits = 24;
+    static const int32_t fractional_bits = 8;
+    static const int32_t scale_factor = 1 << fractional_bits;
     static const int32_t fractional_mask = scale_factor - 1;
-    static const size_t total_bits = integer_bits + fractional_bits;
+    static const int32_t total_bits = integer_bits + fractional_bits;
     int32_t raw_value;
 
     static constexpr fixed from_int(int32_t integer_value) {
@@ -95,13 +96,13 @@ struct fixed {
         return from_raw(raw_value - other.raw_value);
     }
     fixed operator*(const fixed& other) const {
-        return from_raw(((int64_t)raw_value * other.raw_value) >> fractional_bits);
+        return from_raw((int32_t)(((int64_t)raw_value * (int64_t)other.raw_value) >> (int64_t)fractional_bits));
     }
     fixed operator*(int scaler) const {
         return from_raw(raw_value * scaler);
     }
     fixed operator/(const fixed& other) const {
-        return from_raw((((int64_t)raw_value) << fractional_bits) / other.raw_value);
+        return from_raw((int32_t)((((int64_t)raw_value) << (int64_t)fractional_bits) / (int64_t)other.raw_value));
     }
     fixed operator/(int scaler) const {
         return from_raw(raw_value / scaler);
@@ -197,7 +198,7 @@ struct fvec2 {
     fixed length() const {
         int64_t x64 = x.raw_value;
         int64_t y64 = y.raw_value;
-        uint64_t length_squared = (x64 * x64) + (y64 * y64);
+        int64_t length_squared = (x64 * x64) + (y64 * y64);
         return fixed::from_raw((int32_t)sqrt_i64(length_squared));
     }
     fixed distance_to(const fvec2& other) const {
@@ -423,12 +424,12 @@ inline int next_largest_power_of_two(int number) {
 
 inline ivec2 get_nearest_cell_in_rect(ivec2 start_cell, ivec2 rect_position, int rect_size) {
     ivec2 nearest_cell = rect_position;
-    uint32_t nearest_cell_dist = ivec2::manhattan_distance(start_cell, nearest_cell);
+    int nearest_cell_dist = ivec2::manhattan_distance(start_cell, nearest_cell);
 
     for (int y = rect_position.y; y < rect_position.y + rect_size; y++) {
         for (int x = rect_position.x; x < rect_position.x + rect_size; x++) {
             ivec2 cell = ivec2(x, y);
-            uint32_t cell_dist = ivec2::manhattan_distance(start_cell, cell);
+            int cell_dist = ivec2::manhattan_distance(start_cell, cell);
             if (cell_dist < nearest_cell_dist) {
                 nearest_cell = cell;
                 nearest_cell_dist = cell_dist;
@@ -443,7 +444,7 @@ struct Time {
     uint32_t hours;
     uint32_t minutes;
     uint32_t seconds;
-    static Time from_seconds(int s) {
+    static Time from_seconds(uint32_t s) {
         Time time;
         time.seconds = s;
         time.minutes = time.seconds / 60;

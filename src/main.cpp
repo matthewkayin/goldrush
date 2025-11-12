@@ -2,6 +2,10 @@
 #include "core/logger.h"
 #include "core/filesystem.h"
 #include "core/input.h"
+#include "core/cursor.h"
+#include "core/sound.h"
+#include "core/options.h"
+#include "network/network.h"
 #include "render/render.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
@@ -95,6 +99,15 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return -1;
     }
+    if (!cursor_init()) {
+        logger_quit();
+        return -1;
+    }
+    if (!sound_init()) {
+        logger_quit();
+        return -1;
+    }
+    options_load();
 
     bool is_running = true;
     const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
@@ -128,7 +141,15 @@ int gold_main(int argc, char** argv) {
                 is_running = false;
                 break;
             }
+
+            // Network
+            network_service();
+            NetworkEvent event;
+            while (network_poll_events(&event)) {
+            }
         }
+
+        sound_update();
 
         // Render
         render_prepare_frame();
@@ -148,6 +169,9 @@ int gold_main(int argc, char** argv) {
     }
 
     // Quit subsystems
+    network_quit();
+    sound_quit();
+    cursor_quit();
     render_quit();
     logger_quit();
 

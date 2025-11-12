@@ -3,12 +3,12 @@
 #include <unordered_map>
 
 static const std::unordered_map<Tileset, TilesetParams> TILESET_PARAMS = {
-    { TILESET_ARIZONA, { .path = "tileset_arizona.png" }},
-    { TILESET_FOG, { .path = "fog_of_war.png" }}
+    { TILESET_ARIZONA, (TilesetParams) { .path = "tileset_arizona.png" }},
+    { TILESET_FOG, (TilesetParams) { .path = "fog_of_war.png" }}
 };
 
 static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
-    { SPRITE_TILE_NULL, {
+    { SPRITE_TILE_NULL, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -17,7 +17,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 16
         }
     }},
-    { SPRITE_TILE_SAND1, {
+    { SPRITE_TILE_SAND1, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -26,7 +26,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_SAND2, {
+    { SPRITE_TILE_SAND2, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -35,7 +35,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_SAND3, {
+    { SPRITE_TILE_SAND3, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -44,7 +44,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WATER, {
+    { SPRITE_TILE_WATER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -53,7 +53,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 16
         }
     }},
-    { SPRITE_TILE_WALL_NW_CORNER, {
+    { SPRITE_TILE_WALL_NW_CORNER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -62,7 +62,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WALL_NE_CORNER, {
+    { SPRITE_TILE_WALL_NE_CORNER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -71,7 +71,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WALL_SW_CORNER, {
+    { SPRITE_TILE_WALL_SW_CORNER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -80,7 +80,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_TILE_WALL_SE_CORNER, {
+    { SPRITE_TILE_WALL_SE_CORNER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -89,7 +89,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_TILE_WALL_NORTH_EDGE, {
+    { SPRITE_TILE_WALL_NORTH_EDGE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -98,7 +98,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WALL_WEST_EDGE, {
+    { SPRITE_TILE_WALL_WEST_EDGE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -107,7 +107,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 16
         }
     }},
-    { SPRITE_TILE_WALL_EAST_EDGE, {
+    { SPRITE_TILE_WALL_EAST_EDGE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -116,7 +116,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 16
         }
     }},
-    { SPRITE_TILE_WALL_SOUTH_EDGE, {
+    { SPRITE_TILE_WALL_SOUTH_EDGE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -125,7 +125,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_TILE_WALL_SE_FRONT, {
+    { SPRITE_TILE_WALL_SE_FRONT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -134,7 +134,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_SOUTH_FRONT, {
+    { SPRITE_TILE_WALL_SOUTH_FRONT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -143,7 +143,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_SW_FRONT, {
+    { SPRITE_TILE_WALL_SW_FRONT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -152,7 +152,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_NW_INNER_CORNER, {
+    { SPRITE_TILE_WALL_NW_INNER_CORNER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -161,7 +161,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WALL_NE_INNER_CORNER, {
+    { SPRITE_TILE_WALL_NE_INNER_CORNER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -170,7 +170,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WALL_SW_INNER_CORNER, {
+    { SPRITE_TILE_WALL_SW_INNER_CORNER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -179,7 +179,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 16
         }
     }},
-    { SPRITE_TILE_WALL_SE_INNER_CORNER, {
+    { SPRITE_TILE_WALL_SE_INNER_CORNER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -188,7 +188,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 16
         }
     }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_LEFT, {
+    { SPRITE_TILE_WALL_SOUTH_STAIR_LEFT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -197,7 +197,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_CENTER, {
+    { SPRITE_TILE_WALL_SOUTH_STAIR_CENTER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -206,7 +206,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT, {
+    { SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -215,7 +215,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_LEFT, {
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_LEFT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -224,7 +224,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_CENTER, {
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_CENTER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -233,7 +233,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_RIGHT, {
+    { SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_RIGHT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -242,7 +242,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_NORTH_STAIR_LEFT, {
+    { SPRITE_TILE_WALL_NORTH_STAIR_LEFT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -251,7 +251,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_NORTH_STAIR_CENTER, {
+    { SPRITE_TILE_WALL_NORTH_STAIR_CENTER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -260,7 +260,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_NORTH_STAIR_RIGHT, {
+    { SPRITE_TILE_WALL_NORTH_STAIR_RIGHT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -269,7 +269,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 48
         }
     }},
-    { SPRITE_TILE_WALL_EAST_STAIR_TOP, {
+    { SPRITE_TILE_WALL_EAST_STAIR_TOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -278,7 +278,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WALL_EAST_STAIR_CENTER, {
+    { SPRITE_TILE_WALL_EAST_STAIR_CENTER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -287,7 +287,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 16
         }
     }},
-    { SPRITE_TILE_WALL_EAST_STAIR_BOTTOM, {
+    { SPRITE_TILE_WALL_EAST_STAIR_BOTTOM, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -296,7 +296,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_TILE_WALL_WEST_STAIR_TOP, {
+    { SPRITE_TILE_WALL_WEST_STAIR_TOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -305,7 +305,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WALL_WEST_STAIR_CENTER, {
+    { SPRITE_TILE_WALL_WEST_STAIR_CENTER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -314,7 +314,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 16
         }
     }},
-    { SPRITE_TILE_WALL_WEST_STAIR_BOTTOM, {
+    { SPRITE_TILE_WALL_WEST_STAIR_BOTTOM, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
@@ -323,7 +323,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_DECORATION, {
+    { SPRITE_DECORATION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "tile_decorations.png",
@@ -331,7 +331,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_FOG_HIDDEN, {
+    { SPRITE_FOG_HIDDEN, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_FOG,
@@ -340,7 +340,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_FOG_EXPLORED, {
+    { SPRITE_FOG_EXPLORED, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_FOG,
@@ -349,7 +349,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_UI_MINIMAP, {
+    { SPRITE_UI_MINIMAP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_minimap.png",
@@ -357,7 +357,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_WANTED_SIGN, {
+    { SPRITE_UI_WANTED_SIGN, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_wanted_sign.png",
@@ -365,7 +365,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_FRAME_BOLTS, {
+    { SPRITE_UI_FRAME_BOLTS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_frame_bolts.png",
@@ -373,7 +373,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_UI_FRAME, {
+    { SPRITE_UI_FRAME, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_frame.png",
@@ -381,7 +381,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_UI_FRAME_SMALL, {
+    { SPRITE_UI_FRAME_SMALL, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_frame_small.png",
@@ -389,7 +389,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_UI_BUTTON_REFRESH, {
+    { SPRITE_UI_BUTTON_REFRESH, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "menu_refresh.png",
@@ -397,7 +397,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_BUTTON_ARROW, {
+    { SPRITE_UI_BUTTON_ARROW, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "menu_next.png",
@@ -405,7 +405,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_BUTTON_BURGER, {
+    { SPRITE_UI_BUTTON_BURGER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_menu_button.png",
@@ -413,7 +413,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_BUTTON_PROFILE, {
+    { SPRITE_UI_BUTTON_PROFILE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "menu_profile.png",
@@ -421,7 +421,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_REPLAY_PAUSE, {
+    { SPRITE_UI_REPLAY_PAUSE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_replay_pause.png",
@@ -429,7 +429,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_REPLAY_PLAY, {
+    { SPRITE_UI_REPLAY_PLAY, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_replay_play.png",
@@ -437,7 +437,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_GOLD_ICON, {
+    { SPRITE_UI_GOLD_ICON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_gold.png",
@@ -445,7 +445,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_HOUSE_ICON, {
+    { SPRITE_UI_HOUSE_ICON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_house.png",
@@ -453,7 +453,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_MINER_ICON, {
+    { SPRITE_UI_MINER_ICON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "ui_miner.png",
@@ -461,7 +461,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_ENERGY_ICON, {
+    { SPRITE_UI_ENERGY_ICON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_energy.png",
@@ -469,7 +469,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_DROPDOWN, {
+    { SPRITE_UI_DROPDOWN, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_options_dropdown.png",
@@ -477,7 +477,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 5
         }
     }},
-    { SPRITE_UI_DROPDOWN_MINI, {
+    { SPRITE_UI_DROPDOWN_MINI, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_dropdown_mini.png",
@@ -485,7 +485,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 5
         }
     }},
-    { SPRITE_UI_TEAM_PICKER, {
+    { SPRITE_UI_TEAM_PICKER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_team_picker.png",
@@ -493,7 +493,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_MENU_BUTTON, {
+    { SPRITE_UI_MENU_BUTTON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_parchment_buttons.png",
@@ -501,7 +501,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 2
         }
     }},
-    { SPRITE_UI_TEXT_FRAME, {
+    { SPRITE_UI_TEXT_FRAME, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_text_frame.png",
@@ -509,7 +509,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_CLOUDS, {
+    { SPRITE_UI_CLOUDS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "menu_clouds.png",
@@ -517,13 +517,10 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wmissing-designated-field-initializers"
-    { SPRITE_UI_SWATCH, {
+    { SPRITE_UI_SWATCH, (SpriteParams) {
         .strategy = SPRITE_IMPORT_SWATCH,
     }},
-    #pragma clang diagnostic pop
-    { SPRITE_UI_TITLE, {
+    { SPRITE_UI_TITLE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_title.png",
@@ -531,7 +528,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_MOVE, {
+    { SPRITE_UI_MOVE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_move.png",
@@ -539,7 +536,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_CONTROL_GROUP, {
+    { SPRITE_UI_CONTROL_GROUP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_control_group_frame.png",
@@ -547,7 +544,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_ICON_BUTTON, {
+    { SPRITE_UI_ICON_BUTTON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button.png",
@@ -555,7 +552,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_TOOLTIP_FRAME, {
+    { SPRITE_UI_TOOLTIP_FRAME, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_tooltip_frame.png",
@@ -563,7 +560,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_UI_STAT_ICON_DETECTION, {
+    { SPRITE_UI_STAT_ICON_DETECTION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_stat_detection.png",
@@ -571,7 +568,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_STAT_ICON_BLEED, {
+    { SPRITE_UI_STAT_ICON_BLEED, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_stat_bleed.png",
@@ -579,7 +576,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_ATTACK, {
+    { SPRITE_BUTTON_ICON_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_attack.png",
@@ -587,7 +584,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_STOP, {
+    { SPRITE_BUTTON_ICON_STOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_stop.png",
@@ -595,7 +592,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_DEFEND, {
+    { SPRITE_BUTTON_ICON_DEFEND, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_defend.png",
@@ -603,7 +600,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BUILD, {
+    { SPRITE_BUTTON_ICON_BUILD, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_build.png",
@@ -611,7 +608,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BUILD2, {
+    { SPRITE_BUTTON_ICON_BUILD2, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_build2.png",
@@ -619,7 +616,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_REPAIR, {
+    { SPRITE_BUTTON_ICON_REPAIR, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_repair.png",
@@ -627,7 +624,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_UNLOAD, {
+    { SPRITE_BUTTON_ICON_UNLOAD, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_unload.png",
@@ -635,7 +632,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_CANCEL, {
+    { SPRITE_BUTTON_ICON_CANCEL, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_cancel.png",
@@ -643,7 +640,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_EXPLODE, {
+    { SPRITE_BUTTON_ICON_EXPLODE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_explode.png",
@@ -651,7 +648,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BOMB, {
+    { SPRITE_BUTTON_ICON_BOMB, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_bomb.png",
@@ -659,7 +656,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_HALL, {
+    { SPRITE_BUTTON_ICON_HALL, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_hall.png",
@@ -667,7 +664,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_HOUSE, {
+    { SPRITE_BUTTON_ICON_HOUSE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_house.png",
@@ -675,7 +672,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_SALOON, {
+    { SPRITE_BUTTON_ICON_SALOON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_saloon.png",
@@ -683,7 +680,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BUNKER, {
+    { SPRITE_BUTTON_ICON_BUNKER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_bunker.png",
@@ -691,7 +688,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_SMITH, {
+    { SPRITE_BUTTON_ICON_SMITH, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_smith.png",
@@ -699,7 +696,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_COOP, {
+    { SPRITE_BUTTON_ICON_COOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_coop.png",
@@ -707,7 +704,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BARRACKS, {
+    { SPRITE_BUTTON_ICON_BARRACKS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_barracks.png",
@@ -715,7 +712,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_SHERIFFS, {
+    { SPRITE_BUTTON_ICON_SHERIFFS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_sheriffs.png",
@@ -723,7 +720,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_MINER, {
+    { SPRITE_BUTTON_ICON_MINER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_miner.png",
@@ -731,7 +728,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_WAGON, {
+    { SPRITE_BUTTON_ICON_WAGON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_wagon.png",
@@ -739,7 +736,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_WAR_WAGON, {
+    { SPRITE_BUTTON_ICON_WAR_WAGON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_war_wagon.png",
@@ -747,7 +744,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_COWBOY, {
+    { SPRITE_BUTTON_ICON_COWBOY, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_cowboy.png",
@@ -755,7 +752,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BANDIT, {
+    { SPRITE_BUTTON_ICON_BANDIT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_bandit.png",
@@ -763,7 +760,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_SAPPER, {
+    { SPRITE_BUTTON_ICON_SAPPER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_sapper.png",
@@ -771,7 +768,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_PYRO, {
+    { SPRITE_BUTTON_ICON_PYRO, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_pyro.png",
@@ -779,7 +776,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_SOLDIER, {
+    { SPRITE_BUTTON_ICON_SOLDIER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_soldier.png",
@@ -787,7 +784,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_CANNON, {
+    { SPRITE_BUTTON_ICON_CANNON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_cannon.png",
@@ -795,7 +792,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_JOCKEY, {
+    { SPRITE_BUTTON_ICON_JOCKEY, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_jockey.png",
@@ -803,7 +800,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_DETECTIVE, {
+    { SPRITE_BUTTON_ICON_DETECTIVE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_detective.png",
@@ -811,7 +808,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BALLOON, {
+    { SPRITE_BUTTON_ICON_BALLOON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_balloon.png",
@@ -819,7 +816,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_LANDMINE, {
+    { SPRITE_BUTTON_ICON_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_landmine.png",
@@ -827,7 +824,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_GOLDMINE, {
+    { SPRITE_BUTTON_ICON_GOLDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_goldmine.png",
@@ -835,7 +832,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_WAGON_ARMOR, {
+    { SPRITE_BUTTON_ICON_WAGON_ARMOR, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_wagon_armor.png",
@@ -843,7 +840,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_EXPLOSIVES, {
+    { SPRITE_BUTTON_ICON_EXPLOSIVES, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_tnt.png",
@@ -851,7 +848,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_WORKSHOP, {
+    { SPRITE_BUTTON_ICON_WORKSHOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_workshop.png",
@@ -859,7 +856,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_BAYONETS, {
+    { SPRITE_BUTTON_ICON_BAYONETS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_bayonets.png",
@@ -867,7 +864,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_MOLOTOV, {
+    { SPRITE_BUTTON_ICON_MOLOTOV, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_molotov.png",
@@ -875,7 +872,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_CAMO, {
+    { SPRITE_BUTTON_ICON_CAMO, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_camo.png",
@@ -883,7 +880,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_DECAMO, {
+    { SPRITE_BUTTON_ICON_DECAMO, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_decamo.png",
@@ -891,7 +888,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_PRIVATE_EYE, {
+    { SPRITE_BUTTON_ICON_PRIVATE_EYE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_private_eye.png",
@@ -899,7 +896,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_STAKEOUT, {
+    { SPRITE_BUTTON_ICON_STAKEOUT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_stakeout.png",
@@ -907,7 +904,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_SERRATED_KNIVES, {
+    { SPRITE_BUTTON_ICON_SERRATED_KNIVES, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_serrated_knives.png",
@@ -915,7 +912,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_FAN_HAMMER, {
+    { SPRITE_BUTTON_ICON_FAN_HAMMER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_fan_hammer.png",
@@ -923,7 +920,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUTTON_ICON_TAILWIND, {
+    { SPRITE_BUTTON_ICON_TAILWIND, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "ui_button_icon_tailwind.png",
@@ -931,7 +928,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_LANDMINE, {
+    { SPRITE_SELECT_RING_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_mine.png",
@@ -939,7 +936,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_LANDMINE_ATTACK, {
+    { SPRITE_SELECT_RING_LANDMINE_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_mine_attack.png",
@@ -947,7 +944,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_UNIT, {
+    { SPRITE_SELECT_RING_UNIT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring.png",
@@ -955,7 +952,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_UNIT_ATTACK, {
+    { SPRITE_SELECT_RING_UNIT_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_attack.png",
@@ -963,7 +960,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_WAGON, {
+    { SPRITE_SELECT_RING_WAGON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_wagon.png",
@@ -971,7 +968,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_WAGON_ATTACK, {
+    { SPRITE_SELECT_RING_WAGON_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_wagon_attack.png",
@@ -979,7 +976,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE2, {
+    { SPRITE_SELECT_RING_BUILDING_SIZE2, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_building2x2.png",
@@ -987,7 +984,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE2_ATTACK, {
+    { SPRITE_SELECT_RING_BUILDING_SIZE2_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_building2x2_attack.png",
@@ -995,7 +992,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE3, {
+    { SPRITE_SELECT_RING_BUILDING_SIZE3, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_building3x3.png",
@@ -1003,7 +1000,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE3_ATTACK, {
+    { SPRITE_SELECT_RING_BUILDING_SIZE3_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_building3x3_attack.png",
@@ -1011,7 +1008,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE4, {
+    { SPRITE_SELECT_RING_BUILDING_SIZE4, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_building4x4.png",
@@ -1019,7 +1016,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE4_ATTACK, {
+    { SPRITE_SELECT_RING_BUILDING_SIZE4_ATTACK, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_building4x4_attack.png",
@@ -1027,7 +1024,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_GOLDMINE, {
+    { SPRITE_SELECT_RING_GOLDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_gold_mine.png",
@@ -1035,7 +1032,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_GOLDMINE, {
+    { SPRITE_GOLDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "gold_mine.png",
@@ -1043,7 +1040,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UNIT_WAGON, {
+    { SPRITE_UNIT_WAGON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_wagon.png",
@@ -1051,7 +1048,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_UNIT_WAR_WAGON, {
+    { SPRITE_UNIT_WAR_WAGON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_war_wagon.png",
@@ -1059,7 +1056,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_UNIT_MINER, {
+    { SPRITE_UNIT_MINER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_miner.png",
@@ -1067,7 +1064,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 6
         }
     }},
-    { SPRITE_UNIT_COWBOY, {
+    { SPRITE_UNIT_COWBOY, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_cowboy.png",
@@ -1075,7 +1072,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
-    { SPRITE_UNIT_SAPPER, {
+    { SPRITE_UNIT_SAPPER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_sapper.png",
@@ -1083,7 +1080,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 6 
         }
     }},
-    { SPRITE_UNIT_PYRO, {
+    { SPRITE_UNIT_PYRO, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_pyro.png",
@@ -1091,7 +1088,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
-    { SPRITE_UNIT_JOCKEY, {
+    { SPRITE_UNIT_JOCKEY, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_jockey.png",
@@ -1099,7 +1096,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
-    { SPRITE_UNIT_SOLDIER, {
+    { SPRITE_UNIT_SOLDIER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_soldier.png",
@@ -1107,7 +1104,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
-    { SPRITE_UNIT_CANNON, {
+    { SPRITE_UNIT_CANNON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_cannon.png",
@@ -1115,7 +1112,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
-    { SPRITE_UNIT_DETECTIVE, {
+    { SPRITE_UNIT_DETECTIVE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_spy.png",
@@ -1123,7 +1120,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
-    { SPRITE_UNIT_DETECTIVE_INVISIBLE, {
+    { SPRITE_UNIT_DETECTIVE_INVISIBLE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA,
         .sheet = {
             .path = "unit_spy.png",
@@ -1131,7 +1128,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3 
         }
     }},
-    { SPRITE_UNIT_BALLOON, {
+    { SPRITE_UNIT_BALLOON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_balloon.png",
@@ -1139,7 +1136,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_UNIT_BALLOON_STEAM, {
+    { SPRITE_UNIT_BALLOON_STEAM, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "unit_balloon_steam.png",
@@ -1147,7 +1144,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UNIT_BALLOON_SHADOW, {
+    { SPRITE_UNIT_BALLOON_SHADOW, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "unit_balloon_shadow.png",
@@ -1155,7 +1152,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UNIT_BANDIT, {
+    { SPRITE_UNIT_BANDIT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_bandit.png",
@@ -1163,7 +1160,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_MINER_BUILDING, {
+    { SPRITE_MINER_BUILDING, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "unit_miner_building.png",
@@ -1171,7 +1168,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_BUILDING_HALL, {
+    { SPRITE_BUILDING_HALL, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_hall.png",
@@ -1179,7 +1176,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_HOUSE, {
+    { SPRITE_BUILDING_HOUSE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_house.png",
@@ -1187,7 +1184,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_SALOON, {
+    { SPRITE_BUILDING_SALOON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_saloon.png",
@@ -1195,7 +1192,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_BUNKER, {
+    { SPRITE_BUILDING_BUNKER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_bunker.png",
@@ -1203,7 +1200,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_SMITH, {
+    { SPRITE_BUILDING_SMITH, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_smith.png",
@@ -1211,7 +1208,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_SMITH_ANIMATION, {
+    { SPRITE_BUILDING_SMITH_ANIMATION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "building_smith_animation.png",
@@ -1219,7 +1216,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_WORKSHOP, {
+    { SPRITE_BUILDING_WORKSHOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_workshop.png",
@@ -1227,7 +1224,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_COOP, {
+    { SPRITE_BUILDING_COOP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_coop.png",
@@ -1235,7 +1232,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_BARRACKS, {
+    { SPRITE_BUILDING_BARRACKS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_barracks.png",
@@ -1243,7 +1240,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_SHERIFFS, {
+    { SPRITE_BUILDING_SHERIFFS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_sheriffs.png",
@@ -1251,7 +1248,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_LANDMINE, {
+    { SPRITE_BUILDING_LANDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "building_mine.png",
@@ -1259,7 +1256,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_DESTROYED_BUNKER, {
+    { SPRITE_BUILDING_DESTROYED_BUNKER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "building_destroyed_bunker.png",
@@ -1267,7 +1264,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_DESTROYED_MINE, {
+    { SPRITE_BUILDING_DESTROYED_MINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "building_destroyed_mine.png",
@@ -1275,7 +1272,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_DESTROYED_2, {
+    { SPRITE_BUILDING_DESTROYED_2, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "building_destroyed2x2.png",
@@ -1283,7 +1280,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_DESTROYED_3, {
+    { SPRITE_BUILDING_DESTROYED_3, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "building_destroyed3x3.png",
@@ -1291,7 +1288,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_BUILDING_DESTROYED_4, {
+    { SPRITE_BUILDING_DESTROYED_4, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "building_destroyed4x4.png",
@@ -1299,7 +1296,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_RALLY_FLAG, {
+    { SPRITE_RALLY_FLAG, (SpriteParams) {
         .strategy = SPRITE_IMPORT_RECOLOR,
         .sheet = {
             .path = "rally_flag.png",
@@ -1307,7 +1304,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_PARTICLE_SPARKS, {
+    { SPRITE_PARTICLE_SPARKS, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "particle_sparks.png",
@@ -1315,7 +1312,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 3
         }
     }},
-    { SPRITE_PARTICLE_BUNKER_FIRE, {
+    { SPRITE_PARTICLE_BUNKER_FIRE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "particle_bunker_cowboy.png",
@@ -1323,7 +1320,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_PARTICLE_EXPLOSION, {
+    { SPRITE_PARTICLE_EXPLOSION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "particle_explosion.png",
@@ -1331,7 +1328,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_PARTICLE_CANNON_EXPLOSION, {
+    { SPRITE_PARTICLE_CANNON_EXPLOSION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "particle_cannon_explosion.png",
@@ -1339,7 +1336,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_PARTICLE_FIRE, {
+    { SPRITE_PARTICLE_FIRE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "particle_fire.png",
@@ -1347,7 +1344,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_PARTICLE_BLEED, {
+    { SPRITE_PARTICLE_BLEED, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "particle_bleed.png",
@@ -1355,7 +1352,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_PROJECTILE_MOLOTOV, {
+    { SPRITE_PROJECTILE_MOLOTOV, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "projectile_molotov.png",
@@ -1363,7 +1360,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_WORKSHOP_STEAM, {
+    { SPRITE_WORKSHOP_STEAM, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "building_workshop_steam.png",

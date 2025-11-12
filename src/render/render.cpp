@@ -12,7 +12,7 @@
 
 #define MAX_BATCH_VERTICES 32768
 #define FONT_GLYPH_COUNT 95
-#define FONT_FIRST_CHAR 32 // space
+#define FONT_FIRST_CHAR 32U // space
 #define FONT_HFRAMES 16
 #define FONT_VFRAMES 6
 #define ATLAS_SIZE 2048
@@ -43,26 +43,26 @@ struct Font {
     FontGlyph glyphs[FONT_GLYPH_COUNT];
 };
 
-static const SDL_Color RECOLOR_CLOTHES_REF = { .r = 255, .g = 0, .b = 255, .a = 255 };
-static const SDL_Color RECOLOR_SKIN_REF = { .r = 123, .g = 174, .b = 121, .a = 255 };
+static const SDL_Color RECOLOR_CLOTHES_REF = (SDL_Color) { .r = 255, .g = 0, .b = 255, .a = 255 };
+static const SDL_Color RECOLOR_SKIN_REF = (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 };
 static const std::unordered_map<RenderColor, SDL_Color> RENDER_COLOR_VALUES = {
-    { RENDER_COLOR_WHITE, { .r = 255, .g = 255, .b = 255, .a = 255 }},
-    { RENDER_COLOR_OFFBLACK, { .r = 40, .g = 37, .b = 45, .a = 255 }},
-    { RENDER_COLOR_OFFBLACK_TRANSPARENT, { .r = 40, .g = 37, .b = 45, .a = 128 }},
-    { RENDER_COLOR_DARK_GRAY, { .r = 94, .g = 88, .b = 89, .a = 255 }},
-    { RENDER_COLOR_BLUE, { .r = 92, .g = 132, .b = 153, .a = 255 }},
-    { RENDER_COLOR_DIM_BLUE, { .r = 70, .g = 100, .b = 115, .a = 255 }},
-    { RENDER_COLOR_LIGHT_BLUE, { .r = 134, .g = 191, .b = 186, .a = 255 }},
-    { RENDER_COLOR_RED, { .r = 186, .g = 97, .b = 95, .a = 255 }},
-    { RENDER_COLOR_RED_TRANSPARENT, { .r = 186, .g = 97, .b = 95, .a = 128 }},
-    { RENDER_COLOR_LIGHT_RED, { .r = 219, .g = 151, .b = 114, .a = 255 }},
-    { RENDER_COLOR_GOLD, { .r = 238, .g = 209, .b = 158, .a = 255 }},
-    { RENDER_COLOR_DIM_SAND, { .r = 204, .g = 162, .b = 139, .a = 255 }},
-    { RENDER_COLOR_GREEN, { .r = 123, .g = 174, .b = 121, .a = 255 }},
-    { RENDER_COLOR_GREEN_TRANSPARENT, { .r = 123, .g = 174, .b = 121, .a = 128 }},
-    { RENDER_COLOR_DARK_GREEN, { .r = 77, .g = 135, .b = 115, .a = 255 }},
-    { RENDER_COLOR_PURPLE, { .r = 144, .g = 119, .b = 153, .a = 255 }},
-    { RENDER_COLOR_LIGHT_PURPLE, { .r = 184, .g = 169, .b = 204, .a = 255 }}
+    { RENDER_COLOR_WHITE, (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 }},
+    { RENDER_COLOR_OFFBLACK, (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 255 }},
+    { RENDER_COLOR_OFFBLACK_TRANSPARENT, (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 128 }},
+    { RENDER_COLOR_DARK_GRAY, (SDL_Color) { .r = 94, .g = 88, .b = 89, .a = 255 }},
+    { RENDER_COLOR_BLUE, (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 }},
+    { RENDER_COLOR_DIM_BLUE, (SDL_Color) { .r = 70, .g = 100, .b = 115, .a = 255 }},
+    { RENDER_COLOR_LIGHT_BLUE, (SDL_Color) { .r = 134, .g = 191, .b = 186, .a = 255 }},
+    { RENDER_COLOR_RED, (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 255 }},
+    { RENDER_COLOR_RED_TRANSPARENT, (SDL_Color) { .r = 186, .g = 97, .b = 95, .a = 128 }},
+    { RENDER_COLOR_LIGHT_RED, (SDL_Color) { .r = 219, .g = 151, .b = 114, .a = 255 }},
+    { RENDER_COLOR_GOLD, (SDL_Color) { .r = 238, .g = 209, .b = 158, .a = 255 }},
+    { RENDER_COLOR_DIM_SAND, (SDL_Color) { .r = 204, .g = 162, .b = 139, .a = 255 }},
+    { RENDER_COLOR_GREEN, (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 255 }},
+    { RENDER_COLOR_GREEN_TRANSPARENT, (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 128 }},
+    { RENDER_COLOR_DARK_GREEN, (SDL_Color) { .r = 77, .g = 135, .b = 115, .a = 255 }},
+    { RENDER_COLOR_PURPLE, (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 }},
+    { RENDER_COLOR_LIGHT_PURPLE, (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 }}
 };
 
 enum LoadedSurfaceType {
@@ -360,19 +360,20 @@ bool render_load_sprites() {
             SDL_Surface* surface = surfaces[surface_index].surface;
 
             // Search through the empty spaces backwards so that we choose the smallest one that will fit first
-            int space_index;
-            for (space_index = empty_spaces.size() - 1; space_index >= 0; space_index--) {
-                if (surface->w <= empty_spaces[space_index].w && surface->h <= empty_spaces[space_index].h) {
+            int space_index_int;
+            for (space_index_int = (int)empty_spaces.size() - 1; space_index_int >= 0; space_index_int--) {
+                if (surface->w <= empty_spaces[(size_t)space_index_int].w && surface->h <= empty_spaces[(size_t)space_index_int].h) {
                     break;
                 }
             }
             // No space was found, so skip this surface (it will be rendered to a different atlas)
-            if (space_index == -1) {
+            if (space_index_int == -1) {
                 continue;
             }
+            size_t space_index = (size_t)space_index_int;
 
             // Render the surface onto the chosen empty space
-            SDL_Rect dst_rect = { 
+            SDL_Rect dst_rect = (SDL_Rect) { 
                 .x = empty_spaces[space_index].x,
                 .y = empty_spaces[space_index].y,
                 .w = surface->w, .h = surface->h
@@ -382,14 +383,14 @@ bool render_load_sprites() {
             // Set sprite info for this surface
             if (surfaces[surface_index].type == LOADED_SURFACE_FONT) {
                 int font_name = surfaces[surface_index].name;
-                state.fonts[font_name].atlas = atlas_surfaces.size();
+                state.fonts[font_name].atlas = (int)atlas_surfaces.size();
                 state.fonts[font_name].atlas_x = empty_spaces[space_index].x;
                 state.fonts[font_name].atlas_y = empty_spaces[space_index].y;
             } else {
                 int sprite_name = surfaces[surface_index].name;
                 const SpriteParams& params = render_get_sprite_params((SpriteName)sprite_name);
                 SpriteInfo sprite_info; 
-                sprite_info.atlas = atlas_surfaces.size();
+                sprite_info.atlas = (int)atlas_surfaces.size();
                 sprite_info.atlas_x = empty_spaces[space_index].x;
                 sprite_info.atlas_y = empty_spaces[space_index].y;
                 if (params.strategy == SPRITE_IMPORT_TILE) {
@@ -424,7 +425,7 @@ bool render_load_sprites() {
             Rect vsplit;
             vsplit.x = -1; // mark as uninitialized
             if (surface->w < empty_spaces[space_index].w) {
-                vsplit = {
+                vsplit = (Rect) {
                     .x = empty_spaces[space_index].x + surface->w,
                     .y = empty_spaces[space_index].y,
                     .w = empty_spaces[space_index].w - surface->w,
@@ -435,7 +436,7 @@ bool render_load_sprites() {
             Rect hsplit;
             hsplit.x = -1;
             if (surface->h < empty_spaces[space_index].h) {
-                hsplit = {
+                hsplit = (Rect) {
                     .x = empty_spaces[space_index].x,
                     .y = empty_spaces[space_index].y + surface->h,
                     .w = empty_spaces[space_index].w,
@@ -471,12 +472,12 @@ bool render_load_sprites() {
 
     glGenTextures(1, &state.sprite_texture_array);
     glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, ATLAS_SIZE, ATLAS_SIZE, atlas_surfaces.size(), 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, ATLAS_SIZE, ATLAS_SIZE, (GLsizei)atlas_surfaces.size(), 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    for (int atlas = 0; atlas < (int)atlas_surfaces.size(); atlas++) {
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, atlas, ATLAS_SIZE, ATLAS_SIZE, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlas_surfaces[atlas]->pixels);
+    for (size_t atlas = 0; atlas < atlas_surfaces.size(); atlas++) {
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, (GLint)atlas, ATLAS_SIZE, ATLAS_SIZE, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlas_surfaces[atlas]->pixels);
         SDL_DestroySurface(atlas_surfaces[atlas]);
     }
 
@@ -495,16 +496,16 @@ bool render_load_sprites() {
 void render_flip_sdl_surface_vertically(SDL_Surface* surface) {
     SDL_LockSurface(surface);
     int sprite_surface_pitch = surface->pitch;
-    uint8_t* temp = (uint8_t*)malloc(sprite_surface_pitch);
+    uint8_t* temp = (uint8_t*)malloc((size_t)sprite_surface_pitch);
     uint8_t* sprite_surface_pixels = (uint8_t*)surface->pixels;
 
     for (int row = 0; row < surface->h / 2; ++row) {
         uint8_t* row1 = sprite_surface_pixels + (row * sprite_surface_pitch);
         uint8_t* row2 = sprite_surface_pixels + ((surface->h - row - 1) * sprite_surface_pitch);
 
-        memcpy(temp, row1, sprite_surface_pitch);
-        memcpy(row1, row2, sprite_surface_pitch);
-        memcpy(row2, temp, sprite_surface_pitch);
+        memcpy(temp, row1, (size_t)sprite_surface_pitch);
+        memcpy(row1, row2, (size_t)sprite_surface_pitch);
+        memcpy(row2, temp, (size_t)sprite_surface_pitch);
     }
     free(temp);
     SDL_UnlockSurface(surface);
@@ -576,13 +577,13 @@ SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, con
         return NULL;
     }
 
-    SDL_Rect src_rect = { 
+    SDL_Rect src_rect = (SDL_Rect) { 
         .x = params.tile.source_x, 
         .y = params.tile.source_y,
         .w = TILE_SRC_SIZE,
         .h = TILE_SRC_SIZE
     };
-    SDL_Rect dst_rect = {
+    SDL_Rect dst_rect = (SDL_Rect) {
         .x = 0, .y = 0,
         .w = TILE_SRC_SIZE, .h = TILE_SRC_SIZE
     };
@@ -627,13 +628,13 @@ SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const
         // https://gamedev.stackexchange.com/questions/46594/elegant-autotiling
         for (uint32_t edge = 0; edge < 4; edge++) {
             ivec2 edge_source_pos = ivec2(params.tile.source_x, params.tile.source_y) + (autotile_edge_lookup(edge, neighbors & AUTOTILE_EDGE_MASK[edge]) * (TILE_SRC_SIZE / 2));
-            SDL_Rect subtile_src_rect = {
+            SDL_Rect subtile_src_rect = (SDL_Rect) {
                 .x = edge_source_pos.x,
                 .y = edge_source_pos.y,
                 .w = TILE_SRC_SIZE / 2,
                 .h = TILE_SRC_SIZE / 2
             };
-            SDL_Rect subtile_dst_rect = {
+            SDL_Rect subtile_dst_rect = (SDL_Rect) {
                 .x = (autotile_frame.x * TILE_SRC_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].x * (TILE_SRC_SIZE / 2)),
                 .y = (autotile_frame.y * TILE_SRC_SIZE) + (AUTOTILE_EDGE_OFFSETS[edge].y * (TILE_SRC_SIZE / 2)),
                 .w = TILE_SRC_SIZE / 2,
@@ -659,7 +660,7 @@ SDL_Surface* render_load_font(FontName name) {
 
     // Open the font
     std::string font_path = filesystem_get_resource_path() + "font/" + params.path;
-    TTF_Font* ttf_font = TTF_OpenFont(font_path.c_str(), params.size);
+    TTF_Font* ttf_font = TTF_OpenFont(font_path.c_str(), (float)params.size);
     if (ttf_font == NULL) {
         log_error("Unable to open font %s: %s", font_path.c_str(), SDL_GetError());
         return NULL;
@@ -671,8 +672,8 @@ SDL_Surface* render_load_font(FontName name) {
     int glyph_max_width = 0;
     int glyph_max_height = 0;
 
-    SDL_Color font_color = { .r = params.r, .g = params.g, .b = params.b, .a = 255 };
-    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+    SDL_Color font_color = (SDL_Color) { .r = params.r, .g = params.g, .b = params.b, .a = 255 };
+    for (uint32_t glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
         char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
         glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, 0, font_color);
         if (glyphs[glyph_index] == NULL) {
@@ -696,7 +697,7 @@ SDL_Surface* render_load_font(FontName name) {
         int glyph_index_x = glyph_index % FONT_HFRAMES;
         int glyph_index_y = glyph_index / FONT_HFRAMES;
 
-        SDL_Rect dest_rect = { 
+        SDL_Rect dest_rect = (SDL_Rect) { 
             .x = glyph_index_x * glyph_max_width, 
             .y = glyph_index_y * glyph_max_height, 
             .w = glyphs[glyph_index]->w, 
@@ -710,7 +711,7 @@ SDL_Surface* render_load_font(FontName name) {
     // Finish filling out the font struct
     font.glyph_width = glyph_max_width;
     font.glyph_height = glyph_max_height;
-    for (int glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
+    for (uint32_t glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
         int bearing_y;
         TTF_GetGlyphMetrics(ttf_font, FONT_FIRST_CHAR + glyph_index, &font.glyphs[glyph_index].bearing_x, NULL, NULL, &bearing_y, &font.glyphs[glyph_index].advance);
         font.glyphs[glyph_index].bearing_y = glyph_max_height - bearing_y;
@@ -767,7 +768,7 @@ bool render_compile_shader(uint32_t* id, GLenum type, const char* path_suffix) {
     }
 
     fseek(shader_file, 0, SEEK_END);
-    size_t file_size = ftell(shader_file);
+    size_t file_size = (size_t)ftell(shader_file);
     fseek(shader_file, 0, SEEK_SET);
 
     char* shader_source = (char*)malloc(file_size + 1);
@@ -930,14 +931,14 @@ void render_flush_batch() {
     // Buffer sprite batch data
     glBindVertexArray(state.sprite_vao);
     glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, state.sprite_vertices.size() * sizeof(SpriteVertex), &state.sprite_vertices[0]);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)(state.sprite_vertices.size() * sizeof(SpriteVertex)), &state.sprite_vertices[0]);
 
     // Render sprite batch
     glUseProgram(state.sprite_shader);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
 
-    glDrawArrays(GL_TRIANGLES, 0, state.sprite_vertices.size());
+    glDrawArrays(GL_TRIANGLES, 0, (GLsizei)state.sprite_vertices.size());
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -954,13 +955,13 @@ void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t 
     const SpriteInfo& sprite_info = render_get_sprite_info(name);
     GOLD_ASSERT(frame.x <= sprite_info.frame_width && frame.y <= sprite_info.frame_height);
 
-    Rect src_rect = { 
+    Rect src_rect = (Rect) { 
         .x = frame.x * sprite_info.frame_width, 
         .y = (recolor_id * sprite_info.frame_height * sprite_info.vframes) + (frame.y * sprite_info.frame_height), 
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
-    Rect dst_rect = { 
+    Rect dst_rect = (Rect) { 
         .x = position.x, 
         .y = position.y, 
         .w = sprite_info.frame_width * RENDER_SCALE_INT,
@@ -972,13 +973,13 @@ void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t 
 void render_ninepatch(SpriteName sprite, Rect rect) {
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
 
-    Rect src_rect = {
+    Rect src_rect = (Rect) {
         .x = 0,
         .y = 0,
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
-    Rect dst_rect = {
+    Rect dst_rect = (Rect) {
         .x = rect.x,
         .y = rect.y,
         .w = sprite_info.frame_width * RENDER_SCALE_INT,
@@ -1044,13 +1045,13 @@ void render_ninepatch(SpriteName sprite, Rect rect) {
 
 void render_vertical_line(int x, int start_y, int end_y, RenderColor color) {
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
-    Rect src_rect = {
+    Rect src_rect = (Rect) {
         .x = sprite_info.frame_width * color,
         .y = 0,
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
-    Rect dst_rect = {
+    Rect dst_rect = (Rect) {
         .x = x, .y = start_y,
         .w = RENDER_SCALE_INT, .h = end_y - start_y
     };
@@ -1059,13 +1060,13 @@ void render_vertical_line(int x, int start_y, int end_y, RenderColor color) {
 
 void render_draw_rect(Rect rect, RenderColor color) {
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
-    Rect src_rect = {
+    Rect src_rect = (Rect) {
         .x = sprite_info.frame_width * color,
         .y = 0,
         .w = sprite_info.frame_width,
         .h = sprite_info.frame_height
     };
-    Rect dst_rect = {
+    Rect dst_rect = (Rect) {
         .x = rect.x, .y = rect.y,
         .w = RENDER_SCALE_INT, .h = rect.h
     };
@@ -1082,7 +1083,7 @@ void render_draw_rect(Rect rect, RenderColor color) {
 
 void render_fill_rect(Rect rect, RenderColor color) {
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_SWATCH);
-    Rect src_rect = {
+    Rect src_rect = (Rect) {
         .x = sprite_info.frame_width * color,
         .y = 0,
         .w = sprite_info.frame_width,
@@ -1133,27 +1134,27 @@ void render_sprite(SpriteName sprite, Rect src_rect, Rect dst_rect, uint32_t opt
     }
 
     float atlas = (float)sprite_info.atlas;
-    state.sprite_vertices.push_back({
+    state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_top },
         .tex_coord = { tex_coord_left, tex_coord_top, atlas }
     });
-    state.sprite_vertices.push_back({
+    state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_bottom },
         .tex_coord = { tex_coord_right, tex_coord_bottom, atlas }
     });
-    state.sprite_vertices.push_back({
+    state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_bottom },
         .tex_coord = { tex_coord_left, tex_coord_bottom, atlas }
     });
-    state.sprite_vertices.push_back({
+    state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_left, position_top },
         .tex_coord = { tex_coord_left, tex_coord_top, atlas }
     });
-    state.sprite_vertices.push_back({
+    state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_top },
         .tex_coord = { tex_coord_right, tex_coord_top, atlas }
     });
-    state.sprite_vertices.push_back({
+    state.sprite_vertices.push_back((SpriteVertex) {
         .position = { position_right, position_bottom },
         .tex_coord = { tex_coord_right, tex_coord_bottom, atlas }
     });
@@ -1171,9 +1172,9 @@ void render_text(FontName name, const char* text, ivec2 position) {
     float frame_size_y = (float)(state.fonts[name].glyph_height) / (float)ATLAS_SIZE;
 
     while (text[text_index] != '\0') {
-        int glyph_index = (int)text[text_index] - FONT_FIRST_CHAR;
+        uint32_t glyph_index = (uint32_t)text[text_index] - FONT_FIRST_CHAR;
         if (glyph_index < 0 || glyph_index >= FONT_GLYPH_COUNT) {
-            glyph_index = (int)('|' - FONT_FIRST_CHAR);
+            glyph_index = (uint32_t)('|' - FONT_FIRST_CHAR);
         }
 
         float position_top = (float)(SCREEN_HEIGHT - (glyph_position.y + (state.fonts[name].glyphs[glyph_index].bearing_y * RENDER_SCALE_FLOAT)));
@@ -1188,27 +1189,27 @@ void render_text(FontName name, const char* text, ivec2 position) {
         float tex_coord_bottom = tex_coord_top - frame_size_y;
 
         float font_atlas = (float)state.fonts[name].atlas;
-        state.sprite_vertices.push_back({
+        state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_top },
             .tex_coord = { tex_coord_left, tex_coord_top, font_atlas }
         });
-        state.sprite_vertices.push_back({
+        state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_bottom },
             .tex_coord = { tex_coord_right, tex_coord_bottom, font_atlas }
         });
-        state.sprite_vertices.push_back({
+        state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_bottom },
             .tex_coord = { tex_coord_left, tex_coord_bottom, font_atlas }
         });
-        state.sprite_vertices.push_back({
+        state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_left, position_top },
             .tex_coord = { tex_coord_left, tex_coord_top, font_atlas }
         });
-        state.sprite_vertices.push_back({
+        state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_top },
             .tex_coord = { tex_coord_right, tex_coord_top, font_atlas}
         });
-        state.sprite_vertices.push_back({
+        state.sprite_vertices.push_back((SpriteVertex) {
             .position = { position_right, position_bottom },
             .tex_coord = { tex_coord_right, tex_coord_bottom, font_atlas }
         });
@@ -1218,21 +1219,21 @@ void render_text(FontName name, const char* text, ivec2 position) {
     }
 }
 
-ivec2 render_get_text_size(FontName name, const char* text, float scale) {
+ivec2 render_get_text_size(FontName name, const char* text) {
     ivec2 size = ivec2(0, state.fonts[name].glyph_height);
     size_t text_index = 0;
 
     while (text[text_index] != '\0') {
-        int glyph_index = (int)text[text_index] - FONT_FIRST_CHAR;
+        uint32_t glyph_index = (uint32_t)text[text_index] - FONT_FIRST_CHAR;
         if (glyph_index < 0 || glyph_index >= FONT_GLYPH_COUNT) {
-            glyph_index = (int)('|' - FONT_FIRST_CHAR);
+            glyph_index = (uint32_t)('|' - FONT_FIRST_CHAR);
         }
 
         size.x += state.fonts[name].glyphs[glyph_index].advance;
         text_index++;
     }
 
-    return size * scale;
+    return size * RENDER_SCALE_INT;
 }
 
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel) {
@@ -1282,53 +1283,53 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
 
     SpriteVertex minimap_vertices[12] = {
         // minimap tiles
-        {
+        (SpriteVertex) {
             .position = { position_left, position_top },
             .tex_coord = { tex_coord_left, tex_coord_top, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_right, position_bottom },
             .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_left, position_bottom },
             .tex_coord = { tex_coord_left, tex_coord_bottom, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_left, position_top },
             .tex_coord = { tex_coord_left, tex_coord_top, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_right, position_top },
             .tex_coord = { tex_coord_right, tex_coord_top, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_right, position_bottom },
             .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
         },
 
         // minimap fog
-        {
+        (SpriteVertex) {
             .position = { position_left, position_top },
             .tex_coord = { tex_coord_fog_left, tex_coord_top, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_right, position_bottom },
             .tex_coord = { tex_coord_fog_right, tex_coord_bottom, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_left, position_bottom },
             .tex_coord = { tex_coord_fog_left, tex_coord_bottom, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_left, position_top },
             .tex_coord = { tex_coord_fog_left, tex_coord_top, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_right, position_top },
             .tex_coord = { tex_coord_fog_right, tex_coord_top, 0.0f }
         },
-        {
+        (SpriteVertex) {
             .position = { position_right, position_bottom },
             .tex_coord = { tex_coord_fog_right, tex_coord_bottom, 0.0f }
         }

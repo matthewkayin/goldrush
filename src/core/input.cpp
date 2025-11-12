@@ -47,14 +47,14 @@ void input_update_screen_scale() {
         // Letterbox
         float ratio = (float)window_size.x / (float)SCREEN_WIDTH;
         float scaled_height = (float)SCREEN_HEIGHT * ratio;
-        float border_size = ((float)window_size.y - scaled_height) / 2.0;
+        float border_size = ((float)window_size.y - scaled_height) / 2.0f;
         state.scaled_screen_size = ivec2((int)window_size.x, (int)scaled_height);
         state.scaled_screen_position = ivec2(0, (int)border_size);
     } else {
         // Pillarbox
         float ratio = (float)window_size.y / (float)SCREEN_HEIGHT;
         float scaled_width = (float)SCREEN_WIDTH * ratio;
-        float border_size = ((float)window_size.x - scaled_width) / 2.0;
+        float border_size = ((float)window_size.x - scaled_width) / 2.0f;
         state.scaled_screen_size = ivec2((int)scaled_width, (int)window_size.y);
         state.scaled_screen_position = ivec2((int)border_size, 0);
     }
@@ -102,7 +102,7 @@ void input_poll_events() {
                 break;
             }
             case SDL_EVENT_MOUSE_MOTION: {
-                state.mouse_position = ivec2(event.motion.x - state.scaled_screen_position.x, event.motion.y - state.scaled_screen_position.y);
+                state.mouse_position = ivec2((int)event.motion.x - state.scaled_screen_position.x, (int)event.motion.y - state.scaled_screen_position.y);
                 state.mouse_position = ivec2((state.mouse_position.x * SCREEN_WIDTH) / state.scaled_screen_size.x, (state.mouse_position.y * SCREEN_HEIGHT) / state.scaled_screen_size.y);
                 state.mouse_position.x = std::clamp(state.mouse_position.x, 0, SCREEN_WIDTH);
                 state.mouse_position.y = std::clamp(state.mouse_position.y, 0, SCREEN_HEIGHT);
@@ -232,7 +232,7 @@ int input_sprintf_sdl_scancode_str(char* str_ptr, SDL_Scancode scancode) {
         return sprintf(str_ptr, "ESC");
     }
     if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z) {
-        uint8_t letter_index = scancode - SDL_SCANCODE_A;
+        uint8_t letter_index = (uint8_t)scancode - (uint8_t)SDL_SCANCODE_A;
         return sprintf(str_ptr, "%c", (char)((uint8_t)'A' + letter_index));
     }
     if (scancode >= SDL_SCANCODE_MINUS && scancode <= SDL_SCANCODE_SLASH) {

@@ -1,0 +1,8 @@
+#pragma once
+
+enum CellLayer {
+    CELL_LAYER_UNDERGROUND,
+    CELL_LAYER_GROUND,
+    CELL_LAYER_SKY,
+    CELL_LAYER_COUNT
+};
