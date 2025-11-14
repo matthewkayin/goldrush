@@ -44,7 +44,7 @@ struct EntityDataUnit {
     int damage;
     int accuracy;
     int evasion;
-    int attack_cooldown;
+    uint32_t attack_cooldown;
     int range_squared;
     int min_range_squared;
 };

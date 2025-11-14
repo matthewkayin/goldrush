@@ -115,6 +115,10 @@ struct ivec2 {
 
     ivec2() = default;
     ivec2(int x, int y) : x(x), y(y) {}
+    ivec2(uint32_t x, uint32_t y) {
+        x = (int)x;
+        y = (int)y;
+    }
     bool operator==(const ivec2& other) const {
         return this->x == other.x && this->y == other.y;
     }

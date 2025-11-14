@@ -32,3 +32,8 @@
 #define MAX_USERNAME_LENGTH 32
 #define SELECTION_LIMIT 20U
 #define HOTKEY_GROUP_SIZE 6
+
+typedef uint16_t EntityId;
+const EntityId ID_MAX = 4096;
+const EntityId ID_NULL = ID_MAX + 1;
+const uint32_t INDEX_INVALID = 65535;

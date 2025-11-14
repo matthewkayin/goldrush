@@ -199,10 +199,10 @@ void network_service() {
                     strncpy(lobby.name, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_NAME), NETWORK_LOBBY_NAME_BUFFER_SIZE);
                     memcpy(&lobby.player_count, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_PLAYER_COUNT), sizeof(uint8_t));
                     strncpy(lobby.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(lobby.connection_info.steam.identity_str));
-                    log_trace("Found lobby %s host steam identity %s lobby query %s", lobby.name, lobby.connection_info.steam.identity_str, state.lobby_name_query);
+                    log_debug("Found lobby %s host steam identity %s lobby query %s", lobby.name, lobby.connection_info.steam.identity_str, state.lobby_name_query);
 
                     if (strlen(state.lobby_name_query) == 0 || strstr(lobby.name, state.lobby_name_query) != NULL) {
-                        log_trace("added lobby.");
+                        log_debug("added lobby.");
                         state.lobbies.push_back(lobby);
                     }
                 }
@@ -255,19 +255,19 @@ void network_service() {
                 break;
             }
             case LobbyDataUpdate_t::k_iCallback: {
-                log_trace("Received LobbyDataUpdate callback");
+                log_debug("Received LobbyDataUpdate callback");
                 if (state.status != NETWORK_STATUS_OFFLINE || !state.steam_invite_lobby_id.IsValid()) {
-                    log_trace("We are in a game are have been invited to something already, ignoring.");
+                    log_debug("We are in a game are have been invited to something already, ignoring.");
                     break;
                 }
 
                 LobbyDataUpdate_t* lobby_data_update = (LobbyDataUpdate_t*)callback.m_pubParam;
                 if (!lobby_data_update->m_bSuccess) {
-                    log_trace("LobbyDataUpdate was not successful.");
+                    log_debug("LobbyDataUpdate was not successful.");
                     break;
                 }
                 if (lobby_data_update->m_ulSteamIDLobby != state.steam_invite_lobby_id.ConvertToUint64()) {
-                    log_trace("LobbyDataUpdate lobby ID does not match the steam invite lobby ID.");
+                    log_debug("LobbyDataUpdate lobby ID does not match the steam invite lobby ID.");
                     break;
                 }
 
@@ -276,7 +276,7 @@ void network_service() {
                 strncpy(event.steam_invite.connection_info.steam.identity_str, SteamMatchmaking()->GetLobbyData(state.steam_invite_lobby_id, NETWORK_STEAM_LOBBY_PROPERTY_HOST_IDENTITY), sizeof(event.steam_invite.connection_info.steam.identity_str));
                 state.events.push(event);
                 state.steam_invite_lobby_id.Clear();
-                log_trace("Pushed NETWORK_EVENT_STEAM_INVITE");
+                log_debug("Pushed NETWORK_EVENT_STEAM_INVITE");
 
                 break;
             }
@@ -521,10 +521,10 @@ void network_join_lobby(NetworkConnectionInfo connection_info) {
 
 #ifdef GOLD_STEAM
 void network_steam_accept_invite(CSteamID lobby_id) {
-    log_trace("Called network_steam_accept_invite with lobby_id %u", lobby_id.ConvertToUint64());
+    log_debug("Called network_steam_accept_invite with lobby_id %u", lobby_id.ConvertToUint64());
     state.steam_invite_lobby_id = lobby_id;
     bool success = SteamMatchmaking()->RequestLobbyData(state.steam_invite_lobby_id);
-    log_trace("RequestLobbyData was a success? %i", (int)success);
+    log_debug("RequestLobbyData was a success? %i", (int)success);
 }
 #endif
 
@@ -675,13 +675,13 @@ void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
 
     // Build message
     // Message size is 1 byte for type, 4 bytes for LCG seed, 8 bytes for map width / height, and the rest of the bytes are the generated noise values
-    size_t message_size = 1 + 4 + 8 + (noise.width * noise.height * sizeof(int8_t));
+    size_t message_size = 1 + 4 + 8 + ((size_t)(noise.width * noise.height) * sizeof(int8_t));
     uint8_t* message = (uint8_t*)malloc(message_size);
     message[0] = NETWORK_MESSAGE_LOAD_MATCH;
     memcpy(message + 1, &lcg_seed, sizeof(int32_t));
     memcpy(message + 5, &noise.width, sizeof(uint32_t));
     memcpy(message + 9, &noise.height, sizeof(uint32_t));
-    memcpy(message + 13, &noise.map[0], noise.width * noise.height * sizeof(int8_t));
+    memcpy(message + 13, &noise.map[0], (size_t)(noise.width * noise.height) * sizeof(int8_t));
 
     // Send the packet
     network_host_broadcast(state.host, message, message_size);
@@ -1053,8 +1053,8 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
             memcpy(&event.match_load.lcg_seed, data + 1, sizeof(int32_t));
             memcpy(&event.match_load.noise.width, data + 5, sizeof(uint32_t));
             memcpy(&event.match_load.noise.height, data + 9, sizeof(uint32_t));
-            event.match_load.noise.map = (int8_t*)malloc(event.match_load.noise.width * event.match_load.noise.height);
-            memcpy(&event.match_load.noise.map[0], data + 13, event.match_load.noise.width * event.match_load.noise.height);
+            event.match_load.noise.map = (int8_t*)malloc((size_t)(event.match_load.noise.width * event.match_load.noise.height));
+            memcpy(&event.match_load.noise.map[0], data + 13, (size_t)(event.match_load.noise.width * event.match_load.noise.height));
 
             state.events.push(event);
             break;

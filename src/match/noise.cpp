@@ -164,19 +164,19 @@ Noise noise_generate(uint64_t seed, uint32_t width, uint32_t height) {
     Noise noise;
     noise.width = width;
     noise.height = height;
-    noise.map = (int8_t*)malloc(noise.width * noise.height * sizeof(int8_t));
+    noise.map = (uint8_t*)malloc(noise.width * noise.height * sizeof(uint8_t));
 
     const double FREQUENCY = 1.0 / 56.0;
-    for (uint32_t x = 0; x < noise.width; x++) {
-        for (uint32_t y = 0; y < noise.height; y++) {
-            // Generates result from -1 to 1
+    for (int x = 0; x < noise.width; x++) {
+        for (int y = 0; y < noise.height; y++) {
+            // simplex_noise generates a result from -1 to 1, so we convert to the range 0 to 1
             double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
             if (perlin_result < 0.15) {
-                noise.map[x + (y * noise.width)] = -1;
+                noise.map[x + (y * noise.width)] = NOISE_VALUE_WATER;
             } else if (perlin_result < 0.6) {
-                noise.map[x + (y * noise.width)] = 0;
+                noise.map[x + (y * noise.width)] = NOISE_VALUE_LOWGROUND;
             } else {
-                noise.map[x + (y * noise.width)] = 1;
+                noise.map[x + (y * noise.width)] = NOISE_VALUE_HIGHGROUND;
             } 
         }
     }
