@@ -1,9 +1,0 @@
-Hi welcome back
-
-We're fixing all the signed conversion warnings
-We've decided that everything that is only ever going to be positive should be an unsigned int
-But we have to be careful because sometimes we have out-of-bounds cell values and we've just been checking that they're in bounds, 
-    but we need to make sure now that they don't overflow the unsigned int if we cast to unsigned int
-Also the noise map values have been changed to be uint8_t with NOISE_VALUE constants as their values
-Make sure that the NOISE_VALUE constants get used throughout the code and make sure that the type used for noise values throughout the code is correct
-Also the lcg_rand got changed to use uint32_t, so make sure that everyone is on board with that. main.cpp probably casts to int32_t
