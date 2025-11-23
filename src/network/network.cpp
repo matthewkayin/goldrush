@@ -1050,10 +1050,10 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
 
             NetworkEvent event;
             event.type = NETWORK_EVENT_MATCH_LOAD;
-            memcpy(&event.match_load.lcg_seed, data + 1, sizeof(int32_t));
-            memcpy(&event.match_load.noise.width, data + 5, sizeof(uint32_t));
-            memcpy(&event.match_load.noise.height, data + 9, sizeof(uint32_t));
-            event.match_load.noise.map = (int8_t*)malloc((size_t)(event.match_load.noise.width * event.match_load.noise.height));
+            memcpy(&event.match_load.lcg_seed, data + 1, sizeof(int));
+            memcpy(&event.match_load.noise.width, data + 5, sizeof(int));
+            memcpy(&event.match_load.noise.height, data + 9, sizeof(int));
+            event.match_load.noise.map = (uint8_t*)malloc((size_t)(event.match_load.noise.width * event.match_load.noise.height));
             memcpy(&event.match_load.noise.map[0], data + 13, (size_t)(event.match_load.noise.width * event.match_load.noise.height));
 
             state.events.push(event);

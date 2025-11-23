@@ -11,9 +11,9 @@
 static const int MAP_PLAYER_SPAWN_SIZE = 13;
 static const int MAP_PLAYER_SPAWN_MARGIN = 13;
 static const int MAP_STAIR_SPACING = 16;
-static const uint32_t PATHING_REGION_UNASSIGNED = UINT32_MAX;
-static const uint32_t PARENT_NONE = UINT32_MAX;
-static const size_t PATHFIND_ITERATION_MAX = 1999;
+static const int PATHING_REGION_UNASSIGNED = -1;
+static const int MAP_ISLAND_UNASSIGNED = -1;
+static const uint32_t PATHFIND_ITERATION_MAX = 1999;
 
 struct PoissonDiskParams {
     std::vector<int> avoid_values;
@@ -24,9 +24,9 @@ struct PoissonDiskParams {
 
 SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
-std::vector<ivec2> map_poisson_disk(const Map& map, uint32_t* lcg_seed, PoissonDiskParams& params);
+std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params);
 
-void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
+void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.width = noise.width;
     map.height = noise.height;
     log_info("Generating map. Size: %ux%u", map.width, map.height);
@@ -45,19 +45,19 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
 
     // Clear out water that is too close to walls
     const int WATER_WALL_DIST = 4;
-    for (uint32_t x = 0; x < noise.width; x++) {
-        for (uint32_t y = 0; y < noise.height; y++) {
+    for (int x = 0; x < noise.width; x++) {
+        for (int y = 0; y < noise.height; y++) {
             if (noise.map[x + (y * noise.width)] != NOISE_VALUE_WATER) {
                 continue;
             }
 
             bool is_too_close_to_wall = false;
-            for (uint32_t nx = (uint32_t)std::max(0, (int)x - WATER_WALL_DIST); nx < x + WATER_WALL_DIST + 1; nx++) {
-                for (uint32_t ny = (uint32_t)std::max(0, (int)y - WATER_WALL_DIST); ny < y + WATER_WALL_DIST + 1; ny++) {
+            for (int nx = x - WATER_WALL_DIST; nx < x + WATER_WALL_DIST + 1; nx++) {
+                for (int ny = y - WATER_WALL_DIST; ny < y + WATER_WALL_DIST + 1; ny++) {
                     if (!map_is_cell_in_bounds(map, ivec2(nx, ny))) {
                         continue;
                     }
-                    if (noise.map[nx + (ny * noise.width)] > 0 && ivec2::manhattan_distance(ivec2(x, y), ivec2(nx, ny)) <= WATER_WALL_DIST) {
+                    if (noise.map[nx + (ny * noise.width)] == NOISE_VALUE_HIGHGROUND && ivec2::manhattan_distance(ivec2(x, y), ivec2(nx, ny)) <= WATER_WALL_DIST) {
                         is_too_close_to_wall = true;
                     }
                 }
@@ -66,26 +66,26 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
                 }
             }
             if (is_too_close_to_wall) {
-                noise.map[x + (y * noise.width)] = 0;
+                noise.map[x + (y * noise.width)] = NOISE_VALUE_LOWGROUND;
             }
         }
     }
 
     // Widen narrow gaps
-    for (uint32_t y = 0; y < noise.height; y++) {
-        for (uint32_t x = 0; x < noise.width; x++) {
-            if (noise.map[x + (y * noise.width)] == NOISE_VALUE_WATER || noise.map[x + (y * noise.width)] == 2) {
+    for (int y = 0; y < noise.height; y++) {
+        for (int x = 0; x < noise.width; x++) {
+            if (noise.map[x + (y * noise.width)] == NOISE_VALUE_WATER) {
                 continue;
             }
 
             for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                 ivec2 wall = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                if (!map_is_cell_in_bounds(map, wall) || noise.map[(uint32_t)wall.x + ((uint32_t)wall.y * noise.width)] > noise.map[x + (y * noise.width)]) {
+                if (!map_is_cell_in_bounds(map, wall) || noise.map[wall.x + (wall.y * noise.width)] > noise.map[x + (y * noise.width)]) {
                     const int STEP_COUNT = direction % 2 == 0 ? 3 : 2;
                     for (int step = 0; step < STEP_COUNT; step++) {
                         ivec2 opposite = ivec2(x, y) - (DIRECTION_IVEC2[direction] * (step + 1));
-                        if (map_is_cell_in_bounds(map, opposite) && noise.map[(uint32_t)opposite.x + ((uint32_t)opposite.y * noise.width)] > noise.map[x + (y * noise.width)]) {
-                            noise.map[(uint32_t)opposite.x + ((uint32_t)opposite.y * noise.width)] = noise.map[x + (y * noise.width)];
+                        if (map_is_cell_in_bounds(map, opposite) && noise.map[opposite.x + (opposite.y * noise.width)] > noise.map[x + (y * noise.width)]) {
+                            noise.map[opposite.x + (opposite.y * noise.width)] = noise.map[x + (y * noise.width)];
                         }
                     }
                 }
@@ -95,12 +95,12 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
 
     // Remove small lowground areas
     {
-        std::vector<int> map_tile_islands(noise.width * noise.height, -1);
+        std::vector<int> map_tile_islands(noise.width * noise.height, MAP_ISLAND_UNASSIGNED);
         std::vector<int> island_size;
 
         while (true) {
             // Set index equal to the first index of the first unassigned tile in the array
-            uint32_t index;
+            int index;
             for (index = 0; index < noise.width * noise.height; index++) {
                 if (map_tile_islands[index] == -1) {
                     break;
@@ -132,7 +132,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
                 }
 
                 // skip this because we've already explored it
-                if (map_tile_islands[next.x + (next.y * noise.width)] != -1) {
+                if (map_tile_islands[next.x + (next.y * noise.width)] != MAP_ISLAND_UNASSIGNED) {
                     continue;
                 }
 
@@ -145,7 +145,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
         } 
         // End assign noise tiles to islands
 
-        for (int island_index = 0; island_index < island_size.size(); island_index++) {
+        for (int island_index = 0; island_index < (int)island_size.size(); island_index++) {
             // Big islands are fine as they are
             if (island_size[island_index] > 15) {
                 continue;
@@ -162,7 +162,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
 
             // And use that index to determine the island's noise value
             // If the noise value is non-zero, then skip it
-            if (noise.map[first_index] != 0) {
+            if (noise.map[first_index] != NOISE_VALUE_LOWGROUND) {
                 continue;
             }
 
@@ -173,15 +173,15 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
                     continue;
                 }
 
-                noise.map[index] = 1;
+                noise.map[index] = NOISE_VALUE_HIGHGROUND;
             }
         }
     }
     
     // Remove lowground nooks
-    for (int y = 0; y < (int)noise.height; y++) {
-        for (int x = 0; x < (int)noise.width; x++) {
-            if (noise.map[x + (y * noise.width)] != 0) {
+    for (int y = 0; y < noise.height; y++) {
+        for (int x = 0; x < noise.width; x++) {
+            if (noise.map[x + (y * noise.width)] != NOISE_VALUE_LOWGROUND) {
                 continue;
             }
 
@@ -191,12 +191,12 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
                 if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= noise.width || neighbor.y >= noise.height) {
                     continue;
                 }
-                if (noise.map[neighbor.x + (neighbor.y * noise.width)] > 0) {
+                if (noise.map[neighbor.x + (neighbor.y * noise.width)] == NOISE_VALUE_HIGHGROUND) {
                     highground_neighbor_count++;
                 }
             }
             if (highground_neighbor_count > 2) {
-                noise.map[x + (y * noise.width)] = 1;
+                noise.map[x + (y * noise.width)] = NOISE_VALUE_HIGHGROUND;
             }
         }
     }
@@ -205,16 +205,16 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
     {
         // First mark all of the highground floor (i.e. non-ground) tiles
         std::vector<bool> is_highground_floor(noise.width * noise.height, false);
-        for (int y = 0; y < (int)noise.height; y++) {
-            for (int x = 0; x < (int)noise.width; x++) {
-                if (noise.map[x + (y * noise.width)] != 1) {
+        for (int y = 0; y < noise.height; y++) {
+            for (int x = 0; x < noise.width; x++) {
+                if (noise.map[x + (y * noise.width)] != NOISE_VALUE_HIGHGROUND) {
                     continue;
                 }
 
                 is_highground_floor[x + (y * noise.width)] = true;
                 for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                     ivec2 adjacent = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                    if (!map_is_cell_in_bounds(map, adjacent) || noise.map[adjacent.x + (adjacent.y * noise.width)] == 1) {
+                    if (!map_is_cell_in_bounds(map, adjacent) || noise.map[adjacent.x + (adjacent.y * noise.width)] == NOISE_VALUE_HIGHGROUND) {
                         continue;
                     }
                     is_highground_floor[x + (y * noise.width)] = false;
@@ -224,8 +224,8 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
 
         // Then mark all of the highground floors that can be occupied by a 2x2 unit
         std::vector<bool> is_2x2_highground_floor(noise.width * noise.height, false);
-        for (int y = 0; y < (int)noise.height; y++) {
-            for (int x = 0; x < (int)noise.width; x++) {
+        for (int y = 0; y < noise.height; y++) {
+            for (int x = 0; x < noise.width; x++) {
                 if (!is_highground_floor[x + (y * noise.width)]) {
                     continue;
                 }
@@ -252,9 +252,9 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
         }
 
         // Finally, remove any walls that do not have a 2x2 occupiable floor surrounding them
-        for (int y = 0; y < (int)noise.height; y++) {
-            for (int x = 0; x < (int)noise.width; x++) {
-                if (noise.map[x + (y * map.width)] != 1) {
+        for (int y = 0; y < noise.height; y++) {
+            for (int x = 0; x < noise.width; x++) {
+                if (noise.map[x + (y * map.width)] != NOISE_VALUE_HIGHGROUND) {
                     continue;
                 }
 
@@ -267,19 +267,20 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
                 }
 
                 if (!has_adjacent_2x2_floor) {
-                    noise.map[x + (y * map.width)] = 0;
+                    noise.map[x + (y * map.width)] = NOISE_VALUE_LOWGROUND;
                 }
             }
         }
     }
 
+    /*
     // Remove elevation artifacts
     uint32_t elevation_artifact_count;
     const int ELEVATION_NEAR_DIST = 4;
     do {
         elevation_artifact_count = 0;
-        for (int x = 0; x < (int)noise.width; x++) {
-            for (int y = 0; y < (int)noise.height; y++) {
+        for (int x = 0; x < noise.width; x++) {
+            for (int y = 0; y < noise.height; y++) {
                 if (noise.map[x + (y * noise.width)] != 2) {
                     continue;
                 }
@@ -306,6 +307,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
             }
         }
     } while (elevation_artifact_count != 0);
+    */
 
     // Bake map tiles
     std::vector<ivec2> artifacts;
@@ -321,14 +323,14 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
         artifacts.clear();
 
         log_debug("Baking map tiles...");
-        for (int y = 0; y < (int)map.height; y++) {
-            for (int x = 0; x < (int)map.width; x++) {
+        for (int y = 0; y < map.height; y++) {
+            for (int x = 0; x < map.width; x++) {
                 int index = x + (y * map.width);
                 if (noise.map[index] >= 0) {
                     map.tiles[index].elevation = noise.map[index];
                     // First check if we need to place a regular wall here
                     uint32_t neighbors = 0;
-                    if (noise.map[index] > 0) {
+                    if (noise.map[index] == NOISE_VALUE_HIGHGROUND) {
                         int8_t tile_elevation = noise.map[index];
                         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                             ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
@@ -358,7 +360,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
                             artifacts.push_back(ivec2(x, y));
                         }
                     }
-                } else if (noise.map[index] == NOISE_LEVEL_WATER) {
+                } else if (noise.map[index] == NOISE_VALUE_WATER) {
                     uint32_t neighbors = 0;
                     // Check adjacent neighbors
                     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
@@ -398,7 +400,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
     } while (!artifacts.empty());
 
     // Place front walls
-    for (uint32_t index = 0; index < map.width * map.height; index++) {
+    for (int index = 0; index < map.width * map.height; index++) {
         int previous = index - map.width;
         if (previous < 0) {
             continue;
@@ -415,7 +417,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
     // Generate ramps
     std::vector<ivec2> stair_cells;
     for (int pass = 0; pass < 2; pass++) {
-        for (int x = 0; x < (int)map.width; x++) {
+        for (int x = 0; x < map.width; x++) {
             for (int y = 0; y < (int)map.height; y++) {
                 Tile tile = map.tiles[x + (y * map.width)];
                 // Only generate ramps on straight edged walls
@@ -571,7 +573,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
     log_debug("Generated ramps.");
 
     // Block all walls and water
-    for (uint32_t index = 0; index < map.width * map.height; index++) {
+    for (int index = 0; index < map.width * map.height; index++) {
         if (!(map.tiles[index].sprite == SPRITE_TILE_SAND1 ||
                 map.tiles[index].sprite == SPRITE_TILE_SAND2 ||
                 map.tiles[index].sprite == SPRITE_TILE_SAND3 ||
@@ -693,7 +695,7 @@ void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& pl
         }
 
         // Generate the avoid values
-        for (uint32_t index = 0; index < map.width * map.height; index++) {
+        for (int index = 0; index < map.width * map.height; index++) {
             if (map.cells[CELL_LAYER_GROUND][index].type == CELL_BLOCKED || map_is_tile_ramp(map, ivec2(index % map.width, index / map.width))) {
                 params.avoid_values[index] = 6;
             }
@@ -859,10 +861,10 @@ bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size) {
 
 void map_calculate_unreachable_cells(Map& map) {
     // Determine map "islands"
-    std::vector<int> map_tile_islands = std::vector<int>(map.width * map.height, -1);
+    std::vector<int> map_tile_islands = std::vector<int>(map.width * map.height, MAP_ISLAND_UNASSIGNED);
     std::vector<int> island_size;
 
-    for (uint32_t index = 0; index < map.width * map.height; index++) {
+    for (int index = 0; index < map.width * map.height; index++) {
         if (map.cells[CELL_LAYER_GROUND][index].type == CELL_UNREACHABLE) {
             map.cells[CELL_LAYER_GROUND][index].type = CELL_EMPTY;
         }
@@ -870,13 +872,13 @@ void map_calculate_unreachable_cells(Map& map) {
 
     while (true) {
         // Set index equal to the index of the first unassigned tile in the array
-        uint32_t index;
+        int index;
         for (index = 0; index < map.width * map.height; index++) {
             if (map_is_cell_blocked(map.cells[CELL_LAYER_GROUND][index])) {
                 continue;
             }
 
-            if (map_tile_islands[index] == -1) {
+            if (map_tile_islands[index] == MAP_ISLAND_UNASSIGNED) {
                 break;
             }
         }
@@ -906,7 +908,7 @@ void map_calculate_unreachable_cells(Map& map) {
             }
 
             // skip this because we've already explored it
-            if (map_tile_islands[next.x + (next.y * map.width)] != -1) {
+            if (map_tile_islands[next.x + (next.y * map.width)] != MAP_ISLAND_UNASSIGNED) {
                 continue;
             }
 
@@ -926,7 +928,7 @@ void map_calculate_unreachable_cells(Map& map) {
     }
     // Everything that's not on the main "island" is considered blocked
     // This makes it so that we don't place any player spawns or gold at these locations
-    for (uint32_t index = 0; index < map.width * map.height; index++) {
+    for (int index = 0; index < map.width * map.height; index++) {
         if (map.cells[CELL_LAYER_GROUND][index].type == CELL_EMPTY && map_tile_islands[index] != biggest_island) {
             map.cells[CELL_LAYER_GROUND][index].type = CELL_UNREACHABLE;
         }
@@ -992,7 +994,7 @@ SpriteName map_wall_autotile_lookup(uint32_t neighbors) {
     }
 }
 
-uint32_t map_neighbors_to_autotile_index(uint32_t neighbors) {
+uint32_t map_neighbors_to_autotile_index(uint32_t p_neighbors) {
     static uint32_t autotile_index[256];
     static bool initialized = false;
     if (!initialized) {
@@ -1020,11 +1022,11 @@ uint32_t map_neighbors_to_autotile_index(uint32_t neighbors) {
         initialized = true;
     }
 
-    return autotile_index[neighbors];
+    return autotile_index[p_neighbors];
 }
 
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point) {
-    if (point.x < params.margin.x || point.x >= (int)map.width - params.margin.x || point.y < params.margin.y || point.y >= (int)map.height - params.margin.y) {
+    if (point.x < params.margin.x || point.x >= map.width - params.margin.x || point.y < params.margin.y || point.y >= (int)map.height - params.margin.y) {
         return false;
     }
 
@@ -1054,7 +1056,7 @@ bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params,
     return true;
 }
 
-std::vector<ivec2> map_poisson_disk(const Map& map, uint32_t* lcg_seed, PoissonDiskParams& params) {
+std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params) {
     std::vector<ivec2> sample;
     std::vector<ivec2> frontier;
 
@@ -1125,16 +1127,16 @@ std::vector<ivec2> map_poisson_disk(const Map& map, uint32_t* lcg_seed, PoissonD
 }
 
 bool map_is_cell_in_bounds(const Map& map, ivec2 cell) {
-    return !(cell.x < 0 || cell.y < 0 || cell.x >= (int)map.width || cell.y >= (int)map.height);
+    return !(cell.x < 0 || cell.y < 0 || cell.x >= map.width || cell.y >= (int)map.height);
 }
 
 bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, int size) {
-    return !(cell.x < 0 || cell.y < 0 || cell.x + size > (int)map.width || cell.y + size > (int)map.height);
+    return !(cell.x < 0 || cell.y < 0 || cell.x + size > map.width || cell.y + size > (int)map.height);
 }
 
 ivec2 map_clamp_cell(const Map& map, ivec2 cell) {
     return ivec2(
-        std::clamp(cell.x, 0, (int)map.width),
+        std::clamp(cell.x, 0, map.width),
         std::clamp(cell.y, 0, (int)map.height)
     );
 }
@@ -1208,22 +1210,22 @@ bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int 
 
     for (int y = cell.y; y < cell.y + size; y++) {
         for (int x = cell.x; x < cell.x + size; x++) {
-            Cell cell = map_get_cell(map, layer, ivec2(x, y));
+            Cell map_cell = map_get_cell(map, layer, ivec2(x, y));
             // If the cell is empty or the cells is not empty but it is within the origin's rect, then it's not occupied
-            if (cell.type == CELL_EMPTY || origin_rect.has_point(ivec2(x, y))) {
+            if (map_cell.type == CELL_EMPTY || origin_rect.has_point(ivec2(x, y))) {
                 continue;
             }  
             // If cell is a miner and we are gold walking, then it is not blocked
-            if (cell.type == CELL_MINER && ignore_miners) {
+            if (map_cell.type == CELL_MINER && ignore_miners) {
                 continue;
             }
             // If cell is a unit and we are ignoring units, then it is not blocked
-            if (cell.type == CELL_UNIT && ignore_units) {
+            if (map_cell.type == CELL_UNIT && ignore_units) {
                 continue;
             }
             // If the cell is a unit that is far enough away from the origin, then it is not occupied
             // This allows units paths to ignore a unit ahead of them whose position may change
-            if ((cell.type == CELL_UNIT || cell.type == CELL_MINER) && origin_id != ID_NULL
+            if ((map_cell.type == CELL_UNIT || map_cell.type == CELL_MINER) && origin_id != ID_NULL
                     && ivec2::manhattan_distance(origin, ivec2(x, y)) > 5) {
                 continue;
             }
@@ -1516,7 +1518,7 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
     return to;
 }
 
-ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size) {
+ivec2 map_pathfind_get_region_path_target(const Map& map, ivec2 from, ivec2 to, int cell_size) {
     ZoneScoped;
 
     if (map.pathing_regions[from.x + (from.y * map.width)] == map.pathing_regions[to.x + (to.y * map.width)] ||
@@ -1542,7 +1544,7 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
 
     while (!frontier.empty()) {
         int smallest_index = 0;
-        for (int index = 1; index < frontier.size(); index++) {
+        for (int index = 1; index < (int)frontier.size(); index++) {
             if (frontier[index].score(to) < frontier[smallest_index].score(to)) {
                 smallest_index = index;
             }
@@ -1579,12 +1581,12 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
             };
 
             int frontier_index;
-            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+            for (frontier_index = 0; frontier_index < (int)frontier.size(); frontier_index++) {
                 if (child.cell == frontier[frontier_index].cell) {
                     break;
                 }
             }
-            if (frontier_index < frontier.size()) {
+            if (frontier_index < (int)frontier.size()) {
                 if (child.score(to) < frontier[frontier_index].score(to)) {
                     frontier[frontier_index] = child;
                 }
@@ -1627,12 +1629,12 @@ ivec2 map_pathfind_get_region_path_target(const Map& map, CellLayer layer, ivec2
             };
 
             int frontier_index;
-            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+            for (frontier_index = 0; frontier_index < (int)frontier.size(); frontier_index++) {
                 if (connection_index == frontier[frontier_index].connection) {
                     break;
                 }
             }
-            if (frontier_index < frontier.size()) {
+            if (frontier_index < (int)frontier.size()) {
                 if (child.score(to) < frontier[frontier_index].score(to)) {
                     frontier[frontier_index] = child;
                 }
@@ -1870,7 +1872,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
     original_to = to;
     if (layer == CELL_LAYER_GROUND) {
-        to = map_pathfind_get_region_path_target(map, layer, from, to, cell_size);
+        to = map_pathfind_get_region_path_target(map, from, to, cell_size);
     }
     map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells, to != original_to);
 }

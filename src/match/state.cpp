@@ -2831,7 +2831,7 @@ void entity_attack_target(MatchState& state, EntityId attacker_id) {
         state.fog_reveals.push_back(reveal);
     }
 
-    int32_t accuracy_roll = lcg_rand(&state.lcg_seed) % 100;
+    int accuracy_roll = lcg_rand(&state.lcg_seed) % 100;
     bool attack_missed = accuracy < accuracy_roll;
     bool attack_is_melee = attack_with_bayonets || attacker_data.unit_data.range_squared == 1;
     if (attack_missed && attack_is_melee) {
@@ -3433,15 +3433,15 @@ void match_fog_update(MatchState& state, uint32_t player_team, ivec2 cell, int c
                     }
 
                     // Remember revealed entities
-                    Cell cell = map_get_cell(state.map, CELL_LAYER_GROUND, line_cell);
-                    if (cell.type == CELL_BUILDING || cell.type == CELL_GOLDMINE) {
-                        Entity& entity = state.entities.get_by_id(cell.id);
+                    Cell map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, line_cell);
+                    if (map_cell.type == CELL_BUILDING || map_cell.type == CELL_GOLDMINE) {
+                        Entity& entity = state.entities.get_by_id(map_cell.id);
                         if (entity_is_selectable(entity)) {
                             ivec2 frame = entity_get_animation_frame(entity);
                             if (entity.type == ENTITY_GOLDMINE && frame.x == 1) {
                                 frame.x = 0;
                             }
-                            state.remembered_entities[player_team][cell.id] = (RememberedEntity) {
+                            state.remembered_entities[player_team][map_cell.id] = (RememberedEntity) {
                                 .type = entity.type,
                                 .frame = frame,
                                 .cell = entity.cell,

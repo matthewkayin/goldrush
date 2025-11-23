@@ -179,7 +179,7 @@ struct MatchPlayer {
     bool active;
     char name[MAX_USERNAME_LENGTH + 1];
     uint32_t team;
-    int32_t recolor_id;
+    int recolor_id;
     uint32_t gold;
     uint32_t upgrades;
     uint32_t upgrades_in_progress;
@@ -301,7 +301,7 @@ struct FogReveal {
 };
 
 struct MatchState {
-    uint32_t lcg_seed;
+    int lcg_seed;
     Map map;
     std::vector<int> fog[MAX_PLAYERS];
     std::vector<int> detection[MAX_PLAYERS];

@@ -160,7 +160,7 @@ float simplex_noise(uint64_t seed, double x, double y) {
     return value;
 }
 
-Noise noise_generate(uint64_t seed, uint32_t width, uint32_t height) {
+Noise noise_generate(uint64_t seed, int width, int height) {
     Noise noise;
     noise.width = width;
     noise.height = height;

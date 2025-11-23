@@ -51,7 +51,7 @@ struct MapPathNode {
     fixed distance;
     // The parent is the previous node stepped in the path to reach this node
     // It should be an index in the explored list or -1 if it is the start node
-    uint32_t parent;
+    int parent;
     ivec2 cell;
 
     fixed score() const {
@@ -61,8 +61,8 @@ struct MapPathNode {
 
 struct MapRegionPathNode {
     ivec2 cell;
-    uint32_t connection;
-    uint32_t parent;
+    int connection;
+    int parent;
     int cost;
     int score(const ivec2& target) {
         return cost + ivec2::manhattan_distance(cell, target);
@@ -75,8 +75,8 @@ struct MapRegionConnection {
 };
 
 struct Map {
-    uint32_t width;
-    uint32_t height;
+    int width;
+    int height;
     std::vector<Tile> tiles;
     std::vector<Cell> cells[CELL_LAYER_COUNT];
 
@@ -86,7 +86,7 @@ struct Map {
     std::vector<MapRegionConnection> pathing_region_connections;
 };
 
-void map_init(Map& map, Noise& noise, uint32_t* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
+void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
 bool map_is_cell_blocked(Cell cell);
 bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size);
 void map_calculate_unreachable_cells(Map& map);

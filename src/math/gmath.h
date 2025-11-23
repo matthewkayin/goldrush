@@ -25,12 +25,12 @@ inline int64_t sqrt_i64(int64_t v) {
 }
 
 struct fixed {
-    static const int32_t integer_bits = 24;
-    static const int32_t fractional_bits = 8;
-    static const int32_t scale_factor = 1 << fractional_bits;
-    static const int32_t fractional_mask = scale_factor - 1;
-    static const int32_t total_bits = integer_bits + fractional_bits;
-    int32_t raw_value;
+    static const int integer_bits = 24;
+    static const int fractional_bits = 8;
+    static const int scale_factor = 1 << fractional_bits;
+    static const int fractional_mask = scale_factor - 1;
+    static const int total_bits = integer_bits + fractional_bits;
+    int raw_value;
 
     static constexpr fixed from_int(int32_t integer_value) {
         return fixed { integer_value << fractional_bits };
@@ -38,17 +38,17 @@ struct fixed {
     static constexpr fixed from_raw(int32_t raw_value) {
         return fixed { raw_value };
     }
-    static constexpr fixed from_int_and_raw_decimal(int32_t integer_value, int32_t raw_decimal_value) {
+    static constexpr fixed from_int_and_raw_decimal(int32_t integer_value, int raw_decimal_value) {
         return fixed { (integer_value << fractional_bits) + raw_decimal_value };
     }
 
-    int32_t integer_part() const {
+    int integer_part() const {
         return raw_value >> fractional_bits;
     }
-    int32_t fractional_part() const {
+    int fractional_part() const {
         return raw_value & fractional_mask;
     }
-    int32_t fractional_value() const {
+    int fractional_value() const {
         return ((raw_value & fractional_mask) * 1000) / scale_factor;
     }
 
@@ -115,10 +115,6 @@ struct ivec2 {
 
     ivec2() = default;
     ivec2(int x, int y) : x(x), y(y) {}
-    ivec2(uint32_t x, uint32_t y) {
-        x = (int)x;
-        y = (int)y;
-    }
     bool operator==(const ivec2& other) const {
         return this->x == other.x && this->y == other.y;
     }

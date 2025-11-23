@@ -10,8 +10,8 @@ LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor -Ivendor/tracy
-COMPILER_FLAGS := -std=c++20 -Wall -Wextra -Wshadow -Wconversion -Wno-missing-designated-field-initializers
-LINKER_FLAGS := -std=c++20
+COMPILER_FLAGS := -std=c++17 -Wall -Wextra -Wshadow -Wno-missing-designated-field-initializers
+LINKER_FLAGS := -std=c++17
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 RC_FILES :=
 

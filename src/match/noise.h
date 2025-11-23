@@ -11,9 +11,9 @@ const uint8_t NOISE_VALUE_LOWGROUND = 1;
 const uint8_t NOISE_VALUE_HIGHGROUND = 2;
 
 struct Noise {
-    uint32_t width;
-    uint32_t height;
+    int width;
+    int height;
     uint8_t* map;
 };
 
-Noise noise_generate(uint64_t seed, uint32_t width, uint32_t height);
+Noise noise_generate(uint64_t seed, int width, int height);

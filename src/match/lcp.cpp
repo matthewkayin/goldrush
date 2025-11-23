@@ -2,8 +2,7 @@
 
 #include <cstdint>
 
-uint32_t lcg_rand(uint32_t* previous) {
-    uint32_t result = (((*previous * 1103515245U) + 12345U) >> 16) & 0x7fff;
-    *previous = ((*previous * 1103515245U) + 12345U) & 0x7fffffff;
-    return result;
+int32_t lcg_rand(int32_t* previous) {
+    *previous = ((*previous * 1103515245) + 12345) & 0x7fffffff;
+    return *previous & 0x7fff;
 }

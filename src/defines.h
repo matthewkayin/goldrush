@@ -2,6 +2,14 @@
 
 #include <cstdint>
 
+#if defined(__clang__) || defined(__GNUC__)
+    #define STATIC_ASSERT _Static_assert
+#else
+    #define STATIC_ASSERT static_assert
+#endif
+
+STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
+
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
     #define PLATFORM_WIN32 1
     #define WIN32_LEAN_AND_MEAN
