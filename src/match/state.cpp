@@ -658,16 +658,7 @@ void match_update(MatchState& state) {
         while (particle_index < state.particles[particle_layer].size()) {
             animation_update(state.particles[particle_layer][particle_index].animation);
 
-            // On particle finish
-            if (!animation_is_playing(state.particles[particle_layer][particle_index].animation)) {
-                if (state.particles[particle_layer][particle_index].animation.name == ANIMATION_PARTICLE_SMOKE_START) {
-                    state.particles[particle_layer][particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE);
-                } else if (state.particles[particle_layer][particle_index].animation.name == ANIMATION_PARTICLE_SMOKE) {
-                    state.particles[particle_layer][particle_index].animation = animation_create(ANIMATION_PARTICLE_SMOKE_END);
-                }
-            }
-
-            // If particle finished and is not playing an animation, then remove it
+            // On particle finish, remove particle
             if (!animation_is_playing(state.particles[particle_layer][particle_index].animation)) {
                 state.particles[particle_layer].erase(state.particles[particle_layer].begin() + particle_index);
             } else {

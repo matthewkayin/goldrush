@@ -27,7 +27,7 @@ FILE* replay_file_open(int32_t lcg_seed, const Noise& noise, MatchPlayer players
     std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + filesystem_get_timestamp_str() + ".rep";
     #ifdef GOLD_DEBUG
         if (use_arg_replay_file) {
-            std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + arg_replay_file + ".rep";
+            replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + arg_replay_file + ".rep";
         }
     #endif
 

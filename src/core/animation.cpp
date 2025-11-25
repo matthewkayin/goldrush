@@ -177,21 +177,6 @@ void animation_init() {
         .frames = animation_frame_range(0, 3, 4),
         .loops = 1
     };
-    ANIMATION_DATA[ANIMATION_PARTICLE_SMOKE_START] = (AnimationData) {
-        .vframe = -1,
-        .frames = animation_frame_range(0, 2, 4),
-        .loops = 1
-    };
-    ANIMATION_DATA[ANIMATION_PARTICLE_SMOKE] = (AnimationData) {
-        .vframe = -1,
-        .frames = animation_frame_range(3, 4, 30),
-        .loops = 36 
-    };
-    ANIMATION_DATA[ANIMATION_PARTICLE_SMOKE_END] = (AnimationData) {
-        .vframe = -1,
-        .frames = animation_frame_range(5, 7, 4),
-        .loops = 1
-    };
     ANIMATION_DATA[ANIMATION_PARTICLE_BLEED] = (AnimationData) {
         .vframe = 0,
         .frames = animation_frame_range(0, 3, 8),

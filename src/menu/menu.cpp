@@ -847,6 +847,10 @@ const char* menu_get_player_status_string(NetworkPlayerStatus status) {
     }
 }
 
+const char* menu_get_selected_replay_filename(const MenuState* state) {
+    return state->replay_filenames[state->lobbylist_item_selected].c_str();
+}
+
 void menu_render(const MenuState* state) {
     // Sky background
     render_fill_rect({ .x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT }, RENDER_COLOR_BLUE);

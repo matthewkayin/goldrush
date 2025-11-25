@@ -78,6 +78,7 @@ void menu_show_status(MenuState* state, const char* message);
 void menu_add_chat_message(MenuState* state, const char* message);
 size_t menu_get_lobbylist_page_count(size_t count);
 const char* menu_get_player_status_string(NetworkPlayerStatus status);
+const char* menu_get_selected_replay_filename(const MenuState* state);
 
 void menu_render(const MenuState* state);
 void menu_render_decoration(const MenuState* state, int index);

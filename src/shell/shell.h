@@ -21,6 +21,12 @@ struct RenderSpriteParams {
     int recolor_id;
 };
 
+enum RenderHealthbarType {
+    RENDER_HEALTHBAR,
+    RENDER_GARRISON_BAR,
+    RENDER_ENERGY_BAR
+};
+
 enum MatchShellSelectionType {
     MATCH_SHELL_SELECTION_NONE,
     MATCH_SHELL_SELECTION_UNITS,
@@ -110,6 +116,7 @@ struct MatchShellState {
     uint32_t status_timer;
 
     // For building placement
+    InputAction hotkey_group[HOTKEY_GROUP_SIZE];
     EntityType building_type;
 
     // Chat
@@ -176,6 +183,8 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
 
 // Update
 void match_shell_update(MatchShellState* state);
+void match_shell_handle_input(MatchShellState* state);
+void match_shell_order_move(MatchShellState* state);
 
 // State queries
 bool match_shell_is_mouse_in_ui();
@@ -192,6 +201,7 @@ void match_shell_center_camera_on_cell(MatchShellState* state, ivec2 cell);
 std::vector<EntityId> match_shell_create_selection(const MatchShellState* state, Rect select_rect);
 void match_shell_set_selection(MatchShellState* state, std::vector<EntityId>& selection);
 MatchShellSelectionType match_shell_get_selection_type(const MatchShellState* state, const std::vector<EntityId>& selection);
+bool match_shell_selection_has_enough_energy(const MatchShellState* state, const std::vector<EntityId>& selection, uint32_t cost);
 
 // Vision
 bool match_shell_is_entity_visible(const MatchShellState* state, const Entity& entity);
@@ -201,6 +211,17 @@ int match_shell_get_fog(const MatchShellState* state, ivec2 cell);
 // Chat
 void match_shell_add_chat_message(MatchShellState* state, uint8_t player_id, const char* message);
 void match_shell_handle_player_disconnect(MatchShellState* state, uint8_t player_id);
+
+// Status
+void match_shell_show_status(MatchShellState* state, const char* message);
+
+// Building placement
+ivec2 match_shell_get_building_cell(int building_size, ivec2 camera_offset);
+bool match_shell_building_can_be_placed(const MatchShellState* state);
+bool match_shell_is_building_place_cell_valid(const MatchShellState* state, ivec2 miner_cell, ivec2 cell);
+
+// Hotkey Menu
+Rect match_shell_get_selection_list_item_rect(uint32_t selection_index);
 
 // Menu
 const char* match_shell_get_menu_header_text(const MatchShellState* state);
@@ -220,4 +241,16 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program);
 
 // Render
 void match_shell_render(const MatchShellState* state);
+SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking);
+SpriteName match_shell_hotkey_get_sprite(const MatchShellState* state, InputAction hotkey, bool show_toggled);
+void match_shell_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
+void match_shell_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max);
+void match_shell_render_target_build(const MatchShellState* state, const Target& target, uint8_t player_id);
 RenderSpriteParams match_shell_create_entity_render_params(const MatchShellState* state, const Entity& entity);
+void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState* state, const Entity& entity);
+void match_shell_render_entity_icon(const MatchShellState* state, const Entity& entity, Rect icon_rect);
+void match_shell_render_entity_move_animation(const MatchShellState* state, const Entity& entity);
+void match_shell_render_particle(const MatchShellState* state, const Particle& particle);
+bool match_shell_should_render_hotkey_toggled(const MatchShellState* state, InputAction hotkey);
+const char* match_shell_render_get_stat_tooltip(SpriteName sprite);
+FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, const Fire& fire);

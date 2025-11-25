@@ -8,6 +8,7 @@
 #include "network/network.h"
 #include "render/render.h"
 #include "menu/menu.h"
+#include "shell/shell.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
@@ -19,6 +20,11 @@
 #endif
 
 int gold_main(int argc, char** argv);
+
+#ifdef PLATFORM_WIN32
+    #include <windows.h>
+    #define FILENAME_MAX_LENGTH MAX_PATH
+#endif
 
 #if defined PLATFORM_WIN32 and not defined GOLD_DEBUG
 #include <windows.h>
@@ -64,25 +70,92 @@ static const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
 enum GameMode {
     GAME_MODE_NONE,
     GAME_MODE_MENU,
-    GAME_MODE_MATCH
+    GAME_MODE_MATCH,
+    GAME_MODE_REPLAY
 };
 
 struct GameState {
     GameMode mode = GAME_MODE_NONE;
     MenuState* menu_state = nullptr;
+    MatchShellState* match_shell_state = nullptr;
 };
 
-void game_set_mode(GameState& state, GameMode next_mode) {
-    if (next_mode == GAME_MODE_MENU) {
+#ifdef GOLD_STEAM
+    struct GameSetModeMenuParams {
+        uint64_t steam_invite_id;
+    };
+#endif
+
+struct GameSetModeMatchParams {
+    int lcg_seed;
+    Noise noise;
+};
+
+struct GameSetModeReplayParams {
+    char filename[FILENAME_MAX_LENGTH + 1];
+};
+
+struct GameSetModeParams {
+    GameMode mode;
+    union {
+        #ifdef GOLD_STEAM
+            GameSetModeMenuParams menu;
+        #endif
+        GameSetModeMatchParams match;
+        GameSetModeReplayParams replay;
+    };
+};
+
+void game_set_mode(GameState& state, GameSetModeParams params) {
+    if (params.mode == GAME_MODE_MENU) {
         state.menu_state = menu_init();
+
+        #ifdef GOLD_STEAM
+            if (params.menu.steam_invite_id != 0) {
+                network_set_backend(NETWORK_BACKEND_STEAM);
+                CSteamID steam_id;
+                steam_id.SetFromUint64(params.menu.steam_invite_id);
+                network_steam_accept_invite(steam_id);
+            }
+        #endif
+    }
+    if (params.mode == GAME_MODE_MATCH) {
+        state.match_shell_state = match_shell_init(params.match.lcg_seed, params.match.noise);
+        free(params.match.noise.map);
+    }
+    if (params.mode == GAME_MODE_REPLAY) {
+        state.match_shell_state = replay_shell_init(params.replay.filename);
+        if (state.match_shell_state == nullptr) {
+            menu_show_status(state.menu_state, "Error opening replay file.");
+            return;
+        }
     }
 
     if (state.mode == GAME_MODE_MENU) {
         delete state.menu_state;
         state.menu_state = nullptr;
     }
+    if (state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) {
+        sound_end_fire_loop();
+        delete state.match_shell_state;
+        state.match_shell_state = nullptr;
+    }
 
-    state.mode = next_mode;
+    state.mode = params.mode;
+}
+
+bool game_is_running(const GameState& state) {
+    if (input_user_requests_exit()) {
+        return false;
+    }
+    if (state.mode == GAME_MODE_MENU && state.menu_state->mode == MENU_MODE_EXIT) {
+        return false;
+    }
+    if ((state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) && state.match_shell_state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
+        return false;
+    }
+
+    return true;
 }
 
 int gold_main(int argc, char** argv) {
@@ -90,6 +163,8 @@ int gold_main(int argc, char** argv) {
         if (SteamAPI_RestartAppIfNecessary(GOLD_STEAM_APP_ID)) {
             return 1;
         }
+
+        uint64_t steam_invite_id = 0;
     #endif
 
     std::string logfile_path = filesystem_get_timestamp_str() + ".log";
@@ -100,6 +175,12 @@ int gold_main(int argc, char** argv) {
             if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
                 argn++;
                 logfile_path = argv[argn];
+            }
+        #endif
+        #ifdef GOLD_STEAM
+            if (strcmp(argv[argn], "+connect_lobby") == 0 && argn + 1 < argc) {
+                argn++;
+                steam_invite_id = std::stoull(argv[argn]);
             }
         #endif
     }
@@ -133,6 +214,17 @@ int gold_main(int argc, char** argv) {
         log_info("Release build.");
     #endif
 
+    #ifdef GOLD_STEAM
+        if (!SteamAPI_Init()) {
+            log_error("Error initializing Steam API.");
+            return 1;
+        }
+        log_info("Initialized Steam API.");
+        if (steam_invite_id != 0) {
+            log_debug("Got connect_lobby from sys args. steam_invite_id: %u", steam_invite_id);
+        }
+    #endif
+
     // Create window
     SDL_Window* window = SDL_CreateWindow(APP_NAME, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
 
@@ -164,9 +256,18 @@ int gold_main(int argc, char** argv) {
     uint32_t fps = 0;
 
     GameState state;
-    game_set_mode(state, GAME_MODE_MENU);
 
-    while (!input_user_requests_exit()) {
+    // Set game mode to menu
+    {
+        GameSetModeParams params;
+        params.mode = GAME_MODE_MENU;
+        #ifdef GOLD_STEAM
+            params.menu.steam_invite_id = steam_invite_id;
+        #endif
+        game_set_mode(state, params);
+    }
+
+    while (game_is_running(state)) {
         // Timekeep
         uint64_t current_time = SDL_GetTicksNS();
         update_accumulator += current_time - last_time;
@@ -198,8 +299,11 @@ int gold_main(int argc, char** argv) {
                         break;
                     }
                     case GAME_MODE_MATCH: {
+                        match_shell_handle_network_event(state.match_shell_state, event);
                         break;
                     }
+                    case GAME_MODE_REPLAY:
+                        break;
                 }
             }
 
@@ -209,9 +313,53 @@ int gold_main(int argc, char** argv) {
                     break;
                 case GAME_MODE_MENU: {
                     menu_update(state.menu_state);
+
+                    // Host begin load match
+                    if (state.menu_state->mode == MENU_MODE_LOAD_MATCH) {
+                        // Set LCG Seed
+                        #ifdef GOLD_RAND_SEED
+                            int lcg_seed = GOLD_RAND_SEED;
+                        #else
+                            int lcg_seed = (int)time(NULL);
+                        #endif
+
+                        // Generate noise
+                        uint64_t noise_seed = (uint64_t)lcg_seed;
+                        int map_width = match_setting_get_map_size((MatchSettingMapSizeValue)network_get_match_setting(MATCH_SETTING_MAP_SIZE));
+                        int map_height = map_width;
+                        Noise noise = noise_generate(noise_seed, map_width, map_height);
+
+                        network_begin_loading_match(lcg_seed, noise);
+
+                        game_set_mode(state, (GameSetModeParams) {
+                            .mode = GAME_MODE_MATCH,
+                            .match = (GameSetModeMatchParams) {
+                                .lcg_seed = lcg_seed,
+                                .noise = noise
+                            }
+                        });
+                    } else if (state.menu_state->mode == MENU_MODE_LOAD_REPLAY) {
+                        GameSetModeParams params;
+                        params.mode = GAME_MODE_REPLAY;
+                        strncpy(params.replay.filename, menu_get_selected_replay_filename(state.menu_state), FILENAME_MAX_LENGTH);
+                        game_set_mode(state, params);
+                    }
+
                     break;
                 }
-                case GAME_MODE_MATCH: {
+                case GAME_MODE_MATCH:
+                case GAME_MODE_REPLAY: {
+                    match_shell_update(state.match_shell_state);
+
+                    if (state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH) {
+                        GameSetModeParams params;
+                        params.mode = GAME_MODE_MENU;
+                        #ifdef GOLD_STEAM
+                            params.menu.steam_invite_id = 0;
+                        #endif
+                        game_set_mode(state, params);
+                    }
+
                     break;
                 }
             }
@@ -229,7 +377,9 @@ int gold_main(int argc, char** argv) {
                 menu_render(state.menu_state);
                 break;
             }
-            case GAME_MODE_MATCH: {
+            case GAME_MODE_MATCH:
+            case GAME_MODE_REPLAY: {
+                match_shell_render(state.match_shell_state);
                 break;
             }
         }
@@ -243,7 +393,9 @@ int gold_main(int argc, char** argv) {
     }
 
     // Delete the current game sub-state
-    game_set_mode(state, GAME_MODE_NONE);
+    game_set_mode(state, (GameSetModeParams) {
+        .mode = GAME_MODE_NONE
+    });
 
     options_save();
 
