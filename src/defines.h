@@ -31,6 +31,12 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
     #define GOLD_DEBUG
 #endif
 
+#define GOLD_STEAM
+#ifdef GOLD_STEAM
+    // #define GOLD_STEAM_APP_ID 3774270U
+    #define GOLD_STEAM_APP_ID 3831190U
+#endif
+
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
 #define UPDATES_PER_SECOND 60

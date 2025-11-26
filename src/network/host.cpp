@@ -187,7 +187,7 @@ void network_host_disconnect_peer(NetworkHost* host, uint16_t peer_id, bool gent
         SteamNetworkingSockets()->CloseConnection(host->steam.peers[peer_id], 0, "", false);
         host->steam.peers[peer_id] = host->steam.peers[host->steam.peer_count - 1];
         host->steam.peer_count--;
-        log_trace("Disconnected peer. peer count %u", host->steam.peer_count);
+        log_debug("Disconnected peer. peer count %u", host->steam.peer_count);
     }
 #endif
 }
