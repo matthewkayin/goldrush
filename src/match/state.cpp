@@ -936,7 +936,7 @@ EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t p
         map_calculate_unreachable_cells(state.map);
     }
 
-    log_info("Created entity %s ID %u player %u cell %vi", entity_data.name, id, player_id, &cell);
+    log_info("Created entity %s ID %u player %u cell <%i, %i>", entity_data.name, id, player_id, cell.x, cell.y);
 
     return id;
 }

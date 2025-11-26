@@ -327,19 +327,18 @@ void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_
             for (int x = 0; x < map.width; x++) {
                 int index = x + (y * map.width);
                 if (noise.map[index] >= 0) {
-                    map.tiles[index].elevation = noise.map[index];
+                    map.tiles[index].elevation = (uint32_t)(noise.map[index] == NOISE_VALUE_HIGHGROUND);
                     // First check if we need to place a regular wall here
                     uint32_t neighbors = 0;
                     if (noise.map[index] == NOISE_VALUE_HIGHGROUND) {
-                        int8_t tile_elevation = noise.map[index];
                         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                             ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
                             if (!map_is_cell_in_bounds(map, neighbor_cell)) {
                                 continue;
                             }
                             int neighbor_index = neighbor_cell.x + (neighbor_cell.y * map.width);
-                            int8_t neighbor_elevation = noise.map[neighbor_index];
-                            if (tile_elevation > neighbor_elevation) {
+                            uint32_t neighbor_elevation = (uint32_t)(noise.map[neighbor_index] == NOISE_VALUE_HIGHGROUND);
+                            if (map.tiles[index].elevation > neighbor_elevation) {
                                 neighbors += DIRECTION_MASK[direction];
                             }
                         }

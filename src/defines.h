@@ -10,7 +10,7 @@
 
 STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
+#if defined(_WIN32)
     #define PLATFORM_WIN32 1
     #define WIN32_LEAN_AND_MEAN
     #define SDL_MAIN_HANDLED

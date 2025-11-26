@@ -254,6 +254,9 @@ int gold_main(int argc, char** argv) {
     uint64_t update_accumulator = 0;
     uint32_t frames = 0;
     uint32_t fps = 0;
+    #ifdef GOLD_DEBUG
+        bool should_render_debug_info = false;
+    #endif
 
     GameState state;
 
@@ -286,6 +289,11 @@ int gold_main(int argc, char** argv) {
 
             // Input
             input_poll_events();
+            #ifdef GOLD_DEBUG
+                if (input_is_action_just_pressed(INPUT_ACTION_F3)) {
+                    should_render_debug_info = !should_render_debug_info;
+                }
+            #endif
 
             // Network
             network_service();
@@ -383,6 +391,30 @@ int gold_main(int argc, char** argv) {
                 break;
             }
         }
+
+        #ifdef GOLD_DEBUG
+            if (should_render_debug_info) {
+                int render_y = 0;
+                char debug_text[256];
+                sprintf(debug_text, "FPS: %u", fps);
+                render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
+                render_y += 20;
+
+                if (state.mode == GAME_MODE_MATCH) {
+                    sprintf(debug_text, "Paused ? %i", (int)state.match_shell_state->is_paused);
+                    render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
+                    render_y += 20;
+                } 
+
+                if (state.mode == GAME_MODE_MATCH && !match_shell_is_mouse_in_ui()) {
+                    ivec2 cell = (input_get_mouse_position() + state.match_shell_state->camera_offset) / TILE_SIZE;
+                    Tile tile = map_get_tile(state.match_shell_state->match_state.map, cell);
+                    sprintf(debug_text, "Cell <%i, %i> Elevation %u Tile <%i, %i>", cell.x, cell.y, tile.elevation, tile.frame.x, tile.frame.y);
+                    render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
+                    render_y += 20;
+                }
+            }
+        #endif
 
         render_present_frame();
     }
