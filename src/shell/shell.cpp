@@ -5,6 +5,7 @@
 #include "network/network.h"
 #include "match/hotkey.h"
 #include "match/upgrade.h"
+#include "match/desync.h"
 #include <algorithm>
 
 // Timing
@@ -741,9 +742,15 @@ void match_shell_update(MatchShellState* state) {
         }
     }
 
+    // Match update
+    if (state->match_timer % TURN_DURATION == 0) {
+        uint32_t checksum = match_checksum(state->match_state);
+        log_debug("CHECKSUM turn %u checksum %u", state->match_timer / TURN_DURATION, checksum);
+    }
+    match_update(state->match_state);
+
     // Increment match timer
     state->match_timer++;
-    match_update(state->match_state);
 
     // Handle input
     if (!match_shell_is_in_menu(state)) {
