@@ -655,7 +655,7 @@ void match_shell_update(MatchShellState* state) {
     if (state->replay_mode && state->match_timer == match_shell_replay_end_of_tape(state)) {
         state->is_paused = true;
     }
-    if (state->is_paused) {
+    if (state->is_paused || state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
         return;
     }
 
@@ -743,6 +743,7 @@ void match_shell_update(MatchShellState* state) {
 
     // Increment match timer
     state->match_timer++;
+    match_update(state->match_state);
 
     // Handle input
     if (!match_shell_is_in_menu(state)) {

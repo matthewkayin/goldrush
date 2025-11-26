@@ -303,6 +303,17 @@ int gold_main(int argc, char** argv) {
                     case GAME_MODE_NONE: 
                         break;
                     case GAME_MODE_MENU: {
+                        if (event.type == NETWORK_EVENT_MATCH_LOAD) {
+                            game_set_mode(state, (GameSetModeParams) {
+                                .mode = GAME_MODE_MATCH,
+                                .match = (GameSetModeMatchParams) {
+                                    .lcg_seed = event.match_load.lcg_seed,
+                                    .noise = event.match_load.noise
+                                }
+                            });
+                            break;
+                        }
+
                         menu_handle_network_event(state.menu_state, event);
                         break;
                     }

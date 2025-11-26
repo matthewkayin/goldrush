@@ -147,7 +147,6 @@ bool render_init(SDL_Window* window) {
         return false;
     }
 
-
     // Init quad VAO
     {
         float quad_vertices[] = {
@@ -195,6 +194,34 @@ bool render_init(SDL_Window* window) {
         glBindVertexArray(0);
     }
 
+    // Init minimap texture
+    {
+        glGenTextures(1, &state.minimap_texture);
+
+        glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_FALSE, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        const SDL_PixelFormatDetails* format = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_ABGR8888);
+        state.minimap_pixel_values[MINIMAP_PIXEL_TRANSPARENT] = SDL_MapRGBA(format, NULL, 0, 0, 0, 0);
+        state.minimap_pixel_values[MINIMAP_PIXEL_OFFBLACK] = SDL_MapRGBA(format, NULL, 40, 37, 45, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_OFFBLACK_TRANSPARENT] = SDL_MapRGBA(format, NULL, 40, 37, 45, 128);
+        state.minimap_pixel_values[MINIMAP_PIXEL_WHITE] = SDL_MapRGBA(format, NULL, 255, 255, 255, 255);
+        for (int player = 0; player < MAX_PLAYERS; player++) {
+            SDL_Color player_color = RENDER_COLOR_VALUES.at(RENDER_PLAYER_COLORS[player]);
+            state.minimap_pixel_values[MINIMAP_PIXEL_PLAYER0 + player] = SDL_MapRGBA(format, NULL, player_color.r, player_color.g, player_color.b, player_color.a);
+        }
+        state.minimap_pixel_values[MINIMAP_PIXEL_GOLD] = SDL_MapRGBA(format, NULL, 238, 209, 158, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_SAND] = SDL_MapRGBA(format, NULL, 204, 162, 139, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_WATER] = SDL_MapRGBA(format, NULL, 70, 100, 115, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_WALL] = SDL_MapRGBA(format, NULL, 94, 88, 89, 255);
+
+        memset(state.minimap_texture_pixels, 0, sizeof(state.minimap_texture_pixels));
+    }
+
     // Init screen framebuffer
     {
         glGenFramebuffers(1, &state.screen_framebuffer);
@@ -240,7 +267,7 @@ bool render_init(SDL_Window* window) {
     glUniformMatrix4fv(glGetUniformLocation(state.sprite_shader, "projection"), 1, GL_FALSE, projection.data);
 
     // Load minimap shader
-    if (!render_load_shader(&state.minimap_shader, "sprite.vert.glsl", "text.frag.glsl")) {
+    if (!render_load_shader(&state.minimap_shader, "sprite.vert.glsl", "minimap.frag.glsl")) {
         return false;
     }
     glUseProgram(state.minimap_shader);
