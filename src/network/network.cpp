@@ -704,6 +704,12 @@ void network_send_checksum(uint32_t checksum) {
     network_host_flush(state.host);
 }
 
+void network_send_serialized_frame(uint8_t* state_buffer, size_t state_buffer_length) {
+    state_buffer[0] = NETWORK_MESSAGE_SERIALIZED_FRAME;
+    network_host_broadcast(state.host, state_buffer, state_buffer_length);
+    network_host_flush(state.host);
+}
+
 // INTERNAL
 
 bool network_lan_scanner_create() {
@@ -1100,6 +1106,32 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
                     .checksum = incoming_message.checksum
                 }
             });
+            break;
+        }
+        case NETWORK_MESSAGE_SERIALIZED_FRAME: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
+            log_debug("NETWORK Received serialized frame.");
+            uint8_t* state_buffer = (uint8_t*)malloc(length);
+            if (state_buffer == NULL) {
+                log_error("NETWORK could not malloc state_buffer");
+                return;
+            }
+            memcpy(state_buffer, data, length);
+
+            state.events.push((NetworkEvent) {
+                .type = NETWORK_EVENT_SERIALIZED_FRAME,
+                .serialized_frame = (NetworkEventSerializedFrame) {
+                    .state_buffer = state_buffer,
+                    .state_buffer_length = length
+                }
+            });
+            break;
+        }
+        default: {
+            log_warn("NETWORK Received unrecognized message type %u", message_type);
             break;
         }
     }

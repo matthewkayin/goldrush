@@ -102,6 +102,7 @@ enum NetworkEventType {
     NETWORK_EVENT_MATCH_LOAD,
     NETWORK_EVENT_INPUT,
     NETWORK_EVENT_CHECKSUM,
+    NETWORK_EVENT_SERIALIZED_FRAME,
 #ifdef GOLD_STEAM
     NETWORK_EVENT_STEAM_INVITE
 #endif
@@ -136,9 +137,16 @@ struct NetworkEventChecksum {
     uint32_t checksum;
 };
 
-struct NetworkEventSteamInvite {
-    NetworkConnectionInfo connection_info;
+struct NetworkEventSerializedFrame {
+    uint8_t* state_buffer;
+    size_t state_buffer_length;
 };
+
+#ifdef GOLD_STEAM
+    struct NetworkEventSteamInvite {
+        NetworkConnectionInfo connection_info;
+    };
+#endif
 
 struct NetworkEvent {
     NetworkEventType type;
@@ -149,7 +157,10 @@ struct NetworkEvent {
         NetworkEventMatchLoad match_load;
         NetworkEventInput input;
         NetworkEventChecksum checksum;
-        NetworkEventSteamInvite steam_invite;
+        NetworkEventSerializedFrame serialized_frame;
+        #ifdef GOLD_STEAM
+            NetworkEventSteamInvite steam_invite;
+        #endif
     };
 };
 
@@ -171,7 +182,8 @@ enum NetworkMessageType {
     NETWORK_MESSAGE_CHAT,
     NETWORK_MESSAGE_LOAD_MATCH,
     NETWORK_MESSAGE_INPUT,
-    NETWORK_MESSAGE_CHECKSUM
+    NETWORK_MESSAGE_CHECKSUM,
+    NETWORK_MESSAGE_SERIALIZED_FRAME
 };
 
 struct NetworkMessageGreetServer {

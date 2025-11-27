@@ -5,7 +5,7 @@
 #include "network/network.h"
 #include "match/hotkey.h"
 #include "match/upgrade.h"
-#include "match/desync.h"
+#include "shell/desync.h"
 #include <algorithm>
 
 // Timing
@@ -349,8 +349,16 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
         case NETWORK_EVENT_CHECKSUM: {
             state->checksums[event.checksum.player_id].push_back(event.checksum.checksum);
             log_debug("CHECKSUM received player %u frame %u sum %u", event.checksum.player_id, state->checksums[event.checksum.player_id].size() - 1, event.checksum.checksum);
+            if (state->mode == MATCH_SHELL_MODE_DESYNC) {
+                log_debug("Already desynced, ignoring.");
+                return;
+            }
             match_shell_compare_checksums(state, state->checksums[event.checksum.player_id].size() - 1);
             break;
+        }
+        case NETWORK_EVENT_SERIALIZED_FRAME: {
+            match_shell_handle_serialized_frame(event.serialized_frame.state_buffer, event.serialized_frame.state_buffer_length);
+            free(event.serialized_frame.state_buffer);
         }
         default:
             break;
@@ -662,7 +670,7 @@ void match_shell_update(MatchShellState* state) {
     if (state->replay_mode && state->match_timer == match_shell_replay_end_of_tape(state)) {
         state->is_paused = true;
     }
-    if (state->is_paused || state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
+    if (state->is_paused || state->mode == MATCH_SHELL_MODE_DESYNC) {
         return;
     }
 
@@ -750,7 +758,7 @@ void match_shell_update(MatchShellState* state) {
 
     // Checksum
     if (!state->replay_mode) {
-        uint32_t checksum = match_checksum(state->match_timer, state->match_state);
+        uint32_t checksum = match_serialize(state->match_state);
         network_send_checksum(checksum);
         state->checksums[network_get_player_id()].push_back(checksum);
         log_debug("CHECKSUM sent player %u frame %u sum %u", network_get_player_id(), state->checksums[network_get_player_id()].size() - 1, checksum);
@@ -2379,11 +2387,43 @@ bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t fram
 }
 
 void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
-    if (!match_shell_are_checksums_out_of_sync(state, frame)) {
+    if (match_shell_are_checksums_out_of_sync(state, frame)) {
+        log_error("DESYNC on frame %u", frame);
+
+        state->mode = MATCH_SHELL_MODE_DESYNC;
+
+        size_t state_buffer_length;
+        uint8_t* state_buffer = match_read_serialized_frame(frame, &state_buffer_length);
+        if (state_buffer == NULL) {
+            log_error("match_shell_compare_checksums could not read serialized frame.");
+            return;
+        }
+
+        network_send_serialized_frame(state_buffer, state_buffer_length);
+        free(state_buffer);
+        log_info("DESYNC Sent serialized frame with size %llu.", state_buffer_length);
+    }
+}
+
+void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length) {
+    uint32_t frame;
+    memcpy(&frame, incoming_state_buffer + sizeof(uint8_t), sizeof(frame));
+    log_info("DESYNC Received serialized frame %u with size %llu", frame, incoming_state_buffer_length);
+
+    size_t state_buffer_length;
+    uint8_t* state_buffer = match_read_serialized_frame(frame, &state_buffer_length);
+    if (state_buffer == NULL) {
+        log_error("match_shell_handle_serialized_frame could not read serialized frame.");
         return;
     }
 
-    GOLD_ASSERT_MESSAGE(false, "DESYNC DETECTED");
+    size_t header_size = sizeof(uint8_t) + sizeof(uint32_t);
+    uint32_t checksum = compute_checksum(state_buffer + header_size, state_buffer_length - header_size);
+    uint32_t checksum2 = compute_checksum(incoming_state_buffer + header_size, incoming_state_buffer_length - header_size);
+    log_info("DESYNC Comparing serialized / incoming frame %u. size %llu / %llu. checksum %u / %u", frame, state_buffer_length - header_size, incoming_state_buffer_length - header_size, checksum, checksum2);
+    desync_compare_frames(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), incoming_state_buffer + sizeof(uint8_t) + sizeof(uint32_t));
+    free(state_buffer);
+    log_info("DESYNC Finished comparing frames.");
 }
 
 // RENDER

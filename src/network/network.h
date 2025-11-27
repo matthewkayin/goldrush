@@ -46,3 +46,4 @@ void network_remove_bot(uint8_t player_id);
 void network_begin_loading_match(int32_t lcg_seed, const Noise& noise);
 void network_send_input(uint8_t* out_buffer, size_t out_buffer_length);
 void network_send_checksum(uint32_t checksum);
+void network_send_serialized_frame(uint8_t* state_buffer, size_t state_buffer_length);

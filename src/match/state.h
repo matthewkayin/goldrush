@@ -114,7 +114,6 @@ struct Target {
         TargetBuild build;
     };
 };
-const int test = sizeof(Target);
 
 enum BuildingQueueItemType {
     BUILDING_QUEUE_ITEM_UNIT,

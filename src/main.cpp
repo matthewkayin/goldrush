@@ -9,7 +9,7 @@
 #include "render/render.h"
 #include "menu/menu.h"
 #include "shell/shell.h"
-#include "match/desync.h"
+#include "shell/desync.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
