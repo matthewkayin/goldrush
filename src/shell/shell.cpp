@@ -668,7 +668,10 @@ void match_shell_update(MatchShellState* state) {
     if (state->replay_mode && state->match_timer == match_shell_replay_end_of_tape(state)) {
         state->is_paused = true;
     }
-    if (state->is_paused || state->mode == MATCH_SHELL_MODE_DESYNC) {
+    if (state->is_paused || 
+            state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || 
+            state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM || 
+            state->mode == MATCH_SHELL_MODE_DESYNC) {
         return;
     }
 
