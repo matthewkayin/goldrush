@@ -109,10 +109,10 @@ struct TargetBuild {
 struct Target {
     TargetType type;
     EntityId id;
+    uint8_t padding = 0;
+    uint8_t padding2 = 0;
     ivec2 cell;
-    union {
-        TargetBuild build;
-    };
+    TargetBuild build;
 };
 
 enum BuildingQueueItemType {
@@ -177,6 +177,8 @@ struct Entity {
 struct MatchPlayer {
     bool active;
     char name[MAX_USERNAME_LENGTH + 1];
+    uint8_t padding = 0;
+    uint8_t padding2 = 0;
     uint32_t team;
     int recolor_id;
     uint32_t gold;
@@ -339,12 +341,6 @@ EntityId match_get_nearest_builder(const MatchState& state, const std::vector<En
 
 bool match_is_target_invalid(const MatchState& state, const Target& target, uint8_t player_id);
 
-// Building Queue
-
-uint32_t building_queue_item_duration(const BuildingQueueItem& item);
-uint32_t building_queue_item_cost(const BuildingQueueItem& item);
-uint32_t building_queue_population_cost(const BuildingQueueItem& item);
-
 // Entity
 
 EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t player_id);
@@ -397,6 +393,25 @@ void entity_building_finish(MatchState& state, EntityId building_id);
 void entity_building_enqueue(MatchState& state, Entity& building, BuildingQueueItem item);
 void entity_building_dequeue(MatchState& state, Entity& building);
 bool entity_building_is_supply_blocked(const MatchState& state, const Entity& building);
+
+// Building Queue
+
+uint32_t building_queue_item_duration(const BuildingQueueItem& item);
+uint32_t building_queue_item_cost(const BuildingQueueItem& item);
+uint32_t building_queue_population_cost(const BuildingQueueItem& item);
+
+// Target
+
+Target target_none();
+Target target_cell(ivec2 cell);
+Target target_entity(EntityId entity_id);
+Target target_attack_cell(ivec2 cell);
+Target target_attack_entity(EntityId entity_id);
+Target target_repair(EntityId entity_id);
+Target target_unload(ivec2 cell);
+Target target_molotov(ivec2 cell);
+Target target_build(TargetBuild target_build);
+Target target_build_assist(EntityId entity_id);
 
 // Event
 

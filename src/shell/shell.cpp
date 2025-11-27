@@ -186,10 +186,10 @@ MatchShellState* match_shell_init(int lcg_seed, Noise& noise) {
 
     // Populate match player info using network player info
     MatchPlayer players[MAX_PLAYERS];
+    memset(players, 0, sizeof(players));
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         const NetworkPlayer& network_player = network_get_player(player_id);
         if (network_player.status == NETWORK_PLAYER_STATUS_NONE) {
-            memset(&players[player_id], 0, sizeof(MatchPlayer));
             continue;
         }
 
@@ -348,9 +348,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
         }
         case NETWORK_EVENT_CHECKSUM: {
             state->checksums[event.checksum.player_id].push_back(event.checksum.checksum);
-            log_debug("CHECKSUM received player %u frame %u sum %u", event.checksum.player_id, state->checksums[event.checksum.player_id].size() - 1, event.checksum.checksum);
             if (state->mode == MATCH_SHELL_MODE_DESYNC) {
-                log_debug("Already desynced, ignoring.");
                 return;
             }
             match_shell_compare_checksums(state, state->checksums[event.checksum.player_id].size() - 1);
@@ -761,7 +759,6 @@ void match_shell_update(MatchShellState* state) {
         uint32_t checksum = match_serialize(state->match_state);
         network_send_checksum(checksum);
         state->checksums[network_get_player_id()].push_back(checksum);
-        log_debug("CHECKSUM sent player %u frame %u sum %u", network_get_player_id(), state->checksums[network_get_player_id()].size() - 1, checksum);
         match_shell_compare_checksums(state, state->checksums[network_get_player_id()].size() - 1);
     }
 

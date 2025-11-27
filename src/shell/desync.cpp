@@ -220,8 +220,6 @@ uint32_t match_serialize(const MatchState& match_state) {
     fwrite(&state.buffer->size, sizeof(state.buffer->size), 1, state.desync_file);
     fwrite(state.buffer->data, state.buffer->size, 1, state.desync_file);
 
-    log_debug("match_serialize state buffer size %llu", state.buffer->size);
-
     uint32_t checksum = compute_checksum(state.buffer->data, state.buffer->size);
 
     dynamic_buffer_clear(state.buffer);
@@ -241,7 +239,6 @@ uint8_t* match_read_serialized_frame(uint32_t frame_number, size_t* state_buffer
     while (current_frame_number != frame_number) {
         size_t block_size;
         fread(&block_size, sizeof(size_t), 1, state.desync_file);
-        log_debug("match_read_serialized_frame frame %u size %llu", current_frame_number, block_size);
 
         dynamic_buffer_clear(state.buffer);
         if (state.buffer->capacity < block_size) {
