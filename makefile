@@ -10,7 +10,7 @@ LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor -Ivendor/tracy
-COMPILER_FLAGS := -std=c++17 -Wall -Wextra -Wshadow -Wno-missing-designated-field-initializers
+COMPILER_FLAGS := -std=c++17 -Wall -Wextra -Wshadow 
 LINKER_FLAGS := -std=c++17
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 RC_FILES :=
@@ -39,6 +39,7 @@ ifeq ($(OS),Windows_NT)
 	DIRECTORIES := \src $(subst $(DIR),,$(shell dir src /S /AD /B | findstr /i src)) # Get all directories under src.
 
 # ws2_32 and winmm are linked for enet
+	COMPILER_FLAGS += -Wno-missing-designated-field-initializers
 	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_image -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -ldbghelp
 else
 	UNAME_S := $(shell uname -s)

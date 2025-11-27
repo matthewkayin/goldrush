@@ -22,10 +22,7 @@
 
 int gold_main(int argc, char** argv);
 
-#ifdef PLATFORM_WIN32
-    #include <windows.h>
-    #define FILENAME_MAX_LENGTH MAX_PATH
-#endif
+#define FILENAME_MAX_LENGTH 255
 
 #if defined PLATFORM_WIN32 and not defined GOLD_DEBUG
 #include <windows.h>
@@ -204,7 +201,7 @@ int gold_main(int argc, char** argv) {
     log_info("Initializing %s %s.", APP_NAME, APP_VERSION);
     #if defined(PLATFORM_WIN32)
         log_info("Detected platform WIN32.");
-    #elif defined(PLATFORM_MACOS);
+    #elif defined(PLATFORM_MACOS)
         log_info("Detected platform MACOS.");
     #elif defined(PLATFORM_LINUX)
         log_info("Detected platform LINUX.");
