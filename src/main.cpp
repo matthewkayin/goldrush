@@ -9,6 +9,7 @@
 #include "render/render.h"
 #include "menu/menu.h"
 #include "shell/shell.h"
+#include "match/desync.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
@@ -245,6 +246,10 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return 1;
     }
+    if (!match_desync_init(logfile_path.substr(0, logfile_path.find('.')).c_str())) {
+        logger_quit();
+        return 1;
+    }
     input_init(window);
     options_load();
     srand((uint32_t)time(0));
@@ -443,6 +448,7 @@ int gold_main(int argc, char** argv) {
     options_save();
 
     // Quit subsystems
+    match_desync_quit();
     network_quit();
     sound_quit();
     cursor_quit();

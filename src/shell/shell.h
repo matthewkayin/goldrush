@@ -168,6 +168,9 @@ struct MatchShellState {
     SDL_Mutex* replay_loading_early_exit_mutex;
     bool replay_loading_early_exit;
 
+    // Checksum
+    std::vector<uint32_t> checksums[MAX_PLAYERS];
+
     // Debug
     #ifdef GOLD_DEBUG
         DebugFog debug_fog;
@@ -238,6 +241,10 @@ size_t match_shell_replay_end_of_tape(const MatchShellState* state);
 bool match_shell_is_at_least_one_opponent_in_match(const MatchShellState* state);
 bool match_shell_is_surrender_required_to_leave(const MatchShellState* state);
 void match_shell_leave_match(MatchShellState* state, bool exit_program);
+
+// Desync
+bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t frame);
+void match_shell_compare_checksums(MatchShellState* state, uint32_t frame);
 
 // Render
 void match_shell_render(const MatchShellState* state);

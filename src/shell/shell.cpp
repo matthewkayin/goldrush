@@ -346,6 +346,12 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
             match_shell_handle_player_disconnect(state, event.player_disconnected.player_id);
             break;
         }
+        case NETWORK_EVENT_CHECKSUM: {
+            state->checksums[event.checksum.player_id].push_back(event.checksum.checksum);
+            log_debug("CHECKSUM received player %u frame %u sum %u", event.checksum.player_id, state->checksums[event.checksum.player_id].size() - 1, event.checksum.checksum);
+            match_shell_compare_checksums(state, state->checksums[event.checksum.player_id].size() - 1);
+            break;
+        }
         default:
             break;
     }
@@ -742,11 +748,16 @@ void match_shell_update(MatchShellState* state) {
         }
     }
 
-    // Match update
-    if (state->match_timer % TURN_DURATION == 0) {
-        uint32_t checksum = match_checksum(state->match_state);
-        log_debug("CHECKSUM turn %u checksum %u", state->match_timer / TURN_DURATION, checksum);
+    // Checksum
+    if (!state->replay_mode) {
+        uint32_t checksum = match_checksum(state->match_timer, state->match_state);
+        network_send_checksum(checksum);
+        state->checksums[network_get_player_id()].push_back(checksum);
+        log_debug("CHECKSUM sent player %u frame %u sum %u", network_get_player_id(), state->checksums[network_get_player_id()].size() - 1, checksum);
+        match_shell_compare_checksums(state, state->checksums[network_get_player_id()].size() - 1);
     }
+
+    // Match update
     match_update(state->match_state);
 
     // Increment match timer
@@ -2342,6 +2353,37 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program) {
         replay_file_close(state->replay_file);
     }
     state->mode = exit_program ? MATCH_SHELL_MODE_EXIT_PROGRAM : MATCH_SHELL_MODE_LEAVE_MATCH;
+}
+
+// DESYNC
+
+bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t frame) {
+    // If we haven't gotten to this frame yet, then we can't say for sure that it's out of sync
+    if (state->checksums[network_get_player_id()].size() <= frame) {
+        return false;
+    }
+
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (!state->match_state.players[player_id].active) {
+            continue;
+        }
+        if (state->checksums[player_id].size() <= frame) {
+            continue;
+        }
+        if (state->checksums[player_id][frame] != state->checksums[network_get_player_id()][frame]) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
+    if (!match_shell_are_checksums_out_of_sync(state, frame)) {
+        return;
+    }
+
+    GOLD_ASSERT_MESSAGE(false, "DESYNC DETECTED");
 }
 
 // RENDER

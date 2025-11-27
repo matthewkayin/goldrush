@@ -101,6 +101,7 @@ enum NetworkEventType {
     NETWORK_EVENT_CHAT,
     NETWORK_EVENT_MATCH_LOAD,
     NETWORK_EVENT_INPUT,
+    NETWORK_EVENT_CHECKSUM,
 #ifdef GOLD_STEAM
     NETWORK_EVENT_STEAM_INVITE
 #endif
@@ -130,6 +131,11 @@ struct NetworkEventInput {
     uint8_t in_buffer[NETWORK_INPUT_BUFFER_SIZE];
 };
 
+struct NetworkEventChecksum {
+    uint8_t player_id;
+    uint32_t checksum;
+};
+
 struct NetworkEventSteamInvite {
     NetworkConnectionInfo connection_info;
 };
@@ -142,6 +148,7 @@ struct NetworkEvent {
         NetworkEventChat chat;
         NetworkEventMatchLoad match_load;
         NetworkEventInput input;
+        NetworkEventChecksum checksum;
         NetworkEventSteamInvite steam_invite;
     };
 };
@@ -163,7 +170,8 @@ enum NetworkMessageType {
     NETWORK_MESSAGE_REMOVE_BOT,
     NETWORK_MESSAGE_CHAT,
     NETWORK_MESSAGE_LOAD_MATCH,
-    NETWORK_MESSAGE_INPUT
+    NETWORK_MESSAGE_INPUT,
+    NETWORK_MESSAGE_CHECKSUM
 };
 
 struct NetworkMessageGreetServer {
@@ -224,4 +232,10 @@ struct NetworkMessageAddBot {
 struct NetworkMessageRemoveBot {
     const uint8_t type = NETWORK_MESSAGE_REMOVE_BOT;
     uint8_t player_id;
+};
+
+struct NetworkMessageChecksum {
+    const uint8_t type = NETWORK_MESSAGE_CHECKSUM;
+    uint8_t padding[3];
+    uint32_t checksum;
 };

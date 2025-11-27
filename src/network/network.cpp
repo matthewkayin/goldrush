@@ -696,6 +696,14 @@ void network_send_input(uint8_t* out_buffer, size_t out_buffer_length) {
     network_host_flush(state.host);
 }
 
+void network_send_checksum(uint32_t checksum) {
+    NetworkMessageChecksum message;
+    message.checksum = checksum;
+
+    network_host_broadcast(state.host, &message, sizeof(message));
+    network_host_flush(state.host);
+}
+
 // INTERNAL
 
 bool network_lan_scanner_create() {
@@ -1073,6 +1081,25 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
 
             state.events.push(event);
 
+            break;
+        }
+        case NETWORK_MESSAGE_CHECKSUM: {
+            if (state.status != NETWORK_STATUS_CONNECTED) {
+                return;
+            }
+
+            uint8_t player_id = network_host_get_peer_player_id(state.host, incoming_peer_id); 
+
+            NetworkMessageChecksum incoming_message;
+            memcpy(&incoming_message, data, sizeof(incoming_message));
+
+            state.events.push((NetworkEvent) {
+                .type = NETWORK_EVENT_CHECKSUM,
+                .checksum = (NetworkEventChecksum) {
+                    .player_id = player_id,
+                    .checksum = incoming_message.checksum
+                }
+            });
             break;
         }
     }
