@@ -799,7 +799,7 @@ void match_shell_update(MatchShellState* state) {
 
     // Checksum
     if (!state->replay_mode && state->match_timer % DESYNC_FREQUENCY == 0) {
-        uint32_t checksum = desync_compute_checksum(state->match_state);
+        uint32_t checksum = desync_compute_match_checksum(state->match_state);
         network_send_checksum(checksum);
         state->checksums[network_get_player_id()].push_back(checksum);
         match_shell_compare_checksums(state, state->checksums[network_get_player_id()].size() - 1);
@@ -2467,8 +2467,8 @@ void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t 
         }
 
         size_t header_size = sizeof(uint8_t) + sizeof(uint32_t);
-        uint32_t checksum = desync_compute_checksum(state_buffer + header_size, state_buffer_length - header_size);
-        uint32_t checksum2 = desync_compute_checksum(incoming_state_buffer + header_size, incoming_state_buffer_length - header_size);
+        uint32_t checksum = desync_compute_buffer_checksum(state_buffer + header_size, state_buffer_length - header_size);
+        uint32_t checksum2 = desync_compute_buffer_checksum(incoming_state_buffer + header_size, incoming_state_buffer_length - header_size);
         log_info("DESYNC Comparing serialized / incoming frame %u. size %llu / %llu. checksum %u / %u", frame, state_buffer_length - header_size, incoming_state_buffer_length - header_size, checksum, checksum2);
         desync_compare_frames(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), incoming_state_buffer + sizeof(uint8_t) + sizeof(uint32_t));
         free(state_buffer);

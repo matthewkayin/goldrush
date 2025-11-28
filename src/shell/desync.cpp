@@ -56,6 +56,21 @@ void desync_quit() {
 
 #endif
 
+void desync_checksum_init(uint32_t* a, uint32_t* b) {
+    *a = 1;
+    *b = 0;
+}
+
+void desync_checksum_add_byte(uint32_t *a, uint32_t *b, uint8_t byte) {
+    static const uint32_t MOD_ADLER = 65521;
+    *a = (*a + byte) % MOD_ADLER;
+    *b = (*b + *a) % MOD_ADLER;
+}
+
+uint32_t desync_checksum_compute_result(uint32_t a, uint32_t b) {
+    return (b << 16) | a;
+}
+
 void desync_write(uint8_t* data, size_t length) {
     #ifdef GOLD_DEBUG_DESYNC
         if (state.buffer_size + length > state.buffer_capacity) {
@@ -70,10 +85,8 @@ void desync_write(uint8_t* data, size_t length) {
         state.buffer_size += length;
     #endif
 
-    static const uint32_t MOD_ADLER = 65521;
     for (size_t index = 0; index < length; index++) {
-        state.a = (state.a + data[index]) % MOD_ADLER;
-        state.b = (state.b + state.a) % MOD_ADLER;
+        desync_checksum_add_byte(&state.a, &state.b, data[index]);
     }
 }
 
@@ -90,9 +103,8 @@ void desync_write_vector(const std::vector<T>& vector_value) {
     }
 }
 
-uint32_t desync_compute_checksum(const MatchState& match_state) {
-    state.a = 1;
-    state.b = 0;
+uint32_t desync_compute_match_checksum(const MatchState& match_state) {
+    desync_checksum_init(&state.a, &state.b);
 
     #ifdef GOLD_DEBUG_DESYNC
         state.buffer_size = 0;
@@ -213,10 +225,21 @@ uint32_t desync_compute_checksum(const MatchState& match_state) {
     #endif
 
     // Return checksum
-    return (state.b << 16) | state.a;
+    return desync_checksum_compute_result(state.a, state.b);
 }
 
 #ifdef GOLD_DEBUG_DESYNC
+
+uint32_t desync_compute_buffer_checksum(uint8_t* data, size_t length) {
+    uint32_t a, b;
+    desync_checksum_init(&a, &b);
+
+    for (size_t index = 0; index < length; index++) {
+        desync_checksum_add_byte(&a, &b, data[index]);
+    }
+
+    return desync_checksum_compute_result(a, b);
+}
 
 uint8_t* desync_read_serialized_frame(uint32_t frame_number, size_t* state_buffer_length) {
     fclose(state.desync_file);
