@@ -1869,9 +1869,11 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         return;
     }
 
-    original_to = to;
     if (layer == CELL_LAYER_GROUND) {
-        to = map_pathfind_get_region_path_target(map, from, to, cell_size);
+        ivec2 region_path_target = map_pathfind_get_region_path_target(map, from, to, cell_size);
+        if (ivec2::manhattan_distance(region_path_target, to) > 3) {
+            to = region_path_target;
+        }
     }
     map_pathfind_calculate_path(map, layer, from, to, cell_size, path, ignore, ignore_cells, to != original_to);
 }

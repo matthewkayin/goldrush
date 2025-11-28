@@ -175,6 +175,7 @@ struct MatchShellState {
     // Debug
     #ifdef GOLD_DEBUG
         DebugFog debug_fog;
+        bool debug_view_path_connections;
     #endif
 };
 

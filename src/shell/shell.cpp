@@ -176,6 +176,11 @@ MatchShellState* match_shell_base_init() {
     // Replay file
     state->replay_file = NULL;
 
+    #ifdef GOLD_DEBUG
+        state->debug_fog = DEBUG_FOG_ENABLED;
+        state->debug_view_path_connections = false;
+    #endif
+
     return state;
 }
 
@@ -546,6 +551,8 @@ void match_shell_update(MatchShellState* state) {
 
     // Begin minimap drag
     if (MINIMAP_RECT.has_point(input_get_mouse_position()) && 
+            !match_shell_is_targeting(state) &&
+            !match_shell_is_selecting(state) &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !match_shell_is_in_menu(state)) {
         state->is_minimap_dragging = true;
@@ -1184,7 +1191,9 @@ void match_shell_handle_input(MatchShellState* state) {
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                         state->match_state.players[player_id].gold += 5000;
                     }
-                } 
+                } else if (state->chat_message == "/pathc") {
+                    state->debug_view_path_connections = !state->debug_view_path_connections;
+                }
             #endif
             network_send_chat(state->chat_message.c_str());
             match_shell_add_chat_message(state, network_get_player_id(), state->chat_message.c_str());
@@ -2576,6 +2585,37 @@ void match_shell_render(const MatchShellState* state) {
             render_sprite_frame(SPRITE_PARTICLE_FIRE, fire.animation.frame, (fire.cell * TILE_SIZE) - state->camera_offset, 0, 0);
         }
     }
+
+    #ifdef GOLD_DEBUG
+        if (state->debug_view_path_connections) {
+            for (const MapRegionConnection& connection : state->match_state.map.pathing_region_connections) {
+                for (const ivec2& cell : connection.left) {
+                    Rect rect = (Rect) {
+                        .x = (cell.x * TILE_SIZE) - state->camera_offset.x,
+                        .y = (cell.y * TILE_SIZE) - state->camera_offset.y,
+                        .w = TILE_SIZE,
+                        .h = TILE_SIZE
+                    };
+                    if (!SCREEN_RECT.intersects(rect)) {
+                        continue;
+                    }
+                    render_draw_rect(rect, RENDER_COLOR_LIGHT_BLUE);
+                }
+                for (const ivec2& cell : connection.right) {
+                    Rect rect = (Rect) {
+                        .x = (cell.x * TILE_SIZE) - state->camera_offset.x,
+                        .y = (cell.y * TILE_SIZE) - state->camera_offset.y,
+                        .w = TILE_SIZE,
+                        .h = TILE_SIZE
+                    };
+                    if (!SCREEN_RECT.intersects(rect)) {
+                        continue;
+                    }
+                    render_draw_rect(rect, RENDER_COLOR_LIGHT_BLUE);
+                }
+            }
+        }
+    #endif
 
     // Entities
     for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
