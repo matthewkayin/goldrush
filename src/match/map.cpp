@@ -1235,6 +1235,60 @@ bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int 
     return false;
 }
 
+bool map_is_player_town_hall_cell_valid(const Map& map, ivec2 mine_cell, ivec2 cell) {
+    static const int HALL_SIZE = 4;
+    if (!map_is_cell_rect_in_bounds(map, cell, HALL_SIZE)) {
+        return false;
+    }
+    if (map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, cell, HALL_SIZE)) {
+        return false;
+    }
+    if (!map_is_cell_rect_same_elevation(map, cell, HALL_SIZE)) {
+        return false;
+    }
+    if (map_get_tile(map, cell).elevation != map_get_tile(map, mine_cell).elevation) {
+        return false;
+    }
+
+    // Check for surrounding stairs
+    const int STAIR_RADIUS = 2;
+    for (int x = cell.x - STAIR_RADIUS; x < cell.x + HALL_SIZE + STAIR_RADIUS + 1; x++) {
+        for (int y = cell.y - STAIR_RADIUS; y < cell.y + HALL_SIZE + STAIR_RADIUS + 1; y++) {
+            if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
+                continue;
+            }
+            if (map_is_tile_ramp(map, ivec2(x, y))) {
+                return false;
+            }
+        }
+    }
+
+    // Check mine exit path
+    std::vector<ivec2> mine_exit_path;
+    map_get_ideal_mine_exit_path(map, mine_cell, cell, &mine_exit_path);
+
+    if (mine_exit_path.empty()) {
+        return false;
+    }
+
+    for (ivec2 path_cell : mine_exit_path) {
+        for (int y = path_cell.y - 1; y < path_cell.y + 2; y++) {
+            for (int x = path_cell.x - 1; x < path_cell.x + 2; x++) {
+                if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
+                    continue;
+                }
+                Cell map_cell = map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y));
+                if (map_cell.type == CELL_BLOCKED || 
+                        (map_cell.type >= CELL_DECORATION_1 && map_cell.type <= CELL_DECORATION_5)) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
     ivec2 nearest_cell;
     int nearest_cell_dist = -1;
@@ -1260,56 +1314,8 @@ ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell) {
     uint32_t index = 0;
     ivec2 cell = cell_begin[index];
     while (index < 4) {
-        // check if cell is valid
-        bool cell_is_valid = map_is_cell_rect_in_bounds(map, cell, start_size);
-        if (cell_is_valid) {
-            cell_is_valid = !map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, cell, start_size) && 
-                    map_is_cell_rect_same_elevation(map, cell, start_size) && 
-                    map_get_tile(map, cell).elevation == map_get_tile(map, mine_cell).elevation &&
-                    (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist);
-        }
-        // check the surrounding cells
-        if (cell_is_valid) {
-            const int STAIR_RADIUS = 2;
-            for (int x = cell.x - STAIR_RADIUS; x < cell.x + start_size + STAIR_RADIUS + 1; x++) {
-                for (int y = cell.y - STAIR_RADIUS; y < cell.y + start_size + STAIR_RADIUS + 1; y++) {
-                    if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
-                        continue;
-                    }
-                    if (map_is_tile_ramp(map, ivec2(x, y))) {
-                        cell_is_valid = false;
-                        break;
-                    }
-                }
-                if (!cell_is_valid) {
-                    break;
-                }
-            }
-        }
-        // check that the mining path is unobstructed
-        if (cell_is_valid) {
-            std::vector<ivec2> mine_exit_path;
-            map_get_ideal_mine_exit_path(map, mine_cell, cell, &mine_exit_path);
-
-            if (mine_exit_path.empty()) {
-                cell_is_valid = false;
-            }
-
-            for (ivec2 path_cell : mine_exit_path) {
-                for (int y = path_cell.y - 1; y < path_cell.y + 2; y++) {
-                    for (int x = path_cell.x - 1; x < path_cell.x + 2; x++) {
-                        if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
-                            continue;
-                        }
-                        if (map_is_cell_blocked(map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y)))) {
-                            cell_is_valid = false;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (cell_is_valid) {
+        if (map_is_player_town_hall_cell_valid(map, mine_cell, cell) &&
+                (nearest_cell_dist == -1 || ivec2::manhattan_distance(start, cell) < nearest_cell_dist)) {
             nearest_cell = cell;
             nearest_cell_dist = ivec2::manhattan_distance(start, cell);
         }

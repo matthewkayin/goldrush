@@ -32,7 +32,7 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 #endif
 
 #ifdef GOLD_DEBUG
-    #define GOLD_RAND_SEED 1764276115
+    // #define GOLD_RAND_SEED 1764335434
     #define GOLD_DEBUG_DESYNC
 #endif
 
