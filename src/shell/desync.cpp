@@ -1,10 +1,5 @@
 #include "desync.h"
 
-#include "core/filesystem.h"
-#include "core/logger.h"
-#include <algorithm>
-#include <cstdlib>
-
 STATIC_ASSERT(sizeof(Tile) == 16ULL);
 STATIC_ASSERT(sizeof(Cell) == 8ULL);
 STATIC_ASSERT(sizeof(Animation) == 24ULL);
@@ -16,138 +11,133 @@ STATIC_ASSERT(sizeof(Projectile) == 20ULL);
 STATIC_ASSERT(sizeof(FogReveal) == 24ULL);
 STATIC_ASSERT(sizeof(MatchPlayer) == 56ULL);
 
-struct DynamicBuffer {
-    uint8_t* data;
-    size_t size;
-    size_t capacity;
-};
-
-DynamicBuffer* dynamic_buffer_init() {
-    DynamicBuffer* buffer = (DynamicBuffer*)malloc(sizeof(DynamicBuffer));
-    buffer->size = 0;
-    buffer->capacity = 1024ULL * 1024ULL;
-    buffer->data = (uint8_t*)malloc(buffer->capacity);
-
-    return buffer;
-}
-
-void dynamic_buffer_write(DynamicBuffer* buffer, uint8_t* data, size_t length) {
-    if (buffer->size + length > buffer->capacity) {
-        uint8_t* temp = buffer->data;
-        buffer->capacity *= 2;
-        buffer->data = (uint8_t*)malloc(buffer->capacity);
-        memcpy(buffer->data, temp, buffer->size);
-        free(temp);
-    }
-
-    memcpy(buffer->data + buffer->size, data, length);
-    buffer->size += length;
-}
-
-template <typename T>
-void dynamic_buffer_write_value(DynamicBuffer* buffer, const T& value) {
-    dynamic_buffer_write(buffer, (uint8_t*)&value, sizeof(T));
-}
-
-template <typename T>
-void dynamic_buffer_write_vector(DynamicBuffer* buffer, const std::vector<T>& vector_value) {
-    dynamic_buffer_write_value<size_t>(buffer, vector_value.size());
-    if (!vector_value.empty()) {
-        dynamic_buffer_write(buffer, (uint8_t*)&vector_value[0], vector_value.size() * sizeof(T));
-    }
-}
-
-void dynamic_buffer_clear(DynamicBuffer* buffer) {
-    buffer->size = 0;
-}
-
-void dynamic_buffer_free(DynamicBuffer* buffer) {
-    free(buffer->data);
-    free(buffer);
-}
+#include "core/filesystem.h"
+#include <algorithm>
+#include <cstdlib>
 
 struct DesyncState {
+    uint32_t a;
+    uint32_t b;
+
+#ifdef GOLD_DEBUG_DESYNC
+    uint8_t* buffer;
+    size_t buffer_size;
+    size_t buffer_capacity;
+
     std::string desync_file_path;
-    DynamicBuffer* buffer;
     FILE* desync_file;
+#endif
 };
 static DesyncState state;
 
-bool match_desync_init(const char* desync_filename) {
-    state.buffer = dynamic_buffer_init();
-    if (state.buffer == NULL) {
-        return false;
-    }
+#ifdef GOLD_DEBUG_DESYNC
 
-    state.desync_file_path = filesystem_get_data_path() + FILESYSTEM_LOG_FOLDER_NAME + desync_filename + ".desync";
-    state.desync_file = fopen(state.desync_file_path.c_str(), "wb");
-    if (state.desync_file == NULL) {
-        return false;
-    }
+bool desync_init(const char* desync_filename) {
+        state.buffer_size = 0;
+        state.buffer_capacity = 1024ULL * 1024ULL;
+        state.buffer = (uint8_t*)malloc(state.buffer_capacity);
+        if (state.buffer == NULL) {
+            return false;
+        }
+
+        state.desync_file_path = filesystem_get_data_path() + FILESYSTEM_LOG_FOLDER_NAME + desync_filename + ".desync";
+        state.desync_file = fopen(state.desync_file_path.c_str(), "wb");
+        if (state.desync_file == NULL) {
+            return false;
+        }
 
     return true;
 }
 
-void match_desync_quit() {
-    dynamic_buffer_free(state.buffer);
+void desync_quit() {
+    free(state.buffer);
     fclose(state.desync_file);
 }
 
-uint32_t compute_checksum(uint8_t* data, size_t length) {
+#endif
+
+void desync_write(uint8_t* data, size_t length) {
+    #ifdef GOLD_DEBUG_DESYNC
+        if (state.buffer_size + length > state.buffer_capacity) {
+            uint8_t* temp = state.buffer;
+            state.buffer_capacity *= 2;
+            state.buffer = (uint8_t*)malloc(state.buffer_capacity);
+            memcpy(state.buffer, temp, state.buffer_size);
+            free(temp);
+        }
+
+        memcpy(state.buffer + state.buffer_size, data, length);
+        state.buffer_size += length;
+    #endif
+
     static const uint32_t MOD_ADLER = 65521;
-
-    uint32_t a = 1;
-    uint32_t b = 0;
-
     for (size_t index = 0; index < length; index++) {
-        a = (a + data[index]) % MOD_ADLER;
-        b = (b + a) % MOD_ADLER;
+        state.a = (state.a + data[index]) % MOD_ADLER;
+        state.b = (state.b + state.a) % MOD_ADLER;
     }
-
-    return (b << 16) | a;
 }
 
-uint32_t match_serialize(const MatchState& match_state) {
+template <typename T>
+void desync_write_value(const T& value) {
+    desync_write((uint8_t*)&value, sizeof(T));
+}
+
+template <typename T>
+void desync_write_vector(const std::vector<T>& vector_value) {
+    desync_write_value<size_t>(vector_value.size());
+    if (!vector_value.empty()) {
+        desync_write((uint8_t*)&vector_value[0], vector_value.size() * sizeof(T));
+    }
+}
+
+uint32_t desync_compute_checksum(const MatchState& match_state) {
+    state.a = 1;
+    state.b = 0;
+
+    #ifdef GOLD_DEBUG_DESYNC
+        state.buffer_size = 0;
+    #endif
+
     // LCG seed
-    dynamic_buffer_write_value<int>(state.buffer, match_state.lcg_seed);
+    desync_write_value<int>(match_state.lcg_seed);
 
     // Map
-    dynamic_buffer_write_value<int>(state.buffer, match_state.map.width);
-    dynamic_buffer_write_value<int>(state.buffer, match_state.map.height);
+    desync_write_value<int>(match_state.map.width);
+    desync_write_value<int>(match_state.map.height);
 
-    dynamic_buffer_write_vector<Tile>(state.buffer, match_state.map.tiles);
+    desync_write_vector<Tile>(match_state.map.tiles);
 
     for (size_t layer = 0; layer < CELL_LAYER_COUNT; layer++) {
-        dynamic_buffer_write_vector<Cell>(state.buffer, match_state.map.cells[layer]);
+        desync_write_vector<Cell>(match_state.map.cells[layer]);
     }
 
-    dynamic_buffer_write_value<int>(state.buffer, match_state.map.pathing_region_count);
-    dynamic_buffer_write_vector<int>(state.buffer, match_state.map.pathing_regions);
+    desync_write_value<int>(match_state.map.pathing_region_count);
+    desync_write_vector<int>(match_state.map.pathing_regions);
 
-    dynamic_buffer_write_value<size_t>(state.buffer, match_state.map.pathing_region_connection_indices.size());
+    desync_write_value<size_t>(match_state.map.pathing_region_connection_indices.size());
     for (size_t index = 0; index < match_state.map.pathing_region_connection_indices.size(); index++) {
-        dynamic_buffer_write_vector<int>(state.buffer, match_state.map.pathing_region_connection_indices[index]);
+        desync_write_vector<int>(match_state.map.pathing_region_connection_indices[index]);
     }
 
-    dynamic_buffer_write_value<size_t>(state.buffer, match_state.map.pathing_region_connections.size());
+    desync_write_value<size_t>(match_state.map.pathing_region_connections.size());
     for (size_t index = 0; index < match_state.map.pathing_region_connections.size(); index++) {
-        dynamic_buffer_write_vector<ivec2>(state.buffer, match_state.map.pathing_region_connections[index].left);
-        dynamic_buffer_write_vector<ivec2>(state.buffer, match_state.map.pathing_region_connections[index].right);
+        desync_write_vector<ivec2>(match_state.map.pathing_region_connections[index].left);
+        desync_write_vector<ivec2>(match_state.map.pathing_region_connections[index].right);
     }
 
     // Fog 
     for (size_t player = 0; player < MAX_PLAYERS; player++) {
-        dynamic_buffer_write_vector<int>(state.buffer, match_state.fog[player]);
+        desync_write_vector<int>(match_state.fog[player]);
     }
 
     // Detection 
     for (size_t player = 0; player < MAX_PLAYERS; player++) {
-        dynamic_buffer_write_vector<int>(state.buffer, match_state.detection[player]);
+        desync_write_vector<int>(match_state.detection[player]);
     }
 
     // Remembered entities
     for (size_t player = 0; player < MAX_PLAYERS; player++) {
-        dynamic_buffer_write_value<size_t>(state.buffer, match_state.remembered_entities[player].size());
+        desync_write_value<size_t>(match_state.remembered_entities[player].size());
 
         std::vector<EntityId> keys;
         for (auto it : match_state.remembered_entities[player]) {
@@ -156,79 +146,79 @@ uint32_t match_serialize(const MatchState& match_state) {
         std::sort(keys.begin(), keys.end());
 
         for (const EntityId key : keys) {
-            dynamic_buffer_write_value<EntityId>(state.buffer, key);
-            dynamic_buffer_write_value<RememberedEntity>(state.buffer, match_state.remembered_entities[player].at(key));
+            desync_write_value<EntityId>(key);
+            desync_write_value<RememberedEntity>(match_state.remembered_entities[player].at(key));
         }
     }
 
-    dynamic_buffer_write_value<bool>(state.buffer, match_state.is_fog_dirty);
+    desync_write_value<bool>(match_state.is_fog_dirty);
 
     // Entities
-    dynamic_buffer_write_value<size_t>(state.buffer, match_state.entities.size());
+    desync_write_value<size_t>(match_state.entities.size());
     for (uint32_t entity_index = 0; entity_index < match_state.entities.size(); entity_index++) {
-        dynamic_buffer_write_value<EntityId>(state.buffer, match_state.entities.get_id_of(entity_index));
+        desync_write_value<EntityId>(match_state.entities.get_id_of(entity_index));
 
         const Entity& entity = match_state.entities[entity_index];
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.type);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.mode);
-        dynamic_buffer_write_value<uint8_t>(state.buffer, entity.player_id);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.flags);
-        dynamic_buffer_write_value<ivec2>(state.buffer, entity.cell);
-        dynamic_buffer_write_value<fvec2>(state.buffer, entity.position);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.direction);
-        dynamic_buffer_write_value<int>(state.buffer, entity.health);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.energy);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.timer);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.energy_regen_timer);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.health_regen_timer);
-        dynamic_buffer_write_value<Animation>(state.buffer, entity.animation);
-        dynamic_buffer_write_vector<EntityId>(state.buffer, entity.garrisoned_units);
-        dynamic_buffer_write_value<EntityId>(state.buffer, entity.garrison_id);
-        dynamic_buffer_write_value<EntityId>(state.buffer, entity.goldmine_id);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.gold_held);
-        dynamic_buffer_write_value<Target>(state.buffer, entity.target);
-        dynamic_buffer_write_vector<Target>(state.buffer, entity.target_queue);
-        dynamic_buffer_write_vector<ivec2>(state.buffer, entity.path);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.pathfind_attempts);
-        dynamic_buffer_write_vector<BuildingQueueItem>(state.buffer, entity.queue);
-        dynamic_buffer_write_value<ivec2>(state.buffer, entity.rally_point);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.cooldown_timer);
-        dynamic_buffer_write_value<ivec2>(state.buffer, entity.attack_move_cell);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.taking_damage_counter);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.taking_damage_timer);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.fire_damage_timer);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.bleed_timer);
-        dynamic_buffer_write_value<uint32_t>(state.buffer, entity.bleed_damage_timer);
-        dynamic_buffer_write_value<Animation>(state.buffer, entity.bleed_animation);
+        desync_write_value<uint32_t>(entity.type);
+        desync_write_value<uint32_t>(entity.mode);
+        desync_write_value<uint8_t>(entity.player_id);
+        desync_write_value<uint32_t>(entity.flags);
+        desync_write_value<ivec2>(entity.cell);
+        desync_write_value<fvec2>(entity.position);
+        desync_write_value<uint32_t>(entity.direction);
+        desync_write_value<int>(entity.health);
+        desync_write_value<uint32_t>(entity.energy);
+        desync_write_value<uint32_t>(entity.timer);
+        desync_write_value<uint32_t>(entity.energy_regen_timer);
+        desync_write_value<uint32_t>(entity.health_regen_timer);
+        desync_write_value<Animation>(entity.animation);
+        desync_write_vector<EntityId>(entity.garrisoned_units);
+        desync_write_value<EntityId>(entity.garrison_id);
+        desync_write_value<EntityId>(entity.goldmine_id);
+        desync_write_value<uint32_t>(entity.gold_held);
+        desync_write_value<Target>(entity.target);
+        desync_write_vector<Target>(entity.target_queue);
+        desync_write_vector<ivec2>(entity.path);
+        desync_write_value<uint32_t>(entity.pathfind_attempts);
+        desync_write_vector<BuildingQueueItem>(entity.queue);
+        desync_write_value<ivec2>(entity.rally_point);
+        desync_write_value<uint32_t>(entity.cooldown_timer);
+        desync_write_value<ivec2>(entity.attack_move_cell);
+        desync_write_value<uint32_t>(entity.taking_damage_counter);
+        desync_write_value<uint32_t>(entity.taking_damage_timer);
+        desync_write_value<uint32_t>(entity.fire_damage_timer);
+        desync_write_value<uint32_t>(entity.bleed_timer);
+        desync_write_value<uint32_t>(entity.bleed_damage_timer);
+        desync_write_value<Animation>(entity.bleed_animation);
     }
 
     // Particles
     for (size_t layer = 0; layer < PARTICLE_LAYER_COUNT; layer++) {
-        dynamic_buffer_write_vector<Particle>(state.buffer, match_state.particles[layer]);
+        desync_write_vector<Particle>(match_state.particles[layer]);
     }
 
     // Projectiles, fire, fire cells, fog reveals
-    dynamic_buffer_write_vector<Projectile>(state.buffer, match_state.projectiles);
-    dynamic_buffer_write_vector<Fire>(state.buffer, match_state.fires);
-    dynamic_buffer_write_vector<int>(state.buffer, match_state.fire_cells);
-    dynamic_buffer_write_vector<FogReveal>(state.buffer, match_state.fog_reveals);
+    desync_write_vector<Projectile>(match_state.projectiles);
+    desync_write_vector<Fire>(match_state.fires);
+    desync_write_vector<int>(match_state.fire_cells);
+    desync_write_vector<FogReveal>(match_state.fog_reveals);
 
     // Players
-    dynamic_buffer_write(state.buffer, (uint8_t*)match_state.players, MAX_PLAYERS * sizeof(MatchPlayer));
+    desync_write((uint8_t*)match_state.players, MAX_PLAYERS * sizeof(MatchPlayer));
 
     // Write to desync file
-    fwrite(&state.buffer->size, sizeof(state.buffer->size), 1, state.desync_file);
-    fwrite(state.buffer->data, state.buffer->size, 1, state.desync_file);
+    #ifdef GOLD_DESYNC_DEBUG
+        fwrite(&state.buffer_size, sizeof(state.buffer_size), 1, state.desync_file);
+        fwrite(state.buffer, state.buffer_size, 1, state.desync_file);
+    #endif
 
-    uint32_t checksum = compute_checksum(state.buffer->data, state.buffer->size);
-
-    dynamic_buffer_clear(state.buffer);
-
-    // Compute and return checksum
-    return checksum;
+    // Return checksum
+    return (state.b << 16) | state.a;
 }
 
-uint8_t* match_read_serialized_frame(uint32_t frame_number, size_t* state_buffer_length) {
+#ifdef GOLD_DEBUG_DESYNC
+
+uint8_t* desync_read_serialized_frame(uint32_t frame_number, size_t* state_buffer_length) {
     fclose(state.desync_file);
     state.desync_file = fopen(state.desync_file_path.c_str(), "rb");
     if (state.desync_file == NULL) {
@@ -240,17 +230,17 @@ uint8_t* match_read_serialized_frame(uint32_t frame_number, size_t* state_buffer
         size_t block_size;
         fread(&block_size, sizeof(size_t), 1, state.desync_file);
 
-        dynamic_buffer_clear(state.buffer);
-        if (state.buffer->capacity < block_size) {
-            state.buffer->capacity = block_size;
-            free(state.buffer->data);
-            state.buffer->data = (uint8_t*)malloc(state.buffer->capacity);
-            if (state.buffer->data == NULL) {
+        state.buffer_size = 0;
+        if (state.buffer_capacity < block_size) {
+            state.buffer_capacity = block_size;
+            free(state.buffer);
+            state.buffer = (uint8_t*)malloc(state.buffer_capacity);
+            if (state.buffer == NULL) {
                 fclose(state.desync_file);
                 return NULL;
             }
         }
-        fread(state.buffer->data, block_size, 1, state.desync_file);
+        fread(state.buffer, block_size, 1, state.desync_file);
 
         current_frame_number++;
     }
@@ -410,3 +400,5 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
         state_buffer_offset += desync_compare_value<MatchPlayer>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
     }
 }
+
+#endif

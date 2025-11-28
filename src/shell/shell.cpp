@@ -22,6 +22,11 @@ static const Rect MENU_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (MENU_WIDTH / 2), .y = 128,
     .w = MENU_WIDTH, .h = 288
 };
+static const int DESYNC_MENU_WIDTH = 332;
+static const Rect DESYNC_MENU_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (DESYNC_MENU_WIDTH / 2), .y = 128,
+    .w = DESYNC_MENU_WIDTH, .h = 288
+};
 
 // Chat
 static const size_t CHAT_MAX_LENGTH = 64;
@@ -122,6 +127,13 @@ static const Rect DISCONNECT_FRAME_RECT = (Rect) {
 // Healthbar
 static const int HEALTHBAR_HEIGHT = 8;
 static const int HEALTHBAR_PADDING = 7;
+
+// Desync
+#ifdef GOLD_DEBUG_DESYNC
+    static const uint32_t DESYNC_FREQUENCY = 1U;
+#else
+    static const uint32_t DESYNC_FREQUENCY = 60U;
+#endif
 
 MatchShellState* match_shell_base_init() {
     MatchShellState* state = new MatchShellState();
@@ -359,10 +371,12 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
             match_shell_compare_checksums(state, state->checksums[event.checksum.player_id].size() - 1);
             break;
         }
+    #ifdef GOLD_DEBUG_DESYNC
         case NETWORK_EVENT_SERIALIZED_FRAME: {
             match_shell_handle_serialized_frame(event.serialized_frame.state_buffer, event.serialized_frame.state_buffer_length);
             free(event.serialized_frame.state_buffer);
         }
+    #endif
         default:
             break;
     }
@@ -399,11 +413,13 @@ void match_shell_update(MatchShellState* state) {
         .w = menu_button_sprite_info.frame_width * 2, .h = menu_button_sprite_info.frame_height * 2
     };
     if (!(state->is_minimap_dragging || match_shell_is_selecting(state)) && 
+            // Menu button doesn't work for defeat / victory / desync screens
+            !(state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT || state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY || state->mode == MATCH_SHELL_MODE_DESYNC) &&
             ((menu_button_rect.has_point(input_get_mouse_position()) && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) || input_is_action_just_pressed(INPUT_ACTION_MATCH_MENU))) {
-        if (state->mode == MATCH_SHELL_MODE_MENU || state->mode == MATCH_SHELL_MODE_MENU_SURRENDER || state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP) {
+        if (match_shell_is_in_menu(state)) {
             state->options_menu.mode = OPTIONS_MENU_CLOSED;
             state->mode = MATCH_SHELL_MODE_NONE;
-        } else if (state->mode != MATCH_SHELL_MODE_MATCH_OVER_DEFEAT && state->mode != MATCH_SHELL_MODE_MATCH_OVER_VICTORY) {
+        } else {
             state->mode = MATCH_SHELL_MODE_MENU;
             input_stop_text_input();
         }
@@ -420,7 +436,7 @@ void match_shell_update(MatchShellState* state) {
         }
 
         state->ui.input_enabled = state->options_menu.mode == OPTIONS_MENU_CLOSED;
-        ui_frame_rect(state->ui, MENU_RECT);
+        ui_frame_rect(state->ui, state->mode == MATCH_SHELL_MODE_DESYNC ? DESYNC_MENU_RECT : MENU_RECT);
 
         const char* header_text = match_shell_get_menu_header_text(state);
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_GOLD, header_text);
@@ -428,8 +444,18 @@ void match_shell_update(MatchShellState* state) {
         ui_element_position(state->ui, text_pos);
         ui_text(state->ui, FONT_WESTERN8_GOLD, header_text);
 
+        if (state->mode == MATCH_SHELL_MODE_DESYNC) {
+            ivec2 text_column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 64);
+            ui_begin_column(state->ui, text_column_position, 10);
+                ui_text(state->ui, FONT_HACK_WHITE, "Your game is out of", true);
+                ui_text(state->ui, FONT_HACK_WHITE, "sync with your opponents.", true);
+            ui_end_container(state->ui);
+        }
+
         ivec2 column_position = ivec2(MENU_RECT.x + (MENU_RECT.w / 2), MENU_RECT.y + 64);
-        if (state->mode != MATCH_SHELL_MODE_MENU) {
+        if (state->mode == MATCH_SHELL_MODE_DESYNC) {
+            column_position.y += 94;
+        } else if (state->mode != MATCH_SHELL_MODE_MENU) {
             column_position.y += 22;
         }
         ui_begin_column(state->ui, column_position, 10);
@@ -472,13 +498,20 @@ void match_shell_update(MatchShellState* state) {
                 if (ui_button(state->ui, "Exit Program", button_size, true)) {
                     match_shell_leave_match(state, true);
                 }
+            } else if (state->mode == MATCH_SHELL_MODE_DESYNC) {
+                if (ui_button(state->ui, "Leave Match", button_size, true)) {
+                    match_shell_leave_match(state, false);
+                }
+                if (ui_button(state->ui, "Exit Program", button_size, true)) {
+                    match_shell_leave_match(state, true);
+                }
             }
         ui_end_container(state->ui);
 
         if (state->options_menu.mode != OPTIONS_MENU_CLOSED) {
             options_menu_update(state->options_menu, state->ui);
         }
-    } 
+    }
     
     // Replay UI
     if (state->replay_mode) {
@@ -765,8 +798,8 @@ void match_shell_update(MatchShellState* state) {
     }
 
     // Checksum
-    if (!state->replay_mode) {
-        uint32_t checksum = match_serialize(state->match_state);
+    if (!state->replay_mode && state->match_timer % DESYNC_FREQUENCY == 0) {
+        uint32_t checksum = desync_compute_checksum(state->match_state);
         network_send_checksum(checksum);
         state->checksums[network_get_player_id()].push_back(checksum);
         match_shell_compare_checksums(state, state->checksums[network_get_player_id()].size() - 1);
@@ -1795,7 +1828,8 @@ bool match_shell_is_in_menu(const MatchShellState* state) {
             state->mode == MATCH_SHELL_MODE_MENU_SURRENDER ||
             state->mode == MATCH_SHELL_MODE_MENU_SURRENDER_TO_DESKTOP ||
             state->mode == MATCH_SHELL_MODE_MATCH_OVER_VICTORY ||
-            state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT;
+            state->mode == MATCH_SHELL_MODE_MATCH_OVER_DEFEAT || 
+            state->mode == MATCH_SHELL_MODE_DESYNC;
 }
 
 bool match_shell_is_in_hotkey_submenu(const MatchShellState* state) {
@@ -2240,6 +2274,8 @@ const char* match_shell_get_menu_header_text(const MatchShellState* state) {
             return "Victory!";
         case MATCH_SHELL_MODE_MATCH_OVER_DEFEAT:
             return "Defeat!";
+        case MATCH_SHELL_MODE_DESYNC:
+            return "Desync Detected";
         default:
             return "";
     }
@@ -2401,39 +2437,45 @@ void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
 
         state->mode = MATCH_SHELL_MODE_DESYNC;
 
+        #ifdef GOLD_DEBUG_DESYNC
+            size_t state_buffer_length;
+            uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
+            if (state_buffer == NULL) {
+                log_error("match_shell_compare_checksums could not read serialized frame.");
+                return;
+            }
+
+            network_send_serialized_frame(state_buffer, state_buffer_length);
+            free(state_buffer);
+            log_info("DESYNC Sent serialized frame with size %llu.", state_buffer_length);
+        #endif
+    }
+}
+
+#ifdef GOLD_DEBUG_DESYNC
+
+void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length) {
+        uint32_t frame;
+        memcpy(&frame, incoming_state_buffer + sizeof(uint8_t), sizeof(frame));
+        log_info("DESYNC Received serialized frame %u with size %llu", frame, incoming_state_buffer_length);
+
         size_t state_buffer_length;
-        uint8_t* state_buffer = match_read_serialized_frame(frame, &state_buffer_length);
+        uint8_t* state_buffer = desync_read_serialized_frame(frame, &state_buffer_length);
         if (state_buffer == NULL) {
-            log_error("match_shell_compare_checksums could not read serialized frame.");
+            log_error("match_shell_handle_serialized_frame could not read serialized frame.");
             return;
         }
 
-        network_send_serialized_frame(state_buffer, state_buffer_length);
+        size_t header_size = sizeof(uint8_t) + sizeof(uint32_t);
+        uint32_t checksum = desync_compute_checksum(state_buffer + header_size, state_buffer_length - header_size);
+        uint32_t checksum2 = desync_compute_checksum(incoming_state_buffer + header_size, incoming_state_buffer_length - header_size);
+        log_info("DESYNC Comparing serialized / incoming frame %u. size %llu / %llu. checksum %u / %u", frame, state_buffer_length - header_size, incoming_state_buffer_length - header_size, checksum, checksum2);
+        desync_compare_frames(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), incoming_state_buffer + sizeof(uint8_t) + sizeof(uint32_t));
         free(state_buffer);
-        log_info("DESYNC Sent serialized frame with size %llu.", state_buffer_length);
-    }
+        log_info("DESYNC Finished comparing frames.");
 }
 
-void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length) {
-    uint32_t frame;
-    memcpy(&frame, incoming_state_buffer + sizeof(uint8_t), sizeof(frame));
-    log_info("DESYNC Received serialized frame %u with size %llu", frame, incoming_state_buffer_length);
-
-    size_t state_buffer_length;
-    uint8_t* state_buffer = match_read_serialized_frame(frame, &state_buffer_length);
-    if (state_buffer == NULL) {
-        log_error("match_shell_handle_serialized_frame could not read serialized frame.");
-        return;
-    }
-
-    size_t header_size = sizeof(uint8_t) + sizeof(uint32_t);
-    uint32_t checksum = compute_checksum(state_buffer + header_size, state_buffer_length - header_size);
-    uint32_t checksum2 = compute_checksum(incoming_state_buffer + header_size, incoming_state_buffer_length - header_size);
-    log_info("DESYNC Comparing serialized / incoming frame %u. size %llu / %llu. checksum %u / %u", frame, state_buffer_length - header_size, incoming_state_buffer_length - header_size, checksum, checksum2);
-    desync_compare_frames(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), incoming_state_buffer + sizeof(uint8_t) + sizeof(uint32_t));
-    free(state_buffer);
-    log_info("DESYNC Finished comparing frames.");
-}
+#endif
 
 // RENDER
 

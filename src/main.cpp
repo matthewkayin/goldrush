@@ -166,6 +166,9 @@ int gold_main(int argc, char** argv) {
     #endif
 
     std::string logfile_path = filesystem_get_timestamp_str() + ".log";
+    #ifdef GOLD_DEBUG_DESYNC
+        std::string desync_filename = "desync.bin";
+    #endif
 
     // Parse system arguments
     for (int argn = 1; argn < argc; argn++) {
@@ -173,6 +176,9 @@ int gold_main(int argc, char** argv) {
             if (strcmp(argv[argn], "--logfile") == 0 && argn + 1 < argc) {
                 argn++;
                 logfile_path = argv[argn];
+                #ifdef GOLD_DEBUG_DESYNC
+                    desync_filename = logfile_path.substr(0, logfile_path.find('.'));
+                #endif
             }
         #endif
         #ifdef GOLD_STEAM
@@ -243,10 +249,12 @@ int gold_main(int argc, char** argv) {
         logger_quit();
         return 1;
     }
-    if (!match_desync_init(logfile_path.substr(0, logfile_path.find('.')).c_str())) {
-        logger_quit();
-        return 1;
-    }
+    #ifdef GOLD_DEBUG_DESYNC
+        if (!desync_init(desync_filename.c_str())) {
+            logger_quit();
+            return 1;
+        }
+    #endif
     input_init(window);
     options_load();
     srand((uint32_t)time(0));
@@ -445,7 +453,9 @@ int gold_main(int argc, char** argv) {
     options_save();
 
     // Quit subsystems
-    match_desync_quit();
+    #ifdef GOLD_DEBUG_DESYNC
+        desync_quit();
+    #endif
     network_quit();
     sound_quit();
     cursor_quit();

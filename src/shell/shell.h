@@ -247,7 +247,9 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program);
 // Desync
 bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t frame);
 void match_shell_compare_checksums(MatchShellState* state, uint32_t frame);
-void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length);
+#ifdef GOLD_DEBUG_DESYNC
+    void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t incoming_state_buffer_length);
+#endif
 
 // Render
 void match_shell_render(const MatchShellState* state);
