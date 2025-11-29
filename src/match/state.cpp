@@ -811,6 +811,12 @@ EntityId match_find_best_entity(const MatchState& state, const MatchFindBestEnti
     return state.entities.get_id_of(best_entity_index);
 }
 
+std::function<bool(const Entity& a, const Entity& b)> match_compare_closest_manhattan_distance_to(ivec2 cell) {
+    return [cell](const Entity& a, const Entity& b) {
+        return ivec2::manhattan_distance(a.cell, cell) < ivec2::manhattan_distance(b.cell, cell);
+    };
+}
+
 EntityId match_get_nearest_builder(const MatchState& state, const std::vector<EntityId>& builders, ivec2 cell) {
     EntityId nearest_unit_id; 
     int nearest_unit_dist = -1;
