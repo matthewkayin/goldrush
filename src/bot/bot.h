@@ -6,15 +6,8 @@
 #include "core/match_setting.h"
 #include <unordered_map>
 
-enum BotMode {
-    BOT_MODE_OPENER_BANDIT_RUSH,
-    BOT_MODE_OPENER_BUNKER,
-    BOT_MODE_EXPAND,
-    BOT_MODE_ATTACK,
-    BOT_MODE_SURRENDER
-};
-
 enum BotUnitComp {
+    BOT_UNIT_COMP_NONE,
     BOT_UNIT_COMP_COWBOY_BANDIT,
     BOT_UNIT_COMP_COWBOY_BANDIT_PYRO,
     BOT_UNIT_COMP_COWBOY_SAPPER_PYRO,
@@ -31,10 +24,39 @@ enum BotMetric {
     BOT_METRIC_COUNT
 };
 
+enum BotSquadType {
+    BOT_SQUAD_TYPE_ATTACK,
+    BOT_SQUAD_TYPE_DEFEND,
+    BOT_SQUAD_TYPE_RESERVES,
+    BOT_SQUAD_TYPE_LANDMINES,
+    BOT_SQUAD_TYPE_RETURN
+};
+
+struct BotSquad {
+    BotSquadType type;
+    EntityId target_base_goldmine_id;
+    std::vector<EntityId> entities;
+};
+
+struct BotDesiredSquad {
+    BotSquadType type;
+    EntityCount entity_count;
+};
+
+struct BotBaseInfo {
+    uint8_t controlled_by_player_id;
+    int defense_score;
+};
+
+struct BotRetreatMemory {
+    std::vector<EntityId> enemy_list;
+    int retreat_count;
+};
+
 struct Bot {
     uint8_t player_id;
+    bool has_surrendered;
     int lcg_seed;
-    BotMode mode;
     MatchSettingDifficultyValue difficulty;
 
     // Metrics
@@ -54,6 +76,10 @@ struct Bot {
     // Scouting
     EntityId scout_id;
     uint32_t scout_info;
+
+    // Base info
+    std::unordered_map<EntityId, BotBaseInfo> base_info;
+    std::unordered_map<EntityId, BotRetreatMemory> retreat_memory;
 };
 
 Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyValue difficulty, int lcg_seed);
@@ -62,8 +88,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 // Production
 
 MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t match_timer);
-void bot_set_desired_production(const MatchState& state, const Bot& bot);
-bool bot_should_use_army_ratio(const Bot& bot);
+void bot_update_desired_production(const MatchState& state, const Bot& bot);
 
 // Saturate bases
 
@@ -96,6 +121,7 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
 // Scouting
 
+void bot_update_base_info(const MatchState& state, Bot& bot);
 bool bot_check_scout_info(const Bot& bot, uint32_t flag);
 void bot_set_scout_info(Bot& bot, uint32_t flag, bool value);
 
@@ -116,6 +142,11 @@ EntityType bot_get_building_which_researches(uint32_t upgrade);
 void bot_gather_metrics(const MatchState& state, Bot& bot);
 bool bot_is_entity_type_production_building(EntityType type);
 std::vector<EntityType> bot_entity_types_production_buildings();
+
+// Score Util
+
+int bot_score_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
+int bot_score_entity_list(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entity_list);
 
 // Util
 
