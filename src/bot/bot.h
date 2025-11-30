@@ -34,7 +34,7 @@ enum BotSquadType {
 
 struct BotSquad {
     BotSquadType type;
-    EntityId target_base_goldmine_id;
+    ivec2 target_cell;
     std::vector<EntityId> entities;
 };
 
@@ -72,6 +72,9 @@ struct Bot {
     std::queue<EntityId> buildings_to_set_rally_points;
     uint32_t macro_cycle_timer;
     uint32_t macro_cycle_count;
+
+    // Squads
+    std::vector<BotSquad> squads;
 
     // Scouting
     EntityId scout_id;
@@ -119,6 +122,34 @@ bool bot_has_building_available_to_train_units(const Bot& bot, EntityCount desir
 EntityType bot_get_unit_type_to_train(Bot& bot, EntityCount desired_entities);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type, uint32_t match_time_minutes);
 
+// Squads
+
+BotSquad bot_squad_create(const MatchState& state, Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list);
+void bot_squad_dissolve(Bot& bot, BotSquad& squad);
+void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id);
+MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
+void bot_squad_remove_dead_units(const MatchState& state, Bot& bot, BotSquad& squad);
+bool bot_squad_is_entity_near_squad(const MatchState& state, const BotSquad& squad, const Entity& entity);
+std::vector<EntityId> bot_squad_get_nearby_enemy_list(const MatchState& state, const Bot& bot, const BotSquad& squad);
+bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad, int nearby_enemy_score);
+MatchInput bot_squad_bunker_micro(const MatchState& state, const Bot& bot, const BotSquad& squad);
+EntityId bot_squad_get_bunker_id(const MatchState& state, const BotSquad& squad);
+bool bot_squad_has_bunker(const MatchState& state, const BotSquad& squad);
+uint32_t bot_squad_get_carrier_capacity(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id);
+bool bot_squad_carrier_has_capacity(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id);
+MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, const std::vector<EntityId>& entity_list);
+bool bot_squad_carrier_has_en_route_infantry(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, ivec2* en_route_infantry_center);
+MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, ivec2 en_route_infantry_center);
+bool bot_squad_should_carrier_unload_garrisoned_units(const MatchState& state, const Bot& bot, const BotSquad& squad, const Entity& carrier);
+MatchInput bot_squad_pyro_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& pyro, EntityId pyro_id, ivec2 nearby_enemy_cell);
+int bot_squad_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
+ivec2 bot_squad_find_best_molotov_cell(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 attack_point);
+MatchInput bot_squad_detective_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& detective, EntityId detective_id, ivec2 nearby_enemy_cell);
+MatchInput bot_squad_a_move_miners(const MatchState& state, const Bot& bot, const BotSquad& squad, const Entity& first_miner, EntityId first_miner_id, ivec2 nearby_enemy_cell);
+MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const Bot& bot, const BotSquad& squad, const std::vector<EntityId>& entity_list);
+MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);
+EntityId bot_squad_get_nearest_base_goldmine_id(const MatchState& state, const Bot& bot, const BotSquad& squad);
+
 // Scouting
 
 void bot_update_base_info(const MatchState& state, Bot& bot);
@@ -154,3 +185,6 @@ bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entit
 EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& bot, const Entity& goldmine);
 bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell);
 uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot);
+MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
+ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& bot, EntityId goldmine_id);
+bool bot_has_landmine_squad(const Bot& bot);

@@ -17,8 +17,8 @@ static const int BOT_UNIT_SCORE = 4;
 static const int BOT_UNIT_SCORE_IN_BUNKER = 6;
 
 // Near dist
-static const int BOT_NEAR_DIST = 16;
-static const int BOT_MED_DIST = 32;
+static const int BOT_NEAR_DISTANCE = 16;
+static const int BOT_MEDIUM_DISTANCE = 32;
 
 Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyValue difficulty, int lcg_seed) {
     Bot bot;
@@ -53,6 +53,23 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
     MatchInput production_input = bot_get_production_input(state, bot, match_timer);
     if (production_input.type != MATCH_INPUT_NONE) {
         return production_input;
+    }
+
+    // Squads
+
+    uint32_t squad_index = 0;
+    while (squad_index < bot.squads.size()) {
+        MatchInput input = bot_squad_update(state, bot, bot.squads[squad_index]);
+        if (bot.squads[squad_index].entities.empty()) {
+            bot.squads[squad_index] = bot.squads[bot.squads.size() - 1];
+            bot.squads.pop_back();
+        } else {
+            squad_index++;
+        }
+
+        if (input.type != MATCH_INPUT_NONE) {
+            return input;
+        }
     }
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -909,7 +926,7 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
 // SQUADS
 
-BotSquad bot_squad_create(const MatchState& state, Bot& bot, BotSquadType type, EntityId target_base_goldmine_id, const std::vector<EntityId>& entity_list) {
+BotSquad bot_squad_create(const MatchState& state, Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list) {
     if (entity_list.empty()) {
         log_warn("BOT %u squad_create, entity_list is empty.", bot.player_id);
     }
@@ -917,10 +934,10 @@ BotSquad bot_squad_create(const MatchState& state, Bot& bot, BotSquadType type, 
 
     BotSquad squad;
     squad.type = type;
-    squad.target_base_goldmine_id = target_base_goldmine_id;
+    squad.target_cell = target_cell;
     squad.entities.reserve(entity_list.size());
 
-    log_debug("BOT %u squad_create, type %u target %u entity_count %u", type, target_base_goldmine_id, entity_list.size());
+    log_debug("BOT %u squad_create, type %u target_cell <%i, %i>", type, target_cell.x, target_cell.y);
     for (EntityId entity_id : entity_list) {
         squad.entities.push_back(entity_id);
         bot_reserve_entity(bot, entity_id);
@@ -951,7 +968,7 @@ void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id
     squad.entities.pop_back();
 }
 
-MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_timer) {
+MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
     // Remove dead units
     bot_squad_remove_dead_units(state, bot, squad);
     if (squad.entities.empty()) {
@@ -978,20 +995,25 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
          * we need to attack this location next time
         */
 
-        // Create retreat memory
-        BotRetreatMemory memory = (BotRetreatMemory) {
-            .enemy_list = nearby_enemy_list,
-            .retreat_count = 1
-        };
+        Cell target_cell_map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, squad.target_cell);
+        if (target_cell_map_cell.type == CELL_GOLDMINE) {
+            EntityId target_goldmine_id = target_cell_map_cell.id;
 
-        // Check for existing retreat memory
-        auto existing_retreat_memory_it = bot.retreat_memory.find(squad.target_base_goldmine_id);
-        if (existing_retreat_memory_it != bot.retreat_memory.end() &&
-                nearby_enemy_score <= bot_score_entity_list(state, bot, existing_retreat_memory_it->second.enemy_list)) {
-            memory.retreat_count = existing_retreat_memory_it->second.retreat_count + 1;
+            // Create retreat memory
+            BotRetreatMemory memory = (BotRetreatMemory) {
+                .enemy_list = nearby_enemy_list,
+                .retreat_count = 1
+            };
+
+            // Check for existing retreat memory
+            auto existing_retreat_memory_it = bot.retreat_memory.find(target_goldmine_id);
+            if (existing_retreat_memory_it != bot.retreat_memory.end() &&
+                    nearby_enemy_score <= bot_score_entity_list(state, bot, existing_retreat_memory_it->second.enemy_list)) {
+                memory.retreat_count = existing_retreat_memory_it->second.retreat_count + 1;
+            }
+
+            bot.retreat_memory[target_goldmine_id] = memory;
         }
-
-        bot.retreat_memory[squad.target_base_goldmine_id] = memory;
 
         // Set squad to return
         squad.type = BOT_SQUAD_TYPE_RETURN;
@@ -999,50 +1021,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
 
     // Bunker squads
     if (bot_squad_has_bunker(state, squad)) {
-        EntityId bunker_id = bot_squad_get_bunker_id(state, squad);
-        const Entity& bunker = state.entities.get_by_id(bunker_id);
-
-        // Check if a miner is under attack
-        EntityId miner_under_attack_id = match_find_entity(state, [&bunker](const Entity& miner, EntityId /*miner_id*/) {
-            return miner.player_id == bunker.player_id &&
-                    entity_is_selectable(miner) &&
-                    miner.type == ENTITY_MINER &&
-                    miner.taking_damage_timer != 0 &&
-                    ivec2::manhattan_distance(miner.cell, bunker.cell) < BOT_MED_DIST;
-        });
-
-        // Check if the units in the bunker can hit anything
-        const int BUNKER_RANGE = entity_get_data(ENTITY_COWBOY).unit_data.range_squared;
-        EntityId enemy_in_range_of_bunker_id = match_find_entity(state, [&state, &bunker, &BUNKER_RANGE](const Entity& enemy, EntityId /*enemy_id*/) {
-            int enemy_cell_size = entity_get_data(enemy.type).cell_size;
-            return entity_is_unit(enemy.type) &&
-                    state.players[enemy.player_id].team != state.players[bunker.player_id].team &&
-                    entity_is_selectable(enemy) &&
-                    ivec2::euclidean_distance_squared(bunker.cell, enemy.cell) <= BUNKER_RANGE;
-        });
-
-        // If a miner is under attack and they can't hit anything, tell them to exit the bunker
-        if (miner_under_attack_id != ID_NULL && 
-                enemy_in_range_of_bunker_id == ID_NULL && 
-                !bunker.garrisoned_units.empty()) {
-            MatchInput unload_input;
-            unload_input.type = MATCH_INPUT_UNLOAD;
-            unload_input.unload.carrier_count = 1;
-            unload_input.unload.carrier_ids[0] = bunker_id;
-
-            log_debug("BOT %u squad_update, unload bunker because miner is under attack.", bot.player_id);
-            return unload_input;
-        // Otherwise, tell them to enter the bunker
-        } else if (miner_under_attack_id == ID_NULL && 
-                    enemy_in_range_of_bunker_id == ID_NULL && 
-                    bunker.garrisoned_units.size() < squad.entities.size() - 1 &&
-                    bot_squad_carrier_has_capacity(state, bunker, bunker_id)) {
-            MatchInput garrison_input = bot_squad_garrison_into_carrier(state, bunker, bunker_id, squad.entities);
-            if (garrison_input.type != MATCH_INPUT_NONE) {
-                log_debug("BOT %u squad_update, bunker squad enter bunker.", bot.player_id);
-                return garrison_input;
-            }
-        }
+        return bot_squad_bunker_micro(state, bot, squad);
     }
 
     // Engaged unit micro
@@ -1068,7 +1047,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
                 return enemy.type != ENTITY_GOLDMINE &&
                         state.players[enemy.player_id].team != state.players[unit.player_id].team &&
                         entity_is_selectable(enemy) &&
-                        ivec2::manhattan_distance(enemy.cell, unit.cell) < BOT_NEAR_DIST &&
+                        ivec2::manhattan_distance(enemy.cell, unit.cell) < BOT_NEAR_DISTANCE &&
                         entity_is_visible_to_player(state, enemy, unit.player_id);
             },
             .compare = match_compare_closest_manhattan_distance_to(unit.cell)
@@ -1105,7 +1084,125 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
     } // End for each engaged unit
     // End engaged unit micro
 
+    // Divide unengaged units into distant infantry (can be garrisoned) and distant cavalry (cannot be garrisoned)
+    std::vector<EntityId> distant_infantry;
+    std::vector<EntityId> distant_cavalry;
+    for (EntityId entity_id : unengaged_units) {
+        const Entity& entity = state.entities.get_by_id(entity_id);
+        const EntityData& entity_data = entity_get_data(entity.type);
 
+        if (entity_data.garrison_size == ENTITY_CANNOT_GARRISON) {
+            distant_cavalry.push_back(entity_id);
+            continue;
+        }
+
+        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_MEDIUM_DISTANCE) {
+            distant_cavalry.push_back(entity_id);
+            continue;
+        }
+
+        distant_infantry.push_back(entity_id);
+    }
+
+    // Garrison distant infantry if there are any carriers
+    for (EntityId carrier_id : squad.entities) {
+        const Entity& carrier = state.entities.get_by_id(carrier_id);
+        const EntityData& carrier_data = entity_get_data(carrier.type);
+
+        // Filter out non-carriers
+        if (carrier_data.garrison_capacity == 0) {
+            continue;
+        }
+
+        // Filter out full carriers
+        if (!bot_squad_carrier_has_capacity(state, squad, carrier, carrier_id)) {
+            continue;
+        }
+
+        MatchInput garrison_input = bot_squad_garrison_into_carrier(state, squad, carrier, carrier_id, distant_infantry);
+        if (garrison_input.type != MATCH_INPUT_NONE) {
+            return garrison_input;
+        }
+    }
+
+    // Carrier micro (move carriers closer to units)
+    for (EntityId carrier_id : squad.entities) {
+        const Entity& carrier = state.entities.get_by_id(carrier_id);
+        const EntityData& carrier_data = entity_get_data(carrier.type);
+
+        // Filter out non-carriers
+        if (!entity_is_unit(carrier.type) || carrier_data.garrison_capacity == 0) {
+            continue;
+        }
+
+        // Move carrier toward en route infantry
+        ivec2 en_route_infantry_center;
+        if (bot_squad_carrier_has_en_route_infantry(state, squad, carrier, carrier_id, &en_route_infantry_center)) {
+            MatchInput move_carrier_input = bot_squad_move_carrier_toward_en_route_infantry(state, squad, carrier, carrier_id, en_route_infantry_center);
+            if (move_carrier_input.type != MATCH_INPUT_NONE) {
+                return move_carrier_input;
+            }
+
+            continue;
+        }
+        
+        // From here on, the carrier does not have any en route infantry
+
+        // If the carrier is empty, release it from the squad
+        if (carrier.garrisoned_units.empty()) {
+            bot_squad_remove_entity_by_id(bot, squad, carrier_id);
+
+            log_debug("BOT %u, squad_update, return empty carrier to nearest hall.", bot.player_id);
+            return bot_return_entity_to_nearest_hall(state, bot, carrier_id);
+        }
+
+        // Unload units
+        if (bot_squad_should_carrier_unload_garrisoned_units(state, bot, squad, carrier)) {
+            MatchInput input;
+            input.type = MATCH_INPUT_MOVE_UNLOAD;
+            input.move.shift_command = 0;
+            input.move.target_id = ID_NULL;
+            input.move.target_cell = carrier.cell;
+            input.move.entity_count = 1;
+            input.move.entity_ids[0] = carrier_id;
+
+            log_debug("BOT %u, squad_update, unload carrier units.", bot.player_id);
+            return input;
+        }
+
+        distant_cavalry.push_back(carrier_id);
+    }
+
+    // At this point, any distant infantry have not been able to garrison, so move them
+    // into the cavalry list so that they can be A-moved
+    for (EntityId entity_id : distant_infantry) {
+        distant_cavalry.push_back(entity_id);
+    }
+
+    MatchInput move_input = bot_squad_move_distant_units_to_target(state, bot, squad, distant_cavalry);
+    if (move_input.type != MATCH_INPUT_NONE) {
+        return move_input;
+    }
+
+    // Squad state changes
+    bool is_enemy_near_squad = !nearby_enemy_list.empty();
+    if (squad.type == BOT_SQUAD_TYPE_RESERVES && !is_enemy_near_squad) {
+        bot_squad_dissolve(bot, squad);
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+    if (squad.type == BOT_SQUAD_TYPE_ATTACK && !is_enemy_near_squad) {
+        squad.type = BOT_SQUAD_TYPE_RETURN;
+    }
+    if (squad.type == BOT_SQUAD_TYPE_RETURN && is_enemy_near_squad) {
+        squad.type = BOT_SQUAD_TYPE_ATTACK;
+    }
+
+    // Return squad to base
+    if (squad.type == BOT_SQUAD_TYPE_RETURN) {
+        return bot_squad_return_to_nearest_base(state, bot, squad);
+    }
+
+    return (MatchInput) {.type = MATCH_INPUT_NONE };
 }
 
 void bot_squad_remove_dead_units(const MatchState& state, Bot& bot, BotSquad& squad) {
@@ -1126,7 +1223,7 @@ void bot_squad_remove_dead_units(const MatchState& state, Bot& bot, BotSquad& sq
 bool bot_squad_is_entity_near_squad(const MatchState& state, const BotSquad& squad, const Entity& entity) {
     for (EntityId squad_entity_id : squad.entities) {
         const Entity& squad_entity = state.entities.get_by_id(squad_entity_id);
-        if (ivec2::manhattan_distance(entity.cell, squad_entity.cell) < BOT_NEAR_DIST) {
+        if (ivec2::manhattan_distance(entity.cell, squad_entity.cell) < BOT_NEAR_DISTANCE) {
             return true;
         }
     }
@@ -1177,6 +1274,58 @@ bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const Bot
     return squad_score < nearby_enemy_score;
 }
 
+MatchInput bot_squad_bunker_micro(const MatchState& state, const Bot& bot, const BotSquad& squad) {
+    EntityId bunker_id = bot_squad_get_bunker_id(state, squad);
+    const Entity& bunker = state.entities.get_by_id(bunker_id);
+
+    // Check if a miner is under attack
+    EntityId miner_under_attack_id = match_find_entity(state, [&bunker](const Entity& miner, EntityId /*miner_id*/) {
+        return miner.player_id == bunker.player_id &&
+                entity_is_selectable(miner) &&
+                miner.type == ENTITY_MINER &&
+                miner.taking_damage_timer != 0 &&
+                ivec2::manhattan_distance(miner.cell, bunker.cell) < BOT_MEDIUM_DISTANCE;
+    });
+
+    // Check if the units in the bunker can hit anything
+    const int BUNKER_RANGE = entity_get_data(ENTITY_COWBOY).unit_data.range_squared;
+    EntityId enemy_in_range_of_bunker_id = match_find_entity(state, [&state, &bunker, &BUNKER_RANGE](const Entity& enemy, EntityId /*enemy_id*/) {
+        int enemy_cell_size = entity_get_data(enemy.type).cell_size;
+        return entity_is_unit(enemy.type) &&
+                state.players[enemy.player_id].team != state.players[bunker.player_id].team &&
+                entity_is_selectable(enemy) &&
+                ivec2::euclidean_distance_squared(bunker.cell, enemy.cell) <= BUNKER_RANGE;
+    });
+
+    // If a miner is under attack and they can't hit anything, tell them to exit the bunker
+    if (miner_under_attack_id != ID_NULL && 
+            enemy_in_range_of_bunker_id == ID_NULL && 
+            !bunker.garrisoned_units.empty()) {
+
+        MatchInput unload_input;
+        unload_input.type = MATCH_INPUT_UNLOAD;
+        unload_input.unload.carrier_count = 1;
+        unload_input.unload.carrier_ids[0] = bunker_id;
+
+        log_debug("BOT %u squad_update, unload bunker because miner is under attack.", bot.player_id);
+        return unload_input;
+    }
+
+    // Otherwise, tell them to enter the bunker
+    if (miner_under_attack_id == ID_NULL && enemy_in_range_of_bunker_id == ID_NULL && 
+            bunker.garrisoned_units.size() < squad.entities.size() - 1 &&
+            bot_squad_carrier_has_capacity(state, squad, bunker, bunker_id)) {
+
+        MatchInput garrison_input = bot_squad_garrison_into_carrier(state, squad, bunker, bunker_id, squad.entities);
+        if (garrison_input.type != MATCH_INPUT_NONE) {
+            log_debug("BOT %u squad_update, bunker squad enter bunker.", bot.player_id);
+            return garrison_input;
+        }
+    }
+
+    return (MatchInput) { .type = MATCH_INPUT_NONE };
+}
+
 EntityId bot_squad_get_bunker_id(const MatchState& state, const BotSquad& squad) {
     for (EntityId entity_id : squad.entities) {
         if (state.entities.get_by_id(entity_id).type == ENTITY_BUNKER) {
@@ -1191,14 +1340,13 @@ bool bot_squad_has_bunker(const MatchState& state, const BotSquad& squad) {
     return bot_squad_get_bunker_id(state, squad) != ID_NULL;
 }
 
-uint32_t bot_squad_get_carrier_capacity(const MatchState& state, const Entity& carrier, EntityId carrier_id) {
+uint32_t bot_squad_get_carrier_capacity(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id) {
     const uint32_t GARRISON_CAPACITY = entity_get_data(carrier.type).garrison_capacity;
 
     uint32_t garrison_size = carrier.garrisoned_units.size();
-    for (const Entity& entity : state.entities) {
-        if (entity.player_id == carrier.player_id && 
-                entity.target.type == TARGET_ENTITY && 
-                entity.target.id == carrier_id) {
+    for (EntityId entity_id : squad.entities) {
+        const Entity& entity = state.entities.get_by_id(entity_id);
+        if (entity.target.type != TARGET_ENTITY || entity.target.id != carrier_id) {
             garrison_size++;
         }
     }
@@ -1209,11 +1357,11 @@ uint32_t bot_squad_get_carrier_capacity(const MatchState& state, const Entity& c
     return GARRISON_CAPACITY - garrison_size;
 }
 
-bool bot_squad_carrier_has_capacity(const MatchState& state, const Entity& carrier, EntityId carrier_id) {
-    return bot_squad_get_carrier_capacity(state, carrier, carrier_id) != 0;
+bool bot_squad_carrier_has_capacity(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id) {
+    return bot_squad_get_carrier_capacity(state, squad, carrier, carrier_id) != 0;
 }
 
-MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const Entity& carrier, EntityId carrier_id, const std::vector<EntityId>& entity_list) {
+MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, const std::vector<EntityId>& entity_list) {
     MatchInput input;
     input.type = MATCH_INPUT_MOVE_ENTITY;
     input.move.shift_command = 0;
@@ -1221,7 +1369,7 @@ MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const Entity
     input.move.target_cell = ivec2(0, 0);
     input.move.entity_count = 0;
 
-    uint32_t carrier_capacity = bot_squad_get_carrier_capacity(state, carrier, carrier_id);
+    uint32_t carrier_capacity = bot_squad_get_carrier_capacity(state, squad, carrier, carrier_id);
     const uint32_t CARRIER_MAX_CAPACITY = entity_get_data(carrier.type).garrison_capacity;
 
     GOLD_ASSERT(carrier_capacity < CARRIER_MAX_CAPACITY);
@@ -1277,6 +1425,88 @@ MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const Entity
     return input;
 }
 
+bool bot_squad_carrier_has_en_route_infantry(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, ivec2* en_route_infantry_center) {
+    const uint32_t GARRISON_CAPACITY = entity_get_data(carrier.type).garrison_capacity;
+
+    if (en_route_infantry_center != NULL) {
+        *en_route_infantry_center = ivec2(0, 0);
+    }
+
+    if (carrier.garrisoned_units.size() == GARRISON_CAPACITY) {
+        return false;
+    }
+
+    uint32_t en_route_infantry_count = 0;
+    for (EntityId entity_id : squad.entities) {
+        const Entity& entity = state.entities.get_by_id(entity_id);
+        if (entity.target.type == TARGET_ENTITY && entity.target.id == carrier_id) {
+            *en_route_infantry_center += entity.cell;
+            en_route_infantry_count++;
+        }
+    }
+
+    if (en_route_infantry_center != 0) {
+        *en_route_infantry_center = *en_route_infantry_center / en_route_infantry_count;
+    }
+
+    return en_route_infantry_center != 0;
+}
+
+MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, ivec2 en_route_infantry_center) {
+    // If the carrier is already close to the infantry, then don't worry about moving
+    if (ivec2::manhattan_distance(carrier.cell, en_route_infantry_center) < BOT_NEAR_DISTANCE) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Long pathing might be a performance issue here
+    std::vector<ivec2> path_to_infantry_center;
+    map_pathfind_calculate_path(state.map, CELL_LAYER_GROUND, carrier.cell, en_route_infantry_center, 2, &path_to_infantry_center, MAP_OPTION_IGNORE_UNITS, NULL, false);
+
+    // If the path is small, then don't bother moving
+    if (path_to_infantry_center.size() < BOT_NEAR_DISTANCE) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    ivec2 path_midpoint = path_to_infantry_center[path_to_infantry_center.size() / 2];
+
+    // If the carrier is already walking close to the path midpoint, then don't bother moving
+    if (ivec2::manhattan_distance(carrier.cell, path_midpoint) < BOT_NEAR_DISTANCE) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Move carrier to the midpoint
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_CELL;
+    input.move.shift_command = 0;
+    input.move.target_id = ID_NULL;
+    input.move.target_cell = path_midpoint;
+    input.move.entity_count = 1;
+    input.move.entity_ids[0] = carrier_id;
+
+    log_debug("BOT %u, squad_move_carrier_toward_en_route_infantry.", carrier.player_id);
+    return input;
+}
+
+bool bot_squad_should_carrier_unload_garrisoned_units(const MatchState& state, const Bot& bot, const BotSquad& squad, const Entity& carrier) {
+    // Unload units if near target cell or near an enemy,
+    // but don't unload units if we are already unloading units
+
+    if (carrier.target.type == TARGET_UNLOAD && ivec2::manhattan_distance(carrier.cell, carrier.target.cell) < 4) {
+        return false;
+    }
+    if (ivec2::manhattan_distance(carrier.cell, squad.target_cell) < BOT_NEAR_DISTANCE - 4) {
+        return true;
+    }
+    EntityId nearby_enemy_id = match_find_entity(state, [&state, &carrier](const Entity& enemy, EntityId enemy_id) {
+        return enemy.type != ENTITY_GOLDMINE &&
+                state.players[enemy.player_id].team != state.players[carrier.player_id].team &&
+                entity_is_selectable(enemy) &&
+                ivec2::manhattan_distance(enemy.cell, carrier.cell) < BOT_NEAR_DISTANCE &&
+                entity_is_visible_to_player(state, enemy, carrier.player_id);
+    });
+    return nearby_enemy_id != ID_NULL;
+}
+
 MatchInput bot_squad_pyro_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& pyro, EntityId pyro_id, ivec2 nearby_enemy_cell) {
     // If pyro is out of energy, run away
     if (pyro.energy < MOLOTOV_ENERGY_COST) {
@@ -1296,7 +1526,7 @@ MatchInput bot_squad_pyro_micro(const MatchState& state, Bot& bot, BotSquad& squ
 
     // Don't interrupt a throw in-progress, unless it is far away
     if (pyro.target.type == TARGET_MOLOTOV &&
-            ivec2::manhattan_distance(pyro.target.cell, molotov_cell) < BOT_NEAR_DIST) {
+            ivec2::manhattan_distance(pyro.target.cell, molotov_cell) < BOT_NEAR_DISTANCE) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
@@ -1388,8 +1618,8 @@ ivec2 bot_squad_find_best_molotov_cell(const MatchState& state, const Bot& bot, 
     ivec2 best_molotov_cell = ivec2(-1, -1);
     int best_molotov_cell_score = MINIMUM_MOLOTOV_CELL_SCORE - 1;
 
-    for (int y = attack_point.y - BOT_NEAR_DIST; y < attack_point.y + BOT_NEAR_DIST; y++) {
-        for (int x = attack_point.x - BOT_NEAR_DIST; x < attack_point.x + BOT_NEAR_DIST; x++) {
+    for (int y = attack_point.y - BOT_NEAR_DISTANCE; y < attack_point.y + BOT_NEAR_DISTANCE; y++) {
+        for (int x = attack_point.x - BOT_NEAR_DISTANCE; x < attack_point.x + BOT_NEAR_DISTANCE; x++) {
             ivec2 cell = ivec2(x, y);
             if (!map_is_cell_in_bounds(state.map, cell)) {
                 continue;
@@ -1427,7 +1657,7 @@ MatchInput bot_squad_detective_micro(const MatchState& state, Bot& bot, BotSquad
         if (other_detective.type != ENTITY_DETECTIVE ||
                 entity_check_flag(other_detective, ENTITY_FLAG_INVISIBLE) ||
                 other_detective.energy < CAMO_ENERGY_COST ||
-                ivec2::manhattan_distance(other_detective.cell, nearby_enemy_cell) < BOT_NEAR_DIST) {
+                ivec2::manhattan_distance(other_detective.cell, nearby_enemy_cell) < BOT_NEAR_DISTANCE) {
             continue;
         }
 
@@ -1456,7 +1686,7 @@ MatchInput bot_squad_a_move_miners(const MatchState& state, const Bot& bot, cons
         if (other_miner.type != ENTITY_MINER ||
                 !entity_is_selectable(other_miner) ||
                 !entity_is_mining(state, other_miner) ||
-                ivec2::manhattan_distance(other_miner.cell, first_miner.cell) > BOT_NEAR_DIST) {
+                ivec2::manhattan_distance(other_miner.cell, first_miner.cell) > BOT_NEAR_DISTANCE) {
             continue;
         }
 
@@ -1468,6 +1698,88 @@ MatchInput bot_squad_a_move_miners(const MatchState& state, const Bot& bot, cons
     }
 
     return input;
+}
+
+MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const Bot& bot, const BotSquad& squad, const std::vector<EntityId>& entity_list) {
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_ATTACK_CELL;
+    input.move.shift_command = 0;
+    input.move.target_id = ID_NULL;
+    input.move.target_cell = squad.target_cell;
+    input.move.entity_count = 0;
+
+    for (EntityId entity_id : entity_list) {
+        const Entity& entity = state.entities.get_by_id(entity_id);
+
+        // Filter out untis that are already moving
+        if (entity.target.type == TARGET_ATTACK_CELL && ivec2::manhattan_distance(entity.cell, entity.target.cell) < BOT_NEAR_DISTANCE) {
+            continue;
+        }
+
+        input.move.entity_ids[input.move.entity_count] = entity_id;
+        input.move.entity_count++;
+        if (input.move.entity_count == SELECTION_LIMIT) {
+            break;
+        }
+    }
+
+    if (input.move.entity_count != 0) {
+        return input;
+    }
+
+    return (MatchInput) { .type = MATCH_INPUT_NONE };
+}
+
+MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad) {
+    EntityId nearest_base_goldmine_id = bot_squad_get_nearest_base_goldmine_id(state, bot, squad);
+
+    // If we don't control a base, just dissolve the squad
+    if (nearest_base_goldmine_id == ID_NULL) {
+        bot_squad_dissolve(bot, squad);
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_MOVE_CELL;
+    input.move.shift_command = 0;
+    input.move.target_id = ID_NULL;
+    input.move.target_cell = bot_get_unoccupied_cell_near_goldmine(state, bot, nearest_base_goldmine_id);
+    input.move.entity_count = 0;
+
+    while (!squad.entities.empty()) {
+        input.move.entity_ids[input.move.entity_count] = squad.entities.back();
+        input.move.entity_count++;
+
+        bot_release_entity(bot, squad.entities.back());
+        squad.entities.pop_back();
+
+        if (input.move.entity_count == SELECTION_LIMIT) {
+            break;
+        }
+    }
+
+    return input;
+}
+
+EntityId bot_squad_get_nearest_base_goldmine_id(const MatchState& state, const Bot& bot, const BotSquad& squad) {
+    ivec2 target_cell = squad.target_cell;
+    EntityId nearest_base_goldmine_id = ID_NULL;
+    for (const auto it : bot.base_info) {
+        EntityId base_goldmine_id = it.first;
+        const BotBaseInfo& base_info = it.second;
+
+        if (base_info.controlled_by_player_id != bot.player_id) {
+            continue;
+        }
+
+        if (nearest_base_goldmine_id == ID_NULL || 
+                ivec2::manhattan_distance(state.entities.get_by_id(base_goldmine_id).cell, target_cell) < 
+                ivec2::manhattan_distance(state.entities.get_by_id(nearest_base_goldmine_id).cell, target_cell)) {
+            nearest_base_goldmine_id = base_goldmine_id;
+        }
+    }
+
+    return nearest_base_goldmine_id;
 }
 
 // SCOUTING
@@ -1546,7 +1858,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
         EntityId nearest_goldmine_id = ID_NULL;
         for (auto it : bot.base_info) {
             const Entity& goldmine = state.entities.get_by_id(it.first);
-            if (ivec2::manhattan_distance(entity.cell, goldmine.cell) < BOT_MED_DIST) {
+            if (ivec2::manhattan_distance(entity.cell, goldmine.cell) < BOT_MEDIUM_DISTANCE) {
                 continue;
             }
 
@@ -1851,7 +2163,6 @@ uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot) {
     return mining_base_count;
 }
 
-
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id) {
     const Entity& entity = state.entities.get_by_id(entity_id);
 
@@ -1868,9 +2179,16 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    int entity_size = entity_get_data(entity.type).cell_size;
-    ivec2 target_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_size, state.entities.get_by_id(nearest_hall_id).cell, entity_get_data(ENTITY_HALL).cell_size, MAP_OPTION_IGNORE_UNITS);
-    target_cell = bot_get_unoccupied_cell_near_hall(state, bot, target_cell);
+    ivec2 nearest_hall_cell = state.entities.get_by_id(nearest_hall_id).cell;
+    EntityId nearest_goldmine_id = match_find_best_entity(state, (MatchFindBestEntityParams) {
+        .filter = [](const Entity& goldmine, EntityId /*goldmine_id*/) {
+            return goldmine.type == ENTITY_GOLDMINE;
+        },
+        .compare = match_compare_closest_manhattan_distance_to(nearest_hall_cell)
+    });
+    GOLD_ASSERT(nearest_goldmine_id != ID_NULL);
+
+    ivec2 target_cell = bot_get_unoccupied_cell_near_goldmine(state, bot, nearest_goldmine_id);
 
     MatchInput input;
     input.type = MATCH_INPUT_MOVE_CELL;
@@ -1880,4 +2198,59 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
     input.move.entity_ids[0] = entity_id;
     input.move.entity_count = 1;
     return input;
+}
+
+ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& bot, EntityId goldmine_id) {
+    ivec2 goldmine_cell = state.entities.get_by_id(goldmine_id).cell;
+
+    // To determine the retreat_cell, search around the nearby base
+    std::vector<ivec2> frontier;
+    std::vector<bool> is_explored(state.map.width * state.map.height, false);
+
+    frontier.push_back(goldmine_cell - ivec2(1, 1));
+    ivec2 retreat_cell = ivec2(-1, -1);
+    while (!frontier.empty()) {
+        ivec2 next = frontier.back();
+        frontier.pop_back();
+
+        if (is_explored[next.x + (next.y * state.map.width)]) {
+            continue;
+        }
+
+        if (ivec2::manhattan_distance(next, goldmine_cell) > BOT_NEAR_DISTANCE &&
+                map_is_cell_rect_in_bounds(state.map, next - ivec2(1, 1), 3) &&
+                !map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, next - ivec2(1, 1), 3)) {
+            retreat_cell = next;
+            break;
+        }
+
+        is_explored[next.x + (next.y * state.map.width)] = true;
+
+        for (int direction = 0; direction < 4; direction += 2) {
+            ivec2 child = next + DIRECTION_IVEC2[direction];
+
+            if (!map_is_cell_in_bounds(state.map, child)) {
+                continue;
+            }
+
+            frontier.push_back(child);
+        }
+    }
+
+    GOLD_ASSERT(retreat_cell.x != -1);
+    if (retreat_cell.x == -1) {
+        retreat_cell = map_clamp_cell(state.map, goldmine_cell - ivec2(BOT_NEAR_DISTANCE, 0));
+    }
+
+    return retreat_cell;
+}
+
+bool bot_has_landmine_squad(const Bot& bot) {
+    for (const BotSquad& squad : bot.squads) {
+        if (squad.type == BOT_SQUAD_TYPE_LANDMINES) {
+            return true;
+        }
+    }
+
+    return false;
 }
