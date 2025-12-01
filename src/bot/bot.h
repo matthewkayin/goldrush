@@ -6,6 +6,13 @@
 #include "core/match_setting.h"
 #include <unordered_map>
 
+enum BotOpener {
+    BOT_OPENER_BANDIT_RUSH,
+    BOT_OPENER_BUNKER,
+    BOT_OPENER_EXPAND_FIRST,
+    BOT_OPENER_COUNT
+};
+
 enum BotUnitComp {
     BOT_UNIT_COMP_NONE,
     BOT_UNIT_COMP_COWBOY_BANDIT,
@@ -44,7 +51,10 @@ struct BotDesiredSquad {
 };
 
 struct BotBaseInfo {
-    uint8_t controlled_by_player_id;
+    uint8_t controlling_player;
+    bool has_surrounding_hall;
+    bool has_gold;
+    bool is_low_on_gold;
     int defense_score;
 };
 
@@ -56,7 +66,6 @@ struct BotRetreatMemory {
 struct Bot {
     uint8_t player_id;
     bool has_surrendered;
-    int lcg_seed;
     MatchSettingDifficultyValue difficulty;
 
     // Metrics
@@ -67,8 +76,10 @@ struct Bot {
 
     // Production
     BotUnitComp unit_comp;
+    BotUnitComp preferred_unit_comp;
     EntityCount desired_buildings;
     EntityCount desired_army_ratio;
+    std::vector<BotDesiredSquad> desired_squads;
     std::queue<EntityId> buildings_to_set_rally_points;
     uint32_t macro_cycle_timer;
     uint32_t macro_cycle_count;
@@ -79,14 +90,28 @@ struct Bot {
     // Scouting
     EntityId scout_id;
     uint32_t scout_info;
+    uint32_t last_scout_time;
+    std::vector<EntityId> entities_to_scout;
+    std::unordered_map<EntityId, bool> is_entity_assumed_to_be_scouted;
 
     // Base info
     std::unordered_map<EntityId, BotBaseInfo> base_info;
     std::unordered_map<EntityId, BotRetreatMemory> retreat_memory;
 };
 
-Bot bot_init(const MatchState& state, uint8_t player_id, MatchSettingDifficultyValue difficulty, int lcg_seed);
+Bot bot_init(uint8_t player_id, MatchSettingDifficultyValue difficulty, BotOpener opener, BotUnitComp preferred_unit_comp);
+BotOpener bot_roll_opener(int* lcg_seed, MatchSettingDifficultyValue difficulty);
+BotUnitComp bot_roll_preferred_unit_comp(int* lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_timer);
+
+// Strategy
+
+bool bot_should_expand(const MatchState& state, const Bot& bot);
+uint32_t bot_get_player_mining_base_count(const Bot& bot, uint8_t player_id);
+uint32_t bot_get_low_on_gold_base_count(const Bot& bot);
+uint32_t bot_get_max_enemy_mining_base_count(const MatchState& state, const Bot& bot);
+bool bot_has_base_that_is_missing_a_hall(const Bot& bot);
+bool bot_are_all_goldmines_occupied(const Bot& bot);
 
 // Production
 
@@ -139,20 +164,26 @@ uint32_t bot_squad_get_carrier_capacity(const MatchState& state, const BotSquad&
 bool bot_squad_carrier_has_capacity(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id);
 MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, const std::vector<EntityId>& entity_list);
 bool bot_squad_carrier_has_en_route_infantry(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, ivec2* en_route_infantry_center);
-MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, ivec2 en_route_infantry_center);
-bool bot_squad_should_carrier_unload_garrisoned_units(const MatchState& state, const Bot& bot, const BotSquad& squad, const Entity& carrier);
+MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& state, const Entity& carrier, EntityId carrier_id, ivec2 en_route_infantry_center);
+bool bot_squad_should_carrier_unload_garrisoned_units(const MatchState& state, const BotSquad& squad, const Entity& carrier);
 MatchInput bot_squad_pyro_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& pyro, EntityId pyro_id, ivec2 nearby_enemy_cell);
-int bot_squad_get_molotov_cell_score(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 cell);
-ivec2 bot_squad_find_best_molotov_cell(const MatchState& state, const Bot& bot, const Entity& pyro, ivec2 attack_point);
+int bot_squad_get_molotov_cell_score(const MatchState& state, const Entity& pyro, ivec2 cell);
+ivec2 bot_squad_find_best_molotov_cell(const MatchState& state, const Entity& pyro, ivec2 attack_point);
 MatchInput bot_squad_detective_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& detective, EntityId detective_id, ivec2 nearby_enemy_cell);
-MatchInput bot_squad_a_move_miners(const MatchState& state, const Bot& bot, const BotSquad& squad, const Entity& first_miner, EntityId first_miner_id, ivec2 nearby_enemy_cell);
-MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const Bot& bot, const BotSquad& squad, const std::vector<EntityId>& entity_list);
+MatchInput bot_squad_a_move_miners(const MatchState& state, const BotSquad& squad, const Entity& first_miner, EntityId first_miner_id, ivec2 nearby_enemy_cell);
+MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const BotSquad& squad, const std::vector<EntityId>& entity_list);
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);
 EntityId bot_squad_get_nearest_base_goldmine_id(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
 // Scouting
 
+void bot_scout_gather_info(const MatchState& state, Bot& bot);
 void bot_update_base_info(const MatchState& state, Bot& bot);
+MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer);
+std::vector<EntityId> bot_determine_entities_to_scout(const MatchState& state, const Bot& bot);
+bool bot_is_entity_in_entities_to_scout_list(const Bot& bot, EntityId entity_id);
+void bot_release_scout(Bot& bot);
+bool bot_should_scout(const Bot& bot, uint32_t match_timer);
 bool bot_check_scout_info(const Bot& bot, uint32_t flag);
 void bot_set_scout_info(Bot& bot, uint32_t flag, bool value);
 
@@ -176,7 +207,7 @@ std::vector<EntityType> bot_entity_types_production_buildings();
 
 // Score Util
 
-int bot_score_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
+int bot_score_entity(const MatchState& state, const Bot& bot, const Entity& entity);
 int bot_score_entity_list(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entity_list);
 
 // Util
@@ -184,7 +215,8 @@ int bot_score_entity_list(const MatchState& state, const Bot& bot, const std::ve
 bool bot_has_scouted_entity(const MatchState& state, const Bot& bot, const Entity& entity, EntityId entity_id);
 EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& bot, const Entity& goldmine);
 bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell);
-uint32_t bot_get_mining_base_count(const MatchState& state, const Bot& bot);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
-ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& bot, EntityId goldmine_id);
+MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
+ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId goldmine_id);
 bool bot_has_landmine_squad(const Bot& bot);
+bool bot_is_bandit_rushing(const Bot& bot);
