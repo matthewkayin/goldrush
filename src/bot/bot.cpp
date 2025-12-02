@@ -143,7 +143,7 @@ bool bot_should_expand(const MatchState& state, const Bot& bot) {
     if (bot_has_base_that_is_missing_a_hall(bot)) {
         return true;
     }
-    if (bot_are_all_goldmines_occupied(bot)) {
+    if (!bot_is_unoccupied_goldmine_available(bot)) {
         return false;
     }
 
@@ -201,28 +201,33 @@ uint32_t bot_get_max_enemy_mining_base_count(const MatchState& state, const Bot&
     return max_enemy_mining_base_count;
 }
 
-bool bot_has_base_that_is_missing_a_hall(const Bot& bot) {
+bool bot_has_base_that_is_missing_a_hall(const Bot& bot, EntityId* goldmine_id) {
     for (auto base_info_it : bot.base_info) {
         const BotBaseInfo& base_info = base_info_it.second;
         if (base_info.controlling_player == bot.player_id && base_info.has_gold && !base_info.has_surrounding_hall) {
+            if (goldmine_id != NULL) {
+                *goldmine_id = base_info_it.first;
+            }
+            return true;
+        }
+    }
+
+    if (goldmine_id != NULL) {
+        *goldmine_id = ID_NULL;
+    }
+    return false;
+}
+
+bool bot_is_unoccupied_goldmine_available(const Bot& bot) {
+    for (auto base_info_it : bot.base_info) {
+        const BotBaseInfo& base_info = base_info_it.second;
+        if (base_info.controlling_player == PLAYER_NONE && base_info.has_gold) {
             return true;
         }
     }
 
     return false;
 }
-
-bool bot_are_all_goldmines_occupied(const Bot& bot) {
-    for (auto base_info_it : bot.base_info) {
-        const BotBaseInfo& base_info = base_info_it.second;
-        if (base_info.controlling_player == PLAYER_NONE) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 
 // PRODUCTION
 
@@ -237,6 +242,17 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
     if (bot_should_build_house(state, bot)) {
         log_debug("BOT %u get_production_input, build house.", bot.player_id);
         return bot_build_building(state, bot, ENTITY_HOUSE);
+    }
+
+    // Expand
+    if (bot_should_expand(state, bot)) {
+        if (bot.metrics[BOT_METRIC_IN_PROGRESS_ENTITY_COUNT][ENTITY_HALL] == 0) {
+            EntityId goldmine_id = bot_find_goldmine_for_next_expansion(state, bot);
+            const Entity& goldmine = state.entities.get_by_id(goldmine_id);
+            if (bot_is_area_safe(state, bot, goldmine.cell)) {
+                return bot_build_building(state, bot, ENTITY_HALL);
+            }
+        }
     }
 
     // Count entities
@@ -710,19 +726,16 @@ uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state
 }
 
 ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
-    // If no goldmines are found, we will not build a hall
-    uint32_t nearest_goldmine_index = bot_find_index_of_hall_next_to_goldmine(state, bot);
-    if (nearest_goldmine_index == INDEX_INVALID) {
-        return ivec2(-1, -1);
-    }
+    EntityId goldmine_id = bot_find_goldmine_for_next_expansion(state, bot);
+    const Entity& goldmine = state.entities.get_by_id(goldmine_id);
 
     // To find the hall location, we will search around the perimeter
     // of the building_block_rect for this goldmine and evaluate each 
     // placement, choosing the one with the least obstacles nearby
-    Rect building_block_rect = entity_goldmine_get_block_building_rect(state.entities[nearest_goldmine_index].cell);
+    Rect building_block_rect = entity_goldmine_get_block_building_rect(goldmine.cell);
     Rect goldmine_rect = (Rect) {
-        .x = state.entities[nearest_goldmine_index].cell.x,
-        .y = state.entities[nearest_goldmine_index].cell.y,
+        .x = goldmine.cell.x,
+        .y = goldmine.cell.y,
         .w = entity_get_data(ENTITY_GOLDMINE).cell_size,
         .h = entity_get_data(ENTITY_GOLDMINE).cell_size
     };
@@ -754,7 +767,7 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
         };
         // If the area is blocked (by a cactus, for example) then don't build there
         if (!map_is_cell_rect_in_bounds(state.map, hall_cell, HALL_SIZE) || map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, hall_cell, HALL_SIZE) ||
-                map_get_pathing_region(state.map, hall_cell) != map_get_pathing_region(state.map, state.entities[nearest_goldmine_index].cell)) {
+                map_get_pathing_region(state.map, hall_cell) != map_get_pathing_region(state.map, goldmine.cell)) {
             hall_score = -1;
         } else {
             // Check for obstacles (including stairs) in a rect around where the hall would be
@@ -778,7 +791,7 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
             }
 
             std::vector<ivec2> path;
-            map_get_ideal_mine_exit_path(state.map, state.entities[nearest_goldmine_index].cell, hall_cell, &path);
+            map_get_ideal_mine_exit_path(state.map, goldmine.cell, hall_cell, &path);
             hall_score += path.size();
             hall_score += Rect::euclidean_distance_squared_between(hall_rect, goldmine_rect);
         }
@@ -814,37 +827,48 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
     return best_hall_cell;
 }
 
-uint32_t bot_find_index_of_hall_next_to_goldmine(const MatchState& state, const Bot& bot) {
-    uint32_t existing_hall_index = bot_find_hall_index_with_least_nearby_buildings(state, bot.player_id, false);
-    if (existing_hall_index == INDEX_INVALID) {
-        return INDEX_INVALID;
+EntityId bot_find_goldmine_for_next_expansion(const MatchState& state, const Bot& bot) {
+    // If we have a base that is missing a hall, rebuild the hall there
+    EntityId goldmine_missing_hall_id;
+    if (bot_has_base_that_is_missing_a_hall(bot, &goldmine_missing_hall_id)) {
+        return goldmine_missing_hall_id;
     }
 
-    // Find the unoccupied goldmine nearest to the existing hall
-    uint32_t nearest_goldmine_index = INDEX_INVALID;
-    for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
-        const Entity& goldmine = state.entities[goldmine_index];
-        if (goldmine.type != ENTITY_GOLDMINE) {
-            continue;
-        }
-
-        EntityId surrounding_hall_id = match_find_entity(state, [&goldmine](const Entity& hall, EntityId /*hall_id*/) {
-            return hall.type == ENTITY_HALL &&
-                    entity_is_selectable(hall) &&
-                    bot_does_entity_surround_goldmine(hall, goldmine.cell);
+    // Choose the reference entity
+    // This will either be the hall with the least nearby buildings
+    // Or, if no hall is found, any random bot-controlled building 
+    uint32_t hall_index = bot_find_hall_index_with_least_nearby_buildings(state, bot.player_id, false);
+    EntityId reference_entity_id = hall_index != INDEX_INVALID
+        ? state.entities.get_id_of(hall_index)
+        : match_find_entity(state, [&bot](const Entity& building, EntityId /*building_id*/) {
+            return building.player_id == bot.player_id;
         });
-        if (surrounding_hall_id != ID_NULL) {
+    GOLD_ASSERT(reference_entity_id != ID_NULL);
+
+    return bot_find_unoccupied_goldmine_nearest_to_entity(state, bot, reference_entity_id);
+}
+
+EntityId bot_find_unoccupied_goldmine_nearest_to_entity(const MatchState& state, const Bot& bot, EntityId reference_entity_id) {
+    const Entity& reference_entity = state.entities.get_by_id(reference_entity_id);
+
+    // Find the unoccupied goldmine closest to this allied building
+    EntityId nearest_goldmine_id = ID_NULL;
+    for (auto it : bot.base_info) {
+        EntityId goldmine_id = it.first;
+        const BotBaseInfo& base_info = it.second;
+
+        if (base_info.controlling_player != PLAYER_NONE || !base_info.has_gold) {
             continue;
         }
 
-        if (nearest_goldmine_index == INDEX_INVALID || 
-                ivec2::manhattan_distance(state.entities[goldmine_index].cell, state.entities[existing_hall_index].cell) < 
-                ivec2::manhattan_distance(state.entities[nearest_goldmine_index].cell, state.entities[existing_hall_index].cell)) {
-            nearest_goldmine_index = goldmine_index;
+        if (nearest_goldmine_id == ID_NULL ||
+                ivec2::manhattan_distance(state.entities.get_by_id(goldmine_id).cell, reference_entity.cell) <
+                ivec2::manhattan_distance(state.entities.get_by_id(nearest_goldmine_id).cell, reference_entity.cell)) {
+            nearest_goldmine_id = goldmine_id;
         }
     }
-    
-    return nearest_goldmine_index;
+
+    return nearest_goldmine_id;
 }
 
 EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index) {
@@ -2744,4 +2768,15 @@ bool bot_is_bandit_rushing(const Bot& bot) {
     }
 
     return false;
+}
+
+bool bot_is_area_safe(const MatchState& state, const Bot& bot, ivec2 cell) {
+    EntityId nearby_enemy_id = match_find_entity(state, [&state, &bot, &cell](const Entity& entity, EntityId entity_id) {
+            return entity.type != ENTITY_GOLDMINE &&
+                    entity_is_selectable(entity) &&
+                    state.players[entity.player_id].team != state.players[bot.player_id].team &&
+                    ivec2::manhattan_distance(entity.cell, cell) < BOT_NEAR_DISTANCE;
+    });
+
+    return nearby_enemy_id == ID_NULL;
 }

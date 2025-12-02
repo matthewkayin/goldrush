@@ -110,8 +110,8 @@ bool bot_should_expand(const MatchState& state, const Bot& bot);
 uint32_t bot_get_player_mining_base_count(const Bot& bot, uint8_t player_id);
 uint32_t bot_get_low_on_gold_base_count(const Bot& bot);
 uint32_t bot_get_max_enemy_mining_base_count(const MatchState& state, const Bot& bot);
-bool bot_has_base_that_is_missing_a_hall(const Bot& bot);
-bool bot_are_all_goldmines_occupied(const Bot& bot);
+bool bot_has_base_that_is_missing_a_hall(const Bot& bot, EntityId* goldmine_id = NULL);
+bool bot_is_unoccupied_goldmine_available(const Bot& bot);
 
 // Production
 
@@ -132,7 +132,8 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
 ivec2 bot_find_building_location(const MatchState& state, ivec2 start_cell, int size);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id, bool count_bunkers_only);
 ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot);
-uint32_t bot_find_index_of_hall_next_to_goldmine(const MatchState& state, const Bot& bot);
+EntityId bot_find_goldmine_for_next_expansion(const MatchState& state, const Bot& bot);
+EntityId bot_find_unoccupied_goldmine_nearest_to_entity(const MatchState& state, const Bot& bot, EntityId reference_entity_id);
 EntityId bot_find_builder(const MatchState& state, const Bot& bot, uint32_t near_hall_index);
 ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t nearby_hall_index);
 
@@ -220,3 +221,4 @@ MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entit
 ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId goldmine_id);
 bool bot_has_landmine_squad(const Bot& bot);
 bool bot_is_bandit_rushing(const Bot& bot);
+bool bot_is_area_safe(const MatchState& state, const Bot& bot, ivec2 cell);
