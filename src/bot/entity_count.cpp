@@ -4,7 +4,7 @@ EntityCount::EntityCount() {
     entity_count.fill(0);
 }
 
-uint32_t EntityCount::size() const {
+uint32_t EntityCount::count() const {
     uint32_t _size = 0;
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         _size += entity_count[entity_type];
@@ -13,7 +13,7 @@ uint32_t EntityCount::size() const {
     return _size;
 }
 
-uint32_t EntityCount::size_units_only() const {
+uint32_t EntityCount::unit_count() const {
     uint32_t _size = 0;
     for (uint32_t entity_type = ENTITY_MINER; entity_type < ENTITY_HALL; entity_type++) {
         _size += entity_count[entity_type];
@@ -22,7 +22,7 @@ uint32_t EntityCount::size_units_only() const {
     return _size;
 }
 
-uint32_t EntityCount::size_buildings_only() const {
+uint32_t EntityCount::building_count() const {
     uint32_t _size = 0;
     for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_LANDMINE; entity_type++) {
         _size += entity_count[entity_type];
@@ -42,7 +42,7 @@ uint32_t EntityCount::operator[](uint32_t entity_type) const {
 }
 
 bool EntityCount::is_empty() const {
-    return size() == 0;
+    return count() == 0;
 }
 
 bool EntityCount::is_gte_to(const EntityCount& other) const {

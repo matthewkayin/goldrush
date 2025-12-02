@@ -65,7 +65,6 @@ struct BotRetreatMemory {
 
 struct Bot {
     uint8_t player_id;
-    bool has_surrendered;
     MatchSettingDifficultyValue difficulty;
 
     // Metrics
@@ -106,6 +105,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 // Strategy
 
+bool bot_should_surrender(const Bot& bot);
 bool bot_should_expand(const MatchState& state, const Bot& bot);
 uint32_t bot_get_player_mining_base_count(const Bot& bot, uint8_t player_id);
 uint32_t bot_get_low_on_gold_base_count(const Bot& bot);
@@ -116,6 +116,7 @@ bool bot_is_unoccupied_goldmine_available(const Bot& bot);
 // Production
 
 MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t match_timer);
+void bot_set_unit_comp(const MatchState& state, Bot& bot, BotUnitComp unit_comp);
 void bot_update_desired_production(const MatchState& state, const Bot& bot);
 
 // Saturate bases
@@ -175,6 +176,13 @@ MatchInput bot_squad_a_move_miners(const MatchState& state, const BotSquad& squa
 MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const BotSquad& squad, const std::vector<EntityId>& entity_list);
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);
 EntityId bot_squad_get_nearest_base_goldmine_id(const MatchState& state, const Bot& bot, const BotSquad& squad);
+
+std::vector<EntityId> bot_create_entity_list_from_entity_count(const MatchState& state, const Bot& bot, EntityCount entity_count);
+ivec2 bot_entity_list_get_center(const MatchState& state, const std::vector<EntityId>& entity_list);
+ivec2 bot_squad_choose_target_cell(const MatchState& state, const Bot& bot, BotSquadType type, const std::vector<EntityId>& entity_list);
+ivec2 bot_squad_get_landmine_target_cell(const MatchState& state, const Bot& bot, ivec2 pyro_cell);
+ivec2 bot_squad_get_attack_target_cell(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entity_list);
+ivec2 bot_squad_get_defend_target_cell(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entity_list);
 
 // Scouting
 
