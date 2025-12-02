@@ -112,6 +112,9 @@ uint32_t bot_get_low_on_gold_base_count(const Bot& bot);
 uint32_t bot_get_max_enemy_mining_base_count(const MatchState& state, const Bot& bot);
 bool bot_has_base_that_is_missing_a_hall(const Bot& bot, EntityId* goldmine_id = NULL);
 bool bot_is_unoccupied_goldmine_available(const Bot& bot);
+EntityId bot_get_least_defended_enemy_base_goldmine_id(const MatchState& state, const Bot& bot);
+void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint32_t options);
+int bot_score_entities_at_location(const MatchState& state, const Bot& bot, ivec2 location, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
 
 // Production
 

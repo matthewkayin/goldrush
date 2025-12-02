@@ -305,6 +305,26 @@ bool bot_is_unoccupied_goldmine_available(const Bot& bot) {
     return false;
 }
 
+EntityId bot_get_least_defended_enemy_base_goldmine_id(const MatchState& state, const Bot& bot) {
+    EntityId least_defended_base_goldmine_id = ID_NULL;
+    for (auto it : bot.base_info) {
+        EntityId goldmine_id = it.first;
+        const BotBaseInfo& base_info = it.second;
+
+        if (base_info.controlling_player == PLAYER_NONE ||
+                state.players[base_info.controlling_player].team == state.players[bot.player_id].team) {
+            continue;
+        }
+
+        if (least_defended_base_goldmine_id == ID_NULL ||
+                base_info.defense_score < bot.base_info.at(least_defended_base_goldmine_id).defense_score) {
+            least_defended_base_goldmine_id = goldmine_id;
+        }
+    }
+    
+    return least_defended_base_goldmine_id;
+}
+
 void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint32_t options) {
     bool should_counterattack = (options & BOT_DEFEND_COUNTERATTACK) == BOT_DEFEND_COUNTERATTACK;
     bool should_defend_with_workers = (options & BOT_DEFEND_WITH_WORKERS) == BOT_DEFEND_WITH_WORKERS;
@@ -404,7 +424,10 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     }
 
     // Next, see if we can use unreserved units to mount a counterattack
-    if (should_counterattack && unreserved_army_score > bot_get_least_defended_enemy_hall_score(bot)) {
+    EntityId least_defended_enemy_base_goldmine_id = bot_get_least_defended_enemy_base_goldmine_id(state, bot);
+    if (should_counterattack &&
+            least_defended_enemy_base_goldmine_id != ID_NULL &&
+            unreserved_army_score > bot.base_info.at(least_defended_enemy_base_goldmine_id).defense_score) {
         ivec2 counterattack_squad_target_cell = bot_squad_get_attack_target_cell(state, bot, unreserved_army);
         bot_squad_create(state, bot, BOT_SQUAD_TYPE_ATTACK, counterattack_squad_target_cell, unreserved_army);
         log_debug("BOT %u defend_location, counterattack %u", bot.player_id, unreserved_army.size());
