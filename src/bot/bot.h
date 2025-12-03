@@ -27,8 +27,7 @@ enum BotMetric {
     BOT_METRIC_ENTITY_COUNT,
     BOT_METRIC_UNRESERVED_ENTITY_COUNT,
     BOT_METRIC_IN_PROGRESS_ENTITY_COUNT,
-    BOT_METRIC_AVAILABLE_PRODUCTION_BUILDING_COUNT,
-    BOT_METRIC_COUNT
+    BOT_METRIC_AVAILABLE_PRODUCTION_BUILDING_COUNT
 };
 
 enum BotSquadType {
@@ -53,8 +52,10 @@ struct BotDesiredSquad {
 struct BotBaseInfo {
     uint8_t controlling_player;
     bool has_surrounding_hall;
+    bool is_saturated;
     bool has_gold;
     bool is_low_on_gold;
+    bool is_under_attack;
     int defense_score;
 };
 
@@ -66,9 +67,6 @@ struct BotRetreatMemory {
 struct Bot {
     uint8_t player_id;
     MatchSettingDifficultyValue difficulty;
-
-    // Metrics
-    EntityCount metrics[BOT_METRIC_COUNT];
 
     // Unit management
     std::unordered_map<EntityId, bool> is_entity_reserved;
@@ -105,16 +103,20 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
 // Strategy
 
-bool bot_should_surrender(const Bot& bot);
+bool bot_should_surrender(const MatchState& state, const Bot& bot);
 bool bot_should_expand(const MatchState& state, const Bot& bot);
+bool bot_should_tech_into_preferred_unit_comp(const MatchState& state, const Bot& bot);
 uint32_t bot_get_player_mining_base_count(const Bot& bot, uint8_t player_id);
+bool bot_are_bases_fully_saturated(const Bot& bot);
 uint32_t bot_get_low_on_gold_base_count(const Bot& bot);
 uint32_t bot_get_max_enemy_mining_base_count(const MatchState& state, const Bot& bot);
 bool bot_has_base_that_is_missing_a_hall(const Bot& bot, EntityId* goldmine_id = NULL);
 bool bot_is_unoccupied_goldmine_available(const Bot& bot);
 EntityId bot_get_least_defended_enemy_base_goldmine_id(const MatchState& state, const Bot& bot);
+bool bot_is_under_attack(const Bot& bot);
 void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint32_t options);
 int bot_score_entities_at_location(const MatchState& state, const Bot& bot, ivec2 location, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
+bool bot_should_attack(const MatchState& state, const Bot& bot);
 
 // Production
 
@@ -148,8 +150,8 @@ MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgr
 
 // Train Units
 
-bool bot_has_building_available_to_train_units(const Bot& bot, EntityCount desired_entities);
-EntityType bot_get_unit_type_to_train(Bot& bot, EntityCount desired_entities);
+bool bot_has_building_available_to_train_units(const Bot& bot, EntityCount desired_entities, EntityCount available_building_count, EntityCount unreserved_and_in_progress_entity_count);
+EntityType bot_get_unit_type_to_train(Bot& bot, EntityCount desired_entities, EntityCount available_building_count, EntityCount unreserved_and_in_progress_entity_count);
 MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_type, uint32_t match_time_minutes);
 
 // Squads
@@ -181,6 +183,7 @@ MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, B
 EntityId bot_squad_get_nearest_base_goldmine_id(const MatchState& state, const Bot& bot, const BotSquad& squad);
 
 std::vector<EntityId> bot_create_entity_list_from_entity_count(const MatchState& state, const Bot& bot, EntityCount entity_count);
+void bot_entity_list_filter(const MatchState& state, std::vector<EntityId>& entity_list, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
 ivec2 bot_entity_list_get_center(const MatchState& state, const std::vector<EntityId>& entity_list);
 ivec2 bot_squad_choose_target_cell(const MatchState& state, const Bot& bot, BotSquadType type, const std::vector<EntityId>& entity_list);
 ivec2 bot_squad_get_landmine_target_cell(const MatchState& state, const Bot& bot, ivec2 pyro_cell);
@@ -213,7 +216,14 @@ EntityType bot_get_building_which_researches(uint32_t upgrade);
 
 // Metrics
 
-void bot_gather_metrics(const MatchState& state, Bot& bot);
+EntityCount bot_count_in_progress_entities(const MatchState& state, const Bot& bot);
+EntityCount bot_count_unreserved_entities(const MatchState& state, const Bot& bot);
+EntityCount bot_count_unreserved_army(const MatchState& state, const Bot& bot);
+bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity, EntityId entity_id);
+EntityCount bot_count_available_production_buildings(const MatchState& state, const Bot& bot);
+uint32_t bot_score_unreserved_army(const MatchState& state, const Bot& bot);
+uint32_t bot_score_allied_army(const MatchState& state, const Bot& bot);
+uint32_t bot_score_enemy_army(const MatchState& state, const Bot& bot);
 bool bot_is_entity_type_production_building(EntityType type);
 std::vector<EntityType> bot_entity_types_production_buildings();
 
@@ -230,6 +240,8 @@ bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
 MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
 ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId goldmine_id);
-bool bot_has_landmine_squad(const Bot& bot);
+uint32_t bot_get_index_of_squad_of_type(const Bot& bot, BotSquadType type);
+bool bot_has_squad_of_type(const Bot& bot, BotSquadType type);
+bool bot_has_desired_squad_of_type(const Bot& bot, BotSquadType type);
 bool bot_is_bandit_rushing(const Bot& bot);
 bool bot_is_area_safe(const MatchState& state, const Bot& bot, ivec2 cell);
