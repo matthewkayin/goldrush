@@ -241,7 +241,19 @@ MatchShellState* match_shell_init(int lcg_seed, Noise& noise) {
         }
     }
 
-    // TODO: init bots
+    // Init bots
+    // memset(state->bots, 0, sizeof(state->bots));
+    MatchSettingDifficultyValue difficulty = (MatchSettingDifficultyValue)network_get_match_setting(MATCH_SETTING_DIFFICULTY);
+    int bot_lcg_seed = lcg_seed;
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
+            continue;
+        }
+
+        BotOpener opener = bot_roll_opener(&bot_lcg_seed, difficulty);
+        BotUnitComp preferred_unit_comp = bot_roll_preferred_unit_comp(&bot_lcg_seed);
+        state->bots[player_id] = bot_init(player_id, difficulty, opener, preferred_unit_comp);
+    }
 
     return state;
 }
@@ -717,6 +729,34 @@ void match_shell_update(MatchShellState* state) {
 
     // Non-replay begin turn
     if (state->match_timer % TURN_DURATION == 0 && !state->replay_mode) {
+        // Bot inputs
+        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+            // Filter down to active, bot players
+            if (!(state->match_state.players[player_id].active && 
+                    network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT)) {
+                continue;
+            }
+
+            if (state->inputs[player_id].empty()) {
+                MatchInput bot_input = bot_get_turn_input(state->match_state, state->bots[player_id], state->match_timer);
+                state->inputs[player_id].push({ bot_input });
+
+                // Buffer empty inputs. This way the bot can always assume that all its inputs have been applied when deciding on the next one
+                for (uint32_t index = 0; index < TURN_OFFSET - 1; index++) {
+                    state->inputs[player_id].push({ (MatchInput) { .type = MATCH_INPUT_NONE } });
+                }
+
+                // Check for bot surrender
+                if (bot_should_surrender(state->match_state, state->bots[player_id])) {
+                    match_shell_add_chat_message(state, player_id, "gg");
+                    match_shell_handle_player_disconnect(state, player_id);
+                    // handle_player_disconnect should have set the bot to inactive for us
+                    GOLD_ASSERT(!state->match_state.players[player_id].active);
+                }
+            }
+        }
+
+        // Check that all inputs have been received
         bool all_inputs_received = true;
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             if (!state->match_state.players[player_id].active) {

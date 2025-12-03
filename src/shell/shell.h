@@ -7,6 +7,7 @@
 #include "menu/options_menu.h"
 #include "render/render.h"
 #include "network/types.h"
+#include "bot/bot.h"
 
 #define MATCH_SHELL_UI_HEIGHT 176
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10
@@ -98,6 +99,9 @@ struct MatchShellState {
     // Inputs
     std::queue<std::vector<MatchInput>> inputs[MAX_PLAYERS];
     std::vector<MatchInput> input_queue;
+
+    // Bots
+    Bot bots[MAX_PLAYERS];
 
     // Camera
     ivec2 camera_offset;
