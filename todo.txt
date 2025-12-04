@@ -1,0 +1,7 @@
+# TODO
+
+- Bug: Cowboy hats are cutoff by fires north of them
+- Bot: making too many saloons. Is it not counting in progress buildings properly?
+- Bot: rally point for cowboys seems to be -1, -1. They are moving to top left of the map...
+- Bot: testing for bugs
+- Different tilesets
