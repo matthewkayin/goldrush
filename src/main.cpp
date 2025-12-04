@@ -266,6 +266,7 @@ int gold_main(int argc, char** argv) {
     uint32_t fps = 0;
     #ifdef GOLD_DEBUG
         bool should_render_debug_info = false;
+        uint64_t debug_playback_speed = 1;
     #endif
 
     GameState state;
@@ -283,7 +284,11 @@ int gold_main(int argc, char** argv) {
     while (game_is_running(state)) {
         // Timekeep
         uint64_t current_time = SDL_GetTicksNS();
-        update_accumulator += current_time - last_time;
+        #ifdef GOLD_DEBUG
+            update_accumulator += (current_time - last_time) * debug_playback_speed;
+        #else
+            update_accumulator += current_time - last_time;
+        #endif
         last_time = current_time;
 
         if (current_time - last_second >= SDL_NS_PER_SECOND) {
@@ -302,6 +307,9 @@ int gold_main(int argc, char** argv) {
             #ifdef GOLD_DEBUG
                 if (input_is_action_just_pressed(INPUT_ACTION_F3)) {
                     should_render_debug_info = !should_render_debug_info;
+                }
+                if (input_is_action_just_pressed(INPUT_ACTION_TURBO)) {
+                    debug_playback_speed = debug_playback_speed == 1 ? 4 : 1;
                 }
             #endif
 

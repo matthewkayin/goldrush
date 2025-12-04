@@ -1258,7 +1258,7 @@ void match_shell_handle_input(MatchShellState* state) {
                     state->debug_fog = DEBUG_FOG_DISABLED;
                 } else if (state->chat_message == "/fog enable") {
                     state->debug_fog = DEBUG_FOG_ENABLED;
-                } else if (state->chat_message == "/fog bot vision") {
+                } else if (state->chat_message == "/bot vision") {
                     state->debug_fog = DEBUG_FOG_BOT_VISION;
                 } else if (state->chat_message == "/gold") {
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
