@@ -441,6 +441,13 @@ int gold_main(int argc, char** argv) {
                     sprintf(debug_text, "Cell <%i, %i> Elevation %u Tile <%i, %i>", cell.x, cell.y, tile.elevation, tile.frame.x, tile.frame.y);
                     render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
                     render_y += 20;
+
+                    render_draw_rect((Rect) {
+                        .x = (cell.x * TILE_SIZE) - state.match_shell_state->camera_offset.x,
+                        .y = (cell.y * TILE_SIZE) - state.match_shell_state->camera_offset.y,
+                        .w = TILE_SIZE,
+                        .h = TILE_SIZE
+                    }, RENDER_COLOR_WHITE);
                 }
             }
         #endif

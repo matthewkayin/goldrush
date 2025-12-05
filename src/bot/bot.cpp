@@ -1226,7 +1226,7 @@ ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot) {
         };
         // If the area is blocked (by a cactus, for example) then don't build there
         if (!map_is_cell_rect_in_bounds(state.map, hall_cell, HALL_SIZE) || map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, hall_cell, HALL_SIZE) ||
-                map_get_pathing_region(state.map, hall_cell) != map_get_pathing_region(state.map, goldmine.cell)) {
+                map_get_tile(state.map, hall_cell).elevation != map_get_tile(state.map, goldmine.cell).elevation) {
             hall_score = -1;
         } else {
             // Check for obstacles (including stairs) in a rect around where the hall would be
@@ -1395,8 +1395,8 @@ ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t
     ivec2 search_start_cell = path_start_cell;
     uint32_t path_index = 0;
     while (path_index < path.size() &&
-            (ivec2::manhattan_distance(path[path_index], path_start_cell) < 17 &&
-            map_get_pathing_region(state.map, path[path_index]) == map_get_pathing_region(state.map, path_start_cell))) {
+            ivec2::manhattan_distance(path[path_index], path_start_cell) < 17 &&
+            map_get_tile(state.map, path[path_index]).elevation == map_get_tile(state.map, path_start_cell).elevation) {
         path_index++;
     }
     if (path_index > 1 && path_index < path.size() && path_index < path.size()) {
@@ -2088,7 +2088,7 @@ MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& sta
 
     // Long pathing might be a performance issue here
     std::vector<ivec2> path_to_infantry_center;
-    map_pathfind_calculate_path(state.map, CELL_LAYER_GROUND, carrier.cell, en_route_infantry_center, 2, &path_to_infantry_center, MAP_OPTION_IGNORE_UNITS, NULL, false);
+    map_pathfind(state.map, CELL_LAYER_GROUND, carrier.cell, en_route_infantry_center, 2, &path_to_infantry_center, MAP_OPTION_IGNORE_UNITS, NULL);
 
     // If the path is small, then don't bother moving
     if (path_to_infantry_center.size() < BOT_NEAR_DISTANCE) {
@@ -3702,7 +3702,7 @@ MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entit
 
     static const int FLEE_DISTANCE = 16;
     if (ivec2::manhattan_distance(entity.cell, target_cell) < FLEE_DISTANCE &&
-            map_get_pathing_region(state.map, entity.cell) == map_get_pathing_region(state.map, target_cell)) {
+            map_get_tile(state.map, entity.cell).elevation == map_get_tile(state.map, target_cell).elevation) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 

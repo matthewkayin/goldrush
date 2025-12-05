@@ -1295,8 +1295,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                         if (!entity.path.empty() && entity.path.size() < 8 &&
                                 (entity.target.type == TARGET_ENTITY || entity.target.type == TARGET_ATTACK_ENTITY)) {
                             ivec2 target_cell = entity_get_target_cell(state, entity);
-                            if (map_get_pathing_region(state.map, entity.path.back()) == map_get_pathing_region(state.map, target_cell) &&
-                                    ivec2::manhattan_distance(entity.path.back(), target_cell) > 8) {
+                            if (ivec2::manhattan_distance(entity.path.back(), target_cell) > 8) {
                                 entity.mode = MODE_UNIT_IDLE;
                                 entity.path.clear();
                                 // break out of while movement left
