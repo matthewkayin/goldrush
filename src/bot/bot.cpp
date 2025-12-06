@@ -440,7 +440,6 @@ bool bot_has_base_that_is_missing_a_hall(const Bot& bot, EntityId* goldmine_id) 
 bool bot_is_unoccupied_goldmine_available(const Bot& bot) {
     for (auto base_info_it : bot.base_info) {
         const BotBaseInfo& base_info = base_info_it.second;
-        log_debug("is_unoccupied_goldmine_available %u, player %u, has gold %i", base_info_it.first, base_info.controlling_player, base_info.has_gold);
         if (base_info.controlling_player == PLAYER_NONE && base_info.has_gold) {
             return true;
         }
@@ -1309,7 +1308,6 @@ EntityId bot_find_goldmine_for_next_expansion(const MatchState& state, const Bot
 
 EntityId bot_find_unoccupied_goldmine_nearest_to_entity(const MatchState& state, const Bot& bot, EntityId reference_entity_id) {
     const Entity& reference_entity = state.entities.get_by_id(reference_entity_id);
-    log_debug("BOT %u find_unoccupied_goldmine_nearest_to_entity", bot.player_id);
 
     // Find the unoccupied goldmine closest to this allied building
     EntityId nearest_goldmine_id = ID_NULL;
@@ -1317,22 +1315,17 @@ EntityId bot_find_unoccupied_goldmine_nearest_to_entity(const MatchState& state,
         EntityId goldmine_id = it.first;
         const BotBaseInfo& base_info = it.second;
 
-        log_debug("BOT considering %u", goldmine_id);
         if (base_info.controlling_player != PLAYER_NONE || !base_info.has_gold) {
-            log_debug("BOT goldmine not valid. controlling player %u. has gold %i", base_info.controlling_player, base_info.has_gold);
             continue;
         }
 
-        log_debug("BOT goldmine is valid.");
         if (nearest_goldmine_id == ID_NULL ||
                 ivec2::manhattan_distance(state.entities.get_by_id(goldmine_id).cell, reference_entity.cell) <
                 ivec2::manhattan_distance(state.entities.get_by_id(nearest_goldmine_id).cell, reference_entity.cell)) {
             nearest_goldmine_id = goldmine_id;
-            log_debug("BOT nearest goldmine id is now %u.", nearest_goldmine_id);
         }
     }
 
-    log_debug("BOT returning nearest goldmine id %u", nearest_goldmine_id);
     return nearest_goldmine_id;
 }
 
@@ -1815,6 +1808,17 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
     // Squad state changes
     bool is_enemy_near_squad = !nearby_enemy_list.empty();
+    if (squad.type == BOT_SQUAD_TYPE_RESERVES || squad.type == BOT_SQUAD_TYPE_ATTACK) {
+        EntityId enemy_near_target_id = match_find_entity(state, [&state, &bot, &squad](const Entity& entity, EntityId /*entity_id*/) {
+            return entity.type != ENTITY_GOLDMINE &&
+                state.players[entity.player_id].team != state.players[bot.player_id].team &&
+                entity.health != 0 &&
+                ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_NEAR_DISTANCE;
+        });
+        if (enemy_near_target_id != ID_NULL) {
+            is_enemy_near_squad = true;
+        }
+    }
     if (squad.type == BOT_SQUAD_TYPE_RESERVES && !is_enemy_near_squad) {
         bot_squad_dissolve(bot, squad);
         return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -1974,7 +1978,7 @@ uint32_t bot_squad_get_carrier_capacity(const MatchState& state, const BotSquad&
     uint32_t garrison_size = carrier.garrisoned_units.size();
     for (EntityId entity_id : squad.entities) {
         const Entity& entity = state.entities.get_by_id(entity_id);
-        if (entity.target.type != TARGET_ENTITY || entity.target.id != carrier_id) {
+        if (entity.target.type == TARGET_ENTITY && entity.target.id == carrier_id) {
             garrison_size++;
         }
     }
@@ -1998,16 +2002,15 @@ MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSqu
     input.move.entity_count = 0;
 
     uint32_t carrier_capacity = bot_squad_get_carrier_capacity(state, squad, carrier, carrier_id);
-    const uint32_t CARRIER_MAX_CAPACITY = entity_get_data(carrier.type).garrison_capacity;
 
-    GOLD_ASSERT(carrier_capacity < CARRIER_MAX_CAPACITY);
+    GOLD_ASSERT(carrier_capacity != 0);
 
     for (EntityId entity_id : entity_list) {
         const Entity& entity = state.entities.get_by_id(entity_id);
-        const uint32_t ENTITY_GARRISON_SIZE = entity_get_data(entity.type).garrison_size;
+        const uint32_t entity_garrison_size = entity_get_data(entity.type).garrison_size;
         
         // Don't garrison units which cannot garrison
-        if (ENTITY_GARRISON_SIZE == ENTITY_CANNOT_GARRISON) {
+        if (entity_garrison_size == ENTITY_CANNOT_GARRISON) {
             continue;
         }
 
@@ -2017,7 +2020,7 @@ MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSqu
         }
 
         // If there is space to garrison, then garrison the unit
-        if (carrier_capacity + input.move.entity_count + ENTITY_GARRISON_SIZE < CARRIER_MAX_CAPACITY) {
+        if (input.move.entity_count + entity_garrison_size <= carrier_capacity) {
             input.move.entity_ids[input.move.entity_count] = entity_id;
             input.move.entity_count++;
             continue;
