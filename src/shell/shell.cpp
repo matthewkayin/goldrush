@@ -190,6 +190,7 @@ MatchShellState* match_shell_base_init() {
 
     #ifdef GOLD_DEBUG
         state->debug_fog = DEBUG_FOG_ENABLED;
+        state->debug_show_region_lines = false;
     #endif
 
     return state;
@@ -1253,17 +1254,19 @@ void match_shell_handle_input(MatchShellState* state) {
     if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active() && !state->replay_mode) {
         if (!state->chat_message.empty()) {
             #ifdef GOLD_DEBUG
-                if (state->chat_message == "/fog disable") {
+                if (state->chat_message == "/fog off") {
                     state->debug_fog = DEBUG_FOG_DISABLED;
-                } else if (state->chat_message == "/fog enable") {
+                } else if (state->chat_message == "/fog on") {
                     state->debug_fog = DEBUG_FOG_ENABLED;
-                } else if (state->chat_message == "/bot vision") {
+                } else if (state->chat_message == "/fog bot") {
                     state->debug_fog = DEBUG_FOG_BOT_VISION;
                 } else if (state->chat_message == "/gold") {
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                         state->match_state.players[player_id].gold += 5000;
                     }
-                } 
+                }  else if (state->chat_message == "/regions") {
+                    state->debug_show_region_lines = !state->debug_show_region_lines;
+                }
             #endif
             network_send_chat(state->chat_message.c_str());
             match_shell_add_chat_message(state, network_get_player_id(), state->chat_message.c_str());
@@ -2568,7 +2571,7 @@ void match_shell_render(const MatchShellState* state) {
                 }
 
                 #ifdef GOLD_DEBUG
-                    if (elevation == tile.elevation) {
+                    if (state->debug_show_region_lines && elevation == tile.elevation) {
                         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                             ivec2 neighbor = base_coords + ivec2(x, y) + DIRECTION_IVEC2[direction];
                             if (!map_is_cell_in_bounds(state->match_state.map, neighbor) || map_get_region(state->match_state.map, neighbor) == state->match_state.map.regions[map_index]) {

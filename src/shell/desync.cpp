@@ -125,6 +125,17 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state) {
         desync_write_vector<Cell>(match_state.map.cells[layer]);
     }
 
+    // Map regions
+    desync_write_vector<int>(match_state.map.regions);
+
+    // Map region connections
+    desync_write_value<size_t>(match_state.map.region_connections.size());
+    for (size_t region = 0; region < match_state.map.region_connections.size(); region++) {
+        for (size_t other_region = 0; other_region < match_state.map.region_connections.size(); other_region++) {
+            desync_write_vector<ivec2>(match_state.map.region_connections[region][other_region]);
+        }
+    }
+
     // Fog 
     for (size_t player = 0; player < MAX_PLAYERS; player++) {
         desync_write_vector<int>(match_state.fog[player]);
@@ -317,6 +328,18 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
     // Map cell layers
     for (size_t layer = 0; layer < CELL_LAYER_COUNT; layer++) {
         state_buffer_offset += desync_compare_vector<Cell>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+    }
+
+    // Map regions
+    state_buffer_offset += desync_compare_vector<int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+
+    // Map region connections
+    size_t region_connections_size;
+    state_buffer_offset += desync_compare_value<size_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset, &region_connections_size);
+    for (size_t region = 0; region < region_connections_size; region++) {
+        for (size_t other_region = 0; other_region < region_connections_size; other_region++) {
+            state_buffer_offset += desync_compare_vector<ivec2>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        }
     }
 
     // Fog 
