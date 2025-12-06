@@ -2945,10 +2945,13 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer) {
             }
 
             // Remove any to-scouted entities that are close to the attacker
+            // And also remove the current to-scout entity
             uint32_t index = 0;
             while (index < bot.entities_to_scout.size()) {
-                const Entity& to_scout = state.entities.get_by_id(bot.entities_to_scout[index]);
-                if (ivec2::manhattan_distance(to_scout.cell, attacker.cell) < BOT_NEAR_DISTANCE) {
+                EntityId to_scout_id = bot.entities_to_scout[index];
+                const Entity& to_scout = state.entities.get_by_id(to_scout_id);
+                if (scout.target.id == to_scout_id || 
+                        ivec2::manhattan_distance(to_scout.cell, attacker.cell) < BOT_NEAR_DISTANCE) {
                     bot.entities_to_scout[index] = bot.entities_to_scout.back();
                     bot.entities_to_scout.pop_back();
                 } else {
@@ -3050,6 +3053,9 @@ bool bot_should_scout(const Bot& bot, uint32_t match_timer) {
         next_scout_time = bot.last_scout_time + (5U * 60U * UPDATES_PER_SECOND);
     }
 
+    if (match_timer >= next_scout_time) {
+        log_debug("BOT %u should_scout. next_scout_time %u match_timer %u", bot.player_id, next_scout_time, match_timer);
+    }
     return match_timer >= next_scout_time;
 }
 

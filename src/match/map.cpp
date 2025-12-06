@@ -1671,7 +1671,8 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 
     std::vector<int> region_path; 
     ivec2 heuristic_cell; 
-    if (layer == CELL_LAYER_SKY || map_get_region(map, from) == map_get_region(map, to)) {
+    bool no_region_path = (ignore & MAP_OPTION_NO_REGION_PATH) == MAP_OPTION_NO_REGION_PATH;
+    if (layer == CELL_LAYER_SKY || map_get_region(map, from) == map_get_region(map, to) || no_region_path) {
         heuristic_cell = to;
     } else {
         region_path = map_get_region_path(map, map_get_region(map, from), map_get_region(map, to));
@@ -1825,6 +1826,6 @@ void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_ce
     GOLD_ASSERT(mine_exit_cell.x != -1);
 
     path->clear();
-    map_pathfind(map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, path, MAP_OPTION_IGNORE_MINERS, NULL);
+    map_pathfind(map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, path, MAP_OPTION_IGNORE_MINERS | MAP_OPTION_NO_REGION_PATH, NULL);
     path->push_back(mine_exit_cell);
 }

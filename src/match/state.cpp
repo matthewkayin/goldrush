@@ -1176,6 +1176,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                     uint32_t pathfind_options = 0;
                     if (entity_is_mining(state, entity)) {
                         pathfind_options |= MAP_OPTION_IGNORE_MINERS;
+                        pathfind_options |= MAP_OPTION_NO_REGION_PATH;
                     }
                     if (entity.target.type == TARGET_CELL && entity.pathfind_attempts == 0) {
                         pathfind_options |= MAP_OPTION_ALLOW_PATH_SQUIRRELING;
