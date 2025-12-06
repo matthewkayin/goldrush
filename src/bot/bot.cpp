@@ -1718,7 +1718,8 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
             continue;
         }
 
-        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_MEDIUM_DISTANCE) {
+        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > BOT_NEAR_DISTANCE &&
+                ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_MEDIUM_DISTANCE) {
             distant_cavalry.push_back(entity_id);
             continue;
         }
@@ -1798,7 +1799,10 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
     // At this point, any distant infantry have not been able to garrison, so move them
     // into the cavalry list so that they can be A-moved
     for (EntityId entity_id : distant_infantry) {
-        distant_cavalry.push_back(entity_id);
+        const Entity& entity = state.entities.get_by_id(entity_id);
+        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > BOT_NEAR_DISTANCE) {
+            distant_cavalry.push_back(entity_id);
+        }
     }
 
     MatchInput move_input = bot_squad_move_distant_units_to_target(state, squad, distant_cavalry);
@@ -2504,7 +2508,7 @@ ivec2 bot_squad_get_landmine_target_cell(const MatchState& state, const Bot& bot
         return ivec2(-1, -1);
     }
 
-    return state.entities.get_by_id(nearest_controlled_goldmine_id).cell;
+    return bot_get_unoccupied_cell_near_goldmine(state, nearest_controlled_goldmine_id);
 }
 
 ivec2 bot_squad_get_attack_target_cell(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entity_list) {
