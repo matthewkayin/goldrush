@@ -438,7 +438,7 @@ int gold_main(int argc, char** argv) {
                 if (state.mode == GAME_MODE_MATCH && !match_shell_is_mouse_in_ui()) {
                     ivec2 cell = (input_get_mouse_position() + state.match_shell_state->camera_offset) / TILE_SIZE;
                     Tile tile = map_get_tile(state.match_shell_state->match_state.map, cell);
-                    sprintf(debug_text, "Cell <%i, %i> Elevation %u Tile <%i, %i>", cell.x, cell.y, tile.elevation, tile.frame.x, tile.frame.y);
+                    sprintf(debug_text, "Cell <%i, %i> Elevation %u Tile <%i, %i> Region %i", cell.x, cell.y, tile.elevation, tile.frame.x, tile.frame.y, map_get_region(state.match_shell_state->match_state.map, cell));
                     render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
                     render_y += 20;
 

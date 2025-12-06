@@ -2566,6 +2566,39 @@ void match_shell_render(const MatchShellState* state) {
                         .recolor_id = 0
                     });
                 }
+
+                #ifdef GOLD_DEBUG
+                    if (elevation == tile.elevation) {
+                        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                            ivec2 neighbor = base_coords + ivec2(x, y) + DIRECTION_IVEC2[direction];
+                            if (!map_is_cell_in_bounds(state->match_state.map, neighbor) || map_get_region(state->match_state.map, neighbor) == state->match_state.map.regions[map_index]) {
+                                continue;
+                            }
+                            ivec2 tile_pos = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
+                            if (direction == DIRECTION_NORTH) {
+                                render_draw_rect((Rect) {
+                                    .x = tile_pos.x, .y = tile_pos.y,
+                                    .w = TILE_SIZE, .h = 1
+                                }, RENDER_COLOR_WHITE);
+                            } else if (direction == DIRECTION_SOUTH) {
+                                render_draw_rect((Rect) {
+                                    .x = tile_pos.x, .y = tile_pos.y + TILE_SIZE - 1,
+                                    .w = TILE_SIZE, .h = 1
+                                }, RENDER_COLOR_WHITE);
+                            } else if (direction == DIRECTION_WEST) {
+                                render_draw_rect((Rect) {
+                                    .x = tile_pos.x, .y = tile_pos.y, 
+                                    .w = 1, .h = TILE_SIZE
+                                }, RENDER_COLOR_WHITE);
+                            } else if (direction == DIRECTION_EAST) {
+                                render_draw_rect((Rect) {
+                                    .x = tile_pos.x + TILE_SIZE - 1, .y = tile_pos.y, 
+                                    .w = 1, .h = TILE_SIZE
+                                }, RENDER_COLOR_WHITE);
+                            }
+                        }
+                    }
+                #endif
             }  // End for each x
         } // End for each y
 

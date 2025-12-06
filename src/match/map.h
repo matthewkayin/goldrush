@@ -46,11 +46,21 @@ struct Cell {
     uint8_t padding[2];
 };
 
+struct MapRegionPathNode {
+    int parent;
+    int region;
+    int cost;
+};
+
 struct MapPathNode {
     // The parent is the previous node stepped in the path to reach this node
     // It should be an index in the explored list or -1 if it is the start node
     int parent;
     ivec2 cell;
+    int cost;
+    int score(ivec2 target) const {
+        return cost + ivec2::manhattan_distance(cell, target);
+    }
 };
 
 struct Map {
@@ -58,6 +68,9 @@ struct Map {
     int height;
     std::vector<Tile> tiles;
     std::vector<Cell> cells[CELL_LAYER_COUNT];
+
+    std::vector<int> regions;
+    std::vector<std::vector<std::vector<ivec2>>> region_connections;
 };
 
 void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
@@ -86,6 +99,10 @@ ivec2 map_get_player_town_hall_cell(const Map& map, ivec2 mine_cell);
 ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 start, int start_size, ivec2 rect_position, int rect_size, uint32_t ignore = 0, ivec2 ignore_cell = ivec2(-1, -1));
 
 ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, uint32_t ignore);
+
+int map_get_region(const Map& map, ivec2 cell);
+int map_get_region_count(const Map& map);
+int map_are_regions_connected(const Map& map, int region_a, int region_b);
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t options, std::vector<ivec2>* ignore_cells = NULL);
 void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path);
