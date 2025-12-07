@@ -595,6 +595,7 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     });
     if (should_defend_with_workers && !workers.empty()) {
         bot.squads.push_back(bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, workers));
+        log_debug("BOT %u defend_location, worker defense", bot.player_id);
         return;
     }
 }
@@ -673,11 +674,13 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
     // Saturate bases
     MatchInput saturate_bases_input = bot_saturate_bases(state, bot);
     if (saturate_bases_input.type != MATCH_INPUT_NONE) {
+        log_debug("BOT production returned saturate bases input");
         return saturate_bases_input;
     }
 
     // Build house
     if (bot_should_build_house(state, bot) && !bot_is_under_attack(bot)) {
+        log_debug("BOT production returned build house input");
         return bot_build_building(state, bot, ENTITY_HOUSE);
     }
 
@@ -693,25 +696,17 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
         EntityId goldmine_id = bot_find_goldmine_for_next_expansion(state, bot);
         const Entity& goldmine = state.entities.get_by_id(goldmine_id);
         if (bot_is_area_safe(state, bot, goldmine.cell)) {
+            log_debug("BOT production returned build base input");
             return bot_build_building(state, bot, ENTITY_HALL);
         } 
     } 
-
-    if (bot_should_expand(state, bot) && !bot_is_under_attack(bot)) {
-        if (in_progress_entity_count[ENTITY_HALL] == 0) {
-            EntityId goldmine_id = bot_find_goldmine_for_next_expansion(state, bot);
-            const Entity& goldmine = state.entities.get_by_id(goldmine_id);
-            if (bot_is_area_safe(state, bot, goldmine.cell)) {
-                return bot_build_building(state, bot, ENTITY_HALL);
-            }
-        }
-    }
 
     // Research upgrades
     uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot);
     if (desired_upgrade != 0) {
         EntityType building_type = bot_get_building_which_researches(desired_upgrade);
         if (available_building_count[building_type] != 0) {
+            log_debug("BOT production returned research upgrade input");
             return bot_research_upgrade(state, bot, desired_upgrade);
         }
     }
@@ -1834,17 +1829,19 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             return entity.type != ENTITY_GOLDMINE &&
                 state.players[entity.player_id].team != state.players[bot.player_id].team &&
                 entity.health != 0 &&
-                ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_NEAR_DISTANCE;
+                ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_MEDIUM_DISTANCE;
         });
         if (enemy_near_target_id != ID_NULL) {
             is_enemy_near_squad = true;
         }
     }
     if (squad.type == BOT_SQUAD_TYPE_RESERVES && !is_enemy_near_squad) {
+        log_debug("BOT %u squad_update, dissolve reserves squad because no enemy nearby", bot.player_id);
         bot_squad_dissolve(bot, squad);
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
     if (squad.type == BOT_SQUAD_TYPE_ATTACK && !is_enemy_near_squad) {
+        log_debug("BOT %u squad_update, return attack squad because no enemy nearby", bot.player_id);
         squad.type = BOT_SQUAD_TYPE_RETURN;
     }
 
@@ -1930,12 +1927,13 @@ MatchInput bot_squad_bunker_micro(const MatchState& state, const Bot& bot, const
     const Entity& bunker = state.entities.get_by_id(bunker_id);
 
     // Check if a miner is under attack
-    EntityId miner_under_attack_id = match_find_entity(state, [&bunker](const Entity& miner, EntityId /*miner_id*/) {
-        return miner.player_id == bunker.player_id &&
-                entity_is_selectable(miner) &&
-                miner.type == ENTITY_MINER &&
-                miner.taking_damage_timer != 0 &&
-                ivec2::manhattan_distance(miner.cell, bunker.cell) < BOT_MEDIUM_DISTANCE;
+    EntityId ally_under_attack_id = match_find_entity(state, [&bunker](const Entity& ally, EntityId /*miner_id*/) {
+        return ally.player_id == bunker.player_id &&
+                entity_is_selectable(ally) &&
+                (ally.type == ENTITY_MINER || entity_is_building(ally.type)) &&
+                ally.type != ENTITY_BUNKER &&
+                ally.taking_damage_timer != 0 &&
+                ivec2::manhattan_distance(ally.cell, bunker.cell) < BOT_MEDIUM_DISTANCE;
     });
 
     // Check if the units in the bunker can hit anything
@@ -1948,7 +1946,7 @@ MatchInput bot_squad_bunker_micro(const MatchState& state, const Bot& bot, const
     });
 
     // If a miner is under attack and they can't hit anything, tell them to exit the bunker
-    if (miner_under_attack_id != ID_NULL && 
+    if (ally_under_attack_id != ID_NULL && 
             enemy_in_range_of_bunker_id == ID_NULL && 
             !bunker.garrisoned_units.empty()) {
 
@@ -1962,10 +1960,10 @@ MatchInput bot_squad_bunker_micro(const MatchState& state, const Bot& bot, const
     }
 
     // Otherwise, tell them to enter the bunker
-    if (miner_under_attack_id == ID_NULL && enemy_in_range_of_bunker_id == ID_NULL && 
+    if (ally_under_attack_id == ID_NULL && enemy_in_range_of_bunker_id == ID_NULL && 
+            !bot_squad_bunker_units_are_engaged(state, squad, bunker, bunker_id) &&
             bunker.garrisoned_units.size() < squad.entities.size() - 1 &&
             bot_squad_carrier_has_capacity(state, squad, bunker, bunker_id)) {
-
         MatchInput garrison_input = bot_squad_garrison_into_carrier(state, squad, bunker, bunker_id, squad.entities);
         if (garrison_input.type != MATCH_INPUT_NONE) {
             log_debug("BOT %u squad_update, bunker squad enter bunker.", bot.player_id);
@@ -1988,6 +1986,31 @@ EntityId bot_squad_get_bunker_id(const MatchState& state, const BotSquad& squad)
 
 bool bot_squad_has_bunker(const MatchState& state, const BotSquad& squad) {
     return bot_squad_get_bunker_id(state, squad) != ID_NULL;
+}
+
+bool bot_squad_bunker_units_are_engaged(const MatchState& state, const BotSquad& squad, const Entity& bunker, EntityId bunker_id) {
+    for (EntityId entity_id : squad.entities) {
+        if (entity_id == bunker_id) {
+            continue;
+        }
+
+        const Entity& entity = state.entities.get_by_id(entity_id);
+        if (entity.target.type != TARGET_ATTACK_ENTITY) {
+            continue;
+        }
+        
+        uint32_t target_index = state.entities.get_index_of(entity.target.id);
+        if (target_index == INDEX_INVALID) {
+            continue;
+        }
+
+        const Entity& target = state.entities[target_index];
+        if (ivec2::manhattan_distance(target.cell, bunker.cell) < BOT_MEDIUM_DISTANCE) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 uint32_t bot_squad_get_carrier_capacity(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id) {
@@ -3358,6 +3381,7 @@ EntityCount bot_count_available_production_buildings(const MatchState& state, co
     for (const Entity& entity : state.entities) {
         if (entity.player_id == bot.player_id &&
                 entity.mode == MODE_BUILDING_FINISHED &&
+                entity.queue.empty() &&
                 bot_is_entity_type_production_building(entity.type)) {
             count[entity.type]++;
         }

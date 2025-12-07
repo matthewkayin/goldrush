@@ -170,6 +170,7 @@ bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const Bot
 MatchInput bot_squad_bunker_micro(const MatchState& state, const Bot& bot, const BotSquad& squad);
 EntityId bot_squad_get_bunker_id(const MatchState& state, const BotSquad& squad);
 bool bot_squad_has_bunker(const MatchState& state, const BotSquad& squad);
+bool bot_squad_bunker_units_are_engaged(const MatchState& state, const BotSquad& squad, const Entity& bunker, EntityId bunker_id);
 uint32_t bot_squad_get_carrier_capacity(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id);
 bool bot_squad_carrier_has_capacity(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id);
 MatchInput bot_squad_garrison_into_carrier(const MatchState& state, const BotSquad& squad, const Entity& carrier, EntityId carrier_id, const std::vector<EntityId>& entity_list);
