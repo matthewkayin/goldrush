@@ -1629,13 +1629,18 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             // Create retreat memory
             BotRetreatMemory memory = (BotRetreatMemory) {
                 .enemy_list = nearby_enemy_list,
-                .retreat_count = 1
+                .retreat_count = 1,
+                .retreat_time = match_timer
             };
 
             // Check for existing retreat memory
             auto existing_retreat_memory_it = bot.retreat_memory.find(target_goldmine_id);
             if (existing_retreat_memory_it != bot.retreat_memory.end() &&
-                    nearby_enemy_score <= bot_score_entity_list(state, bot, existing_retreat_memory_it->second.enemy_list)) {
+                    // Only increase retreat count against losses to smaller or equal armies than the last retreat memory
+                    nearby_enemy_score <= bot_score_entity_list(state, bot, existing_retreat_memory_it->second.enemy_list) &&
+                    // Only increase retreat count if it has been (literally) a minute since the last retreat.
+                    // This shouldn't be that necessary, but it prevents the retreat counter from getting crazy high due to jank bot retreat behavior
+                    existing_retreat_memory_it->second.retreat_time + (60U * UPDATES_PER_SECOND) >= match_timer) {
                 memory.retreat_count = existing_retreat_memory_it->second.retreat_count + 1;
             }
 
@@ -1644,14 +1649,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
 
         // Set squad to return
         squad.type = BOT_SQUAD_TYPE_RETURN;
-
-        char nearby_enemy_list_buffer[512];
-        nearby_enemy_list_buffer[0] = '\0';
-        char* nearby_enemy_list_ptr = nearby_enemy_list_buffer;
-        for (EntityId nearby_enemy_id : nearby_enemy_list) {
-            nearby_enemy_list_ptr += sprintf(nearby_enemy_list_ptr, "%i, ", nearby_enemy_id);
-        }
-        log_debug("BOT %u squad_update, retreat. nearby enemy score %u nearby enemy list %s", bot.player_id, nearby_enemy_score, nearby_enemy_list_buffer);
+        log_debug("BOT %u squad_update, retreat. nearby enemy score %u", bot.player_id, nearby_enemy_score);
     }
 
     // Bunker squads
@@ -1661,62 +1659,73 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
 
     // Engaged unit micro
     std::vector<EntityId> unengaged_units;
-    for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) {
-        EntityId unit_id = squad.entities[squad_entity_index];
-        const Entity& unit = state.entities.get_by_id(unit_id);
+    if (squad.type != BOT_SQUAD_TYPE_RETURN) {
+        for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entities.size(); squad_entity_index++) {
+            EntityId unit_id = squad.entities[squad_entity_index];
+            const Entity& unit = state.entities.get_by_id(unit_id);
 
-        // Filer down only to units
-        if (!entity_is_unit(unit.type)) {
-            continue;
-        }
-
-        // Filter down only to ungarrisoned units and non-carriers
-        const EntityData& unit_data = entity_get_data(unit.type);
-        if (unit.garrison_id != ID_NULL || unit_data.garrison_capacity != 0) {
-            continue;
-        }
-
-        // Check if there is an enemy nearby
-        EntityId nearby_enemy_id = match_find_best_entity(state, (MatchFindBestEntityParams) {
-            .filter = [&state, &unit](const Entity& enemy, EntityId /*enemy_id*/) {
-                return enemy.type != ENTITY_GOLDMINE &&
-                        state.players[enemy.player_id].team != state.players[unit.player_id].team &&
-                        entity_is_selectable(enemy) &&
-                        ivec2::manhattan_distance(enemy.cell, unit.cell) < BOT_NEAR_DISTANCE &&
-                        entity_is_visible_to_player(state, enemy, unit.player_id);
-            },
-            .compare = match_compare_closest_manhattan_distance_to(unit.cell)
-        });
-
-        // If this is none, then the entity is considered unengaged
-        if (nearby_enemy_id == ID_NULL || unit.type == ENTITY_BALLOON) {
-            unengaged_units.push_back(unit_id);
-            continue;
-        }
-
-        ivec2 nearby_enemy_cell = state.entities.get_by_id(nearby_enemy_id).cell;
-
-        // If unit is pyro, then throw molotov
-        if (unit.type == ENTITY_PYRO) {
-            MatchInput pyro_input = bot_squad_pyro_micro(state, bot, squad, unit, unit_id, nearby_enemy_cell);
-            if (pyro_input.type != MATCH_INPUT_NONE) {
-                return pyro_input;
+            // Filer down only to units
+            if (!entity_is_unit(unit.type)) {
+                continue;
             }
-        }
 
-        // If unit is a detective, then activate camo
-        if (unit.type == ENTITY_DETECTIVE && !entity_check_flag(unit, ENTITY_FLAG_INVISIBLE)) {
-            MatchInput detective_input = bot_squad_detective_micro(state, bot, squad, unit, unit_id, nearby_enemy_cell);
-            if (detective_input.type != MATCH_INPUT_NONE) {
-                return detective_input;
+            // Filter down only to ungarrisoned units and non-carriers
+            const EntityData& unit_data = entity_get_data(unit.type);
+            if (unit.garrison_id != ID_NULL || unit_data.garrison_capacity != 0) {
+                continue;
             }
-        }
 
-        // If unit is a miner, tell it to stop mining
-        if (unit.type == ENTITY_MINER && entity_is_mining(state, unit)) {
-            return bot_squad_a_move_miners(state, squad, unit, unit_id, nearby_enemy_cell);
-        }
-    } // End for each engaged unit
+            // Check if this unit already has a good target nearby
+            bool unit_is_engaged = (unit.target.type == TARGET_ATTACK_ENTITY || unit.target.type == TARGET_MOLOTOV) &&
+                    ivec2::manhattan_distance(unit.cell, entity_get_target_cell(state, unit)) < BOT_MEDIUM_DISTANCE;
+
+            // Check if there is an enemy nearby
+            EntityId nearby_enemy_id = unit_is_engaged
+                ? ID_NULL
+                : match_find_best_entity(state, (MatchFindBestEntityParams) {
+                    .filter = [&state, &unit](const Entity& enemy, EntityId /*enemy_id*/) {
+                        return enemy.type != ENTITY_GOLDMINE &&
+                                state.players[enemy.player_id].team != state.players[unit.player_id].team &&
+                                entity_is_selectable(enemy) &&
+                                ivec2::manhattan_distance(enemy.cell, unit.cell) < BOT_NEAR_DISTANCE &&
+                                entity_is_visible_to_player(state, enemy, unit.player_id);
+                    },
+                    .compare = match_compare_closest_manhattan_distance_to(unit.cell)
+                });
+            if (nearby_enemy_id != ID_NULL) {
+                unit_is_engaged = true;
+            }
+
+            // If this is none, then the entity is considered unengaged
+            if (!unit_is_engaged ||
+                    unit.type == ENTITY_BALLOON || 
+                    unit.type == ENTITY_WAGON) {
+                unengaged_units.push_back(unit_id);
+                continue;
+            }
+
+            // If unit is pyro, then throw molotov
+            if (unit.type == ENTITY_PYRO && nearby_enemy_id != ID_NULL) {
+                MatchInput pyro_input = bot_squad_pyro_micro(state, bot, squad, unit, unit_id, state.entities.get_by_id(nearby_enemy_id).cell);
+                if (pyro_input.type != MATCH_INPUT_NONE) {
+                    return pyro_input;
+                }
+            }
+
+            // If unit is a detective, then activate camo
+            if (unit.type == ENTITY_DETECTIVE && !entity_check_flag(unit, ENTITY_FLAG_INVISIBLE)) {
+                MatchInput detective_input = bot_squad_detective_micro(state, bot, squad, unit, unit_id);
+                if (detective_input.type != MATCH_INPUT_NONE) {
+                    return detective_input;
+                }
+            }
+
+            // If unit is a miner, tell it to stop mining
+            if (unit.type == ENTITY_MINER && entity_is_mining(state, unit) && nearby_enemy_id != ID_NULL) {
+                return bot_squad_a_move_miners(state, squad, unit, unit_id, state.entities.get_by_id(nearby_enemy_id).cell);
+            }
+        } // End for each engaged unit
+    }
     // End engaged unit micro
 
     // Landmine Squad Micro
@@ -1736,8 +1745,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             continue;
         }
 
-        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > BOT_NEAR_DISTANCE &&
-                ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_MEDIUM_DISTANCE) {
+        if (ivec2::manhattan_distance(entity.cell, squad.target_cell) > BOT_NEAR_DISTANCE) {
             distant_cavalry.push_back(entity_id);
             continue;
         }
@@ -1847,9 +1855,6 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
     }
     if (squad.type == BOT_SQUAD_TYPE_ATTACK && !is_enemy_near_squad) {
         squad.type = BOT_SQUAD_TYPE_RETURN;
-    }
-    if (squad.type == BOT_SQUAD_TYPE_RETURN && is_enemy_near_squad) {
-        squad.type = BOT_SQUAD_TYPE_ATTACK;
     }
 
     // Return squad to base
@@ -2289,7 +2294,7 @@ ivec2 bot_squad_find_best_molotov_cell(const MatchState& state, const Entity& py
     return best_molotov_cell;
 }
 
-MatchInput bot_squad_detective_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& detective, EntityId detective_id, ivec2 nearby_enemy_cell) {
+MatchInput bot_squad_detective_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& detective, EntityId detective_id) {
     if (detective.energy < CAMO_ENERGY_COST) {
         bot_squad_remove_entity_by_id(bot, squad, detective_id);
         log_debug("BOT %u squad_detective_micro, out of energy. returning to nearest hall.", bot.player_id);
@@ -2310,7 +2315,7 @@ MatchInput bot_squad_detective_micro(const MatchState& state, Bot& bot, BotSquad
         if (other_detective.type != ENTITY_DETECTIVE ||
                 entity_check_flag(other_detective, ENTITY_FLAG_INVISIBLE) ||
                 other_detective.energy < CAMO_ENERGY_COST ||
-                ivec2::manhattan_distance(other_detective.cell, nearby_enemy_cell) < BOT_NEAR_DISTANCE) {
+                ivec2::manhattan_distance(other_detective.cell, detective.cell) < BOT_NEAR_DISTANCE) {
             continue;
         }
 
@@ -2377,6 +2382,22 @@ MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const
     }
 
     if (input.move.entity_count != 0) {
+        log_debug("-- BOT: a-moving distant units --");
+        for (uint32_t index = 0; index < input.move.entity_count; index++) {
+            EntityId entity_id = input.move.entity_ids[index];
+            const Entity& entity = state.entities.get_by_id(entity_id);
+            if (entity.target.type == TARGET_ATTACK_ENTITY) {
+                uint32_t target_index = state.entities.get_index_of(entity.target.id);
+                if (target_index != INDEX_INVALID) {
+                    const Entity& target = state.entities[target_index];
+                    log_debug("Entity %u %s cell <%i, %i> attacking entity %u %s cell <%i, %i> distance %i", entity_id, entity_get_data(entity.type).name, entity.target.id, entity.cell.x, entity.cell.y, entity_get_data(target.type).name, target.cell.x, target.cell.y, ivec2::manhattan_distance(entity.cell, target.cell));
+                    continue;
+                }
+            }
+            ivec2 target_cell = entity_get_target_cell(state, entity);
+            log_debug("Entity %u %s target type %u cell <%i, %i>", entity_id, entity_get_data(entity.type).name, entity.target.type, target_cell.x, target_cell.y);
+        }
+        log_debug("-- END --");
         return input;
     }
 
@@ -2848,28 +2869,15 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
         // If there's no surrounding hall, fallback to the nearest building
         if (nearest_building_id == ID_NULL) {
             nearest_building_id = match_find_best_entity(state, (MatchFindBestEntityParams) {
-                .filter = [&state, &bot](const Entity& building, EntityId building_id) {
+                .filter = [&state, &bot, &goldmine](const Entity& building, EntityId building_id) {
                     return building.mode == MODE_BUILDING_FINISHED && 
                             building.type != ENTITY_LANDMINE &&
+                            ivec2::manhattan_distance(building.cell, goldmine.cell) < BOT_NEAR_DISTANCE &&
                             bot_has_scouted_entity(state, bot, building, building_id);
                 },
                 .compare = match_compare_closest_manhattan_distance_to(goldmine.cell)
             });
             if (nearest_building_id == ID_NULL) {
-                continue;
-            }
-
-            // Make sure that the nearest goldmine to this building is the goldmine itself
-            const Entity& nearest_building = state.entities.get_by_id(nearest_building_id);
-            EntityId goldmine_nearest_to_building_id = match_find_best_entity(state, (MatchFindBestEntityParams) {
-                .filter = [](const Entity& other_goldmine, EntityId /*other_goldmine_id*/) {
-                    return other_goldmine.type == ENTITY_GOLDMINE;
-                },
-                .compare = match_compare_closest_manhattan_distance_to(nearest_building.cell)
-            });
-            // If the nearest goldmine to the nearest building is not the goldmine itself,
-            // then this goldmine is considered to be unoccupied
-            if (goldmine_nearest_to_building_id != goldmine_id) {
                 continue;
             }
         }
@@ -3738,7 +3746,7 @@ int bot_score_entity(const MatchState& state, const Bot& bot, const Entity& enti
         case ENTITY_CANNON:
             return 3 * BOT_UNIT_SCORE;
         default:
-            return 1 * BOT_UNIT_SCORE;
+            return BOT_UNIT_SCORE;
     }
 }
 

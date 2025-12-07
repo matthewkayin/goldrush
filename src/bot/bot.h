@@ -62,6 +62,7 @@ struct BotBaseInfo {
 struct BotRetreatMemory {
     std::vector<EntityId> enemy_list;
     int retreat_count;
+    uint32_t retreat_time;
 };
 
 struct Bot {
@@ -178,7 +179,7 @@ bool bot_squad_should_carrier_unload_garrisoned_units(const MatchState& state, c
 MatchInput bot_squad_pyro_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& pyro, EntityId pyro_id, ivec2 nearby_enemy_cell);
 int bot_squad_get_molotov_cell_score(const MatchState& state, const Entity& pyro, ivec2 cell);
 ivec2 bot_squad_find_best_molotov_cell(const MatchState& state, const Entity& pyro, ivec2 attack_point);
-MatchInput bot_squad_detective_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& detective, EntityId detective_id, ivec2 nearby_enemy_cell);
+MatchInput bot_squad_detective_micro(const MatchState& state, Bot& bot, BotSquad& squad, const Entity& detective, EntityId detective_id);
 MatchInput bot_squad_a_move_miners(const MatchState& state, const BotSquad& squad, const Entity& first_miner, EntityId first_miner_id, ivec2 nearby_enemy_cell);
 MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const BotSquad& squad, const std::vector<EntityId>& entity_list);
 MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, BotSquad& squad);
