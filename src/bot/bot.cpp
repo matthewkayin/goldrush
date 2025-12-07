@@ -28,6 +28,9 @@ static const uint32_t BOT_DEFEND_WITH_WORKERS = 1 << 1;
 // Attack thresholds
 static const uint32_t BOT_HARASS_SQUAD_MAX_SIZE = 8U;
 
+// Landmines
+static const uint32_t LANDMINE_MAX_PER_BASE = 6U;
+
 Bot bot_init(uint8_t player_id, MatchSettingDifficultyValue difficulty, BotOpener opener, BotUnitComp preferred_unit_comp) {
     Bot bot;
 
@@ -38,6 +41,8 @@ Bot bot_init(uint8_t player_id, MatchSettingDifficultyValue difficulty, BotOpene
     bot.preferred_unit_comp = preferred_unit_comp;
     bot.macro_cycle_timer = 0;
     bot.macro_cycle_count = 0;
+
+    bot.next_landmine_time = 0;
 
     bot.scout_id = ID_NULL;
     bot.scout_info = 0;
@@ -131,7 +136,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
     uint32_t squad_index = 0;
     while (squad_index < bot.squads.size()) {
-        MatchInput input = bot_squad_update(state, bot, bot.squads[squad_index]);
+        MatchInput input = bot_squad_update(state, bot, bot.squads[squad_index], match_timer);
         if (bot.squads[squad_index].entities.empty()) {
             bot.squads[squad_index] = bot.squads[bot.squads.size() - 1];
             bot.squads.pop_back();
@@ -1590,7 +1595,7 @@ void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id
     squad.entities.pop_back();
 }
 
-MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) {
+MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_timer) {
     // Remove dead units
     bot_squad_remove_dead_units(state, bot, squad);
     if (squad.entities.empty()) {
@@ -1639,6 +1644,14 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
 
         // Set squad to return
         squad.type = BOT_SQUAD_TYPE_RETURN;
+
+        char nearby_enemy_list_buffer[512];
+        nearby_enemy_list_buffer[0] = '\0';
+        char* nearby_enemy_list_ptr = nearby_enemy_list_buffer;
+        for (EntityId nearby_enemy_id : nearby_enemy_list) {
+            nearby_enemy_list_ptr += sprintf(nearby_enemy_list_ptr, "%i, ", nearby_enemy_id);
+        }
+        log_debug("BOT %u squad_update, retreat. nearby enemy score %u nearby enemy list %s", bot.player_id, nearby_enemy_score, nearby_enemy_list_buffer);
     }
 
     // Bunker squads
@@ -1705,6 +1718,11 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad) 
         }
     } // End for each engaged unit
     // End engaged unit micro
+
+    // Landmine Squad Micro
+    if (squad.type == BOT_SQUAD_TYPE_LANDMINES) {
+        return bot_squad_landmines_micro(state, bot, squad, match_timer);
+    }
 
     // Divide unengaged units into distant infantry (can be garrisoned) and distant cavalry (cannot be garrisoned)
     std::vector<EntityId> distant_infantry;
@@ -2619,6 +2637,135 @@ ivec2 bot_squad_get_defend_target_cell(const MatchState& state, const Bot& bot, 
     return path[std::min((int)path.size() - 1, 7)];
 }
 
+MatchInput bot_squad_landmines_micro(const MatchState& state, Bot& bot, const BotSquad& squad, uint32_t match_timer) {
+    if (match_timer < bot.next_landmine_time) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    if (!match_player_has_upgrade(state, bot.player_id, UPGRADE_LANDMINES)) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    EntityId pyro_id = squad.entities[0];
+    const Entity& pyro = state.entities.get_by_id(pyro_id);
+
+    // If the pyro is already making a landmine or doesn't have enough energy, then do nothing
+    if (pyro.target.type == TARGET_BUILD || pyro.energy < entity_get_data(ENTITY_LANDMINE).gold_cost) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Find all controlled bases and initialize their landmine count to 0
+    std::unordered_map<EntityId, uint32_t> base_landmine_count;
+    for (auto it : bot.base_info) {
+        EntityId goldmine_id = it.first;
+        const BotBaseInfo& base_info = it.second;
+        if (base_info.controlling_player == bot.player_id) {
+            base_landmine_count[goldmine_id] = 0;
+        }
+    }
+    // If we have no bases, do nothing
+    if (base_landmine_count.empty()) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Determine landmine count at each base
+    for (const Entity& landmine : state.entities) {
+        if (landmine.type != ENTITY_LANDMINE || landmine.player_id != bot.player_id) {
+            continue;
+        }
+
+        EntityId nearest_base_goldmine_id = ID_NULL;
+        for (auto it : base_landmine_count) {
+            EntityId goldmine_id = it.first;
+            if (nearest_base_goldmine_id == ID_NULL || 
+                    ivec2::manhattan_distance(state.entities.get_by_id(goldmine_id).cell, landmine.cell) <
+                    ivec2::manhattan_distance(state.entities.get_by_id(nearest_base_goldmine_id).cell, landmine.cell)) {
+                nearest_base_goldmine_id = goldmine_id;
+            }
+        }
+
+        GOLD_ASSERT(nearest_base_goldmine_id != ID_NULL);
+        base_landmine_count[nearest_base_goldmine_id]++;
+    }
+
+    // Find the nearest base which still needs landmines
+    EntityId nearest_base_goldmine_id = ID_NULL;
+    for (auto it : base_landmine_count) {
+        EntityId goldmine_id = it.first;
+        uint32_t landmine_count = it.second;
+        if (landmine_count >= LANDMINE_MAX_PER_BASE) {
+            continue;
+        }
+        if (nearest_base_goldmine_id == ID_NULL ||
+                ivec2::manhattan_distance(state.entities.get_by_id(goldmine_id).cell, pyro.cell) <
+                ivec2::manhattan_distance(state.entities.get_by_id(nearest_base_goldmine_id).cell, pyro.cell)) {
+            nearest_base_goldmine_id = goldmine_id;
+        }
+    }
+
+    // If there are no bases which still need landmines, then do nothing
+    if (nearest_base_goldmine_id == ID_NULL) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    const Entity& nearest_base_goldmine = state.entities.get_by_id(nearest_base_goldmine_id);
+
+    // Find the nearest enemy base to determine where to place mines    
+    EntityId nearest_enemy_base_goldmine_id = ID_NULL;
+    for (auto it : bot.base_info) {
+        EntityId goldmine_id = it.first;
+        const BotBaseInfo& base_info = it.second;
+        if (base_info.controlling_player == PLAYER_NONE ||
+                state.players[base_info.controlling_player].team == state.players[bot.player_id].team) {
+            continue;
+        }
+
+        if (nearest_enemy_base_goldmine_id == ID_NULL ||
+                ivec2::manhattan_distance(state.entities.get_by_id(goldmine_id).cell, nearest_base_goldmine.cell) < 
+                ivec2::manhattan_distance(state.entities.get_by_id(nearest_enemy_base_goldmine_id).cell, nearest_base_goldmine.cell)) {
+            nearest_enemy_base_goldmine_id = goldmine_id;
+        }
+    }
+
+    // If there are no enemy bases, then do nothing
+    if (nearest_enemy_base_goldmine_id == ID_NULL) {
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Pathfind from the nearest un-landmined base to the nearest enemy base
+    const Entity& nearest_enemy_base_goldmine = state.entities.get_by_id(nearest_enemy_base_goldmine_id);
+    ivec2 path_start_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, nearest_base_goldmine.cell, 3, 1, nearest_enemy_base_goldmine.cell, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
+    ivec2 path_end_cell = map_get_nearest_cell_around_rect(state.map, CELL_LAYER_GROUND, path_start_cell, 1, nearest_enemy_base_goldmine.cell, 4, MAP_OPTION_IGNORE_UNITS | MAP_OPTION_IGNORE_MINERS);
+    std::vector<ivec2> path;
+    map_pathfind(state.map, CELL_LAYER_GROUND, path_start_cell, path_end_cell, 1, &path, MAP_OPTION_AVOID_LANDMINES);
+
+    if (path.size() < BOT_NEAR_DISTANCE) {
+        bot.next_landmine_time = match_timer + (UPDATES_PER_SECOND * 60U);
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    // Check if landmine cell is safe
+    ivec2 landmine_cell = path[BOT_NEAR_DISTANCE - 1];
+    EntityId nearby_enemy_id = match_find_entity(state, [&state, &bot, &landmine_cell](const Entity& entity, EntityId /*entity_id*/) {
+        return state.players[entity.player_id].team != state.players[bot.player_id].team &&
+            entity_is_selectable(entity) && 
+            ivec2::manhattan_distance(entity.cell, landmine_cell) < BOT_NEAR_DISTANCE;
+    });
+    if (nearby_enemy_id == ID_NULL) {
+        bot.next_landmine_time = match_timer + (UPDATES_PER_SECOND * 60U);
+        return (MatchInput) { .type = MATCH_INPUT_NONE };
+    }
+
+    MatchInput input;
+    input.type = MATCH_INPUT_BUILD;
+    input.build.shift_command = 0;
+    input.build.building_type = ENTITY_LANDMINE;
+    input.build.target_cell = landmine_cell;
+    input.build.entity_count = 1;
+    input.build.entity_ids[0] = pyro_id;
+    return input;
+}
+
 // SCOUTING
 
 void bot_scout_gather_info(const MatchState& state, Bot& bot) {
@@ -3057,9 +3204,6 @@ bool bot_should_scout(const Bot& bot, uint32_t match_timer) {
         next_scout_time = bot.last_scout_time + (5U * 60U * UPDATES_PER_SECOND);
     }
 
-    if (match_timer >= next_scout_time) {
-        log_debug("BOT %u should_scout. next_scout_time %u match_timer %u", bot.player_id, next_scout_time, match_timer);
-    }
     return match_timer >= next_scout_time;
 }
 

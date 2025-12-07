@@ -3844,6 +3844,9 @@ void match_shell_render(const MatchShellState* state) {
     render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match_state.map.width, state->match_state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 
     ui_render(state->ui);
+    if (state->replay_mode) {
+        ui_render(state->replay_ui);
+    }
 }
 
 SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking) {

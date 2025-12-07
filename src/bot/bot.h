@@ -83,6 +83,7 @@ struct Bot {
 
     // Squads
     std::vector<BotSquad> squads;
+    uint32_t next_landmine_time;
 
     // Scouting
     EntityId scout_id;
@@ -160,7 +161,7 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 BotSquad bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const std::vector<EntityId>& entity_list);
 void bot_squad_dissolve(Bot& bot, BotSquad& squad);
 void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id);
-MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad);
+MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_timer);
 void bot_squad_remove_dead_units(const MatchState& state, Bot& bot, BotSquad& squad);
 bool bot_squad_is_entity_near_squad(const MatchState& state, const BotSquad& squad, const Entity& entity);
 std::vector<EntityId> bot_squad_get_nearby_enemy_list(const MatchState& state, const Bot& bot, const BotSquad& squad);
@@ -190,6 +191,8 @@ ivec2 bot_squad_choose_target_cell(const MatchState& state, const Bot& bot, BotS
 ivec2 bot_squad_get_landmine_target_cell(const MatchState& state, const Bot& bot, ivec2 pyro_cell);
 ivec2 bot_squad_get_attack_target_cell(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entity_list);
 ivec2 bot_squad_get_defend_target_cell(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entity_list);
+
+MatchInput bot_squad_landmines_micro(const MatchState& state, Bot& bot, const BotSquad& squad, uint32_t match_timer);
 
 // Scouting
 
