@@ -496,16 +496,7 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     });
 
     // Determine defending score
-    // Note that we're filtering out reserved entities because we will count squads seperately
-    int defending_score = bot_score_entities_at_location(state, bot, location, [&state, &bot](const Entity& entity, EntityId entity_id) {
-        return (entity_is_unit(entity.type) || entity.type == ENTITY_BUNKER) &&
-            entity.type != ENTITY_MINER &&
-            entity_is_selectable(entity) &&
-            state.players[entity.player_id].team == state.players[bot.player_id].team &&
-            !bot_is_entity_reserved(bot, entity_id);
-    });
-
-    // Add squads to defending score
+    int defending_score = 0;
     for (const BotSquad& squad : bot.squads) {
         if (!(squad.type == BOT_SQUAD_TYPE_DEFEND || squad.type == BOT_SQUAD_TYPE_RESERVES)) {
             continue;
@@ -1917,7 +1908,7 @@ std::vector<EntityId> bot_squad_get_nearby_enemy_list(const MatchState& state, c
     return enemy_list;
 }
 
-bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad, const std::vector<EntityId>& nearby_enemy_list, int nearby_enemy_score) {
+bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad, int nearby_enemy_score) {
     // Don't retreat on easy mode
     if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
         return false;
@@ -3300,7 +3291,7 @@ EntityCount bot_count_in_progress_entities(const MatchState& state, const Bot& b
     EntityCount count;
 
     for (const Entity& entity : state.entities) {
-        if (entity.player_id != bot.player_id) {
+        if (entity.player_id != bot.player_id || entity.health == 0) {
             continue;
         }
 
@@ -3325,6 +3316,7 @@ EntityCount bot_count_unreserved_entities(const MatchState& state, const Bot& bo
         EntityId entity_id = state.entities.get_id_of(entity_index);
 
         if (entity.player_id == bot.player_id &&
+                entity.health != 0 &&
                 !bot_is_entity_reserved(bot, entity_id)) {
             count[entity.type]++;
         }
@@ -3355,7 +3347,9 @@ bool bot_is_entity_unreserved_army(const Bot& bot, const Entity& entity, EntityI
         return false;
     }
 
-    return entity.player_id == bot.player_id && !bot_is_entity_reserved(bot, entity_id);
+    return entity.player_id == bot.player_id && 
+        entity.health != 0 &&
+        !bot_is_entity_reserved(bot, entity_id);
 }
 
 EntityCount bot_count_available_production_buildings(const MatchState& state, const Bot& bot) {
@@ -3363,6 +3357,7 @@ EntityCount bot_count_available_production_buildings(const MatchState& state, co
 
     for (const Entity& entity : state.entities) {
         if (entity.player_id == bot.player_id &&
+                entity.mode == MODE_BUILDING_FINISHED &&
                 bot_is_entity_type_production_building(entity.type)) {
             count[entity.type]++;
         }
