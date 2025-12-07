@@ -435,7 +435,7 @@ int gold_main(int argc, char** argv) {
                     render_y += 20;
                 } 
 
-                if (state.mode == GAME_MODE_MATCH && !match_shell_is_mouse_in_ui()) {
+                if ((state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) && !match_shell_is_mouse_in_ui()) {
                     ivec2 cell = (input_get_mouse_position() + state.match_shell_state->camera_offset) / TILE_SIZE;
                     Tile tile = map_get_tile(state.match_shell_state->match_state.map, cell);
                     sprintf(debug_text, "Cell <%i, %i> Elevation %u Tile <%i, %i> Region %i", cell.x, cell.y, tile.elevation, tile.frame.x, tile.frame.y, map_get_region(state.match_shell_state->match_state.map, cell));
@@ -448,6 +448,14 @@ int gold_main(int argc, char** argv) {
                         .w = TILE_SIZE,
                         .h = TILE_SIZE
                     }, RENDER_COLOR_WHITE);
+
+                    Cell map_cell = map_get_cell(state.match_shell_state->match_state.map, CELL_LAYER_GROUND, cell);
+                    if (map_cell.type == CELL_UNIT || map_cell.type == CELL_BUILDING || map_cell.type == CELL_MINER || map_cell.type == CELL_GOLDMINE) {
+                        const Entity& entity = state.match_shell_state->match_state.entities.get_by_id(map_cell.id);
+                        sprintf(debug_text, "Entity %u %s", map_cell.id, entity_get_data(entity.type).name);
+                        render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
+                        render_y += 20;
+                    }
                 }
             }
         #endif

@@ -245,6 +245,7 @@ size_t match_shell_replay_end_of_tape(const MatchShellState* state);
 
 // Leave match
 bool match_shell_is_at_least_one_opponent_in_match(const MatchShellState* state);
+bool match_shell_is_in_single_player_game();
 bool match_shell_is_surrender_required_to_leave(const MatchShellState* state);
 void match_shell_leave_match(MatchShellState* state, bool exit_program);
 

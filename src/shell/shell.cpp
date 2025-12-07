@@ -721,6 +721,7 @@ void match_shell_update(MatchShellState* state) {
         state->is_paused = true;
     }
     if (state->is_paused || 
+            (match_shell_is_in_menu(state) && match_shell_is_in_single_player_game()) ||
             state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || 
             state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM || 
             state->mode == MATCH_SHELL_MODE_DESYNC) {
@@ -2422,6 +2423,19 @@ bool match_shell_is_at_least_one_opponent_in_match(const MatchShellState* state)
     }
 
     return false;
+}
+
+bool match_shell_is_in_single_player_game() {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (player_id == network_get_player_id()) {
+            continue;
+        }
+        if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_READY) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool match_shell_is_surrender_required_to_leave(const MatchShellState* state) {

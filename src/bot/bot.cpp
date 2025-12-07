@@ -780,8 +780,8 @@ void bot_update_desired_production(Bot& bot) {
             bot.desired_buildings[ENTITY_SALOON] = 2 * mining_base_count;
             bot.desired_buildings[ENTITY_WORKSHOP] = 1;
 
-            bot.desired_army_ratio[ENTITY_COWBOY] = 3;
-            bot.desired_army_ratio[ENTITY_BANDIT] = 2;
+            bot.desired_army_ratio[ENTITY_COWBOY] = 4;
+            bot.desired_army_ratio[ENTITY_BANDIT] = 4;
             bot.desired_army_ratio[ENTITY_PYRO] = 1;
             break;
         }
@@ -1917,7 +1917,7 @@ std::vector<EntityId> bot_squad_get_nearby_enemy_list(const MatchState& state, c
     return enemy_list;
 }
 
-bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad, int nearby_enemy_score) {
+bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad, const std::vector<EntityId>& nearby_enemy_list, int nearby_enemy_score) {
     // Don't retreat on easy mode
     if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
         return false;
@@ -2382,22 +2382,7 @@ MatchInput bot_squad_move_distant_units_to_target(const MatchState& state, const
     }
 
     if (input.move.entity_count != 0) {
-        log_debug("-- BOT: a-moving distant units --");
-        for (uint32_t index = 0; index < input.move.entity_count; index++) {
-            EntityId entity_id = input.move.entity_ids[index];
-            const Entity& entity = state.entities.get_by_id(entity_id);
-            if (entity.target.type == TARGET_ATTACK_ENTITY) {
-                uint32_t target_index = state.entities.get_index_of(entity.target.id);
-                if (target_index != INDEX_INVALID) {
-                    const Entity& target = state.entities[target_index];
-                    log_debug("Entity %u %s cell <%i, %i> attacking entity %u %s cell <%i, %i> distance %i", entity_id, entity_get_data(entity.type).name, entity.target.id, entity.cell.x, entity.cell.y, entity_get_data(target.type).name, target.cell.x, target.cell.y, ivec2::manhattan_distance(entity.cell, target.cell));
-                    continue;
-                }
-            }
-            ivec2 target_cell = entity_get_target_cell(state, entity);
-            log_debug("Entity %u %s target type %u cell <%i, %i>", entity_id, entity_get_data(entity.type).name, entity.target.type, target_cell.x, target_cell.y);
-        }
-        log_debug("-- END --");
+        log_debug("BOT squad_move_distant_units_to_target");
         return input;
     }
 
