@@ -117,7 +117,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
     // Surrender
 
-    if (bot_should_surrender(state, bot)) {
+    if (bot_should_surrender(state, bot, match_timer)) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
@@ -324,7 +324,11 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
     }
 }
 
-bool bot_should_surrender(const MatchState& state, const Bot& bot) {
+bool bot_should_surrender(const MatchState& state, const Bot& bot, uint32_t match_timer) {
+    if (bot_has_non_miner_army(state, bot)) {
+        return false;
+    }
+
     EntityCount entity_count;
     for (const Entity& entity : state.entities) {
         if (entity.player_id == bot.player_id) {
@@ -332,7 +336,56 @@ bool bot_should_surrender(const MatchState& state, const Bot& bot) {
         }
     }
 
-    return entity_count[ENTITY_HALL] <= 1 && entity_count.unit_count() == 0;
+    // If we have no units and are on only one base, then surrender
+    if (entity_count[ENTITY_HALL] <= 1 && entity_count.unit_count() == 0) {
+        return true;
+    }
+
+    // If we have no mining bases and no army and no money to get another base, then surrender
+    EntityCount unreserved_army_count = bot_count_unreserved_army(state, bot);
+    if (match_timer >= 5U * 60U * UPDATES_PER_SECOND &&
+            unreserved_army_count.count() == 0 &&
+            !bot_is_mining(state, bot) &&
+            bot_get_effective_gold(state, bot) <= entity_get_data(ENTITY_HALL).gold_cost) {
+        return true;
+    }
+
+    return false;
+}
+
+bool bot_has_non_miner_army(const MatchState& state, const Bot& bot) {
+    for (const BotSquad& squad : bot.squads) {
+        if (squad.type == BOT_SQUAD_TYPE_ATTACK) {
+            return true;
+        }
+        if (squad.type == BOT_SQUAD_TYPE_RESERVES) {
+            bool is_miner_squad = true;
+            for (EntityId entity_id : squad.entities) {
+                // It's not safe to assume that these IDs are valid because the squads
+                // might not have all been updated this turn
+                uint32_t entity_index = state.entities.get_index_of(entity_id);
+                if (entity_index != INDEX_INVALID && state.entities[entity_index].type != ENTITY_MINER) {
+                    is_miner_squad = false;
+                    break;
+                }
+            }
+            if (!is_miner_squad) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool bot_is_mining(const MatchState& state, const Bot& bot) {
+    EntityId miner_id = match_find_entity(state, [&state, &bot](const Entity& miner, EntityId /*miner_id*/) {
+        return miner.type == ENTITY_MINER &&
+            miner.health != 0 &&
+            miner.player_id == bot.player_id &&
+            entity_is_mining(state, miner);
+    });
+    return miner_id != ID_NULL;
 }
 
 bool bot_should_expand(const MatchState& state, const Bot& bot) {
@@ -651,8 +704,7 @@ bool bot_should_attack(const MatchState& state, const Bot& bot) {
     }
 
     // Attack if there are no more bases left to take
-    if (bot_get_player_mining_base_count(bot, bot.player_id) == 0 && 
-            !bot_is_unoccupied_goldmine_available(bot)) {
+    if (bot_should_all_in(bot)) {
         return true;
     }
 
@@ -668,19 +720,22 @@ bool bot_should_attack(const MatchState& state, const Bot& bot) {
             bot_score_allied_army(state, bot) > bot_score_enemy_army(state, bot);
 }
 
+bool bot_should_all_in(const Bot& bot) {
+    return bot_get_player_mining_base_count(bot, bot.player_id) == 0 &&
+        !bot_is_unoccupied_goldmine_available(bot);
+}
+
 // PRODUCTION
 
 MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t match_timer) {
     // Saturate bases
     MatchInput saturate_bases_input = bot_saturate_bases(state, bot);
     if (saturate_bases_input.type != MATCH_INPUT_NONE) {
-        log_debug("BOT production returned saturate bases input");
         return saturate_bases_input;
     }
 
     // Build house
     if (bot_should_build_house(state, bot) && !bot_is_under_attack(bot)) {
-        log_debug("BOT production returned build house input");
         return bot_build_building(state, bot, ENTITY_HOUSE);
     }
 
@@ -696,7 +751,6 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
         EntityId goldmine_id = bot_find_goldmine_for_next_expansion(state, bot);
         const Entity& goldmine = state.entities.get_by_id(goldmine_id);
         if (bot_is_area_safe(state, bot, goldmine.cell)) {
-            log_debug("BOT production returned build base input");
             return bot_build_building(state, bot, ENTITY_HALL);
         } 
     } 
@@ -1908,6 +1962,11 @@ std::vector<EntityId> bot_squad_get_nearby_enemy_list(const MatchState& state, c
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad, int nearby_enemy_score) {
     // Don't retreat on easy mode
     if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+        return false;
+    }
+
+    // Don't retreat if all-in
+    if (bot_should_all_in(bot)) {
         return false;
     }
 

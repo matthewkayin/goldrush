@@ -106,7 +106,9 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 // Strategy
 
 void bot_strategy_update(const MatchState& state, Bot& bot);
-bool bot_should_surrender(const MatchState& state, const Bot& bot);
+bool bot_should_surrender(const MatchState& state, const Bot& bot, uint32_t match_timer);
+bool bot_has_non_miner_army(const MatchState& state, const Bot& bot);
+bool bot_is_mining(const MatchState& state, const Bot& bot);
 bool bot_should_expand(const MatchState& state, const Bot& bot);
 bool bot_should_tech_into_preferred_unit_comp(const MatchState& state, const Bot& bot);
 uint32_t bot_get_player_mining_base_count(const Bot& bot, uint8_t player_id);
@@ -120,6 +122,7 @@ bool bot_is_under_attack(const Bot& bot);
 void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint32_t options);
 int bot_score_entities_at_location(const MatchState& state, const Bot& bot, ivec2 location, std::function<bool(const Entity& entity, EntityId entity_id)> filter);
 bool bot_should_attack(const MatchState& state, const Bot& bot);
+bool bot_should_all_in(const Bot& bot);
 
 // Production
 

@@ -748,7 +748,7 @@ void match_shell_update(MatchShellState* state) {
                 }
 
                 // Check for bot surrender
-                if (bot_should_surrender(state->match_state, state->bots[player_id])) {
+                if (bot_should_surrender(state->match_state, state->bots[player_id], state->match_timer)) {
                     match_shell_add_chat_message(state, player_id, "gg");
                     match_shell_handle_player_disconnect(state, player_id);
                     // handle_player_disconnect should have set the bot to inactive for us
@@ -2906,7 +2906,7 @@ void match_shell_render(const MatchShellState* state) {
                 render_sprite_frame(SPRITE_WORKSHOP_STEAM, ivec2(hframe, 0), steam_position, RENDER_SPRITE_CENTERED, 0);
             }
         } else if (entity.type == ENTITY_SMITH && entity.animation.name != ANIMATION_UNIT_IDLE) {
-            render_sprite_frame(SPRITE_BUILDING_SMITH_ANIMATION, entity.animation.frame, entity.position.to_ivec2() - ivec2(0, 16) - state->camera_offset, 0, 0);
+            render_sprite_frame(SPRITE_BUILDING_SMITH_ANIMATION, entity.animation.frame, entity.position.to_ivec2() - ivec2(0, 32) - state->camera_offset, 0, 0);
         }
     }
 
