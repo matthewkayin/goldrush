@@ -2845,43 +2845,8 @@ void entity_attack_target(MatchState& state, EntityId attacker_id) {
         });
     }
 
-    if (attacker.type == ENTITY_CANNON) {
-        // Check which enemies we hit
-        Rect full_damage_rect = (Rect) {
-            .x = hit_position.x - (TILE_SIZE / 2),
-            .y = hit_position.y - (TILE_SIZE / 2),
-            .w = TILE_SIZE, .h = TILE_SIZE
-        };
-        Rect splash_damage_rect = (Rect) {
-            .x = full_damage_rect.x - (TILE_SIZE / 2),
-            .y = full_damage_rect.y - (TILE_SIZE / 2),
-            .w = full_damage_rect.w + TILE_SIZE,
-            .h = full_damage_rect.h + TILE_SIZE,
-        };
-        for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
-            Entity& entity = state.entities[entity_index];
-
-            if (entity.type == ENTITY_GOLDMINE || !entity_is_selectable(entity)) {
-                continue;
-            }
-
-            // To check if we've hit this enemy, first check the splash damage rect
-            // We have to check both, but since the splash rect is bigger, we know that 
-            // if they're outside of it, they will be outside of the full damage rect as well
-            Rect entity_rect = entity_get_rect(entity);
-            if (entity_rect.intersects(splash_damage_rect)) {
-                int damage = attacker_data.unit_data.damage; 
-                // Half damage if they are only within splash damage range
-                if (!entity_rect.intersects(full_damage_rect)) {
-                    damage /= 2;
-                }
-                damage = std::max(1, damage - entity_get_armor(state, entity));
-
-                entity.health = std::max(0, entity.health - damage);
-                entity_on_attack(state, attacker_id, entity);
-            }
-        }
-    } else if (!attack_missed) {
+    // Deal damage
+    if (!attack_missed) {
         int attacker_damage = attack_with_bayonets ? SOLDIER_BAYONET_DAMAGE : attacker_data.unit_data.damage;
         int damage = std::max(1, attacker_damage - entity_get_armor(state, defender));
         defender.health = std::max(0, defender.health - damage);
@@ -2889,6 +2854,30 @@ void entity_attack_target(MatchState& state, EntityId attacker_id) {
             defender.bleed_timer = BLEED_DURATION;
         }
         entity_on_attack(state, attacker_id, defender);
+    }
+
+    // Cannon splash damage, happens regardless of miss
+    if (attacker.type == ENTITY_CANNON) {
+        Rect splash_damage_rect = (Rect) {
+            .x = hit_position.x - TILE_SIZE,
+            .y = hit_position.y - TILE_SIZE,
+            .w = TILE_SIZE * 2,
+            .h = TILE_SIZE * 2
+        };
+        const int splash_damage = attacker_data.unit_data.damage / 2;
+
+        for (Entity& entity : state.entities) {
+            if (entity.type == ENTITY_GOLDMINE || !entity_is_selectable(entity)) {
+                continue;
+            }
+
+            Rect entity_rect = entity_get_rect(entity);
+            if (entity_rect.intersects(splash_damage_rect)) {
+                int damage = std::max(1, splash_damage - entity_get_armor(state, entity));
+                entity.health = std::max(0, entity.health - damage);
+                entity_on_attack(state, attacker_id, entity);
+            }
+        }
     }
 }
 
