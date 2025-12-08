@@ -78,6 +78,71 @@ struct GameState {
     MatchShellState* match_shell_state = nullptr;
 };
 
+#ifdef GOLD_DEBUG
+    enum TestMode {
+        TEST_MODE_NONE,
+        TEST_MODE_HOST,
+        TEST_MODE_JOIN
+    };
+
+    void test_mode_update(TestMode test_mode, GameState& state) {
+        if (state.mode == GAME_MODE_MENU) {
+            switch (state.menu_state->mode) {
+                case MENU_MODE_USERNAME: {
+                    state.menu_state->username = test_mode == TEST_MODE_HOST ? "Burr" : "Hamilton";
+                    network_set_username(state.menu_state->username.c_str());
+                    menu_set_mode(state.menu_state, MENU_MODE_MAIN);
+                    break;
+                }
+                case MENU_MODE_MAIN: {
+                    menu_set_mode_local_network_lobbylist(state.menu_state);
+                    break;
+                }
+                case MENU_MODE_LOBBYLIST: {
+                    if (test_mode == TEST_MODE_HOST) {
+                        menu_set_mode(state.menu_state, MENU_MODE_CREATE_LOBBY);
+                    } else if (test_mode == TEST_MODE_JOIN) {
+                        if (network_get_lobby_count() == 0) {
+                            network_search_lobbies("");
+                        } else {
+                            network_join_lobby(network_get_lobby(0).connection_info);
+                            menu_set_mode(state.menu_state, MENU_MODE_CONNECTING);
+                        }
+                    }
+                    break;
+                }
+                case MENU_MODE_CREATE_LOBBY: {
+                    network_open_lobby(state.menu_state->lobby_name.c_str(), (NetworkLobbyPrivacy)state.menu_state->lobby_privacy);
+                    menu_set_mode(state.menu_state, MENU_MODE_CONNECTING);
+                    break;
+                }
+                case MENU_MODE_LOBBY: {
+                    if (test_mode == TEST_MODE_HOST) {
+                        if (network_get_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE) != MATCH_SETTING_MAP_SIZE_MEDIUM) {
+                            network_set_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE, (uint8_t)MATCH_SETTING_MAP_SIZE_MEDIUM);
+                            break;
+                        }
+                        if (network_get_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY) != MATCH_SETTING_DIFFICULTY_HARD) {
+                            network_set_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY_HARD, (uint8_t)MATCH_SETTING_DIFFICULTY_HARD);
+                            break;
+                        }
+                        if (network_get_player_count() == 2 && network_get_player(1).status == NETWORK_PLAYER_STATUS_READY) {
+                            menu_set_mode(state.menu_state, MENU_MODE_LOAD_MATCH);
+                        }
+                    } else if (test_mode == TEST_MODE_JOIN) {
+                        if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
+                            network_set_player_ready(true);
+                        }
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    }
+#endif
+
 #ifdef GOLD_STEAM
     struct GameSetModeMenuParams {
         uint64_t steam_invite_id;
@@ -169,6 +234,9 @@ int gold_main(int argc, char** argv) {
     #ifdef GOLD_DEBUG_DESYNC
         std::string desync_filename = "desync.bin";
     #endif
+    #ifdef GOLD_DEBUG
+        TestMode test_mode = TEST_MODE_NONE;
+    #endif
 
     // Parse system arguments
     for (int argn = 1; argn < argc; argn++) {
@@ -179,6 +247,14 @@ int gold_main(int argc, char** argv) {
                 #ifdef GOLD_DEBUG_DESYNC
                     desync_filename = logfile_path.substr(0, logfile_path.find('.'));
                 #endif
+            }
+            if (strcmp(argv[argn], "--test") == 0 && argn + 1 < argc) {
+                argn++;
+                if (strcmp(argv[argn], "host") == 0) {
+                    test_mode = TEST_MODE_HOST;
+                } else if (strcmp(argv[argn], "join") == 0) {
+                    test_mode = TEST_MODE_JOIN;
+                }
             }
         #endif
         #ifdef GOLD_STEAM
@@ -345,6 +421,11 @@ int gold_main(int argc, char** argv) {
             }
 
             // Update
+            #ifdef GOLD_DEBUG
+                if (test_mode != TEST_MODE_NONE) {
+                    test_mode_update(test_mode, state);
+                }
+            #endif
             switch (state.mode) {
                 case GAME_MODE_NONE:
                     break;

@@ -6,10 +6,7 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gold",
-            "args": [
-                "--resolution",
-                "1280x720"
-            ],
+            "args": [],
             "cwd": "${workspaceFolder}/bin",
             "windows": {
                 "program": "${workspaceFolder}/bin/gold.exe",
@@ -50,6 +47,40 @@
                 "console": "integratedTerminal"
             },
         },
+        {
+            "name": "Run Test Host",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--test",
+                "host",
+                "--logfile",
+                "host.log"
+            ],
+            "cwd": "${workspaceFolder}/bin",
+            "windows": {
+                "program": "${workspaceFolder}/bin/gold.exe",
+                "console": "integratedTerminal"
+            },
+        },
+        {
+            "name": "Run Test Join",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--test",
+                "join",
+                "--logfile",
+                "join.log"
+            ],
+            "cwd": "${workspaceFolder}/bin",
+            "windows": {
+                "program": "${workspaceFolder}/bin/gold.exe",
+                "console": "integratedTerminal"
+            },
+        }
     ],
     "compounds": [
         {
@@ -57,5 +88,10 @@
             "configurations": ["player1", "player2"],
             "stopAll": true
         },
+        {
+            "name": "Run Both Test Hosts",
+            "configurations": ["Run Test Host", "Run Test Join"],
+            "stopAll": true
+        }
     ]
 }
