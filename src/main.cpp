@@ -5,24 +5,22 @@
 #include "core/cursor.h"
 #include "core/sound.h"
 #include "core/options.h"
+#include "game/game.h"
 #include "network/network.h"
 #include "render/render.h"
 #include "menu/menu.h"
-#include "shell/shell.h"
 #include "shell/desync.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
-#include <string>
 #include <ctime>
+#include <string>
 
 #ifdef GOLD_STEAM
     #include <steam/steam_api.h>
 #endif
 
 int gold_main(int argc, char** argv);
-
-#define FILENAME_MAX_LENGTH 255
 
 #if defined PLATFORM_WIN32 and not defined GOLD_DEBUG
 #include <windows.h>
@@ -64,162 +62,6 @@ int main(int argc, char** argv) {
 #endif
 
 static const uint64_t UPDATE_DURATION = SDL_NS_PER_SECOND / UPDATES_PER_SECOND;
-
-enum GameMode {
-    GAME_MODE_NONE,
-    GAME_MODE_MENU,
-    GAME_MODE_MATCH,
-    GAME_MODE_REPLAY
-};
-
-struct GameState {
-    GameMode mode = GAME_MODE_NONE;
-    MenuState* menu_state = nullptr;
-    MatchShellState* match_shell_state = nullptr;
-};
-
-#ifdef GOLD_DEBUG
-    enum TestMode {
-        TEST_MODE_NONE,
-        TEST_MODE_HOST,
-        TEST_MODE_JOIN
-    };
-
-    void test_mode_update(TestMode test_mode, GameState& state) {
-        if (state.mode == GAME_MODE_MENU) {
-            switch (state.menu_state->mode) {
-                case MENU_MODE_USERNAME: {
-                    state.menu_state->username = test_mode == TEST_MODE_HOST ? "Burr" : "Hamilton";
-                    network_set_username(state.menu_state->username.c_str());
-                    menu_set_mode(state.menu_state, MENU_MODE_MAIN);
-                    break;
-                }
-                case MENU_MODE_MAIN: {
-                    menu_set_mode_local_network_lobbylist(state.menu_state);
-                    break;
-                }
-                case MENU_MODE_LOBBYLIST: {
-                    if (test_mode == TEST_MODE_HOST) {
-                        menu_set_mode(state.menu_state, MENU_MODE_CREATE_LOBBY);
-                    } else if (test_mode == TEST_MODE_JOIN) {
-                        if (network_get_lobby_count() == 0) {
-                            network_search_lobbies("");
-                        } else {
-                            network_join_lobby(network_get_lobby(0).connection_info);
-                            menu_set_mode(state.menu_state, MENU_MODE_CONNECTING);
-                        }
-                    }
-                    break;
-                }
-                case MENU_MODE_CREATE_LOBBY: {
-                    network_open_lobby(state.menu_state->lobby_name.c_str(), (NetworkLobbyPrivacy)state.menu_state->lobby_privacy);
-                    menu_set_mode(state.menu_state, MENU_MODE_CONNECTING);
-                    break;
-                }
-                case MENU_MODE_LOBBY: {
-                    if (test_mode == TEST_MODE_HOST) {
-                        if (network_get_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE) != MATCH_SETTING_MAP_SIZE_MEDIUM) {
-                            network_set_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE, (uint8_t)MATCH_SETTING_MAP_SIZE_MEDIUM);
-                            break;
-                        }
-                        if (network_get_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY) != MATCH_SETTING_DIFFICULTY_HARD) {
-                            network_set_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY_HARD, (uint8_t)MATCH_SETTING_DIFFICULTY_HARD);
-                            break;
-                        }
-                        if (network_get_player_count() == 2 && network_get_player(1).status == NETWORK_PLAYER_STATUS_READY) {
-                            menu_set_mode(state.menu_state, MENU_MODE_LOAD_MATCH);
-                        }
-                    } else if (test_mode == TEST_MODE_JOIN) {
-                        if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
-                            network_set_player_ready(true);
-                        }
-                    }
-                    break;
-                }
-                default:
-                    break;
-            }
-        }
-    }
-#endif
-
-#ifdef GOLD_STEAM
-    struct GameSetModeMenuParams {
-        uint64_t steam_invite_id;
-    };
-#endif
-
-struct GameSetModeMatchParams {
-    int lcg_seed;
-    Noise noise;
-};
-
-struct GameSetModeReplayParams {
-    char filename[FILENAME_MAX_LENGTH + 1];
-};
-
-struct GameSetModeParams {
-    GameMode mode;
-    union {
-        #ifdef GOLD_STEAM
-            GameSetModeMenuParams menu;
-        #endif
-        GameSetModeMatchParams match;
-        GameSetModeReplayParams replay;
-    };
-};
-
-void game_set_mode(GameState& state, GameSetModeParams params) {
-    if (params.mode == GAME_MODE_MENU) {
-        state.menu_state = menu_init();
-
-        #ifdef GOLD_STEAM
-            if (params.menu.steam_invite_id != 0) {
-                network_set_backend(NETWORK_BACKEND_STEAM);
-                CSteamID steam_id;
-                steam_id.SetFromUint64(params.menu.steam_invite_id);
-                network_steam_accept_invite(steam_id);
-            }
-        #endif
-    }
-    if (params.mode == GAME_MODE_MATCH) {
-        state.match_shell_state = match_shell_init(params.match.lcg_seed, params.match.noise);
-        free(params.match.noise.map);
-    }
-    if (params.mode == GAME_MODE_REPLAY) {
-        state.match_shell_state = replay_shell_init(params.replay.filename);
-        if (state.match_shell_state == nullptr) {
-            menu_show_status(state.menu_state, "Error opening replay file.");
-            return;
-        }
-    }
-
-    if (state.mode == GAME_MODE_MENU) {
-        delete state.menu_state;
-        state.menu_state = nullptr;
-    }
-    if (state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) {
-        sound_end_fire_loop();
-        delete state.match_shell_state;
-        state.match_shell_state = nullptr;
-    }
-
-    state.mode = params.mode;
-}
-
-bool game_is_running(const GameState& state) {
-    if (input_user_requests_exit()) {
-        return false;
-    }
-    if (state.mode == GAME_MODE_MENU && state.menu_state->mode == MENU_MODE_EXIT) {
-        return false;
-    }
-    if ((state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) && state.match_shell_state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
-        return false;
-    }
-
-    return true;
-}
 
 int gold_main(int argc, char** argv) {
     #ifdef GOLD_STEAM
@@ -343,9 +185,16 @@ int gold_main(int argc, char** argv) {
     #ifdef GOLD_DEBUG
         bool should_render_debug_info = false;
         uint64_t debug_playback_speed = 1;
+        if (test_mode != TEST_MODE_NONE) {
+            debug_playback_speed = 4;
+        }
     #endif
 
-    GameState state;
+    #ifdef GOLD_DEBUG
+        GameState state = game_test_init(test_mode);
+    #else
+        GameState state = game_init();
+    #endif
 
     // Set game mode to menu
     {
@@ -393,94 +242,11 @@ int gold_main(int argc, char** argv) {
             network_service();
             NetworkEvent event;
             while (network_poll_events(&event)) {
-                switch (state.mode) {
-                    case GAME_MODE_NONE: 
-                        break;
-                    case GAME_MODE_MENU: {
-                        if (event.type == NETWORK_EVENT_MATCH_LOAD) {
-                            game_set_mode(state, (GameSetModeParams) {
-                                .mode = GAME_MODE_MATCH,
-                                .match = (GameSetModeMatchParams) {
-                                    .lcg_seed = event.match_load.lcg_seed,
-                                    .noise = event.match_load.noise
-                                }
-                            });
-                            break;
-                        }
-
-                        menu_handle_network_event(state.menu_state, event);
-                        break;
-                    }
-                    case GAME_MODE_MATCH: {
-                        match_shell_handle_network_event(state.match_shell_state, event);
-                        break;
-                    }
-                    case GAME_MODE_REPLAY:
-                        break;
-                }
+                game_handle_network_event(state, event);
             }
 
             // Update
-            #ifdef GOLD_DEBUG
-                if (test_mode != TEST_MODE_NONE) {
-                    test_mode_update(test_mode, state);
-                }
-            #endif
-            switch (state.mode) {
-                case GAME_MODE_NONE:
-                    break;
-                case GAME_MODE_MENU: {
-                    menu_update(state.menu_state);
-
-                    // Host begin load match
-                    if (state.menu_state->mode == MENU_MODE_LOAD_MATCH) {
-                        // Set LCG Seed
-                        #ifdef GOLD_RAND_SEED
-                            int lcg_seed = GOLD_RAND_SEED;
-                        #else
-                            int lcg_seed = (int)time(NULL);
-                        #endif
-
-                        // Generate noise
-                        uint64_t noise_seed = (uint64_t)lcg_seed;
-                        int map_width = match_setting_get_map_size((MatchSettingMapSizeValue)network_get_match_setting(MATCH_SETTING_MAP_SIZE));
-                        int map_height = map_width;
-                        Noise noise = noise_generate(noise_seed, map_width, map_height);
-
-                        network_begin_loading_match(lcg_seed, noise);
-
-                        game_set_mode(state, (GameSetModeParams) {
-                            .mode = GAME_MODE_MATCH,
-                            .match = (GameSetModeMatchParams) {
-                                .lcg_seed = lcg_seed,
-                                .noise = noise
-                            }
-                        });
-                    } else if (state.menu_state->mode == MENU_MODE_LOAD_REPLAY) {
-                        GameSetModeParams params;
-                        params.mode = GAME_MODE_REPLAY;
-                        strncpy(params.replay.filename, menu_get_selected_replay_filename(state.menu_state), FILENAME_MAX_LENGTH);
-                        game_set_mode(state, params);
-                    }
-
-                    break;
-                }
-                case GAME_MODE_MATCH:
-                case GAME_MODE_REPLAY: {
-                    match_shell_update(state.match_shell_state);
-
-                    if (state.match_shell_state->mode == MATCH_SHELL_MODE_LEAVE_MATCH) {
-                        GameSetModeParams params;
-                        params.mode = GAME_MODE_MENU;
-                        #ifdef GOLD_STEAM
-                            params.menu.steam_invite_id = 0;
-                        #endif
-                        game_set_mode(state, params);
-                    }
-
-                    break;
-                }
-            }
+            game_update(state);
         }
 
         sound_update();
@@ -488,19 +254,7 @@ int gold_main(int argc, char** argv) {
         // Render
         render_prepare_frame();
 
-        switch (state.mode) {
-            case GAME_MODE_NONE:
-                break;
-            case GAME_MODE_MENU: {
-                menu_render(state.menu_state);
-                break;
-            }
-            case GAME_MODE_MATCH:
-            case GAME_MODE_REPLAY: {
-                match_shell_render(state.match_shell_state);
-                break;
-            }
-        }
+        game_render(state);
 
         #ifdef GOLD_DEBUG
             if (should_render_debug_info) {
@@ -550,9 +304,7 @@ int gold_main(int argc, char** argv) {
     }
 
     // Delete the current game sub-state
-    game_set_mode(state, (GameSetModeParams) {
-        .mode = GAME_MODE_NONE
-    });
+    game_quit(state);
 
     options_save();
 

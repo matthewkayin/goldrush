@@ -8,9 +8,6 @@
 #include "shell/desync.h"
 #include <algorithm>
 
-// Timing
-static const uint32_t TURN_OFFSET = 4;
-static const uint32_t TURN_DURATION = 4;
 
 // Status
 static const uint32_t STATUS_DURATION = 60;
@@ -1274,6 +1271,7 @@ void match_shell_handle_input(MatchShellState* state) {
         }
         sound_play(SOUND_UI_CLICK);
         input_stop_text_input();
+        return;
     }
 
     // Hotkey click
@@ -1633,7 +1631,7 @@ void match_shell_handle_input(MatchShellState* state) {
     }
 
     // Control group key press
-    if (!spectator_mode) {
+    if (!spectator_mode && !input_is_text_input_active()) {
         uint32_t number_key_pressed;
         for (number_key_pressed = 0; number_key_pressed < 10; number_key_pressed++) {
             if (input_is_action_just_pressed((InputAction)(INPUT_ACTION_NUM1 + number_key_pressed))) {
@@ -1708,7 +1706,10 @@ void match_shell_handle_input(MatchShellState* state) {
     }
 
     // Jump to latest alert
-    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && state->latest_alert_cell.x != -1 && !spectator_mode) {
+    if (input_is_action_just_pressed(INPUT_ACTION_SPACE) && 
+            state->latest_alert_cell.x != -1 &&
+            !input_is_text_input_active() &&
+            !spectator_mode) {
         match_shell_center_camera_on_cell(state, state->latest_alert_cell);
     }
 

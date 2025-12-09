@@ -14,6 +14,10 @@
 #define MATCH_SHELL_CONTROL_GROUP_NONE -1
 #define MATCH_SHELL_CAMERA_HOTKEY_COUNT 6
 
+// Timing
+const uint32_t TURN_OFFSET = 4;
+const uint32_t TURN_DURATION = 4;
+
 struct RenderSpriteParams {
     SpriteName sprite;
     ivec2 frame;

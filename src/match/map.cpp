@@ -1584,10 +1584,13 @@ std::vector<int> map_get_region_path(const Map& map, int from_region, int to_reg
 
     // Build region path
     MapRegionPathNode current = end_node;
+    log_debug("--region path--");
     while (current.parent != -1) {
         path.push_back(current.region);
+        log_debug("%i", path.back());
         current = explored[current.parent];
     }
+    log_debug("--end--");
 
     return path;
 }
@@ -1678,6 +1681,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         region_path = map_get_region_path(map, map_get_region(map, from), map_get_region(map, to));
         heuristic_cell = map_get_region_connection_cell_closest_to_cell(map, from, region_path.back());
     }
+    log_debug("HEURISTIC <%i, %i>", heuristic_cell.x, heuristic_cell.y);
 
     frontier.push_back((MapPathNode) {
         .parent = -1,
@@ -1712,13 +1716,20 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             heuristic_cell = region_path.back() == map_get_region(map, to) 
                 ? to 
                 : map_get_region_connection_cell_closest_to_cell(map, smallest.cell, region_path.back());
+
+            // Clear the frontier once we get to a new region.
+            // This helps ensure path completion on long, roundabout paths
+            // by making it so that we prioritize new cells in the new region
+            // instead of old cells from earlier in the pathing process.
+            // It also means we can get away with less frontier comparisons.
+            frontier.clear();
         }
 
         // Otherwise, add this tile to the explored list
         explored.push_back(smallest);
-        explored_indices[smallest.cell.x + (smallest.cell.y * map.width)] = explored.size() - 1;
-        if (ivec2::manhattan_distance(explored.back().cell, to) < ivec2::manhattan_distance(explored[closest_explored].cell, to)) {
-            closest_explored = explored.size() - 1;
+        explored_indices[smallest.cell.x + (smallest.cell.y * map.width)] = (int)explored.size() - 1;
+        if (ivec2::manhattan_distance(explored.back().cell, heuristic_cell) < ivec2::manhattan_distance(explored[closest_explored].cell, heuristic_cell)) {
+            closest_explored = (int)explored.size() - 1;
         }
 
         if (explored.size() > PATHFIND_ITERATION_MAX) {
@@ -1768,11 +1779,6 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
                 if (is_cell_too_close_to_landmine) {
                     continue;
                 }
-            }
-
-            // Ignore ignore_cells
-            if (explored_indices[child.cell.x + (child.cell.y * map.width)] == EXPLORED_INDEX_IGNORE_CELL) {
-                continue;
             }
 
             // Don't allow diagonal movement through cracks
