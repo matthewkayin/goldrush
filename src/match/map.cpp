@@ -1584,13 +1584,10 @@ std::vector<int> map_get_region_path(const Map& map, int from_region, int to_reg
 
     // Build region path
     MapRegionPathNode current = end_node;
-    log_debug("--region path--");
     while (current.parent != -1) {
         path.push_back(current.region);
-        log_debug("%i", path.back());
         current = explored[current.parent];
     }
-    log_debug("--end--");
 
     return path;
 }
@@ -1681,7 +1678,6 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
         region_path = map_get_region_path(map, map_get_region(map, from), map_get_region(map, to));
         heuristic_cell = map_get_region_connection_cell_closest_to_cell(map, from, region_path.back());
     }
-    log_debug("HEURISTIC <%i, %i>", heuristic_cell.x, heuristic_cell.y);
 
     frontier.push_back((MapPathNode) {
         .parent = -1,

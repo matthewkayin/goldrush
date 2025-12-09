@@ -2176,7 +2176,7 @@ bool bot_squad_carrier_has_en_route_infantry(const MatchState& state, const BotS
         }
     }
 
-    if (en_route_infantry_center != 0) {
+    if (en_route_infantry_count != 0) {
         *en_route_infantry_center = *en_route_infantry_center / en_route_infantry_count;
     }
 
