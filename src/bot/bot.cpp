@@ -74,6 +74,13 @@ Bot bot_init(uint8_t player_id, MatchSettingDifficultyValue difficulty, BotOpene
 
             break;
         }
+    #ifdef GOLD_DEBUG
+        case BOT_OPENER_TECH_FIRST: {
+            bot.unit_comp = preferred_unit_comp;
+
+            break;
+        }
+    #endif
         case BOT_OPENER_COUNT: {
             GOLD_ASSERT(false);
             break;
@@ -3196,12 +3203,14 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer) {
 
     // Determine closest entity to scout
     uint32_t closest_unscouted_entity_index = INDEX_INVALID;
+    int closest_unscouted_entity_distance;
     for (EntityId entity_id : bot.entities_to_scout) {
         uint32_t entity_index = state.entities.get_index_of(entity_id);
+        int entity_distance = ivec2::manhattan_distance(state.entities[entity_index].cell, scout.cell);
         if (closest_unscouted_entity_index == INDEX_INVALID || 
-                ivec2::manhattan_distance(state.entities[entity_index].cell, scout.cell) <
-                ivec2::manhattan_distance(state.entities[closest_unscouted_entity_index].cell, scout.cell)) {
+                (entity_distance < closest_unscouted_entity_distance && std::abs(entity_distance - closest_unscouted_entity_distance) > 4)) {
             closest_unscouted_entity_index = entity_index;
+            closest_unscouted_entity_distance = entity_distance;
         }
     }
     EntityId unscouted_entity_id = state.entities.get_id_of(closest_unscouted_entity_index);
@@ -3958,17 +3967,27 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId go
     std::vector<ivec2> frontier;
     std::vector<bool> is_explored(state.map.width * state.map.height, false);
 
-    frontier.push_back(goldmine_cell - ivec2(1, 1));
+    ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, goldmine_cell, 3, 1, ivec2(-1, -1), MAP_OPTION_IGNORE_MINERS | MAP_OPTION_IGNORE_UNITS);
+    if (exit_cell.x == -1) {
+        // This fallback should only be used if they like, covered one of the bots goldmines in buildings
+        return map_clamp_cell(state.map, goldmine_cell - ivec2(BOT_NEAR_DISTANCE, 0));
+    }
+
+    frontier.push_back(exit_cell);
     ivec2 retreat_cell = ivec2(-1, -1);
     while (!frontier.empty()) {
         ivec2 next = frontier.back();
         frontier.pop_back();
 
+        if (ivec2::manhattan_distance(next, goldmine_cell) > BOT_MEDIUM_DISTANCE) {
+            continue;
+        }
+
         if (is_explored[next.x + (next.y * state.map.width)]) {
             continue;
         }
 
-        if (ivec2::manhattan_distance(next, goldmine_cell) > BOT_NEAR_DISTANCE &&
+        if (ivec2::manhattan_distance(next, goldmine_cell + ivec2(1, 1)) > 5 &&
                 map_is_cell_rect_in_bounds(state.map, next - ivec2(1, 1), 3) &&
                 !map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, next - ivec2(1, 1), 3)) {
             retreat_cell = next;
@@ -3977,7 +3996,7 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId go
 
         is_explored[next.x + (next.y * state.map.width)] = true;
 
-        for (int direction = 0; direction < 4; direction += 2) {
+        for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
             ivec2 child = next + DIRECTION_IVEC2[direction];
 
             if (!map_is_cell_in_bounds(state.map, child)) {
@@ -3990,7 +4009,8 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId go
 
     GOLD_ASSERT(retreat_cell.x != -1);
     if (retreat_cell.x == -1) {
-        retreat_cell = map_clamp_cell(state.map, goldmine_cell - ivec2(BOT_NEAR_DISTANCE, 0));
+        // Fallback to the exit cell if needed
+        return exit_cell;
     }
 
     return retreat_cell;

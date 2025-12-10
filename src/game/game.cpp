@@ -198,7 +198,7 @@ void game_test_set_mode(GameState& state, GameMode mode) {
     if (mode == GAME_MODE_MATCH) {
         int lcg_seed = rand();
         MatchSettingDifficultyValue difficulty = MATCH_SETTING_DIFFICULTY_HARD;
-        BotOpener opener = bot_roll_opener(&lcg_seed, difficulty);
+        BotOpener opener = BOT_OPENER_TECH_FIRST;
         BotUnitComp unit_comp = bot_roll_preferred_unit_comp(&lcg_seed);
         state.test_bot = bot_init(network_get_player_id(), difficulty, opener, unit_comp);
     }
