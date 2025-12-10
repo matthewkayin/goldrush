@@ -1053,8 +1053,9 @@ void match_shell_update(MatchShellState* state) {
         uint32_t selection_index = 0;
         while (selection_index < state->selection.size()) {
             Entity& selected_entity = state->match_state.entities.get_by_id(state->selection[selection_index]);
-            if (!entity_is_selectable(selected_entity) || !match_shell_is_entity_visible(state, selected_entity)) {
+            if (!match_shell_can_keep_selecting_entity(state, selected_entity)) {
                 state->selection.erase(state->selection.begin() + selection_index);
+                log_debug("erased selection");
             } else {
                 selection_index++;
             }
@@ -1668,7 +1669,9 @@ void match_shell_handle_input(MatchShellState* state) {
             }
 
             // Snap to control group
-            if (state->control_group_double_tap_timer != 0 && state->control_group_selected == control_group_index) {
+            if (state->control_group_double_tap_timer != 0 && 
+                    state->control_group_selected == control_group_index &&
+                    !state->selection.empty()) {
                 ivec2 group_min;
                 ivec2 group_max;
                 for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
@@ -2010,7 +2013,7 @@ void match_shell_set_selection(MatchShellState* state, std::vector<EntityId>& se
 
     for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
         uint32_t entity_index = state->match_state.entities.get_index_of(state->selection[selection_index]);
-        if (entity_index == INDEX_INVALID || !entity_is_selectable(state->match_state.entities[entity_index])) {
+        if (entity_index == INDEX_INVALID || !match_shell_is_entity_selectable(state, state->match_state.entities[entity_index])) {
             state->selection.erase(state->selection.begin() + selection_index);
             selection_index--;
             continue;
@@ -2056,6 +2059,31 @@ bool match_shell_selection_has_enough_energy(const MatchShellState* state, const
     }
 
     return false;
+}
+
+bool match_shell_is_entity_player_controlled_and_in_goldmine(const MatchShellState* state, const Entity& entity) {
+    return (!state->replay_mode && 
+            entity.health != 0 &&
+            entity.player_id == network_get_player_id() &&
+            entity_is_in_mine(state->match_state, entity));
+}
+
+bool match_shell_is_entity_selectable(const MatchShellState* state, const Entity& entity) {
+    // Special-case for allowing players to select
+    // their own miners that have entered a goldmine
+    if (match_shell_is_entity_player_controlled_and_in_goldmine(state, entity)) {
+        return true;
+    }
+
+    return entity_is_selectable(entity);
+}
+
+bool match_shell_can_keep_selecting_entity(const MatchShellState* state, const Entity& entity) {
+    if (match_shell_is_entity_player_controlled_and_in_goldmine(state, entity)) {
+        return true;
+    }
+
+    return entity_is_selectable(entity) && match_shell_is_entity_visible(state, entity);
 }
 
 // VISION
@@ -2649,6 +2677,9 @@ void match_shell_render(const MatchShellState* state) {
                         entity_get_elevation(entity, state->match_state.map) != elevation) {
                     continue;
                 }
+                if (entity_is_in_mine(state->match_state, entity)) {
+                    continue;
+                }
                 match_shell_render_entity_select_rings_and_healthbars(state, entity);
             }
 
@@ -3219,7 +3250,7 @@ void match_shell_render(const MatchShellState* state) {
 
         for (EntityId id : state->control_groups[control_group_index]) {
             uint32_t entity_index = state->match_state.entities.get_index_of(id);
-            if (entity_index == INDEX_INVALID || !entity_is_selectable(state->match_state.entities[entity_index])) {
+            if (entity_index == INDEX_INVALID || state->match_state.entities[entity_index].health == 0) {
                 continue;
             }
 

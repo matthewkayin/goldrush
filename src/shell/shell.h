@@ -215,6 +215,9 @@ std::vector<EntityId> match_shell_create_selection(const MatchShellState* state,
 void match_shell_set_selection(MatchShellState* state, std::vector<EntityId>& selection);
 MatchShellSelectionType match_shell_get_selection_type(const MatchShellState* state, const std::vector<EntityId>& selection);
 bool match_shell_selection_has_enough_energy(const MatchShellState* state, const std::vector<EntityId>& selection, uint32_t cost);
+bool match_shell_is_entity_player_controlled_and_in_goldmine(const MatchShellState* state, const Entity& entity);
+bool match_shell_is_entity_selectable(const MatchShellState* state, const Entity& entity);
+bool match_shell_can_keep_selecting_entity(const MatchShellState* state, const Entity& entity);
 
 // Vision
 bool match_shell_is_entity_visible(const MatchShellState* state, const Entity& entity);

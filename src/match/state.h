@@ -356,6 +356,7 @@ uint32_t entity_get_max_energy(const MatchState& state, const Entity& entity);
 bool entity_has_detection(const MatchState& state, const Entity& entity);
 int entity_get_armor(const MatchState& state, const Entity& entity);
 bool entity_is_selectable(const Entity& entity);
+bool entity_can_be_given_orders(const MatchState& state, const Entity& entity);
 uint32_t entity_get_elevation(const Entity& entity, const Map& map);
 Rect entity_get_rect(const Entity& entity);
 fvec2 entity_get_target_position(const Entity& entity);
@@ -367,6 +368,7 @@ ivec2 entity_get_animation_frame(const Entity& entity);
 Rect entity_goldmine_get_block_building_rect(ivec2 cell);
 
 bool entity_is_mining(const MatchState& state, const Entity& entity);
+bool entity_is_in_mine(const MatchState& state, const Entity& entity);
 bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);
 
 void entity_set_target(Entity& entity, Target target);
