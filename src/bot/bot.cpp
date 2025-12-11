@@ -587,12 +587,14 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
             !bot_is_entity_reserved(bot, entity_id);
     });
     int unreserved_army_score = bot_score_entity_list(state, bot, unreserved_army);
-    ivec2 unreserved_army_center = bot_entity_list_get_center(state, unreserved_army);
-    if (defending_score + unreserved_army_score >= enemy_score &&
-            ivec2::manhattan_distance(unreserved_army_center, location) < BOT_MEDIUM_DISTANCE) {
-        bot.squads.push_back(bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, unreserved_army));
-        log_debug("BOT %u defend_location, send in unreserved army %u", bot.player_id, unreserved_army.size());
-        return;
+    if (!unreserved_army.empty()) {
+        ivec2 unreserved_army_center = bot_entity_list_get_center(state, unreserved_army);
+        if (defending_score + unreserved_army_score >= enemy_score &&
+                ivec2::manhattan_distance(unreserved_army_center, location) < BOT_MEDIUM_DISTANCE) {
+            bot.squads.push_back(bot_squad_create(bot, BOT_SQUAD_TYPE_RESERVES, location, unreserved_army));
+            log_debug("BOT %u defend_location, send in unreserved army %u", bot.player_id, unreserved_army.size());
+            return;
+        }
     }
 
     // Next, check attacking squads to see if they should turn around and defend
@@ -638,6 +640,7 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     EntityId least_defended_enemy_base_goldmine_id = bot_get_least_defended_enemy_base_goldmine_id(state, bot);
     if (should_counterattack &&
             least_defended_enemy_base_goldmine_id != ID_NULL &&
+            !unreserved_army.empty() &&
             unreserved_army_score > bot.base_info.at(least_defended_enemy_base_goldmine_id).defense_score) {
         ivec2 counterattack_squad_target_cell = bot_squad_get_attack_target_cell(state, bot, unreserved_army);
         bot.squads.push_back(bot_squad_create(bot, BOT_SQUAD_TYPE_ATTACK, counterattack_squad_target_cell, unreserved_army));
