@@ -247,14 +247,39 @@ void game_test_update(GameState& state) {
                         network_set_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE, (uint8_t)MATCH_SETTING_MAP_SIZE_MEDIUM);
                         break;
                     }
+                    if (network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) != MATCH_SETTING_TEAMS_ENABLED) {
+                        network_set_match_setting((uint8_t)MATCH_SETTING_TEAMS, (uint8_t)MATCH_SETTING_TEAMS_ENABLED);
+                        break;
+                    }
                     if (network_get_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY) != MATCH_SETTING_DIFFICULTY_HARD) {
                         network_set_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY_HARD, (uint8_t)MATCH_SETTING_DIFFICULTY_HARD);
                         break;
                     }
-                    if (network_get_player_count() == 2 && network_get_player(1).status == NETWORK_PLAYER_STATUS_READY) {
+                    if (network_get_player_count() == 1) {
+                        // wait for player 2
+                        break;
+                    }
+                    if (network_get_player_count() < MAX_PLAYERS) {
+                        network_add_bot();
+                        break;
+                    }
+                    if (network_get_player(2).team != 0) {
+                        network_set_player_team(2, 0);
+                        break;
+                    }
+                    if (network_get_player(3).team != 1) {
+                        network_set_player_team(3, 1);
+                        break;
+                    }
+                    if (network_get_player(1).status == NETWORK_PLAYER_STATUS_READY) {
                         menu_set_mode(state.menu_state, MENU_MODE_LOAD_MATCH);
                     }
                 } else if (state.test_mode == TEST_MODE_JOIN) {
+                    if (network_get_player(network_get_player_id()).team == 0 &&
+                            network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) == MATCH_SETTING_TEAMS_ENABLED) {
+                        network_set_player_team(network_get_player_id(), 1);
+                        break;
+                    }
                     if (network_get_player(network_get_player_id()).status == NETWORK_PLAYER_STATUS_NOT_READY) {
                         network_set_player_ready(true);
                     }

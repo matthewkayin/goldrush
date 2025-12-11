@@ -1002,6 +1002,40 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
             log_debug("BOT %u saturate_bases, cancel in-progress worker.", bot.player_id);
             return input;
         }
+    
+        // Scramble stuck workers
+        EntityId stuck_worker_id = match_find_entity(state, [&state, &bot, &goldmine_id](const Entity& entity, EntityId /*entity_id*/) {
+            if (entity.player_id != bot.player_id ||
+                    !entity_is_mining(state, entity) ||
+                    entity.goldmine_id != goldmine_id ||
+                    entity.mode != MODE_UNIT_BLOCKED) {
+                return false;
+            }
+            ivec2 facing_cell = entity.cell + DIRECTION_IVEC2[entity.direction];
+            if (!map_is_cell_in_bounds(state.map, facing_cell)) {
+                return false;
+            }
+            Cell map_cell = map_get_cell(state.map, CELL_LAYER_GROUND, facing_cell);
+            if (!(map_cell.type == CELL_MINER || map_cell.type == CELL_UNIT)) {
+                return false;
+            }
+            const Entity& other_miner = state.entities.get_by_id(map_cell.id);
+            return other_miner.mode == MODE_UNIT_BLOCKED &&
+                    other_miner.direction == (entity.direction + 4) % DIRECTION_COUNT;
+        });
+        if (stuck_worker_id != ID_NULL) {
+            MatchInput input;
+            input.type = MATCH_INPUT_MOVE_CELL;
+            input.move.shift_command = 0;
+            input.move.target_id = ID_NULL;
+            input.move.target_cell = bot_get_position_near_hall_away_from_miners(state, hall.cell, goldmine.cell);
+            input.move.entity_count = 1;
+            input.move.entity_ids[0] = stuck_worker_id;
+
+            log_debug("BOT %u saturate bases, scramble stuck worker.", bot.player_id);
+            return input;
+        }
+
     } // End for each goldmine
 
     return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -1042,8 +1076,10 @@ EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, i
         .filter = [&bot](const Entity& entity, EntityId entity_id) {
             return entity.type == ENTITY_MINER && 
                     entity.player_id == bot.player_id &&
-                    entity.mode == MODE_UNIT_IDLE &&
-                    entity.target.type == TARGET_NONE &&
+                    ((entity.mode == MODE_UNIT_IDLE &&
+                        entity.target.type == TARGET_NONE) ||
+                     (entity.mode == MODE_UNIT_MOVE &&
+                        entity.target.type == TARGET_CELL)) &&
                     entity_id != bot.scout_id &&
                     !bot_is_entity_reserved(bot, entity_id);
         },
@@ -3263,7 +3299,7 @@ MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer) {
         uint32_t entity_index = state.entities.get_index_of(entity_id);
         int entity_distance = ivec2::manhattan_distance(state.entities[entity_index].cell, scout.cell);
         if (closest_unscouted_entity_index == INDEX_INVALID || 
-                (entity_distance < closest_unscouted_entity_distance && std::abs(entity_distance - closest_unscouted_entity_distance) > 4)) {
+                (entity_distance < closest_unscouted_entity_distance && std::abs(entity_distance - closest_unscouted_entity_distance) > BOT_NEAR_DISTANCE)) {
             closest_unscouted_entity_index = entity_index;
             closest_unscouted_entity_distance = entity_distance;
         }
