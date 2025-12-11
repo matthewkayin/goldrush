@@ -154,7 +154,7 @@ ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t
 
 // Research upgrades
 
-uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot);
+uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot, EntityCount unreserved_and_in_progress_entity_count);
 MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgrade);
 
 // Train Units
@@ -217,8 +217,8 @@ void bot_set_scout_info(Bot& bot, uint32_t flag, bool value);
 // Entity Reservation
 
 bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id);
-void bot_reserve_entity(Bot& bot, EntityId entity_id);
-void bot_release_entity(Bot& bot, EntityId entity_id);
+void bot_reserve_entity(Bot& bot, EntityId entity_id, bool log = true);
+void bot_release_entity(Bot& bot, EntityId entity_id, bool log = true);
 
 // Entity Type Util
 
@@ -262,7 +262,7 @@ EntityId bot_find_hall_surrounding_goldmine(const MatchState& state, const Bot& 
 bool bot_does_entity_surround_goldmine(const Entity& entity, ivec2 goldmine_cell);
 MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot& bot, EntityId entity_id);
 MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entity_id);
-ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId goldmine_id);
+ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& bot, EntityId goldmine_id);
 uint32_t bot_get_index_of_squad_of_type(const Bot& bot, BotSquadType type);
 bool bot_has_squad_of_type(const Bot& bot, BotSquadType type);
 bool bot_has_desired_squad_of_type(const Bot& bot, BotSquadType type);

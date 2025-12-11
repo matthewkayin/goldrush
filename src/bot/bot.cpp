@@ -646,9 +646,9 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
     }
 
     // Finally, if we're really desperate, use workers to attack
-    std::vector<EntityId> workers = match_find_entities(state, [&bot, &location](const Entity& entity, EntityId entity_id) {
+    std::vector<EntityId> workers = match_find_entities(state, [&state, &bot, &location](const Entity& entity, EntityId entity_id) {
         return entity.type == ENTITY_MINER &&
-            entity_is_selectable(entity) &&
+            entity_can_be_given_orders(state, entity) &&
             entity.player_id == bot.player_id &&
             !bot_is_entity_reserved(bot, entity_id) &&
             ivec2::manhattan_distance(entity.cell, location) < BOT_NEAR_DISTANCE;
@@ -763,7 +763,7 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
     } 
 
     // Research upgrades
-    uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot);
+    uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot, unreserved_and_in_progress_entity_count);
     if (desired_upgrade != 0) {
         EntityType building_type = bot_get_building_which_researches(desired_upgrade);
         if (available_building_count[building_type] != 0) {
@@ -786,6 +786,19 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
             !bot_prefer_tech_over_units && 
             match_timer > bot.macro_cycle_timer) {
         return bot_train_unit(state, bot, bot_get_unit_type_to_train(bot, desired_entities, available_building_count, unreserved_and_in_progress_entity_count), match_timer);
+    }
+
+    // Determine any other desired buildings based on building pre-reqs
+    for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_LANDMINE; entity_type++) {
+        if (desired_entities[entity_type] == 0) {
+            continue;
+        }
+
+        EntityType prereq = bot_get_building_prereq((EntityType)entity_type);
+        while (prereq != ENTITY_TYPE_COUNT && desired_entities[prereq] == 0) {
+            desired_entities[prereq] = 1;
+            prereq = bot_get_building_prereq((EntityType)prereq);
+        }
     }
 
     // Build buildings
@@ -1453,7 +1466,7 @@ ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t
 
 // RESEARCH UPGRADES
 
-uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
+uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot, EntityCount unreserved_and_in_progress_entity_count) {
     if (bot_has_squad_of_type(bot, BOT_SQUAD_TYPE_LANDMINES) && 
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_LANDMINES)) {
         return UPGRADE_LANDMINES;
@@ -1463,12 +1476,19 @@ uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
         return 0;
     }
 
+    if (unreserved_and_in_progress_entity_count[ENTITY_SHERIFFS] &&
+            match_player_upgrade_is_available(state, bot.player_id, UPGRADE_PRIVATE_EYE)) {
+        return UPGRADE_PRIVATE_EYE;
+    }
+
     if (bot.unit_comp == BOT_UNIT_COMP_SOLDIER_CANNON &&
+            unreserved_and_in_progress_entity_count[ENTITY_BARRACKS] != 0 &&
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_BAYONETS)) {
         return UPGRADE_BAYONETS;
     }
 
     if (bot.desired_army_ratio[ENTITY_WAGON] != 0 &&
+            unreserved_and_in_progress_entity_count[ENTITY_COOP] != 0 &&
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_WAR_WAGON)) {
         return UPGRADE_WAR_WAGON;
     }
@@ -1479,6 +1499,7 @@ uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot) {
     }
 
     if (bot.desired_army_ratio[ENTITY_BALLOON] != 0 && 
+            unreserved_and_in_progress_entity_count[ENTITY_WORKSHOP] != 0 &&
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_TAILWIND)) {
         return UPGRADE_TAILWIND;
     }
@@ -1611,19 +1632,55 @@ BotSquad bot_squad_create(Bot& bot, BotSquadType type, ivec2 target_cell, const 
     squad.target_cell = target_cell;
     squad.entities.reserve(entity_list.size());
 
-    log_debug("BOT %u squad_create, type %u target_cell <%i, %i>", bot.player_id, type, target_cell.x, target_cell.y);
+    {
+        char debug_buffer[1024];
+        char* debug_ptr = debug_buffer;
+        debug_ptr += sprintf(debug_ptr, "BOT %u squad_create, type ", bot.player_id);
+        switch (type) {
+            case BOT_SQUAD_TYPE_ATTACK:
+                debug_ptr += sprintf(debug_ptr, "ATTACK");
+                break;
+            case BOT_SQUAD_TYPE_RESERVES:
+                debug_ptr += sprintf(debug_ptr, "RESERVES");
+                break;
+            case BOT_SQUAD_TYPE_LANDMINES:
+                debug_ptr += sprintf(debug_ptr, "LANDMINES");
+                break;
+            case BOT_SQUAD_TYPE_DEFEND:
+                debug_ptr += sprintf(debug_ptr, "DEFEND");
+                break;
+            case BOT_SQUAD_TYPE_RETURN:
+                GOLD_ASSERT(false);
+        }
+        debug_ptr += sprintf(debug_ptr, " target cell <%i, %i> entities [", target_cell.x, target_cell.y);
+        for (EntityId entity_id : entity_list) {
+            debug_ptr += sprintf(debug_ptr, "%u,", entity_id);
+        }
+        debug_ptr += sprintf(debug_ptr, "]");
+        log_debug(debug_buffer);
+    }
     for (EntityId entity_id : entity_list) {
         squad.entities.push_back(entity_id);
-        bot_reserve_entity(bot, entity_id);
+        bot_reserve_entity(bot, entity_id, false);
     }
-    log_debug("BOT %u squad_create, end.", bot.player_id);
 
     return squad;
 }
 
 void bot_squad_dissolve(Bot& bot, BotSquad& squad) {
+    {
+        char debug_buffer[512];
+        char* debug_ptr = debug_buffer;
+        debug_ptr += sprintf(debug_ptr, "BOT %u squad_dissolve, type %u entities [", bot.player_id, squad.type);
+        for (EntityId entity_id : squad.entities) {
+            debug_ptr += sprintf(debug_ptr, "%u,", entity_id);
+        }
+        debug_ptr += sprintf(debug_ptr, "]");
+        log_debug(debug_buffer);
+    }
+
     for (EntityId entity_id : squad.entities) {
-        bot_release_entity(bot, entity_id);
+        bot_release_entity(bot, entity_id, false);
     }
     squad.entities.clear();
 }
@@ -1885,6 +1942,7 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
 
     // Squad state changes
     bool is_enemy_near_squad = !nearby_enemy_list.empty();
+    bool is_enemy_near_target = false;
     if (squad.type == BOT_SQUAD_TYPE_RESERVES || squad.type == BOT_SQUAD_TYPE_ATTACK) {
         EntityId enemy_near_target_id = match_find_entity(state, [&state, &bot, &squad](const Entity& entity, EntityId /*entity_id*/) {
             return entity.type != ENTITY_GOLDMINE &&
@@ -1892,16 +1950,13 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
                 entity.health != 0 &&
                 ivec2::manhattan_distance(entity.cell, squad.target_cell) < BOT_MEDIUM_DISTANCE;
         });
-        if (enemy_near_target_id != ID_NULL) {
-            is_enemy_near_squad = true;
-        }
+        is_enemy_near_target = enemy_near_target_id != ID_NULL;
     }
-    if (squad.type == BOT_SQUAD_TYPE_RESERVES && !is_enemy_near_squad) {
+    if (squad.type == BOT_SQUAD_TYPE_RESERVES && !is_enemy_near_target) {
         log_debug("BOT %u squad_update, dissolve reserves squad because no enemy nearby", bot.player_id);
-        bot_squad_dissolve(bot, squad);
-        return (MatchInput) { .type = MATCH_INPUT_NONE };
+        squad.type = BOT_SQUAD_TYPE_RETURN;
     }
-    if (squad.type == BOT_SQUAD_TYPE_ATTACK && !is_enemy_near_squad) {
+    if (squad.type == BOT_SQUAD_TYPE_ATTACK && !(is_enemy_near_squad || is_enemy_near_target)) {
         log_debug("BOT %u squad_update, return attack squad because no enemy nearby", bot.player_id);
         squad.type = BOT_SQUAD_TYPE_RETURN;
     }
@@ -2482,7 +2537,7 @@ MatchInput bot_squad_return_to_nearest_base(const MatchState& state, Bot& bot, B
     input.type = MATCH_INPUT_MOVE_CELL;
     input.move.shift_command = 0;
     input.move.target_id = ID_NULL;
-    input.move.target_cell = bot_get_unoccupied_cell_near_goldmine(state, nearest_base_goldmine_id);
+    input.move.target_cell = bot_get_unoccupied_cell_near_goldmine(state, bot, nearest_base_goldmine_id);
     input.move.entity_count = 0;
 
     while (!squad.entities.empty()) {
@@ -2612,7 +2667,7 @@ ivec2 bot_squad_get_landmine_target_cell(const MatchState& state, const Bot& bot
         return ivec2(-1, -1);
     }
 
-    return bot_get_unoccupied_cell_near_goldmine(state, nearest_controlled_goldmine_id);
+    return bot_get_unoccupied_cell_near_goldmine(state, bot, nearest_controlled_goldmine_id);
 }
 
 ivec2 bot_squad_get_attack_target_cell(const MatchState& state, const Bot& bot, const std::vector<EntityId>& entity_list) {
@@ -3300,13 +3355,17 @@ bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id) {
     return bot.is_entity_reserved.find(entity_id) != bot.is_entity_reserved.end();
 }
 
-void bot_reserve_entity(Bot& bot, EntityId entity_id) {
-    log_debug("BOT: reserve entity %u", entity_id);
+void bot_reserve_entity(Bot& bot, EntityId entity_id, bool log) {
+    if (log) {
+        log_debug("BOT: reserve entity %u", entity_id);
+    }
     bot.is_entity_reserved[entity_id] = true;
 }
 
-void bot_release_entity(Bot& bot, EntityId entity_id) {
-    log_debug("BOT: release entity %u", entity_id);
+void bot_release_entity(Bot& bot, EntityId entity_id, bool log) {
+    if (log) {
+        log_debug("BOT: release entity %u", entity_id);
+    }
     GOLD_ASSERT(bot.is_entity_reserved.find(entity_id) != bot.is_entity_reserved.end());
     bot.is_entity_reserved.erase(entity_id);
 }
@@ -3906,7 +3965,7 @@ MatchInput bot_return_entity_to_nearest_hall(const MatchState& state, const Bot&
     });
     GOLD_ASSERT(nearest_goldmine_id != ID_NULL);
 
-    ivec2 target_cell = bot_get_unoccupied_cell_near_goldmine(state, nearest_goldmine_id);
+    ivec2 target_cell = bot_get_unoccupied_cell_near_goldmine(state, bot, nearest_goldmine_id);
 
     MatchInput input;
     input.type = MATCH_INPUT_MOVE_CELL;
@@ -3960,17 +4019,29 @@ MatchInput bot_unit_flee(const MatchState& state, const Bot& bot, EntityId entit
     return input;
 }
 
-ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId goldmine_id) {
-    ivec2 goldmine_cell = state.entities.get_by_id(goldmine_id).cell;
+ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& bot, EntityId goldmine_id) {
+    const Entity& goldmine = state.entities.get_by_id(goldmine_id);
 
     // To determine the retreat_cell, search around the nearby base
     std::vector<ivec2> frontier;
     std::vector<bool> is_explored(state.map.width * state.map.height, false);
 
-    ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, goldmine_cell, 3, 1, ivec2(-1, -1), MAP_OPTION_IGNORE_MINERS | MAP_OPTION_IGNORE_UNITS);
+    ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, goldmine.cell, 3, 1, ivec2(-1, -1), MAP_OPTION_IGNORE_MINERS | MAP_OPTION_IGNORE_UNITS);
     if (exit_cell.x == -1) {
         // This fallback should only be used if they like, covered one of the bots goldmines in buildings
-        return map_clamp_cell(state.map, goldmine_cell - ivec2(BOT_NEAR_DISTANCE, 0));
+        return map_clamp_cell(state.map, goldmine.cell - ivec2(BOT_NEAR_DISTANCE, 0));
+    }
+
+    // Calculate mine exit path center. This cell is to be avoided if possible
+    ivec2 mine_exit_path_center = ivec2(-1, -1);
+    EntityId hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
+    if (hall_id != ID_NULL) {
+        const Entity& hall = state.entities.get_by_id(hall_id);
+        std::vector<ivec2> ideal_mine_exit_path;
+        map_get_ideal_mine_exit_path(state.map, goldmine.cell, hall.cell, &ideal_mine_exit_path);
+        if (!ideal_mine_exit_path.empty()) {
+            mine_exit_path_center = ideal_mine_exit_path[ideal_mine_exit_path.size() / 2];
+        }
     }
 
     frontier.push_back(exit_cell);
@@ -3979,7 +4050,7 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId go
         ivec2 next = frontier.back();
         frontier.pop_back();
 
-        if (ivec2::manhattan_distance(next, goldmine_cell) > BOT_MEDIUM_DISTANCE) {
+        if (ivec2::manhattan_distance(next, goldmine.cell) > BOT_MEDIUM_DISTANCE) {
             continue;
         }
 
@@ -3987,7 +4058,8 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, EntityId go
             continue;
         }
 
-        if (ivec2::manhattan_distance(next, goldmine_cell + ivec2(1, 1)) > 5 &&
+        if (ivec2::manhattan_distance(next, goldmine.cell + ivec2(1, 1)) > 5 &&
+                ivec2::manhattan_distance(next, mine_exit_path_center) > 8 &&
                 map_is_cell_rect_in_bounds(state.map, next - ivec2(1, 1), 3) &&
                 !map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, next - ivec2(1, 1), 3)) {
             retreat_cell = next;
