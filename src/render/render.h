@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "render/types.h"
 #include "render/sprite.h"
 #include "render/font.h"
 #include "math/gmath.h"
@@ -30,27 +31,6 @@ struct SpriteInfo {
     int vframes;
     int frame_width;
     int frame_height;
-};
-
-enum RenderColor {
-    RENDER_COLOR_WHITE,
-    RENDER_COLOR_OFFBLACK,
-    RENDER_COLOR_OFFBLACK_TRANSPARENT,
-    RENDER_COLOR_DARK_GRAY,
-    RENDER_COLOR_BLUE,
-    RENDER_COLOR_DIM_BLUE,
-    RENDER_COLOR_LIGHT_BLUE,
-    RENDER_COLOR_RED,
-    RENDER_COLOR_RED_TRANSPARENT,
-    RENDER_COLOR_LIGHT_RED,
-    RENDER_COLOR_GOLD,
-    RENDER_COLOR_DIM_SAND,
-    RENDER_COLOR_GREEN,
-    RENDER_COLOR_GREEN_TRANSPARENT,
-    RENDER_COLOR_DARK_GREEN,
-    RENDER_COLOR_PURPLE,
-    RENDER_COLOR_LIGHT_PURPLE,
-    RENDER_COLOR_COUNT
 };
 
 const RenderColor RENDER_PLAYER_COLORS[MAX_PLAYERS] = { 

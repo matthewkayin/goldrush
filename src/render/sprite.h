@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "render/types.h"
 
 enum Tileset {
     TILESET_ARIZONA,
@@ -76,6 +77,7 @@ enum SpriteName {
     SPRITE_UI_SWATCH,
     SPRITE_UI_TITLE,
     SPRITE_UI_MOVE,
+    SPRITE_UI_MOVE_YELLOW,
     SPRITE_UI_ICON_BUTTON,
     SPRITE_UI_TOOLTIP_FRAME,
     SPRITE_UI_CONTROL_GROUP,
@@ -127,17 +129,24 @@ enum SpriteName {
     SPRITE_BUTTON_ICON_TAILWIND,
     SPRITE_SELECT_RING_LANDMINE,
     SPRITE_SELECT_RING_LANDMINE_ATTACK,
+    SPRITE_SELECT_RING_LANDMINE_YELLOW,
     SPRITE_SELECT_RING_UNIT,
     SPRITE_SELECT_RING_UNIT_ATTACK,
+    SPRITE_SELECT_RING_UNIT_YELLOW,
     SPRITE_SELECT_RING_WAGON,
     SPRITE_SELECT_RING_WAGON_ATTACK,
+    SPRITE_SELECT_RING_WAGON_YELLOW,
     SPRITE_SELECT_RING_BUILDING_SIZE2,
     SPRITE_SELECT_RING_BUILDING_SIZE2_ATTACK,
+    SPRITE_SELECT_RING_BUILDING_SIZE2_YELLOW,
     SPRITE_SELECT_RING_BUILDING_SIZE3,
     SPRITE_SELECT_RING_BUILDING_SIZE3_ATTACK,
+    SPRITE_SELECT_RING_BUILDING_SIZE3_YELLOW,
     SPRITE_SELECT_RING_BUILDING_SIZE4,
     SPRITE_SELECT_RING_BUILDING_SIZE4_ATTACK,
+    SPRITE_SELECT_RING_BUILDING_SIZE4_YELLOW,
     SPRITE_SELECT_RING_GOLDMINE,
+    SPRITE_SELECT_RING_GOLDMINE_YELLOW,
     SPRITE_GOLDMINE,
     SPRITE_UNIT_WAGON,
     SPRITE_UNIT_WAR_WAGON,
@@ -185,8 +194,9 @@ enum SpriteName {
 
 enum SpriteImportStrategy {
     SPRITE_IMPORT_DEFAULT,
+    SPRITE_IMPORT_PLAYER_COLOR,
+    SPRITE_IMPORT_PLAYER_COLOR_AND_LOW_ALPHA,
     SPRITE_IMPORT_RECOLOR,
-    SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA,
     SPRITE_IMPORT_TILE,
     SPRITE_IMPORT_SWATCH
 };
@@ -195,6 +205,14 @@ struct SpriteParamsSheet {
     const char* path;
     int hframes;
     int vframes;
+};
+
+struct SpriteParamsRecolor {
+    const char* path;
+    int hframes;
+    int vframes;
+    RenderColor from_color;
+    RenderColor to_color;
 };
 
 enum TileType {
@@ -214,6 +232,7 @@ struct SpriteParams {
     union {
         SpriteParamsSheet sheet;
         SpriteParamsTile tile;
+        SpriteParamsRecolor recolor;
     };
 };
 

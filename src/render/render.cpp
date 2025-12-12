@@ -62,7 +62,8 @@ static const std::unordered_map<RenderColor, SDL_Color> RENDER_COLOR_VALUES = {
     { RENDER_COLOR_GREEN_TRANSPARENT, (SDL_Color) { .r = 123, .g = 174, .b = 121, .a = 128 }},
     { RENDER_COLOR_DARK_GREEN, (SDL_Color) { .r = 77, .g = 135, .b = 115, .a = 255 }},
     { RENDER_COLOR_PURPLE, (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 }},
-    { RENDER_COLOR_LIGHT_PURPLE, (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 }}
+    { RENDER_COLOR_LIGHT_PURPLE, (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 }},
+    { RENDER_COLOR_YELLOW, (SDL_Color) { .r = 255, .g = 255, .b = 84, .a = 255 }},
 };
 
 enum LoadedSurfaceType {
@@ -105,7 +106,8 @@ static RenderState state;
 // Init
 bool render_load_sprites();
 void render_flip_sdl_surface_vertically(SDL_Surface* surface);
-SDL_Surface* render_recolor_surface(SDL_Surface* sprite_surface, bool recolor_low_alpha);
+SDL_Surface* render_create_player_color_surface(SDL_Surface* sprite_surface, bool recolor_low_alpha);
+void render_recolor_surface(SDL_Surface* surface, RenderColor from_color, RenderColor to_color);
 SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params);
 SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params);
 SDL_Surface* render_load_font(FontName name);
@@ -348,11 +350,13 @@ bool render_load_sprites() {
                 return false;
             }
 
-            if (params.strategy == SPRITE_IMPORT_RECOLOR || params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA) {
-                sprite_surface = render_recolor_surface(sprite_surface, params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA);
+            if (params.strategy == SPRITE_IMPORT_PLAYER_COLOR || params.strategy == SPRITE_IMPORT_PLAYER_COLOR_AND_LOW_ALPHA) {
+                sprite_surface = render_create_player_color_surface(sprite_surface, params.strategy == SPRITE_IMPORT_PLAYER_COLOR_AND_LOW_ALPHA);
                 if (sprite_surface == NULL) {
                     return false;
                 }
+            } else if (params.strategy == SPRITE_IMPORT_RECOLOR) {
+                render_recolor_surface(sprite_surface, params.recolor.from_color, params.recolor.to_color);
             }
             surfaces[FONT_COUNT + sprite].surface = sprite_surface;
         }
@@ -441,7 +445,7 @@ bool render_load_sprites() {
                     sprite_info.hframes = params.sheet.hframes;
                     sprite_info.vframes = params.sheet.vframes;
                     sprite_info.frame_width = surface->w / sprite_info.hframes;
-                    sprite_info.frame_height = (params.strategy == SPRITE_IMPORT_RECOLOR || params.strategy == SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA)
+                    sprite_info.frame_height = (params.strategy == SPRITE_IMPORT_PLAYER_COLOR || params.strategy == SPRITE_IMPORT_PLAYER_COLOR_AND_LOW_ALPHA)
                                                     ? surface->h / (sprite_info.vframes * MAX_PLAYERS)
                                                     : surface->h / sprite_info.vframes;
                 }
@@ -540,7 +544,7 @@ void render_flip_sdl_surface_vertically(SDL_Surface* surface) {
     SDL_UnlockSurface(surface);
 }
 
-SDL_Surface* render_recolor_surface(SDL_Surface* sprite_surface, bool recolor_low_alpha) {
+SDL_Surface* render_create_player_color_surface(SDL_Surface* sprite_surface, bool recolor_low_alpha) {
     // Create a surface big enough to hold the recolor atlas
     SDL_Surface* recolor_surface = SDL_CreateSurface(sprite_surface->w, sprite_surface->h * MAX_PLAYERS, sprite_surface->format);
     if (recolor_surface == NULL) {
@@ -597,6 +601,24 @@ SDL_Surface* render_recolor_surface(SDL_Surface* sprite_surface, bool recolor_lo
     // Allows the rest of the sprite loading to work the same as with normal sprites
     SDL_DestroySurface(sprite_surface);
     return recolor_surface;
+}
+
+void render_recolor_surface(SDL_Surface* surface, RenderColor from_color, RenderColor to_color) {
+    const SDL_Color& reference_color = RENDER_COLOR_VALUES.at(from_color);
+    const SDL_Color& replacement_color = RENDER_COLOR_VALUES.at(to_color);
+
+    const SDL_PixelFormatDetails* format_details = SDL_GetPixelFormatDetails(surface->format);
+    uint32_t reference_pixel = SDL_MapRGBA(format_details, NULL, reference_color.r, reference_color.g, reference_color.b, reference_color.a);
+    uint32_t replacement_pixel = SDL_MapRGBA(format_details, NULL, replacement_color.r, replacement_color.g, replacement_color.b, replacement_color.a);
+
+    SDL_LockSurface(surface);
+    uint32_t* pixels = (uint32_t*)surface->pixels;
+    for (int index = 0; index < surface->w * surface->h; index++) {
+        if (pixels[index] == reference_pixel) {
+            pixels[index] = replacement_pixel;
+        }
+    }
+    SDL_UnlockSurface(surface);
 }
 
 SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params) {

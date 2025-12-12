@@ -491,7 +491,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UI_MINER_ICON, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "ui_miner.png",
             .hframes = 1,
@@ -571,6 +571,16 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .path = "ui_move.png",
             .hframes = 5,
             .vframes = 1
+        }
+    }},
+    { SPRITE_UI_MOVE_YELLOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .recolor = {
+            .path = "ui_move.png",
+            .hframes = 5,
+            .vframes = 1,
+            .from_color = RENDER_COLOR_WHITE,
+            .to_color = RENDER_COLOR_YELLOW
         }
     }},
     { SPRITE_UI_CONTROL_GROUP, (SpriteParams) {
@@ -981,6 +991,16 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_SELECT_RING_LANDMINE_YELLOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .recolor = {
+            .path = "select_ring_mine.png",
+            .hframes = 1,
+            .vframes = 1,
+            .from_color = RENDER_COLOR_WHITE,
+            .to_color = RENDER_COLOR_YELLOW,
+        }
+    }},
     { SPRITE_SELECT_RING_UNIT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
@@ -995,6 +1015,16 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .path = "select_ring_attack.png",
             .hframes = 1,
             .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_UNIT_YELLOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .recolor = {
+            .path = "select_ring.png",
+            .hframes = 1,
+            .vframes = 1,
+            .from_color = RENDER_COLOR_WHITE,
+.to_color = RENDER_COLOR_YELLOW
         }
     }},
     { SPRITE_SELECT_RING_WAGON, (SpriteParams) {
@@ -1013,6 +1043,16 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_SELECT_RING_WAGON_YELLOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .recolor = {
+            .path = "select_ring_wagon.png",
+            .hframes = 1,
+            .vframes = 1,
+            .from_color = RENDER_COLOR_WHITE,
+            .to_color = RENDER_COLOR_YELLOW
+        }
+    }},
     { SPRITE_SELECT_RING_BUILDING_SIZE2, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
@@ -1027,6 +1067,16 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .path = "select_ring_building2x2_attack.png",
             .hframes = 1,
             .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE2_YELLOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .recolor = {
+            .path = "select_ring_building2x2.png",
+            .hframes = 1,
+            .vframes = 1,
+            .from_color = RENDER_COLOR_WHITE,
+            .to_color = RENDER_COLOR_YELLOW
         }
     }},
     { SPRITE_SELECT_RING_BUILDING_SIZE3, (SpriteParams) {
@@ -1045,6 +1095,16 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE3_YELLOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .recolor = {
+            .path = "select_ring_building3x3.png",
+            .hframes = 1,
+            .vframes = 1,
+            .from_color = RENDER_COLOR_WHITE,
+            .to_color = RENDER_COLOR_YELLOW
+        }
+    }},
     { SPRITE_SELECT_RING_BUILDING_SIZE4, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
@@ -1061,12 +1121,32 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+    { SPRITE_SELECT_RING_BUILDING_SIZE4_YELLOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .recolor = {
+            .path = "select_ring_building4x4.png",
+            .hframes = 1,
+            .vframes = 1,
+            .from_color = RENDER_COLOR_WHITE,
+            .to_color = RENDER_COLOR_YELLOW
+        }
+    }},
     { SPRITE_SELECT_RING_GOLDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring_gold_mine.png",
             .hframes = 1,
             .vframes = 1
+        }
+    }},
+    { SPRITE_SELECT_RING_GOLDMINE_YELLOW, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_RECOLOR,
+        .recolor = {
+            .path = "select_ring_gold_mine.png",
+            .hframes = 1,
+            .vframes = 1,
+            .from_color = RENDER_COLOR_WHITE,
+            .to_color = RENDER_COLOR_YELLOW,
         }
     }},
     { SPRITE_GOLDMINE, (SpriteParams) {
@@ -1078,7 +1158,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_WAGON, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_wagon.png",
             .hframes = 15,
@@ -1086,7 +1166,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_WAR_WAGON, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_war_wagon.png",
             .hframes = 15,
@@ -1094,7 +1174,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_MINER, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_miner.png",
             .hframes = 15,
@@ -1102,7 +1182,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_COWBOY, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_cowboy.png",
             .hframes = 15,
@@ -1110,7 +1190,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_SAPPER, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_sapper.png",
             .hframes = 15,
@@ -1118,7 +1198,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_PYRO, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_pyro.png",
             .hframes = 15,
@@ -1126,7 +1206,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_JOCKEY, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_jockey.png",
             .hframes = 15,
@@ -1134,7 +1214,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_SOLDIER, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_soldier.png",
             .hframes = 26,
@@ -1142,7 +1222,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_CANNON, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_cannon.png",
             .hframes = 21,
@@ -1150,7 +1230,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_DETECTIVE, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_spy.png",
             .hframes = 15,
@@ -1158,7 +1238,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_DETECTIVE_INVISIBLE, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR_AND_LOW_ALPHA,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR_AND_LOW_ALPHA,
         .sheet = {
             .path = "unit_spy.png",
             .hframes = 15,
@@ -1166,7 +1246,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_BALLOON, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_balloon.png",
             .hframes = 5,
@@ -1190,7 +1270,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_UNIT_BANDIT, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_bandit.png",
             .hframes = 15,
@@ -1198,7 +1278,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_MINER_BUILDING, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "unit_miner_building.png",
             .hframes = 2,
@@ -1206,7 +1286,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_HALL, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_hall.png",
             .hframes = 4,
@@ -1214,7 +1294,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_HOUSE, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_house.png",
             .hframes = 4,
@@ -1222,7 +1302,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_SALOON, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_saloon.png",
             .hframes = 4,
@@ -1230,7 +1310,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_BUNKER, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_bunker.png",
             .hframes = 4,
@@ -1238,7 +1318,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_SMITH, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_smith.png",
             .hframes = 4,
@@ -1254,7 +1334,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_WORKSHOP, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_workshop.png",
             .hframes = 19,
@@ -1262,7 +1342,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_COOP, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_coop.png",
             .hframes = 4,
@@ -1270,7 +1350,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_BARRACKS, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_barracks.png",
             .hframes = 4,
@@ -1278,7 +1358,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_SHERIFFS, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_sheriffs.png",
             .hframes = 4,
@@ -1286,7 +1366,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_BUILDING_LANDMINE, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "building_mine.png",
             .hframes = 4,
@@ -1334,7 +1414,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
         }
     }},
     { SPRITE_RALLY_FLAG, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
+        .strategy = SPRITE_IMPORT_PLAYER_COLOR,
         .sheet = {
             .path = "rally_flag.png",
             .hframes = 6,
