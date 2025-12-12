@@ -3,6 +3,7 @@
 #include "core/logger.h"
 #include "match/upgrade.h"
 #include "match/lcg.h"
+#include <tracy/tracy/Tracy.hpp>
 
 // Scout info
 static const uint32_t BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES = 1;
@@ -116,6 +117,8 @@ BotUnitComp bot_roll_preferred_unit_comp(int* lcg_seed) {
 }
 
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_timer) {
+    ZoneScoped;
+
     GOLD_ASSERT_MESSAGE(state.players[bot.player_id].active, "bot_get_turn_input should not be called after bot has surrendered.");
 
     // Gather info
@@ -214,6 +217,8 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 // STRATEGY
 
 void bot_strategy_update(const MatchState& state, Bot& bot) {
+    ZoneScoped;
+
     // Handle base under attack
     for (auto it : bot.base_info) {
         EntityId goldmine_id = it.first;
@@ -738,6 +743,8 @@ bool bot_should_all_in(const Bot& bot) {
 // PRODUCTION
 
 MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t match_timer) {
+    ZoneScoped;
+
     // Saturate bases
     MatchInput saturate_bases_input = bot_saturate_bases(state, bot);
     if (saturate_bases_input.type != MATCH_INPUT_NONE) {
@@ -1739,6 +1746,8 @@ void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id
 }
 
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_timer) {
+    ZoneScoped;
+
     // Remove dead units
     bot_squad_remove_dead_units(state, bot, squad);
     if (squad.entities.empty()) {
@@ -2948,6 +2957,8 @@ MatchInput bot_squad_landmines_micro(const MatchState& state, Bot& bot, const Bo
 // SCOUTING
 
 void bot_scout_gather_info(const MatchState& state, Bot& bot) {
+    ZoneScoped;
+
     // Check for scout death
     if (bot.scout_id != ID_NULL) {
         uint32_t scout_index = state.entities.get_index_of(bot.scout_id);
@@ -2997,6 +3008,8 @@ void bot_scout_gather_info(const MatchState& state, Bot& bot) {
 }
 
 void bot_update_base_info(const MatchState& state, Bot& bot) {
+    ZoneScoped;
+
     bot.base_info.clear();
 
     // Populate the base_info list and figure out who controls each goldmine
@@ -3152,6 +3165,8 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
 }
 
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer) {
+    ZoneScoped;
+
     if (bot.scout_id == ID_NULL) {
         if (!bot_should_scout(bot, match_timer)) {
             return (MatchInput) { .type = MATCH_INPUT_NONE };
@@ -3622,7 +3637,9 @@ std::vector<EntityType> bot_entity_types_production_buildings() {
 // MISC
 
 EntityId bot_find_threatened_in_progress_building(const MatchState& state, const Bot& bot) {
-    return match_find_entity(state, [&state, &bot](const Entity& building, EntityId /*building_id*/) {
+    ZoneScoped;
+
+        return match_find_entity(state, [&state, &bot](const Entity& building, EntityId /*building_id*/) {
         if (building.mode != MODE_BUILDING_IN_PROGRESS ||
                 building.player_id != bot.player_id) {
             return false;
@@ -3660,6 +3677,8 @@ EntityId bot_find_threatened_in_progress_building(const MatchState& state, const
 }
 
 EntityId bot_find_building_in_need_of_repair(const MatchState& state, const Bot& bot) {
+    ZoneScoped;
+
     return match_find_entity(state, [&state, &bot](const Entity& building, EntityId building_id) {
         // Filter down to on-fire, finished, owned buildings
         if (building.player_id != bot.player_id ||
@@ -3702,6 +3721,8 @@ MatchInput bot_repair_building(const MatchState& state, const Bot& bot, EntityId
 }
 
 MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot) {
+    ZoneScoped;
+
     std::vector<EntityId> stray_units = match_find_entities(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
         // Filter down to owned, unreserved units
         if (!entity_is_unit(entity.type) ||
@@ -3759,6 +3780,8 @@ MatchInput bot_rein_in_stray_units(const MatchState& state, const Bot& bot) {
 }
 
 MatchInput bot_update_building_rally_point(const MatchState& state, const Bot& bot, EntityId building_id) {
+    ZoneScoped;
+
     const Entity& building = state.entities.get_by_id(building_id);
 
     ivec2 rally_point = bot_choose_building_rally_point(state, bot, building);
@@ -3865,6 +3888,8 @@ bool bot_is_rally_cell_valid(const MatchState& state, ivec2 rally_cell, int rall
 }
 
 MatchInput bot_unload_unreserved_carriers(const MatchState& state, const Bot& bot) {
+    ZoneScoped;
+
     EntityId carrier_id = match_find_entity(state, [&bot](const Entity& carrier, EntityId carrier_id) {
         return carrier.player_id == bot.player_id &&
                 entity_is_selectable(carrier) &&

@@ -15,6 +15,7 @@
 #include <SDL3/SDL_ttf.h>
 #include <ctime>
 #include <string>
+#include <tracy/tracy/Tracy.hpp>
 
 #ifdef GOLD_STEAM
     #include <steam/steam_api.h>
@@ -296,6 +297,8 @@ int gold_main(int argc, char** argv) {
         #endif
 
         render_present_frame();
+
+        FrameMark;
     }
 
     // Disconnect the network

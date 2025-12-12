@@ -221,6 +221,7 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state) {
 
     // Write to desync file
     #ifdef GOLD_DEBUG_DESYNC
+        GOLD_ASSERT(state.buffer_size != 0);
         fwrite(&state.buffer_size, sizeof(state.buffer_size), 1, state.desync_file);
         fwrite(state.buffer, state.buffer_size, 1, state.desync_file);
     #endif
