@@ -7,7 +7,7 @@
 #include "match/upgrade.h"
 #include "shell/desync.h"
 #include <algorithm>
-
+#include <tracy/tracy/Tracy.hpp>
 
 // Status
 static const uint32_t STATUS_DURATION = 60;
@@ -394,6 +394,8 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
 // UPDATE
 
 void match_shell_update(MatchShellState* state) {
+    ZoneScoped;
+
     if (state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
         return;
     }
@@ -2563,6 +2565,8 @@ void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t 
 // RENDER
 
 void match_shell_render(const MatchShellState* state) {
+    ZoneScoped;
+
     std::vector<RenderSpriteParams> above_fog_sprite_params;
     std::vector<RenderSpriteParams> ysort_params;
 

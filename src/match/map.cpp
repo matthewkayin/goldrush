@@ -6,6 +6,7 @@
 #include "lcg.h"
 #include <unordered_map>
 #include <algorithm>
+#include <tracy/tracy/Tracy.hpp>
 
 static const int MAP_PLAYER_SPAWN_SIZE = 13;
 static const int MAP_PLAYER_SPAWN_MARGIN = 13;
@@ -1410,6 +1411,8 @@ int map_are_regions_connected(const Map& map, int region_a, int region_b) {
 }
 
 ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    ZoneScoped;
+
     if (from == to) {
         return to;
     }
@@ -1510,6 +1513,8 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
 }
 
 std::vector<int> map_get_region_path(const Map& map, int from_region, int to_region) {
+    ZoneScoped;
+
     std::vector<int> path;
 
     if (from_region == to_region) {
@@ -1609,6 +1614,8 @@ ivec2 map_get_region_connection_cell_closest_to_cell(const Map& map, ivec2 cell,
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    ZoneScoped;
+
     static const int EXPLORED_INDEX_NOT_EXPLORED = -1;
     static const int EXPLORED_INDEX_IGNORE_CELL = -2;
 
