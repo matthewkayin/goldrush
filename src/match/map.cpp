@@ -26,7 +26,8 @@ SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params);
 
-void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
+void map_init(Map& map, MatchSettingMapTypeValue map_type, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
+    map.type = map_type;
     map.width = noise.width;
     map.height = noise.height;
     log_info("Generating map. Size: %ux%u", map.width, map.height);
@@ -273,42 +274,6 @@ void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_
         }
     }
 
-    /*
-    // Remove elevation artifacts
-    uint32_t elevation_artifact_count;
-    const int ELEVATION_NEAR_DIST = 4;
-    do {
-        elevation_artifact_count = 0;
-        for (int x = 0; x < noise.width; x++) {
-            for (int y = 0; y < noise.height; y++) {
-                if (noise.map[x + (y * noise.width)] != 2) {
-                    continue;
-                }
-
-                bool is_highground_too_close = false;
-                for (int nx = x - ELEVATION_NEAR_DIST; nx < x + ELEVATION_NEAR_DIST + 1; nx++) {
-                    for (int ny = y - ELEVATION_NEAR_DIST; ny < y + ELEVATION_NEAR_DIST + 1; ny++) {
-                        if (!map_is_cell_in_bounds(map, ivec2(nx, ny))) {
-                            continue;
-                        }
-                        if (noise.map[nx + (ny * noise.width)] != 1) {
-                            is_highground_too_close = true;
-                            break;
-                        }
-                    }
-                    if (is_highground_too_close) {
-                        break;
-                    }
-                }
-                if (is_highground_too_close) {
-                    noise.map[x + (y * noise.width)] = 1;
-                    elevation_artifact_count++;
-                }
-            }
-        }
-    } while (elevation_artifact_count != 0);
-    */
-
     // Bake map tiles
     std::vector<ivec2> artifacts;
     do {
@@ -326,7 +291,7 @@ void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_
         for (int y = 0; y < map.height; y++) {
             for (int x = 0; x < map.width; x++) {
                 int index = x + (y * map.width);
-                if (noise.map[index] >= 0) {
+                if (noise.map[index] == NOISE_VALUE_LOWGROUND || noise.map[index] == NOISE_VALUE_HIGHGROUND) {
                     map.tiles[index].elevation = (uint32_t)(noise.map[index] == NOISE_VALUE_HIGHGROUND);
                     // First check if we need to place a regular wall here
                     uint32_t neighbors = 0;
@@ -346,12 +311,7 @@ void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_
 
                     // Regular sand tile 
                     if (neighbors == 0) {
-                        int new_index = lcg_rand(lcg_seed) % 7;
-                        if (new_index < 4 && index % 3 == 0) {
-                            map.tiles[index].sprite = new_index == 1 ? SPRITE_TILE_SAND3 : SPRITE_TILE_SAND2;
-                        } else {
-                            map.tiles[index].sprite = SPRITE_TILE_SAND1;
-                        }
+                        map.tiles[index].sprite = map_choose_ground_tile_sprite(map_type, index, lcg_seed);
                     // Wall tile 
                     } else {
                         map.tiles[index].sprite = map_wall_autotile_lookup(neighbors);
@@ -386,7 +346,7 @@ void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_
                     // Set the map tile based on the neighbors
                     uint32_t autotile_index = map_neighbors_to_autotile_index(neighbors);
                     map.tiles[index] = (Tile) {
-                        .sprite = SPRITE_TILE_WATER,
+                        .sprite = map_choose_water_tile_sprite(map_type),
                         .frame = ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES),
                         .elevation = 0
                     };
@@ -573,10 +533,8 @@ void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_
 
     // Block all walls and water
     for (int index = 0; index < map.width * map.height; index++) {
-        if (!(map.tiles[index].sprite == SPRITE_TILE_SAND1 ||
-                map.tiles[index].sprite == SPRITE_TILE_SAND2 ||
-                map.tiles[index].sprite == SPRITE_TILE_SAND3 ||
-                map_is_tile_ramp(map, ivec2(index % map.width, index / map.width)))) {
+        ivec2 cell = ivec2(index % map.width, index / map.width);
+        if (!map_is_tile_ground(map, cell) && !map_is_tile_ramp(map, cell)) {
             map.cells[CELL_LAYER_GROUND][index].type = CELL_BLOCKED;
         }
     }
@@ -814,7 +772,61 @@ void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_
             map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)].type = (CellType)(CELL_DECORATION_1 + (lcg_rand(lcg_seed) % 5));
         }
     }
+}
 
+SpriteName map_choose_ground_tile_sprite(MatchSettingMapTypeValue map_type, int index, int* lcg_seed) {
+    switch (map_type) {
+        case MAP_TYPE_ARIZONA: {
+            int new_index = lcg_rand(lcg_seed) % 7;
+            if (new_index == 1 && index % 3 == 0) {
+                return SPRITE_TILE_SAND3;
+            } else if (new_index < 4 && index % 3 == 0) {
+                return SPRITE_TILE_SAND2;
+            } else {
+                return SPRITE_TILE_SAND1;
+            }
+        }
+        case MAP_TYPE_KLONDIKE: {
+            int new_index = lcg_rand(lcg_seed) % 20;
+            if (new_index == 1 && index % 7 == 0) {
+                return SPRITE_TILE_SNOW3;
+            } else if (new_index == 0 && index % 7 == 0) {
+                return SPRITE_TILE_SNOW2;
+            } else {
+                return SPRITE_TILE_SNOW1;
+            }
+        }
+        case MAP_TYPE_COUNT: {
+            GOLD_ASSERT(false);
+            return SPRITE_TILE_NULL;
+        }
+    }
+}
+
+SpriteName map_choose_water_tile_sprite(MatchSettingMapTypeValue map_type) {
+    switch (map_type) {
+        case MAP_TYPE_ARIZONA:
+            return SPRITE_TILE_SAND_WATER;
+        case MAP_TYPE_KLONDIKE:
+            return SPRITE_TILE_SNOW_WATER;
+        case MAP_TYPE_COUNT: {
+            GOLD_ASSERT(false);
+            return SPRITE_TILE_NULL;
+        }
+    }
+}
+
+SpriteName map_get_plain_ground_tile_sprite(const Map& map) {
+    switch (map.type) {
+        case MAP_TYPE_ARIZONA:
+            return SPRITE_TILE_SAND1;
+        case MAP_TYPE_KLONDIKE:
+            return SPRITE_TILE_SNOW1;
+        case MAP_TYPE_COUNT: {
+            GOLD_ASSERT(false);
+            return SPRITE_TILE_NULL;
+        }
+    }
 }
 
 bool map_is_cell_blocked(Cell cell) {
@@ -1122,9 +1134,25 @@ Tile map_get_tile(const Map& map, ivec2 cell) {
     return map.tiles[cell.x + (cell.y * map.width)];
 }
 
+bool map_is_tile_ground(const Map& map, ivec2 cell) {
+    uint8_t tile_sprite = map.tiles[cell.x + (cell.y * map.width)].sprite;
+    return tile_sprite == SPRITE_TILE_SAND1 ||
+        tile_sprite == SPRITE_TILE_SAND2 ||
+        tile_sprite == SPRITE_TILE_SAND3 ||
+        tile_sprite == SPRITE_TILE_SNOW1 ||
+        tile_sprite == SPRITE_TILE_SNOW2 ||
+        tile_sprite == SPRITE_TILE_SNOW3;
+}
+
 bool map_is_tile_ramp(const Map& map, ivec2 cell) {
     uint8_t tile_sprite = map.tiles[cell.x + (cell.y * map.width)].sprite;
     return tile_sprite >= SPRITE_TILE_WALL_SOUTH_STAIR_LEFT && tile_sprite <= SPRITE_TILE_WALL_WEST_STAIR_BOTTOM;
+}
+
+bool map_is_tile_water(const Map& map, ivec2 cell) {
+    uint8_t tile_sprite = map.tiles[cell.x + (cell.y * map.width)].sprite;
+    return tile_sprite == SPRITE_TILE_SAND_WATER ||
+        tile_sprite == SPRITE_TILE_SNOW_WATER;
 }
 
 bool map_is_cell_rect_same_elevation(const Map& map, ivec2 cell, int size) {

@@ -210,14 +210,15 @@ MatchShellState* match_shell_init(int lcg_seed, Noise& noise) {
         players[player_id].active = true;
         strcpy(players[player_id].name, network_player.name);
         // Use the player_id as the "team" in a FFA game to ensure everyone is on a separate team
-        players[player_id].team = network_get_match_setting(MATCH_SETTING_TEAMS) == MATCH_SETTING_TEAMS_ENABLED 
+        players[player_id].team = network_get_match_setting(MATCH_SETTING_TEAMS) == TEAMS_ENABLED 
                                         ? network_player.team
                                         : player_id;
         players[player_id].recolor_id = network_player.recolor_id;
     }
-    state->replay_file = replay_file_open(lcg_seed, noise, players);
+    MatchSettingMapTypeValue map_type = (MatchSettingMapTypeValue)network_get_match_setting((uint8_t)MATCH_SETTING_MAP_TYPE);
+    state->replay_file = replay_file_open(lcg_seed, map_type, noise, players);
     state->replay_mode = false;
-    state->match_state = match_init(lcg_seed, noise, players);
+    state->match_state = match_init(lcg_seed, map_type, noise, players);
 
     // Init input queues
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -2593,11 +2594,16 @@ void match_shell_render(const MatchShellState* state) {
                     .recolor_id = 0
                 };
 
-                bool should_render_on_ground_level = (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_WATER) || map_is_tile_ramp(state->match_state.map, base_coords + ivec2(x, y));
-                if (!(tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_WATER) && elevation == 0) {
-                    render_sprite_frame(SPRITE_TILE_SAND1, ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                bool should_render_on_ground_level = 
+                    map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) || 
+                    map_is_tile_ramp(state->match_state.map, base_coords + ivec2(x, y));
+                if (elevation == 0 && 
+                        !map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) &&
+                        !map_is_tile_water(state->match_state.map, base_coords + ivec2(x, y))) {
+                    render_sprite_frame(map_get_plain_ground_tile_sprite(state->match_state.map), ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                 }
-                if ((should_render_on_ground_level && elevation == 0) || (!should_render_on_ground_level && elevation == tile.elevation)) {
+                if ((should_render_on_ground_level && elevation == 0) || 
+                        (!should_render_on_ground_level && elevation == tile.elevation)) {
                     render_sprite_frame(tile_params.sprite, tile_params.frame, tile_params.position, tile_params.options, tile_params.recolor_id);
                 } 
 
@@ -3789,7 +3795,7 @@ void match_shell_render(const MatchShellState* state) {
             Tile tile = map_get_tile(state->match_state.map, ivec2(x, y));
             if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
                 pixel = MINIMAP_PIXEL_SAND;
-            } else if (tile.sprite == SPRITE_TILE_WATER) {
+            } else if (tile.sprite == SPRITE_TILE_SAND_WATER) {
                 pixel = MINIMAP_PIXEL_WATER;
             } else {
                 pixel = MINIMAP_PIXEL_WALL;

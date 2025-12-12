@@ -29,7 +29,7 @@ static const uint32_t FOG_REVEAL_DURATION = 60;
 static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 
-MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
+MatchState match_init(int32_t lcg_seed, MatchSettingMapTypeValue map_type, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
     #ifdef GOLD_RAND_SEED
         state.lcg_seed = GOLD_RAND_SEED;
@@ -38,7 +38,7 @@ MatchState match_init(int32_t lcg_seed, Noise& noise, MatchPlayer players[MAX_PL
     log_info("Set random seed to %i", lcg_seed);
     std::vector<ivec2> map_spawn_points;
     std::vector<ivec2> goldmine_cells;
-    map_init(state.map, noise, &state.lcg_seed, map_spawn_points, goldmine_cells);
+    map_init(state.map, map_type, noise, &state.lcg_seed, map_spawn_points, goldmine_cells);
     memcpy(state.players, players, sizeof(state.players));
 
     state.fire_cells = std::vector<int>((size_t)(state.map.width * state.map.height), 0);
@@ -3533,7 +3533,7 @@ void match_set_cell_on_fire(MatchState& state, ivec2 cell, ivec2 source) {
     if (map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED) {
         return;
     }
-    if (map_get_tile(state.map, cell).sprite == SPRITE_TILE_WATER) {
+    if (map_is_tile_water(state.map, cell)) {
         return;
     }
     if (ivec2::manhattan_distance(cell, source) > PROJECTILE_MOLOTOV_FIRE_SPREAD ||

@@ -93,7 +93,7 @@ Bot bot_init(uint8_t player_id, MatchSettingDifficultyValue difficulty, BotOpene
 }
 
 BotOpener bot_roll_opener(int* lcg_seed, MatchSettingDifficultyValue difficulty) {
-    if (difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+    if (difficulty == DIFFICULTY_EASY) {
         return BOT_OPENER_BUNKER;
     }
 
@@ -415,9 +415,9 @@ bool bot_should_expand(const MatchState& state, const Bot& bot) {
     // Moderate: Maintain two bases
     // Hard: Maintain two, but keep up with opponent if they take more than that
     uint32_t target_base_count;
-    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+    if (bot.difficulty == DIFFICULTY_EASY) {
         target_base_count = 1U;
-    } else if (bot.difficulty == MATCH_SETTING_DIFFICULTY_MODERATE) {
+    } else if (bot.difficulty == DIFFICULTY_MODERATE) {
         target_base_count = 2U;
     } else {
         target_base_count = std::max(2U, bot_get_max_enemy_mining_base_count(state, bot));
@@ -692,7 +692,7 @@ bool bot_should_attack(const MatchState& state, const Bot& bot) {
     // Hard: Harass if possible, then push
 
     // Easy: Don't attack unless player has attacked us first
-    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY && !bot_check_scout_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED)) {
+    if (bot.difficulty == DIFFICULTY_EASY && !bot_check_scout_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED)) {
         return false;
     }
 
@@ -722,7 +722,7 @@ bool bot_should_attack(const MatchState& state, const Bot& bot) {
     const int least_defended_base_score = bot.base_info.at(least_defended_enemy_goldmine_id).defense_score;
     const int minimum_attack_threshold = 
         least_defended_base_score < 4 * BOT_UNIT_SCORE_IN_BUNKER && 
-        bot.difficulty == MATCH_SETTING_DIFFICULTY_HARD
+        bot.difficulty == DIFFICULTY_HARD
             ? 4 * BOT_UNIT_SCORE_IN_BUNKER
             : 32 * BOT_UNIT_SCORE;
     const int attack_threshold = std::max(least_defended_base_score + (BOT_UNIT_SCORE * 4), minimum_attack_threshold);
@@ -1511,7 +1511,7 @@ uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot, Entity
         return UPGRADE_LANDMINES;
     }
 
-    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+    if (bot.difficulty == DIFFICULTY_EASY) {
         return 0;
     }
 
@@ -1641,10 +1641,10 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
     bot.buildings_to_set_rally_points.push(building_id);
 
-    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY || bot.difficulty == MATCH_SETTING_DIFFICULTY_MODERATE) {
+    if (bot.difficulty == DIFFICULTY_EASY || bot.difficulty == DIFFICULTY_MODERATE) {
         bot.macro_cycle_count++;
         if (bot.macro_cycle_count >= bot_get_player_mining_base_count(bot, bot.player_id) * 2) {
-            bot.macro_cycle_timer = match_timer + (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY ? BOT_MACRO_COOLDOWN_EASY : BOT_MACRO_COOLDOWN_MODERATE);
+            bot.macro_cycle_timer = match_timer + (bot.difficulty == DIFFICULTY_EASY ? BOT_MACRO_COOLDOWN_EASY : BOT_MACRO_COOLDOWN_MODERATE);
             bot.macro_cycle_count = 0;
         }
     } 
@@ -2062,7 +2062,7 @@ std::vector<EntityId> bot_squad_get_nearby_enemy_list(const MatchState& state, c
 
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad, int nearby_enemy_score) {
     // Don't retreat on easy mode
-    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_EASY) {
+    if (bot.difficulty == DIFFICULTY_EASY) {
         return false;
     }
 
@@ -2075,7 +2075,7 @@ bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const Bot
     int squad_score = bot_score_entity_list(state, bot, squad.entities);
 
     // On moderate difficulty, retreat less willingly
-    if (bot.difficulty == MATCH_SETTING_DIFFICULTY_MODERATE) {
+    if (bot.difficulty == DIFFICULTY_MODERATE) {
         squad_score += 4 * BOT_UNIT_SCORE;
     }
 
@@ -2375,8 +2375,7 @@ MatchInput bot_squad_pyro_micro(const MatchState& state, Bot& bot, BotSquad& squ
 
 int bot_squad_get_molotov_cell_score(const MatchState& state, const Entity& pyro, ivec2 cell) {
     if (!map_is_cell_in_bounds(state.map, cell) ||
-            map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED || 
-            map_get_tile(state.map, cell).sprite == SPRITE_TILE_WATER) {
+            map_get_cell(state.map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED) {
         return 0;
     }
 
@@ -2958,7 +2957,7 @@ void bot_scout_gather_info(const MatchState& state, Bot& bot) {
     }
 
     // Check for invisible units
-    if (bot.difficulty != MATCH_SETTING_DIFFICULTY_EASY) {
+    if (bot.difficulty != DIFFICULTY_EASY) {
         EntityId proof_of_landmines_id = match_find_entity(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
             if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
                 return false;

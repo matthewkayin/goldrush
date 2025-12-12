@@ -197,7 +197,7 @@ void game_test_set_mode(GameState& state, GameMode mode) {
 
     if (mode == GAME_MODE_MATCH) {
         int lcg_seed = rand();
-        MatchSettingDifficultyValue difficulty = MATCH_SETTING_DIFFICULTY_HARD;
+        MatchSettingDifficultyValue difficulty = DIFFICULTY_HARD;
         BotOpener opener = BOT_OPENER_TECH_FIRST;
         BotUnitComp unit_comp = bot_roll_preferred_unit_comp(&lcg_seed);
         state.test_bot = bot_init(network_get_player_id(), difficulty, opener, unit_comp);
@@ -243,16 +243,16 @@ void game_test_update(GameState& state) {
             }
             case MENU_MODE_LOBBY: {
                 if (state.test_mode == TEST_MODE_HOST) {
-                    if (network_get_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE) != MATCH_SETTING_MAP_SIZE_MEDIUM) {
-                        network_set_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE, (uint8_t)MATCH_SETTING_MAP_SIZE_MEDIUM);
+                    if (network_get_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE) != MAP_SIZE_MEDIUM) {
+                        network_set_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE, (uint8_t)MAP_SIZE_MEDIUM);
                         break;
                     }
-                    if (network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) != MATCH_SETTING_TEAMS_ENABLED) {
-                        network_set_match_setting((uint8_t)MATCH_SETTING_TEAMS, (uint8_t)MATCH_SETTING_TEAMS_ENABLED);
+                    if (network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) != TEAMS_ENABLED) {
+                        network_set_match_setting((uint8_t)MATCH_SETTING_TEAMS, (uint8_t)TEAMS_ENABLED);
                         break;
                     }
-                    if (network_get_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY) != MATCH_SETTING_DIFFICULTY_HARD) {
-                        network_set_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY_HARD, (uint8_t)MATCH_SETTING_DIFFICULTY_HARD);
+                    if (network_get_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY) != DIFFICULTY_HARD) {
+                        network_set_match_setting((uint8_t)DIFFICULTY_HARD, (uint8_t)DIFFICULTY_HARD);
                         break;
                     }
                     if (network_get_player_count() == 1) {
@@ -276,7 +276,7 @@ void game_test_update(GameState& state) {
                     }
                 } else if (state.test_mode == TEST_MODE_JOIN) {
                     if (network_get_player(network_get_player_id()).team == 0 &&
-                            network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) == MATCH_SETTING_TEAMS_ENABLED) {
+                            network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) == TEAMS_ENABLED) {
                         network_set_player_team(network_get_player_id(), 1);
                         break;
                     }

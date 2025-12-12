@@ -3,7 +3,8 @@
 #include <unordered_map>
 
 static const std::unordered_map<Tileset, TilesetParams> TILESET_PARAMS = {
-    { TILESET_ARIZONA, (TilesetParams) { .path = "tileset_arizona.png" }},
+    { TILESET_ARIZONA, (TilesetParams) { .path = "arizona_tiles.png" }},
+    { TILESET_KLONDIKE, (TilesetParams) { .path = "klondike_tiles.png" }},
     { TILESET_FOG, (TilesetParams) { .path = "fog_of_war.png" }}
 };
 
@@ -44,10 +45,46 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 0
         }
     }},
-    { SPRITE_TILE_WATER, (SpriteParams) {
+    { SPRITE_TILE_SAND_WATER, (SpriteParams) {
         .strategy = SPRITE_IMPORT_TILE,
         .tile = {
             .tileset = TILESET_ARIZONA,
+            .type = TILE_TYPE_AUTO,
+            .source_x = 0,
+            .source_y = 16
+        }
+    }},
+    { SPRITE_TILE_SNOW1, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_KLONDIKE,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 0,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_SNOW2, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_KLONDIKE,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 16,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_SNOW3, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_KLONDIKE,
+            .type = TILE_TYPE_SINGLE,
+            .source_x = 32,
+            .source_y = 0
+        }
+    }},
+    { SPRITE_TILE_SNOW_WATER, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_TILE,
+        .tile = {
+            .tileset = TILESET_KLONDIKE,
             .type = TILE_TYPE_AUTO,
             .source_x = 0,
             .source_y = 16
@@ -326,7 +363,7 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
     { SPRITE_DECORATION, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
-            .path = "tile_decorations.png",
+            .path = "arizona_decorations.png",
             .hframes = 5,
             .vframes = 1
         }

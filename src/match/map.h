@@ -4,6 +4,7 @@
 #include "noise.h"
 #include "render/sprite.h"
 #include "math/gmath.h"
+#include "core/match_setting.h"
 #include <vector>
 #include <unordered_map>
 
@@ -65,6 +66,7 @@ struct MapPathNode {
 };
 
 struct Map {
+    MatchSettingMapTypeValue type;
     int width;
     int height;
     std::vector<Tile> tiles;
@@ -74,7 +76,10 @@ struct Map {
     std::vector<std::vector<std::vector<ivec2>>> region_connections;
 };
 
-void map_init(Map& map, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
+void map_init(Map& map, MatchSettingMapTypeValue map_type, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
+SpriteName map_choose_ground_tile_sprite(MatchSettingMapTypeValue map_type, int index, int* lcg_seed);
+SpriteName map_choose_water_tile_sprite(MatchSettingMapTypeValue map_type);
+SpriteName map_get_plain_ground_tile_sprite(const Map& map);
 bool map_is_cell_blocked(Cell cell);
 bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size);
 void map_calculate_unreachable_cells(Map& map);
@@ -86,7 +91,9 @@ bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, int size);
 ivec2 map_clamp_cell(const Map& map, ivec2 cell);
 
 Tile map_get_tile(const Map& map, ivec2 cell);
+bool map_is_tile_ground(const Map& map, ivec2 cell);
 bool map_is_tile_ramp(const Map& map, ivec2 cell);
+bool map_is_tile_water(const Map& map, ivec2 cell);
 bool map_is_cell_rect_same_elevation(const Map& map, ivec2 cell, int size);
 
 Cell map_get_cell(const Map& map, CellLayer layer, ivec2 cell);

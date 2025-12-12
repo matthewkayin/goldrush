@@ -274,7 +274,9 @@ bool render_init(SDL_Window* window) {
     glUniform1ui(glGetUniformLocation(state.minimap_shader, "sprite_texture"), 0);
     glUniformMatrix4fv(glGetUniformLocation(state.minimap_shader, "projection"), 1, GL_FALSE, projection.data);
 
-    render_load_sprites();
+    if (!render_load_sprites()) {
+        return false;
+    }
 
     render_update_screen_scale();
     SDL_GL_SetSwapInterval(1);

@@ -478,7 +478,7 @@ void menu_update(MenuState* state) {
                     ui_element_position(state->ui, ivec2(0, 2));
                     ui_text(state->ui, FONT_HACK_GOLD, menu_get_player_status_string((NetworkPlayerStatus)player.status));
 
-                    bool teams_enabled = network_get_match_setting(MATCH_SETTING_TEAMS) == MATCH_SETTING_TEAMS_ENABLED;
+                    bool teams_enabled = network_get_match_setting(MATCH_SETTING_TEAMS) == TEAMS_ENABLED;
                     char team_picker_char;
                     if (teams_enabled) {
                         team_picker_char = (char)('1' + (int)player.team);

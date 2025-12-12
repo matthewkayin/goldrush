@@ -10,6 +10,7 @@ STATIC_ASSERT(sizeof(Particle) == 40ULL);
 STATIC_ASSERT(sizeof(Projectile) == 20ULL);
 STATIC_ASSERT(sizeof(FogReveal) == 24ULL);
 STATIC_ASSERT(sizeof(MatchPlayer) == 56ULL);
+STATIC_ASSERT(sizeof(MatchSettingMapTypeValue) == 4ULL);
 
 #include "core/filesystem.h"
 #include <algorithm>
@@ -113,7 +114,8 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state) {
     // LCG seed
     desync_write_value<int>(match_state.lcg_seed);
 
-    // Map
+    // Map: type, width, and height
+    desync_write_value<MatchSettingMapTypeValue>(match_state.map.type);
     desync_write_value<int>(match_state.map.width);
     desync_write_value<int>(match_state.map.height);
 
@@ -218,7 +220,7 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state) {
     desync_write((uint8_t*)match_state.players, MAX_PLAYERS * sizeof(MatchPlayer));
 
     // Write to desync file
-    #ifdef GOLD_DESYNC_DEBUG
+    #ifdef GOLD_DEBUG_DESYNC
         fwrite(&state.buffer_size, sizeof(state.buffer_size), 1, state.desync_file);
         fwrite(state.buffer, state.buffer_size, 1, state.desync_file);
     #endif
@@ -318,7 +320,8 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
     // LCG seed
     state_buffer_offset += desync_compare_value<int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
 
-    // Map
+    // Map: type, width, height
+    state_buffer_offset += desync_compare_value<MatchSettingMapTypeValue>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
     state_buffer_offset += desync_compare_value<int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
     state_buffer_offset += desync_compare_value<int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
 
