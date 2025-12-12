@@ -187,7 +187,7 @@ int gold_main(int argc, char** argv) {
         bool should_render_debug_info = false;
         uint64_t debug_playback_speed = 1;
         if (test_mode != TEST_MODE_NONE) {
-            debug_playback_speed = 4;
+            // debug_playback_speed = 4;
         }
     #endif
 
