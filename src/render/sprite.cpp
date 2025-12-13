@@ -573,16 +573,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_UI_MOVE_YELLOW, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
-        .recolor = {
-            .path = "select_ring/move.png",
-            .hframes = 5,
-            .vframes = 1,
-            .from_color = RENDER_COLOR_WHITE,
-            .to_color = RENDER_COLOR_YELLOW
-        }
-    }},
     { SPRITE_UI_CONTROL_GROUP, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
@@ -991,16 +981,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_LANDMINE_YELLOW, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
-        .recolor = {
-            .path = "select_ring/landmine.png",
-            .hframes = 1,
-            .vframes = 1,
-            .from_color = RENDER_COLOR_WHITE,
-            .to_color = RENDER_COLOR_YELLOW,
-        }
-    }},
     { SPRITE_SELECT_RING_UNIT, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
@@ -1015,16 +995,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .path = "select_ring/1x1_attack.png",
             .hframes = 1,
             .vframes = 1
-        }
-    }},
-    { SPRITE_SELECT_RING_UNIT_YELLOW, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
-        .recolor = {
-            .path = "select_ring/1x1.png",
-            .hframes = 1,
-            .vframes = 1,
-            .from_color = RENDER_COLOR_WHITE,
-            .to_color = RENDER_COLOR_YELLOW
         }
     }},
     { SPRITE_SELECT_RING_WAGON, (SpriteParams) {
@@ -1043,16 +1013,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_WAGON_YELLOW, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
-        .recolor = {
-            .path = "select_ring/wagon.png",
-            .hframes = 1,
-            .vframes = 1,
-            .from_color = RENDER_COLOR_WHITE,
-            .to_color = RENDER_COLOR_YELLOW
-        }
-    }},
     { SPRITE_SELECT_RING_BUILDING_SIZE2, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
@@ -1067,16 +1027,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .path = "select_ring/2x2_attack.png",
             .hframes = 1,
             .vframes = 1
-        }
-    }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE2_YELLOW, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
-        .recolor = {
-            .path = "select_ring/2x2.png",
-            .hframes = 1,
-            .vframes = 1,
-            .from_color = RENDER_COLOR_WHITE,
-            .to_color = RENDER_COLOR_YELLOW
         }
     }},
     { SPRITE_SELECT_RING_BUILDING_SIZE3, (SpriteParams) {
@@ -1095,16 +1045,6 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE3_YELLOW, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
-        .recolor = {
-            .path = "select_ring/3x3.png",
-            .hframes = 1,
-            .vframes = 1,
-            .from_color = RENDER_COLOR_WHITE,
-            .to_color = RENDER_COLOR_YELLOW
-        }
-    }},
     { SPRITE_SELECT_RING_BUILDING_SIZE4, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
@@ -1121,32 +1061,12 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
-    { SPRITE_SELECT_RING_BUILDING_SIZE4_YELLOW, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
-        .recolor = {
-            .path = "select_ring/4x4.png",
-            .hframes = 1,
-            .vframes = 1,
-            .from_color = RENDER_COLOR_WHITE,
-            .to_color = RENDER_COLOR_YELLOW
-        }
-    }},
     { SPRITE_SELECT_RING_GOLDMINE, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "select_ring/goldmine.png",
             .hframes = 1,
             .vframes = 1
-        }
-    }},
-    { SPRITE_SELECT_RING_GOLDMINE_YELLOW, (SpriteParams) {
-        .strategy = SPRITE_IMPORT_RECOLOR,
-        .recolor = {
-            .path = "select_ring/goldmine.png",
-            .hframes = 1,
-            .vframes = 1,
-            .from_color = RENDER_COLOR_WHITE,
-            .to_color = RENDER_COLOR_YELLOW,
         }
     }},
     { SPRITE_GOLDMINE, (SpriteParams) {

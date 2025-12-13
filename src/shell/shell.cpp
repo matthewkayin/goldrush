@@ -2698,9 +2698,7 @@ void match_shell_render(const MatchShellState* state) {
                     map_get_tile(state->match_state.map, state->move_animation_position / TILE_SIZE).elevation == elevation) {
                 if (state->move_animation.name == ANIMATION_UI_MOVE_CELL && cell_layer == CELL_LAYER_GROUND) {
                     RenderSpriteParams params = (RenderSpriteParams) {
-                        .sprite = match_shell_use_yellow_rings(state) 
-                            ? SPRITE_UI_MOVE_YELLOW 
-                            : SPRITE_UI_MOVE,
+                        .sprite = SPRITE_UI_MOVE,
                         .frame = state->move_animation.frame,
                         .position = state->move_animation_position - state->camera_offset,
                         .options = RENDER_SPRITE_CENTERED,
@@ -2724,7 +2722,7 @@ void match_shell_render(const MatchShellState* state) {
                         if (it != state->match_state.remembered_entities[state->match_state.players[network_get_player_id()].team].end()) {
                             ivec2 entity_center_position = (it->second.cell * TILE_SIZE) + ((ivec2(it->second.cell_size, it->second.cell_size) * TILE_SIZE) / 2);
 
-                            render_sprite_frame(match_shell_get_entity_select_ring(it->second.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY, match_shell_use_yellow_rings(state)), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+                            render_sprite_frame(match_shell_get_entity_select_ring(it->second.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
                         }
                     }
                 }
@@ -3238,7 +3236,7 @@ void match_shell_render(const MatchShellState* state) {
             .w = std::abs(state->select_origin.x - mouse_world_pos.x),
             .h = std::abs(state->select_origin.y - mouse_world_pos.y)
         };
-        render_draw_rect(select_rect, match_shell_get_selection_color(state->match_state.map.type));
+        render_draw_rect(select_rect, RENDER_COLOR_WHITE);
     }
 
     // UI frames
@@ -3548,7 +3546,7 @@ void match_shell_render(const MatchShellState* state) {
         } else {
             ivec2 healthbar_position = SELECTION_LIST_TOP_LEFT + ivec2(68, 36 + 4);
             ivec2 healthbar_size = ivec2(128, 24);
-            match_shell_render_healthbar(RENDER_HEALTHBAR, state->match_state.map.type, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
+            match_shell_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 
             char health_text[16];
             sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
@@ -3559,7 +3557,7 @@ void match_shell_render(const MatchShellState* state) {
             uint32_t entity_max_energy = entity_get_max_energy(state->match_state, entity);
             if (entity_is_unit(entity.type) && entity_max_energy != 0)  {
                 healthbar_position += ivec2(0, healthbar_size.y + 2);
-                match_shell_render_healthbar(RENDER_ENERGY_BAR, state->match_state.map.type, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
+                match_shell_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
                 sprintf(health_text, "%i/%i", entity.energy, entity_max_energy);
                 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
                 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
@@ -3797,16 +3795,8 @@ void match_shell_render(const MatchShellState* state) {
     // Minimap tiles
     for (int y = 0; y < state->match_state.map.height; y++) {
         for (int x = 0; x < state->match_state.map.width; x++) {
-            MinimapPixel pixel; 
             Tile tile = map_get_tile(state->match_state.map, ivec2(x, y));
-            if (tile.sprite >= SPRITE_TILE_SAND1 && tile.sprite <= SPRITE_TILE_SAND3) {
-                pixel = MINIMAP_PIXEL_SAND;
-            } else if (tile.sprite == SPRITE_TILE_SAND_WATER) {
-                pixel = MINIMAP_PIXEL_WATER;
-            } else {
-                pixel = MINIMAP_PIXEL_WALL;
-            }
-            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), pixel);
+            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), match_shell_get_minimap_pixel_for_tile(tile.sprite));
         }
     }
     // Minimap entities
@@ -3815,20 +3805,12 @@ void match_shell_render(const MatchShellState* state) {
             continue;
         }
 
-        MinimapPixel pixel;
-        if (entity.type == ENTITY_GOLDMINE) {
-            pixel = MINIMAP_PIXEL_GOLD;
-        } else if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
-            pixel = MINIMAP_PIXEL_WHITE;
-        } else {
-            pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match_state.players[entity.player_id].recolor_id);
-        }
         int entity_cell_size = entity_get_data(entity.type).cell_size;
         Rect entity_rect = (Rect) {
             .x = entity.cell.x, .y = entity.cell.y,
             .w = entity_cell_size, .h = entity_cell_size
         };
-        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, pixel);
+        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, match_shell_get_minimap_pixel_for_entity(state, entity));
     }
     // Minimap remembered entities
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -3911,17 +3893,13 @@ bool match_shell_use_yellow_rings(const MatchShellState* state) {
     return state->match_state.map.type == MAP_TYPE_KLONDIKE;
 }
 
-SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking, bool use_yellow_rings) {
+SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking) {
     if (type == ENTITY_GOLDMINE) {
-        return use_yellow_rings 
-            ? SPRITE_SELECT_RING_GOLDMINE_YELLOW
-            : SPRITE_SELECT_RING_GOLDMINE;
+        return SPRITE_SELECT_RING_GOLDMINE;
     }
     if (type == ENTITY_LANDMINE) {
         if (attacking) {
             return SPRITE_SELECT_RING_LANDMINE_ATTACK;
-        } else if (use_yellow_rings) {
-            return SPRITE_SELECT_RING_LANDMINE_YELLOW;
         } else {
             return SPRITE_SELECT_RING_LANDMINE;
         }
@@ -3930,15 +3908,13 @@ SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking, b
     SpriteName select_ring;
     int entity_cell_size = entity_get_data(type).cell_size;
     if (entity_is_unit(type)) {
-        select_ring = (SpriteName)(SPRITE_SELECT_RING_UNIT + ((entity_cell_size - 1) * 3));
+        select_ring = (SpriteName)(SPRITE_SELECT_RING_UNIT + ((entity_cell_size - 1) * 2));
     } else {
-        select_ring = (SpriteName)(SPRITE_SELECT_RING_BUILDING_SIZE2 + ((entity_cell_size - 2) * 3));
+        select_ring = (SpriteName)(SPRITE_SELECT_RING_BUILDING_SIZE2 + ((entity_cell_size - 2) * 2));
     }
     if (attacking) {
         select_ring = (SpriteName)(select_ring + 1);
-    } else if (use_yellow_rings) {
-        select_ring = (SpriteName)(select_ring + 2);
-    }
+    } 
     return select_ring;
 }
 
@@ -3979,7 +3955,7 @@ void match_shell_ysort_render_params(std::vector<RenderSpriteParams>& params, in
     }
 }
 
-void match_shell_render_healthbar(RenderHealthbarType type, MatchSettingMapTypeValue map_type, ivec2 position, ivec2 size, int amount, int max) {
+void match_shell_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max) {
     Rect healthbar_rect = (Rect) { 
         .x = position.x, 
         .y = position.y, 
@@ -3997,7 +3973,7 @@ void match_shell_render_healthbar(RenderHealthbarType type, MatchSettingMapTypeV
     
     RenderColor healthbar_color;
     if (type == RENDER_GARRISON_BAR) {
-        healthbar_color = match_shell_get_selection_color(map_type);
+        healthbar_color = RENDER_COLOR_WHITE;
     } else if (type == RENDER_ENERGY_BAR) {
         healthbar_color = RENDER_COLOR_BLUE;
     } else if (healthbar_subrect.w <= healthbar_rect.w / 3) {
@@ -4079,7 +4055,7 @@ void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState
     bool use_red_select_ring = state->replay_mode || entity.type == ENTITY_GOLDMINE 
                                     ? false 
                                     : state->match_state.players[entity.player_id].team != state->match_state.players[network_get_player_id()].team;
-    SpriteName select_ring_sprite = match_shell_get_entity_select_ring(entity.type, use_red_select_ring, match_shell_use_yellow_rings(state));
+    SpriteName select_ring_sprite = match_shell_get_entity_select_ring(entity.type, use_red_select_ring);
     ivec2 entity_center_position = entity_is_unit(entity.type) 
             ? entity.position.to_ivec2()
             : ivec2(entity_rect.x + (entity_rect.w / 2), entity_rect.y + (entity_rect.h / 2)); 
@@ -4092,20 +4068,20 @@ void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState
     // Render healthbar
     ivec2 healthbar_position = ivec2(entity_rect.x, entity_rect.y + entity_rect.h + HEALTHBAR_PADDING) - state->camera_offset;
     if (entity_data.max_health != 0) {
-        match_shell_render_healthbar(RENDER_HEALTHBAR, state->match_state.map.type, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
+        match_shell_render_healthbar(RENDER_HEALTHBAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), entity.health, entity_data.max_health);
         healthbar_position.y += HEALTHBAR_HEIGHT + 2;
     }
 
     // Render garrison bar
     if (entity_data.garrison_capacity != 0 && (entity.type == ENTITY_GOLDMINE || state->replay_mode || 
             state->match_state.players[entity.player_id].team == state->match_state.players[network_get_player_id()].team)) {
-        match_shell_render_healthbar(RENDER_GARRISON_BAR, state->match_state.map.type, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
+        match_shell_render_healthbar(RENDER_GARRISON_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.garrisoned_units.size(), (int)entity_data.garrison_capacity);
         healthbar_position.y += HEALTHBAR_HEIGHT + 2;
     } 
     // Render energy bar
     uint32_t entity_max_energy = entity_get_max_energy(state->match_state, entity);
     if (entity_is_unit(entity.type) && entity_max_energy != 0) {
-        match_shell_render_healthbar(RENDER_ENERGY_BAR, state->match_state.map.type, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.energy, (int)entity_max_energy);
+        match_shell_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, ivec2(entity_rect.w, HEALTHBAR_HEIGHT), (int)entity.energy, (int)entity_max_energy);
     }
 }
 
@@ -4120,10 +4096,10 @@ void match_shell_render_entity_icon(const MatchShellState* state, const Entity& 
     ivec2 healthbar_size = ivec2(60, 8);
     uint32_t entity_max_energy = entity_get_max_energy(state->match_state, entity);
     if (entity_is_unit(entity.type) && entity_max_energy != 0) {
-        match_shell_render_healthbar(RENDER_ENERGY_BAR, state->match_state.map.type, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
+        match_shell_render_healthbar(RENDER_ENERGY_BAR, healthbar_position, healthbar_size, entity.energy, entity_max_energy);
         healthbar_position -= ivec2(0, healthbar_size.y + 2);
     }
-    match_shell_render_healthbar(RENDER_HEALTHBAR, state->match_state.map.type, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
+    match_shell_render_healthbar(RENDER_HEALTHBAR, healthbar_position, healthbar_size, entity.health, entity_data.max_health);
 }
 
 void match_shell_render_entity_move_animation(const MatchShellState* state, const Entity& entity) {
@@ -4136,7 +4112,7 @@ void match_shell_render_entity_move_animation(const MatchShellState* state, cons
         entity_center_position.y += ENTITY_SKY_POSITION_Y_OFFSET;
     }
 
-    render_sprite_frame(match_shell_get_entity_select_ring(entity.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY, match_shell_use_yellow_rings(state)), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
+    render_sprite_frame(match_shell_get_entity_select_ring(entity.type, state->move_animation.name == ANIMATION_UI_MOVE_ATTACK_ENTITY), ivec2(0, 0), entity_center_position, RENDER_SPRITE_CENTERED, 0);
 }
 
 void match_shell_render_particle(const MatchShellState* state, const Particle& particle) {
@@ -4207,15 +4183,31 @@ FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, co
     return FIRE_CELL_RENDER_ABOVE;
 }
 
-RenderColor match_shell_get_selection_color(MatchSettingMapTypeValue map_type) {
-    switch (map_type) {
-        case MAP_TYPE_ARIZONA: 
-            return RENDER_COLOR_WHITE;
-        case MAP_TYPE_KLONDIKE: 
-            return RENDER_COLOR_YELLOW;
-        case MAP_TYPE_COUNT: {
-            GOLD_ASSERT(false);
-            return RENDER_COLOR_RED;
-        }
+MinimapPixel match_shell_get_minimap_pixel_for_tile(SpriteName tile_sprite) {
+    switch (tile_sprite) {
+        case SPRITE_TILE_SAND1:
+        case SPRITE_TILE_SAND2:
+        case SPRITE_TILE_SAND3:
+            return MINIMAP_PIXEL_SAND;
+        case SPRITE_TILE_SAND_WATER:
+            return MINIMAP_PIXEL_WATER;
+        case SPRITE_TILE_SNOW1:
+        case SPRITE_TILE_SNOW2:
+        case SPRITE_TILE_SNOW3:
+            return MINIMAP_PIXEL_SNOW;
+        case SPRITE_TILE_SNOW_WATER:
+            return MINIMAP_PIXEL_SNOW_WATER;
+        default:
+            return MINIMAP_PIXEL_WALL;
     }
+}
+
+MinimapPixel match_shell_get_minimap_pixel_for_entity(const MatchShellState* state, const Entity& entity) {
+    if (entity.type == ENTITY_GOLDMINE) {
+        return MINIMAP_PIXEL_GOLD;
+    }
+    if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
+        return MINIMAP_PIXEL_WHITE;
+    }
+    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match_state.players[entity.player_id].recolor_id);
 }

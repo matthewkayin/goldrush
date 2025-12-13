@@ -63,7 +63,7 @@ static const std::unordered_map<RenderColor, SDL_Color> RENDER_COLOR_VALUES = {
     { RENDER_COLOR_DARK_GREEN, (SDL_Color) { .r = 77, .g = 135, .b = 115, .a = 255 }},
     { RENDER_COLOR_PURPLE, (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 }},
     { RENDER_COLOR_LIGHT_PURPLE, (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 }},
-    { RENDER_COLOR_YELLOW, (SDL_Color) { .r = 255, .g = 255, .b = 84, .a = 255 }},
+    // { RENDER_COLOR_SELECTION_GREEN, (SDL_Color) { .r = 94, .g = 183, .b = 75, .a = 255 }},
 };
 
 enum LoadedSurfaceType {
@@ -107,7 +107,6 @@ static RenderState state;
 bool render_load_sprites();
 void render_flip_sdl_surface_vertically(SDL_Surface* surface);
 SDL_Surface* render_create_player_color_surface(SDL_Surface* sprite_surface, bool recolor_low_alpha);
-void render_recolor_surface(SDL_Surface* surface, RenderColor from_color, RenderColor to_color);
 SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params);
 SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params);
 SDL_Surface* render_load_font(FontName name);
@@ -220,6 +219,8 @@ bool render_init(SDL_Window* window) {
         state.minimap_pixel_values[MINIMAP_PIXEL_SAND] = SDL_MapRGBA(format, NULL, 204, 162, 139, 255);
         state.minimap_pixel_values[MINIMAP_PIXEL_WATER] = SDL_MapRGBA(format, NULL, 70, 100, 115, 255);
         state.minimap_pixel_values[MINIMAP_PIXEL_WALL] = SDL_MapRGBA(format, NULL, 94, 88, 89, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_SNOW] = SDL_MapRGBA(format, NULL, 181, 179, 167, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_SNOW_WATER] = SDL_MapRGBA(format, NULL, 99, 146, 153, 255);
 
         memset(state.minimap_texture_pixels, 0, sizeof(state.minimap_texture_pixels));
     }
@@ -355,9 +356,7 @@ bool render_load_sprites() {
                 if (sprite_surface == NULL) {
                     return false;
                 }
-            } else if (params.strategy == SPRITE_IMPORT_RECOLOR) {
-                render_recolor_surface(sprite_surface, params.recolor.from_color, params.recolor.to_color);
-            }
+            } 
             surfaces[FONT_COUNT + sprite].surface = sprite_surface;
         }
         SDL_SetSurfaceBlendMode(surfaces[FONT_COUNT + sprite].surface, SDL_BLENDMODE_NONE);
@@ -601,24 +600,6 @@ SDL_Surface* render_create_player_color_surface(SDL_Surface* sprite_surface, boo
     // Allows the rest of the sprite loading to work the same as with normal sprites
     SDL_DestroySurface(sprite_surface);
     return recolor_surface;
-}
-
-void render_recolor_surface(SDL_Surface* surface, RenderColor from_color, RenderColor to_color) {
-    const SDL_Color& reference_color = RENDER_COLOR_VALUES.at(from_color);
-    const SDL_Color& replacement_color = RENDER_COLOR_VALUES.at(to_color);
-
-    const SDL_PixelFormatDetails* format_details = SDL_GetPixelFormatDetails(surface->format);
-    uint32_t reference_pixel = SDL_MapRGBA(format_details, NULL, reference_color.r, reference_color.g, reference_color.b, reference_color.a);
-    uint32_t replacement_pixel = SDL_MapRGBA(format_details, NULL, replacement_color.r, replacement_color.g, replacement_color.b, replacement_color.a);
-
-    SDL_LockSurface(surface);
-    uint32_t* pixels = (uint32_t*)surface->pixels;
-    for (int index = 0; index < surface->w * surface->h; index++) {
-        if (pixels[index] == reference_pixel) {
-            pixels[index] = replacement_pixel;
-        }
-    }
-    SDL_UnlockSurface(surface);
 }
 
 SDL_Surface* render_create_single_tile_surface(SDL_Surface* tileset_surface, const SpriteParams& params) {

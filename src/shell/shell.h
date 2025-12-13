@@ -266,10 +266,10 @@ void match_shell_compare_checksums(MatchShellState* state, uint32_t frame);
 // Render
 void match_shell_render(const MatchShellState* state);
 bool match_shell_use_yellow_rings(const MatchShellState* state);
-SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking, bool use_yellow_rings);
+SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking);
 SpriteName match_shell_hotkey_get_sprite(const MatchShellState* state, InputAction hotkey, bool show_toggled);
 void match_shell_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
-void match_shell_render_healthbar(RenderHealthbarType type, MatchSettingMapTypeValue map_type, ivec2 position, ivec2 size, int amount, int max);
+void match_shell_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max);
 void match_shell_render_target_build(const MatchShellState* state, const Target& target, uint8_t player_id);
 RenderSpriteParams match_shell_create_entity_render_params(const MatchShellState* state, const Entity& entity);
 void match_shell_render_entity_select_rings_and_healthbars(const MatchShellState* state, const Entity& entity);
@@ -279,4 +279,5 @@ void match_shell_render_particle(const MatchShellState* state, const Particle& p
 bool match_shell_should_render_hotkey_toggled(const MatchShellState* state, InputAction hotkey);
 const char* match_shell_render_get_stat_tooltip(SpriteName sprite);
 FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, const Fire& fire);
-RenderColor match_shell_get_selection_color(MatchSettingMapTypeValue map_type);
+MinimapPixel match_shell_get_minimap_pixel_for_tile(SpriteName tile_sprite);
+MinimapPixel match_shell_get_minimap_pixel_for_entity(const MatchShellState* state, const Entity& entity);
