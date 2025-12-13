@@ -125,10 +125,11 @@ void game_update(GameState& state) {
                 #endif
 
                 // Generate noise
+                MapType map_type = (MapType)network_get_match_setting(MATCH_SETTING_MAP_TYPE);
                 uint64_t noise_seed = (uint64_t)lcg_seed;
-                int map_width = match_setting_get_map_size((MatchSettingMapSizeValue)network_get_match_setting(MATCH_SETTING_MAP_SIZE));
+                int map_width = match_setting_get_map_size((MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE));
                 int map_height = map_width;
-                Noise noise = noise_generate(noise_seed, map_width, map_height);
+                Noise noise = noise_generate(map_type, noise_seed, map_width, map_height);
 
                 network_begin_loading_match(lcg_seed, noise);
 
@@ -198,7 +199,7 @@ void game_test_set_mode(GameState& state, GameMode mode) {
 
     if (mode == GAME_MODE_MATCH) {
         int lcg_seed = rand();
-        MatchSettingDifficultyValue difficulty = DIFFICULTY_HARD;
+        Difficulty difficulty = DIFFICULTY_HARD;
         BotOpener opener = BOT_OPENER_TECH_FIRST;
         BotUnitComp unit_comp = bot_roll_preferred_unit_comp(&lcg_seed);
         state.test_bot = bot_init(network_get_player_id(), difficulty, opener, unit_comp);

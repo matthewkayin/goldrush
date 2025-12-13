@@ -186,7 +186,7 @@ MatchShellState* match_shell_base_init() {
     state->replay_file = NULL;
 
     #ifdef GOLD_DEBUG
-        state->debug_fog = DEBUG_FOG_ENABLED;
+        state->debug_fog = DEBUG_FOG_DISABLED;
         state->debug_show_region_lines = false;
     #endif
 
@@ -215,7 +215,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise& noise) {
                                         : player_id;
         players[player_id].recolor_id = network_player.recolor_id;
     }
-    MatchSettingMapTypeValue map_type = (MatchSettingMapTypeValue)network_get_match_setting((uint8_t)MATCH_SETTING_MAP_TYPE);
+    MapType map_type = (MapType)network_get_match_setting((uint8_t)MATCH_SETTING_MAP_TYPE);
     state->replay_file = replay_file_open(lcg_seed, map_type, noise, players);
     state->replay_mode = false;
     state->match_state = match_init(lcg_seed, map_type, noise, players);
@@ -241,7 +241,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise& noise) {
 
     // Init bots
     // memset(state->bots, 0, sizeof(state->bots));
-    MatchSettingDifficultyValue difficulty = (MatchSettingDifficultyValue)network_get_match_setting(MATCH_SETTING_DIFFICULTY);
+    Difficulty difficulty = (Difficulty)network_get_match_setting(MATCH_SETTING_DIFFICULTY);
     int bot_lcg_seed = lcg_seed;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
@@ -2590,10 +2590,12 @@ void match_shell_render(const MatchShellState* state) {
                 int map_index = (base_coords.x + x) + ((base_coords.y + y) * state->match_state.map.width);
                 Tile tile = state->match_state.map.tiles[map_index];
 
+                ivec2 tile_params_position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
                 RenderSpriteParams tile_params = (RenderSpriteParams) {
                     .sprite = tile.sprite,
                     .frame = tile.frame,
-                    .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
+                    .position = tile_params_position,
+                    .ysort_position = tile_params_position.y,
                     .options = RENDER_SPRITE_NO_CULL,
                     .recolor_id = 0
                 };
@@ -2604,7 +2606,7 @@ void match_shell_render(const MatchShellState* state) {
                 if (elevation == 0 && 
                         !map_is_tile_ground(state->match_state.map, base_coords + ivec2(x, y)) &&
                         !map_is_tile_water(state->match_state.map, base_coords + ivec2(x, y))) {
-                    render_sprite_frame(map_get_plain_ground_tile_sprite(state->match_state.map), ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(map_get_plain_ground_tile_sprite(state->match_state.map.type), ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                 }
                 if ((should_render_on_ground_level && elevation == 0) || 
                         (!should_render_on_ground_level && elevation == tile.elevation)) {
@@ -2613,11 +2615,15 @@ void match_shell_render(const MatchShellState* state) {
 
                 // Decorations
                 Cell cell = state->match_state.map.cells[CELL_LAYER_GROUND][map_index];
-                if (cell.type >= CELL_DECORATION_1 && cell.type <= CELL_DECORATION_5 && tile.elevation == elevation) {
+                if (cell.type == CELL_DECORATION && tile.elevation == elevation) {
+                    SpriteName decoration_sprite = map_get_decoration_sprite(state->match_state.map.type);
+                    const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
+                    const int decoration_extra_height = (RENDER_SCALE_INT * decoration_sprite_info.frame_height) - TILE_SIZE;
                     ysort_params.push_back((RenderSpriteParams) {
-                        .sprite = SPRITE_DECORATION,
-                        .frame = ivec2(cell.type - CELL_DECORATION_1, 0),
-                        .position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE),
+                        .sprite = decoration_sprite,
+                        .frame = ivec2(cell.decoration_hframe, 0),
+                        .position = ivec2(tile_params_position.x, tile_params_position.y - decoration_extra_height),
+                        .ysort_position = tile_params_position.y,
                         .options = RENDER_SPRITE_NO_CULL,
                         .recolor_id = 0
                     });
@@ -2697,10 +2703,12 @@ void match_shell_render(const MatchShellState* state) {
             if (animation_is_playing(state->move_animation) &&
                     map_get_tile(state->match_state.map, state->move_animation_position / TILE_SIZE).elevation == elevation) {
                 if (state->move_animation.name == ANIMATION_UI_MOVE_CELL && cell_layer == CELL_LAYER_GROUND) {
+                    ivec2 params_position = state->move_animation_position - state->camera_offset;
                     RenderSpriteParams params = (RenderSpriteParams) {
                         .sprite = SPRITE_UI_MOVE,
                         .frame = state->move_animation.frame,
-                        .position = state->move_animation_position - state->camera_offset,
+                        .position = params_position,
+                        .ysort_position = params_position.y,
                         .options = RENDER_SPRITE_CENTERED,
                         .recolor_id = 0
                     };
@@ -2779,11 +2787,13 @@ void match_shell_render(const MatchShellState* state) {
 
         if (entity.bleed_timer != 0) {
             const SpriteInfo& bleed_sprite_info = render_get_sprite_info(SPRITE_PARTICLE_BLEED);
+            ivec2 bleed_params_position = ivec2(render_rect.x + (render_rect.w / 2) - bleed_sprite_info.frame_width, 
+                                                render_rect.y + (render_rect.h / 2) - bleed_sprite_info.frame_height);
             RenderSpriteParams bleed_params = (RenderSpriteParams) {
                 .sprite = SPRITE_PARTICLE_BLEED,
                 .frame = entity.bleed_animation.frame,
-                .position = ivec2(render_rect.x + (render_rect.w / 2) - bleed_sprite_info.frame_width, 
-                                  render_rect.y + (render_rect.h / 2) - bleed_sprite_info.frame_height),
+                .position = bleed_params_position,
+                .ysort_position = bleed_params_position.y,
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_id = 0
             };
@@ -2825,10 +2835,12 @@ void match_shell_render(const MatchShellState* state) {
             const EntityData& entity_data = entity_get_data(it.second.type);
             const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
 
+            ivec2 params_position = (it.second.cell * TILE_SIZE) - state->camera_offset;
             RenderSpriteParams params = (RenderSpriteParams) {
                 .sprite = entity_data.sprite,
                 .frame = it.second.frame,
-                .position = (it.second.cell * TILE_SIZE) - state->camera_offset,
+                .position = params_position,
+                .ysort_position = params_position.y,
                 .options = RENDER_SPRITE_NO_CULL,
                 .recolor_id = it.second.recolor_id
             };
@@ -2854,10 +2866,12 @@ void match_shell_render(const MatchShellState* state) {
                 continue;
             }
 
+            ivec2 params_position = building.rally_point - ivec2(8, 30) - state->camera_offset;
             RenderSpriteParams params = (RenderSpriteParams) {
                 .sprite = SPRITE_RALLY_FLAG,
                 .frame = state->rally_flag_animation.frame,
-                .position = building.rally_point - ivec2(8, 30) - state->camera_offset,
+                .position = params_position,
+                .ysort_position = params_position.y,
                 .options = 0,
                 .recolor_id = state->match_state.players[building.player_id].recolor_id
             };
@@ -3937,7 +3951,7 @@ int match_shell_ysort_render_params_partition(std::vector<RenderSpriteParams>& p
     int i = low - 1;
 
     for (int j = low; j <= high - 1; j++) {
-        if (params[j].position.y < pivot.position.y) {
+        if (params[j].ysort_position < pivot.ysort_position) {
             i++;
             RenderSpriteParams temp = params[j];
             params[j] = params[i];
@@ -4011,10 +4025,12 @@ void match_shell_render_target_build(const MatchShellState* state, const Target&
 }
 
 RenderSpriteParams match_shell_create_entity_render_params(const MatchShellState* state, const Entity& entity) {
+    ivec2 params_position = entity.position.to_ivec2() - state->camera_offset;
     RenderSpriteParams params = (RenderSpriteParams) {
         .sprite = entity_get_sprite(state->match_state, entity),
         .frame = entity_get_animation_frame(entity),
-        .position = entity.position.to_ivec2() - state->camera_offset,
+        .position = params_position,
+        .ysort_position = params_position.y,
         .options = 0,
         .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state->match_state.players[entity.player_id].recolor_id
     };
@@ -4166,7 +4182,7 @@ FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, co
     if (map_fire_cell.type == CELL_BUILDING) {
         return FIRE_CELL_DO_NOT_RENDER;
     }
-    if (map_fire_cell.type >= CELL_DECORATION_1 && map_fire_cell.type <= CELL_DECORATION_5) {
+    if (map_fire_cell.type == CELL_DECORATION) {
         return FIRE_CELL_RENDER_ABOVE;
     }
     if (!(map_fire_cell.type == CELL_UNIT || map_fire_cell.type == CELL_MINER)) {

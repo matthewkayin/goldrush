@@ -5,6 +5,7 @@
 #pragma once
 
 #include "defines.h"
+#include "core/match_setting.h"
 
 const uint8_t NOISE_VALUE_WATER = 0;
 const uint8_t NOISE_VALUE_LOWGROUND = 1;
@@ -16,4 +17,4 @@ struct Noise {
     uint8_t* map;
 };
 
-Noise noise_generate(uint64_t seed, int width, int height);
+Noise noise_generate(MapType map_type, uint64_t seed, int width, int height);

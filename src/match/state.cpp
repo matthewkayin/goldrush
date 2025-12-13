@@ -30,7 +30,7 @@ static const uint32_t FOG_REVEAL_DURATION = 60;
 static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 
-MatchState match_init(int32_t lcg_seed, MatchSettingMapTypeValue map_type, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
+MatchState match_init(int32_t lcg_seed, MapType map_type, Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
     #ifdef GOLD_RAND_SEED
         state.lcg_seed = GOLD_RAND_SEED;

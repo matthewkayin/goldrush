@@ -32,7 +32,7 @@ static const uint32_t BOT_HARASS_SQUAD_MAX_SIZE = 8U;
 // Landmines
 static const uint32_t LANDMINE_MAX_PER_BASE = 6U;
 
-Bot bot_init(uint8_t player_id, MatchSettingDifficultyValue difficulty, BotOpener opener, BotUnitComp preferred_unit_comp) {
+Bot bot_init(uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp) {
     Bot bot;
 
     bot.player_id = player_id;
@@ -93,7 +93,7 @@ Bot bot_init(uint8_t player_id, MatchSettingDifficultyValue difficulty, BotOpene
     return bot;
 }
 
-BotOpener bot_roll_opener(int* lcg_seed, MatchSettingDifficultyValue difficulty) {
+BotOpener bot_roll_opener(int* lcg_seed, Difficulty difficulty) {
     if (difficulty == DIFFICULTY_EASY) {
         return BOT_OPENER_BUNKER;
     }

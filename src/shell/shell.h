@@ -22,6 +22,7 @@ struct RenderSpriteParams {
     SpriteName sprite;
     ivec2 frame;
     ivec2 position;
+    int ysort_position;
     uint32_t options;
     int recolor_id;
 };

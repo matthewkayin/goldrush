@@ -19,26 +19,26 @@ struct MatchSettingData {
     size_t value_count;
 };
 
-enum MatchSettingTeamsValue {
+enum Teams {
     TEAMS_DISABLED,
     TEAMS_ENABLED,
     TEAMS_COUNT
 };
 
-enum MatchSettingMapTypeValue {
+enum MapType {
     MAP_TYPE_ARIZONA,
     MAP_TYPE_KLONDIKE,
     MAP_TYPE_COUNT
 };
 
-enum MatchSettingMapSizeValue {
+enum MapSize {
     MAP_SIZE_SMALL,
     MAP_SIZE_MEDIUM,
     MAP_SIZE_LARGE,
     MAP_SIZE_COUNT
 };
 
-enum MatchSettingDifficultyValue {
+enum Difficulty {
     DIFFICULTY_EASY,
     DIFFICULTY_MODERATE,
     DIFFICULTY_HARD,
@@ -46,4 +46,4 @@ enum MatchSettingDifficultyValue {
 };
 
 const MatchSettingData& match_setting_data(MatchSetting setting);
-uint32_t match_setting_get_map_size(MatchSettingMapSizeValue value);
+uint32_t match_setting_get_map_size(MapSize value);

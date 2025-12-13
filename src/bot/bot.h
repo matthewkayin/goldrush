@@ -70,7 +70,7 @@ struct BotRetreatMemory {
 
 struct Bot {
     uint8_t player_id;
-    MatchSettingDifficultyValue difficulty;
+    Difficulty difficulty;
 
     // Unit management
     std::unordered_map<EntityId, bool> is_entity_reserved;
@@ -101,8 +101,8 @@ struct Bot {
     std::unordered_map<EntityId, BotRetreatMemory> retreat_memory;
 };
 
-Bot bot_init(uint8_t player_id, MatchSettingDifficultyValue difficulty, BotOpener opener, BotUnitComp preferred_unit_comp);
-BotOpener bot_roll_opener(int* lcg_seed, MatchSettingDifficultyValue difficulty);
+Bot bot_init(uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp);
+BotOpener bot_roll_opener(int* lcg_seed, Difficulty difficulty);
 BotUnitComp bot_roll_preferred_unit_comp(int* lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_timer);
 

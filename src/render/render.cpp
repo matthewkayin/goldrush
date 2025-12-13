@@ -20,9 +20,6 @@
 #define MINIMAP_TEXTURE_HEIGHT 256
 #define TILE_SRC_SIZE 16
 
-static const int RENDER_SCALE_INT = 2;
-static const int RENDER_SCALE_FLOAT = 2.0f;
-
 struct SpriteVertex {
     float position[2];
     float tex_coord[3];

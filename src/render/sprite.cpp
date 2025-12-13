@@ -360,11 +360,19 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .source_y = 32
         }
     }},
-    { SPRITE_DECORATION, (SpriteParams) {
+    { SPRITE_DECORATION_ARIZONA, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {
             .path = "map/arizona_decorations.png",
             .hframes = 5,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_DECORATION_KLONDIKE, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "map/klondike_decorations.png",
+            .hframes = 4,
             .vframes = 1
         }
     }},

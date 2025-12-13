@@ -94,6 +94,9 @@ const uint32_t RENDER_SPRITE_NO_CULL = 1;
 const uint32_t RENDER_SPRITE_FLIP_H = 2;
 const uint32_t RENDER_SPRITE_CENTERED = 4;
 
+const int RENDER_SCALE_INT = 2;
+const int RENDER_SCALE_FLOAT = 2.0f;
+
 bool render_init(SDL_Window* window);
 void render_quit();
 void render_set_display(RenderDisplay display);

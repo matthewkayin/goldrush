@@ -37,7 +37,7 @@ const MatchSettingData& match_setting_data(MatchSetting setting) {
     return MATCH_SETTING_DATA.at(setting);
 }
 
-uint32_t match_setting_get_map_size(MatchSettingMapSizeValue value) {
+uint32_t match_setting_get_map_size(MapSize value) {
     switch (value) {
         case MAP_SIZE_SMALL:
             return 96;

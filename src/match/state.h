@@ -324,7 +324,7 @@ struct MatchFindBestEntityParams {
     std::function<bool(const Entity& a, const Entity& b)> compare;
 };
 
-MatchState match_init(int32_t lcg_seed, MatchSettingMapTypeValue map_type, Noise& noise, MatchPlayer players[MAX_PLAYERS]);
+MatchState match_init(int32_t lcg_seed, MapType map_type, Noise& noise, MatchPlayer players[MAX_PLAYERS]);
 uint32_t match_get_player_population(const MatchState& state, uint8_t player_id);
 uint32_t match_get_player_max_population(const MatchState& state, uint8_t player_id);
 bool match_player_has_upgrade(const MatchState& state, uint8_t player_id, uint32_t upgrade);

@@ -964,7 +964,7 @@ void menu_render_decoration(const MenuState* state, int index) {
     if (cactus_index == 2) {
         cactus_index = 0;
     }
-    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_DECORATION);
+    const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_DECORATION_ARIZONA);
     Rect src_rect = {
         .x = 0,
         .y = 0,
@@ -977,5 +977,5 @@ void menu_render_decoration(const MenuState* state, int index) {
         .w = TILE_SIZE * 2,
         .h = TILE_SIZE * 2
     };
-    render_sprite(SPRITE_DECORATION, src_rect, dst_rect, 0);
+    render_sprite(SPRITE_DECORATION_ARIZONA, src_rect, dst_rect, 0);
 }

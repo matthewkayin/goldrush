@@ -27,7 +27,7 @@ SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params);
 
-void map_init(Map& map, MatchSettingMapTypeValue map_type, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
+void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.type = map_type;
     map.width = noise.width;
     map.height = noise.height;
@@ -46,7 +46,7 @@ void map_init(Map& map, MatchSettingMapTypeValue map_type, Noise& noise, int* lc
     });
 
     // Clear out water that is too close to walls
-    const int WATER_WALL_DIST = 4;
+    const int WATER_WALL_DIST = 6;
     for (int x = 0; x < noise.width; x++) {
         for (int y = 0; y < noise.height; y++) {
             if (noise.map[x + (y * noise.width)] != NOISE_VALUE_WATER) {
@@ -69,6 +69,48 @@ void map_init(Map& map, MatchSettingMapTypeValue map_type, Noise& noise, int* lc
             }
             if (is_too_close_to_wall) {
                 noise.map[x + (y * noise.width)] = NOISE_VALUE_LOWGROUND;
+            }
+        }
+    }
+
+    // Remove tiny lakes
+    {
+        std::vector<bool> is_cell_explored(noise.width * noise.height, false);
+        for (int y = 0; y < noise.height; y++) {
+            for (int x = 0; x < noise.width; x++) {
+                if (noise.map[x + (y * noise.width)] != NOISE_VALUE_WATER ||
+                        is_cell_explored[x + (y * noise.width)]) {
+                    continue;
+                }
+
+                std::vector<ivec2> water_cells;
+                std::vector<ivec2> frontier;
+
+                frontier.push_back(ivec2(x, y));
+                is_cell_explored[x + (y * noise.width)] = true;
+                while (!frontier.empty()) {
+                    ivec2 next = frontier.back();
+                    frontier.pop_back();
+                    water_cells.push_back(next);
+
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                        ivec2 child = next + DIRECTION_IVEC2[direction];
+                        if (!map_is_cell_in_bounds(map, child) || 
+                                is_cell_explored[child.x + (child.y * map.width)] ||
+                                noise.map[child.x + (child.y * noise.width)] != NOISE_VALUE_WATER) {
+                            continue;
+                        }
+
+                        frontier.push_back(child);
+                        is_cell_explored[child.x + (child.y * noise.width)] = true;
+                    }
+                }
+
+                if (water_cells.size() < 8) {
+                    for (ivec2 cell : water_cells) {
+                        noise.map[cell.x + (cell.y * noise.width)] = NOISE_VALUE_LOWGROUND;
+                    }
+                }
             }
         }
     }
@@ -769,13 +811,18 @@ void map_init(Map& map, MatchSettingMapTypeValue map_type, Noise& noise, int* lc
         params.allow_unreachable_cells = true;
         params.margin = ivec2(0, 0);
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
+        SpriteName decoration_sprite = map_get_decoration_sprite(map_type);
+        const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
         for (ivec2 cell : decoration_cells) {
-            map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)].type = (CellType)(CELL_DECORATION_1 + (lcg_rand(lcg_seed) % 5));
+            map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)] = (Cell) {
+                .type = CELL_DECORATION,
+                .decoration_hframe = lcg_rand(lcg_seed) % decoration_sprite_info.hframes
+            };
         }
     }
 }
 
-SpriteName map_choose_ground_tile_sprite(MatchSettingMapTypeValue map_type, int index, int* lcg_seed) {
+SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_seed) {
     switch (map_type) {
         case MAP_TYPE_ARIZONA: {
             int new_index = lcg_rand(lcg_seed) % 7;
@@ -804,7 +851,7 @@ SpriteName map_choose_ground_tile_sprite(MatchSettingMapTypeValue map_type, int 
     }
 }
 
-SpriteName map_choose_water_tile_sprite(MatchSettingMapTypeValue map_type) {
+SpriteName map_choose_water_tile_sprite(MapType map_type) {
     switch (map_type) {
         case MAP_TYPE_ARIZONA:
             return SPRITE_TILE_SAND_WATER;
@@ -817,8 +864,8 @@ SpriteName map_choose_water_tile_sprite(MatchSettingMapTypeValue map_type) {
     }
 }
 
-SpriteName map_get_plain_ground_tile_sprite(const Map& map) {
-    switch (map.type) {
+SpriteName map_get_plain_ground_tile_sprite(MapType map_type) {
+    switch (map_type) {
         case MAP_TYPE_ARIZONA:
             return SPRITE_TILE_SAND1;
         case MAP_TYPE_KLONDIKE:
@@ -830,11 +877,24 @@ SpriteName map_get_plain_ground_tile_sprite(const Map& map) {
     }
 }
 
+SpriteName map_get_decoration_sprite(MapType map_type) {
+    switch (map_type) {
+        case MAP_TYPE_ARIZONA: 
+            return SPRITE_DECORATION_ARIZONA;
+        case MAP_TYPE_KLONDIKE: 
+            return SPRITE_DECORATION_KLONDIKE;
+        case MAP_TYPE_COUNT: {
+            GOLD_ASSERT(false);
+            return SPRITE_TILE_NULL;
+        }
+    }
+}
+
 bool map_is_cell_blocked(Cell cell) {
     return cell.type == CELL_BLOCKED || 
                 cell.type == CELL_BUILDING || 
                 cell.type == CELL_GOLDMINE ||
-                (cell.type >= CELL_DECORATION_1 && cell.type <= CELL_DECORATION_5);
+                cell.type == CELL_DECORATION;
 }
 
 bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size) {
@@ -1285,8 +1345,7 @@ bool map_is_player_town_hall_cell_valid(const Map& map, ivec2 mine_cell, ivec2 c
                     continue;
                 }
                 Cell map_cell = map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y));
-                if (map_cell.type == CELL_BLOCKED || 
-                        (map_cell.type >= CELL_DECORATION_1 && map_cell.type <= CELL_DECORATION_5)) {
+                if (map_cell.type == CELL_BLOCKED || map_cell.type == CELL_DECORATION) {
                     return false;
                 }
             }
