@@ -17,12 +17,12 @@ struct CursorParams {
 
 static const std::unordered_map<CursorName, CursorParams> CURSOR_PARAMS = {
     { CURSOR_DEFAULT, (CursorParams) {
-        .path = "ui_cursor.png",
+        .path = "cursor/default.png",
         .hot_x = 0,
         .hot_y = 0
     }},
     { CURSOR_TARGET, (CursorParams) {
-        .path = "ui_cursor_target.png",
+        .path = "cursor/target.png",
         .hot_x = 9,
         .hot_y = 9
     }}
