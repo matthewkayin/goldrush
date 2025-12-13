@@ -3236,6 +3236,11 @@ void match_shell_render(const MatchShellState* state) {
             .w = std::abs(state->select_origin.x - mouse_world_pos.x),
             .h = std::abs(state->select_origin.y - mouse_world_pos.y)
         };
+        select_rect.x += 2;
+        select_rect.y += 2;
+        render_draw_rect(select_rect, RENDER_COLOR_OFFBLACK_A200);
+        select_rect.x -= 2;
+        select_rect.y -= 2;
         render_draw_rect(select_rect, RENDER_COLOR_WHITE);
     }
 

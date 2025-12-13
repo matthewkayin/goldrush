@@ -302,7 +302,7 @@ void ui_screen_shade(UI& state) {
     ui_queue_fill_rect(state, { 
         .x = 0, .y = 0, 
         .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT},
-    RENDER_COLOR_OFFBLACK_TRANSPARENT, 0);
+    RENDER_COLOR_OFFBLACK_A128, 0);
 }
 
 void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length, bool word_wrap) {

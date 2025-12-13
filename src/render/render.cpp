@@ -48,7 +48,8 @@ static const SDL_Color RECOLOR_SKIN_REF = (SDL_Color) { .r = 123, .g = 174, .b =
 static const std::unordered_map<RenderColor, SDL_Color> RENDER_COLOR_VALUES = {
     { RENDER_COLOR_WHITE, (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 }},
     { RENDER_COLOR_OFFBLACK, (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 255 }},
-    { RENDER_COLOR_OFFBLACK_TRANSPARENT, (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 128 }},
+    { RENDER_COLOR_OFFBLACK_A200, (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 200 }},
+    { RENDER_COLOR_OFFBLACK_A128, (SDL_Color) { .r = 40, .g = 37, .b = 45, .a = 128 }},
     { RENDER_COLOR_DARK_GRAY, (SDL_Color) { .r = 94, .g = 88, .b = 89, .a = 255 }},
     { RENDER_COLOR_BLUE, (SDL_Color) { .r = 92, .g = 132, .b = 153, .a = 255 }},
     { RENDER_COLOR_DIM_BLUE, (SDL_Color) { .r = 70, .g = 100, .b = 115, .a = 255 }},
