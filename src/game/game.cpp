@@ -215,16 +215,23 @@ void game_test_update(GameState& state) {
 
     if (state.mode == GAME_MODE_MENU) {
         switch (state.menu_state->mode) {
-            case MENU_MODE_USERNAME: {
-                state.menu_state->username = state.test_mode == TEST_MODE_HOST 
-                    ? "Burr" 
-                    : "Hamilton";
-                network_set_username(state.menu_state->username.c_str());
-                menu_set_mode(state.menu_state, MENU_MODE_MAIN);
-                break;
-            }
+            #ifndef GOLD_STEAM
+                case MENU_MODE_USERNAME: {
+                    state.menu_state->username = state.test_mode == TEST_MODE_HOST 
+                        ? "Burr" 
+                        : "Hamilton";
+                    network_set_username(state.menu_state->username.c_str());
+                    menu_set_mode(state.menu_state, MENU_MODE_MAIN);
+                    break;
+                }
+            #endif
             case MENU_MODE_MAIN: {
-                menu_set_mode_local_network_lobbylist(state.menu_state);
+                #ifdef GOLD_STEAM
+                    network_set_backend(NETWORK_BACKEND_STEAM);
+                    menu_set_mode(state.menu_state, MENU_MODE_LOBBYLIST);
+                #else
+                    menu_set_mode_local_network_lobbylist(state.menu_state);
+                #endif
                 break;
             }
             case MENU_MODE_LOBBYLIST: {

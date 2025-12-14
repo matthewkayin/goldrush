@@ -216,6 +216,7 @@ void network_service() {
                 LobbyCreated_t* lobby_created = (LobbyCreated_t*)callback.m_pubParam;
 
                 if (lobby_created->m_eResult != k_EResultOK) {
+                    log_error("NETWORK steam failed to create lobby %u", lobby_created->m_eResult);
                     state.status = NETWORK_STATUS_OFFLINE;
                     state.events.push((NetworkEvent) {
                         .type = NETWORK_EVENT_LOBBY_CONNECTION_FAILED

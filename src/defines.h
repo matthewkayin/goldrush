@@ -38,7 +38,7 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 
 // #define TRACY_ENABLE
 
-// #define GOLD_STEAM
+#define GOLD_STEAM
 #ifdef GOLD_STEAM
     // #define GOLD_STEAM_APP_ID 3774270U
     #define GOLD_STEAM_APP_ID 3831190U
