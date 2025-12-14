@@ -11,6 +11,12 @@ STATIC_ASSERT(sizeof(Projectile) == 20ULL);
 STATIC_ASSERT(sizeof(FogReveal) == 24ULL);
 STATIC_ASSERT(sizeof(MatchPlayer) == 56ULL);
 STATIC_ASSERT(sizeof(MapType) == 4ULL);
+STATIC_ASSERT(sizeof(Difficulty) == 4ULL);
+STATIC_ASSERT(sizeof(BotUnitComp) == 4ULL);
+STATIC_ASSERT(sizeof(EntityCount) == 88ULL);
+STATIC_ASSERT(sizeof(BotSquadType) == 4ULL);
+STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
+STATIC_ASSERT(sizeof(BotBaseInfo) == 12ULL);
 
 #include "core/filesystem.h"
 #include <algorithm>
@@ -104,7 +110,31 @@ void desync_write_vector(const std::vector<T>& vector_value) {
     }
 }
 
-uint32_t desync_compute_match_checksum(const MatchState& match_state) {
+template <typename T>
+void desync_write_queue(const std::queue<T>& queue_value) {
+    std::queue<T> queue_copy = queue_value;
+    desync_write_value<size_t>(queue_copy.size());
+    while (!queue_copy.empty()) {
+        desync_write_value<T>(queue_copy.front());
+        queue_copy.pop();
+    }
+}
+
+template <typename T, typename U>
+void desync_write_unordered_map(const std::unordered_map<T, U>& map) {
+    desync_write_value<size_t>(map.size());
+    std::vector<T> keys;
+    for (auto it : map) {
+        keys.push_back(it.first);
+    }
+    std::sort(keys.begin(), keys.end());
+    for (T key : keys) {
+        desync_write_value<T>(key);
+        desync_write_value<U>(map.at(key));
+    }
+}
+
+uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS]) {
     desync_checksum_init(&state.a, &state.b);
 
     #ifdef GOLD_DEBUG_DESYNC
@@ -150,18 +180,7 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state) {
 
     // Remembered entities
     for (size_t player = 0; player < MAX_PLAYERS; player++) {
-        desync_write_value<size_t>(match_state.remembered_entities[player].size());
-
-        std::vector<EntityId> keys;
-        for (auto it : match_state.remembered_entities[player]) {
-            keys.push_back(it.first);
-        }
-        std::sort(keys.begin(), keys.end());
-
-        for (const EntityId key : keys) {
-            desync_write_value<EntityId>(key);
-            desync_write_value<RememberedEntity>(match_state.remembered_entities[player].at(key));
-        }
+        desync_write_unordered_map<EntityId, RememberedEntity>(match_state.remembered_entities[player]);
     }
 
     desync_write_value<bool>(match_state.is_fog_dirty);
@@ -218,6 +237,67 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state) {
 
     // Players
     desync_write((uint8_t*)match_state.players, MAX_PLAYERS * sizeof(MatchPlayer));
+
+    // Bots
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        const Bot& bot = bots[player_id];
+
+        // Player ID
+        desync_write_value<uint8_t>(bot.player_id);
+        desync_write_value<Difficulty>(bot.difficulty);
+
+        // Is entity reserved
+        desync_write_unordered_map<EntityId, bool>(bot.is_entity_reserved);
+
+        // Production
+        desync_write_value<BotUnitComp>(bot.unit_comp);
+        desync_write_value<BotUnitComp>(bot.preferred_unit_comp);
+        desync_write_value<EntityCount>(bot.desired_buildings);
+        desync_write_value<EntityCount>(bot.desired_army_ratio);
+        desync_write_vector<BotDesiredSquad>(bot.desired_squads);
+        desync_write_queue<EntityId>(bot.buildings_to_set_rally_points);;
+        desync_write_value<uint32_t>(bot.macro_cycle_timer);
+        desync_write_value<uint32_t>(bot.macro_cycle_count);
+
+        // Squads
+        desync_write_value<size_t>(bot.squads.size());
+        for (size_t index = 0; index < bot.squads.size(); index++) {
+            const BotSquad& squad = bot.squads[index];
+
+            desync_write_value<BotSquadType>(squad.type);
+            desync_write_value<ivec2>(squad.target_cell);
+            desync_write_vector<EntityId>(squad.entities);
+        }
+
+        // Next landmine time
+        desync_write_value<uint32_t>(bot.next_landmine_time);
+
+        // Scouting
+        desync_write_value<EntityId>(bot.scout_id);
+        desync_write_value<uint32_t>(bot.scout_info);
+        desync_write_value<uint32_t>(bot.last_scout_time);
+        desync_write_vector<EntityId>(bot.entities_to_scout);
+        desync_write_unordered_map<EntityId, bool>(bot.is_entity_assumed_to_be_scouted);
+
+        // Base info
+        desync_write_unordered_map<EntityId, BotBaseInfo>(bot.base_info);
+
+        // Retreat memory
+        desync_write_value<size_t>(bot.retreat_memory.size());
+        std::vector<EntityId> keys;
+        for (auto it : bot.retreat_memory) {
+            keys.push_back(it.first);
+        }
+        std::sort(keys.begin(), keys.end());
+        for (EntityId entity_id : keys) {
+            const BotRetreatMemory& memory = bot.retreat_memory.at(entity_id);
+
+            desync_write_value<EntityId>(entity_id);
+            desync_write_vector<EntityId>(memory.enemy_list);
+            desync_write_value<int>(memory.retreat_count);
+            desync_write_value<uint32_t>(memory.retreat_time);
+        }
+    }
 
     // Write to desync file
     #ifdef GOLD_DEBUG_DESYNC
@@ -315,6 +395,19 @@ size_t desync_compare_vector(uint8_t* data, uint8_t* data2) {
     return offset;
 }
 
+template <typename T, typename U>
+size_t desync_compare_unordered_map(uint8_t* data, uint8_t* data2) {
+    size_t map_size;
+    size_t offset = desync_compare_value<size_t>(data, data2, &map_size);
+
+    for (size_t index = 0; index < map_size; index++) {
+        offset += desync_compare_value<T>(data, data2);
+        offset += desync_compare_value<U>(data, data2);
+    }
+
+    return offset;
+}
+
 void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
     size_t state_buffer_offset = 0;
 
@@ -358,13 +451,7 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
 
     // Remembered entities
     for (size_t player = 0; player < MAX_PLAYERS; player++) {
-        size_t remembered_entities_size;
-        state_buffer_offset += desync_compare_value<size_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset, &remembered_entities_size);
-
-        for (size_t index = 0; index < remembered_entities_size; index++) {
-            state_buffer_offset += desync_compare_value<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
-            state_buffer_offset += desync_compare_value<RememberedEntity>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
-        }
+        state_buffer_offset += desync_compare_unordered_map<EntityId, RememberedEntity>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
     }
 
     state_buffer_offset += desync_compare_value<bool>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
@@ -422,6 +509,58 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
     // Players
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         state_buffer_offset += desync_compare_value<MatchPlayer>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+    }
+
+    // Bots
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        // Player ID
+        state_buffer_offset += desync_compare_value<uint8_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_value<Difficulty>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+
+        // Is entity reserved
+        state_buffer_offset += desync_compare_unordered_map<EntityId, bool>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+
+        // Production
+        state_buffer_offset += desync_compare_value<BotUnitComp>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_value<BotUnitComp>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_value<EntityCount>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_value<EntityCount>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_vector<BotDesiredSquad>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_vector<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_value<uint32_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_value<uint32_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+
+        // Squads
+        size_t squad_size;
+        state_buffer_offset += desync_compare_value<size_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset, &squad_size);
+        for (size_t index = 0; index < squad_size; index++) {
+            state_buffer_offset += desync_compare_value<BotSquadType>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+            state_buffer_offset += desync_compare_value<ivec2>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+            state_buffer_offset += desync_compare_vector<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        }
+
+        // Next landmine time
+        state_buffer_offset += desync_compare_value<uint32_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+
+        // Scouting
+        state_buffer_offset += desync_compare_value<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_value<uint32_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_value<uint32_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_vector<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_unordered_map<EntityId, bool>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+
+        // Base info
+        state_buffer_offset += desync_compare_unordered_map<EntityId, BotBaseInfo>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+
+        // Retreat memory
+        size_t retreat_memory_size;
+        state_buffer_offset += desync_compare_value<size_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset, &retreat_memory_size);
+        for (size_t index = 0; index < retreat_memory_size; index++) {
+            state_buffer_offset += desync_compare_value<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+            state_buffer_offset += desync_compare_vector<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+            state_buffer_offset += desync_compare_value<int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+            state_buffer_offset += desync_compare_value<uint32_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        }
     }
 }
 

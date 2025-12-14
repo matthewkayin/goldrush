@@ -2,8 +2,9 @@
 
 #include "defines.h"
 #include "match/state.h"
+#include "bot/bot.h"
 
-uint32_t desync_compute_match_checksum(const MatchState& match_state);
+uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS]);
 
 #ifdef GOLD_DEBUG_DESYNC
 

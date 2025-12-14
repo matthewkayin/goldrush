@@ -245,6 +245,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise& noise) {
     int bot_lcg_seed = lcg_seed;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
+            state->bots[player_id] = bot_empty();
             continue;
         }
 
@@ -840,7 +841,7 @@ void match_shell_update(MatchShellState* state) {
 
     // Checksum
     if (!state->replay_mode && state->match_timer % DESYNC_FREQUENCY == 0) {
-        uint32_t checksum = desync_compute_match_checksum(state->match_state);
+        uint32_t checksum = desync_compute_match_checksum(state->match_state, state->bots);
         network_send_checksum(checksum);
         state->checksums[network_get_player_id()].push_back(checksum);
         match_shell_compare_checksums(state, state->checksums[network_get_player_id()].size() - 1);

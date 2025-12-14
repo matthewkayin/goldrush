@@ -59,6 +59,7 @@ struct BotBaseInfo {
     bool has_gold;
     bool is_low_on_gold;
     bool is_under_attack;
+    uint16_t padding = 0;
     int defense_score;
 };
 
@@ -101,6 +102,7 @@ struct Bot {
     std::unordered_map<EntityId, BotRetreatMemory> retreat_memory;
 };
 
+Bot bot_empty();
 Bot bot_init(uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp);
 BotOpener bot_roll_opener(int* lcg_seed, Difficulty difficulty);
 BotUnitComp bot_roll_preferred_unit_comp(int* lcg_seed);

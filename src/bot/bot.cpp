@@ -32,14 +32,14 @@ static const uint32_t BOT_HARASS_SQUAD_MAX_SIZE = 8U;
 // Landmines
 static const uint32_t LANDMINE_MAX_PER_BASE = 6U;
 
-Bot bot_init(uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp) {
+Bot bot_empty() {
     Bot bot;
 
-    bot.player_id = player_id;
-    bot.difficulty = difficulty;
+    bot.player_id = PLAYER_NONE;
+    bot.difficulty = DIFFICULTY_EASY;
 
     bot.unit_comp = BOT_UNIT_COMP_NONE;
-    bot.preferred_unit_comp = preferred_unit_comp;
+    bot.preferred_unit_comp = BOT_UNIT_COMP_NONE;
     bot.macro_cycle_timer = 0;
     bot.macro_cycle_count = 0;
 
@@ -48,6 +48,16 @@ Bot bot_init(uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnit
     bot.scout_id = ID_NULL;
     bot.scout_info = 0;
     bot.last_scout_time = 0;
+
+    return bot;
+}
+
+Bot bot_init(uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp) {
+    Bot bot = bot_empty();
+
+    bot.player_id = player_id;
+    bot.difficulty = difficulty;
+    bot.preferred_unit_comp = preferred_unit_comp;
 
     switch (opener) {
         case BOT_OPENER_BANDIT_RUSH: {
@@ -553,6 +563,7 @@ bool bot_is_under_attack(const Bot& bot) {
 void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint32_t options) {
     bool should_counterattack = (options & BOT_DEFEND_COUNTERATTACK) == BOT_DEFEND_COUNTERATTACK;
     bool should_defend_with_workers = (options & BOT_DEFEND_WITH_WORKERS) == BOT_DEFEND_WITH_WORKERS;
+    log_debug("BOT %u defend_location, <%i, %i> options %u", bot.player_id, location.x, location.y, options);
 
     // Determine enemy score
     int enemy_score = bot_score_entities_at_location(state, bot, location, [&state, &bot](const Entity& enemy, EntityId /*enemy_id*/) {
@@ -577,6 +588,7 @@ void bot_defend_location(const MatchState& state, Bot& bot, ivec2 location, uint
 
     // If this location is already well defended, then don't do anything
     if (defending_score > enemy_score + (2 * BOT_UNIT_SCORE)) {
+        log_debug("BOT %u defend_location, defense is fine. do nothing.", bot.player_id);
         return;
     }
 
@@ -831,6 +843,8 @@ void bot_set_unit_comp(Bot& bot, BotUnitComp unit_comp) {
 
 void bot_update_desired_production(Bot& bot) {
     const uint32_t mining_base_count = bot_get_player_mining_base_count(bot, bot.player_id);
+    bot.desired_buildings.clear();
+    bot.desired_army_ratio.clear();
 
     switch (bot.unit_comp) {
         case BOT_UNIT_COMP_NONE: {
