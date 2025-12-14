@@ -3038,7 +3038,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
             continue;
         }
 
-        bot.base_info[goldmine_index] = (BotBaseInfo) {
+        bot.base_info[goldmine_id] = (BotBaseInfo) {
             .controlling_player = PLAYER_NONE,
             .has_surrounding_hall = false,
             .is_saturated = false,
