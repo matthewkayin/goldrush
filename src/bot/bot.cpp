@@ -3047,6 +3047,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
             .is_under_attack = false,
             .defense_score = 0
         };
+        log_debug("BOT %u update_base_info, frame %u goldmine %u defense score %i", bot.player_id, match_timer, goldmine_id, bot.base_info[goldmine_id].defense_score);
 
         // First try to find the surrounding hall
         EntityId nearest_building_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
@@ -3127,6 +3128,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
 
         int entity_defense_score = entity.type == ENTITY_LANDMINE ? 2 : bot_score_entity(state, bot, entity);
         bot.base_info[nearest_goldmine_id].defense_score += entity_defense_score;
+        log_debug("BOT %u update_base_info, frame %u goldmine %u defense score %i entity %u entity defense score %i", bot.player_id, match_timer, nearest_goldmine_id, bot.base_info[nearest_goldmine_id].defense_score, entity_id, entity_defense_score);
     }
 
     // Add retreat memories to defense score
@@ -3148,6 +3150,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
         retreat_memory_score += desired_lead;
 
         bot.base_info[goldmine_id].defense_score = std::max(bot.base_info[goldmine_id].defense_score, retreat_memory_score);
+        log_debug("BOT %u update_base_info, frame %u goldmine %u defense score %i memory score %i", bot.player_id, match_timer, goldmine_id, bot.base_info[goldmine_id].defense_score, retreat_memory_score);
     }
 
     // Determine if bases are under attack
