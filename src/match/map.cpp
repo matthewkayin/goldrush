@@ -816,7 +816,7 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
         for (ivec2 cell : decoration_cells) {
             map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)] = (Cell) {
                 .type = CELL_DECORATION,
-                .decoration_hframe = lcg_rand(lcg_seed) % decoration_sprite_info.hframes
+                .decoration_hframe = (uint16_t)(lcg_rand(lcg_seed) % decoration_sprite_info.hframes)
             };
         }
     }

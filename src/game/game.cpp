@@ -256,7 +256,7 @@ void game_test_update(GameState& state) {
                         break;
                     }
                     if (network_get_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY) != DIFFICULTY_HARD) {
-                        network_set_match_setting((uint8_t)DIFFICULTY_HARD, (uint8_t)DIFFICULTY_HARD);
+                        network_set_match_setting((uint8_t)MATCH_SETTING_DIFFICULTY, (uint8_t)DIFFICULTY_HARD);
                         break;
                     }
                     if (network_get_player_count() == 1) {

@@ -2513,7 +2513,7 @@ bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t fram
             continue;
         }
         if (state->checksums[player_id][frame] != state->checksums[network_get_player_id()][frame]) {
-            log_debug("checksum out of sync. frame %u between player %u (checksum %u) and us %u (checksum %u)", 
+            log_debug("DESYNC found on frame %u between player %u (checksum %u) and player %u (checksum %u)", 
                 frame, 
                 player_id, 
                 state->checksums[player_id][frame],

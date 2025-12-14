@@ -42,8 +42,9 @@ struct Cell {
     CellType type;
     union {
         EntityId id;
-        int decoration_hframe;
+        uint16_t decoration_hframe;
     };
+    uint16_t padding = 0;
 };
 
 struct MapRegionPathNode {
