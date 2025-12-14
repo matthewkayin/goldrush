@@ -3025,6 +3025,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
     ZoneScoped;
 
     bot.base_info.clear();
+    log_debug("BOT %u update_base_info frame %u", bot.player_id, match_timer);
 
     // Populate the base_info list and figure out who controls each goldmine
     for (uint32_t goldmine_index = 0; goldmine_index < state.entities.size(); goldmine_index++) {
@@ -3047,7 +3048,6 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
             .is_under_attack = false,
             .defense_score = 0
         };
-        log_debug("BOT %u update_base_info, frame %u goldmine %u defense score %i", bot.player_id, match_timer, goldmine_id, bot.base_info[goldmine_id].defense_score);
 
         // First try to find the surrounding hall
         EntityId nearest_building_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
@@ -3064,9 +3064,11 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
                 .compare = match_compare_closest_manhattan_distance_to(goldmine.cell)
             });
             if (nearest_building_id == ID_NULL) {
+                log_debug("goldmine id %u no nearest building.", goldmine_id);
                 continue;
             }
         }
+        log_debug("goldmine id %u nearest building id %u", goldmine_id, nearest_building_id);
 
         const Entity& nearest_building = state.entities.get_by_id(nearest_building_id);
         bot.base_info[goldmine_id].controlling_player = nearest_building.player_id;
@@ -3076,6 +3078,14 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
             bot.base_info[goldmine_id].has_surrounding_hall &&
             bot.base_info[goldmine_id].has_gold &&
             match_get_miners_on_gold(state, goldmine_id, bot.base_info[goldmine_id].controlling_player) == MATCH_MAX_MINERS_ON_GOLD;
+        log_debug("goldmine %u nearest building %u controlling player %u has surrounding hall %i is saturated %i has gold %i is low on gold %i",
+            goldmine_id,
+            nearest_building_id,
+            bot.base_info[goldmine_id].controlling_player,
+            (int)bot.base_info[goldmine_id].has_surrounding_hall,
+            (int)bot.base_info[goldmine_id].is_saturated,
+            (int)bot.base_info[goldmine_id].has_gold,
+            (int)bot.base_info[goldmine_id].is_low_on_gold);
     }
 
     // Calculate base defense score for each controlled goldmine
@@ -3103,6 +3113,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
             continue;
         }
 
+        log_debug("finding nearest goldmine entity %u player %u cell <%i, %i>", entity_id, entity.player_id, entity.cell.x, entity.cell.y);
         EntityId nearest_goldmine_id = ID_NULL;
         for (auto it : bot.base_info) {
             const Entity& goldmine = state.entities.get_by_id(it.first);
@@ -3110,27 +3121,31 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
             if (it.second.controlling_player == PLAYER_NONE ||
                     state.players[entity.player_id].team != 
                     state.players[it.second.controlling_player].team) {
+                log_debug("goldmine %u is not controlled by entity's team.", it.first);
                 continue;
             }
             // Make sure this entity only counts if its close to the base
             if (ivec2::manhattan_distance(entity.cell, goldmine.cell) < BOT_MEDIUM_DISTANCE) {
+                log_debug("goldmine %u cell <%i, %i> is too far away.", it.first, goldmine.cell.x, goldmine.cell.y);
                 continue;
             }
 
             if (nearest_goldmine_id == ID_NULL ||
                     ivec2::manhattan_distance(entity.cell, goldmine.cell) <
                     ivec2::manhattan_distance(entity.cell, state.entities.get_by_id(nearest_goldmine_id).cell)) {
+                log_debug("entity %u nearest goldmine id is now %u cell <%i, %i>.", entity_id, nearest_goldmine_id, goldmine.cell.x, goldmine.cell.y);
                 nearest_goldmine_id = it.first;
             }
         }
 
         if (nearest_goldmine_id == ID_NULL) {
+            log_debug("entity %u has no nearest goldmine", entity_id);
             continue;
         }
 
         int entity_defense_score = entity.type == ENTITY_LANDMINE ? 2 : bot_score_entity(state, bot, entity);
         bot.base_info[nearest_goldmine_id].defense_score += entity_defense_score;
-        log_debug("BOT %u update_base_info, frame %u goldmine %u defense score %i entity %u entity defense score %i", bot.player_id, match_timer, nearest_goldmine_id, bot.base_info[nearest_goldmine_id].defense_score, entity_id, entity_defense_score);
+        log_debug("entity adds to goldmine %u defense score %i entity %u entity defense score %i", nearest_goldmine_id, bot.base_info[nearest_goldmine_id].defense_score, entity_id, entity_defense_score);
     }
 
     // Add retreat memories to defense score
@@ -3152,7 +3167,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
         retreat_memory_score += desired_lead;
 
         bot.base_info[goldmine_id].defense_score = std::max(bot.base_info[goldmine_id].defense_score, retreat_memory_score);
-        log_debug("BOT %u update_base_info, frame %u goldmine %u defense score %i memory score %i", bot.player_id, match_timer, goldmine_id, bot.base_info[goldmine_id].defense_score, retreat_memory_score);
+        log_debug("retreat memory adds to goldmine %u defense score %i memory score %i", goldmine_id, bot.base_info[goldmine_id].defense_score, retreat_memory_score);
     }
 
     // Determine if bases are under attack
@@ -3186,8 +3201,9 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
         EntityId goldmine_id = it.first;
         const BotBaseInfo& second = it.second;
 
-        log_debug("BOT %u update_base_info, frame %u goldmine %u defense score %u", bot.player_id, match_timer, goldmine_id, second.defense_score);
+        log_debug("goldmine %u defense score %u", goldmine_id, second.defense_score);
     }
+    log_debug("-- END --");
 }
 
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer) {
