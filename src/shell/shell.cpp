@@ -2506,10 +2506,19 @@ bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t fram
         if (!state->match_state.players[player_id].active) {
             continue;
         }
+        if (network_get_player(player_id).status == NETWORK_PLAYER_STATUS_BOT) {
+            continue;
+        }
         if (state->checksums[player_id].size() <= frame) {
             continue;
         }
         if (state->checksums[player_id][frame] != state->checksums[network_get_player_id()][frame]) {
+            log_debug("checksum out of sync. frame %u between player %u (checksum %u) and us %u (checksum %u)", 
+                frame, 
+                player_id, 
+                state->checksums[player_id][frame],
+                network_get_player_id(), 
+                state->checksums[network_get_player_id()][frame]);
             return true;
         }
     }
