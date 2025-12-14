@@ -3107,7 +3107,9 @@ void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_time
         for (auto it : bot.base_info) {
             const Entity& goldmine = state.entities.get_by_id(it.first);
             // Make sure this entity only counts towards its own team
-            if (state.players[entity.player_id].team != state.players[it.second.controlling_player].team) {
+            if (it.second.controlling_player == PLAYER_NONE ||
+                    state.players[entity.player_id].team != 
+                    state.players[it.second.controlling_player].team) {
                 continue;
             }
             // Make sure this entity only counts if its close to the base
