@@ -206,8 +206,8 @@ MatchInput bot_squad_landmines_micro(const MatchState& state, Bot& bot, const Bo
 
 // Scouting
 
-void bot_scout_gather_info(const MatchState& state, Bot& bot);
-void bot_update_base_info(const MatchState& state, Bot& bot);
+void bot_scout_gather_info(const MatchState& state, Bot& bot, uint32_t match_timer);
+void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_timer);
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer);
 std::vector<EntityId> bot_determine_entities_to_scout(const MatchState& state, const Bot& bot);
 bool bot_is_entity_in_entities_to_scout_list(const Bot& bot, EntityId entity_id);

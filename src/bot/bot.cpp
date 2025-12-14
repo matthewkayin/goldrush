@@ -133,7 +133,7 @@ MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_
 
     // Gather info
 
-    bot_scout_gather_info(state, bot);
+    bot_scout_gather_info(state, bot, match_timer);
 
     // Surrender
 
@@ -2970,7 +2970,7 @@ MatchInput bot_squad_landmines_micro(const MatchState& state, Bot& bot, const Bo
 
 // SCOUTING
 
-void bot_scout_gather_info(const MatchState& state, Bot& bot) {
+void bot_scout_gather_info(const MatchState& state, Bot& bot, uint32_t match_timer) {
     ZoneScoped;
 
     // Check for scout death
@@ -3018,10 +3018,10 @@ void bot_scout_gather_info(const MatchState& state, Bot& bot) {
     }
 
     bot_update_desired_production(bot);
-    bot_update_base_info(state, bot);
+    bot_update_base_info(state, bot, match_timer);
 }
 
-void bot_update_base_info(const MatchState& state, Bot& bot) {
+void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_timer) {
     ZoneScoped;
 
     bot.base_info.clear();
@@ -3127,13 +3127,6 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
 
         int entity_defense_score = entity.type == ENTITY_LANDMINE ? 2 : bot_score_entity(state, bot, entity);
         bot.base_info[nearest_goldmine_id].defense_score += entity_defense_score;
-        log_debug("BOT %u update_base_info, goldmine %u entity ID %u type %s entity defense score %u defense score %u",
-            bot.player_id,
-            nearest_goldmine_id,
-            state.entities.get_id_of(entity_index),
-            entity_get_data(entity.type).name,
-            entity_defense_score,
-            bot.base_info[nearest_goldmine_id].defense_score);
     }
 
     // Add retreat memories to defense score
@@ -3155,7 +3148,6 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
         retreat_memory_score += desired_lead;
 
         bot.base_info[goldmine_id].defense_score = std::max(bot.base_info[goldmine_id].defense_score, retreat_memory_score);
-        log_debug("BOT %u update_base_info, goldmine %u retreat_memory_score %u defense score %u", bot.player_id, goldmine_id, retreat_memory_score, bot.base_info[goldmine_id]);
     }
 
     // Determine if bases are under attack
@@ -3183,6 +3175,13 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
         });
 
         bot.base_info[goldmine_id].is_under_attack = nearby_enemy_id != ID_NULL;
+    }
+
+    for (auto it : bot.base_info) {
+        EntityId goldmine_id = it.first;
+        const BotBaseInfo& second = it.second;
+
+        log_debug("BOT %u update_base_info, frame %u goldmine %u defense score %u", bot.player_id, match_timer, goldmine_id, second.defense_score);
     }
 }
 

@@ -401,7 +401,8 @@ size_t desync_compare_unordered_map(uint8_t* data, uint8_t* data2) {
     size_t offset = desync_compare_value<size_t>(data, data2, &map_size);
 
     for (size_t index = 0; index < map_size; index++) {
-        offset += desync_compare_value<T>(data + offset, data2 + offset);
+        T key;
+        offset += desync_compare_value<T>(data + offset, data2 + offset, &key);
         offset += desync_compare_value<U>(data + offset, data2 + offset);
     }
 
