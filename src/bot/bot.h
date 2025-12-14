@@ -59,7 +59,8 @@ struct BotBaseInfo {
     bool has_gold;
     bool is_low_on_gold;
     bool is_under_attack;
-    uint16_t padding = 0;
+    bool has_been_scouted;
+    uint8_t padding = 0;
     int defense_score;
 };
 
@@ -98,12 +99,13 @@ struct Bot {
     std::unordered_map<EntityId, bool> is_entity_assumed_to_be_scouted;
 
     // Base info
-    std::unordered_map<EntityId, BotBaseInfo> base_info;
-    std::unordered_map<EntityId, BotRetreatMemory> retreat_memory;
+    std::vector<EntityId> goldmine_ids;
+    std::vector<BotBaseInfo> base_info;
+    std::vector<BotRetreatMemory> retreat_memory;
 };
 
 Bot bot_empty();
-Bot bot_init(uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp);
+Bot bot_init(const MatchState& state, uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp);
 BotOpener bot_roll_opener(int* lcg_seed, Difficulty difficulty);
 BotUnitComp bot_roll_preferred_unit_comp(int* lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_timer);
@@ -206,8 +208,9 @@ MatchInput bot_squad_landmines_micro(const MatchState& state, Bot& bot, const Bo
 
 // Scouting
 
-void bot_scout_gather_info(const MatchState& state, Bot& bot, uint32_t match_timer);
-void bot_update_base_info(const MatchState& state, Bot& bot, uint32_t match_timer);
+void bot_scout_gather_info(const MatchState& state, Bot& bot);
+BotBaseInfo bot_base_info_empty();
+void bot_update_base_info(const MatchState& state, Bot& bot);
 MatchInput bot_scout(const MatchState& state, Bot& bot, uint32_t match_timer);
 std::vector<EntityId> bot_determine_entities_to_scout(const MatchState& state, const Bot& bot);
 bool bot_is_entity_in_entities_to_scout_list(const Bot& bot, EntityId entity_id);

@@ -251,7 +251,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise& noise) {
 
         BotOpener opener = bot_roll_opener(&bot_lcg_seed, difficulty);
         BotUnitComp preferred_unit_comp = bot_roll_preferred_unit_comp(&bot_lcg_seed);
-        state->bots[player_id] = bot_init(player_id, difficulty, opener, preferred_unit_comp);
+        state->bots[player_id] = bot_init(state->match_state, player_id, difficulty, opener, preferred_unit_comp);
     }
 
     return state;

@@ -202,7 +202,7 @@ void game_test_set_mode(GameState& state, GameMode mode) {
         Difficulty difficulty = DIFFICULTY_HARD;
         BotOpener opener = BOT_OPENER_TECH_FIRST;
         BotUnitComp unit_comp = bot_roll_preferred_unit_comp(&lcg_seed);
-        state.test_bot = bot_init(network_get_player_id(), difficulty, opener, unit_comp);
+        state.test_bot = bot_init(state.match_shell_state->match_state, network_get_player_id(), difficulty, opener, unit_comp);
     }
 }
 

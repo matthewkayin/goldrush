@@ -280,19 +280,12 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
         desync_write_unordered_map<EntityId, bool>(bot.is_entity_assumed_to_be_scouted);
 
         // Base info
-        desync_write_unordered_map<EntityId, BotBaseInfo>(bot.base_info);
+        desync_write_vector<EntityId>(bot.goldmine_ids);
+        desync_write_vector<BotBaseInfo>(bot.base_info);
 
         // Retreat memory
         desync_write_value<size_t>(bot.retreat_memory.size());
-        std::vector<EntityId> keys;
-        for (auto it : bot.retreat_memory) {
-            keys.push_back(it.first);
-        }
-        std::sort(keys.begin(), keys.end());
-        for (EntityId entity_id : keys) {
-            const BotRetreatMemory& memory = bot.retreat_memory.at(entity_id);
-
-            desync_write_value<EntityId>(entity_id);
+        for (const BotRetreatMemory& memory : bot.retreat_memory) {
             desync_write_vector<EntityId>(memory.enemy_list);
             desync_write_value<int>(memory.retreat_count);
             desync_write_value<uint32_t>(memory.retreat_time);
@@ -551,13 +544,13 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
         state_buffer_offset += desync_compare_unordered_map<EntityId, bool>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
 
         // Base info
-        state_buffer_offset += desync_compare_unordered_map<EntityId, BotBaseInfo>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_vector<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_vector<BotBaseInfo>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
 
         // Retreat memory
         size_t retreat_memory_size;
         state_buffer_offset += desync_compare_value<size_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset, &retreat_memory_size);
         for (size_t index = 0; index < retreat_memory_size; index++) {
-            state_buffer_offset += desync_compare_value<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
             state_buffer_offset += desync_compare_vector<EntityId>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
             state_buffer_offset += desync_compare_value<int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
             state_buffer_offset += desync_compare_value<uint32_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
