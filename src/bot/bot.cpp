@@ -3127,6 +3127,13 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
 
         int entity_defense_score = entity.type == ENTITY_LANDMINE ? 2 : bot_score_entity(state, bot, entity);
         bot.base_info[nearest_goldmine_id].defense_score += entity_defense_score;
+        log_debug("BOT %u update_base_info, goldmine %u entity ID %u type %s entity defense score %u defense score %u",
+            bot.player_id,
+            nearest_goldmine_id,
+            state.entities.get_id_of(entity_index),
+            entity_get_data(entity.type).name,
+            entity_defense_score,
+            bot.base_info[nearest_goldmine_id].defense_score);
     }
 
     // Add retreat memories to defense score
@@ -3148,6 +3155,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
         retreat_memory_score += desired_lead;
 
         bot.base_info[goldmine_id].defense_score = std::max(bot.base_info[goldmine_id].defense_score, retreat_memory_score);
+        log_debug("BOT %u update_base_info, goldmine %u retreat_memory_score %u defense score %u", bot.player_id, goldmine_id, retreat_memory_score, bot.base_info[goldmine_id]);
     }
 
     // Determine if bases are under attack
