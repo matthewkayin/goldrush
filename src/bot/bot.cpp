@@ -1854,7 +1854,9 @@ MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, 
             }
 
             // Check if this unit already has a good target nearby
-            bool unit_is_engaged = (unit.target.type == TARGET_ATTACK_ENTITY || unit.target.type == TARGET_MOLOTOV) &&
+            bool unit_is_engaged = 
+                ((unit.target.type == TARGET_ATTACK_ENTITY && state.entities.get_index_of(unit.target.id) != INDEX_INVALID)
+                    || unit.target.type == TARGET_MOLOTOV) &&
                     ivec2::manhattan_distance(unit.cell, entity_get_target_cell(state, unit)) < BOT_MEDIUM_DISTANCE;
 
             // Check if there is an enemy nearby
