@@ -1676,27 +1676,70 @@ void match_shell_handle_input(MatchShellState* state) {
             if (state->control_group_double_tap_timer != 0 && 
                     state->control_group_selected == control_group_index &&
                     !state->selection.empty()) {
-                ivec2 group_min;
-                ivec2 group_max;
+                std::vector<Rect> group_rects;
+                std::vector<uint32_t> group_rect_entity_counts;
                 for (uint32_t selection_index = 0; selection_index < state->selection.size(); selection_index++) {
                     const Entity& entity = state->match_state.entities.get_by_id(state->selection[selection_index]);
-                    if (selection_index == 0) {
-                        group_min = entity.cell;
-                        group_max = entity.cell;
+
+                    const int entity_cell_size = entity_get_data(entity.type).cell_size;
+                    Rect entity_rect = (Rect) {
+                        .x = entity.cell.x,
+                        .y = entity.cell.y,
+                        .w = entity_cell_size,
+                        .h = entity_cell_size
+                    };
+
+                    uint32_t existing_group_index;
+                    for (existing_group_index = 0; existing_group_index < group_rects.size(); existing_group_index++) {
+                        Rect group_rect = group_rects[existing_group_index];
+
+                        // If the entity is inside this rect, then use it
+                        if (group_rect.has_point(entity.cell)) {
+                            break;
+                        }
+
+                        // If the entity is outside the rect but close to it, then use it
+                        if (Rect::euclidean_distance_squared_between(entity_rect, group_rect) < 64) {
+                            break;
+                        }
+                    }
+
+                    if (existing_group_index < group_rects.size()) {
+                        // If the unit is outside the rect, then extend the rect to contain the unit
+                        Rect group_rect = group_rects[existing_group_index];
+                        if (!group_rect.has_point(entity.cell)) {
+                            group_rect.x = std::min(group_rect.x, entity_rect.x);
+                            group_rect.y = std::min(group_rect.y, entity_rect.y);
+                            int group_rect_max_x = std::max(group_rect.x + group_rect.w, entity_rect.x + entity_rect.w);
+                            int group_rect_max_y = std::max(group_rect.y + group_rect.h, entity_rect.y + entity_rect.h);
+                            group_rect.w = group_rect_max_x - group_rect.x;
+                            group_rect.h = group_rect_max_y - group_rect.y;
+
+                            group_rects[existing_group_index] = group_rect;
+                        }
+
+                        group_rect_entity_counts[existing_group_index]++;
                         continue;
                     }
 
-                    group_min.x = std::min(group_min.x, entity.cell.x);
-                    group_min.y = std::min(group_min.y, entity.cell.y);
-                    group_max.x = std::max(group_max.x, entity.cell.x);
-                    group_max.y = std::max(group_max.y, entity.cell.y);
+                    // Otherwise, if the unit did not find a nearby rect, begin a new rect for the unit
+                    group_rects.push_back(entity_rect);
+                    group_rect_entity_counts.push_back(1);
                 }
 
-                Rect group_rect = (Rect) {
-                    .x = group_min.x, .y = group_min.y,
-                    .w = group_max.x - group_min.x, .h = group_max.y - group_min.y
-                };
+                // Chose the group rect with the most entities
+                GOLD_ASSERT(!group_rects.empty() && group_rects.size() == group_rect_entity_counts.size());
+                uint32_t most_populated_group_rect_index = 0;
+                for (uint32_t group_rect_index = 1; group_rect_index < group_rects.size(); group_rect_index++) {
+                    if (group_rect_entity_counts[group_rect_index] > group_rect_entity_counts[most_populated_group_rect_index]) {
+                        most_populated_group_rect_index = group_rect_index;
+                    }
+                }
+
+                // Snap to the group rect's center
+                Rect group_rect = group_rects[most_populated_group_rect_index];
                 ivec2 group_center = ivec2(group_rect.x + (group_rect.w / 2), group_rect.y + (group_rect.h / 2));
+                map_clamp_cell(state->match_state.map, group_center);
                 match_shell_center_camera_on_cell(state, group_center);
                 return;
             }
