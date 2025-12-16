@@ -10,6 +10,7 @@ enum FontName {
     FONT_HACK_PLAYER1,
     FONT_HACK_PLAYER2,
     FONT_HACK_PLAYER3,
+    FONT_HACK_SHADOW,
     FONT_WESTERN8_OFFBLACK,
     FONT_WESTERN8_WHITE,
     FONT_WESTERN8_GOLD,
@@ -20,19 +21,16 @@ enum FontName {
     FONT_COUNT
 };
 
-enum FontImportStrategy {
-    FONT_IMPORT_DEFAULT,
-    FONT_IMPORT_IGNORE_BEARING,
-    FONT_IMPORT_NUMERIC_ONLY
-};
+const uint32_t FONT_OPTION_IGNORE_BEARING = 1;
 
 struct FontParams {
-    FontImportStrategy strategy;
+    uint32_t options;
     const char* path;
     int size;
     uint8_t r;
     uint8_t g;
     uint8_t b;
+    uint8_t a;
 };
 
 const FontParams& resource_get_font_params(FontName name);

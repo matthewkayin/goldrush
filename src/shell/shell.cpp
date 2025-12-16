@@ -3803,6 +3803,7 @@ void match_shell_render(const MatchShellState* state) {
         }
 
         int render_x = SCREEN_WIDTH;
+        const ivec2 text_shadow_offset = ivec2(2, 2);
 
         // Rendering from right to left here
 
@@ -3810,6 +3811,7 @@ void match_shell_render(const MatchShellState* state) {
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "200/200").x + 4);
         char population_text[8];
         sprintf(population_text, "%u/%u", match_get_player_population(state->match_state, player_id), match_get_player_max_population(state->match_state, player_id));
+        render_text(FONT_HACK_SHADOW, population_text, ivec2(render_x, resource_base_y + 6) + text_shadow_offset);
         render_text(FONT_HACK_WHITE, population_text, ivec2(render_x, resource_base_y + 6));
 
         // Population icon
@@ -3820,6 +3822,7 @@ void match_shell_render(const MatchShellState* state) {
         render_x -= (render_get_text_size(FONT_HACK_WHITE, "99999").x + 4);
         char gold_text[8];
         sprintf(gold_text, "%u", state->displayed_gold_amounts[player_id]);
+        render_text(FONT_HACK_SHADOW, gold_text, ivec2(render_x, resource_base_y + 6) + text_shadow_offset);
         render_text(FONT_HACK_WHITE, gold_text, ivec2(render_x, resource_base_y + 6));
 
         // Gold icon
@@ -3828,7 +3831,8 @@ void match_shell_render(const MatchShellState* state) {
 
         // Player name
         if (state->replay_mode) {
-            render_x -= (render_get_text_size(FONT_HACK_WHITE, state->match_state.players[player_id].name).x + 4);
+            render_x -= (render_get_text_size(FONT_HACK_WHITE, state->match_state.players[player_id].name).x + 32);
+            render_text(FONT_HACK_SHADOW, state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 6) + text_shadow_offset);
             render_text((FontName)(FONT_HACK_PLAYER0 + state->match_state.players[player_id].recolor_id), state->match_state.players[player_id].name, ivec2(render_x, resource_base_y + 6));
         }
 

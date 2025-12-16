@@ -26,6 +26,7 @@ struct PoissonDiskParams {
 SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params);
+bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<ivec2>& avoid_cells, const std::vector<int>& avoid_values);
 
 void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.type = map_type;
@@ -811,6 +812,72 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
         params.allow_unreachable_cells = true;
         params.margin = ivec2(0, 0);
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
+
+        // Generate tree clusters
+        if (map_type == MAP_TYPE_KLONDIKE) {
+            std::vector<int> avoid_values;
+            std::vector<ivec2> avoid_cells; 
+            for (int y = 0; y < map.height; y++) {
+                for (int x = 0; x < map.width; x++) {
+                    if (map_is_tile_ramp(map, ivec2(x, y))) {
+                        avoid_cells.push_back(ivec2(x, y));
+                        avoid_values.push_back(8);
+                    }
+                }
+            }
+            for (ivec2 goldmine_cell : goldmine_cells) {
+                ivec2 goldmine_center = goldmine_cell + ivec2(1, 1);
+                avoid_cells.push_back(goldmine_center);
+                avoid_values.push_back(16);
+            }
+
+            std::vector<ivec2> source_cells = decoration_cells;
+            decoration_cells.clear();
+            for (ivec2 source_cell : source_cells) {
+                uint32_t tree_count = 0;
+                const uint32_t target_tree_count = 7 + (lcg_rand(lcg_seed) % 13);
+                ivec2 cell = source_cell;
+
+                // Choose the forest direction
+                int forest_direction = (lcg_rand(lcg_seed) % 4) * 2;
+                int forest_adjacent_direction = (lcg_rand(lcg_seed) % 2 == 0
+                    ? forest_direction + 2
+                    : forest_direction + 6) % DIRECTION_COUNT;
+
+                while (tree_count < target_tree_count) {
+                    ivec2 cell_children[4] = {
+                        cell, 
+                        cell + DIRECTION_IVEC2[forest_direction] + DIRECTION_IVEC2[forest_adjacent_direction],
+                        cell + DIRECTION_IVEC2[forest_direction] - DIRECTION_IVEC2[forest_adjacent_direction],
+                        cell + (DIRECTION_IVEC2[forest_direction] * 2)
+                    };
+                    for (int index = 0; index < 4; index++) {
+                        if (map_is_tree_cell_valid(map, cell_children[index], avoid_cells, avoid_values)) {
+                            decoration_cells.push_back(cell_children[index]);
+                            avoid_cells.push_back(cell_children[index]);
+                            avoid_values.push_back(1);
+                            tree_count++;
+                        }
+                        if (tree_count == target_tree_count) {
+                            break;
+                        }
+                    }
+
+                    int direction_roll = lcg_rand(lcg_seed) % 3;
+                    ivec2 next_cell = direction_roll == 2
+                        ? cell + (DIRECTION_IVEC2[forest_direction] * 2) + (DIRECTION_IVEC2[forest_adjacent_direction] * 2)
+                        : cell + (DIRECTION_IVEC2[forest_direction] * 2);
+                    if (!map_is_cell_in_bounds(map, next_cell) || 
+                            map_get_tile(map, next_cell).elevation != 
+                            map_get_tile(map, cell).elevation) {
+                        break;
+                    }
+
+                    cell = next_cell;
+                }
+            }
+        }
+
         SpriteName decoration_sprite = map_get_decoration_sprite(map_type);
         const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
         for (ivec2 cell : decoration_cells) {
@@ -1076,6 +1143,10 @@ uint32_t map_neighbors_to_autotile_index(uint32_t p_neighbors) {
 }
 
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point) {
+    // Don't allow trees on the very top cell
+    if (map.type == MAP_TYPE_KLONDIKE && point.y < 1) {
+        return false;
+    }
     if (point.x < params.margin.x || point.x >= map.width - params.margin.x || point.y < params.margin.y || point.y >= (int)map.height - params.margin.y) {
         return false;
     }
@@ -1174,6 +1245,33 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
     }
 
     return sample;
+}
+
+bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<ivec2>& avoid_cells, const std::vector<int>& avoid_values) {
+    if (!map_is_cell_in_bounds(map, cell)) {
+        return false;
+    }
+    // Don't allow trees on the very top row
+    if (cell.y == 0) {
+        return false;
+    }
+
+    Cell map_cell = map_get_cell(map, CELL_LAYER_GROUND, cell);
+    Cell map_cell_upper = map_get_cell(map, CELL_LAYER_GROUND, cell + ivec2(0, -1));
+    if (map_cell.type != CELL_EMPTY || map_cell_upper.type != CELL_EMPTY) {
+        return false;
+    }
+
+    for (uint32_t avoid_index = 0; avoid_index < avoid_values.size(); avoid_index++) {
+        if (avoid_values[avoid_index] == 0) {
+            continue;
+        }
+        if (ivec2::manhattan_distance(cell, avoid_cells[avoid_index]) <= avoid_values[avoid_index]) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool map_is_cell_in_bounds(const Map& map, ivec2 cell) {

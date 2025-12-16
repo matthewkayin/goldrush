@@ -686,6 +686,8 @@ SDL_Surface* render_create_auto_tile_surface(SDL_Surface* tileset_surface, const
 
 SDL_Surface* render_load_font(FontName name) {
     const FontParams& params = resource_get_font_params((FontName)name);
+    const bool font_option_ignore_bearing = (params.options & FONT_OPTION_IGNORE_BEARING) == FONT_OPTION_IGNORE_BEARING;
+
     Font& font = state.fonts[name];
 
     // Open the font
@@ -702,7 +704,7 @@ SDL_Surface* render_load_font(FontName name) {
     int glyph_max_width = 0;
     int glyph_max_height = 0;
 
-    SDL_Color font_color = (SDL_Color) { .r = params.r, .g = params.g, .b = params.b, .a = 255 };
+    SDL_Color font_color = (SDL_Color) { .r = params.r, .g = params.g, .b = params.b, .a = params.a };
     for (uint32_t glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
         char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
         glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, 0, font_color);
@@ -745,7 +747,7 @@ SDL_Surface* render_load_font(FontName name) {
         int bearing_y;
         TTF_GetGlyphMetrics(ttf_font, FONT_FIRST_CHAR + glyph_index, &font.glyphs[glyph_index].bearing_x, NULL, NULL, &bearing_y, &font.glyphs[glyph_index].advance);
         font.glyphs[glyph_index].bearing_y = glyph_max_height - bearing_y;
-        if (params.strategy == FONT_IMPORT_IGNORE_BEARING) {
+        if (font_option_ignore_bearing) {
             font.glyphs[glyph_index].bearing_x = 0;
             font.glyphs[glyph_index].bearing_y = 0;
         }
