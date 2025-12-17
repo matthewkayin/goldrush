@@ -161,6 +161,33 @@ float simplex_noise(uint64_t seed, double x, double y) {
     return value;
 }
 
+uint8_t noise_value_from_result(MapType map_type, double result) {
+    switch (map_type) {
+        case MAP_TYPE_ARIZONA: {
+            if (result < 0.15) {
+                return NOISE_VALUE_WATER;
+            } else if (result < 0.6) { 
+                return NOISE_VALUE_LOWGROUND;
+            } else {
+                return NOISE_VALUE_HIGHGROUND;
+            }
+        }
+        case MAP_TYPE_KLONDIKE: {
+            if (result < 0.1) {
+                return NOISE_VALUE_WATER;
+            } else if (result < 0.65) {
+                return NOISE_VALUE_LOWGROUND;
+            } else {
+                return NOISE_VALUE_HIGHGROUND;
+            }
+        }
+        case MAP_TYPE_COUNT: {
+            GOLD_ASSERT(false);
+            return NOISE_VALUE_LOWGROUND;
+        }
+    }
+}
+
 Noise noise_generate(MapType map_type, uint64_t seed, int width, int height) {
     Noise noise;
     noise.width = width;
@@ -168,37 +195,12 @@ Noise noise_generate(MapType map_type, uint64_t seed, int width, int height) {
     noise.map = (uint8_t*)malloc(noise.width * noise.height * sizeof(uint8_t));
 
     const double FREQUENCY = 1.0 / 56.0;
-    double water_threshold = -1.0;
-    double lowground_threshold = -1.0;
-
-    switch (map_type) {
-        case MAP_TYPE_ARIZONA: {
-            water_threshold = 0.15;
-            lowground_threshold = 0.6;
-            break;
-        }
-        case MAP_TYPE_KLONDIKE: {
-            water_threshold = 0.25;
-            lowground_threshold = 0.75;
-            break;
-        }
-        case MAP_TYPE_COUNT: {
-            break;
-        }
-    }
-    GOLD_ASSERT(water_threshold != -1.0 && lowground_threshold != -1.0);
 
     for (int x = 0; x < noise.width; x++) {
         for (int y = 0; y < noise.height; y++) {
             // simplex_noise generates a result from -1 to 1, so we convert to the range 0 to 1
             double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
-            if (perlin_result < water_threshold) {
-                noise.map[x + (y * noise.width)] = NOISE_VALUE_WATER;
-            } else if (perlin_result < lowground_threshold) {
-                noise.map[x + (y * noise.width)] = NOISE_VALUE_LOWGROUND;
-            } else {
-                noise.map[x + (y * noise.width)] = NOISE_VALUE_HIGHGROUND;
-            } 
+            noise.map[x + (y * noise.width)] = noise_value_from_result(map_type, perlin_result);
         }
     }
 
