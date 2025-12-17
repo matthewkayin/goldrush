@@ -16,8 +16,13 @@ static const int REGION_UNASSIGNED = -1;
 static const int REGION_CHUNK_SIZE = 32;
 static const uint32_t PATHFIND_ITERATION_MAX = 1999;
 
+struct PoissonAvoidValue {
+    ivec2 cell;
+    int distance;
+};
+
 struct PoissonDiskParams {
-    std::vector<int> avoid_values;
+    std::vector<PoissonAvoidValue> avoid_values;
     int disk_radius;
     bool allow_unreachable_cells;
     ivec2 margin;
@@ -679,34 +684,38 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
     log_debug("Determined player spawns.");
 
     // Generate gold mines
-    PoissonDiskParams params = (PoissonDiskParams) {
-        .avoid_values = std::vector<int>(map.width * map.height, 0),
-        .disk_radius = 48,
-        .allow_unreachable_cells = false,
-        .margin = ivec2(5, 5)
-    };
     {
+        PoissonDiskParams params = (PoissonDiskParams) {
+            .avoid_values = std::vector<PoissonAvoidValue>(),
+            .disk_radius = 48,
+            .allow_unreachable_cells = false,
+            .margin = ivec2(5, 5)
+        };
+
         // Place a gold mine on each player's spawn
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             GOLD_ASSERT(player_spawns[player_id].x != -1);
 
             ivec2 mine_cell = player_spawns[player_id];
             goldmine_cells.push_back(mine_cell);
-            params.avoid_values[mine_cell.x + (mine_cell.y * map.width)] = params.disk_radius;
+            params.avoid_values.push_back((PoissonAvoidValue) {
+                .cell = mine_cell,
+                .distance = 48
+            });
         }
 
         // Generate the avoid values
         for (int index = 0; index < map.width * map.height; index++) {
             if (map.cells[CELL_LAYER_GROUND][index].type == CELL_BLOCKED || map_is_tile_ramp(map, ivec2(index % map.width, index / map.width))) {
-                params.avoid_values[index] = 6;
+                params.avoid_values.push_back((PoissonAvoidValue) {
+                    .cell = ivec2(index % map.width, index / map.width),
+                    .distance = 6
+                }); 
             }
         }
 
         std::vector<ivec2> goldmine_results = map_poisson_disk(map, lcg_seed, params);
         goldmine_cells.insert(goldmine_cells.end(), goldmine_results.begin(), goldmine_results.end());
-        for (ivec2 goldmine_cell : goldmine_cells) {
-            params.avoid_values[goldmine_cell.x + (goldmine_cell.y * map.width)] = 4;
-        }
     }
     // End generate gold mines
     log_debug("Generated gold mines.");
@@ -797,86 +806,36 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
     }
 
     // Generate decorations
-    {
-        // Place avoid values on each town hall cell
-        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            ivec2 town_hall_cell = map_get_player_town_hall_cell(map, player_spawns[player_id]);
-            for (int y = town_hall_cell.y; y < town_hall_cell.y + 4; y++) {
-                for (int x = town_hall_cell.x; x < town_hall_cell.x + 4; x++) {
-                    params.avoid_values[x + (y * map.width)] = 4;
+    if (map_type == MAP_TYPE_ARIZONA) {
+        PoissonDiskParams params = (PoissonDiskParams) {
+            .avoid_values = std::vector<PoissonAvoidValue>(),
+            .disk_radius = 16,
+            .allow_unreachable_cells = true,
+            .margin = ivec2(0, 0)
+        };
+
+        // Generate avoid values for each ramp
+        for (int y = 0; y < map.height; y++) {
+            for (int x = 0; x < map.width; x++) {
+                if (!map_is_tile_ramp(map, ivec2(x, y))) {
+                    continue;
                 }
+                params.avoid_values.push_back((PoissonAvoidValue) {
+                    .cell = ivec2(x, y),
+                    .distance = 6
+                });
             }
         }
 
-        params.disk_radius = 16;
-        params.allow_unreachable_cells = true;
-        params.margin = ivec2(0, 0);
+        // Generate avoid values for each goldmine
+        for (ivec2 goldmine_cell : goldmine_cells) {
+            params.avoid_values.push_back((PoissonAvoidValue) {
+                .cell = goldmine_cell,
+                .distance = 16
+            });
+        }
+
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
-
-        // Generate tree clusters
-        if (map_type == MAP_TYPE_KLONDIKE) {
-            std::vector<int> avoid_values;
-            std::vector<ivec2> avoid_cells; 
-            for (int y = 0; y < map.height; y++) {
-                for (int x = 0; x < map.width; x++) {
-                    if (map_is_tile_ramp(map, ivec2(x, y))) {
-                        avoid_cells.push_back(ivec2(x, y));
-                        avoid_values.push_back(8);
-                    }
-                }
-            }
-            for (ivec2 goldmine_cell : goldmine_cells) {
-                ivec2 goldmine_center = goldmine_cell + ivec2(1, 1);
-                avoid_cells.push_back(goldmine_center);
-                avoid_values.push_back(16);
-            }
-
-            std::vector<ivec2> source_cells = decoration_cells;
-            decoration_cells.clear();
-            for (ivec2 source_cell : source_cells) {
-                uint32_t tree_count = 0;
-                const uint32_t target_tree_count = 7 + (lcg_rand(lcg_seed) % 13);
-                ivec2 cell = source_cell;
-
-                // Choose the forest direction
-                int forest_direction = (lcg_rand(lcg_seed) % 4) * 2;
-                int forest_adjacent_direction = (lcg_rand(lcg_seed) % 2 == 0
-                    ? forest_direction + 2
-                    : forest_direction + 6) % DIRECTION_COUNT;
-
-                while (tree_count < target_tree_count) {
-                    ivec2 cell_children[4] = {
-                        cell, 
-                        cell + DIRECTION_IVEC2[forest_direction] + DIRECTION_IVEC2[forest_adjacent_direction],
-                        cell + DIRECTION_IVEC2[forest_direction] - DIRECTION_IVEC2[forest_adjacent_direction],
-                        cell + (DIRECTION_IVEC2[forest_direction] * 2)
-                    };
-                    for (int index = 0; index < 4; index++) {
-                        if (map_is_tree_cell_valid(map, cell_children[index], avoid_cells, avoid_values)) {
-                            decoration_cells.push_back(cell_children[index]);
-                            avoid_cells.push_back(cell_children[index]);
-                            avoid_values.push_back(1);
-                            tree_count++;
-                        }
-                        if (tree_count == target_tree_count) {
-                            break;
-                        }
-                    }
-
-                    int direction_roll = lcg_rand(lcg_seed) % 3;
-                    ivec2 next_cell = direction_roll == 2
-                        ? cell + (DIRECTION_IVEC2[forest_direction] * 2) + (DIRECTION_IVEC2[forest_adjacent_direction] * 2)
-                        : cell + (DIRECTION_IVEC2[forest_direction] * 2);
-                    if (!map_is_cell_in_bounds(map, next_cell) || 
-                            map_get_tile(map, next_cell).elevation != 
-                            map_get_tile(map, cell).elevation) {
-                        break;
-                    }
-
-                    cell = next_cell;
-                }
-            }
-        }
 
         SpriteName decoration_sprite = map_get_decoration_sprite(map_type);
         const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
@@ -1161,16 +1120,9 @@ bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params,
         return false;
     }
 
-    for (int nx = point.x - params.disk_radius; nx < point.x + params.disk_radius + 1; nx++) {
-        for (int ny = point.y - params.disk_radius; ny < point.y + params.disk_radius + 1; ny++) {
-            ivec2 near_point = ivec2(nx, ny);
-            if (!map_is_cell_in_bounds(map, near_point)) {
-                continue;
-            }
-            int avoid_value = params.avoid_values[near_point.x + (near_point.y * map.width)];
-            if (avoid_value != 0 && ivec2::manhattan_distance(point, near_point) <= avoid_value) {
-                return false;
-            }
+    for (const PoissonAvoidValue& avoid_value : params.avoid_values) {
+        if (ivec2::manhattan_distance(point, avoid_value.cell) <= avoid_value.distance) {
+            return false;
         }
     }
 
@@ -1189,7 +1141,10 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
 
     frontier.push_back(first);
     sample.push_back(first);
-    params.avoid_values[first.x + (first.y * map.width)] = params.disk_radius;
+    params.avoid_values.push_back((PoissonAvoidValue) {
+        .cell = first,
+        .distance = params.disk_radius
+    });
 
     std::vector<ivec2> circle_offset_points;
     {
@@ -1238,7 +1193,10 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
         if (child_is_valid) {
             frontier.push_back(child);
             sample.push_back(child);
-            params.avoid_values[child.x + (child.y * map.width)] = params.disk_radius;
+            params.avoid_values.push_back((PoissonAvoidValue) {
+                .cell = child,
+                .distance = params.disk_radius
+            });
         } else {
             frontier.erase(frontier.begin() + next_index);
         }
