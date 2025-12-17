@@ -31,7 +31,7 @@ struct PoissonDiskParams {
 SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params);
-bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<ivec2>& avoid_cells, const std::vector<int>& avoid_values);
+bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values);
 
 void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.type = map_type;
@@ -327,7 +327,7 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
     std::vector<ivec2> artifacts;
     do {
         std::fill(map.tiles.begin(), map.tiles.end(), (Tile) {
-            .sprite = SPRITE_TILE_SAND1,
+            .sprite = map_get_plain_ground_tile_sprite(map_type),
             .frame = ivec2(0, 0),
             .elevation = 0
         });
@@ -556,8 +556,7 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
                     if (!map_is_cell_in_bounds(map, stair_front_cell)) {
                         continue;
                     }
-                    SpriteName stair_front_cell_tile = map.tiles[stair_front_cell.x + (stair_front_cell.y * map.width)].sprite;
-                    if (stair_front_cell_tile < SPRITE_TILE_SAND1 || stair_front_cell_tile > SPRITE_TILE_SAND3) {
+                    if (!map_is_tile_ground(map, stair_front_cell)) {
                         continue;
                     }
 
@@ -846,6 +845,64 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
             };
         }
     }
+
+    /*
+    // Generate klondike forests
+    if (map_type == MAP_TYPE_KLONDIKE) {
+        std::vector<PoissonAvoidValue> avoid_values;
+
+        // Generate avoid values for each ramp
+        for (int y = 0; y < map.height; y++) {
+            for (int x = 0; x < map.width; x++) {
+                if (!map_is_tile_ramp(map, ivec2(x, y))) {
+                    continue;
+                }
+                avoid_values.push_back((PoissonAvoidValue) {
+                    .cell = ivec2(x, y),
+                    .distance = 6
+                });
+            }
+        }
+
+        // Generate avoid values for each goldmine
+        for (ivec2 goldmine_cell : goldmine_cells) {
+            avoid_values.push_back((PoissonAvoidValue) {
+                .cell = goldmine_cell,
+                .distance = 16
+            });
+        }
+
+        std::vector<ivec2> frontier;
+
+        // Seed the frontier with points along the map's edge
+        for (int x = 16; x < map.width - 16; x += 32) {
+            ivec2 seed_cell = ivec2(x, 0);
+            if (map_is_tree_cell_valid(map, seed_cell, avoid_values)) {
+                frontier.push_back(seed_cell);
+            }
+            seed_cell.y = map.height - 1;
+            if (map_is_tree_cell_valid(map, seed_cell, avoid_values)) {
+                frontier.push_back(seed_cell);
+            }
+        }
+        for (int y = 16; y < map.height - 16; y += 32) {
+            ivec2 seed_cell = ivec2(0, y);
+            if (map_is_tree_cell_valid(map, seed_cell, avoid_values)) {
+                frontier.push_back(seed_cell);
+            }
+            seed_cell.x = map.width - 1;
+            if (map_is_tree_cell_valid(map, seed_cell, avoid_values)) {
+                frontier.push_back(seed_cell);
+            }
+        }
+
+        std::vector<bool> explored(map.width * map.height, false);
+
+        while (!frontier.empty()) {
+
+        }
+    }
+    */
 }
 
 SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_seed) {
@@ -1205,7 +1262,7 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
     return sample;
 }
 
-bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<ivec2>& avoid_cells, const std::vector<int>& avoid_values) {
+bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values) {
     if (!map_is_cell_in_bounds(map, cell)) {
         return false;
     }
@@ -1220,11 +1277,8 @@ bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<ivec2>
         return false;
     }
 
-    for (uint32_t avoid_index = 0; avoid_index < avoid_values.size(); avoid_index++) {
-        if (avoid_values[avoid_index] == 0) {
-            continue;
-        }
-        if (ivec2::manhattan_distance(cell, avoid_cells[avoid_index]) <= avoid_values[avoid_index]) {
+    for (const PoissonAvoidValue& avoid_value : avoid_values) {
+        if (ivec2::manhattan_distance(cell, avoid_value.cell) <= avoid_value.distance) {
             return false;
         }
     }
