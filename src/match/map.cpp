@@ -805,50 +805,7 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
     }
 
     // Generate decorations
-    if (map_type == MAP_TYPE_ARIZONA) {
-        PoissonDiskParams params = (PoissonDiskParams) {
-            .avoid_values = std::vector<PoissonAvoidValue>(),
-            .disk_radius = 16,
-            .allow_unreachable_cells = true,
-            .margin = ivec2(0, 0)
-        };
-
-        // Generate avoid values for each ramp
-        for (int y = 0; y < map.height; y++) {
-            for (int x = 0; x < map.width; x++) {
-                if (!map_is_tile_ramp(map, ivec2(x, y))) {
-                    continue;
-                }
-                params.avoid_values.push_back((PoissonAvoidValue) {
-                    .cell = ivec2(x, y),
-                    .distance = 6
-                });
-            }
-        }
-
-        // Generate avoid values for each goldmine
-        for (ivec2 goldmine_cell : goldmine_cells) {
-            params.avoid_values.push_back((PoissonAvoidValue) {
-                .cell = goldmine_cell,
-                .distance = 16
-            });
-        }
-
-        std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
-
-        SpriteName decoration_sprite = map_get_decoration_sprite(map_type);
-        const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
-        for (ivec2 cell : decoration_cells) {
-            map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)] = (Cell) {
-                .type = CELL_DECORATION,
-                .decoration_hframe = (uint16_t)(lcg_rand(lcg_seed) % decoration_sprite_info.hframes)
-            };
-        }
-    }
-
-    /*
-    // Generate klondike forests
-    if (map_type == MAP_TYPE_KLONDIKE) {
+    {
         std::vector<PoissonAvoidValue> avoid_values;
 
         // Generate avoid values for each ramp
@@ -872,37 +829,99 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
             });
         }
 
-        std::vector<ivec2> frontier;
+        PoissonDiskParams params = (PoissonDiskParams) {
+            .avoid_values = avoid_values,
+            .disk_radius = 16,
+            .allow_unreachable_cells = true,
+            .margin = ivec2(0, 0)
+        };
 
-        // Seed the frontier with points along the map's edge
-        for (int x = 16; x < map.width - 16; x += 32) {
-            ivec2 seed_cell = ivec2(x, 0);
-            if (map_is_tree_cell_valid(map, seed_cell, avoid_values)) {
-                frontier.push_back(seed_cell);
-            }
-            seed_cell.y = map.height - 1;
-            if (map_is_tree_cell_valid(map, seed_cell, avoid_values)) {
-                frontier.push_back(seed_cell);
-            }
-        }
-        for (int y = 16; y < map.height - 16; y += 32) {
-            ivec2 seed_cell = ivec2(0, y);
-            if (map_is_tree_cell_valid(map, seed_cell, avoid_values)) {
-                frontier.push_back(seed_cell);
-            }
-            seed_cell.x = map.width - 1;
-            if (map_is_tree_cell_valid(map, seed_cell, avoid_values)) {
-                frontier.push_back(seed_cell);
+        std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
+
+        if (map_type == MAP_TYPE_ARIZONA) {
+            for (ivec2 cell : decoration_cells) {
+                map_create_decoration_at_cell(map, lcg_seed, cell);
             }
         }
 
-        std::vector<bool> explored(map.width * map.height, false);
+        if (map_type == MAP_TYPE_KLONDIKE) {
+            struct DecorationNode {
+                ivec2 cell;
+                int depth;
+            };
 
-        while (!frontier.empty()) {
+            static const int MAX_DECORATION_DEPTH = 3;
 
+            std::vector<int> decoration_depth_map(map.width * map.height, 0);
+            for (int y = 0; y < map.height; y++) {
+                for (int x = 0; x < map.width; x++) {
+                    ivec2 cell = ivec2(x, y);
+
+                    // Calculate a score from 0 to MAX_DEPTH for the depth based on the distance to the center of the map
+                    // Cells closer to the edges will be closer to MAX_DEPTH and cells closer to the center will be closer to 0
+                    ivec2 map_center = ivec2(map.width / 2, map.height / 2);
+                    int cell_distance_to_center = ivec2::manhattan_distance(cell, map_center);
+                    decoration_depth_map[x + (y * map.width)] += (MAX_DECORATION_DEPTH * cell_distance_to_center) / (map.width / 2);
+
+                    if (map_get_cell(map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED) {
+                        static int WALL_RADIUS = 3;
+                        for (int ny = y - WALL_RADIUS; ny < y + WALL_RADIUS + 1; ny++) {
+                            for (int nx = x - WALL_RADIUS; nx < x + WALL_RADIUS + 1; nx++) {
+                                ivec2 near_cell = ivec2(nx, ny);
+                                if (!map_is_cell_in_bounds(map, near_cell)) {
+                                    continue;
+                                }
+                                int distance_to_wall = ivec2::manhattan_distance(near_cell, cell);
+                                decoration_depth_map[nx + (ny * map.width)] += (MAX_DECORATION_DEPTH * distance_to_wall) / (WALL_RADIUS + WALL_RADIUS);
+                            }
+                        }
+                    }
+                }
+            }
+
+            std::vector<DecorationNode> frontier;
+            for (ivec2 cell : decoration_cells) {
+                frontier.push_back((DecorationNode) {
+                    .cell = cell,
+                    .depth = decoration_depth_map[cell.x + (cell.y * map.width)]
+                });
+            }
+            std::vector<bool> is_explored(map.width * map.height, false);
+
+            while (!frontier.empty()) {
+                DecorationNode next = frontier.back();
+                frontier.pop_back();
+
+                map_create_decoration_at_cell(map, lcg_seed, next.cell);
+
+                is_explored[next.cell.x + (next.cell.y * map.width)] = true;
+
+                if (next.depth == 0) {
+                    continue;
+                }
+
+                int child_direction = (lcg_rand(lcg_seed) % 4) * 2;
+                int child_adjacent_direction = (child_direction + 2) % DIRECTION_COUNT;
+                ivec2 child_cells[2] = {
+                    next.cell + DIRECTION_IVEC2[child_direction] + DIRECTION_IVEC2[child_adjacent_direction],
+                    next.cell + DIRECTION_IVEC2[child_direction] - DIRECTION_IVEC2[child_adjacent_direction]
+                };
+                for (int index = 0; index < 2; index++) {
+                    DecorationNode child = (DecorationNode) {
+                        .cell = child_cells[index],
+                        .depth = next.depth - 1
+                    };
+                    if (is_explored[child.cell.x + (child.cell.y * map.width)]) {
+                        continue;
+                    }
+                    if (!map_is_tree_cell_valid(map, child.cell, avoid_values)) {
+                        continue;
+                    }
+                    frontier.push_back(child);
+                }
+            }
         }
     }
-    */
 }
 
 SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_seed) {
@@ -971,6 +990,16 @@ SpriteName map_get_decoration_sprite(MapType map_type) {
             return SPRITE_TILE_NULL;
         }
     }
+}
+
+void map_create_decoration_at_cell(Map& map, int* lcg_seed, ivec2 cell) {
+    SpriteName decoration_sprite = map_get_decoration_sprite(map.type);
+    const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
+
+    map.cells[CELL_LAYER_GROUND][cell.x + (cell.y * map.width)] = (Cell) {
+        .type = CELL_DECORATION,
+        .decoration_hframe = (uint16_t)(lcg_rand(lcg_seed) % decoration_sprite_info.hframes)
+    };
 }
 
 bool map_is_cell_blocked(Cell cell) {
@@ -1271,12 +1300,17 @@ bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<Poisso
         return false;
     }
 
-    Cell map_cell = map_get_cell(map, CELL_LAYER_GROUND, cell);
-    Cell map_cell_upper = map_get_cell(map, CELL_LAYER_GROUND, cell + ivec2(0, -1));
-    if (map_cell.type != CELL_EMPTY || map_cell_upper.type != CELL_EMPTY) {
+    if (map_get_cell(map, CELL_LAYER_GROUND, cell).type != CELL_EMPTY) {
         return false;
     }
+    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+        ivec2 neighbor_cell = cell + DIRECTION_IVEC2[direction];
+        if (map_get_cell(map, CELL_LAYER_GROUND, neighbor_cell).type != CELL_EMPTY) {
+            return false;
+        }
+    }
 
+    // Check avoid values
     for (const PoissonAvoidValue& avoid_value : avoid_values) {
         if (ivec2::manhattan_distance(cell, avoid_value.cell) <= avoid_value.distance) {
             return false;

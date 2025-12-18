@@ -85,6 +85,7 @@ bool map_is_cell_rect_blocked(const Map& map, ivec2 cell, int cell_size);
 void map_calculate_unreachable_cells(Map& map);
 
 uint32_t map_neighbors_to_autotile_index(uint32_t neighbors);
+void map_create_decoration_at_cell(Map& map, int* lcg_seed, ivec2 cell);
 
 bool map_is_cell_in_bounds(const Map& map, ivec2 cell);
 bool map_is_cell_rect_in_bounds(const Map& map, ivec2 cell, int size);
