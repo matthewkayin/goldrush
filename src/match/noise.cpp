@@ -175,6 +175,8 @@ uint8_t noise_value_from_result(MapType map_type, double result) {
         case MAP_TYPE_KLONDIKE: {
             if (result < 0.1) {
                 return NOISE_VALUE_WATER;
+            } else if (result < 0.3) {
+                return NOISE_VALUE_TREE;
             } else if (result < 0.7) {
                 return NOISE_VALUE_LOWGROUND;
             } else {

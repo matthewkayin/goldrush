@@ -8,8 +8,9 @@
 #include "core/match_setting.h"
 
 const uint8_t NOISE_VALUE_WATER = 0;
-const uint8_t NOISE_VALUE_LOWGROUND = 1;
-const uint8_t NOISE_VALUE_HIGHGROUND = 2;
+const uint8_t NOISE_VALUE_TREE = 1;
+const uint8_t NOISE_VALUE_LOWGROUND = 2;
+const uint8_t NOISE_VALUE_HIGHGROUND = 3;
 
 struct Noise {
     int width;

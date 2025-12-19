@@ -60,7 +60,11 @@ struct MapPathNode {
     ivec2 cell;
     int cost;
     int score(ivec2 target) const {
-        return cost + ivec2::manhattan_distance(cell, target);
+        // Cost is divided by 2 because the cost scale is larger than the distance scale
+        // (this is so that we can weight diagonal movement more heavily than adjacent movement.
+        // diagonal movement costs 1.5 which is saved as a cost of 3 and adjacent movement costs
+        // 1 which is saved as a cost of 2 (3/2 vs 2/2).
+        return (cost / 2) + ivec2::manhattan_distance(cell, target);
     }
 };
 

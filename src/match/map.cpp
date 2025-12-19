@@ -124,7 +124,8 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
     // Widen narrow gaps
     for (int y = 0; y < noise.height; y++) {
         for (int x = 0; x < noise.width; x++) {
-            if (noise.map[x + (y * noise.width)] == NOISE_VALUE_WATER) {
+            if (noise.map[x + (y * noise.width)] == NOISE_VALUE_WATER ||
+                    noise.map[x + (y * noise.width)] == NOISE_VALUE_TREE) {
                 continue;
             }
 
@@ -332,7 +333,7 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
             .elevation = 0
         });
         for (ivec2 artifact : artifacts) {
-            noise.map[artifact.x + (artifact.y * map.width)]--;
+            noise.map[artifact.x + (artifact.y * map.width)] = NOISE_VALUE_LOWGROUND;
         }
         artifacts.clear();
 
@@ -719,62 +720,6 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
     // End generate gold mines
     log_debug("Generated gold mines.");
 
-    // Make sure that the map size is equally divisible by the region size
-    // At the time of writing this, map sizes are 96, 128, and 160 and region size is 32
-    GOLD_ASSERT(map.width % REGION_CHUNK_SIZE == 0);
-
-    // Create map regions
-    int region_count = 0;
-    map.regions = std::vector(map.width * map.height, REGION_UNASSIGNED);
-    for (int chunk_y = 0; chunk_y < map.height / REGION_CHUNK_SIZE; chunk_y++) {
-        for (int chunk_x = 0; chunk_x < map.width / REGION_CHUNK_SIZE; chunk_x++) {
-            for (int y = chunk_y * REGION_CHUNK_SIZE; y < (chunk_y + 1) * REGION_CHUNK_SIZE; y++) {
-                for (int x = chunk_x * REGION_CHUNK_SIZE; x < (chunk_x + 1) * REGION_CHUNK_SIZE; x++) {
-                    // Filter down to unblocked, unassigned cells
-                    Cell map_cell = map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y));
-                    if (map_cell.type == CELL_BLOCKED || map_cell.type == CELL_UNREACHABLE ||
-                            map_get_region(map, ivec2(x, y)) != REGION_UNASSIGNED) {
-                        continue;
-                    }
-
-                    // Now we know that this cell should be in a region
-                    // Flood fill to find all cells connected to this cell
-                    // that are within the same chunk
-
-                    std::vector<ivec2> frontier;
-                    frontier.push_back(ivec2(x, y));
-                    while (!frontier.empty()) {
-                        ivec2 next = frontier.back();
-                        frontier.pop_back();
-
-                        map.regions[next.x + (next.y * map.width)] = region_count;
-
-                        for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                            ivec2 child = next + DIRECTION_IVEC2[direction];
-                            if (child.x < chunk_x || child.y < chunk_y ||
-                                    child.x >= (chunk_x + 1) * REGION_CHUNK_SIZE || child.y >= (chunk_y + 1) * REGION_CHUNK_SIZE) {
-                                continue;
-                            }
-
-                            Cell child_cell = map_get_cell(map, CELL_LAYER_GROUND, child);
-                            if (child_cell.type == CELL_BLOCKED || child_cell.type == CELL_UNREACHABLE ||
-                                    map_get_region(map, child) != REGION_UNASSIGNED) {
-                                continue;
-                            }
-                            if (map_get_tile(map, child).elevation != map_get_tile(map, next).elevation) {
-                                continue;
-                            }
-
-                            frontier.push_back(child);
-                        }
-                    } // end while not frontier empty
-
-                    region_count++;
-                }
-            }
-        }
-    }
-    
     // Generate decorations
     {
         std::vector<PoissonAvoidValue> avoid_values;
@@ -809,121 +754,186 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
 
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
 
-        if (map_type == MAP_TYPE_ARIZONA) {
-            for (ivec2 cell : decoration_cells) {
-                map_create_decoration_at_cell(map, lcg_seed, cell);
+        if (map_type == MAP_TYPE_KLONDIKE) {
+            for (int y = 1; y < map.height; y++) {
+                for (int x = 0; x < map.width; x++) {
+                    if (noise.map[x + (y * map.width)] != NOISE_VALUE_TREE ||
+                            !map_is_tree_cell_valid(map, ivec2(x, y), avoid_values)) {
+                        continue;
+                    }
+
+                    std::vector<ivec2> frontier;
+                    std::vector<bool> is_explored(map.width * map.height, false);
+                    frontier.push_back(ivec2(x, y));
+
+                    while (!frontier.empty()) {
+                        ivec2 next = frontier.back();
+                        frontier.pop_back();
+
+                        if (is_explored[next.x + (next.y * map.width)]) {
+                            continue;
+                        }
+                        if (!map_is_tree_cell_valid(map, next, avoid_values)) {
+                            continue;
+                        }
+                        map_create_decoration_at_cell(map, lcg_seed, next);
+
+                        is_explored[next.x + (next.y * map.width)] = true;
+
+                        for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                            ivec2 child = next + DIRECTION_IVEC2[direction];
+                            if (!map_is_cell_in_bounds(map, child) ||
+                                    noise.map[child.x + (child.y * map.width)] != NOISE_VALUE_TREE) {
+                                continue;
+                            }
+                            frontier.push_back(child);
+                        }
+                    }
+                }
             }
         }
 
-        if (map_type == MAP_TYPE_KLONDIKE) {
-            struct DecorationNode {
-                ivec2 cell;
-                int depth;
-            };
-
-            static const int MAX_TREE_DENSITY = 3;
-
-            std::vector<int> tree_density(map.width * map.height, 0);
-            for (int y = 0; y < map.height; y++) {
-                for (int x = 0; x < map.width; x++) {
-                    ivec2 cell = ivec2(x, y);
-
-                    // Calculate a score from 0 to MAX_DEPTH for the depth based on the distance to the center of the map
-                    // Cells closer to the edges will be closer to MAX_DEPTH and cells closer to the center will be closer to 0
-                    ivec2 map_center = ivec2(map.width / 2, map.height / 2);
-                    int cell_distance_to_center = ivec2::manhattan_distance(cell, map_center);
-                    int density = (MAX_TREE_DENSITY * cell_distance_to_center) / map.width;
-
-                    if (map_get_cell(map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED) {
-                        static int WALL_RADIUS = 3;
-                        ivec2 nearest_wall_cell = ivec2(-1, -1);
-                        for (int ny = y - WALL_RADIUS; ny < y + WALL_RADIUS + 1; ny++) {
-                            for (int nx = x - WALL_RADIUS; nx < x + WALL_RADIUS + 1; nx++) {
-                                ivec2 near_cell = ivec2(nx, ny);
-                                if (!map_is_cell_in_bounds(map, near_cell)) {
-                                    continue;
-                                }
-                                if (nearest_wall_cell.x == -1 ||
-                                        ivec2::manhattan_distance(near_cell, cell) <
-                                        ivec2::manhattan_distance(nearest_wall_cell, cell)) {
-                                    nearest_wall_cell = near_cell;
-                                }
-                            }
-                        }
-
-                        if (nearest_wall_cell.x != -1) {
-                            int distance_to_wall = ivec2::manhattan_distance(nearest_wall_cell, cell);
-                            density += (MAX_TREE_DENSITY * distance_to_wall) / (WALL_RADIUS + WALL_RADIUS);
-                        }
-                    }
-
-                    tree_density[x + (y * map.width)] = density;
-                }
+        for (ivec2 cell : decoration_cells) {
+            if (map_type == MAP_TYPE_KLONDIKE && !map_is_tree_cell_valid(map, cell, avoid_values)) {
+                continue;
             }
+            map_create_decoration_at_cell(map, lcg_seed, cell);
+        }
+    }
 
-            for (ivec2 seed_cell : decoration_cells) {
-                int density = tree_density[seed_cell.x + (seed_cell.y * map.width)];
-
-                ivec2 cell = seed_cell;
-                log_debug("cell <%i, %i> density %i", cell.x, cell.y, density);
-
-                for (int index = 0; index < density + 1; index++) {
-                    if (map_is_tree_cell_valid(map, cell, avoid_values)) {
-                        map_create_decoration_at_cell(map, lcg_seed, cell);
-                    }
-
-                    int direction = (lcg_rand(lcg_seed) % 4) * 2;
-                    int adjacent_direction = (direction + 2) % DIRECTION_COUNT;
-                    int step_size = 1 + (lcg_rand(lcg_seed) % 2);
-                    int adjacent_step_direction = lcg_rand(lcg_seed) % 2 == 0 ? 1 : -1;
-                    cell = cell + (DIRECTION_IVEC2[direction] * step_size) + (DIRECTION_IVEC2[adjacent_direction] * adjacent_step_direction);
-                }
-            }
-
-            std::vector<DecorationNode> frontier;
-            for (ivec2 cell : decoration_cells) {
-                frontier.push_back((DecorationNode) {
-                    .cell = cell,
-                    .depth = tree_density[cell.x + (cell.y * map.width)]
-                });
-            }
-            std::vector<bool> is_explored(map.width * map.height, false);
-
-            while (!frontier.empty()) {
-                DecorationNode next = frontier.back();
-                frontier.pop_back();
-
-                map_create_decoration_at_cell(map, lcg_seed, next.cell);
-
-                is_explored[next.cell.x + (next.cell.y * map.width)] = true;
-
-                if (next.depth == 0) {
+    // Clear out trees that create small gaps
+    if (map_type == MAP_TYPE_KLONDIKE) {
+        for (int y = 1; y < map.height; y++) {
+            for (int x = 0; x < map.width; x++) {
+                ivec2 cell = ivec2(x, y);
+                if (map_get_cell(map, CELL_LAYER_GROUND, cell).type != CELL_DECORATION) {
                     continue;
                 }
 
-                int child_direction = (lcg_rand(lcg_seed) % 4) * 2;
-                int child_adjacent_direction = (child_direction + 2) % DIRECTION_COUNT;
-                ivec2 child_cells[2] = {
-                    next.cell + DIRECTION_IVEC2[child_direction] + DIRECTION_IVEC2[child_adjacent_direction],
-                    next.cell + DIRECTION_IVEC2[child_direction] - DIRECTION_IVEC2[child_adjacent_direction]
-                };
-                for (int index = 0; index < 2; index++) {
-                    DecorationNode child = (DecorationNode) {
-                        .cell = child_cells[index],
-                        .depth = next.depth - 1
+                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                    ivec2 neighbor = cell + DIRECTION_IVEC2[direction];
+
+                    // Check if the neighbor cell is empty
+                    if (!map_is_cell_in_bounds(map, neighbor) ||
+                            map_get_cell(map, CELL_LAYER_GROUND, neighbor).type != CELL_EMPTY) {
+                        continue;
+                    }
+
+                    /**
+                     * O P O
+                     * X N T
+                     * O P O
+                     * 
+                     * In the diagram, 
+                     * T is the decoration tree
+                     * N is the neighbor cell
+                     * X is the across cell
+                     * P are the path cells
+                     * 
+                     * If N is an empty neighbor
+                     * And the X across cell is blocked
+                     * And the path cells P are empty
+                     * Then that means that N is a narrow gap
+                     * We will widen that gap by removing decoration T
+                    */
+
+                    // Check the across cell
+                    ivec2 across_cell = neighbor + DIRECTION_IVEC2[direction];
+                    bool is_across_cell_blocked = 
+                        !map_is_cell_in_bounds(map, across_cell) || 
+                        map_get_cell(map, CELL_LAYER_GROUND, across_cell).type == CELL_BLOCKED ||
+                        map_get_cell(map, CELL_LAYER_GROUND, across_cell).type == CELL_DECORATION;
+                    if (!is_across_cell_blocked) {
+                        continue;
+                    }
+
+                    // Check the path cells
+                    int path_direction = (direction + 2) % DIRECTION_COUNT;
+                    ivec2 neighbor_path_cells[2] = {
+                        neighbor + DIRECTION_IVEC2[path_direction],
+                        neighbor - DIRECTION_IVEC2[path_direction]
                     };
-                    if (is_explored[child.cell.x + (child.cell.y * map.width)]) {
-                        continue;
+
+                    bool path_is_clear = true;
+                    for (int index = 0; index < 2; index++) {
+                        if (!map_is_cell_in_bounds(map, neighbor_path_cells[index]) ||
+                                map_get_cell(map, CELL_LAYER_GROUND, neighbor_path_cells[index]).type != CELL_EMPTY) {
+                            path_is_clear = false;
+                            break;
+                        }
                     }
-                    if (!map_is_tree_cell_valid(map, child.cell, avoid_values)) {
-                        continue;
+
+                    // If the path is clear, remove T
+                    if (path_is_clear) {
+                        map.cells[CELL_LAYER_GROUND][x + (y * map.width)] = (Cell) {
+                            .type = CELL_EMPTY,
+                            .id = ID_NULL
+                        };
+                        break;
                     }
-                    frontier.push_back(child);
                 }
             }
         }
     }
 
+    map_calculate_unreachable_cells(map);
+
+    // Make sure that the map size is equally divisible by the region size
+    // At the time of writing this, map sizes are 96, 128, and 160 and region size is 32
+    GOLD_ASSERT(map.width % REGION_CHUNK_SIZE == 0);
+
+    // Create map regions
+    int region_count = 0;
+    map.regions = std::vector(map.width * map.height, REGION_UNASSIGNED);
+    for (int chunk_y = 0; chunk_y < map.height / REGION_CHUNK_SIZE; chunk_y++) {
+        for (int chunk_x = 0; chunk_x < map.width / REGION_CHUNK_SIZE; chunk_x++) {
+            for (int y = chunk_y * REGION_CHUNK_SIZE; y < (chunk_y + 1) * REGION_CHUNK_SIZE; y++) {
+                for (int x = chunk_x * REGION_CHUNK_SIZE; x < (chunk_x + 1) * REGION_CHUNK_SIZE; x++) {
+                    // Filter down to unblocked, unassigned cells
+                    Cell map_cell = map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y));
+                    if (map_cell.type == CELL_BLOCKED || map_cell.type == CELL_UNREACHABLE || map_cell.type == CELL_DECORATION ||
+                            map_get_region(map, ivec2(x, y)) != REGION_UNASSIGNED) {
+                        continue;
+                    }
+
+                    // Now we know that this cell should be in a region
+                    // Flood fill to find all cells connected to this cell
+                    // that are within the same chunk
+
+                    std::vector<ivec2> frontier;
+                    frontier.push_back(ivec2(x, y));
+                    while (!frontier.empty()) {
+                        ivec2 next = frontier.back();
+                        frontier.pop_back();
+
+                        map.regions[next.x + (next.y * map.width)] = region_count;
+
+                        for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                            ivec2 child = next + DIRECTION_IVEC2[direction];
+                            if (child.x < chunk_x || child.y < chunk_y ||
+                                    child.x >= (chunk_x + 1) * REGION_CHUNK_SIZE || child.y >= (chunk_y + 1) * REGION_CHUNK_SIZE) {
+                                continue;
+                            }
+
+                            Cell child_cell = map_get_cell(map, CELL_LAYER_GROUND, child);
+                            if (child_cell.type == CELL_BLOCKED || child_cell.type == CELL_UNREACHABLE || child_cell.type == CELL_DECORATION ||
+                                    map_get_region(map, child) != REGION_UNASSIGNED) {
+                                continue;
+                            }
+                            if (map_get_tile(map, child).elevation != map_get_tile(map, next).elevation) {
+                                continue;
+                            }
+
+                            frontier.push_back(child);
+                        }
+                    } // end while not frontier empty
+
+                    region_count++;
+                }
+            }
+        }
+    }
+    
     // Create region connections
     for (int region = 0; region < region_count; region++) {
         map.region_connections.push_back(std::vector<std::vector<ivec2>>());
@@ -1341,8 +1351,20 @@ bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<Poisso
     }
 
     // Check avoid values
+    Rect cell_rect = (Rect) {
+        .x = cell.x,
+        .y = cell.y,
+        .w = 1,
+        .h = 1
+    };
     for (const PoissonAvoidValue& avoid_value : avoid_values) {
-        if (ivec2::manhattan_distance(cell, avoid_value.cell) <= avoid_value.distance) {
+        Rect avoid_rect = (Rect) {
+            .x = avoid_value.cell.x,
+            .y = avoid_value.cell.y,
+            .w = 1,
+            .h = 1
+        };
+        if (Rect::euclidean_distance_squared_between(cell_rect, avoid_rect) <= avoid_value.distance * avoid_value.distance) {
             return false;
         }
     }
@@ -1987,6 +2009,14 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             // instead of old cells from earlier in the pathing process.
             // It also means we can get away with less frontier comparisons.
             frontier.clear();
+        // If we've reached the region of the to cell, then clear the region path and just path directly to our final target.
+        // This helps handle special cases where sometimes we pathfind into our target region on the way to an intermediate region.
+        // In these cases, the pathfinding was taking the unit all the way to the intermediate region and then doubling back to the
+        // target region. This logic prevents the doubling back and lets us path straight to our goal.
+        } else if (region_path.size() > 1 && map_get_region(map, smallest.cell) == map_get_region(map, to)) {
+            region_path.clear();
+            heuristic_cell = to;
+            frontier.clear();
         }
 
         // Otherwise, add this tile to the explored list
@@ -2010,7 +2040,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
             MapPathNode child = (MapPathNode) {
                 .parent = (int)explored.size() - 1,
                 .cell = smallest.cell + DIRECTION_IVEC2[direction],
-                .cost = smallest.cost + 1
+                .cost = smallest.cost + (direction % 2 == 1 ? 3 : 2)
             };
 
             // Don't consider out of bounds children
