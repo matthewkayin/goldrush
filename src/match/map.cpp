@@ -850,9 +850,9 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
                 int depth;
             };
 
-            static const int MAX_DECORATION_DEPTH = 3;
+            static const int MAX_TREE_DENSITY = 3;
 
-            std::vector<int> decoration_depth_map(map.width * map.height, 0);
+            std::vector<int> tree_density(map.width * map.height, 0);
             for (int y = 0; y < map.height; y++) {
                 for (int x = 0; x < map.width; x++) {
                     ivec2 cell = ivec2(x, y);
@@ -861,21 +861,51 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
                     // Cells closer to the edges will be closer to MAX_DEPTH and cells closer to the center will be closer to 0
                     ivec2 map_center = ivec2(map.width / 2, map.height / 2);
                     int cell_distance_to_center = ivec2::manhattan_distance(cell, map_center);
-                    decoration_depth_map[x + (y * map.width)] += (MAX_DECORATION_DEPTH * cell_distance_to_center) / (map.width / 2);
+                    int density = (MAX_TREE_DENSITY * cell_distance_to_center) / map.width;
 
                     if (map_get_cell(map, CELL_LAYER_GROUND, cell).type == CELL_BLOCKED) {
                         static int WALL_RADIUS = 3;
+                        ivec2 nearest_wall_cell = ivec2(-1, -1);
                         for (int ny = y - WALL_RADIUS; ny < y + WALL_RADIUS + 1; ny++) {
                             for (int nx = x - WALL_RADIUS; nx < x + WALL_RADIUS + 1; nx++) {
                                 ivec2 near_cell = ivec2(nx, ny);
                                 if (!map_is_cell_in_bounds(map, near_cell)) {
                                     continue;
                                 }
-                                int distance_to_wall = ivec2::manhattan_distance(near_cell, cell);
-                                decoration_depth_map[nx + (ny * map.width)] += (MAX_DECORATION_DEPTH * distance_to_wall) / (WALL_RADIUS + WALL_RADIUS);
+                                if (nearest_wall_cell.x == -1 ||
+                                        ivec2::manhattan_distance(near_cell, cell) <
+                                        ivec2::manhattan_distance(nearest_wall_cell, cell)) {
+                                    nearest_wall_cell = near_cell;
+                                }
                             }
                         }
+
+                        if (nearest_wall_cell.x != -1) {
+                            int distance_to_wall = ivec2::manhattan_distance(nearest_wall_cell, cell);
+                            density += (MAX_TREE_DENSITY * distance_to_wall) / (WALL_RADIUS + WALL_RADIUS);
+                        }
                     }
+
+                    tree_density[x + (y * map.width)] = density;
+                }
+            }
+
+            for (ivec2 seed_cell : decoration_cells) {
+                int density = tree_density[seed_cell.x + (seed_cell.y * map.width)];
+
+                ivec2 cell = seed_cell;
+                log_debug("cell <%i, %i> density %i", cell.x, cell.y, density);
+
+                for (int index = 0; index < density + 1; index++) {
+                    if (map_is_tree_cell_valid(map, cell, avoid_values)) {
+                        map_create_decoration_at_cell(map, lcg_seed, cell);
+                    }
+
+                    int direction = (lcg_rand(lcg_seed) % 4) * 2;
+                    int adjacent_direction = (direction + 2) % DIRECTION_COUNT;
+                    int step_size = 1 + (lcg_rand(lcg_seed) % 2);
+                    int adjacent_step_direction = lcg_rand(lcg_seed) % 2 == 0 ? 1 : -1;
+                    cell = cell + (DIRECTION_IVEC2[direction] * step_size) + (DIRECTION_IVEC2[adjacent_direction] * adjacent_step_direction);
                 }
             }
 
@@ -883,7 +913,7 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
             for (ivec2 cell : decoration_cells) {
                 frontier.push_back((DecorationNode) {
                     .cell = cell,
-                    .depth = decoration_depth_map[cell.x + (cell.y * map.width)]
+                    .depth = tree_density[cell.x + (cell.y * map.width)]
                 });
             }
             std::vector<bool> is_explored(map.width * map.height, false);
