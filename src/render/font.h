@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include <SDL3/SDL.h>
 
 enum FontName {
     FONT_HACK_OFFBLACK,
@@ -27,10 +28,7 @@ struct FontParams {
     uint32_t options;
     const char* path;
     int size;
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-    uint8_t a;
+    SDL_Color color;
 };
 
 const FontParams& resource_get_font_params(FontName name);

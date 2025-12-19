@@ -1,5 +1,6 @@
 #include "render.h"
 
+#include "render/ui_color.h"
 #include "core/logger.h"
 #include "core/filesystem.h"
 #include "core/asserts.h"
@@ -61,7 +62,10 @@ static const std::unordered_map<RenderColor, SDL_Color> RENDER_COLOR_VALUES = {
     { RENDER_COLOR_DARK_GREEN, (SDL_Color) { .r = 77, .g = 135, .b = 115, .a = 255 }},
     { RENDER_COLOR_PURPLE, (SDL_Color) { .r = 144, .g = 119, .b = 153, .a = 255 }},
     { RENDER_COLOR_LIGHT_PURPLE, (SDL_Color) { .r = 184, .g = 169, .b = 204, .a = 255 }},
-    // { RENDER_COLOR_SELECTION_GREEN, (SDL_Color) { .r = 94, .g = 183, .b = 75, .a = 255 }},
+    { RENDER_COLOR_PLAYER_UI0, PLAYER_UI_COLOR[0] },
+    { RENDER_COLOR_PLAYER_UI1, PLAYER_UI_COLOR[1] },
+    { RENDER_COLOR_PLAYER_UI2, PLAYER_UI_COLOR[2] },
+    { RENDER_COLOR_PLAYER_UI3, PLAYER_UI_COLOR[3] },
 };
 
 enum LoadedSurfaceType {
@@ -210,7 +214,7 @@ bool render_init(SDL_Window* window) {
         state.minimap_pixel_values[MINIMAP_PIXEL_OFFBLACK_TRANSPARENT] = SDL_MapRGBA(format, NULL, 40, 37, 45, 128);
         state.minimap_pixel_values[MINIMAP_PIXEL_WHITE] = SDL_MapRGBA(format, NULL, 255, 255, 255, 255);
         for (int player = 0; player < MAX_PLAYERS; player++) {
-            SDL_Color player_color = RENDER_COLOR_VALUES.at(RENDER_PLAYER_COLORS[player]);
+            SDL_Color player_color = RENDER_COLOR_VALUES.at((RenderColor)(RENDER_COLOR_PLAYER_UI0 + player));
             state.minimap_pixel_values[MINIMAP_PIXEL_PLAYER0 + player] = SDL_MapRGBA(format, NULL, player_color.r, player_color.g, player_color.b, player_color.a);
         }
         state.minimap_pixel_values[MINIMAP_PIXEL_GOLD] = SDL_MapRGBA(format, NULL, 238, 209, 158, 255);
@@ -218,7 +222,8 @@ bool render_init(SDL_Window* window) {
         state.minimap_pixel_values[MINIMAP_PIXEL_WATER] = SDL_MapRGBA(format, NULL, 70, 100, 115, 255);
         state.minimap_pixel_values[MINIMAP_PIXEL_WALL] = SDL_MapRGBA(format, NULL, 94, 88, 89, 255);
         state.minimap_pixel_values[MINIMAP_PIXEL_SNOW] = SDL_MapRGBA(format, NULL, 181, 179, 167, 255);
-        state.minimap_pixel_values[MINIMAP_PIXEL_SNOW_WATER] = SDL_MapRGBA(format, NULL, 99, 146, 153, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_SNOW_WATER] = SDL_MapRGBA(format, NULL, 121, 166, 173, 255);
+        state.minimap_pixel_values[MINIMAP_PIXEL_TREE] = SDL_MapRGBA(format, NULL, 73, 110, 97, 255);
 
         memset(state.minimap_texture_pixels, 0, sizeof(state.minimap_texture_pixels));
     }
@@ -704,7 +709,7 @@ SDL_Surface* render_load_font(FontName name) {
     int glyph_max_width = 0;
     int glyph_max_height = 0;
 
-    SDL_Color font_color = (SDL_Color) { .r = params.r, .g = params.g, .b = params.b, .a = params.a };
+    SDL_Color font_color = params.color;
     for (uint32_t glyph_index = 0; glyph_index < FONT_GLYPH_COUNT; glyph_index++) {
         char text[2] = { (char)(FONT_FIRST_CHAR + glyph_index), '\0'};
         glyphs[glyph_index] = TTF_RenderText_Solid(ttf_font, text, 0, font_color);

@@ -280,5 +280,5 @@ void match_shell_render_particle(const MatchShellState* state, const Particle& p
 bool match_shell_should_render_hotkey_toggled(const MatchShellState* state, InputAction hotkey);
 const char* match_shell_render_get_stat_tooltip(SpriteName sprite);
 FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, const Fire& fire);
-MinimapPixel match_shell_get_minimap_pixel_for_tile(SpriteName tile_sprite);
+MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state, ivec2 cell);
 MinimapPixel match_shell_get_minimap_pixel_for_entity(const MatchShellState* state, const Entity& entity);

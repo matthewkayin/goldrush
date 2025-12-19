@@ -3871,8 +3871,7 @@ void match_shell_render(const MatchShellState* state) {
     // Minimap tiles
     for (int y = 0; y < state->match_state.map.height; y++) {
         for (int x = 0; x < state->match_state.map.width; x++) {
-            Tile tile = map_get_tile(state->match_state.map, ivec2(x, y));
-            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), match_shell_get_minimap_pixel_for_tile(tile.sprite));
+            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), match_shell_get_minimap_pixel_for_cell(state, ivec2(x, y)));
         }
     }
     // Minimap entities
@@ -4261,8 +4260,17 @@ FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, co
     return FIRE_CELL_RENDER_ABOVE;
 }
 
-MinimapPixel match_shell_get_minimap_pixel_for_tile(SpriteName tile_sprite) {
-    switch (tile_sprite) {
+MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state, ivec2 cell) {
+    if (state->match_state.map.type == MAP_TYPE_KLONDIKE) {
+        Cell map_cell = map_get_cell(state->match_state.map, CELL_LAYER_GROUND, cell);
+        if (map_cell.type == CELL_DECORATION || 
+                ((map_cell.type == CELL_EMPTY || map_cell.type == CELL_UNREACHABLE) && 
+                cell.y < state->match_state.map.height - 1 && 
+                map_get_cell(state->match_state.map, CELL_LAYER_GROUND, ivec2(cell.x, cell.y + 1)).type == CELL_DECORATION)) {
+            return MINIMAP_PIXEL_TREE;
+        }
+    }
+    switch (map_get_tile(state->match_state.map, cell).sprite) {
         case SPRITE_TILE_SAND1:
         case SPRITE_TILE_SAND2:
         case SPRITE_TILE_SAND3:
