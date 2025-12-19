@@ -775,35 +775,6 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
         }
     }
     
-    // Create region connections
-    for (int region = 0; region < region_count; region++) {
-        map.region_connections.push_back(std::vector<std::vector<ivec2>>());
-        for (int other_region = 0; other_region < region_count; other_region++) {
-            map.region_connections[region].push_back(std::vector<ivec2>());
-        }
-    }
-    for (int y = 0; y < map.height; y++) {
-        for (int x = 0; x < map.width; x++) {
-            int region = map_get_region(map, ivec2(x, y));
-            if (region == REGION_UNASSIGNED) {
-                continue;
-            }
-
-            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                ivec2 neighbor = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                if (!map_is_cell_in_bounds(map, neighbor)) {
-                    continue;
-                }
-                int neighbor_region = map_get_region(map, neighbor);
-                if (neighbor_region == REGION_UNASSIGNED || neighbor_region == region) {
-                    continue;
-                }
-
-                map.region_connections[region][neighbor_region].push_back(neighbor);
-            }
-        }
-    }
-
     // Generate decorations
     {
         std::vector<PoissonAvoidValue> avoid_values;
@@ -949,6 +920,35 @@ void map_init(Map& map, MapType map_type, Noise& noise, int* lcg_seed, std::vect
                     }
                     frontier.push_back(child);
                 }
+            }
+        }
+    }
+
+    // Create region connections
+    for (int region = 0; region < region_count; region++) {
+        map.region_connections.push_back(std::vector<std::vector<ivec2>>());
+        for (int other_region = 0; other_region < region_count; other_region++) {
+            map.region_connections[region].push_back(std::vector<ivec2>());
+        }
+    }
+    for (int y = 0; y < map.height; y++) {
+        for (int x = 0; x < map.width; x++) {
+            int region = map_get_region(map, ivec2(x, y));
+            if (region == REGION_UNASSIGNED) {
+                continue;
+            }
+
+            for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                ivec2 neighbor = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                if (!map_is_cell_in_bounds(map, neighbor)) {
+                    continue;
+                }
+                int neighbor_region = map_get_region(map, neighbor);
+                if (neighbor_region == REGION_UNASSIGNED || neighbor_region == region) {
+                    continue;
+                }
+
+                map.region_connections[region][neighbor_region].push_back(neighbor);
             }
         }
     }
