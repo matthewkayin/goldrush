@@ -23,7 +23,7 @@ static const uint8_t REPLAY_BLOCK_TYPE_CHAT = 1 << 4;
     }
 #endif
 
-FILE* replay_file_open(int32_t lcg_seed, MapType map_type, const Noise& noise, MatchPlayer players[MAX_PLAYERS]) {
+FILE* replay_file_open(int32_t lcg_seed, MapType map_type, const Noise* noise, MatchPlayer players[MAX_PLAYERS]) {
     std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + filesystem_get_timestamp_str() + ".rep";
     #ifdef GOLD_DEBUG
         if (use_arg_replay_file) {
@@ -51,9 +51,7 @@ FILE* replay_file_open(int32_t lcg_seed, MapType map_type, const Noise& noise, M
     fwrite(&map_type_byte, 1, sizeof(uint8_t), file);
 
     // Map
-    fwrite(&noise.width, 1, sizeof(uint32_t), file);
-    fwrite(&noise.height, 1, sizeof(uint32_t), file);
-    fwrite(noise.map, 1, noise.width * noise.height * sizeof(int8_t), file);
+    noise_fwrite(noise, file);
 
     // Players
     for (uint32_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -147,11 +145,7 @@ bool replay_file_read(const char* path, MatchState* state, std::vector<std::vect
     MapType map_type = (MapType)map_type_byte;
 
     // Map
-    Noise noise;
-    fread(&noise.width, 1, sizeof(uint32_t), file);
-    fread(&noise.height, 1, sizeof(uint32_t), file);
-    noise.map = (uint8_t*)malloc(noise.width * noise.height * sizeof(uint8_t));
-    fread(noise.map, 1, noise.width * noise.height * sizeof(uint8_t), file);
+    Noise* noise = noise_fread(file);
 
     // Players
     MatchPlayer players[MAX_PLAYERS];
@@ -233,7 +227,7 @@ bool replay_file_read(const char* path, MatchState* state, std::vector<std::vect
         }
     }
 
-    free(noise.map);
+    noise_free(noise);
     fclose(file);
 
     return read_successful;

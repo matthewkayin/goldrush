@@ -123,7 +123,7 @@ struct NetworkEventChat {
 
 struct NetworkEventMatchLoad {
     int32_t lcg_seed;
-    Noise noise;
+    Noise* noise;
 };
 
 struct NetworkEventInput {

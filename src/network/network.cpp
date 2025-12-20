@@ -659,7 +659,7 @@ void network_remove_bot(uint8_t player_id) {
     network_host_flush(state.host);
 }
 
-void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
+void network_begin_loading_match(int32_t lcg_seed, const Noise* noise) {
     if (state.backend == NETWORK_BACKEND_LAN) {
         network_lan_scanner_destroy();
     } 
@@ -676,13 +676,17 @@ void network_begin_loading_match(int32_t lcg_seed, const Noise& noise) {
 
     // Build message
     // Message size is 1 byte for type, 4 bytes for LCG seed, 8 bytes for map width / height, and the rest of the bytes are the generated noise values
-    size_t message_size = 1 + 4 + 8 + ((size_t)(noise.width * noise.height) * sizeof(int8_t));
+    size_t message_size = sizeof(uint8_t) + sizeof(int32_t) + noise_serialized_size(noise);
     uint8_t* message = (uint8_t*)malloc(message_size);
+    size_t message_offset = 0;
+
     message[0] = NETWORK_MESSAGE_LOAD_MATCH;
-    memcpy(message + 1, &lcg_seed, sizeof(int32_t));
-    memcpy(message + 5, &noise.width, sizeof(uint32_t));
-    memcpy(message + 9, &noise.height, sizeof(uint32_t));
-    memcpy(message + 13, &noise.map[0], (size_t)(noise.width * noise.height) * sizeof(int8_t));
+    message_offset += sizeof(uint8_t);
+
+    memcpy(message + message_offset, &lcg_seed, sizeof(int32_t));
+    message_offset += sizeof(int32_t);
+
+    noise_serialize(noise, message + message_offset);
 
     // Send the packet
     network_host_broadcast(state.host, message, message_size);
@@ -1065,11 +1069,8 @@ void network_handle_message(uint16_t incoming_peer_id, uint8_t* data, size_t len
 
             NetworkEvent event;
             event.type = NETWORK_EVENT_MATCH_LOAD;
-            memcpy(&event.match_load.lcg_seed, data + 1, sizeof(int));
-            memcpy(&event.match_load.noise.width, data + 5, sizeof(int));
-            memcpy(&event.match_load.noise.height, data + 9, sizeof(int));
-            event.match_load.noise.map = (uint8_t*)malloc((size_t)(event.match_load.noise.width * event.match_load.noise.height));
-            memcpy(&event.match_load.noise.map[0], data + 13, (size_t)(event.match_load.noise.width * event.match_load.noise.height));
+            memcpy(&event.match_load.lcg_seed, data + sizeof(uint8_t), sizeof(int));
+            event.match_load.noise = noise_deserialize(data + sizeof(uint8_t) + sizeof(uint32_t));
 
             state.events.push(event);
             break;

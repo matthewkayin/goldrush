@@ -189,7 +189,7 @@ struct MatchShellState {
 };
 
 // Init
-MatchShellState* match_shell_init(int lcg_seed, Noise& noise);
+MatchShellState* match_shell_init(int lcg_seed, Noise* noise);
 MatchShellState* replay_shell_init(const char* replay_path);
 
 // Network event

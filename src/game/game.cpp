@@ -49,7 +49,6 @@ void game_set_mode(GameState& state, GameSetModeParams params) {
     }
     if (params.mode == GAME_MODE_MATCH) {
         state.match_shell_state = match_shell_init(params.match.lcg_seed, params.match.noise);
-        free(params.match.noise.map);
     }
     if (params.mode == GAME_MODE_REPLAY) {
         state.match_shell_state = replay_shell_init(params.replay.filename);
@@ -89,6 +88,7 @@ void game_handle_network_event(GameState& state, const NetworkEvent& event) {
                         .noise = event.match_load.noise
                     }
                 });
+                free(event.match_load.noise);
                 break;
             }
 
@@ -129,7 +129,7 @@ void game_update(GameState& state) {
                 uint64_t noise_seed = (uint64_t)lcg_seed;
                 int map_width = match_setting_get_map_size((MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE));
                 int map_height = map_width;
-                Noise noise = noise_generate(map_type, noise_seed, map_width, map_height);
+                Noise* noise = noise_generate(map_type, noise_seed, map_width, map_height);
 
                 network_begin_loading_match(lcg_seed, noise);
 
@@ -140,6 +140,8 @@ void game_update(GameState& state) {
                         .noise = noise
                     }
                 });
+
+                noise_free(noise);
             } else if (state.menu_state->mode == MENU_MODE_LOAD_REPLAY) {
                 GameSetModeParams params;
                 params.mode = GAME_MODE_REPLAY;

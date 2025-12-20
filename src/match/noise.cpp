@@ -190,21 +190,100 @@ uint8_t noise_value_from_result(MapType map_type, double result) {
     }
 }
 
-Noise noise_generate(MapType map_type, uint64_t seed, int width, int height) {
-    Noise noise;
-    noise.width = width;
-    noise.height = height;
-    noise.map = (uint8_t*)malloc(noise.width * noise.height * sizeof(uint8_t));
+Noise* noise_init(int width, int height) {
+    Noise* noise = (Noise*)malloc(sizeof(Noise));
+    noise->width = width;
+    noise->height = height;
+    noise->map = (uint8_t*)malloc(noise->width * noise->height * sizeof(uint8_t));
+    noise->forest = (uint8_t*)malloc(noise->width * noise->height * sizeof(uint8_t));
+
+    return noise;
+}
+
+Noise* noise_generate(MapType map_type, uint64_t seed, int width, int height) {
+    Noise* noise = noise_init(width, height);
 
     const double FREQUENCY = 1.0 / 56.0;
 
-    for (int x = 0; x < noise.width; x++) {
-        for (int y = 0; y < noise.height; y++) {
+    for (int x = 0; x < noise->width; x++) {
+        for (int y = 0; y < noise->height; y++) {
             // simplex_noise generates a result from -1 to 1, so we convert to the range 0 to 1
             double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
-            noise.map[x + (y * noise.width)] = noise_value_from_result(map_type, perlin_result);
+            noise->map[x + (y * noise->width)] = noise_value_from_result(map_type, perlin_result);
         }
     }
+
+    return noise;
+}
+
+void noise_free(Noise* noise) {
+    free(noise->map);
+    free(noise);
+}
+
+size_t noise_serialized_size(const Noise* noise) {
+    return sizeof(noise->width) + 
+        sizeof(noise->height) + 
+        // map
+        (noise->width * noise->height * sizeof(uint8_t)) +
+        // forest
+        (noise->width * noise->height * sizeof(uint8_t));
+}
+
+size_t noise_serialize(const Noise* noise, uint8_t* buffer) {
+    size_t offset = 0;
+
+    memcpy(buffer, &noise->width, sizeof(noise->width));
+    offset += sizeof(noise->width);
+
+    memcpy(buffer + offset, &noise->height, sizeof(noise->height));
+    offset += sizeof(noise->height);
+
+    memcpy(buffer + offset, noise->map, noise->width * noise->height * sizeof(uint8_t));
+    offset += noise->width * noise->height * sizeof(uint8_t);
+
+    memcpy(buffer + offset, noise->forest, noise->width * noise->height * sizeof(uint8_t));
+    offset += noise->width * noise->height * sizeof(uint8_t);
+
+    return offset;
+}
+
+Noise* noise_deserialize(uint8_t* buffer) {
+    int width, height;
+    size_t offset = 0;
+
+    memcpy(&width, buffer, sizeof(width));
+    offset += sizeof(width);
+
+    memcpy(&height, buffer + offset, sizeof(height));
+    offset += sizeof(height);
+
+    Noise* noise = noise_init(width, height);
+
+    memcpy(noise->map, buffer + offset, noise->width * noise->height * sizeof(uint8_t));
+    offset += noise->width * noise->height * sizeof(uint8_t);
+
+    memcpy(noise->forest, buffer + offset, noise->width * noise->height * sizeof(uint8_t));
+    offset += noise->width * noise->height * sizeof(uint8_t);
+
+    return noise;
+}
+
+void noise_fwrite(const Noise* noise, FILE* file) {
+    fwrite(&noise->width, 1, sizeof(noise->width), file);
+    fwrite(&noise->height, 1, sizeof(noise->height), file);
+    fwrite(noise->map, 1, noise->width * noise->height * sizeof(uint8_t), file);
+    fwrite(noise->forest, 1, noise->width * noise->height * sizeof(uint8_t), file);
+}
+
+Noise* noise_fread(FILE* file) {
+    int width, height;
+    fread(&width, 1, sizeof(width), file);
+    fread(&height, 1, sizeof(width), file);
+
+    Noise* noise = noise_init(width, height);
+    noise->map = (uint8_t*)malloc(noise->width * noise->height * sizeof(uint8_t));
+    noise->forest = (uint8_t*)malloc(noise->width * noise->height * sizeof(uint8_t));
 
     return noise;
 }

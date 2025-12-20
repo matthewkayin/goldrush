@@ -193,7 +193,7 @@ MatchShellState* match_shell_base_init() {
     return state;
 }
 
-MatchShellState* match_shell_init(int lcg_seed, Noise& noise) {
+MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     MatchShellState* state = match_shell_base_init();
 
     state->mode = MATCH_SHELL_MODE_NOT_STARTED;

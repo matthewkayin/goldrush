@@ -22,7 +22,7 @@ enum GameMode {
 
 struct GameSetModeMatchParams {
     int lcg_seed;
-    Noise noise;
+    Noise* noise;
 };
 
 struct GameSetModeReplayParams {
