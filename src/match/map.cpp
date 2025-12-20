@@ -755,39 +755,32 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
 
         if (map_type == MAP_TYPE_KLONDIKE) {
+            const int FOREST_MAP_EDGE_MARGIN = 1;
+            const int FOREST_MAP_INNER_CIRCLE_RADIUS = (map.width / 2) - FOREST_MAP_EDGE_MARGIN;
+            const int FOREST_MAP_INNER_CIRCLE_RADIUS_SQUARED = FOREST_MAP_INNER_CIRCLE_RADIUS * FOREST_MAP_INNER_CIRCLE_RADIUS;
+            const Rect MAP_CENTER_RECT = (Rect) {
+                .x = (map.width / 2) - 1,
+                .y = (map.height / 2) - 1,
+                .w = 2, .h = 2
+            };
+
             for (int y = 1; y < map.height; y++) {
                 for (int x = 0; x < map.width; x++) {
-                    if (noise->map[x + (y * map.width)] != NOISE_VALUE_TREE ||
-                            !map_is_tree_cell_valid(map, ivec2(x, y), avoid_values)) {
-                        continue;
+                    Rect cell_rect = (Rect) {
+                        .x = x, .y = y,
+                        .w = 1, .h = 1
+                    };
+                    if (Rect::euclidean_distance_squared_between(cell_rect, MAP_CENTER_RECT) > FOREST_MAP_INNER_CIRCLE_RADIUS_SQUARED) {
+                        noise->forest[x + (y * map.width)] = 1;
                     }
+                }
+            }
 
-                    std::vector<ivec2> frontier;
-                    std::vector<bool> is_explored(map.width * map.height, false);
-                    frontier.push_back(ivec2(x, y));
-
-                    while (!frontier.empty()) {
-                        ivec2 next = frontier.back();
-                        frontier.pop_back();
-
-                        if (is_explored[next.x + (next.y * map.width)]) {
-                            continue;
-                        }
-                        if (!map_is_tree_cell_valid(map, next, avoid_values)) {
-                            continue;
-                        }
-                        map_create_decoration_at_cell(map, lcg_seed, next);
-
-                        is_explored[next.x + (next.y * map.width)] = true;
-
-                        for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
-                            ivec2 child = next + DIRECTION_IVEC2[direction];
-                            if (!map_is_cell_in_bounds(map, child) ||
-                                    noise->map[child.x + (child.y * map.width)] != NOISE_VALUE_TREE) {
-                                continue;
-                            }
-                            frontier.push_back(child);
-                        }
+            for (int y = 1; y < map.height; y++) {
+                for (int x = 0; x < map.width; x++) {
+                    if (noise->forest[x + (y * map.width)] == 1 &&
+                            map_is_tree_cell_valid(map, ivec2(x, y), avoid_values)) {
+                        map_create_decoration_at_cell(map, lcg_seed, ivec2(x, y));
                     }
                 }
             }

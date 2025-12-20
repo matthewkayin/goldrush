@@ -190,6 +190,18 @@ uint8_t noise_value_from_result(MapType map_type, double result) {
     }
 }
 
+uint8_t noise_forest_value_from_result(MapType map_type, double result) {
+    switch (map_type) {
+        case MAP_TYPE_ARIZONA:
+            return 0;
+        case MAP_TYPE_KLONDIKE:
+            return result < 0.3;
+        case MAP_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return 0;
+    }
+}
+
 Noise* noise_init(int width, int height) {
     Noise* noise = (Noise*)malloc(sizeof(Noise));
     noise->width = width;
@@ -200,16 +212,20 @@ Noise* noise_init(int width, int height) {
     return noise;
 }
 
-Noise* noise_generate(MapType map_type, uint64_t seed, int width, int height) {
+Noise* noise_generate(MapType map_type, uint64_t seed, uint64_t forest_seed, int width, int height) {
     Noise* noise = noise_init(width, height);
 
     const double FREQUENCY = 1.0 / 56.0;
+    const double FOREST_FREQUENCY = 1.0 / 32.0;
 
     for (int x = 0; x < noise->width; x++) {
         for (int y = 0; y < noise->height; y++) {
             // simplex_noise generates a result from -1 to 1, so we convert to the range 0 to 1
             double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
             noise->map[x + (y * noise->width)] = noise_value_from_result(map_type, perlin_result);
+
+            double forest_result = (1.0 + simplex_noise(forest_seed, x * FOREST_FREQUENCY, y * FOREST_FREQUENCY)) * 0.5;
+            noise->forest[x + (y * noise->width)] = noise_forest_value_from_result(map_type, forest_result);
         }
     }
 
