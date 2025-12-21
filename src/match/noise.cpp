@@ -195,7 +195,7 @@ uint8_t noise_forest_value_from_result(MapType map_type, double result) {
         case MAP_TYPE_ARIZONA:
             return 0;
         case MAP_TYPE_KLONDIKE:
-            return result < 0.3;
+            return (uint8_t)(result < 0.4);
         case MAP_TYPE_COUNT:
             GOLD_ASSERT(false);
             return 0;

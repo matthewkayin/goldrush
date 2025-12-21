@@ -114,6 +114,7 @@ MatchState match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPla
         state.players[player_id].upgrades = 0;
         state.players[player_id].upgrades_in_progress = 0;
 
+        continue;
         if (state.players[player_id].active) {
             // Place town hall
             ivec2 town_hall_cell = map_get_player_town_hall_cell(state.map, player_spawns[player_id]);

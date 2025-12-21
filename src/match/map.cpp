@@ -9,7 +9,7 @@
 #include <tracy/tracy/Tracy.hpp>
 
 static const int MAP_PLAYER_SPAWN_SIZE = 13;
-static const int MAP_PLAYER_SPAWN_MARGIN = 13;
+static const int MAP_PLAYER_SPAWN_MARGIN = 3;
 static const int MAP_STAIR_SPACING = 16;
 static const int MAP_ISLAND_UNASSIGNED = -1;
 static const int REGION_UNASSIGNED = -1;
@@ -31,7 +31,7 @@ struct PoissonDiskParams {
 SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params);
-bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values);
+bool map_is_tree_cell_valid(const Map& map, ivec2 cell);
 
 void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.type = map_type;
@@ -425,6 +425,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
 
     // Generate ramps
     std::vector<ivec2> stair_cells;
+    std::vector<ivec2> stair_centers;
     for (int pass = 0; pass < 2; pass++) {
         for (int x = 0; x < map.width; x++) {
             for (int y = 0; y < (int)map.height; y++) {
@@ -514,6 +515,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
 
                 stair_cells.push_back(stair_min);
                 stair_cells.push_back(stair_max);
+                stair_centers.push_back((stair_min + stair_max) / 2);
                 for (ivec2 cell = stair_min; cell != stair_max + step_direction; cell += step_direction) {
                     SpriteName stair_tile = SPRITE_TILE_NULL;
                     if (tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE) {
@@ -601,8 +603,8 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
             int spawn_direction = 1 + (player_id * 2);
 
             ivec2 start = ivec2(map.width / 2, map.height / 2) + ivec2(
-                            DIRECTION_IVEC2[spawn_direction].x * ((map.width / 2) - MAP_PLAYER_SPAWN_MARGIN),
-                            DIRECTION_IVEC2[spawn_direction].y * ((map.height / 2) - MAP_PLAYER_SPAWN_MARGIN));
+                            DIRECTION_IVEC2[spawn_direction].x * ((map.width / 2) - (MAP_PLAYER_SPAWN_SIZE + MAP_PLAYER_SPAWN_MARGIN)),
+                            DIRECTION_IVEC2[spawn_direction].y * ((map.height / 2) - (MAP_PLAYER_SPAWN_SIZE + MAP_PLAYER_SPAWN_MARGIN)));
             std::vector<ivec2> frontier;
             std::unordered_map<uint32_t, uint32_t> explored;
             frontier.push_back(start);
@@ -654,7 +656,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
                 explored[next.x + (next.y * map.width)] = 1;
                 for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                     ivec2 child = next + DIRECTION_IVEC2[direction];
-                    if (!map_is_cell_rect_in_bounds(map, child, MAP_PLAYER_SPAWN_SIZE)) {
+                    if (!map_is_cell_rect_in_bounds(map, child, MAP_PLAYER_SPAWN_SIZE + MAP_PLAYER_SPAWN_MARGIN)) {
                         continue;
                     }
                     if (explored.find(child.x + (child.y * map.width)) != explored.end()) {
@@ -720,11 +722,10 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
     // End generate gold mines
     log_debug("Generated gold mines.");
 
-    // Generate decorations
+    // Generate avoid values for both forest and decoration generation
+    std::vector<PoissonAvoidValue> avoid_values;
     {
-        std::vector<PoissonAvoidValue> avoid_values;
-
-        // Generate avoid values for each ramp
+        // Ramps
         for (int y = 0; y < map.height; y++) {
             for (int x = 0; x < map.width; x++) {
                 if (!map_is_tile_ramp(map, ivec2(x, y))) {
@@ -737,14 +738,101 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
             }
         }
 
-        // Generate avoid values for each goldmine
+        // Goldmines
         for (ivec2 goldmine_cell : goldmine_cells) {
             avoid_values.push_back((PoissonAvoidValue) {
                 .cell = goldmine_cell,
                 .distance = 16
             });
         }
+    }
 
+    // Generate forests
+    if (map_type == MAP_TYPE_KLONDIKE) {
+        std::vector<PoissonAvoidValue> forest_avoid_values = avoid_values;
+
+        // Clear out path between goldmines
+        uint64_t pathing_start_time = SDL_GetTicksNS();
+        for (uint32_t index = 0; index < goldmine_cells.size(); index++) {
+            for (uint32_t other_index = 0; other_index < goldmine_cells.size() + stair_centers.size(); other_index++) {
+                if (other_index == index) {
+                    continue;
+                }
+
+                ivec2 goldmine_cell = goldmine_cells[index];
+                bool is_poi_goldmine = other_index < goldmine_cells.size();
+                ivec2 poi_cell = is_poi_goldmine
+                    ? goldmine_cells[other_index]
+                    : stair_centers[other_index - goldmine_cells.size()];
+                int distance = is_poi_goldmine ? 64 : 32;
+                if (ivec2::manhattan_distance(goldmine_cell, poi_cell) > distance) {
+                    continue;
+                }
+
+                ivec2 start_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, goldmine_cell, 3, 1, poi_cell, 0);
+                ivec2 end_cell = is_poi_goldmine
+                    ? map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, start_cell, 1, poi_cell, 3)
+                    : poi_cell;
+
+                std::vector<ivec2> path;
+                map_pathfind(map, CELL_LAYER_GROUND, start_cell, end_cell, 1, &path, MAP_OPTION_NO_REGION_PATH);
+
+                for (ivec2 cell : path) {
+                    forest_avoid_values.push_back((PoissonAvoidValue) {
+                        .cell = cell,
+                        .distance = 4
+                    });
+                }
+            }
+        }
+        double pathing_duration = (double)(SDL_GetTicksNS() - pathing_start_time) / (double)SDL_NS_PER_SECOND;
+
+        // Clear out forest noise based on avoid values
+        for (const PoissonAvoidValue& avoid_value : forest_avoid_values) {
+            for (int y = avoid_value.cell.y - avoid_value.distance; y < avoid_value.cell.y + avoid_value.distance + 1; y++) {
+                for (int x = avoid_value.cell.x - avoid_value.distance; x < avoid_value.cell.x + avoid_value.distance + 1; x++) {
+                    ivec2 cell = ivec2(x, y);
+                    if (!map_is_cell_in_bounds(map, cell)) {
+                        continue;
+                    }
+                    if (ivec2::euclidean_distance_squared(cell, avoid_value.cell) < avoid_value.distance * avoid_value.distance) {
+                        noise->forest[x + (y * map.width)] = 0;
+                    }
+                }
+            }
+        }
+
+        // Add the edges of the map to the forest noise
+        for (int y = 0; y < map.height; y++) {
+            for (int x = 0; x < map.width; x++) {
+                if (x < MAP_PLAYER_SPAWN_MARGIN || x > map.width - MAP_PLAYER_SPAWN_MARGIN ||
+                        y < MAP_PLAYER_SPAWN_MARGIN || y > map.height - MAP_PLAYER_SPAWN_MARGIN) {
+                    noise->forest[x + (y * map.width)] = 1;
+                    continue;
+                }
+            }
+        }
+
+        // Use the forest noise to generate tree decorations
+        uint64_t tree_start_time = SDL_GetTicksNS();
+        for (int y = 0; y < map.height; y++) {
+            for (int x = 0; x < map.width; x++) {
+                if (noise->forest[x + (y * map.width)] == 0 ||
+                        map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y)).type != CELL_EMPTY ||
+                        map_is_tile_ramp(map, ivec2(x, y)) ||
+                        (x + y) % 2 != 0) {
+                    continue;
+                }
+                map_create_decoration_at_cell(map, lcg_seed, ivec2(x, y));
+            }
+        }
+        double tree_duration = (double)(SDL_GetTicksNS() - tree_start_time) / (double)SDL_NS_PER_SECOND;
+
+        log_debug("Generated forests. Pathing duration %f Tree placement duration %f", pathing_duration, tree_duration);
+    }
+
+    // Generate decorations
+    if (map_type == MAP_TYPE_ARIZONA) {
         PoissonDiskParams params = (PoissonDiskParams) {
             .avoid_values = avoid_values,
             .disk_radius = 16,
@@ -754,45 +842,11 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
 
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
 
-        if (map_type == MAP_TYPE_KLONDIKE) {
-            const int FOREST_MAP_EDGE_MARGIN = 1;
-            const int FOREST_MAP_INNER_CIRCLE_RADIUS = (map.width / 2) - FOREST_MAP_EDGE_MARGIN;
-            const int FOREST_MAP_INNER_CIRCLE_RADIUS_SQUARED = FOREST_MAP_INNER_CIRCLE_RADIUS * FOREST_MAP_INNER_CIRCLE_RADIUS;
-            const Rect MAP_CENTER_RECT = (Rect) {
-                .x = (map.width / 2) - 1,
-                .y = (map.height / 2) - 1,
-                .w = 2, .h = 2
-            };
-
-            for (int y = 1; y < map.height; y++) {
-                for (int x = 0; x < map.width; x++) {
-                    Rect cell_rect = (Rect) {
-                        .x = x, .y = y,
-                        .w = 1, .h = 1
-                    };
-                    if (Rect::euclidean_distance_squared_between(cell_rect, MAP_CENTER_RECT) > FOREST_MAP_INNER_CIRCLE_RADIUS_SQUARED) {
-                        noise->forest[x + (y * map.width)] = 1;
-                    }
-                }
-            }
-
-            for (int y = 1; y < map.height; y++) {
-                for (int x = 0; x < map.width; x++) {
-                    if (noise->forest[x + (y * map.width)] == 1 &&
-                            map_is_tree_cell_valid(map, ivec2(x, y), avoid_values)) {
-                        map_create_decoration_at_cell(map, lcg_seed, ivec2(x, y));
-                    }
-                }
-            }
-        }
-
         for (ivec2 cell : decoration_cells) {
-            if (map_type == MAP_TYPE_KLONDIKE && !map_is_tree_cell_valid(map, cell, avoid_values)) {
-                continue;
-            }
             map_create_decoration_at_cell(map, lcg_seed, cell);
         }
     }
+    log_debug("Generated decorations.");
 
     // Clear out trees that create small gaps
     if (map_type == MAP_TYPE_KLONDIKE) {
@@ -1324,12 +1378,8 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
     return sample;
 }
 
-bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values) {
+bool map_is_tree_cell_valid(const Map& map, ivec2 cell) {
     if (!map_is_cell_in_bounds(map, cell)) {
-        return false;
-    }
-    // Don't allow trees on the very top row
-    if (cell.y == 0) {
         return false;
     }
 
@@ -1338,26 +1388,10 @@ bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<Poisso
     }
     for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
         ivec2 neighbor_cell = cell + DIRECTION_IVEC2[direction];
-        if (map_get_cell(map, CELL_LAYER_GROUND, neighbor_cell).type != CELL_EMPTY) {
-            return false;
+        if (!map_is_cell_in_bounds(map, neighbor_cell)) {
+            continue;
         }
-    }
-
-    // Check avoid values
-    Rect cell_rect = (Rect) {
-        .x = cell.x,
-        .y = cell.y,
-        .w = 1,
-        .h = 1
-    };
-    for (const PoissonAvoidValue& avoid_value : avoid_values) {
-        Rect avoid_rect = (Rect) {
-            .x = avoid_value.cell.x,
-            .y = avoid_value.cell.y,
-            .w = 1,
-            .h = 1
-        };
-        if (Rect::euclidean_distance_squared_between(cell_rect, avoid_rect) <= avoid_value.distance * avoid_value.distance) {
+        if (map_get_cell(map, CELL_LAYER_GROUND, neighbor_cell).type != CELL_EMPTY) {
             return false;
         }
     }
@@ -1955,7 +1989,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     std::vector<int> region_path; 
     ivec2 heuristic_cell; 
     bool no_region_path = (ignore & MAP_OPTION_NO_REGION_PATH) == MAP_OPTION_NO_REGION_PATH;
-    if (layer == CELL_LAYER_SKY || map_get_region(map, from) == map_get_region(map, to) || no_region_path) {
+    if (no_region_path || layer == CELL_LAYER_SKY || map_get_region(map, from) == map_get_region(map, to)) {
         heuristic_cell = to;
     } else {
         region_path = map_get_region_path(map, map_get_region(map, from), map_get_region(map, to));
