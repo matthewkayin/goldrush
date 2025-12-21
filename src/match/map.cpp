@@ -722,9 +722,11 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
     // End generate gold mines
     log_debug("Generated gold mines.");
 
-    // Generate avoid values for both forest and decoration generation
-    std::vector<PoissonAvoidValue> avoid_values;
-    {
+    // Generate forests
+    if (map_type == MAP_TYPE_KLONDIKE) {
+        // Generate avoid values
+        std::vector<PoissonAvoidValue> avoid_values;
+
         // Ramps
         for (int y = 0; y < map.height; y++) {
             for (int x = 0; x < map.width; x++) {
@@ -742,14 +744,9 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         for (ivec2 goldmine_cell : goldmine_cells) {
             avoid_values.push_back((PoissonAvoidValue) {
                 .cell = goldmine_cell,
-                .distance = 16
+                .distance = 12
             });
         }
-    }
-
-    // Generate forests
-    if (map_type == MAP_TYPE_KLONDIKE) {
-        std::vector<PoissonAvoidValue> forest_avoid_values = avoid_values;
 
         // Clear out path between goldmines
         uint64_t pathing_start_time = SDL_GetTicksNS();
@@ -764,8 +761,11 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
                 ivec2 poi_cell = is_poi_goldmine
                     ? goldmine_cells[other_index]
                     : stair_centers[other_index - goldmine_cells.size()];
+                if (!is_poi_goldmine) {
+                    continue;
+                }
                 int distance = is_poi_goldmine ? 64 : 32;
-                if (ivec2::manhattan_distance(goldmine_cell, poi_cell) > distance) {
+                if (ivec2::euclidean_distance_squared(goldmine_cell, poi_cell) > distance * distance) {
                     continue;
                 }
 
@@ -777,9 +777,9 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
                 std::vector<ivec2> path;
                 map_pathfind(map, CELL_LAYER_GROUND, start_cell, end_cell, 1, &path, MAP_OPTION_NO_REGION_PATH);
 
-                for (ivec2 cell : path) {
-                    forest_avoid_values.push_back((PoissonAvoidValue) {
-                        .cell = cell,
+                for (uint32_t path_index = 0; path_index < path.size(); path_index += 4) {
+                    avoid_values.push_back((PoissonAvoidValue) {
+                        .cell = path[path_index],
                         .distance = 4
                     });
                 }
@@ -788,7 +788,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         double pathing_duration = (double)(SDL_GetTicksNS() - pathing_start_time) / (double)SDL_NS_PER_SECOND;
 
         // Clear out forest noise based on avoid values
-        for (const PoissonAvoidValue& avoid_value : forest_avoid_values) {
+        for (const PoissonAvoidValue& avoid_value : avoid_values) {
             for (int y = avoid_value.cell.y - avoid_value.distance; y < avoid_value.cell.y + avoid_value.distance + 1; y++) {
                 for (int x = avoid_value.cell.x - avoid_value.distance; x < avoid_value.cell.x + avoid_value.distance + 1; x++) {
                     ivec2 cell = ivec2(x, y);
@@ -805,8 +805,8 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         // Add the edges of the map to the forest noise
         for (int y = 0; y < map.height; y++) {
             for (int x = 0; x < map.width; x++) {
-                if (x < MAP_PLAYER_SPAWN_MARGIN || x > map.width - MAP_PLAYER_SPAWN_MARGIN ||
-                        y < MAP_PLAYER_SPAWN_MARGIN || y > map.height - MAP_PLAYER_SPAWN_MARGIN) {
+                if (x < MAP_PLAYER_SPAWN_MARGIN || x > map.width - MAP_PLAYER_SPAWN_MARGIN - 1 ||
+                        y < MAP_PLAYER_SPAWN_MARGIN || y > map.height - MAP_PLAYER_SPAWN_MARGIN - 1) {
                     noise->forest[x + (y * map.width)] = 1;
                     continue;
                 }
@@ -833,6 +833,30 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
 
     // Generate decorations
     if (map_type == MAP_TYPE_ARIZONA) {
+        // Generate avoid values for decorations
+        std::vector<PoissonAvoidValue> avoid_values;
+
+        // Ramps
+        for (int y = 0; y < map.height; y++) {
+            for (int x = 0; x < map.width; x++) {
+                if (!map_is_tile_ramp(map, ivec2(x, y))) {
+                    continue;
+                }
+                avoid_values.push_back((PoissonAvoidValue) {
+                    .cell = ivec2(x, y),
+                    .distance = 6
+                });
+            }
+        }
+
+        // Goldmines
+        for (ivec2 goldmine_cell : goldmine_cells) {
+            avoid_values.push_back((PoissonAvoidValue) {
+                .cell = goldmine_cell,
+                .distance = 16
+            });
+        }
+
         PoissonDiskParams params = (PoissonDiskParams) {
             .avoid_values = avoid_values,
             .disk_radius = 16,
@@ -847,81 +871,6 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         }
     }
     log_debug("Generated decorations.");
-
-    // Clear out trees that create small gaps
-    if (map_type == MAP_TYPE_KLONDIKE) {
-        for (int y = 1; y < map.height; y++) {
-            for (int x = 0; x < map.width; x++) {
-                ivec2 cell = ivec2(x, y);
-                if (map_get_cell(map, CELL_LAYER_GROUND, cell).type != CELL_DECORATION) {
-                    continue;
-                }
-
-                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                    ivec2 neighbor = cell + DIRECTION_IVEC2[direction];
-
-                    // Check if the neighbor cell is empty
-                    if (!map_is_cell_in_bounds(map, neighbor) ||
-                            map_get_cell(map, CELL_LAYER_GROUND, neighbor).type != CELL_EMPTY) {
-                        continue;
-                    }
-
-                    /**
-                     * O P O
-                     * X N T
-                     * O P O
-                     * 
-                     * In the diagram, 
-                     * T is the decoration tree
-                     * N is the neighbor cell
-                     * X is the across cell
-                     * P are the path cells
-                     * 
-                     * If N is an empty neighbor
-                     * And the X across cell is blocked
-                     * And the path cells P are empty
-                     * Then that means that N is a narrow gap
-                     * We will widen that gap by removing decoration T
-                    */
-
-                    // Check the across cell
-                    ivec2 across_cell = neighbor + DIRECTION_IVEC2[direction];
-                    bool is_across_cell_blocked = 
-                        !map_is_cell_in_bounds(map, across_cell) || 
-                        map_get_cell(map, CELL_LAYER_GROUND, across_cell).type == CELL_BLOCKED ||
-                        map_get_cell(map, CELL_LAYER_GROUND, across_cell).type == CELL_DECORATION;
-                    if (!is_across_cell_blocked) {
-                        continue;
-                    }
-
-                    // Check the path cells
-                    int path_direction = (direction + 2) % DIRECTION_COUNT;
-                    ivec2 neighbor_path_cells[2] = {
-                        neighbor + DIRECTION_IVEC2[path_direction],
-                        neighbor - DIRECTION_IVEC2[path_direction]
-                    };
-
-                    bool path_is_clear = true;
-                    for (int index = 0; index < 2; index++) {
-                        if (!map_is_cell_in_bounds(map, neighbor_path_cells[index]) ||
-                                map_get_cell(map, CELL_LAYER_GROUND, neighbor_path_cells[index]).type != CELL_EMPTY) {
-                            path_is_clear = false;
-                            break;
-                        }
-                    }
-
-                    // If the path is clear, remove T
-                    if (path_is_clear) {
-                        map.cells[CELL_LAYER_GROUND][x + (y * map.width)] = (Cell) {
-                            .type = CELL_EMPTY,
-                            .id = ID_NULL
-                        };
-                        break;
-                    }
-                }
-            }
-        }
-    }
 
     map_calculate_unreachable_cells(map);
 
