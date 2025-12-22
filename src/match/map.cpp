@@ -51,85 +51,6 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         .elevation = 0
     });
 
-    const int ca_scale = 2;
-    const int ca_width = map.width / ca_scale;
-    const int ca_height = map.height / ca_scale;
-    std::vector<bool> tree_cells(ca_width * ca_height, false);
-    for (int index = 0; index < tree_cells.size(); index++) {
-        tree_cells[index] = lcg_rand(lcg_seed) % 100 < 50;
-    }
-
-    for (int generation = 0; generation < 5; generation++) {
-        std::vector<bool> next_generation(ca_width * ca_height);
-
-        for (int y = 0; y < ca_height; y++) {
-            for (int x = 0; x < ca_width; x++) {
-                ivec2 cell = ivec2(x, y);
-                uint32_t neighbor_count = 0;
-
-                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                    ivec2 neighbor_cell = cell + DIRECTION_IVEC2[direction];
-                    if (neighbor_cell.x < 0 || neighbor_cell.y < 0 || neighbor_cell.x >= ca_width || neighbor_cell.y >= ca_height) {
-                        continue;
-                    }
-                    if (!tree_cells[neighbor_cell.x + (neighbor_cell.y * ca_width)]) {
-                        continue;
-                    }
-                    neighbor_count++;
-                }
-
-                bool is_alive = tree_cells[x + (y * ca_width)];
-                uint32_t neighbors_required = is_alive ? 5 : 4;
-                next_generation[x + (y * ca_width)] = neighbor_count >= neighbors_required;
-            }
-        }
-
-        tree_cells = next_generation;
-    }
-
-    for (int y = 0; y < map.height; y++) {
-        for (int x = 0; x < map.width; x++) {
-            map.tiles[x + (y * map.width)] = (Tile) {
-                .elevation = 0,
-                .sprite = SPRITE_TILE_SNOW1,
-                .frame = ivec2(0, 0)
-            };
-
-            ivec2 ca_cell = ivec2(x / ca_scale, y / ca_scale);
-            if (!tree_cells[ca_cell.x + (ca_cell.y * ca_width)]) {
-                map.cells[CELL_LAYER_GROUND][x + (y * map.width)] = (Cell) {
-                    .type = CELL_DECORATION,
-                    .decoration_hframe = (uint16_t)(lcg_rand(lcg_seed) % 4)
-                };
-            }
-        }
-    }
-
-    for (int i = 0; i < 4; i++) {
-        player_spawns.push_back(ivec2(0, 0));
-    }
-}
-
-/*
-
-void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
-    map.type = map_type;
-    map.width = noise->width;
-    map.height = noise->height;
-    log_info("Generating map. Size: %ux%u", map.width, map.height);
-
-    for (int layer = 0; layer < CELL_LAYER_COUNT; layer++) {
-        map.cells[layer] = std::vector<Cell>(map.width * map.height, (Cell) {
-            .type = CELL_EMPTY,
-            .id = ID_NULL
-        });
-    }
-    map.tiles = std::vector<Tile>(map.width * map.height, (Tile) {
-        .sprite = SPRITE_TILE_SAND1,
-        .frame = ivec2(0, 0),
-        .elevation = 0
-    });
-
     // Clear out water that is too close to walls
     const int WATER_WALL_DIST = 6;
     for (int x = 0; x < noise->width; x++) {
@@ -203,8 +124,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
     // Widen narrow gaps
     for (int y = 0; y < noise->height; y++) {
         for (int x = 0; x < noise->width; x++) {
-            if (noise->map[x + (y * noise->width)] == NOISE_VALUE_WATER ||
-                    noise->map[x + (y * noise->width)] == NOISE_VALUE_TREE) {
+            if (noise->map[x + (y * noise->width)] == NOISE_VALUE_WATER) {
                 continue;
             }
 
@@ -801,117 +721,8 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
     // End generate gold mines
     log_debug("Generated gold mines.");
 
-    // Generate forests
-    if (map_type == MAP_TYPE_KLONDIKE) {
-        // Generate avoid values
-        std::vector<PoissonAvoidValue> avoid_values;
-
-        // Ramps
-        for (int y = 0; y < map.height; y++) {
-            for (int x = 0; x < map.width; x++) {
-                if (!map_is_tile_ramp(map, ivec2(x, y))) {
-                    continue;
-                }
-                avoid_values.push_back((PoissonAvoidValue) {
-                    .cell = ivec2(x, y),
-                    .distance = 6
-                });
-            }
-        }
-
-        // Goldmines
-        for (ivec2 goldmine_cell : goldmine_cells) {
-            avoid_values.push_back((PoissonAvoidValue) {
-                .cell = goldmine_cell,
-                .distance = 12
-            });
-        }
-
-        // Clear out path between goldmines
-        uint64_t pathing_start_time = SDL_GetTicksNS();
-        for (uint32_t index = 0; index < goldmine_cells.size(); index++) {
-            for (uint32_t other_index = 0; other_index < goldmine_cells.size() + stair_centers.size(); other_index++) {
-                if (other_index == index) {
-                    continue;
-                }
-
-                ivec2 goldmine_cell = goldmine_cells[index];
-                bool is_poi_goldmine = other_index < goldmine_cells.size();
-                ivec2 poi_cell = is_poi_goldmine
-                    ? goldmine_cells[other_index]
-                    : stair_centers[other_index - goldmine_cells.size()];
-                if (!is_poi_goldmine) {
-                    continue;
-                }
-                int distance = is_poi_goldmine ? 64 : 32;
-                if (ivec2::euclidean_distance_squared(goldmine_cell, poi_cell) > distance * distance) {
-                    continue;
-                }
-
-                ivec2 start_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, goldmine_cell, 3, 1, poi_cell, 0);
-                ivec2 end_cell = is_poi_goldmine
-                    ? map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, start_cell, 1, poi_cell, 3)
-                    : poi_cell;
-
-                std::vector<ivec2> path;
-                map_pathfind(map, CELL_LAYER_GROUND, start_cell, end_cell, 1, &path, MAP_OPTION_NO_REGION_PATH);
-
-                for (uint32_t path_index = 0; path_index < path.size(); path_index += 4) {
-                    avoid_values.push_back((PoissonAvoidValue) {
-                        .cell = path[path_index],
-                        .distance = 4
-                    });
-                }
-            }
-        }
-        double pathing_duration = (double)(SDL_GetTicksNS() - pathing_start_time) / (double)SDL_NS_PER_SECOND;
-
-        // Clear out forest noise based on avoid values
-        for (const PoissonAvoidValue& avoid_value : avoid_values) {
-            for (int y = avoid_value.cell.y - avoid_value.distance; y < avoid_value.cell.y + avoid_value.distance + 1; y++) {
-                for (int x = avoid_value.cell.x - avoid_value.distance; x < avoid_value.cell.x + avoid_value.distance + 1; x++) {
-                    ivec2 cell = ivec2(x, y);
-                    if (!map_is_cell_in_bounds(map, cell)) {
-                        continue;
-                    }
-                    if (ivec2::euclidean_distance_squared(cell, avoid_value.cell) < avoid_value.distance * avoid_value.distance) {
-                        noise->forest[x + (y * map.width)] = 0;
-                    }
-                }
-            }
-        }
-
-        // Add the edges of the map to the forest noise
-        for (int y = 0; y < map.height; y++) {
-            for (int x = 0; x < map.width; x++) {
-                if (x < MAP_PLAYER_SPAWN_MARGIN || x > map.width - MAP_PLAYER_SPAWN_MARGIN - 1 ||
-                        y < MAP_PLAYER_SPAWN_MARGIN || y > map.height - MAP_PLAYER_SPAWN_MARGIN - 1) {
-                    noise->forest[x + (y * map.width)] = 1;
-                    continue;
-                }
-            }
-        }
-
-        // Use the forest noise to generate tree decorations
-        uint64_t tree_start_time = SDL_GetTicksNS();
-        for (int y = 0; y < map.height; y++) {
-            for (int x = 0; x < map.width; x++) {
-                if (noise->forest[x + (y * map.width)] == 0 ||
-                        map_get_cell(map, CELL_LAYER_GROUND, ivec2(x, y)).type != CELL_EMPTY ||
-                        map_is_tile_ramp(map, ivec2(x, y)) ||
-                        (x + y) % 2 != 0) {
-                    continue;
-                }
-                map_create_decoration_at_cell(map, lcg_seed, ivec2(x, y));
-            }
-        }
-        double tree_duration = (double)(SDL_GetTicksNS() - tree_start_time) / (double)SDL_NS_PER_SECOND;
-
-        log_debug("Generated forests. Pathing duration %f Tree placement duration %f", pathing_duration, tree_duration);
-    }
-
     // Generate decorations
-    if (map_type == MAP_TYPE_ARIZONA) {
+    {
         // Generate avoid values for decorations
         std::vector<PoissonAvoidValue> avoid_values;
 
@@ -1038,8 +849,6 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         }
     }
 }
-
-*/
 
 SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_seed) {
     switch (map_type) {

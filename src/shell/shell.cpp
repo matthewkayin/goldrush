@@ -4261,15 +4261,6 @@ FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, co
 }
 
 MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state, ivec2 cell) {
-    if (state->match_state.map.type == MAP_TYPE_KLONDIKE) {
-        Cell map_cell = map_get_cell(state->match_state.map, CELL_LAYER_GROUND, cell);
-        if (map_cell.type == CELL_DECORATION || 
-                ((map_cell.type == CELL_EMPTY || map_cell.type == CELL_UNREACHABLE) && 
-                cell.y < state->match_state.map.height - 1 && 
-                map_get_cell(state->match_state.map, CELL_LAYER_GROUND, ivec2(cell.x, cell.y + 1)).type == CELL_DECORATION)) {
-            return MINIMAP_PIXEL_TREE;
-        }
-    }
     switch (map_get_tile(state->match_state.map, cell).sprite) {
         case SPRITE_TILE_SAND1:
         case SPRITE_TILE_SAND2:
