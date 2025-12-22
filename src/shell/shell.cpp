@@ -717,6 +717,23 @@ void match_shell_update(MatchShellState* state) {
         sound_end_fire_loop();
     }
 
+    // Update chat blinker
+    if (input_is_text_input_active()) {
+        state->chat_cursor_blink_timer--;
+        if (state->chat_cursor_blink_timer == 0) {
+            state->chat_cursor_visible = !state->chat_cursor_visible;
+            state->chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
+        }
+    }
+    // Update chat
+    for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
+        state->chat[chat_index].timer--;
+        if (state->chat[chat_index].timer == 0) {
+            state->chat.erase(state->chat.begin() + chat_index);
+            chat_index--;
+        }
+    }
+
     // Paused
     if (state->replay_mode && state->match_timer == match_shell_replay_end_of_tape(state)) {
         state->is_paused = true;
@@ -1022,13 +1039,6 @@ void match_shell_update(MatchShellState* state) {
             state->sound_cooldown_timers[sound]--;
         }
     }
-    if (input_is_text_input_active()) {
-        state->chat_cursor_blink_timer--;
-        if (state->chat_cursor_blink_timer == 0) {
-            state->chat_cursor_visible = !state->chat_cursor_visible;
-            state->chat_cursor_blink_timer = CHAT_CURSOR_BLINK_DURATION;
-        }
-    }
 
     // Update alerts
     {
@@ -1040,15 +1050,6 @@ void match_shell_update(MatchShellState* state) {
             } else {
                 alert_index++;
             }
-        }
-    }
-
-    // Update chat
-    for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
-        state->chat[chat_index].timer--;
-        if (state->chat[chat_index].timer == 0) {
-            state->chat.erase(state->chat.begin() + chat_index);
-            chat_index--;
         }
     }
 
@@ -3278,18 +3279,23 @@ void match_shell_render(const MatchShellState* state) {
             const MatchPlayer& player = state->match_state.players[message.player_id];
             char player_text[40];
             sprintf(player_text, "%s: ", player.name);
+            render_text(FONT_HACK_SHADOW, player_text, message_pos + ivec2(2, 2));
             render_text((FontName)(FONT_HACK_PLAYER0 + player.recolor_id), player_text, message_pos);
             message_pos.x += render_get_text_size(FONT_HACK_WHITE, player_text).x;
         }
+        render_text(FONT_HACK_SHADOW, message.message.c_str(), message_pos + ivec2(2, 2));
         render_text(FONT_HACK_WHITE, message.message.c_str(), message_pos);
     }
     if (input_is_text_input_active()) {
         char prompt_str[128];
         sprintf(prompt_str, "Chat: %s", state->chat_message.c_str());
-        render_text(FONT_HACK_WHITE, prompt_str, ivec2(32, MINIMAP_RECT.y - 64));
+        ivec2 chat_message_position = ivec2(32, MINIMAP_RECT.y - 64);
+        render_text(FONT_HACK_SHADOW, prompt_str, chat_message_position + ivec2(2, 2));
+        render_text(FONT_HACK_WHITE, prompt_str, chat_message_position);
         if (state->chat_cursor_visible) {
             int prompt_width = render_get_text_size(FONT_HACK_WHITE, prompt_str).x;
-            ivec2 cursor_pos = ivec2(32 + prompt_width - 2, MINIMAP_RECT.y - 65);
+            ivec2 cursor_pos = chat_message_position + ivec2(prompt_width - 2, -1);
+            render_text(FONT_HACK_SHADOW, "|", cursor_pos + ivec2(2, 2));
             render_text(FONT_HACK_WHITE, "|", cursor_pos);
         }
     }
