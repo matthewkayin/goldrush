@@ -51,6 +51,85 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         .elevation = 0
     });
 
+    const int ca_scale = 2;
+    const int ca_width = map.width / ca_scale;
+    const int ca_height = map.height / ca_scale;
+    std::vector<bool> tree_cells(ca_width * ca_height, false);
+    for (int index = 0; index < tree_cells.size(); index++) {
+        tree_cells[index] = lcg_rand(lcg_seed) % 100 < 50;
+    }
+
+    for (int generation = 0; generation < 5; generation++) {
+        std::vector<bool> next_generation(ca_width * ca_height);
+
+        for (int y = 0; y < ca_height; y++) {
+            for (int x = 0; x < ca_width; x++) {
+                ivec2 cell = ivec2(x, y);
+                uint32_t neighbor_count = 0;
+
+                for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                    ivec2 neighbor_cell = cell + DIRECTION_IVEC2[direction];
+                    if (neighbor_cell.x < 0 || neighbor_cell.y < 0 || neighbor_cell.x >= ca_width || neighbor_cell.y >= ca_height) {
+                        continue;
+                    }
+                    if (!tree_cells[neighbor_cell.x + (neighbor_cell.y * ca_width)]) {
+                        continue;
+                    }
+                    neighbor_count++;
+                }
+
+                bool is_alive = tree_cells[x + (y * ca_width)];
+                uint32_t neighbors_required = is_alive ? 5 : 4;
+                next_generation[x + (y * ca_width)] = neighbor_count >= neighbors_required;
+            }
+        }
+
+        tree_cells = next_generation;
+    }
+
+    for (int y = 0; y < map.height; y++) {
+        for (int x = 0; x < map.width; x++) {
+            map.tiles[x + (y * map.width)] = (Tile) {
+                .elevation = 0,
+                .sprite = SPRITE_TILE_SNOW1,
+                .frame = ivec2(0, 0)
+            };
+
+            ivec2 ca_cell = ivec2(x / ca_scale, y / ca_scale);
+            if (!tree_cells[ca_cell.x + (ca_cell.y * ca_width)]) {
+                map.cells[CELL_LAYER_GROUND][x + (y * map.width)] = (Cell) {
+                    .type = CELL_DECORATION,
+                    .decoration_hframe = (uint16_t)(lcg_rand(lcg_seed) % 4)
+                };
+            }
+        }
+    }
+
+    for (int i = 0; i < 4; i++) {
+        player_spawns.push_back(ivec2(0, 0));
+    }
+}
+
+/*
+
+void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
+    map.type = map_type;
+    map.width = noise->width;
+    map.height = noise->height;
+    log_info("Generating map. Size: %ux%u", map.width, map.height);
+
+    for (int layer = 0; layer < CELL_LAYER_COUNT; layer++) {
+        map.cells[layer] = std::vector<Cell>(map.width * map.height, (Cell) {
+            .type = CELL_EMPTY,
+            .id = ID_NULL
+        });
+    }
+    map.tiles = std::vector<Tile>(map.width * map.height, (Tile) {
+        .sprite = SPRITE_TILE_SAND1,
+        .frame = ivec2(0, 0),
+        .elevation = 0
+    });
+
     // Clear out water that is too close to walls
     const int WATER_WALL_DIST = 6;
     for (int x = 0; x < noise->width; x++) {
@@ -959,6 +1038,8 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         }
     }
 }
+
+*/
 
 SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_seed) {
     switch (map_type) {
