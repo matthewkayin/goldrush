@@ -242,7 +242,6 @@ uint32_t match_get_miners_on_gold(const MatchState& state, EntityId goldmine_id,
     return miner_count;
 }
 
-#include "network/network.h"
 void match_handle_input(MatchState& state, const MatchInput& input) {
     switch (input.type) {
         case MATCH_INPUT_NONE:
@@ -312,9 +311,6 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                     continue;
                 }
                 Entity& entity = state.entities[entity_index];
-                if (state.entities[entity_index].player_id != network_get_player_id()) {
-                    continue;
-                }
 
                 // Set the unit's target
                 Target target = target_none();
