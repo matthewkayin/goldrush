@@ -3398,7 +3398,9 @@ void match_shell_render(const MatchShellState* state) {
     // UI Status message
     if (state->status_timer != 0) {
         int status_message_width = render_get_text_size(FONT_HACK_WHITE, state->status_message.c_str()).x;
-        render_text(FONT_HACK_WHITE, state->status_message.c_str(), ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 266));
+        ivec2 status_message_position = ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 266);
+        render_text(FONT_HACK_SHADOW, state->status_message.c_str(), status_message_position + ivec2(2, 2));
+        render_text(FONT_HACK_WHITE, state->status_message.c_str(), status_message_position);
     }
     
     // Hotkeys
