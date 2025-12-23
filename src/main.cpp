@@ -75,7 +75,7 @@ int gold_main(int argc, char** argv) {
 
     std::string logfile_path = filesystem_get_timestamp_str() + ".log";
     #ifdef GOLD_DEBUG_DESYNC
-        std::string desync_filename = "desync.bin";
+        std::string desync_foldername = "desync";
     #endif
     #ifdef GOLD_DEBUG
         TestMode test_mode = TEST_MODE_NONE;
@@ -88,7 +88,7 @@ int gold_main(int argc, char** argv) {
                 argn++;
                 logfile_path = argv[argn];
                 #ifdef GOLD_DEBUG_DESYNC
-                    desync_filename = logfile_path.substr(0, logfile_path.find('.'));
+                    desync_foldername = "desync_" + logfile_path.substr(0, logfile_path.find('.'));
                 #endif
             }
             if (strcmp(argv[argn], "--test") == 0 && argn + 1 < argc) {
@@ -169,7 +169,7 @@ int gold_main(int argc, char** argv) {
         return 1;
     }
     #ifdef GOLD_DEBUG_DESYNC
-        if (!desync_init(desync_filename.c_str())) {
+        if (!desync_init(desync_foldername.c_str())) {
             logger_quit();
             return 1;
         }

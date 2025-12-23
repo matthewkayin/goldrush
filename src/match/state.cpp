@@ -114,7 +114,6 @@ MatchState match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPla
         state.players[player_id].upgrades = 0;
         state.players[player_id].upgrades_in_progress = 0;
 
-        continue;
         if (state.players[player_id].active) {
             // Place town hall
             ivec2 town_hall_cell = map_get_player_town_hall_cell(state.map, player_spawns[player_id]);
@@ -243,6 +242,7 @@ uint32_t match_get_miners_on_gold(const MatchState& state, EntityId goldmine_id,
     return miner_count;
 }
 
+#include "network/network.h"
 void match_handle_input(MatchState& state, const MatchInput& input) {
     switch (input.type) {
         case MATCH_INPUT_NONE:
@@ -312,6 +312,9 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                     continue;
                 }
                 Entity& entity = state.entities[entity_index];
+                if (state.entities[entity_index].player_id != network_get_player_id()) {
+                    continue;
+                }
 
                 // Set the unit's target
                 Target target = target_none();

@@ -19,6 +19,7 @@ STATIC_ASSERT(sizeof(BotDesiredSquad) == 92ULL);
 STATIC_ASSERT(sizeof(BotBaseInfo) == 12ULL);
 
 #include "core/filesystem.h"
+#include "core/logger.h"
 #include <algorithm>
 #include <cstdlib>
 
@@ -31,34 +32,33 @@ struct DesyncState {
     size_t buffer_size;
     size_t buffer_capacity;
 
-    std::string desync_file_path;
-    FILE* desync_file;
+    std::string desync_folder_path;
 #endif
 };
 static DesyncState state;
 
 #ifdef GOLD_DEBUG_DESYNC
 
-bool desync_init(const char* desync_filename) {
-        state.buffer_size = 0;
-        state.buffer_capacity = 1024ULL * 1024ULL;
-        state.buffer = (uint8_t*)malloc(state.buffer_capacity);
-        if (state.buffer == NULL) {
-            return false;
-        }
+std::string desync_get_filepath(uint32_t frame) {
+    return state.desync_folder_path + "/" + std::to_string(frame) + ".desync";
+}
 
-        state.desync_file_path = filesystem_get_data_path() + FILESYSTEM_LOG_FOLDER_NAME + desync_filename + ".desync";
-        state.desync_file = fopen(state.desync_file_path.c_str(), "wb");
-        if (state.desync_file == NULL) {
-            return false;
-        }
+bool desync_init(const char* desync_foldername) {
+    state.buffer_size = 0;
+    state.buffer_capacity = 1024ULL * 1024ULL;
+    state.buffer = (uint8_t*)malloc(state.buffer_capacity);
+    if (state.buffer == NULL) {
+        return false;
+    }
 
+    state.desync_folder_path = filesystem_get_data_path() + desync_foldername;
+    SDL_CreateDirectory(state.desync_folder_path.c_str());
     return true;
 }
 
 void desync_quit() {
+    SDL_RemovePath(state.desync_folder_path.c_str());
     free(state.buffer);
-    fclose(state.desync_file);
 }
 
 #endif
@@ -134,7 +134,11 @@ void desync_write_unordered_map(const std::unordered_map<T, U>& map) {
     }
 }
 
+#ifdef GOLD_DEBUG_DESYNC
+uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS], uint32_t frame) {
+#else
 uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS]) {
+#endif
     desync_checksum_init(&state.a, &state.b);
 
     #ifdef GOLD_DEBUG_DESYNC
@@ -295,8 +299,15 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
     // Write to desync file
     #ifdef GOLD_DEBUG_DESYNC
         GOLD_ASSERT(state.buffer_size != 0);
-        fwrite(&state.buffer_size, sizeof(state.buffer_size), 1, state.desync_file);
-        fwrite(state.buffer, state.buffer_size, 1, state.desync_file);
+        std::string desync_filepath = desync_get_filepath(frame);
+        FILE* desync_file = fopen(desync_filepath.c_str(), "wb");
+        if (desync_file == NULL) {
+            log_error("Could not open desync file for writing.");
+        } else {
+            fwrite(&state.buffer_size, sizeof(state.buffer_size), 1, desync_file);
+            fwrite(state.buffer, state.buffer_size, 1, desync_file);
+            fclose(desync_file);
+        }
     #endif
 
     // Return checksum
@@ -316,46 +327,33 @@ uint32_t desync_compute_buffer_checksum(uint8_t* data, size_t length) {
     return desync_checksum_compute_result(a, b);
 }
 
+void desync_delete_serialized_frame(uint32_t frame) {
+    std::string desync_filepath = desync_get_filepath(frame);
+    SDL_RemovePath(desync_filepath.c_str());
+}
+
 uint8_t* desync_read_serialized_frame(uint32_t frame_number, size_t* state_buffer_length) {
-    fclose(state.desync_file);
-    state.desync_file = fopen(state.desync_file_path.c_str(), "rb");
-    if (state.desync_file == NULL) {
+    std::string desync_filepath = desync_get_filepath(frame_number);
+    FILE* desync_file = fopen(desync_filepath.c_str(), "rb");
+    if (desync_file == NULL) {
+        log_error("desync file with path %s could not be opened.", desync_filepath.c_str());
         return NULL;
     }
 
-    uint32_t current_frame_number = 0;
-    while (current_frame_number != frame_number) {
-        size_t block_size;
-        fread(&block_size, sizeof(size_t), 1, state.desync_file);
-
-        state.buffer_size = 0;
-        if (state.buffer_capacity < block_size) {
-            state.buffer_capacity = block_size;
-            free(state.buffer);
-            state.buffer = (uint8_t*)malloc(state.buffer_capacity);
-            if (state.buffer == NULL) {
-                fclose(state.desync_file);
-                return NULL;
-            }
-        }
-        fread(state.buffer, block_size, 1, state.desync_file);
-
-        current_frame_number++;
-    }
-
     size_t frame_length;
-    fread(&frame_length, sizeof(size_t), 1, state.desync_file);
+    fread(&frame_length, sizeof(size_t), 1, desync_file);
     *state_buffer_length = frame_length + sizeof(uint8_t) + sizeof(uint32_t);
     // Malloc and read into buffer, but leave room for the frame number and message type
     uint8_t* state_buffer = (uint8_t*)malloc(*state_buffer_length);
     if (state_buffer == NULL) {
-        fclose(state.desync_file);
+        fclose(desync_file);
+        log_error("error mallocing desync state buffer.");
         return NULL;
     }
     memcpy(state_buffer + sizeof(uint8_t), &frame_number, sizeof(frame_number));
-    fread(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), frame_length, 1, state.desync_file);
+    fread(state_buffer + sizeof(uint8_t) + sizeof(uint32_t), frame_length, 1, desync_file);
 
-    fclose(state.desync_file);
+    fclose(desync_file);
     return state_buffer;
 }
 

@@ -858,7 +858,11 @@ void match_shell_update(MatchShellState* state) {
 
     // Checksum
     if (!state->replay_mode && state->match_timer % DESYNC_FREQUENCY == 0) {
-        uint32_t checksum = desync_compute_match_checksum(state->match_state, state->bots);
+        #ifdef GOLD_DEBUG_DESYNC
+            uint32_t checksum = desync_compute_match_checksum(state->match_state, state->bots, state->match_timer);
+        #else
+            uint32_t checksum = desync_compute_match_checksum(state->match_state, state->bots);
+        #endif
         network_send_checksum(checksum);
         state->checksums[network_get_player_id()].push_back(checksum);
         match_shell_compare_checksums(state, state->checksums[network_get_player_id()].size() - 1);
@@ -2542,11 +2546,6 @@ void match_shell_leave_match(MatchShellState* state, bool exit_program) {
 // DESYNC
 
 bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t frame) {
-    // If we haven't gotten to this frame yet, then we can't say for sure that it's out of sync
-    if (state->checksums[network_get_player_id()].size() <= frame) {
-        return false;
-    }
-
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (!state->match_state.players[player_id].active) {
             continue;
@@ -2572,6 +2571,16 @@ bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t fram
 }
 
 void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
+    // If we haven't gotten to this frame yet, hen we can't say for sure that it's out of sync
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_READY) {
+            continue;
+        }
+        if (state->checksums[player_id].size() <= frame) {
+            return;
+        }
+    }
+
     if (match_shell_are_checksums_out_of_sync(state, frame)) {
         log_error("DESYNC on frame %u", frame);
 
@@ -2589,7 +2598,13 @@ void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
             free(state_buffer);
             log_info("DESYNC Sent serialized frame with size %llu.", state_buffer_length);
         #endif
+#ifdef GOLD_DEBUG_DESYNC
+    } else {
+        desync_delete_serialized_frame(frame);
     }
+#else
+    }
+#endif
 }
 
 #ifdef GOLD_DEBUG_DESYNC
