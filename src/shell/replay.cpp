@@ -24,7 +24,7 @@ static const uint8_t REPLAY_BLOCK_TYPE_CHAT = 1 << 4;
 #endif
 
 FILE* replay_file_open(int32_t lcg_seed, MapType map_type, const Noise* noise, MatchPlayer players[MAX_PLAYERS]) {
-    std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + filesystem_get_timestamp_str() + ".rep";
+    std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + FILESYSTEM_REPLAY_AUTOSAVE_PREFIX + filesystem_get_timestamp_str() + ".rep";
     #ifdef GOLD_DEBUG
         if (use_arg_replay_file) {
             replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + arg_replay_file + ".rep";

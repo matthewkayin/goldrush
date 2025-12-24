@@ -53,6 +53,12 @@ static const Rect LOBBY_CREATE_RECT = {
     .w = 600,
     .h = 256
 };
+static const Rect REPLAY_CONFIRM_RECT = {
+    .x = (SCREEN_WIDTH / 2) - (412 / 2),
+    .y = 168,
+    .w = 412,
+    .h = 132
+};
 #ifndef GOLD_STEAM
 static const Rect USERNAME_RECT = {
     .x = (SCREEN_WIDTH / 2) - (600 / 2),
@@ -251,7 +257,10 @@ void menu_update(MenuState* state) {
     }
 
     ui_begin(state->ui);
-    state->ui.input_enabled = state->mode != MENU_MODE_OPTIONS && state->mode != MENU_MODE_REPLAY_RENAME; 
+    state->ui.input_enabled = 
+        state->mode != MENU_MODE_OPTIONS && 
+        state->mode != MENU_MODE_REPLAY_RENAME &&
+        state->mode != MENU_MODE_REPLAY_CONFIRM_CLEAR; 
 #ifndef GOLD_STEAM
     if (state->mode == MENU_MODE_USERNAME) {
         state->ui.input_enabled = false;
@@ -607,7 +616,7 @@ void menu_update(MenuState* state) {
             }
         ui_end_container(state->ui);
         // End lobby buttons
-    } else if (state->mode == MENU_MODE_REPLAYS || state->mode == MENU_MODE_REPLAY_RENAME) {
+    } else if (state->mode == MENU_MODE_REPLAYS || state->mode == MENU_MODE_REPLAY_RENAME || state->mode == MENU_MODE_REPLAY_CONFIRM_CLEAR) {
         ui_frame_rect(state->ui, LOBBYLIST_RECT);
 
         if (state->replay_filenames.empty()) {
@@ -650,6 +659,9 @@ void menu_update(MenuState* state) {
             if (ui_button(state->ui, "Back")) {
                 menu_set_mode(state, MENU_MODE_MAIN);
             }
+            if (ui_button(state->ui, "Clear Autosaves")) {
+                state->mode = MENU_MODE_REPLAY_CONFIRM_CLEAR;
+            }
             if (state->lobbylist_item_selected != MENU_ITEM_NONE) {
                 if (ui_button(state->ui, "Watch")) {
                     menu_set_mode(state, MENU_MODE_LOAD_REPLAY);
@@ -657,6 +669,15 @@ void menu_update(MenuState* state) {
                 if (ui_button(state->ui, "Rename")) {
                     state->mode = MENU_MODE_REPLAY_RENAME;
                     state->replay_rename = state->replay_filenames[state->lobbylist_item_selected];
+                }
+                if (ui_button(state->ui, "Delete")) {
+                    std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + menu_get_selected_replay_filename(state);
+                    state->replay_filenames.erase(state->replay_filenames.begin() + state->lobbylist_item_selected);
+                    state->lobbylist_item_selected = MENU_ITEM_NONE;
+                    if (state->lobbylist_page > menu_get_lobbylist_page_count(state->replay_filenames.size()) - 1) {
+                        state->lobbylist_page--;
+                    }
+                    SDL_RemovePath(replay_path.c_str());
                 }
             }
         ui_end_container(state->ui);
@@ -729,6 +750,35 @@ void menu_update(MenuState* state) {
                 }
             ui_end_container(state->ui);
         ui_end_container(state->ui);
+    }
+
+    if (state->mode == MENU_MODE_REPLAY_CONFIRM_CLEAR) {
+        state->ui.input_enabled = true;
+        ui_screen_shade(state->ui);
+
+        ui_frame_rect(state->ui, REPLAY_CONFIRM_RECT);
+        const char* confirm_text = "Delete all \"autosave\" replays?";
+        ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, confirm_text);
+
+        ui_element_position(state->ui, ivec2(REPLAY_CONFIRM_RECT.x + (REPLAY_CONFIRM_RECT.w / 2) - (header_text_size.x / 2), REPLAY_CONFIRM_RECT.y + 24));
+        ui_text(state->ui, FONT_HACK_GOLD, confirm_text);
+
+        ui_element_position(state->ui, ui_button_position_frame_bottom_left(REPLAY_CONFIRM_RECT));
+        if (ui_button(state->ui, "Back")) {
+            state->mode = MENU_MODE_REPLAYS;
+        }
+
+        ui_element_position(state->ui, ui_button_position_frame_bottom_right(REPLAY_CONFIRM_RECT, "Yes"));
+        if (ui_button(state->ui, "Yes")) {
+            for (const std::string& replay_filename : state->replay_filenames) {
+                if (replay_filename.rfind(FILESYSTEM_REPLAY_AUTOSAVE_PREFIX, 0) == 0) {
+                    std::string replay_path = filesystem_get_data_path() + FILESYSTEM_REPLAY_FOLDER_NAME + replay_filename;
+                    SDL_RemovePath(replay_path.c_str());
+                } else {
+                }
+            }
+            menu_set_mode(state, MENU_MODE_REPLAYS);
+        }
     }
 }
 
