@@ -129,9 +129,10 @@ void game_update(GameState& state) {
                 MapType map_type = (MapType)network_get_match_setting(MATCH_SETTING_MAP_TYPE);
                 int noise_lcg_seed = lcg_seed;
                 uint64_t noise_seed = (uint64_t)noise_lcg_seed;
+                uint64_t forest_seed = (uint64_t)lcg_rand(&noise_lcg_seed);
                 int map_width = match_setting_get_map_size((MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE));
                 int map_height = map_width;
-                Noise* noise = noise_generate(map_type, noise_seed, map_width, map_height);
+                Noise* noise = noise_generate(map_type, noise_seed, forest_seed, map_width, map_height);
 
                 network_begin_loading_match(lcg_seed, noise);
 

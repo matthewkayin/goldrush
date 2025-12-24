@@ -31,7 +31,7 @@ struct PoissonDiskParams {
 SpriteName map_wall_autotile_lookup(uint32_t neighbors);
 bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params, ivec2 point);
 std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params);
-bool map_is_tree_cell_valid(const Map& map, ivec2 cell);
+bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values);
 
 void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
     map.type = map_type;
@@ -756,8 +756,62 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
 
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
 
-        for (ivec2 cell : decoration_cells) {
-            map_create_decoration_at_cell(map, lcg_seed, cell);
+        if (map_type == MAP_TYPE_ARIZONA) {
+            for (ivec2 cell : decoration_cells) {
+                map_create_decoration_at_cell(map, lcg_seed, cell);
+            }
+        }
+
+        if (map_type == MAP_TYPE_KLONDIKE) {
+            struct TreeNode {
+                ivec2 cell;
+                ivec2 source_cell;
+            };
+
+            std::vector<TreeNode> frontier;
+            std::vector<bool> is_explored(map.width * map.height, false);
+
+            for (ivec2 cell : decoration_cells) {
+                frontier.push_back((TreeNode) {
+                    .cell = cell,
+                    .source_cell = cell
+                });
+            }
+
+            while (!frontier.empty()) {
+                TreeNode next = frontier.back();
+                frontier.pop_back();
+
+                if (map_is_tree_cell_valid(map, next.cell, avoid_values)) {
+                    map_create_decoration_at_cell(map, lcg_seed, next.cell);
+                }
+
+                is_explored[next.cell.x + (next.cell.y * map.width)] = true;
+
+                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 child = next.cell + DIRECTION_IVEC2[direction];
+                    if (!map_is_cell_in_bounds(map, child)) {
+                        continue;
+                    }
+                    if (is_explored[child.x + child.y * map.width]) {
+                        continue;
+                    }
+                    if (map_is_tile_ramp(map, child)) {
+                        continue;
+                    }
+                    if (noise->forest[child.x + (child.y * map.width)] == 0) {
+                        continue;
+                    }
+                    if (ivec2::manhattan_distance(child, next.source_cell) > 8) {
+                        continue;
+                    }
+
+                    frontier.push_back((TreeNode) {
+                        .cell = child,
+                        .source_cell = next.source_cell
+                    });
+                }
+            }
         }
     }
     log_debug("Generated decorations.");
@@ -1217,7 +1271,7 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
     return sample;
 }
 
-bool map_is_tree_cell_valid(const Map& map, ivec2 cell) {
+bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values) {
     if (!map_is_cell_in_bounds(map, cell)) {
         return false;
     }
@@ -1231,6 +1285,25 @@ bool map_is_tree_cell_valid(const Map& map, ivec2 cell) {
             continue;
         }
         if (map_get_cell(map, CELL_LAYER_GROUND, neighbor_cell).type != CELL_EMPTY) {
+            return false;
+        }
+    }
+
+    static const int WALL_RADIUS = 2;
+    for (int ny = cell.y - WALL_RADIUS; ny < cell.y + WALL_RADIUS + 1; ny++) {
+        for (int nx = cell.x - WALL_RADIUS; nx < cell.x + WALL_RADIUS + 1; nx++) {
+            ivec2 neighbor_cell = ivec2(nx, ny);
+            if (!map_is_cell_in_bounds(map, neighbor_cell)) {
+                return false;
+            }
+            if (map_get_cell(map, CELL_LAYER_GROUND, neighbor_cell).type == CELL_BLOCKED) {
+                return false;
+            }
+        }
+    }
+
+    for (const PoissonAvoidValue& avoid_value : avoid_values) {
+        if (ivec2::manhattan_distance(cell, avoid_value.cell) < avoid_value.distance) {
             return false;
         }
     }

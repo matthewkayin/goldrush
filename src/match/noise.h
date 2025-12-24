@@ -16,9 +16,10 @@ struct Noise {
     int width;
     int height;
     uint8_t* map;
+    uint8_t* forest;
 };
 
-Noise* noise_generate(MapType map_type, uint64_t seed, int width, int height);
+Noise* noise_generate(MapType map_type, uint64_t seed, uint64_t forest_seed, int width, int height);
 void noise_free(Noise* noise);
 
 size_t noise_serialized_size(const Noise* noise);

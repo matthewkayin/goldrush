@@ -193,7 +193,7 @@ uint8_t noise_forest_value_from_result(MapType map_type, double result) {
         case MAP_TYPE_ARIZONA:
             return 0;
         case MAP_TYPE_KLONDIKE:
-            return (uint8_t)(result < 0.4);
+            return (uint8_t)(result < 0.25);
         case MAP_TYPE_COUNT:
             GOLD_ASSERT(false);
             return 0;
@@ -205,20 +205,25 @@ Noise* noise_init(int width, int height) {
     noise->width = width;
     noise->height = height;
     noise->map = (uint8_t*)malloc(noise->width * noise->height * sizeof(uint8_t));
+    noise->forest = (uint8_t*)malloc(noise->width * noise->height * sizeof(uint8_t));
 
     return noise;
 }
 
-Noise* noise_generate(MapType map_type, uint64_t seed, int width, int height) {
+Noise* noise_generate(MapType map_type, uint64_t seed, uint64_t forest_seed, int width, int height) {
     Noise* noise = noise_init(width, height);
 
     const double FREQUENCY = 1.0 / 56.0;
+    const double FOREST_FREQUENCY = 1.0 / 8.0;
 
     for (int x = 0; x < noise->width; x++) {
         for (int y = 0; y < noise->height; y++) {
             // simplex_noise generates a result from -1 to 1, so we convert to the range 0 to 1
             double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
             noise->map[x + (y * noise->width)] = noise_value_from_result(map_type, perlin_result);
+
+            double forest_result = (1.0 + simplex_noise(forest_seed, x * FOREST_FREQUENCY, y * FOREST_FREQUENCY)) * 0.5;
+            noise->forest[x + (y * noise->width)] = noise_forest_value_from_result(map_type, forest_result);
         }
     }
 
@@ -227,6 +232,7 @@ Noise* noise_generate(MapType map_type, uint64_t seed, int width, int height) {
 
 void noise_free(Noise* noise) {
     free(noise->map);
+    free(noise->forest);
     free(noise);
 }
 
@@ -251,6 +257,9 @@ size_t noise_serialize(const Noise* noise, uint8_t* buffer) {
     memcpy(buffer + offset, noise->map, noise->width * noise->height * sizeof(uint8_t));
     offset += noise->width * noise->height * sizeof(uint8_t);
 
+    memcpy(buffer + offset, noise->forest, noise->width * noise->height * sizeof(uint8_t));
+    offset += noise->width * noise->height * sizeof(uint8_t);
+
     return offset;
 }
 
@@ -269,6 +278,9 @@ Noise* noise_deserialize(uint8_t* buffer) {
     memcpy(noise->map, buffer + offset, noise->width * noise->height * sizeof(uint8_t));
     offset += noise->width * noise->height * sizeof(uint8_t);
 
+    memcpy(noise->forest, buffer + offset, noise->width * noise->height * sizeof(uint8_t));
+    offset += noise->width * noise->height * sizeof(uint8_t);
+
     return noise;
 }
 
@@ -276,6 +288,7 @@ void noise_fwrite(const Noise* noise, FILE* file) {
     fwrite(&noise->width, 1, sizeof(noise->width), file);
     fwrite(&noise->height, 1, sizeof(noise->height), file);
     fwrite(noise->map, 1, noise->width * noise->height * sizeof(uint8_t), file);
+    fwrite(noise->forest, 1, noise->width * noise->height * sizeof(uint8_t), file);
 }
 
 Noise* noise_fread(FILE* file) {
@@ -284,7 +297,8 @@ Noise* noise_fread(FILE* file) {
     fread(&height, 1, sizeof(width), file);
 
     Noise* noise = noise_init(width, height);
-    noise->map = (uint8_t*)malloc(noise->width * noise->height * sizeof(uint8_t));
+    fread(noise->map, 1, noise->width * noise->height * sizeof(uint8_t), file);
+    fread(noise->forest, 1, noise->width * noise->height * sizeof(uint8_t), file);
 
     return noise;
 }
