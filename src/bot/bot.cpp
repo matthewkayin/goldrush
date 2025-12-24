@@ -380,7 +380,7 @@ bool bot_should_surrender(const MatchState& state, const Bot& bot, uint32_t matc
     if (match_timer >= 5U * 60U * UPDATES_PER_SECOND &&
             unreserved_army_count.count() == 0 &&
             !bot_is_mining(state, bot) &&
-            bot_get_effective_gold(state, bot) <= entity_get_data(ENTITY_HALL).gold_cost) {
+            state.players[bot.player_id].gold <= entity_get_data(ENTITY_HALL).gold_cost) {
         return true;
     }
 
@@ -1004,7 +1004,7 @@ MatchInput bot_saturate_bases(const MatchState& state, Bot& bot) {
 
         // If undersatured and no idle worker, make a new worker
         if (miner_count < MATCH_MAX_MINERS_ON_GOLD && 
-                bot_get_effective_gold(state, bot) >= entity_get_data(ENTITY_MINER).gold_cost &&
+                state.players[bot.player_id].gold >= entity_get_data(ENTITY_MINER).gold_cost &&
                 hall.queue.empty()) {
             if (hall.rally_point.x == -1) {
                 bot.buildings_to_set_rally_points.push(hall_id);
@@ -1116,22 +1116,6 @@ EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, i
     });
 }
 
-uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot) {
-    uint32_t effective_gold = state.players[bot.player_id].gold;
-
-    for (const Entity& entity : state.entities) {
-        if (entity.player_id == bot.player_id &&
-                entity.type == ENTITY_MINER &&
-                entity.mode != MODE_UNIT_BUILD &&
-                entity.target.type == TARGET_BUILD) {
-            uint32_t gold_cost = entity_get_data(entity.target.build.building_type).gold_cost;
-            effective_gold = effective_gold > gold_cost ? effective_gold - gold_cost : 0;
-        }
-    }
-
-    return effective_gold;
-}
-
 // BUILD BUILDINGS
 
 bool bot_should_build_house(const MatchState& state, const Bot& bot) {
@@ -1171,7 +1155,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
     }
 
     // Check gold cost
-    if (bot_get_effective_gold(state, bot) < entity_get_data(building_type).gold_cost) {
+    if (state.players[bot.player_id].gold < entity_get_data(building_type).gold_cost) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
@@ -1211,7 +1195,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
 
 ivec2 bot_find_building_location(const MatchState& state, ivec2 start_cell, int size) {
     std::vector<ivec2> frontier = { start_cell };
-    std::vector<uint32_t> explored = std::vector<uint32_t>(state.map.width * state.map.height, 0);
+    std::vector<bool> is_explored = std::vector<bool>(state.map.width * state.map.height, false);
 
     while (!frontier.empty()) {
         uint32_t nearest_index = 0;
@@ -1230,15 +1214,15 @@ ivec2 bot_find_building_location(const MatchState& state, ivec2 start_cell, int 
             return nearest;
         }
 
-        explored[nearest.x + (nearest.y * state.map.width)] = 1;
+        is_explored[nearest.x + (nearest.y * state.map.width)] = true;
 
         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
             ivec2 child = nearest + DIRECTION_IVEC2[direction];
-            if (!map_is_cell_rect_in_bounds(state.map, child - ivec2(2, 2), size + 4)) {
+            if (!map_is_cell_in_bounds(state.map, child)) {
                 continue;
             }
 
-            if (explored[child.x + (child.y * state.map.width)] != 0) {
+            if (is_explored[child.x + (child.y * state.map.width)]) {
                 continue;
             }
 
@@ -1586,7 +1570,7 @@ MatchInput bot_research_upgrade(const MatchState& state, Bot& bot, uint32_t upgr
     }
 
     // Check gold
-    if (bot_get_effective_gold(state, bot) < upgrade_get_data(upgrade).gold_cost) {
+    if (state.players[bot.player_id].gold < upgrade_get_data(upgrade).gold_cost) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
@@ -1660,7 +1644,7 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
     }
 
     // Check gold
-    if (bot_get_effective_gold(state, bot) < entity_get_data(unit_type).gold_cost) {
+    if (state.players[bot.player_id].gold < entity_get_data(unit_type).gold_cost) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 

@@ -142,7 +142,6 @@ void bot_update_desired_production(Bot& bot);
 MatchInput bot_saturate_bases(const MatchState& state, Bot& bot);
 ivec2 bot_get_position_near_hall_away_from_miners(const MatchState& state, ivec2 hall_cell, ivec2 goldmine_cell);
 EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, ivec2 cell);
-uint32_t bot_get_effective_gold(const MatchState& state, const Bot& bot);
 
 // Build buildings
 

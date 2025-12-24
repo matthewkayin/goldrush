@@ -371,7 +371,9 @@ bool entity_is_mining(const MatchState& state, const Entity& entity);
 bool entity_is_in_mine(const MatchState& state, const Entity& entity);
 bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);
 
-void entity_set_target(Entity& entity, Target target);
+void entity_set_target(MatchState& state, Entity& entity, Target target);
+void entity_clear_target_queue(MatchState& state, Entity& entity);
+void entity_refund_target_build(MatchState& state, Entity& entity, const Target& target);
 bool entity_is_target_invalid(const MatchState& state, const Entity& entity);
 bool entity_has_reached_target(const MatchState& state, const Entity& entity);
 bool entity_is_target_in_range(const MatchState& state, const Entity& entity, const Entity& target, TargetType target_type);
