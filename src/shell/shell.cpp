@@ -186,7 +186,7 @@ MatchShellState* match_shell_base_init() {
     state->replay_file = NULL;
 
     #ifdef GOLD_DEBUG
-        state->debug_fog = DEBUG_FOG_DISABLED;
+        state->debug_fog = DEBUG_FOG_ENABLED;
         state->debug_show_region_lines = false;
     #endif
 

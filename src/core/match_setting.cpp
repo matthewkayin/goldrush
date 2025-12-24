@@ -13,7 +13,7 @@ void match_setting_init() {
     };
     MATCH_SETTING_DATA[MATCH_SETTING_MAP_TYPE] = (MatchSettingData) {
         .name = "Map Type",
-        .values = { "Arizona", "Klondike" },
+        .values = { "Tombstone", "Klondike" },
         .value_count = MAP_TYPE_COUNT
     };
     MATCH_SETTING_DATA[MATCH_SETTING_MAP_SIZE] = (MatchSettingData) {
