@@ -142,7 +142,7 @@ int gold_main(int argc, char** argv) {
             log_error("Error initializing Steam API.");
             return 1;
         }
-        log_info("Initialized Steam API.");
+        log_info("Initialized Steam API. App ID %u User logged on? %i", SteamUtils()->GetAppID(), (int)(SteamUser()->BLoggedOn()));
         if (steam_invite_id != 0) {
             log_debug("Got connect_lobby from sys args. steam_invite_id: %u", steam_invite_id);
         }
