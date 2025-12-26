@@ -10,7 +10,7 @@ LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
 INCLUDE_FLAGS := -Isrc -Ivendor -Ivendor/tracy
-COMPILER_FLAGS := -std=c++17 -Wall -Wextra -Wshadow 
+COMPILER_FLAGS := -std=c++17 
 LINKER_FLAGS := -std=c++17
 DEFINES := -D_CRT_SECURE_NO_WARNINGS
 RC_FILES :=
@@ -20,7 +20,7 @@ ifneq ($(RELEASE_VERSION),)
 endif
 
 ifeq ($(RELEASE_VERSION),)
-	COMPILER_FLAGS += -O0 -g
+	COMPILER_FLAGS += -O0 -g -Wall -Wextra -Wshadow
 	LINKER_FLAGS += -g
 else
 	COMPILER_FLAGS += -O2
