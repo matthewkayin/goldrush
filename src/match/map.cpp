@@ -1200,10 +1200,17 @@ std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskPa
     std::vector<ivec2> frontier;
 
     ivec2 first;
+    uint32_t attempts = 0;
+    const uint32_t MAX_ATTEMPTS = 1000;
     do {
         first.x = 1 + (lcg_rand(lcg_seed) % (map.width - 2));
         first.y = 1 + (lcg_rand(lcg_seed) % (map.height - 2));
-    } while (!map_is_poisson_point_valid(map, params, first));
+        attempts++;
+    } while (!map_is_poisson_point_valid(map, params, first) && attempts < MAX_ATTEMPTS);
+    if (!map_is_poisson_point_valid(map, params, first)) {
+        log_warn("map_poisson_disk reached max attempts.");
+        return sample;
+    }
 
     frontier.push_back(first);
     sample.push_back(first);
