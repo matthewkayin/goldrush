@@ -2,6 +2,7 @@
 
 #include "core/logger.h"
 #include "core/asserts.h"
+#include <cstring>
 
 NetworkHost* network_host_create(NetworkBackend backend) {
     NetworkHost* host = (NetworkHost*)malloc(sizeof(NetworkHost));

@@ -2,6 +2,7 @@
 
 #include "core/asserts.h"
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 int fast_floor(double x) {

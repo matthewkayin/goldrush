@@ -1,5 +1,7 @@
 #include "entity_count.h"
 
+#include <cstring>
+
 EntityCount::EntityCount() {
     entity_count.fill(0);
 }

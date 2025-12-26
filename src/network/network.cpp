@@ -6,6 +6,7 @@
 #include <enet/enet.h>
 #include <queue>
 #include <vector>
+#include <cstring>
 
 #ifdef GOLD_STEAM
     #include <steam/steam_api.h>
