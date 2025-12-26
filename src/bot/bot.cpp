@@ -4103,44 +4103,26 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& 
     std::vector<ivec2> frontier;
     std::vector<bool> is_explored(state.map.width * state.map.height, false);
 
-    ivec2 exit_cell = map_get_exit_cell(state.map, CELL_LAYER_GROUND, goldmine.cell, 3, 1, ivec2(-1, -1), MAP_OPTION_IGNORE_MINERS | MAP_OPTION_IGNORE_UNITS);
-    if (exit_cell.x == -1) {
-        // This fallback should only be used if they like, covered one of the bots goldmines in buildings
-        return map_clamp_cell(state.map, goldmine.cell - ivec2(BOT_NEAR_DISTANCE, 0));
-    }
-
-    // Calculate mine exit path center. This cell is to be avoided if possible
-    ivec2 mine_exit_path_center = ivec2(-1, -1);
+    ivec2 near_goldmine_cell = goldmine.cell;
     EntityId hall_id = bot_find_hall_surrounding_goldmine(state, bot, goldmine);
     if (hall_id != ID_NULL) {
         const Entity& hall = state.entities.get_by_id(hall_id);
-        std::vector<ivec2> ideal_mine_exit_path;
-        map_get_ideal_mine_exit_path(state.map, goldmine.cell, hall.cell, &ideal_mine_exit_path);
-        if (!ideal_mine_exit_path.empty()) {
-            mine_exit_path_center = ideal_mine_exit_path[ideal_mine_exit_path.size() / 2];
-        }
+        near_goldmine_cell = (goldmine.cell + hall.cell) / 2;
     }
 
-    frontier.push_back(exit_cell);
-    ivec2 retreat_cell = ivec2(-1, -1);
+    frontier.push_back(near_goldmine_cell);
     while (!frontier.empty()) {
         ivec2 next = frontier.back();
         frontier.pop_back();
-
-        if (ivec2::manhattan_distance(next, goldmine.cell) > BOT_MEDIUM_DISTANCE) {
-            continue;
-        }
 
         if (is_explored[next.x + (next.y * state.map.width)]) {
             continue;
         }
 
-        if (ivec2::manhattan_distance(next, goldmine.cell + ivec2(1, 1)) > 5 &&
-                ivec2::manhattan_distance(next, mine_exit_path_center) > 8 &&
+        if (ivec2::manhattan_distance(next, near_goldmine_cell) > BOT_NEAR_DISTANCE &&
                 map_is_cell_rect_in_bounds(state.map, next - ivec2(1, 1), 3) &&
                 !map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, next - ivec2(1, 1), 3)) {
-            retreat_cell = next;
-            break;
+            return next;
         }
 
         is_explored[next.x + (next.y * state.map.width)] = true;
@@ -4156,13 +4138,19 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& 
         }
     }
 
-    GOLD_ASSERT(retreat_cell.x != -1);
-    if (retreat_cell.x == -1) {
-        // Fallback to the exit cell if needed
-        return exit_cell;
+    log_warn("BOT %u get_unoccupied_cell_near_goldmine, goldmine %u no retreat area found.", bot.player_id, goldmine_id);
+    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+        ivec2 cell = goldmine.cell + (DIRECTION_IVEC2[direction] * BOT_MEDIUM_DISTANCE);
+        if (!map_is_cell_in_bounds(state.map, cell)) {
+            continue;
+        }
+        return cell;
     }
 
-    return retreat_cell;
+    // Leaving this as a return value and backup but the directional for loop above
+    // should always be able to find something to return
+    GOLD_ASSERT(false);
+    return near_goldmine_cell;
 }
 
 uint32_t bot_get_index_of_squad_of_type(const Bot& bot, BotSquadType type) {
