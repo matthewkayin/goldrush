@@ -1242,7 +1242,7 @@ ivec2 bot_find_building_location(const MatchState& state, ivec2 start_cell, int 
 
         for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
             ivec2 child = nearest + DIRECTION_IVEC2[direction];
-            if (!map_is_cell_in_bounds(state.map, child)) {
+            if (!map_is_cell_rect_in_bounds(state.map, child, size)) {
                 continue;
             }
 
