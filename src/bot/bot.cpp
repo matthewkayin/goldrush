@@ -1160,6 +1160,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
     }
 
     uint32_t hall_index = bot_find_hall_index_with_least_nearby_buildings(state, bot.player_id, building_type == ENTITY_BUNKER);
+    log_debug("BOT %u build_building, hall index with least nearby buildings %u", hall_index);
     if (hall_index == INDEX_INVALID) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
@@ -1182,7 +1183,7 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
-    log_debug("BOT %u get_production_input, build building type %s.", bot.player_id, entity_get_data(building_type).name);
+    log_debug("BOT %u get_production_input, build building type %s location <%i, %i>.", bot.player_id, entity_get_data(building_type).name, building_location.x, building_location.y);
     MatchInput input;
     input.type = MATCH_INPUT_BUILD;
     input.build.shift_command = 0;
@@ -1191,6 +1192,30 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
     input.build.entity_count = 1;
     input.build.entity_ids[0] = builder_id;
     return input;
+}
+
+bool bot_is_building_location_valid(const MatchState& state, ivec2 cell, int size) {
+    GOLD_ASSERT(map_is_cell_rect_in_bounds(state.map, cell, size));
+
+    const int MARGIN = 2;
+    uint32_t cell_elevation = map_get_tile(state.map, cell).elevation;
+    for (int y = cell.y - MARGIN; y < cell.y + MARGIN + 1; y++) {
+        for (int x = cell.x - MARGIN; x < cell.x + MARGIN + 1; x++) {
+            ivec2 neighbor = ivec2(x, y);
+            if (!map_is_cell_in_bounds(state.map, neighbor)) {
+                continue;
+            }
+
+            if (map_get_cell(state.map, CELL_LAYER_GROUND, neighbor).type != CELL_EMPTY) {
+                return false;
+            }
+            if (map_get_tile(state.map, neighbor).elevation != cell_elevation) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 ivec2 bot_find_building_location(const MatchState& state, ivec2 start_cell, int size) {
@@ -1206,11 +1231,10 @@ ivec2 bot_find_building_location(const MatchState& state, ivec2 start_cell, int 
             }
         }
         ivec2 nearest = frontier[nearest_index];
-        frontier[nearest_index] = frontier[frontier.size() - 1];
+        frontier[nearest_index] = frontier.back();
         frontier.pop_back();
 
-        if (!map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, nearest - ivec2(2, 2), size + 4) && 
-                map_is_cell_rect_same_elevation(state.map, nearest - ivec2(2, 2), size + 4)) {
+        if (bot_is_building_location_valid(state, nearest, size)) {
             return nearest;
         }
 

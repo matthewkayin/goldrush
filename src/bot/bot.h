@@ -147,6 +147,7 @@ EntityId bot_find_nearest_idle_worker(const MatchState& state, const Bot& bot, i
 
 bool bot_should_build_house(const MatchState& state, const Bot& bot);
 MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType building_type);
+bool bot_is_building_location_valid(const MatchState& state, ivec2 cell, int size);
 ivec2 bot_find_building_location(const MatchState& state, ivec2 start_cell, int size);
 uint32_t bot_find_hall_index_with_least_nearby_buildings(const MatchState& state, uint8_t bot_player_id, bool count_bunkers_only);
 ivec2 bot_find_hall_location(const MatchState& state, const Bot& bot);
