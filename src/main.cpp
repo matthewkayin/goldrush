@@ -27,7 +27,7 @@ int gold_main(int argc, char** argv);
 #include <windows.h>
 #define MAX_ARGS 16
 
-int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE h_prev_instance, LPSTR lp_cmd_line, int n_cmd_show) {
+int WINAPI WinMain(HINSTANCE /*h_instance*/, HINSTANCE /*h_prev_instance*/, LPSTR /*lp_cmd_line*/, int /*n_cmd_show*/) {
     char arg_buffer[MAX_ARGS][256];
     char* argv[MAX_ARGS];
     int argv_index = 0;
@@ -133,7 +133,7 @@ int gold_main(int argc, char** argv) {
     #endif
     #ifdef GOLD_DEBUG
         log_info("Debug build.");
-    #elif
+    #else
         log_info("Release build.");
     #endif
 
