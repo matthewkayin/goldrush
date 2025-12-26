@@ -130,13 +130,13 @@ endif
 bundle:
 ifeq ($(BUILD_PLATFORM),win64)
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\sprite
-	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\sprite $(BUILD_DIR)\sprite
+	-@setlocal enableextensions enabledelayedexpansion && xcopy /y /s .\res\sprite $(BUILD_DIR)\sprite
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\shader
-	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\shader $(BUILD_DIR)\shader
+	-@setlocal enableextensions enabledelayedexpansion && xcopy /y /s .\res\shader $(BUILD_DIR)\shader
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\font
-	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\font $(BUILD_DIR)\font
+	-@setlocal enableextensions enabledelayedexpansion && xcopy /y /s .\res\font $(BUILD_DIR)\font
 	-@setlocal enableextensions enabledelayedexpansion && mkdir $(BUILD_DIR)\sfx
-	-@setlocal enableextensions enabledelayedexpansion && xcopy /y .\res\sfx $(BUILD_DIR)\sfx
+	-@setlocal enableextensions enabledelayedexpansion && xcopy /y /s .\res\sfx $(BUILD_DIR)\sfx
 	-@setlocal enableextensions enabledelayedexpansion && cd $(BUILD_DIR) && tar.exe -acvf goldrush_windows.zip gold.exe *.dll *.lib font sfx shader sprite
 endif
 ifeq ($(BUILD_PLATFORM),macos)
