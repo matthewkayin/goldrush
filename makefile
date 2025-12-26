@@ -9,7 +9,7 @@ DIR := $(subst /,\,${CURDIR})
 LIB_DIR := lib
 BUILD_DIR := bin
 OBJ_DIR := obj
-INCLUDE_FLAGS := -Isrc -Ivendor -Ivendor/tracy
+INCLUDE_FLAGS := -Isrc -Ivendor
 COMPILER_FLAGS := -std=c++17 
 LINKER_FLAGS := -std=c++17
 DEFINES := -D_CRT_SECURE_NO_WARNINGS

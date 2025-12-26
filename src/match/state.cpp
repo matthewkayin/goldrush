@@ -5,7 +5,6 @@
 #include "match/lcg.h"
 #include "match/hotkey.h"
 #include "render/render.h"
-#include <tracy/tracy/Tracy.hpp>
 
 static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
@@ -651,8 +650,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 }
 
 void match_update(MatchState& state) {
-    ZoneScoped;
-
+    
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
         entity_update(state, entity_index);

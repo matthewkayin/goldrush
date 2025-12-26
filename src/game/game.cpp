@@ -4,7 +4,6 @@
 #include "core/logger.h"
 #include "match/lcg.h"
 #include <ctime>
-#include <tracy/tracy/Tracy.hpp>
 
 GameState game_init() {
     GameState state;
@@ -212,8 +211,7 @@ void game_test_set_mode(GameState& state, GameMode mode) {
 }
 
 void game_test_update(GameState& state) {
-    ZoneScoped;
-
+    
     if (state.test_mode == TEST_MODE_NONE) {
         return;
     }

@@ -9,6 +9,9 @@
             "osx": {
                 "command": "make"
             },
+            "linux": {
+                "command": "make"
+            },
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -27,6 +30,9 @@
                 "command": "make clean"
             },
             "osx": {
+                "command": "make clean"
+            },
+            "linux": {
                 "command": "make clean"
             },
             "options": {
