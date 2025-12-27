@@ -117,5 +117,5 @@ ivec2 render_get_text_size(FontName name, const char* text);
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel);
 void render_minimap_draw_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
 void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel);
-void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size);
+void render_minimap_queue_render(ivec2 position, ivec2 src_size, ivec2 dst_size);
 bool render_take_screenshot();

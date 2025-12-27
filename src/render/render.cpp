@@ -20,10 +20,16 @@
 #define MINIMAP_TEXTURE_WIDTH 512
 #define MINIMAP_TEXTURE_HEIGHT 256
 #define TILE_SRC_SIZE 16
+#define MINIMAP_VERTEX_COUNT 12
 
 struct SpriteVertex {
     float position[2];
     float tex_coord[3];
+};
+
+struct MinimapVertex {
+    float position[2];
+    float tex_coord[2];
 };
 
 struct FontGlyph {
@@ -97,8 +103,14 @@ struct RenderState {
 
     GLuint minimap_texture;
     GLuint minimap_shader;
+    GLuint minimap_vao;
+    GLuint minimap_vbo;
     uint32_t minimap_texture_pixels[MINIMAP_TEXTURE_WIDTH * MINIMAP_TEXTURE_HEIGHT];
     uint32_t minimap_pixel_values[MINIMAP_PIXEL_COUNT];
+    bool minimap_render_is_queued;
+    ivec2 minimap_render_position;
+    ivec2 minimap_render_src_size;
+    ivec2 minimap_render_dst_size;
 
     Font fonts[FONT_COUNT];
 };
@@ -118,6 +130,8 @@ bool render_load_shader(uint32_t* id, const char* vertex_path, const char* fragm
 
 void render_update_screen_scale();
 void render_flush_batch();
+
+void render_minimap();
 
 bool render_init(SDL_Window* window) {
     state.window = window;
@@ -196,6 +210,25 @@ bool render_init(SDL_Window* window) {
         glBindVertexArray(0);
     }
 
+    // Init minimap VAO
+    {
+        glGenVertexArrays(1, &state.minimap_vao);
+        glGenBuffers(1, &state.minimap_vbo);
+        glBindVertexArray(state.minimap_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, state.minimap_vbo);
+        glBufferData(GL_ARRAY_BUFFER, MINIMAP_VERTEX_COUNT * sizeof(MinimapVertex), NULL, GL_DYNAMIC_DRAW);
+
+        // Position
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+        // Tex coord
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+
     // Init minimap texture
     {
         glGenTextures(1, &state.minimap_texture);
@@ -266,7 +299,7 @@ bool render_init(SDL_Window* window) {
     glUniformMatrix4fv(glGetUniformLocation(state.sprite_shader, "projection"), 1, GL_FALSE, projection.data);
 
     // Load minimap shader
-    if (!render_load_shader(&state.minimap_shader, "sprite.vert.glsl", "minimap.frag.glsl")) {
+    if (!render_load_shader(&state.minimap_shader, "minimap.vert.glsl", "minimap.frag.glsl")) {
         return false;
     }
     glUseProgram(state.minimap_shader);
@@ -276,6 +309,9 @@ bool render_init(SDL_Window* window) {
     if (!render_load_sprites()) {
         return false;
     }
+
+    state.minimap_render_is_queued = false;
+    glActiveTexture(GL_TEXTURE0);
 
     render_update_screen_scale();
     SDL_GL_SetSwapInterval(1);
@@ -877,6 +913,9 @@ void render_update_screen_scale() {
 
     glUseProgram(state.screen_shader);
     glUniform2fv(glGetUniformLocation(state.screen_shader, "screen_scale"), 1, screen_scale);
+
+    glUseProgram(state.minimap_shader);
+    glUniform2fv(glGetUniformLocation(state.minimap_shader, "screen_scale"), 1, screen_scale);
 }
 
 void render_set_display(RenderDisplay display) {
@@ -940,10 +979,13 @@ void render_present_frame() {
     // Render screen texture onto window
     glUseProgram(state.screen_shader);
     glBindVertexArray(state.screen_vao);
-    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, state.screen_texture);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+
+    if (state.minimap_render_is_queued) {
+        render_minimap();
+    }
 
     SDL_GL_SwapWindow(state.window);
 }
@@ -961,7 +1003,6 @@ void render_flush_batch() {
 
     // Render sprite batch
     glUseProgram(state.sprite_shader);
-    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, state.sprite_texture_array);
 
     glDrawArrays(GL_TRIANGLES, 0, (GLsizei)state.sprite_vertices.size());
@@ -1292,88 +1333,95 @@ void render_minimap_fill_rect(MinimapLayer layer, Rect rect, MinimapPixel pixel)
     }
 }
 
-void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
-    render_flush_batch();
+void render_minimap_queue_render(ivec2 position, ivec2 src_size, ivec2 dst_size) {
+    state.minimap_render_is_queued = true;
+    state.minimap_render_position = position;
+    state.minimap_render_src_size = src_size;
+    state.minimap_render_dst_size = dst_size;
+}
 
-    float position_left = (float)position.x;
-    float position_right = (float)(position.x + dst_size.x);
-    float position_top = (float)(SCREEN_HEIGHT - position.y);
-    float position_bottom = (float)(SCREEN_HEIGHT - (position.y + dst_size.y));
+void render_minimap() {
+    float position_left = (float)state.minimap_render_position.x;
+    float position_right = (float)(state.minimap_render_position.x + state.minimap_render_dst_size.x);
+    float position_top = (float)(SCREEN_HEIGHT - state.minimap_render_position.y);
+    float position_bottom = (float)(SCREEN_HEIGHT - (state.minimap_render_position.y + state.minimap_render_dst_size.y));
 
     float tex_coord_left = 0.0f;
-    float tex_coord_right = (float)src_size.x / (float)MINIMAP_TEXTURE_WIDTH;
+    float tex_coord_right = (float)state.minimap_render_src_size.x / (float)MINIMAP_TEXTURE_WIDTH;
     float tex_coord_fog_left = 0.5f;
-    float tex_coord_fog_right = tex_coord_fog_left + ((float)src_size.x / (float)MINIMAP_TEXTURE_WIDTH);
+    float tex_coord_fog_right = tex_coord_fog_left + ((float)state.minimap_render_src_size.x / (float)MINIMAP_TEXTURE_WIDTH);
     float tex_coord_top = 0.0f;
-    float tex_coord_bottom = ((float)src_size.y / (float)MINIMAP_TEXTURE_HEIGHT);
+    float tex_coord_bottom = ((float)state.minimap_render_src_size.y / (float)MINIMAP_TEXTURE_HEIGHT);
 
-    SpriteVertex minimap_vertices[12] = {
+    MinimapVertex minimap_vertices[MINIMAP_VERTEX_COUNT] = {
         // minimap tiles
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_left, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_left, tex_coord_top }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_right, tex_coord_bottom }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_left, position_bottom },
-            .tex_coord = { tex_coord_left, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_left, tex_coord_bottom }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_left, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_left, tex_coord_top }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_right, position_top },
-            .tex_coord = { tex_coord_right, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_right, tex_coord_top }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_right, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_right, tex_coord_bottom }
         },
 
         // minimap fog
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_fog_left, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_fog_left, tex_coord_top }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_fog_right, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_fog_right, tex_coord_bottom }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_left, position_bottom },
-            .tex_coord = { tex_coord_fog_left, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_fog_left, tex_coord_bottom }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_left, position_top },
-            .tex_coord = { tex_coord_fog_left, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_fog_left, tex_coord_top }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_right, position_top },
-            .tex_coord = { tex_coord_fog_right, tex_coord_top, 0.0f }
+            .tex_coord = { tex_coord_fog_right, tex_coord_top }
         },
-        (SpriteVertex) {
+        (MinimapVertex) {
             .position = { position_right, position_bottom },
-            .tex_coord = { tex_coord_fog_right, tex_coord_bottom, 0.0f }
+            .tex_coord = { tex_coord_fog_right, tex_coord_bottom }
         }
     };
 
-    glActiveTexture(GL_TEXTURE0);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindTexture(GL_TEXTURE_2D, state.minimap_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, MINIMAP_TEXTURE_WIDTH, MINIMAP_TEXTURE_HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, state.minimap_texture_pixels);
 
     glUseProgram(state.minimap_shader);
-    glBindVertexArray(state.sprite_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, state.sprite_vbo);
+    glBindVertexArray(state.minimap_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.minimap_vbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(minimap_vertices), minimap_vertices);
-    glDrawArrays(GL_TRIANGLES, 0, 12);
+    glDrawArrays(GL_TRIANGLES, 0, MINIMAP_VERTEX_COUNT);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    state.minimap_render_is_queued = false;
 }
 
 bool render_take_screenshot() {

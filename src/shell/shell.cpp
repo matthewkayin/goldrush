@@ -3976,7 +3976,7 @@ void match_shell_render(const MatchShellState* state) {
         .h = ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / TILE_SIZE) - 1
     };
     render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
-    render_minimap(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match_state.map.width, state->match_state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
+    render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match_state.map.width, state->match_state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 
     ui_render(state->ui);
     if (state->replay_mode) {
