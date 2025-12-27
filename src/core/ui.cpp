@@ -91,21 +91,21 @@ void ui_end_container(UI& state) {
 
 ivec2 ui_button_size(const char* text) {
     ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
-    if (text_size.x % 16 != 0) {
-        text_size.x = ((text_size.x / 16) + 2) * 16;
+    if (text_size.x % 8 != 0) {
+        text_size.x = ((text_size.x / 8) + 2) * 8;
     }
-    text_size.x += 32;
+    text_size.x += 16;
 
-    return ivec2(text_size.x, 42);
+    return ivec2(text_size.x, 21);
 }
 
 ivec2 ui_button_position_frame_bottom_left(Rect rect) {
-    return ivec2(rect.x + 32, rect.y + rect.h - 42 - 16);
+    return ivec2(rect.x + 16, rect.y + rect.h - 21 - 8);
 }
 
 ivec2 ui_button_position_frame_bottom_right(Rect rect, const char* text) {
     ivec2 button_size = ui_button_size(text);
-    return ivec2(rect.x + rect.w - 32 - button_size.x, rect.y + rect.h - 42 - 16);
+    return ivec2(rect.x + rect.w - 16 - button_size.x, rect.y + rect.h - 21 - 8);
 }
 
 bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally) {
@@ -122,7 +122,7 @@ bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally
     }
     bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && button_rect.has_point(input_get_mouse_position());
 
-    int frame_count = button_rect.w / 16;
+    int frame_count = button_rect.w / 8;
     for (int frame = 0; frame < frame_count; frame++) {
         // Determine hframe
         int hframe = 1;
@@ -131,10 +131,10 @@ bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally
         } else if (frame == frame_count - 1) {
             hframe = 2;
         }
-        ui_queue_sprite(state, SPRITE_UI_MENU_BUTTON, ivec2(hframe, (int)hovered), ivec2(button_rect.x + (frame * 16), button_rect.y - ((int)hovered * 2)), 0);
+        ui_queue_sprite(state, SPRITE_UI_MENU_BUTTON, ivec2(hframe, (int)hovered), ivec2(button_rect.x + (frame * 8), button_rect.y - (int)hovered), 0);
     }
 
-    ivec2 text_pos = ivec2(button_rect.x + 10, button_rect.y + 6 - ((int)hovered * 2));
+    ivec2 text_pos = ivec2(button_rect.x + 5, button_rect.y + 3 - (int)hovered);
     if (center_horizontally) {
         ivec2 text_size = render_get_text_size(FONT_WESTERN8_OFFBLACK, text);
         text_pos.x = button_rect.x + (button_rect.w / 2) - (text_size.x / 2);
@@ -151,7 +151,7 @@ bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally
 bool ui_slim_button(UI& state, const char* text) {
     ivec2 origin = ui_get_container_origin(state);
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
-    ivec2 button_size = ivec2(sprite_info.frame_width * 2, sprite_info.frame_height * 2);
+    ivec2 button_size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
     Rect button_rect = (Rect) {
         .x = origin.x, .y = origin.y,
         .w = button_size.x, .h = button_size.y
@@ -159,8 +159,8 @@ bool ui_slim_button(UI& state, const char* text) {
     ui_update_container(state, ivec2(button_rect.w, button_rect.h));
     bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && button_rect.has_point(input_get_mouse_position());
 
-    ivec2 render_pos = ivec2(button_rect.x, button_rect.y - ((int)hovered * 2));
-    ivec2 text_pos = ivec2(render_pos.x + 10, render_pos.y + 4);
+    ivec2 render_pos = ivec2(button_rect.x, button_rect.y - (int)hovered);
+    ivec2 text_pos = ivec2(render_pos.x + 5, render_pos.y + 2);
     ui_queue_sprite(state, SPRITE_UI_DROPDOWN_MINI, hovered ? ivec2(0, 4) : ivec2(0, 3), render_pos, 0);
     ui_queue_text(state, hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, text_pos, 0);
 
@@ -174,11 +174,11 @@ bool ui_slim_button(UI& state, const char* text) {
 bool ui_sprite_button(UI& state, SpriteName sprite, bool disabled, bool flip_h) {
     ivec2 origin = ui_get_container_origin(state);
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
-    ui_update_container(state, ivec2(sprite_info.frame_width * 2, sprite_info.frame_height * 2));
+    ui_update_container(state, ivec2(sprite_info.frame_width, sprite_info.frame_height));
 
     Rect sprite_rect = (Rect) {
         .x = origin.x, .y = origin.y,
-        .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
+        .w = sprite_info.frame_width, .h = sprite_info.frame_height
     };
     int hframe = 0;
     if (disabled) {
@@ -200,11 +200,11 @@ bool ui_icon_button(UI& state, SpriteName sprite, bool selected) {
     const SpriteInfo& button_sprite_info = render_get_sprite_info(SPRITE_UI_ICON_BUTTON);
 
     ivec2 origin = ui_get_container_origin(state);
-    ui_update_container(state, ivec2(button_sprite_info.frame_width * 2, button_sprite_info.frame_height * 2));
+    ui_update_container(state, ivec2(button_sprite_info.frame_width, button_sprite_info.frame_height));
 
     Rect button_rect = (Rect) {
         .x = origin.x, .y = origin.y,
-        .w = button_sprite_info.frame_width * 2, .h = button_sprite_info.frame_height * 2
+        .w = button_sprite_info.frame_width, .h = button_sprite_info.frame_height
     };
 
     bool hovered = state.input_enabled && sprite != UI_ICON_BUTTON_EMPTY &&
@@ -214,9 +214,9 @@ bool ui_icon_button(UI& state, SpriteName sprite, bool selected) {
         hframe = 1;
     }
 
-    ui_queue_sprite(state, SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), origin - ivec2(0, ((int)hovered * 2)), 0);
+    ui_queue_sprite(state, SPRITE_UI_ICON_BUTTON, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
     if (sprite != UI_ICON_BUTTON_EMPTY) {
-        ui_queue_sprite(state, sprite, ivec2(hframe, 0), origin - ivec2(0, ((int)hovered * 2)), 0);
+        ui_queue_sprite(state, sprite, ivec2(hframe, 0), origin - ivec2(0, (int)hovered), 0);
     }
 
     bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
@@ -240,12 +240,12 @@ void ui_text(UI& state, FontName font, const char* text, bool center_horizontall
 ivec2 ui_text_frame_size(const char* text) {
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
     ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, text);
-    int frame_count = (text_size.x / (sprite_info.frame_width * 2)) + 1;
+    int frame_count = (text_size.x / sprite_info.frame_width) + 1;
     if (text_size.x % sprite_info.frame_width != 0) {
         frame_count++;
     }
 
-    return ivec2(sprite_info.frame_width * frame_count * 2, sprite_info.frame_height * 2);
+    return ivec2(sprite_info.frame_width * frame_count, sprite_info.frame_height);
 }
 
 bool ui_text_frame(UI& state, const char* text, bool disabled) {
@@ -253,13 +253,13 @@ bool ui_text_frame(UI& state, const char* text, bool disabled) {
 
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_TEXT_FRAME);
     ivec2 text_size = render_get_text_size(FONT_HACK_OFFBLACK, text);
-    int frame_count = (text_size.x / (sprite_info.frame_width * 2)) + 1;
+    int frame_count = (text_size.x / sprite_info.frame_width) + 1;
     if (text_size.x % sprite_info.frame_width != 0) {
         frame_count++;
     }
     Rect rect = (Rect) {
         .x = origin.x, .y = origin.y,
-        .w = frame_count * sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
+        .w = frame_count * sprite_info.frame_width, .h = sprite_info.frame_height
     };
     ui_update_container(state, ivec2(rect.w, rect.h));
     bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && !disabled && rect.has_point(input_get_mouse_position());
@@ -271,10 +271,10 @@ bool ui_text_frame(UI& state, const char* text, bool disabled) {
         } else if (frame == frame_count - 1) {
             hframe = 2;
         }
-        ui_queue_sprite(state, SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), ivec2(origin.x + (frame * sprite_info.frame_width * 2), origin.y - ((int)hovered * 2)), 0);
+        ui_queue_sprite(state, SPRITE_UI_TEXT_FRAME, ivec2(hframe, 0), ivec2(origin.x + (frame * sprite_info.frame_width), origin.y - (int)hovered), 0);
     }
 
-    ui_queue_text(state, hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + (rect.w / 2) - (text_size.x / 2), rect.y + 1 - ((int)hovered * 2)), 0);
+    ui_queue_text(state, hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + (rect.w / 2) - (text_size.x / 2), rect.y + 1 - (int)hovered), 0);
 
     bool clicked = hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
@@ -315,9 +315,9 @@ void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value
         .w = size.x, .h = size.y
     };
     ui_queue_ninepatch(state, SPRITE_UI_FRAME_SMALL, text_input_rect, 0);
-    ui_queue_text(state, FONT_HACK_GOLD, prompt, ivec2(text_input_rect.x + 10, text_input_rect.y + 12), 0);
+    ui_queue_text(state, FONT_HACK_GOLD, prompt, ivec2(text_input_rect.x + 5, text_input_rect.y + 6), 0);
     ivec2 prompt_size = render_get_text_size(FONT_HACK_GOLD, prompt);
-    ivec2 text_pos = ivec2(text_input_rect.x + prompt_size.x, text_input_rect.y + 12);
+    ivec2 text_pos = ivec2(text_input_rect.x + prompt_size.x, text_input_rect.y + 6);
 
     if (word_wrap) {
         std::string text = *value;
@@ -333,18 +333,18 @@ void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value
             }
 
             ivec2 word_size = render_get_text_size(FONT_HACK_GOLD, word.c_str());
-            bool word_breaks_line = text_pos.x + word_size.x > text_input_rect.x + text_input_rect.w - 10;
-            if (word_breaks_line && word.length() > 16) {
+            bool word_breaks_line = text_pos.x + word_size.x > text_input_rect.x + text_input_rect.w - 5;
+            if (word_breaks_line && word.length() > 8) {
                 while (!word.empty()) {
                     std::string word_part;
                     int word_part_width = 0;
-                    while (!word.empty() && text_pos.x + word_part_width <= text_input_rect.x + text_input_rect.w - 5) {
+                    while (!word.empty() && text_pos.x + word_part_width <= text_input_rect.x + text_input_rect.w - 3) {
                         word_part.push_back(word[0]);
                         word.erase(word.begin());
                         word_part_width = render_get_text_size(FONT_HACK_GOLD, word_part.c_str()).x;
                     }
                     bool word_part_reaches_end_of_line = false;
-                    if (!word_part.empty() && text_pos.x + word_part_width > text_input_rect.x + text_input_rect.w - 5) {
+                    if (!word_part.empty() && text_pos.x + word_part_width > text_input_rect.x + text_input_rect.w - 3) {
                         word.insert(0, 1, word_part[word_part.size() - 1]);
                         word_part.pop_back();
                         word_part_reaches_end_of_line = true;
@@ -352,16 +352,16 @@ void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value
                     word_part_width = render_get_text_size(FONT_HACK_GOLD, word_part.c_str()).x;
                     ui_queue_text(state, FONT_HACK_GOLD, word_part.c_str(), text_pos, 0);
                     if (word_part_reaches_end_of_line) {
-                        text_pos.x = text_input_rect.x + 5;
-                        text_pos.y += prompt_size.y + 4;
+                        text_pos.x = text_input_rect.x + 3;
+                        text_pos.y += prompt_size.y + 2;
                     } else {
                         text_pos.x += word_part_width;
                     }
                 }
             } else {
                 if (word_breaks_line) {
-                    text_pos.x = text_input_rect.x + 5;
-                    text_pos.y += prompt_size.y + 4;
+                    text_pos.x = text_input_rect.x + 3;
+                    text_pos.y += prompt_size.y + 2;
                 }
 
                 ui_queue_text(state, FONT_HACK_GOLD, word.c_str(), text_pos, 0);
@@ -383,7 +383,7 @@ void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value
                 state.text_input_cursor_blink_timer = UI_TEXT_INPUT_BLINK_DURATION;
             }
             if (state.text_input_show_cursor) {
-                ivec2 cursor_pos = ivec2(text_pos.x - 4, text_pos.y);
+                ivec2 cursor_pos = ivec2(text_pos.x - 2, text_pos.y - 1);
                 ui_queue_text(state, FONT_HACK_GOLD, "|", cursor_pos, 0);
             }
         }
@@ -402,7 +402,7 @@ void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value
 bool ui_team_picker(UI& state, char value, bool disabled) {
     ivec2 origin = ui_get_container_origin(state);
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_TEAM_PICKER);
-    ivec2 size = ivec2(sprite_info.frame_width * 2, sprite_info.frame_height * 2);
+    ivec2 size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
     ui_update_container(state, size);
 
     Rect rect = (Rect) {
@@ -417,7 +417,7 @@ bool ui_team_picker(UI& state, char value, bool disabled) {
 
     ui_queue_sprite(state, SPRITE_UI_TEAM_PICKER, ivec2((int)is_hovered, 0), origin, 0);
     char text[2] = { value, '\0' };
-    ui_queue_text(state, is_hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + 10, rect.y + 4), 0);
+    ui_queue_text(state, is_hovered ? FONT_HACK_WHITE : FONT_HACK_OFFBLACK, text, ivec2(rect.x + 5, rect.y + 2), 0);
 
     bool clicked = is_hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK);
     if (clicked) {
@@ -431,7 +431,7 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
     ivec2 origin = ui_get_container_origin(state);
     SpriteName sprite = type == UI_DROPDOWN ? SPRITE_UI_DROPDOWN : SPRITE_UI_DROPDOWN_MINI;
     const SpriteInfo& sprite_info = render_get_sprite_info(sprite);
-    ivec2 size = ivec2(sprite_info.frame_width * 2, sprite_info.frame_height * 2);
+    ivec2 size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
     ui_update_container(state, size);
 
     Rect rect = (Rect) {
@@ -453,7 +453,7 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
     FontName font = type == UI_DROPDOWN ? FONT_WESTERN8_OFFBLACK : FONT_HACK_OFFBLACK;
     FontName hovered_font = type == UI_DROPDOWN ? FONT_WESTERN8_WHITE : FONT_HACK_WHITE; 
 
-    int text_yoffset = type == UI_DROPDOWN ? 6 : 4;
+    int text_yoffset = type == UI_DROPDOWN ? 3 : 2;
 
     ui_queue_sprite(state, sprite, ivec2(0, vframe), origin, 0);
 
@@ -464,7 +464,7 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
     } else {
         strcpy(item_text, items.at(*selected_item).c_str());
     }
-    ui_queue_text(state, vframe == 1 ? hovered_font : font, item_text, ivec2(origin.x + 10, origin.y + text_yoffset), 0);
+    ui_queue_text(state, vframe == 1 ? hovered_font : font, item_text, ivec2(origin.x + 5, origin.y + text_yoffset), 0);
 
     if (state.element_selected == dropdown_id) {
         // Render all the dropdown items
@@ -486,7 +486,7 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
             } else {
                 strcpy(item_text, items.at((size_t)index).c_str());
             }
-            ui_queue_text(state, item_is_hovered ? hovered_font : font, item_text, ivec2(item_rect.x + 10, item_rect.y + text_yoffset), 1);
+            ui_queue_text(state, item_is_hovered ? hovered_font : font, item_text, ivec2(item_rect.x + 5, item_rect.y + text_yoffset), 1);
 
             if (item_is_hovered) {
                 item_hovered = index;
@@ -513,10 +513,10 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
 }
 
 bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t min, uint32_t max, UiSliderDisplay display) {
-    static const int VALUE_STR_PADDING = 8;
-    static const int SLIDER_HEIGHT = 10;
-    static const int NOTCH_WIDTH = 10;
-    static const int NOTCH_HEIGHT = 28;
+    static const int VALUE_STR_PADDING = 4;
+    static const int SLIDER_HEIGHT = 5;
+    static const int NOTCH_WIDTH = 5;
+    static const int NOTCH_HEIGHT = 14;
 
     int slider_id = ui_get_next_element_id(state);
     ivec2 origin = ui_get_container_origin(state);
@@ -524,7 +524,7 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t mi
 
     // Slider width will be based on the dropdown sprite's width
     const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
-    ivec2 size = ivec2(dropdown_sprite_info.frame_width * 2, dropdown_sprite_info.frame_height * 2);
+    ivec2 size = ivec2(dropdown_sprite_info.frame_width, dropdown_sprite_info.frame_height);
     if (display != UI_SLIDER_DISPLAY_NO_VALUE) {
         char option_value_str[8];
         if (display == UI_SLIDER_DISPLAY_RAW_VALUE) {
@@ -536,21 +536,21 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t mi
         ivec2 value_str_text_size = render_get_text_size(FONT_WESTERN8_GOLD, option_value_str);
         size.x += VALUE_STR_PADDING + value_str_text_size.x;
 
-        ui_queue_text(state, FONT_WESTERN8_GOLD, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 6), 0);
+        ui_queue_text(state, FONT_WESTERN8_GOLD, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 3), 0);
     }
 
     ui_update_container(state, size);
 
     Rect slider_rect = (Rect) {
         .x = origin.x,
-        .y = origin.y + ((dropdown_sprite_info.frame_height * 2) / 2) - (SLIDER_HEIGHT / 2),
-        .w = dropdown_sprite_info.frame_width * 2,
+        .y = origin.y + (dropdown_sprite_info.frame_height / 2) - (SLIDER_HEIGHT / 2),
+        .w = dropdown_sprite_info.frame_width,
         .h = SLIDER_HEIGHT
     };
     Rect slider_subrect = (Rect) {
-        .x = slider_rect.x + 2, 
+        .x = slider_rect.x + 1, 
         .y = slider_rect.y,
-        .w = ((slider_rect.w - 4) * ((int)*value - (int)min)) / (int)max,
+        .w = ((slider_rect.w - 2) * ((int)*value - (int)min)) / (int)max,
         .h = slider_rect.h
     };
     Rect notch_rect = (Rect) {
@@ -559,17 +559,17 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t mi
         .w = NOTCH_WIDTH, .h = NOTCH_HEIGHT
     };
     Rect notch_subrect = (Rect) {
-        .x = notch_rect.x + 2,
-        .y = notch_rect.y + 2,
-        .w = notch_rect.w - 4,
-        .h = notch_rect.h - 4
+        .x = notch_rect.x + 1,
+        .y = notch_rect.y + 1,
+        .w = notch_rect.w - 2,
+        .h = notch_rect.h - 2
     };
 
     if (buffered_value != NULL) {
         Rect slider_buffered_subrect = (Rect) {
-            .x = slider_rect.x + 2, 
+            .x = slider_rect.x + 1, 
             .y = slider_rect.y,
-            .w = ((slider_rect.w - 4) * ((int)*buffered_value - (int)min)) / (int)max,
+            .w = ((slider_rect.w - 2) * ((int)*buffered_value - (int)min)) / (int)max,
             .h = slider_rect.h
         };
         ui_queue_fill_rect(state, slider_buffered_subrect, RENDER_COLOR_WHITE, 0);
@@ -581,8 +581,8 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t mi
 
     Rect input_rect = (Rect) {
         .x = origin.x, .y = origin.y,
-        .w = dropdown_sprite_info.frame_width * 2,
-        .h = dropdown_sprite_info.frame_height * 2
+        .w = dropdown_sprite_info.frame_width, 
+        .h = dropdown_sprite_info.frame_height 
     };
     bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE &&
                         input_rect.has_point(input_get_mouse_position());

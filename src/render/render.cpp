@@ -873,27 +873,17 @@ void render_update_screen_scale() {
     ivec2 window_size;
     SDL_GetWindowSize(state.window, &window_size.x, &window_size.y);
 
-    float screen_scale[2];
-    float screen_aspect = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
-    float window_aspect = (float)window_size.x / (float)window_size.y;
-    if (screen_aspect >= window_aspect) {
-        // Letterbox
-        float ratio = (float)window_size.x / (float)SCREEN_WIDTH;
-        float scaled_height = (float)SCREEN_HEIGHT * ratio;
-        screen_scale[0] = 1.0f;
-        screen_scale[1] = scaled_height / (float)window_size.y;
-    } else {
-        // Pillarbox
-        float ratio = (float)window_size.y / (float)SCREEN_HEIGHT;
-        float scaled_width = (float)SCREEN_WIDTH * ratio;
-        screen_scale[0] = scaled_width / (float)window_size.x;
-        screen_scale[1] = 1.0f;
-    }
+    int scale_width = window_size.x / SCREEN_WIDTH;
+    int scale_height = window_size.y / SCREEN_HEIGHT;
+    float scale = (float)(std::min(scale_width, scale_height));
+
+    float screen_scale[2] = {
+        ((float)SCREEN_WIDTH * scale) / (float)window_size.x,
+        ((float)SCREEN_HEIGHT * scale) / (float)window_size.y,
+    };
 
     glUseProgram(state.screen_shader);
     glUniform2fv(glGetUniformLocation(state.screen_shader, "screen_scale"), 1, screen_scale);
-
-    log_debug("render_update_screen_scale, window <%i, %i> screen scale 0 %f 1 %f aspect %f window aspect %f", window_size.x, window_size.y, screen_scale[0], screen_scale[1], screen_aspect, window_aspect);
 }
 
 void render_set_display(RenderDisplay display) {
@@ -905,8 +895,12 @@ void render_set_display(RenderDisplay display) {
     if (display == RENDER_DISPLAY_WINDOWED) {
         SDL_SetWindowFullscreen(state.window, false);
         SDL_SyncWindow(state.window);
-        SDL_SetWindowSize(state.window, 1280, 720);
-        SDL_SetWindowPosition(state.window, (display_mode->w / 2) - (1280 / 2), (display_mode->h / 2) - (720 / 2));
+        // SDL_SetWindowSize(state.window, SCREEN_WIDTH, SCREEN_HEIGHT);
+        // SDL_SetWindowPosition(state.window, (display_mode->w / 2) - (SCREEN_WIDTH / 2), (display_mode->h / 2) - (SCREEN_HEIGHT / 2));
+        int window_width = 1280;
+        int window_height = 720;
+        SDL_SetWindowSize(state.window, window_width, window_height);
+        SDL_SetWindowPosition(state.window, (display_mode->w / 2) - (window_width / 2), (display_mode->h / 2) - (window_height / 2));
         SDL_SyncWindow(state.window);
         render_update_screen_scale();
     } else {
@@ -1003,8 +997,8 @@ void render_sprite_frame(SpriteName name, ivec2 frame, ivec2 position, uint32_t 
     Rect dst_rect = (Rect) { 
         .x = position.x, 
         .y = position.y, 
-        .w = sprite_info.frame_width * RENDER_SCALE_INT,
-        .h = sprite_info.frame_height * RENDER_SCALE_INT
+        .w = sprite_info.frame_width,
+        .h = sprite_info.frame_height
     };
     render_sprite(name, src_rect, dst_rect, options);
 }
@@ -1021,8 +1015,8 @@ void render_ninepatch(SpriteName sprite, Rect rect) {
     Rect dst_rect = (Rect) {
         .x = rect.x,
         .y = rect.y,
-        .w = sprite_info.frame_width * RENDER_SCALE_INT,
-        .h = sprite_info.frame_height * RENDER_SCALE_INT
+        .w = sprite_info.frame_width,
+        .h = sprite_info.frame_height
     };
 
     // Top left
@@ -1030,55 +1024,55 @@ void render_ninepatch(SpriteName sprite, Rect rect) {
 
     // Top right
     src_rect.x = 0 + (2 * sprite_info.frame_width);
-    dst_rect.x = rect.x + rect.w - (sprite_info.frame_width * RENDER_SCALE_INT);
+    dst_rect.x = rect.x + rect.w - sprite_info.frame_width;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom left
     src_rect.x = 0;
     src_rect.y = 0 + (2 * sprite_info.frame_height);
     dst_rect.x = rect.x;
-    dst_rect.y = rect.y + rect.h - (sprite_info.frame_height * RENDER_SCALE_INT);
+    dst_rect.y = rect.y + rect.h - sprite_info.frame_height;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom right
     src_rect.x = 0 + (2 * sprite_info.frame_width);
-    dst_rect.x = rect.x + rect.w - (sprite_info.frame_width * RENDER_SCALE_INT);
+    dst_rect.x = rect.x + rect.w - sprite_info.frame_width;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Top edge
     src_rect.x = 0 + sprite_info.frame_width;
     src_rect.y = 0;
-    dst_rect.x = rect.x + (sprite_info.frame_width * 2);
+    dst_rect.x = rect.x + sprite_info.frame_width;
     dst_rect.y = rect.y;
-    dst_rect.w = (rect.x + rect.w - (sprite_info.frame_width * RENDER_SCALE_INT)) - dst_rect.x;
+    dst_rect.w = (rect.x + rect.w - sprite_info.frame_width) - dst_rect.x;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Bottom edge
     src_rect.y = 0 + (2 * sprite_info.frame_height);
-    dst_rect.y = (rect.y + rect.h - (sprite_info.frame_height * RENDER_SCALE_INT));
+    dst_rect.y = rect.y + rect.h - sprite_info.frame_height;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Left edge
     src_rect.x = 0;
     src_rect.y = 0 + sprite_info.frame_height;
     dst_rect.x = rect.x;
-    dst_rect.w = sprite_info.frame_width * RENDER_SCALE_INT;
-    dst_rect.y = rect.y + (sprite_info.frame_height * RENDER_SCALE_INT);
-    dst_rect.h = (rect.y + rect.h - (sprite_info.frame_height * RENDER_SCALE_INT)) - dst_rect.y;
+    dst_rect.w = sprite_info.frame_width;
+    dst_rect.y = rect.y + sprite_info.frame_height; 
+    dst_rect.h = (rect.y + rect.h - sprite_info.frame_height) - dst_rect.y;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Right edge
     src_rect.x = 0 + (2 * sprite_info.frame_width);
-    dst_rect.x = rect.x + rect.w - (sprite_info.frame_width * RENDER_SCALE_INT);
+    dst_rect.x = rect.x + rect.w - sprite_info.frame_width; 
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 
     // Center
     src_rect.x = 0 + sprite_info.frame_width;
     src_rect.y = 0 + sprite_info.frame_height;
-    dst_rect.x = rect.x + (sprite_info.frame_width * RENDER_SCALE_INT);
-    dst_rect.y = rect.y + (sprite_info.frame_height * RENDER_SCALE_INT);
-    dst_rect.w = (rect.x + rect.w - (sprite_info.frame_width * RENDER_SCALE_INT)) - dst_rect.x;
-    dst_rect.h = (rect.y + rect.h - (sprite_info.frame_height * RENDER_SCALE_INT)) - dst_rect.y;
+    dst_rect.x = rect.x + sprite_info.frame_width; 
+    dst_rect.y = rect.y + sprite_info.frame_height; 
+    dst_rect.w = (rect.x + rect.w - sprite_info.frame_width) - dst_rect.x;
+    dst_rect.h = (rect.y + rect.h - sprite_info.frame_height) - dst_rect.y;
     render_sprite(sprite, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 
@@ -1092,7 +1086,7 @@ void render_vertical_line(int x, int start_y, int end_y, RenderColor color) {
     };
     Rect dst_rect = (Rect) {
         .x = x, .y = start_y,
-        .w = RENDER_SCALE_INT, .h = end_y - start_y
+        .w = 1, .h = end_y - start_y
     };
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
@@ -1107,16 +1101,16 @@ void render_draw_rect(Rect rect, RenderColor color) {
     };
     Rect dst_rect = (Rect) {
         .x = rect.x, .y = rect.y,
-        .w = RENDER_SCALE_INT, .h = rect.h
+        .w = 1, .h = rect.h
     };
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
-    dst_rect.x = rect.x + rect.w - RENDER_SCALE_INT;
+    dst_rect.x = rect.x + rect.w - 1;
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
     dst_rect.x = rect.x;
     dst_rect.w = rect.w;
-    dst_rect.h = RENDER_SCALE_INT;
+    dst_rect.h = 1;
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
-    dst_rect.y = rect.y + rect.h - RENDER_SCALE_INT;
+    dst_rect.y = rect.y + rect.h - 1;
     render_sprite(SPRITE_UI_SWATCH, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
 }
 
@@ -1216,10 +1210,10 @@ void render_text(FontName name, const char* text, ivec2 position) {
             glyph_index = (uint32_t)('|' - FONT_FIRST_CHAR);
         }
 
-        float position_top = (float)(SCREEN_HEIGHT - (glyph_position.y + (state.fonts[name].glyphs[glyph_index].bearing_y * RENDER_SCALE_FLOAT)));
-        float position_bottom = position_top - ((float)state.fonts[name].glyph_height * RENDER_SCALE_FLOAT);
-        float position_left = (float)(glyph_position.x + (state.fonts[name].glyphs[glyph_index].bearing_x * RENDER_SCALE_FLOAT));
-        float position_right = position_left + ((float)state.fonts[name].glyph_width * RENDER_SCALE_FLOAT);
+        float position_top = (float)(SCREEN_HEIGHT - (glyph_position.y + state.fonts[name].glyphs[glyph_index].bearing_y));
+        float position_bottom = position_top - (float)state.fonts[name].glyph_height;
+        float position_left = (float)(glyph_position.x + state.fonts[name].glyphs[glyph_index].bearing_x);
+        float position_right = position_left + (float)state.fonts[name].glyph_width;
 
         ivec2 glyph_frame = ivec2(glyph_index % FONT_HFRAMES, glyph_index / FONT_HFRAMES);
         float tex_coord_left = (float)(state.fonts[name].atlas_x + (glyph_frame.x * state.fonts[name].glyph_width)) / (float)ATLAS_SIZE;
@@ -1253,7 +1247,7 @@ void render_text(FontName name, const char* text, ivec2 position) {
             .tex_coord = { tex_coord_right, tex_coord_bottom, font_atlas }
         });
 
-        glyph_position.x += state.fonts[name].glyphs[glyph_index].advance * RENDER_SCALE_FLOAT;
+        glyph_position.x += state.fonts[name].glyphs[glyph_index].advance;
         text_index++;
     }
 }
@@ -1272,7 +1266,7 @@ ivec2 render_get_text_size(FontName name, const char* text) {
         text_index++;
     }
 
-    return size * RENDER_SCALE_INT;
+    return size;
 }
 
 void render_minimap_putpixel(MinimapLayer layer, ivec2 position, MinimapPixel pixel) {

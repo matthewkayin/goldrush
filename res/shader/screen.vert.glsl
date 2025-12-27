@@ -5,7 +5,6 @@ layout (location = 1) in vec2 in_tex_coord;
 
 out vec2 frag_tex_coord;
 
-uniform vec2 screen_size;
 uniform vec2 screen_scale;
 
 void main() {

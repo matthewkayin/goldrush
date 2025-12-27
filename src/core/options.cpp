@@ -17,7 +17,7 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .name = "Display",
         .type = OPTION_TYPE_DROPDOWN,
         .min_value = 0,
-        .max_value = RENDER_DISPLAY_COUNT,
+        .max_value = RENDER_DISPLAY_COUNT - 1,
         #ifdef GOLD_DEBUG
         .default_value = RENDER_DISPLAY_WINDOWED
         #else
@@ -28,7 +28,7 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .name = "Vsync",
         .type = OPTION_TYPE_DROPDOWN,
         .min_value = 0,
-        .max_value = RENDER_VSYNC_COUNT,
+        .max_value = RENDER_VSYNC_COUNT - 1,
         .default_value = RENDER_VSYNC_ENABLED
     }},
     { OPTION_SFX_VOLUME, (OptionData) {
@@ -49,8 +49,8 @@ static const std::unordered_map<OptionName, OptionData> OPTION_DATA = {
         .name = "Camera Speed",
         .type = OPTION_TYPE_SLIDER,
         .min_value = 1,
-        .max_value = 63,
-        .default_value = 32
+        .max_value = 32,
+        .default_value = 16
     }}
 };
 
@@ -89,8 +89,16 @@ void options_load() {
             if (options_mode) {
                 int option;
                 for (option = 0; option < OPTION_COUNT; option++) {
-                    if (key == std::string(OPTION_DATA.at((OptionName)option).name)) {
-                        options[(OptionName)option] = (uint32_t)std::stoi(value);
+                    const OptionData& option_data = OPTION_DATA.at((OptionName)option);
+
+                    if (key == std::string(option_data.name)) {
+                        uint32_t option_value = (uint32_t)std::stoi(value);
+                        if (option_value < option_data.min_value || option_value > option_data.max_value) {
+                            log_warn("Option value of %u for %s is out of range.", option_value, option_data.name);
+                            continue;
+                        }
+
+                        options[(OptionName)option] = option_value;
                         break;
                     }
                 }
