@@ -523,7 +523,7 @@ void menu_update(MenuState* state) {
         // Match settings
         ui_frame_rect(state->ui, MATCH_SETTINGS_RECT);
         ivec2 match_settings_text_size = render_get_text_size(FONT_HACK_GOLD, "Settings");
-        ui_element_position(state->ui, ivec2(MATCH_SETTINGS_RECT.x + (MATCH_SETTINGS_RECT.w / 2) - (match_settings_text_size.x / 2), MATCH_SETTINGS_RECT.y + 6));
+        ui_element_position(state->ui, ivec2(MATCH_SETTINGS_RECT.x + (MATCH_SETTINGS_RECT.w / 2) - (match_settings_text_size.x / 2), MATCH_SETTINGS_RECT.y + 12));
         ui_text(state->ui, FONT_HACK_GOLD, "Settings");
 
         ui_begin_column(state->ui, ivec2(MATCH_SETTINGS_RECT.x + 16, MATCH_SETTINGS_RECT.y + 44), 8);
