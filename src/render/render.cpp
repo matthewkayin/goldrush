@@ -86,7 +86,6 @@ struct RenderState {
     GLuint screen_shader;
     GLuint screen_framebuffer;
     GLuint screen_texture;
-    GLuint screenshot_texture;
     GLuint screen_vao;
 
     GLuint sprite_shader;
@@ -246,12 +245,6 @@ bool render_init(SDL_Window* window) {
             return false;
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        glGenTextures(1, &state.screenshot_texture);
-        glBindTexture(GL_TEXTURE_2D, state.screenshot_texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     }
 
     // Load screen shader
@@ -1381,4 +1374,24 @@ void render_minimap(ivec2 position, ivec2 src_size, ivec2 dst_size) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+bool render_take_screenshot() {
+    uint8_t pixels[SCREEN_WIDTH * SCREEN_HEIGHT * 4]; 
+    glBindTexture(GL_TEXTURE_2D, state.screen_texture);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    SDL_Surface* screenshot = SDL_CreateSurfaceFrom(SCREEN_WIDTH, SCREEN_HEIGHT, SDL_PIXELFORMAT_ABGR8888, pixels, 4 * SCREEN_WIDTH);
+    if (screenshot == NULL) {
+        log_error("Failed to take screenshot.");
+        return false;
+    }
+    render_flip_sdl_surface_vertically(screenshot);
+
+    std::string path = filesystem_get_data_path() + filesystem_get_timestamp_str() + ".png";
+    bool success = IMG_SavePNG(screenshot, path.c_str());
+    log_info("Screenshot %s save success %i", path.c_str(), (int)success);
+
+    return success;
 }

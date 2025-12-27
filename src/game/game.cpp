@@ -107,6 +107,10 @@ void game_handle_network_event(GameState& state, const NetworkEvent& event) {
 void game_update(GameState& state) {
     #ifdef GOLD_DEBUG
         game_test_update(state);
+
+        if (input_is_action_just_pressed(INPUT_ACTION_F4)) {
+            render_take_screenshot();
+        }
     #endif
 
     switch (state.mode) {
@@ -211,7 +215,6 @@ void game_test_set_mode(GameState& state, GameMode mode) {
 }
 
 void game_test_update(GameState& state) {
-    
     if (state.test_mode == TEST_MODE_NONE) {
         return;
     }
