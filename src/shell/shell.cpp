@@ -126,7 +126,7 @@ static const int HEALTHBAR_PADDING = 7;
 
 // Desync
 #ifdef GOLD_DEBUG_DESYNC
-    static const uint32_t DESYNC_FREQUENCY = 1U;
+    static const uint32_t DESYNC_FREQUENCY = 4U;
 #else
     static const uint32_t DESYNC_FREQUENCY = 60U;
 #endif
