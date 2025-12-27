@@ -892,6 +892,8 @@ void render_update_screen_scale() {
 
     glUseProgram(state.screen_shader);
     glUniform2fv(glGetUniformLocation(state.screen_shader, "screen_scale"), 1, screen_scale);
+
+    log_debug("render_update_screen_scale, window <%i, %i> screen scale 0 %f 1 %f aspect %f window aspect %f", window_size.x, window_size.y, screen_scale[0], screen_scale[1], screen_aspect, window_aspect);
 }
 
 void render_set_display(RenderDisplay display) {
