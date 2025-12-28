@@ -3973,7 +3973,7 @@ void match_shell_render(const MatchShellState* state) {
         .x = state->camera_offset.x / TILE_SIZE,
         .y = state->camera_offset.y / TILE_SIZE,
         .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
-        .h = ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / TILE_SIZE) - 1
+        .h = ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / TILE_SIZE)
     };
     render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
     render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state->match_state.map.width, state->match_state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
