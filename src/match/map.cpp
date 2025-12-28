@@ -875,10 +875,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
     
     // Create region connections
     for (int region = 0; region < region_count; region++) {
-        map.region_connections.push_back(std::vector<std::vector<ivec2>>());
-        for (int other_region = 0; other_region < region_count; other_region++) {
-            map.region_connections[region].push_back(std::vector<ivec2>());
-        }
+        map.region_connection_indices.push_back(std::unordered_map<int, int>());
     }
     for (int y = 0; y < map.height; y++) {
         for (int x = 0; x < map.width; x++) {
@@ -897,8 +894,54 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
                     continue;
                 }
 
-                map.region_connections[region][neighbor_region].push_back(neighbor);
+                if (map.region_connection_indices[region].find(neighbor_region) == map.region_connection_indices[region].end()) {
+                    MapRegionConnection new_connection;
+                    map.region_connections.push_back(new_connection);
+                    map.region_connection_indices[region][neighbor_region] = (int)map.region_connections.size() - 1;
+                }
+                int region_connection_index = map.region_connection_indices[region][neighbor_region];
+                map.region_connections[region_connection_index].cells.push_back(neighbor);
             }
+        }
+    }
+
+    // Calculate the center of each region connection
+    std::vector<ivec2> region_connection_centers;
+    for (MapRegionConnection& region_connection : map.region_connections) {
+        // Caclulate the average of the cells in the connection
+        ivec2 connection_average = ivec2(0, 0);
+        for (ivec2 cell : region_connection.cells) {
+            connection_average = cell;
+        }
+        connection_average = connection_average / region_connection.cells.size();
+
+        // Choose the center, which is a cell among the connection that is closest to the average
+        ivec2 connection_center = ivec2(-1, -1);
+        for (ivec2 cell : region_connection.cells) {
+            if (connection_center.x == -1 || 
+                    ivec2::manhattan_distance(cell, connection_average) <
+                    ivec2::manhattan_distance(cell, connection_center)) {
+                connection_center = cell;
+            }
+        }
+        region_connection_centers.push_back(connection_center);
+    }
+
+    // Calculate costs between region connections
+    for (int connection_index = 0; connection_index < (int)map.region_connections.size(); connection_index++) {
+        MapRegionConnection& connection = map.region_connections[connection_index];
+
+        // Determine the region that this connection resides in
+        // (this is the region that the connection leads to)
+        int connection_region = map_get_region(map, connection.cells[0]);
+
+        for (auto it : map.region_connection_indices[connection_region]) {
+            int other_connection_index = it.second;
+
+            std::vector<ivec2> path;
+            map_pathfind(map, CELL_LAYER_GROUND, region_connection_centers[connection_index], region_connection_centers[other_connection_index], 1, &path, MAP_OPTION_NO_REGION_PATH);
+
+            connection.cost_to_connection[other_connection_index] = path.size();
         }
     }
 }
@@ -1631,15 +1674,14 @@ int map_get_region(const Map& map, ivec2 cell) {
 }
 
 int map_get_region_count(const Map& map) {
-    return map.region_connections.size();
+    return map.region_connection_indices.size();
 }
 
 int map_are_regions_connected(const Map& map, int region_a, int region_b) {
-    return !map.region_connections[region_a][region_b].empty();
+    return map.region_connection_indices[region_a].find(region_b) != map.region_connection_indices[region_a].end();
 }
 
 ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    
     if (from == to) {
         return to;
     }
@@ -1739,13 +1781,15 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
     return to;
 }
 
-std::vector<int> map_get_region_path(const Map& map, int from_region, int to_region) {
+std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
     std::vector<int> path;
 
-    if (from_region == to_region) {
-        path.push_back(to_region);
+    if (map_get_region(map, from) == map_get_region(map, to)) {
+        path.push_back(map_get_region(map, to));
         return path;
     }
+
+    log_debug("map region path <%i, %i> -> <%i, %i>", from.x, from.y, to.x, to.y);
 
     std::vector<MapRegionPathNode> frontier;
     std::vector<MapRegionPathNode> explored;
@@ -1753,7 +1797,8 @@ std::vector<int> map_get_region_path(const Map& map, int from_region, int to_reg
     
     frontier.push_back((MapRegionPathNode) {
         .parent = -1,
-        .region = from_region,
+        .cell = from,
+        .connection_index = -1,
         .cost = 0
     });
 
@@ -1770,31 +1815,70 @@ std::vector<int> map_get_region_path(const Map& map, int from_region, int to_reg
         frontier[smallest_index] = frontier.back();
         frontier.pop_back();
 
-        if (smallest.region == to_region) {
-            end_node = smallest;
+        if (smallest.cell == to) {
+            end_node = smallest.parent != -1 && 
+                map_get_region(map, explored[smallest.parent].cell) == 
+                map_get_region(map, smallest.cell)
+                    ? explored[smallest.parent]
+                    : smallest;
             break;
         }
 
         explored.push_back(smallest);
-        is_region_explored[smallest.region] = true;
+        is_region_explored[map_get_region(map, smallest.cell)] = true;
 
+        if (map_get_region(map, smallest.cell) == map_get_region(map, to)) {
+            MapRegionPathNode child = (MapRegionPathNode) {
+                .parent = (int)explored.size() - 1,
+                .cell = to,
+                .connection_index = -1,
+                .cost = smallest.cost + ivec2::manhattan_distance(smallest.cell, to)
+            };
+
+            uint32_t frontier_index;
+            for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
+                if (frontier[frontier_index].cell == child.cell) {
+                    if (child.cost < frontier[frontier_index].cost) {
+                        frontier[frontier_index] = child;
+                    }
+                    break;
+                }
+            }
+            if (frontier_index == frontier.size()) {
+                frontier.push_back(child);
+            }
+        }
         for (int connected_region = 0; connected_region < map_get_region_count(map); connected_region++) {
-            if (!map_are_regions_connected(map, smallest.region, connected_region)) {
+            if (!map_are_regions_connected(map, map_get_region(map, smallest.cell), connected_region)) {
                 continue;
             }
             if (is_region_explored[connected_region]) {
                 continue;
             }
 
+            int connection_index = map.region_connection_indices[map_get_region(map, smallest.cell)].at(connected_region);
+            const MapRegionConnection& connection = map.region_connections[connection_index];
+            ivec2 nearest_cell = connection.cells[0];
+            for (int index = 1; index < (int)connection.cells.size(); index++) {
+                if (ivec2::manhattan_distance(connection.cells[index], smallest.cell) < 
+                        ivec2::manhattan_distance(nearest_cell, smallest.cell)) {
+                    nearest_cell = connection.cells[index];
+                }
+            }
+            int connection_cost = smallest.connection_index == -1
+                ? ivec2::manhattan_distance(smallest.cell, nearest_cell)
+                : map.region_connections[smallest.connection_index].cost_to_connection.at(connection_index);
+
             MapRegionPathNode child = (MapRegionPathNode) {
                 .parent = (int)explored.size() - 1,
-                .region = connected_region,
-                .cost = smallest.cost + 1
+                .cell = nearest_cell,
+                .connection_index = connection_index,
+                .cost = smallest.cost + connection_cost
             };
 
             uint32_t frontier_index;
             for (frontier_index = 0; frontier_index < frontier.size(); frontier_index++) {
-                if (child.region == frontier[frontier_index].region) {
+                if (map_get_region(map, child.cell) == map_get_region(map, frontier[frontier_index].cell)) {
                     if (child.cost < frontier[frontier_index].cost) {
                         frontier[frontier_index] = child;
                     }
@@ -1815,7 +1899,7 @@ std::vector<int> map_get_region_path(const Map& map, int from_region, int to_reg
     // Build region path
     MapRegionPathNode current = end_node;
     while (current.parent != -1) {
-        path.push_back(current.region);
+        path.push_back(map_get_region(map, current.cell));
         current = explored[current.parent];
     }
 
@@ -1825,9 +1909,11 @@ std::vector<int> map_get_region_path(const Map& map, int from_region, int to_reg
 ivec2 map_get_region_connection_cell_closest_to_cell(const Map& map, ivec2 cell, int to_region) {
     int from_region = map_get_region(map, cell);
 
-    GOLD_ASSERT(!map.region_connections[from_region][to_region].empty());
+    GOLD_ASSERT(map_are_regions_connected(map, from_region, to_region));
+    int connection_index = map.region_connection_indices[from_region].at(to_region);
+    GOLD_ASSERT(!map.region_connections[connection_index].cells.empty());
     ivec2 nearest_connection_cell = ivec2(-1, -1);
-    for (ivec2 connection_cell : map.region_connections[from_region][to_region]) {
+    for (ivec2 connection_cell : map.region_connections[connection_index].cells) {
         if (nearest_connection_cell.x == -1 ||
                 ivec2::manhattan_distance(connection_cell, cell) <
                 ivec2::manhattan_distance(nearest_connection_cell, cell)) {
@@ -1839,7 +1925,6 @@ ivec2 map_get_region_connection_cell_closest_to_cell(const Map& map, ivec2 cell,
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
-    
     static const int EXPLORED_INDEX_NOT_EXPLORED = -1;
     static const int EXPLORED_INDEX_IGNORE_CELL = -2;
 
@@ -1906,7 +1991,7 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     if (no_region_path || layer == CELL_LAYER_SKY || map_get_region(map, from) == map_get_region(map, to)) {
         heuristic_cell = to;
     } else {
-        region_path = map_get_region_path(map, map_get_region(map, from), map_get_region(map, to));
+        region_path = map_get_region_path(map, from, to);
         heuristic_cell = map_get_region_connection_cell_closest_to_cell(map, from, region_path.back());
     }
 

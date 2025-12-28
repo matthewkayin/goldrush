@@ -49,7 +49,8 @@ struct Cell {
 
 struct MapRegionPathNode {
     int parent;
-    int region;
+    ivec2 cell;
+    int connection_index;
     int cost;
 };
 
@@ -68,6 +69,11 @@ struct MapPathNode {
     }
 };
 
+struct MapRegionConnection {
+    std::vector<ivec2> cells;
+    std::unordered_map<int, int> cost_to_connection;
+};
+
 struct Map {
     MapType type;
     int width;
@@ -76,7 +82,8 @@ struct Map {
     std::vector<Cell> cells[CELL_LAYER_COUNT];
 
     std::vector<int> regions;
-    std::vector<std::vector<std::vector<ivec2>>> region_connections;
+    std::vector<std::unordered_map<int, int>> region_connection_indices;
+    std::vector<MapRegionConnection> region_connections;
 };
 
 void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);

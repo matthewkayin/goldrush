@@ -164,12 +164,17 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
     // Map regions
     desync_write_vector<int>(match_state.map.regions);
 
+    // Map region connection indices
+    desync_write_value<size_t>(match_state.map.region_connection_indices.size());
+    for (size_t index = 0; index < match_state.map.region_connection_indices.size(); index++) {
+        desync_write_unordered_map<int, int>(match_state.map.region_connection_indices[index]);
+    } 
+
     // Map region connections
     desync_write_value<size_t>(match_state.map.region_connections.size());
-    for (size_t region = 0; region < match_state.map.region_connections.size(); region++) {
-        for (size_t other_region = 0; other_region < match_state.map.region_connections.size(); other_region++) {
-            desync_write_vector<ivec2>(match_state.map.region_connections[region][other_region]);
-        }
+    for (size_t index = 0; index < match_state.map.region_connections.size(); index++) {
+        desync_write_vector<ivec2>(match_state.map.region_connections[index].cells);
+        desync_write_unordered_map<int, int>(match_state.map.region_connections[index].cost_to_connection);
     }
 
     // Fog 
@@ -422,13 +427,19 @@ void desync_compare_frames(uint8_t* state_buffer, uint8_t* state_buffer2) {
     // Map regions
     state_buffer_offset += desync_compare_vector<int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
 
+    // Map region connection indices
+    size_t region_connection_indices_size;
+    state_buffer_offset += desync_compare_value<size_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset, &region_connection_indices_size);
+    for (size_t index = 0; index < region_connection_indices_size; index++) {
+        state_buffer_offset += desync_compare_unordered_map<int, int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+    }
+
     // Map region connections
     size_t region_connections_size;
     state_buffer_offset += desync_compare_value<size_t>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset, &region_connections_size);
-    for (size_t region = 0; region < region_connections_size; region++) {
-        for (size_t other_region = 0; other_region < region_connections_size; other_region++) {
-            state_buffer_offset += desync_compare_vector<ivec2>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
-        }
+    for (size_t index = 0; index < region_connection_indices_size; index++) {
+        state_buffer_offset += desync_compare_vector<ivec2>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
+        state_buffer_offset += desync_compare_unordered_map<int, int>(state_buffer + state_buffer_offset, state_buffer2 + state_buffer_offset);
     }
 
     // Fog 
