@@ -911,7 +911,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         // Caclulate the average of the cells in the connection
         ivec2 connection_average = ivec2(0, 0);
         for (ivec2 cell : region_connection.cells) {
-            connection_average = cell;
+            connection_average += cell;
         }
         connection_average = connection_average / region_connection.cells.size();
 
@@ -1774,9 +1774,6 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
             frontier.push_back(child);
         } // End for each child / direction
     } // End while frontier not empty
-
-    frontier.clear();
-    memset(&explored_indices[0], -1, map.width * map.height * sizeof(int));
 
     return to;
 }
