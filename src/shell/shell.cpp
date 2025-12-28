@@ -122,7 +122,7 @@ static const Rect DISCONNECT_FRAME_RECT = (Rect) {
 
 // Healthbar
 static const int HEALTHBAR_HEIGHT = 4;
-static const int HEALTHBAR_PADDING = 3;
+static const int HEALTHBAR_PADDING = 4;
 
 // Desync
 #ifdef GOLD_DEBUG_DESYNC

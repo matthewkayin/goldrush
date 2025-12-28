@@ -1740,7 +1740,6 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
 }
 
 std::vector<int> map_get_region_path(const Map& map, int from_region, int to_region) {
-    
     std::vector<int> path;
 
     if (from_region == to_region) {
