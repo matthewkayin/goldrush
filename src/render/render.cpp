@@ -11,6 +11,8 @@
 #include <vector>
 #include <unordered_map>
 
+#define WINDOWED_WIDTH 1280
+#define WINDOWED_HEIGHT 720
 #define MAX_BATCH_VERTICES 32768
 #define FONT_GLYPH_COUNT 95
 #define FONT_FIRST_CHAR 32U // space
@@ -927,12 +929,8 @@ void render_set_display(RenderDisplay display) {
     if (display == RENDER_DISPLAY_WINDOWED) {
         SDL_SetWindowFullscreen(state.window, false);
         SDL_SyncWindow(state.window);
-        // SDL_SetWindowSize(state.window, SCREEN_WIDTH, SCREEN_HEIGHT);
-        // SDL_SetWindowPosition(state.window, (display_mode->w / 2) - (SCREEN_WIDTH / 2), (display_mode->h / 2) - (SCREEN_HEIGHT / 2));
-        int window_width = 1280;
-        int window_height = 720;
-        SDL_SetWindowSize(state.window, window_width, window_height);
-        SDL_SetWindowPosition(state.window, (display_mode->w / 2) - (window_width / 2), (display_mode->h / 2) - (window_height / 2));
+        SDL_SetWindowSize(state.window, WINDOWED_WIDTH, WINDOWED_HEIGHT);
+        SDL_SetWindowPosition(state.window, (display_mode->w / 2) - (WINDOWED_WIDTH / 2), (display_mode->h / 2) - (WINDOWED_HEIGHT / 2));
         SDL_SyncWindow(state.window);
         render_update_screen_scale();
     } else {

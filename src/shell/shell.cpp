@@ -1300,7 +1300,7 @@ void match_shell_handle_input(MatchShellState* state) {
             ivec2 hotkey_position = SHELL_BUTTON_POSITIONS[hotkey_index];
             Rect hotkey_rect = (Rect) {
                 .x = hotkey_position.x, .y = hotkey_position.y,
-                .w = sprite_info.frame_width * 2, .h = sprite_info.frame_height * 2
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
             };
 
             if ((input_is_action_just_pressed(hotkey) && !input_is_text_input_active()) || (
@@ -1484,8 +1484,8 @@ void match_shell_handle_input(MatchShellState* state) {
             Rect icon_rect = (Rect) {
                 .x = BUILDING_QUEUE_POSITIONS[building_queue_index].x,
                 .y = BUILDING_QUEUE_POSITIONS[building_queue_index].y,
-                .w = icon_sprite_info.frame_width * 2, 
-                .h = icon_sprite_info.frame_height * 2
+                .w = icon_sprite_info.frame_width, 
+                .h = icon_sprite_info.frame_height
             };
             if (icon_rect.has_point(input_get_mouse_position())) {
                 state->input_queue.push_back((MatchInput) {
@@ -1519,8 +1519,8 @@ void match_shell_handle_input(MatchShellState* state) {
                 Rect icon_rect = (Rect) {
                     .x = GARRISON_ICON_POSITIONS[index].x,
                     .y = GARRISON_ICON_POSITIONS[index].y,
-                    .w = icon_sprite_info.frame_width * 2,
-                    .h = icon_sprite_info.frame_height * 2
+                    .w = icon_sprite_info.frame_width,
+                    .h = icon_sprite_info.frame_height
                 };
                 if (icon_rect.has_point(input_get_mouse_position())) {
                     state->input_queue.push_back((MatchInput) {
@@ -2377,8 +2377,8 @@ bool match_shell_is_building_place_cell_valid(const MatchShellState* state, ivec
 // HOTKEY MENU
 
 Rect match_shell_get_selection_list_item_rect(uint32_t selection_index) {
-    ivec2 pos = SELECTION_LIST_TOP_LEFT + ivec2(((selection_index % 10) * 68) - 24, (selection_index / 10) * 68);
-    return (Rect) { .x = pos.x, .y = pos.y, .w = 64, .h = 64 };
+    ivec2 pos = SELECTION_LIST_TOP_LEFT + ivec2(((selection_index % 10) * 34) - 12, (selection_index / 10) * 34);
+    return (Rect) { .x = pos.x, .y = pos.y, .w = 32, .h = 32 };
 }
 
 // MENU
@@ -3395,7 +3395,7 @@ void match_shell_render(const MatchShellState* state) {
     // UI Status message
     if (state->status_timer != 0) {
         int status_message_width = render_get_text_size(FONT_HACK_WHITE, state->status_message.c_str()).x;
-        ivec2 status_message_position = ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 133);
+        ivec2 status_message_position = ivec2((SCREEN_WIDTH / 2) - (status_message_width / 2), SCREEN_HEIGHT - 148);
         render_text(FONT_HACK_SHADOW, state->status_message.c_str(), status_message_position + ivec2(1, 1));
         render_text(FONT_HACK_WHITE, state->status_message.c_str(), status_message_position);
     }
@@ -3536,7 +3536,7 @@ void match_shell_render(const MatchShellState* state) {
                     tooltip_cell_width++;
                 }
                 ivec2 tooltip_top_left = ivec2(
-                    SCREEN_WIDTH - (tooltip_cell_width * 8) - 3,
+                    SCREEN_WIDTH - (tooltip_cell_width * 8) - 2,
                     BUTTON_PANEL_RECT.y - (tooltip_cell_height * 8) - 2
                 );
                 for (int y = 0; y < tooltip_cell_height; y++) {
@@ -3583,7 +3583,7 @@ void match_shell_render(const MatchShellState* state) {
                     render_sprite_frame(SPRITE_UI_HOUSE_ICON, ivec2(0, 0), tooltip_top_left + ivec2(5 + 18 + 32, tooltip_item_y - 2), RENDER_SPRITE_NO_CULL, 0);
                     char population_text[4];
                     sprintf(population_text, "%u", tooltip_population_cost);
-                    render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + ivec2(5 + 18 + 32 + 22, tooltip_item_y + 4));
+                    render_text(FONT_WESTERN8_OFFBLACK, population_text, tooltip_top_left + ivec2(5 + 18 + 32 + 22, tooltip_item_y + 2));
                 }
 
                 // Render energy text
@@ -3643,7 +3643,7 @@ void match_shell_render(const MatchShellState* state) {
             char health_text[16];
             sprintf(health_text, "%i/%i", entity.health, entity_data.max_health);
             ivec2 health_text_size = render_get_text_size(FONT_HACK_WHITE, health_text);
-            ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2) + ivec2(0, 1); 
+            ivec2 health_text_position = healthbar_position + (healthbar_size / 2) - (health_text_size / 2); 
             render_text(FONT_HACK_WHITE, health_text, health_text_position);
 
             uint32_t entity_max_energy = entity_get_max_energy(state->match_state, entity);

@@ -262,12 +262,12 @@ int gold_main(int argc, char** argv) {
                 char debug_text[256];
                 sprintf(debug_text, "FPS: %u", fps);
                 render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
-                render_y += 20;
+                render_y += 10;
 
                 if (state.mode == GAME_MODE_MATCH) {
                     sprintf(debug_text, "Paused ? %i", (int)state.match_shell_state->is_paused);
                     render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
-                    render_y += 20;
+                    render_y += 10;
                 } 
 
                 if ((state.mode == GAME_MODE_MATCH || state.mode == GAME_MODE_REPLAY) && !match_shell_is_mouse_in_ui()) {
@@ -275,7 +275,7 @@ int gold_main(int argc, char** argv) {
                     Tile tile = map_get_tile(state.match_shell_state->match_state.map, cell);
                     sprintf(debug_text, "Cell <%i, %i> Elevation %u Tile <%i, %i> Region %i Minimap Pixel %u", cell.x, cell.y, tile.elevation, tile.frame.x, tile.frame.y, map_get_region(state.match_shell_state->match_state.map, cell), match_shell_get_minimap_pixel_for_cell(state.match_shell_state, cell));
                     render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
-                    render_y += 20;
+                    render_y += 10;
 
                     render_draw_rect((Rect) {
                         .x = (cell.x * TILE_SIZE) - state.match_shell_state->camera_offset.x,
@@ -289,7 +289,7 @@ int gold_main(int argc, char** argv) {
                         const Entity& entity = state.match_shell_state->match_state.entities.get_by_id(map_cell.id);
                         sprintf(debug_text, "Entity %u %s mode %u target %u is mining %i goldmine id %u pathfind attempts %u", map_cell.id, entity_get_data(entity.type).name, entity.mode, entity.target.type, (int)entity_is_mining(state.match_shell_state->match_state, entity), entity.goldmine_id, entity.pathfind_attempts);
                         render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
-                        render_y += 20;
+                        render_y += 10;
                     }
                 }
             }

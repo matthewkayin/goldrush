@@ -41,23 +41,15 @@ void input_init(SDL_Window* window) {
 void input_update_screen_scale() {
     ivec2 window_size;
     SDL_GetWindowSize(state.window, &window_size.x, &window_size.y);
-    float screen_aspect = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
-    float window_aspect = (float)window_size.x / (float)window_size.y;
-    if (screen_aspect >= window_aspect) {
-        // Letterbox
-        float ratio = (float)window_size.x / (float)SCREEN_WIDTH;
-        float scaled_height = (float)SCREEN_HEIGHT * ratio;
-        float border_size = ((float)window_size.y - scaled_height) / 2.0f;
-        state.scaled_screen_size = ivec2((int)window_size.x, (int)scaled_height);
-        state.scaled_screen_position = ivec2(0, (int)border_size);
-    } else {
-        // Pillarbox
-        float ratio = (float)window_size.y / (float)SCREEN_HEIGHT;
-        float scaled_width = (float)SCREEN_WIDTH * ratio;
-        float border_size = ((float)window_size.x - scaled_width) / 2.0f;
-        state.scaled_screen_size = ivec2((int)scaled_width, (int)window_size.y);
-        state.scaled_screen_position = ivec2((int)border_size, 0);
-    }
+
+    int scale_width = window_size.x / SCREEN_WIDTH;
+    int scale_height = window_size.y / SCREEN_HEIGHT;
+    int scale = std::min(scale_width, scale_height);
+
+    state.scaled_screen_size = ivec2(SCREEN_WIDTH, SCREEN_HEIGHT) * scale;
+    state.scaled_screen_position = ivec2(
+        (window_size.x / 2) - (state.scaled_screen_size.x / 2),
+        (window_size.y / 2) - (state.scaled_screen_size.y / 2));
 }
 
 void input_poll_events() {

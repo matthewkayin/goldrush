@@ -2121,7 +2121,7 @@ fixed entity_get_speed(const MatchState& state, const Entity& entity) {
         return fixed::from_raw(0);
     }
     if (entity.type == ENTITY_BALLOON && match_player_has_upgrade(state, entity.player_id, UPGRADE_TAILWIND)) {
-        return fixed::from_int_and_raw_decimal(1, 0);
+        return fixed::from_int_and_raw_decimal(0, 128);
     }
     return entity_get_data(entity.type).unit_data.speed;    
 }
