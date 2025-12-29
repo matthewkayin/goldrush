@@ -20,6 +20,7 @@ STATIC_ASSERT(sizeof(BotBaseInfo) == 12ULL);
 
 #include "core/filesystem.h"
 #include "core/logger.h"
+#include "profile/profile.h"
 #include <algorithm>
 #include <cstdlib>
 
@@ -139,6 +140,8 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
 #else
 uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot bots[MAX_PLAYERS]) {
 #endif
+    GOLD_PROFILE_SCOPE;
+
     desync_checksum_init(&state.a, &state.b);
 
     #ifdef GOLD_DEBUG_DESYNC

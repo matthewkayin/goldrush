@@ -3,7 +3,8 @@
 #include "core/logger.h"
 #include "core/asserts.h"
 #include "render/render.h"
-#include "lcg.h"
+#include "match/lcg.h"
+#include "profile/profile.h"
 #include <unordered_map>
 #include <algorithm>
 
@@ -1682,6 +1683,8 @@ int map_are_regions_connected(const Map& map, int region_a, int region_b) {
 }
 
 ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, ivec2 to, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    GOLD_PROFILE_SCOPE;
+
     if (from == to) {
         return to;
     }
@@ -1779,6 +1782,8 @@ ivec2 map_pathfind_correct_target(const Map& map, CellLayer layer, ivec2 from, i
 }
 
 std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
+    GOLD_PROFILE_SCOPE;
+
     std::vector<int> path;
 
     if (map_get_region(map, from) == map_get_region(map, to)) {
@@ -1922,6 +1927,8 @@ ivec2 map_get_region_connection_cell_closest_to_cell(const Map& map, ivec2 cell,
 }
 
 void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cell_size, std::vector<ivec2>* path, uint32_t ignore, std::vector<ivec2>* ignore_cells) {
+    GOLD_PROFILE_SCOPE;
+
     static const int EXPLORED_INDEX_NOT_EXPLORED = -1;
     static const int EXPLORED_INDEX_IGNORE_CELL = -2;
 
@@ -2144,6 +2151,8 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
 }
 
 void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path) {
+    GOLD_PROFILE_SCOPE;
+
     ivec2 rally_cell = map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, mine_cell + ivec2(1, 1), 1, hall_cell, 4, MAP_OPTION_IGNORE_MINERS);
     ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, rally_cell, MAP_OPTION_IGNORE_MINERS);
 

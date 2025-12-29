@@ -5,6 +5,7 @@
 #include "match/lcg.h"
 #include "match/hotkey.h"
 #include "render/render.h"
+#include "profile/profile.h"
 
 static const uint32_t MATCH_PLAYER_STARTING_GOLD = 50;
 static const uint32_t MATCH_GOLDMINE_STARTING_GOLD = 7500;
@@ -650,6 +651,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
 }
 
 void match_update(MatchState& state) {
+    GOLD_PROFILE_SCOPE;
     
     // Update entities
     for (uint32_t entity_index = 0; entity_index < state.entities.size(); entity_index++) {
@@ -1006,6 +1008,8 @@ EntityId entity_goldmine_create(MatchState& state, ivec2 cell, uint32_t gold_lef
 }
 
 void entity_update(MatchState& state, uint32_t entity_index) {
+    GOLD_PROFILE_SCOPE;
+
     EntityId entity_id = state.entities.get_id_of(entity_index);
     Entity& entity = state.entities[entity_index];
     const EntityData& entity_data = entity_get_data(entity.type);

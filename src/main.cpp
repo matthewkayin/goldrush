@@ -10,6 +10,7 @@
 #include "render/render.h"
 #include "menu/menu.h"
 #include "shell/desync.h"
+#include "profile/profile.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
@@ -296,6 +297,8 @@ int gold_main(int argc, char** argv) {
         #endif
 
         render_present_frame();
+
+        GOLD_PROFILE_FRAME_MARK;
     }
 
     // Disconnect the network

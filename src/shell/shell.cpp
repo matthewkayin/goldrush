@@ -6,6 +6,7 @@
 #include "match/hotkey.h"
 #include "match/upgrade.h"
 #include "shell/desync.h"
+#include "profile/profile.h"
 #include <algorithm>
 
 // Status
@@ -395,6 +396,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
 // UPDATE
 
 void match_shell_update(MatchShellState* state) {
+    GOLD_PROFILE_SCOPE;
     
     if (state->mode == MATCH_SHELL_MODE_LEAVE_MATCH || state->mode == MATCH_SHELL_MODE_EXIT_PROGRAM) {
         return;
@@ -2569,6 +2571,8 @@ bool match_shell_are_checksums_out_of_sync(MatchShellState* state, uint32_t fram
 }
 
 void match_shell_compare_checksums(MatchShellState* state, uint32_t frame) {
+    GOLD_PROFILE_SCOPE;
+
     // If we haven't gotten to this frame yet, hen we can't say for sure that it's out of sync
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_READY) {
@@ -2633,6 +2637,7 @@ void match_shell_handle_serialized_frame(uint8_t* incoming_state_buffer, size_t 
 // RENDER
 
 void match_shell_render(const MatchShellState* state) {
+    GOLD_PROFILE_SCOPE;
     
     std::vector<RenderSpriteParams> above_fog_sprite_params;
     std::vector<RenderSpriteParams> ysort_params;

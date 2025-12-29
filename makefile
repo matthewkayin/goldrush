@@ -20,7 +20,7 @@ ifneq ($(RELEASE_VERSION),)
 endif
 
 ifeq ($(RELEASE_VERSION),)
-	COMPILER_FLAGS += -O0 -g -Wall -Wextra -Wshadow
+	COMPILER_FLAGS += -O0 -g -Wall -Wextra -Wshadow -Ivendor/tracy
 	LINKER_FLAGS += -g
 else
 	COMPILER_FLAGS += -O2

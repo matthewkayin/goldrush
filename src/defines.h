@@ -34,9 +34,10 @@ STATIC_ASSERT(sizeof(int) == sizeof(int32_t));
 #ifdef GOLD_DEBUG
     #define GOLD_RAND_SEED 1766752363
     // #define GOLD_DEBUG_DESYNC
+    // #define TRACY_ENABLE
 #endif
 
-#define GOLD_STEAM
+// #define GOLD_STEAM
 #ifdef GOLD_STEAM
     // #define GOLD_STEAM_APP_ID 3774270U
     #define GOLD_STEAM_APP_ID 3831190U

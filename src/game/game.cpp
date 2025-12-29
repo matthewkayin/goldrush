@@ -3,6 +3,7 @@
 #include "core/input.h"
 #include "core/logger.h"
 #include "match/lcg.h"
+#include "profile/profile.h"
 #include <ctime>
 
 GameState game_init() {
@@ -105,6 +106,8 @@ void game_handle_network_event(GameState& state, const NetworkEvent& event) {
 }
 
 void game_update(GameState& state) {
+    GOLD_PROFILE_SCOPE;
+
     #ifdef GOLD_DEBUG
         game_test_update(state);
 
@@ -176,6 +179,8 @@ void game_update(GameState& state) {
 }
 
 void game_render(const GameState& state) {
+    GOLD_PROFILE_SCOPE;
+
     switch (state.mode) {
         case GAME_MODE_NONE:
             break;
