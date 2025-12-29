@@ -1798,8 +1798,6 @@ std::vector<int> map_get_region_path(const Map& map, ivec2 from, ivec2 to) {
         return path;
     }
 
-    log_debug("map region path <%i, %i> -> <%i, %i>", from.x, from.y, to.x, to.y);
-
     std::vector<MapRegionPathNode> frontier;
     std::vector<MapRegionPathNode> explored;
     std::vector<bool> is_region_explored(map_get_region_count(map), false);

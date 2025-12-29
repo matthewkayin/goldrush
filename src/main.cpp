@@ -288,7 +288,8 @@ int gold_main(int argc, char** argv) {
                     Cell map_cell = map_get_cell(state.match_shell_state->match_state.map, CELL_LAYER_GROUND, cell);
                     if (map_cell.type == CELL_UNIT || map_cell.type == CELL_BUILDING || map_cell.type == CELL_MINER || map_cell.type == CELL_GOLDMINE) {
                         const Entity& entity = state.match_shell_state->match_state.entities.get_by_id(map_cell.id);
-                        sprintf(debug_text, "Entity %u %s mode %u target %u is mining %i goldmine id %u pathfind attempts %u", map_cell.id, entity_get_data(entity.type).name, entity.mode, entity.target.type, (int)entity_is_mining(state.match_shell_state->match_state, entity), entity.goldmine_id, entity.pathfind_attempts);
+                        ivec2 target_cell = entity_is_target_invalid(state.match_shell_state->match_state, entity) ? ivec2(-1, -1) : entity_get_target_cell(state.match_shell_state->match_state, entity);
+                        sprintf(debug_text, "Entity %u %s mode %u target %u cell <%i, %i> is mining %i goldmine id %u pathfind attempts %u", map_cell.id, entity_get_data(entity.type).name, entity.mode, entity.target.type, target_cell.x, target_cell.y, (int)entity_is_mining(state.match_shell_state->match_state, entity), entity.goldmine_id, entity.pathfind_attempts);
                         render_text(FONT_HACK_WHITE, debug_text, ivec2(0, render_y));
                         render_y += 10;
                     }

@@ -1596,7 +1596,7 @@ void match_shell_handle_input(MatchShellState* state) {
             // But only do this if the goldmine has been explored, otherwise we would reveal to players that there is a goldmine where they clicked
             const Entity& goldmine = state->match_state.entities.get_by_id(cell.id);
             if (match_is_cell_rect_explored(state->match_state, state->match_state.players[network_get_player_id()].team, goldmine.cell, entity_get_data(goldmine.type).cell_size)) {
-                input.rally.rally_point = (goldmine.cell * TILE_SIZE) + ivec2(46, 32);
+                input.rally.rally_point = (goldmine.cell * TILE_SIZE) + ivec2(23, 16);
                 state->move_animation = animation_create(ANIMATION_UI_MOVE_ENTITY);
                 state->move_animation_entity_id = cell.id;
                 state->move_animation_position = goldmine.cell * TILE_SIZE;

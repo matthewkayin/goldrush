@@ -322,7 +322,9 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                         ivec2 group_move_cell = input.move.target_cell + (entity.cell - group_center);
                         if (map_is_cell_in_bounds(state.map, group_move_cell) && 
                                 ivec2::manhattan_distance(group_move_cell, input.move.target_cell) <= 3 &&
-                                map_get_tile(state.map, group_move_cell).elevation == map_get_tile(state.map, input.move.target_cell).elevation) {
+                                map_get_tile(state.map, group_move_cell).elevation == map_get_tile(state.map, input.move.target_cell).elevation &&
+                                    !(!map_is_cell_blocked(map_get_cell(state.map, CELL_LAYER_GROUND, input.move.target_cell)) && 
+                                    map_is_cell_blocked(map_get_cell(state.map, CELL_LAYER_GROUND, group_move_cell)))) {
                             target.cell = group_move_cell;
                         }
                     }
