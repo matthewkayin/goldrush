@@ -938,11 +938,18 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
 
         for (auto it : map.region_connection_indices[connection_region]) {
             int other_connection_index = it.second;
+            MapRegionConnection& other_connection = map.region_connections[other_connection_index];
+
+            // If we have already computed this path one way, don't re-compute it
+            if (connection.cost_to_connection.find(other_connection_index) != connection.cost_to_connection.end()) {
+                continue;
+            }
 
             std::vector<ivec2> path;
             map_pathfind(map, CELL_LAYER_GROUND, region_connection_centers[connection_index], region_connection_centers[other_connection_index], 1, &path, MAP_OPTION_NO_REGION_PATH);
 
             connection.cost_to_connection[other_connection_index] = path.size();
+            other_connection.cost_to_connection[connection_index] = path.size();
         }
     }
 }
