@@ -8,6 +8,7 @@
 #include "render/render.h"
 #include "network/types.h"
 #include "bot/bot.h"
+#include "shell/ysort.h"
 
 #define MATCH_SHELL_UI_HEIGHT 86
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10
@@ -17,15 +18,6 @@
 // Timing
 const uint32_t TURN_OFFSET = 4;
 const uint32_t TURN_DURATION = 4;
-
-struct RenderSpriteParams {
-    SpriteName sprite;
-    ivec2 frame;
-    ivec2 position;
-    int ysort_position;
-    uint32_t options;
-    int recolor_id;
-};
 
 enum RenderHealthbarType {
     RENDER_HEALTHBAR,
@@ -269,7 +261,6 @@ void match_shell_render(const MatchShellState* state);
 bool match_shell_use_yellow_rings(const MatchShellState* state);
 SpriteName match_shell_get_entity_select_ring(EntityType type, bool attacking);
 SpriteName match_shell_hotkey_get_sprite(const MatchShellState* state, InputAction hotkey, bool show_toggled);
-void match_shell_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high);
 void match_shell_render_healthbar(RenderHealthbarType type, ivec2 position, ivec2 size, int amount, int max);
 void match_shell_render_target_build(const MatchShellState* state, const Target& target, uint8_t player_id);
 RenderSpriteParams match_shell_create_entity_render_params(const MatchShellState* state, const Entity& entity);

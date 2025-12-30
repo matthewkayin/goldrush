@@ -26,7 +26,7 @@ enum Teams {
 };
 
 enum MapType {
-    MAP_TYPE_ARIZONA,
+    MAP_TYPE_TOMBSTONE,
     MAP_TYPE_KLONDIKE,
     MAP_TYPE_COUNT
 };

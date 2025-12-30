@@ -33,11 +33,10 @@ bool map_is_poisson_point_valid(const Map& map, const PoissonDiskParams& params,
 std::vector<ivec2> map_poisson_disk(const Map& map, int* lcg_seed, PoissonDiskParams& params);
 bool map_is_tree_cell_valid(const Map& map, ivec2 cell, const std::vector<PoissonAvoidValue>& avoid_values);
 
-void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
+void map_init(Map& map, MapType map_type, int width, int height) {
     map.type = map_type;
-    map.width = noise->width;
-    map.height = noise->height;
-    log_info("Generating map. Size: %ux%u", map.width, map.height);
+    map.width = width;
+    map.height = height;
 
     for (int layer = 0; layer < CELL_LAYER_COUNT; layer++) {
         map.cells[layer] = std::vector<Cell>(map.width * map.height, (Cell) {
@@ -46,10 +45,16 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
         });
     }
     map.tiles = std::vector<Tile>(map.width * map.height, (Tile) {
-        .sprite = SPRITE_TILE_SAND1,
+        .sprite = map_get_plain_ground_tile_sprite(map_type),
         .frame = ivec2(0, 0),
         .elevation = 0
     });
+
+    log_info("Initialized map. Type %u Size %ux%u.", map_type, width, height);
+}
+
+void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells) {
+    map_init(map, map_type, noise->width, noise->height);
 
     // Clear out water that is too close to walls
     const int WATER_WALL_DIST = 6;
@@ -756,7 +761,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
 
         std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
 
-        if (map_type == MAP_TYPE_ARIZONA) {
+        if (map_type == MAP_TYPE_TOMBSTONE) {
             for (ivec2 cell : decoration_cells) {
                 map_create_decoration_at_cell(map, lcg_seed, cell);
             }
@@ -956,7 +961,7 @@ void map_init(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vect
 
 SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_seed) {
     switch (map_type) {
-        case MAP_TYPE_ARIZONA: {
+        case MAP_TYPE_TOMBSTONE: {
             int new_index = lcg_rand(lcg_seed) % 7;
             if (new_index == 1 && index % 3 == 0) {
                 return SPRITE_TILE_SAND3;
@@ -985,7 +990,7 @@ SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_s
 
 SpriteName map_choose_water_tile_sprite(MapType map_type) {
     switch (map_type) {
-        case MAP_TYPE_ARIZONA:
+        case MAP_TYPE_TOMBSTONE:
             return SPRITE_TILE_SAND_WATER;
         case MAP_TYPE_KLONDIKE:
             return SPRITE_TILE_SNOW_WATER;
@@ -998,7 +1003,7 @@ SpriteName map_choose_water_tile_sprite(MapType map_type) {
 
 SpriteName map_get_plain_ground_tile_sprite(MapType map_type) {
     switch (map_type) {
-        case MAP_TYPE_ARIZONA:
+        case MAP_TYPE_TOMBSTONE:
             return SPRITE_TILE_SAND1;
         case MAP_TYPE_KLONDIKE:
             return SPRITE_TILE_SNOW1;
@@ -1011,7 +1016,7 @@ SpriteName map_get_plain_ground_tile_sprite(MapType map_type) {
 
 SpriteName map_get_decoration_sprite(MapType map_type) {
     switch (map_type) {
-        case MAP_TYPE_ARIZONA: 
+        case MAP_TYPE_TOMBSTONE: 
             return SPRITE_DECORATION_ARIZONA;
         case MAP_TYPE_KLONDIKE: 
             return SPRITE_DECORATION_KLONDIKE;

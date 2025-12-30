@@ -39,7 +39,7 @@ MatchState match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPla
     log_info("Set random seed to %i", lcg_seed);
     std::vector<ivec2> map_spawn_points;
     std::vector<ivec2> goldmine_cells;
-    map_init(state.map, map_type, noise, &state.lcg_seed, map_spawn_points, goldmine_cells);
+    map_init_generate(state.map, map_type, noise, &state.lcg_seed, map_spawn_points, goldmine_cells);
     memcpy(state.players, players, sizeof(state.players));
 
     state.fire_cells = std::vector<int>((size_t)(state.map.width * state.map.height), 0);

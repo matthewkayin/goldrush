@@ -164,7 +164,7 @@ float simplex_noise(uint64_t seed, double x, double y) {
 
 uint8_t noise_value_from_result(MapType map_type, double result) {
     switch (map_type) {
-        case MAP_TYPE_ARIZONA: {
+        case MAP_TYPE_TOMBSTONE: {
             if (result < 0.15) {
                 return NOISE_VALUE_WATER;
             } else if (result < 0.6) { 
@@ -191,7 +191,7 @@ uint8_t noise_value_from_result(MapType map_type, double result) {
 
 uint8_t noise_forest_value_from_result(MapType map_type, double result) {
     switch (map_type) {
-        case MAP_TYPE_ARIZONA:
+        case MAP_TYPE_TOMBSTONE:
             return 0;
         case MAP_TYPE_KLONDIKE:
             return (uint8_t)(result < 0.25);

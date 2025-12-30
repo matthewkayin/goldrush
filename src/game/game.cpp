@@ -4,6 +4,7 @@
 #include "core/logger.h"
 #include "match/lcg.h"
 #include "profile/profile.h"
+#include "editor/editor.h"
 #include <ctime>
 
 GameState game_init() {
@@ -102,6 +103,10 @@ void game_handle_network_event(GameState& state, const NetworkEvent& event) {
         }
         case GAME_MODE_REPLAY:
             break;
+    #ifdef GOLD_DEBUG
+        case GAME_MODE_MAP_EDIT:
+            break;
+    #endif
     }
 }
 
@@ -175,6 +180,12 @@ void game_update(GameState& state) {
 
             break;
         }
+    #ifdef GOLD_DEBUG
+        case GAME_MODE_MAP_EDIT: {
+            editor_update();
+            break;
+        }
+    #endif
     }
 }
 
@@ -193,6 +204,12 @@ void game_render(const GameState& state) {
             match_shell_render(state.match_shell_state);
             break;
         }
+    #ifdef GOLD_DEBUG
+        case GAME_MODE_MAP_EDIT: {
+            editor_render();
+            break;
+        }
+    #endif
     }
 }
 
@@ -201,6 +218,10 @@ void game_render(const GameState& state) {
 GameState game_debug_init(LaunchMode launch_mode) {
     GameState state = game_init();
     state.launch_mode = launch_mode;
+
+    if (state.launch_mode == LAUNCH_MODE_MAP_EDIT) {
+        editor_init();
+    }
 
     return state;
 }

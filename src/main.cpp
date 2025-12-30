@@ -187,19 +187,29 @@ int gold_main(int argc, char** argv) {
         uint64_t debug_playback_speed = 1;
 
         GameState state = game_debug_init(launch_mode);
+
+        // Set game mode to menu
+        if (launch_mode == LAUNCH_MODE_MAP_EDIT) {
+            state.mode = GAME_MODE_MAP_EDIT;
+        } else {
+            GameSetModeParams params;
+            params.mode = GAME_MODE_MENU;
+            #ifdef GOLD_STEAM
+                params.menu.steam_invite_id = steam_invite_id;
+            #endif
+            game_set_mode(state, params);
+        }
     #else
         GameState state = game_init();
-    #endif
 
-    // Set game mode to menu
-    {
+        // Set game mode to menu
         GameSetModeParams params;
         params.mode = GAME_MODE_MENU;
         #ifdef GOLD_STEAM
             params.menu.steam_invite_id = steam_invite_id;
         #endif
         game_set_mode(state, params);
-    }
+    #endif
 
     while (game_is_running(state)) {
         // Timekeep

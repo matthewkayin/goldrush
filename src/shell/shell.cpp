@@ -2957,7 +2957,7 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // Render ysort params
-    match_shell_ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+    ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
     for (const RenderSpriteParams& params : ysort_params) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
     }
@@ -3150,7 +3150,7 @@ void match_shell_render(const MatchShellState* state) {
 
         ysort_params.push_back(params);
     }
-    match_shell_ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+    ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
     for (const RenderSpriteParams& params : ysort_params) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         if (params.sprite == SPRITE_UNIT_BALLOON) {
@@ -4024,34 +4024,6 @@ SpriteName match_shell_hotkey_get_sprite(const MatchShellState* state, InputActi
         return entity_get_icon(state->match_state, info.entity_type, network_get_player_id());
     } else {
         return hotkey_get_sprite(hotkey, show_toggled);
-    }
-}
-
-int match_shell_ysort_render_params_partition(std::vector<RenderSpriteParams>& params, int low, int high) {
-    RenderSpriteParams pivot = params[high];
-    int i = low - 1;
-
-    for (int j = low; j <= high - 1; j++) {
-        if (params[j].ysort_position < pivot.ysort_position) {
-            i++;
-            RenderSpriteParams temp = params[j];
-            params[j] = params[i];
-            params[i] = temp;
-        }
-    }
-
-    RenderSpriteParams temp = params[high];
-    params[high] = params[i + 1];
-    params[i + 1] = temp;
-
-    return i + 1;
-}
-
-void match_shell_ysort_render_params(std::vector<RenderSpriteParams>& params, int low, int high) {
-    if (low < high) {
-        int partition_index = match_shell_ysort_render_params_partition(params, low, high);
-        match_shell_ysort_render_params(params, low, partition_index - 1);
-        match_shell_ysort_render_params(params, partition_index + 1, high);
     }
 }
 
