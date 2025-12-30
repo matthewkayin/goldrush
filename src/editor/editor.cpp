@@ -11,9 +11,16 @@
 #include "render/render.h"
 #include "shell/ysort.h"
 #include <algorithm>
+#include <vector>
+#include <string>
 
 // Camera
 static const int CAMERA_DRAG_MARGIN = 4;
+
+// Console
+static const size_t CONSOLE_MESSAGE_MAX_LENGTH = 256;
+static const uint32_t CONSOLE_CURSOR_BLINK_DURATION = 30;
+static const ivec2 CONSOLE_MESSAGE_POSITION = ivec2(8, SCREEN_HEIGHT - 24);
 
 struct EditorState {
     Map map;
@@ -22,10 +29,16 @@ struct EditorState {
 
     ivec2 camera_offset;
     bool is_minimap_dragging;
+
+    std::string console_message;
+    bool console_cursor_visible;
+    uint32_t console_cursor_blink_timer;
 };
 static EditorState state;
 
 void editor_clamp_camera();
+void editor_handle_input();
+void editor_handle_console_message(const std::vector<std::string>& words);
 
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
 
@@ -63,15 +76,67 @@ void editor_update() {
         } else if (input_get_mouse_position().y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
             camera_drag_direction.y = 1;
         }
-        // state.camera_offset += camera_drag_direction * option_get_value(OPTION_CAMERA_SPEED);
-        state.camera_offset += camera_drag_direction * 4;
+        state.camera_offset += camera_drag_direction * option_get_value(OPTION_CAMERA_SPEED);
         editor_clamp_camera();
     }
+
+    // Update console cursor blinker
+    if (input_is_text_input_active()) {
+        state.console_cursor_blink_timer--;
+        if (state.console_cursor_blink_timer == 0) {
+            state.console_cursor_visible = !state.console_cursor_visible;
+            state.console_cursor_blink_timer = CONSOLE_CURSOR_BLINK_DURATION;
+        }
+    }
+
+    editor_handle_input();
 }
 
 void editor_clamp_camera() {
     state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map.width * TILE_SIZE) - SCREEN_WIDTH);
     state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map.height * TILE_SIZE) - SCREEN_HEIGHT);
+}
+
+void editor_handle_input() {
+    // Begin chat
+    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active()) {
+        state.console_message = "";
+        state.console_cursor_blink_timer = CONSOLE_CURSOR_BLINK_DURATION;
+        state.console_cursor_visible = true;
+        input_start_text_input(&state.console_message, CONSOLE_MESSAGE_MAX_LENGTH);
+        sound_play(SOUND_UI_CLICK);
+        return;
+    }
+
+    // End chat
+    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active()) {
+        std::vector<std::string> console_message_words;
+        while (!state.console_message.empty()) {
+            size_t space_index = state.console_message.find(' ');
+            std::string word;
+            if (space_index == std::string::npos) {
+                word = state.console_message;
+                state.console_message = "";
+            } else {
+                word = state.console_message.substr(0, space_index);
+                state.console_message = state.console_message.substr(space_index + 1);
+            }
+            console_message_words.push_back(word);
+        }
+
+        if (!console_message_words.empty()) {
+            editor_handle_console_message(console_message_words);
+        }
+
+        if (state.console_message == "/")
+        sound_play(SOUND_UI_CLICK);
+        input_stop_text_input();
+        return;
+    }
+}
+
+void editor_handle_console_message(const std::vector<std::string>& words) {
+    GOLD_ASSERT(!words.empty());
 }
 
 void editor_render() {
@@ -162,6 +227,18 @@ void editor_render() {
                 }
             }
         } // End for each cell layer
+    }
+
+    // Console
+    if (input_is_text_input_active()) {
+        render_text(FONT_HACK_SHADOW, state.console_message.c_str(), CONSOLE_MESSAGE_POSITION + ivec2(1, 1));
+        render_text(FONT_HACK_WHITE, state.console_message.c_str(), CONSOLE_MESSAGE_POSITION);
+        if (state.console_cursor_visible) {
+            int prompt_width = render_get_text_size(FONT_HACK_WHITE, state.console_message.c_str()).x;
+            ivec2 cursor_pos = CONSOLE_MESSAGE_POSITION + ivec2(prompt_width - 1, -1);
+            render_text(FONT_HACK_SHADOW, "|", cursor_pos + ivec2(1, 1));
+            render_text(FONT_HACK_WHITE, "|", cursor_pos);
+        }
     }
 }
 
