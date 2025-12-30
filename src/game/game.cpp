@@ -198,20 +198,25 @@ void game_render(const GameState& state) {
 
 #ifdef GOLD_DEBUG
 
-GameState game_test_init(TestMode test_mode) {
+GameState game_debug_init(LaunchMode launch_mode) {
     GameState state = game_init();
-    state.test_mode = test_mode;
+    state.launch_mode = launch_mode;
 
     return state;
 }
 
 void game_test_set_mode(GameState& state, GameMode mode) {
-    if (state.test_mode == TEST_MODE_NONE) {
+    if (state.launch_mode != LAUNCH_MODE_TEST_HOST && state.launch_mode != LAUNCH_MODE_TEST_JOIN) {
         return;
     }
 
     if (mode == GAME_MODE_MATCH) {
-        int lcg_seed = rand();
+        #ifdef GOLD_TEST_MODE_SEED
+            int lcg_seed = GOLD_TEST_MODE_SEED
+        #else
+            int lcg_seed = rand();
+        #endif
+        log_debug("TEST MODE lcg_seed set to %u", lcg_seed);
         Difficulty difficulty = DIFFICULTY_HARD;
         BotOpener opener = BOT_OPENER_TECH_FIRST;
         BotUnitComp unit_comp = bot_roll_preferred_unit_comp(&lcg_seed);
@@ -220,7 +225,7 @@ void game_test_set_mode(GameState& state, GameMode mode) {
 }
 
 void game_test_update(GameState& state) {
-    if (state.test_mode == TEST_MODE_NONE) {
+    if (state.launch_mode != LAUNCH_MODE_TEST_HOST && state.launch_mode != LAUNCH_MODE_TEST_JOIN) {
         return;
     }
 
@@ -228,7 +233,7 @@ void game_test_update(GameState& state) {
         switch (state.menu_state->mode) {
             #ifndef GOLD_STEAM
                 case MENU_MODE_USERNAME: {
-                    state.menu_state->username = state.test_mode == TEST_MODE_HOST 
+                    state.menu_state->username = state.launch_mode == LAUNCH_MODE_TEST_HOST 
                         ? "Burr" 
                         : "Hamilton";
                     network_set_username(state.menu_state->username.c_str());
@@ -246,9 +251,9 @@ void game_test_update(GameState& state) {
                 break;
             }
             case MENU_MODE_LOBBYLIST: {
-                if (state.test_mode == TEST_MODE_HOST) {
+                if (state.launch_mode == LAUNCH_MODE_TEST_HOST) {
                     menu_set_mode(state.menu_state, MENU_MODE_CREATE_LOBBY);
-                } else if (state.test_mode == TEST_MODE_JOIN) {
+                } else if (state.launch_mode == LAUNCH_MODE_TEST_JOIN) {
                     if (network_get_lobby_count() == 0) {
                         network_search_lobbies("");
                     } else {
@@ -264,7 +269,7 @@ void game_test_update(GameState& state) {
                 break;
             }
             case MENU_MODE_LOBBY: {
-                if (state.test_mode == TEST_MODE_HOST) {
+                if (state.launch_mode == LAUNCH_MODE_TEST_HOST) {
                     if (network_get_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE) != MAP_SIZE_MEDIUM) {
                         network_set_match_setting((uint8_t)MATCH_SETTING_MAP_SIZE, (uint8_t)MAP_SIZE_MEDIUM);
                         break;
@@ -296,7 +301,7 @@ void game_test_update(GameState& state) {
                     if (network_get_player(1).status == NETWORK_PLAYER_STATUS_READY) {
                         menu_set_mode(state.menu_state, MENU_MODE_LOAD_MATCH);
                     }
-                } else if (state.test_mode == TEST_MODE_JOIN) {
+                } else if (state.launch_mode == LAUNCH_MODE_TEST_JOIN) {
                     if (network_get_player(network_get_player_id()).team == 0 &&
                             network_get_match_setting((uint8_t)MATCH_SETTING_TEAMS) == TEAMS_ENABLED) {
                         network_set_player_team(network_get_player_id(), 1);

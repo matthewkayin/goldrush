@@ -11,7 +11,10 @@ enum GameMode {
     GAME_MODE_NONE,
     GAME_MODE_MENU,
     GAME_MODE_MATCH,
-    GAME_MODE_REPLAY
+    GAME_MODE_REPLAY,
+    #ifdef GOLD_DEBUG
+        GAME_MODE_MAP_EDIT
+    #endif
 };
 
 #ifdef GOLD_STEAM
@@ -41,10 +44,11 @@ struct GameSetModeParams {
 };
 
 #ifdef GOLD_DEBUG
-    enum TestMode {
-        TEST_MODE_NONE,
-        TEST_MODE_HOST,
-        TEST_MODE_JOIN
+    enum LaunchMode {
+        LAUNCH_MODE_GAME,
+        LAUNCH_MODE_TEST_HOST,
+        LAUNCH_MODE_TEST_JOIN,
+        LAUNCH_MODE_MAP_EDIT
     };
 #endif
 
@@ -54,7 +58,7 @@ struct GameState {
     MatchShellState* match_shell_state = nullptr;
 
     #ifdef GOLD_DEBUG
-        TestMode test_mode;
+        LaunchMode launch_mode;
         Bot test_bot;
     #endif
 };
@@ -69,7 +73,7 @@ void game_update(GameState& state);
 void game_render(const GameState& state);
 
 #ifdef GOLD_DEBUG
-    GameState game_test_init(TestMode test_mode);
+    GameState game_debug_init(LaunchMode launch_mode);
     void game_test_set_mode(GameState& state, GameMode mode);
     void game_test_update(GameState& state);
 #endif

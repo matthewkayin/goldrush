@@ -53,8 +53,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/bin/gold",
             "args": [
-                "--test",
-                "host",
+                "--test-host",
                 "--logfile",
                 "host.log"
             ],
@@ -70,10 +69,23 @@
             "request": "launch",
             "program": "${workspaceFolder}/bin/gold",
             "args": [
-                "--test",
-                "join",
+                "--test-join",
                 "--logfile",
                 "join.log"
+            ],
+            "cwd": "${workspaceFolder}/bin",
+            "windows": {
+                "program": "${workspaceFolder}/bin/gold.exe",
+                "console": "integratedTerminal"
+            },
+        },
+        {
+            "name": "Run Map Editor",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/gold",
+            "args": [
+                "--map-edit"
             ],
             "cwd": "${workspaceFolder}/bin",
             "windows": {

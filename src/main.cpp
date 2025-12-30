@@ -78,7 +78,7 @@ int gold_main(int argc, char** argv) {
         std::string desync_foldername = "desync";
     #endif
     #ifdef GOLD_DEBUG
-        TestMode test_mode = TEST_MODE_NONE;
+        LaunchMode launch_mode = LAUNCH_MODE_GAME;
     #endif
 
     // Parse system arguments
@@ -91,13 +91,12 @@ int gold_main(int argc, char** argv) {
                     desync_foldername = "desync_" + logfile_path.substr(0, logfile_path.find('.'));
                 #endif
             }
-            if (strcmp(argv[argn], "--test") == 0 && argn + 1 < argc) {
-                argn++;
-                if (strcmp(argv[argn], "host") == 0) {
-                    test_mode = TEST_MODE_HOST;
-                } else if (strcmp(argv[argn], "join") == 0) {
-                    test_mode = TEST_MODE_JOIN;
-                }
+            if (strcmp(argv[argn], "--test-host") == 0) {
+                launch_mode = LAUNCH_MODE_TEST_HOST;
+            } else if (strcmp(argv[argn], "--test-join") == 0) {
+                launch_mode = LAUNCH_MODE_TEST_JOIN;
+            } else if (strcmp(argv[argn], "--map-edit") == 0)  {
+                launch_mode = LAUNCH_MODE_MAP_EDIT;
             }
         #endif
         #ifdef GOLD_STEAM
@@ -186,13 +185,8 @@ int gold_main(int argc, char** argv) {
     #ifdef GOLD_DEBUG
         bool should_render_debug_info = false;
         uint64_t debug_playback_speed = 1;
-        if (test_mode != TEST_MODE_NONE) {
-            // debug_playback_speed = 4;
-        }
-    #endif
 
-    #ifdef GOLD_DEBUG
-        GameState state = game_test_init(test_mode);
+        GameState state = game_debug_init(launch_mode);
     #else
         GameState state = game_init();
     #endif
