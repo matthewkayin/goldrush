@@ -89,8 +89,9 @@ struct UiContainer {
 };
 
 struct UI {
-    uint32_t text_input_cursor_blink_timer;
+    bool input_enabled;
     bool text_input_show_cursor;
+    uint32_t text_input_cursor_blink_timer;
     std::vector<UiContainer> container_stack;
     std::vector<UiRender> render_queue[UI_Z_INDEX_COUNT]; 
     int next_element_id;
@@ -98,7 +99,7 @@ struct UI {
     int element_selected_future;
     int text_input_selected;
     int next_text_input_id;
-    bool input_enabled;
+    int toolbar_column_selected;
 };
 
 UI ui_init();
@@ -284,6 +285,8 @@ bool ui_team_picker(UI& state, char value, bool disabled);
  * @return True if the dropdown value was changed
  */
 bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
+
+bool ui_toolbar(UI& state, std::string* action, const std::vector<std::vector<std::string>>& items, int spacing);
 
 /**
  * Creates a slider

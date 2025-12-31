@@ -518,6 +518,89 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
     return false;
 }
 
+bool ui_toolbar(UI& state, std::string* action, const std::vector<std::vector<std::string>>& items, int spacing) {
+    const int toolbar_id = ui_get_next_element_id(state);
+    const ivec2 origin = ui_get_container_origin(state);
+
+    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+    const ivec2 size = ivec2((dropdown_sprite_info.frame_width + spacing) * items.size(), dropdown_sprite_info.frame_height);
+    ui_update_container(state, size);
+
+    const Rect toolbar_rect = (Rect) {
+        .x = origin.x, .y = origin.y,
+        .w = size.x, .h = size.y
+    };
+
+    const FontName font = FONT_HACK_OFFBLACK;
+    const FontName hovered_font = FONT_HACK_WHITE;
+    const int text_yoffset = 2;
+
+    const bool hovered = 
+        state.input_enabled && 
+        state.element_selected == UI_ELEMENT_NONE && 
+        toolbar_rect.has_point(input_get_mouse_position());
+
+    *action = "";
+    for (int column_index = 0; column_index < (int)items.size(); column_index++) {
+        const int column_x = toolbar_rect.x + (column_index * (dropdown_sprite_info.frame_width + spacing));
+        const bool mouse_is_in_column = 
+            input_get_mouse_position().x >= column_x && 
+            input_get_mouse_position().x < column_x + dropdown_sprite_info.frame_width;
+
+        int vframe = 0;
+        if (hovered && mouse_is_in_column) {
+            vframe = 1;
+        } else if (state.element_selected == toolbar_id && state.toolbar_column_selected == column_index) {
+            vframe = 2;
+        }
+
+        ui_queue_sprite(state, SPRITE_UI_DROPDOWN_MINI, ivec2(0, vframe), ivec2(column_x, origin.y), 0);
+        ui_queue_text(state, vframe == 1 ? hovered_font : font, items[column_index][0].c_str(), ivec2(column_x + 5, origin.y + text_yoffset), 0);
+
+        const Rect column_header_rect = (Rect) {
+            .x = column_x, .y = origin.y,
+            .w = dropdown_sprite_info.frame_width, 
+            .h = dropdown_sprite_info.frame_height
+        };
+        if (state.element_selected == toolbar_id && column_header_rect.has_point(input_get_mouse_position())) {
+            state.toolbar_column_selected = column_index;
+        }
+
+        if (state.element_selected == toolbar_id && state.toolbar_column_selected == column_index) {
+            int item_hovered = -1;
+            for (int row_index = 0; row_index < (int)items[column_index].size() - 1; row_index++) {
+                const Rect item_rect = (Rect) {
+                    .x = column_x,
+                    .y = origin.y + ((dropdown_sprite_info.frame_height * (row_index + 1))),
+                    .w = dropdown_sprite_info.frame_width,
+                    .h = dropdown_sprite_info.frame_height
+                };
+                bool item_is_hovered = state.input_enabled && item_rect.has_point(input_get_mouse_position());
+
+                ui_queue_sprite(state, SPRITE_UI_DROPDOWN_MINI, ivec2(0, 3 + (int)item_is_hovered), ivec2(item_rect.x, item_rect.y), 1);
+                ui_queue_text(state, item_is_hovered ? hovered_font : font, items[column_index][row_index + 1].c_str(), ivec2(item_rect.x + 5, item_rect.y + text_yoffset), 1);
+
+                if (item_is_hovered) {
+                    item_hovered = row_index;
+                }
+            }
+
+            if (state.input_enabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && item_hovered != -1) {
+                *action = items[column_index][item_hovered + 1];
+            }
+        }
+    }
+
+    if (state.element_selected == toolbar_id && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        state.element_selected_future = UI_ELEMENT_NONE;
+    } else if (state.element_selected == UI_ELEMENT_NONE && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && hovered) {
+        state.element_selected_future = toolbar_id;
+        state.toolbar_column_selected = (input_get_mouse_position().x - origin.x) / (dropdown_sprite_info.frame_width + spacing);
+    }
+
+    return *action != "";
+}
+
 bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t min, uint32_t max, UiSliderDisplay display) {
     static const int VALUE_STR_PADDING = 4;
     static const int SLIDER_HEIGHT = 5;

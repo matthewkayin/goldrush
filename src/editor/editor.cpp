@@ -45,7 +45,13 @@ static const Rect CANVAS_RECT = (Rect) {
     .h = SCREEN_HEIGHT - STATUS_RECT.h - TOOLBAR_RECT.h
 };
 
+enum EditorMode {
+    EDITOR_MODE_DEFAULT,
+    EDITOR_MODE_MENU_NEW
+};
+
 struct EditorState {
+    EditorMode mode;
     UI ui;
 
     Map map;
@@ -63,6 +69,7 @@ struct EditorState {
 };
 static EditorState state;
 
+bool editor_is_in_menu();
 void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_input();
@@ -79,6 +86,7 @@ void editor_init() {
         option_set_value(OPTION_DISPLAY, RENDER_DISPLAY_WINDOWED);
     }
 
+    state.mode = EDITOR_MODE_DEFAULT;
     state.ui = ui_init();
 
     map_init(state.map, MAP_TYPE_TOMBSTONE, 96, 96);
@@ -99,15 +107,19 @@ void editor_init() {
 
 void editor_update() {
     ui_begin(state.ui);
+    state.ui.input_enabled = 
+        !state.is_minimap_dragging && 
+        state.camera_drag_mouse_position.x == -1 &&
+        !editor_is_in_menu();
     ui_small_frame_rect(state.ui, TOOLBAR_RECT);
     ui_begin_row(state.ui, ivec2(3, 3), 2);
-        uint32_t item = 0;
-        if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &item, { "File", "New", "Open", "Save", "Save As" }, false)) {
-
-        }
-        item = 0;
-        if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &item, { "Edit", "Undo" }, false)) {
-
+        static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
+            { "File", "New", "Open", "Save" },
+            { "Edit", "Undo" }
+        };
+        std::string action;
+        if (ui_toolbar(state.ui, &action, TOOLBAR_OPTIONS, 2)) {
+            log_debug("TOOLBAR %s", action.c_str());
         }
     ui_end_container(state.ui);
 
@@ -159,6 +171,10 @@ void editor_update() {
     }
 
     editor_handle_input();
+}
+
+bool editor_is_in_menu() {
+    return state.mode == EDITOR_MODE_MENU_NEW;
 }
 
 void editor_clamp_camera() {
