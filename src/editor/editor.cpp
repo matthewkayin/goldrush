@@ -2,6 +2,10 @@
 
 #ifdef GOLD_DEBUG
 
+#include "editor/document.h"
+#include "editor/menu_new.h"
+#include "editor/ui.h"
+#include "editor/action.h"
 #include "core/logger.h"
 #include "core/input.h"
 #include "core/ui.h"
@@ -14,11 +18,6 @@
 #include <algorithm>
 #include <vector>
 #include <string>
-
-// Console
-static const size_t CONSOLE_MESSAGE_MAX_LENGTH = 256;
-static const uint32_t CONSOLE_CURSOR_BLINK_DURATION = 30;
-static const ivec2 CONSOLE_MESSAGE_POSITION = ivec2(8, SCREEN_HEIGHT - 24);
 
 static const Rect TOOLBAR_RECT = (Rect) {
     .x = 0, .y = 0,
@@ -44,32 +43,19 @@ static const Rect CANVAS_RECT = (Rect) {
     .h = SCREEN_HEIGHT - STATUS_RECT.h - TOOLBAR_RECT.h
 };
 
-static const Rect MENU_NEW_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (300 / 2),
-    .y = 48,
-    .w = 300,
-    .h = 256
-};
-
-enum EditorMode {
-    EDITOR_MODE_DEFAULT,
-    EDITOR_MODE_MENU_NEW
-};
-
 enum EditorTool {
     EDITOR_TOOL_BRUSH
 };
 
 struct EditorState {
-    EditorMode mode;
     EditorTool tool;
     UI ui;
 
-    int bake_tiles_lcg_seed;
-    Noise* noise;
-    Map map;
-    IdArray<Entity, MATCH_MAX_ENTITIES> entities;
-    MatchPlayer players[MAX_PLAYERS];
+    EditorDocument* document;
+
+    std::vector<EditorAction> actions;
+
+    EditorMenuNew menu_new;
 
     ivec2 camera_drag_previous_offset;
     ivec2 camera_drag_mouse_position;
@@ -77,18 +63,6 @@ struct EditorState {
     bool is_minimap_dragging;
     bool is_painting;
     uint32_t tool_value;
-
-    std::string console_message;
-    bool console_cursor_visible;
-    uint32_t console_cursor_blink_timer;
-
-    uint32_t menu_new_map_type;
-    uint32_t menu_new_map_size;
-    uint32_t menu_new_use_noise_gen_params;
-    uint32_t menu_new_noise_gen_inverted;
-    uint32_t menu_new_noise_gen_map_water_threshold;
-    uint32_t menu_new_noise_gen_map_lowground_threshold;
-    uint32_t menu_new_noise_gen_forest_threshold;
 };
 static EditorState state;
 
@@ -96,16 +70,8 @@ static EditorState state;
 bool editor_is_in_menu();
 void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
-void editor_handle_input();
-void editor_handle_console_message(const std::vector<std::string>& words);
 void editor_handle_toolbar_action(const std::string& column, const std::string& action);
 void editor_set_tool(EditorTool tool);
-void editor_menu_new_set_map_type(MapType map_type);
-bool editor_menu_dropdown(const char* prompt, uint32_t* selection, const std::vector<std::string>& items, const Rect& rect);
-void editor_menu_slider(const char* prompt, uint32_t* value, const Rect& rect);
-void editor_free_map();
-void editor_new_map();
-void editor_bake_map_tiles();
 ivec2 editor_get_hovered_cell();
 
 // Render
@@ -120,21 +86,10 @@ void editor_init() {
         option_set_value(OPTION_DISPLAY, RENDER_DISPLAY_WINDOWED);
     }
 
-    state.mode = EDITOR_MODE_DEFAULT;
     state.ui = ui_init();
+    state.document = editor_document_init_blank(MAP_TYPE_TOMBSTONE, MAP_SIZE_SMALL);
 
-    state.menu_new_map_size = MAP_SIZE_SMALL;
-    state.menu_new_map_type = MAP_TYPE_TOMBSTONE;
-    state.menu_new_use_noise_gen_params = 0;
-    state.menu_new_noise_gen_inverted = 0;
-    editor_new_map();
-
-    memset(state.players, 0, sizeof(state.players));
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        MatchPlayer& player = state.players[player_id];
-        player.team = (uint32_t)player_id;
-        player.recolor_id = (int)player_id;
-    }
+    state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
 
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
@@ -144,7 +99,9 @@ void editor_init() {
 }
 
 void editor_quit() {
-    editor_free_map();
+    if (state.document != NULL) {
+        editor_document_free(state.document);
+    }
 }
 
 void editor_update() {
@@ -176,15 +133,15 @@ void editor_update() {
 
             switch (state.tool) {
                 case EDITOR_TOOL_BRUSH: {
-                    editor_menu_dropdown("Value:", &state.tool_value, { "Water", "Lowground", "Highground" }, SIDEBAR_RECT);
+                    editor_menu_dropdown(state.ui, "Value:", &state.tool_value, { "Water", "Lowground", "Highground" }, SIDEBAR_RECT);
                     break;
                 }
             }
         ui_end_container(state.ui);
     }
 
+    // Status bar
     ui_small_frame_rect(state.ui, STATUS_RECT);
-
     char status_text[512];
     status_text[0] = '\0';
     char* status_text_ptr = status_text;
@@ -200,47 +157,20 @@ void editor_update() {
         ui_text(state.ui, FONT_HACK_GOLD, status_text);
     }
 
-    // New menu
-    if (state.mode == EDITOR_MODE_MENU_NEW) {
-        state.ui.input_enabled = true;
-        ui_frame_rect(state.ui, MENU_NEW_RECT);
-
-        ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "New Map");
-        ui_element_position(state.ui, ivec2(MENU_NEW_RECT.x + (MENU_NEW_RECT.w / 2) - (header_text_size.x / 2), MENU_NEW_RECT.y + 6));
-        ui_text(state.ui, FONT_HACK_GOLD, "New Map");
-
-        ui_begin_column(state.ui, ivec2(MENU_NEW_RECT.x + 8, MENU_NEW_RECT.y + 30), 4);
-            // Map type
-            if (editor_menu_dropdown("Map Type:", &state.menu_new_map_type, match_setting_data(MATCH_SETTING_MAP_TYPE).values, MENU_NEW_RECT)) {
-                editor_menu_new_set_map_type((MapType)state.menu_new_map_type);
-            }
-
-            // Map size
-            editor_menu_dropdown("Map Size:", &state.menu_new_map_size, match_setting_data(MATCH_SETTING_MAP_SIZE).values, MENU_NEW_RECT);
-
-            // Use noise gen params
-            editor_menu_dropdown("Generation Style:", &state.menu_new_use_noise_gen_params, { "Blank", "Noise" }, MENU_NEW_RECT);
-
-            // Noise gen params
-            if (state.menu_new_use_noise_gen_params) {
-                editor_menu_dropdown("Noise Inverted:", &state.menu_new_noise_gen_inverted, { "No", "Yes" }, MENU_NEW_RECT);
-                editor_menu_slider(state.menu_new_noise_gen_inverted ? "Highground Threshold:" : "Water Threshold:", &state.menu_new_noise_gen_map_water_threshold, MENU_NEW_RECT);
-                editor_menu_slider("Lowground Threshold:", &state.menu_new_noise_gen_map_lowground_threshold, MENU_NEW_RECT);
-                if (state.menu_new_map_type == MAP_TYPE_KLONDIKE) {
-                    editor_menu_slider("Forest Threshold:", &state.menu_new_noise_gen_forest_threshold, MENU_NEW_RECT);
-                }
-            }
-        ui_end_container(state.ui);
-
-        ui_element_position(state.ui, ui_button_position_frame_bottom_left(MENU_NEW_RECT));
-        if (ui_button(state.ui, "Back")) {
-            state.mode = EDITOR_MODE_DEFAULT;
+    // Menu new
+    if (state.menu_new.mode == EDITOR_MENU_NEW_OPEN) {
+        editor_menu_new_update(state.menu_new, state.ui);
+    }
+    if (state.menu_new.mode == EDITOR_MENU_NEW_CREATE) {
+        MapType map_type = (MapType)state.menu_new.map_type;
+        MapSize map_size = (MapSize)state.menu_new.map_size;
+        if (state.menu_new.use_noise_gen_params) {
+            NoiseGenParams params = editor_menu_new_create_noise_gen_params(state.menu_new);
+            state.document = editor_document_init_generated(map_type, params);
+        } else {
+            state.document = editor_document_init_blank(map_type, map_size);
         }
-        ui_element_position(state.ui, ui_button_position_frame_bottom_right(MENU_NEW_RECT, "Create"));
-        if (ui_button(state.ui, "Create")) {
-            editor_new_map();
-            state.mode = EDITOR_MODE_DEFAULT;
-        }
+        state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
     }
 
     // Camera drag
@@ -274,9 +204,8 @@ void editor_update() {
     }
     if (state.is_painting && CANVAS_RECT.has_point(input_get_mouse_position())) {
         ivec2 cell = editor_get_hovered_cell();
-        if (state.noise->map[cell.x + (cell.y * state.noise->width)] != (uint8_t)state.tool_value) {
-            state.noise->map[cell.x + (cell.y * state.noise->width)] = (uint8_t)state.tool_value;
-            editor_bake_map_tiles();
+        if (editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value) {
+            // TODO: paint
         }
     }
 
@@ -295,30 +224,19 @@ void editor_update() {
             std::clamp(input_get_mouse_position().x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w),
             std::clamp(input_get_mouse_position().y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
         ivec2 map_pos = ivec2(
-            (state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-            (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+            (state.document->map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+            (state.document->map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         editor_center_camera_on_cell(map_pos / TILE_SIZE);
     }
-
-    // Update console cursor blinker
-    if (input_is_text_input_active()) {
-        state.console_cursor_blink_timer--;
-        if (state.console_cursor_blink_timer == 0) {
-            state.console_cursor_visible = !state.console_cursor_visible;
-            state.console_cursor_blink_timer = CONSOLE_CURSOR_BLINK_DURATION;
-        }
-    }
-
-    editor_handle_input();
 }
 
 bool editor_is_in_menu() {
-    return state.mode == EDITOR_MODE_MENU_NEW;
+    return state.menu_new.mode == EDITOR_MENU_NEW_OPEN;
 }
 
 void editor_clamp_camera() {
-    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map.width * TILE_SIZE) - CANVAS_RECT.w);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map.height * TILE_SIZE) - CANVAS_RECT.h);
+    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.document->map.width * TILE_SIZE) - CANVAS_RECT.w);
+    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.document->map.height * TILE_SIZE) - CANVAS_RECT.h);
 }
 
 void editor_center_camera_on_cell(ivec2 cell) {
@@ -327,56 +245,10 @@ void editor_center_camera_on_cell(ivec2 cell) {
     editor_clamp_camera();
 }
 
-void editor_handle_input() {
-    // Begin chat
-    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && !input_is_text_input_active()) {
-        state.console_message = "";
-        state.console_cursor_blink_timer = CONSOLE_CURSOR_BLINK_DURATION;
-        state.console_cursor_visible = true;
-        input_start_text_input(&state.console_message, CONSOLE_MESSAGE_MAX_LENGTH);
-        sound_play(SOUND_UI_CLICK);
-        return;
-    }
-
-    // End chat
-    if (input_is_action_just_pressed(INPUT_ACTION_ENTER) && input_is_text_input_active()) {
-        std::vector<std::string> console_message_words;
-        while (!state.console_message.empty()) {
-            size_t space_index = state.console_message.find(' ');
-            std::string word;
-            if (space_index == std::string::npos) {
-                word = state.console_message;
-                state.console_message = "";
-            } else {
-                word = state.console_message.substr(0, space_index);
-                state.console_message = state.console_message.substr(space_index + 1);
-            }
-            console_message_words.push_back(word);
-        }
-
-        if (!console_message_words.empty()) {
-            editor_handle_console_message(console_message_words);
-        }
-
-        if (state.console_message == "/")
-        sound_play(SOUND_UI_CLICK);
-        input_stop_text_input();
-        return;
-    }
-}
-
-void editor_handle_console_message(const std::vector<std::string>& words) {
-    GOLD_ASSERT(!words.empty());
-}
-
 void editor_handle_toolbar_action(const std::string& column, const std::string& action) {
     if (column == "File") {
         if (action == "New") {
-            editor_menu_new_set_map_type(MAP_TYPE_TOMBSTONE);
-            state.menu_new_map_size = MAP_SIZE_SMALL;
-            state.menu_new_use_noise_gen_params = 0;
-            state.menu_new_noise_gen_inverted = 0;
-            state.mode = EDITOR_MODE_MENU_NEW;
+            state.menu_new = editor_menu_new_open();
         }
     } else if (column == "Tool") {
         if (action == "Brush") {
@@ -395,215 +267,119 @@ void editor_set_tool(EditorTool tool) {
     }
 }
 
-void editor_menu_new_set_map_type(MapType map_type) {
-    state.menu_new_map_type = map_type;
-    // set threshold values based on defaults
-    NoiseGenParams params = noise_create_noise_gen_params(map_type, MAP_SIZE_SMALL, 0, 0);
-    state.menu_new_noise_gen_inverted = (uint32_t)params.map_inverted;
-    state.menu_new_noise_gen_map_water_threshold = params.water_threshold;
-    state.menu_new_noise_gen_map_lowground_threshold = params.lowground_threshold;
-    state.menu_new_noise_gen_forest_threshold = params.forest_threshold;
-}
-
-bool editor_menu_dropdown(const char* prompt, uint32_t* selection, const std::vector<std::string>& items, const Rect& rect) {
-    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
-
-    bool dropdown_clicked = false;
-
-    ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
-    ui_begin_row(state.ui, ivec2(0, 0), 0);
-        ui_element_position(state.ui, ivec2(0, 3));
-        ui_text(state.ui, FONT_HACK_GOLD, prompt);
-
-        ui_element_position(state.ui, ivec2(rect.w - 16 - dropdown_sprite_info.frame_width, 0));
-        dropdown_clicked = ui_dropdown(state.ui, UI_DROPDOWN_MINI, selection, items, false);
-    ui_end_container(state.ui);
-
-    return dropdown_clicked;
-}
-
-void editor_menu_slider(const char* prompt, uint32_t* value, const Rect& rect) {
-    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
-
-    ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
-    ui_begin_row(state.ui, ivec2(0, 0), 0);
-        ui_element_position(state.ui, ivec2(0, 3));
-        ui_text(state.ui, FONT_HACK_GOLD, prompt);
-
-        ui_element_position(state.ui, ivec2(rect.w - 16 - dropdown_sprite_info.frame_width, 0));
-        ui_slider(state.ui, value, NULL, 0, 100, UI_SLIDER_DISPLAY_RAW_VALUE);
-    ui_end_container(state.ui);
-}
-
-void editor_free_map() {
-    noise_free(state.noise);
-    state.noise = NULL;
-}
-
-void editor_new_map() {
-    if (state.noise != NULL) {
-        editor_free_map();
-    }
-
-    int map_size = match_setting_get_map_size((MapSize)state.menu_new_map_size);
-    if (state.menu_new_use_noise_gen_params) {
-        uint64_t map_seed = rand();
-        uint64_t forest_seed = rand();
-        NoiseGenParams params = noise_create_noise_gen_params((MapType)state.menu_new_map_type, (MapSize)state.menu_new_map_size, map_seed, forest_seed);
-        params.water_threshold = state.menu_new_noise_gen_map_water_threshold;
-        params.lowground_threshold = state.menu_new_noise_gen_map_lowground_threshold;
-        params.forest_threshold = state.menu_new_noise_gen_forest_threshold;
-        state.noise = noise_generate(params);
-    } else {
-        state.noise = noise_init(map_size, map_size);
-        for (int index = 0; index < state.noise->width * state.noise->height; index++) {
-            state.noise->map[index] = NOISE_VALUE_LOWGROUND;
-            state.noise->forest[index] = 0;
-        }
-    }
-
-    Map map;
-    map_init(map, (MapType)state.menu_new_map_type, map_size, map_size);
-    map_cleanup_noise(map, state.noise);
-
-    state.bake_tiles_lcg_seed = rand();
-    int lcg_seed = state.bake_tiles_lcg_seed;
-    map_bake_map_tiles_and_remove_artifacts(map, state.noise, &lcg_seed);
-    map_bake_front_walls(map);
-
-    state.map = map;
-    state.camera_offset = ivec2(0, 0);
-}
-
-void editor_bake_map_tiles() {
-    int lcg_seed = state.bake_tiles_lcg_seed;
-    map_bake_tiles(state.map, state.noise, &lcg_seed);
-    map_bake_front_walls(state.map);
-}
-
 ivec2 editor_get_hovered_cell() {
     return ((input_get_mouse_position() - ivec2(CANVAS_RECT.x, CANVAS_RECT.y)) + state.camera_offset) / TILE_SIZE;
 }
 
 void editor_render() {
-    std::vector<RenderSpriteParams> ysort_params;
+    if (state.document != NULL) {
+        std::vector<RenderSpriteParams> ysort_params;
 
-    ivec2 base_pos = ivec2(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
-    ivec2 base_coords = ivec2(state.camera_offset.x / TILE_SIZE, state.camera_offset.y / TILE_SIZE);
-    ivec2 max_visible_tiles = ivec2(CANVAS_RECT.w / TILE_SIZE, CANVAS_RECT.h / TILE_SIZE);
-    if (base_pos.x != 0) {
-        max_visible_tiles.x++;
-    }
-    if (base_pos.y != 0) {
-        max_visible_tiles.y++;
-    }
+        ivec2 base_pos = ivec2(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
+        ivec2 base_coords = ivec2(state.camera_offset.x / TILE_SIZE, state.camera_offset.y / TILE_SIZE);
+        ivec2 max_visible_tiles = ivec2(CANVAS_RECT.w / TILE_SIZE, CANVAS_RECT.h / TILE_SIZE);
+        if (base_pos.x != 0) {
+            max_visible_tiles.x++;
+        }
+        if (base_pos.y != 0) {
+            max_visible_tiles.y++;
+        }
 
-    // Begin elevation passes
-    static const int ELEVATION_COUNT = 2;
-    for (uint32_t elevation = 0; elevation < ELEVATION_COUNT; elevation++) {
-        // Render map
-        for (int y = 0; y < max_visible_tiles.y; y++) {
-            for (int x = 0; x < max_visible_tiles.x; x++) {
-                if (base_coords.x + x >= state.map.width || base_coords.y + y >= state.map.height) {
-                    continue;
-                }
+        // Begin elevation passes
+        static const int ELEVATION_COUNT = 2;
+        for (uint32_t elevation = 0; elevation < ELEVATION_COUNT; elevation++) {
+            // Render map
+            for (int y = 0; y < max_visible_tiles.y; y++) {
+                for (int x = 0; x < max_visible_tiles.x; x++) {
+                    if (base_coords.x + x >= state.document->map.width || base_coords.y + y >= state.document->map.height) {
+                        continue;
+                    }
 
-                int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map.width);
-                Tile tile = state.map.tiles[map_index];
+                    int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.document->map.width);
+                    Tile tile = state.document->map.tiles[map_index];
 
-                ivec2 tile_params_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
-                RenderSpriteParams tile_params = (RenderSpriteParams) {
-                    .sprite = tile.sprite,
-                    .frame = tile.frame,
-                    .position = tile_params_position,
-                    .ysort_position = tile_params_position.y,
-                    .options = RENDER_SPRITE_NO_CULL,
-                    .recolor_id = 0
-                };
-
-                bool should_render_on_ground_level = 
-                    map_is_tile_ground(state.map, base_coords + ivec2(x, y)) || 
-                    map_is_tile_ramp(state.map, base_coords + ivec2(x, y));
-                if (elevation == 0 && 
-                        !map_is_tile_ground(state.map, base_coords + ivec2(x, y)) &&
-                        !map_is_tile_water(state.map, base_coords + ivec2(x, y))) {
-                    render_sprite_frame(map_get_plain_ground_tile_sprite(state.map.type), ivec2(0, 0), ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
-                }
-                if ((should_render_on_ground_level && elevation == 0) || 
-                        (!should_render_on_ground_level && elevation == tile.elevation)) {
-                    render_sprite_frame(tile_params.sprite, tile_params.frame, tile_params.position, tile_params.options, tile_params.recolor_id);
-                } 
-
-                // Decorations
-                Cell cell = state.map.cells[CELL_LAYER_GROUND][map_index];
-                if (cell.type == CELL_DECORATION && tile.elevation == elevation) {
-                    SpriteName decoration_sprite = map_get_decoration_sprite(state.map.type);
-                    const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
-                    const int decoration_extra_height = decoration_sprite_info.frame_height - TILE_SIZE;
-                    ysort_params.push_back((RenderSpriteParams) {
-                        .sprite = decoration_sprite,
-                        .frame = ivec2(cell.decoration_hframe, 0),
-                        .position = ivec2(tile_params_position.x, tile_params_position.y - decoration_extra_height),
+                    ivec2 tile_params_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
+                    RenderSpriteParams tile_params = (RenderSpriteParams) {
+                        .sprite = tile.sprite,
+                        .frame = tile.frame,
+                        .position = tile_params_position,
                         .ysort_position = tile_params_position.y,
                         .options = RENDER_SPRITE_NO_CULL,
                         .recolor_id = 0
-                    });
-                }
-            }  // End for each x
-        } // End for each y
+                    };
 
-        // For each cell layer
-        for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
-            // TODO: render select ring of selected entity
-            // Select rings and healthbars
-
-            // Underground entities
-            if (cell_layer == CELL_LAYER_UNDERGROUND) {
-                for (const Entity& entity : state.entities) {
-                    const EntityData& entity_data = entity_get_data(entity.type);
-                    if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
-                            entity_get_elevation(entity, state.map) != elevation) {
-                        continue;
+                    bool should_render_on_ground_level = 
+                        map_is_tile_ground(state.document->map, base_coords + ivec2(x, y)) || 
+                        map_is_tile_ramp(state.document->map, base_coords + ivec2(x, y));
+                    if (elevation == 0 && 
+                            !map_is_tile_ground(state.document->map, base_coords + ivec2(x, y)) &&
+                            !map_is_tile_water(state.document->map, base_coords + ivec2(x, y))) {
+                        render_sprite_frame(map_get_plain_ground_tile_sprite(state.document->map.type), ivec2(0, 0), ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                     }
-                    if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
-                        continue;
+                    if ((should_render_on_ground_level && elevation == 0) || 
+                            (!should_render_on_ground_level && elevation == tile.elevation)) {
+                        render_sprite_frame(tile_params.sprite, tile_params.frame, tile_params.position, tile_params.options, tile_params.recolor_id);
+                    } 
+
+                    // Decorations
+                    Cell cell = state.document->map.cells[CELL_LAYER_GROUND][map_index];
+                    if (cell.type == CELL_DECORATION && tile.elevation == elevation) {
+                        SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map.type);
+                        const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
+                        const int decoration_extra_height = decoration_sprite_info.frame_height - TILE_SIZE;
+                        ysort_params.push_back((RenderSpriteParams) {
+                            .sprite = decoration_sprite,
+                            .frame = ivec2(cell.decoration_hframe, 0),
+                            .position = ivec2(tile_params_position.x, tile_params_position.y - decoration_extra_height),
+                            .ysort_position = tile_params_position.y,
+                            .options = RENDER_SPRITE_NO_CULL,
+                            .recolor_id = 0
+                        });
                     }
+                }  // End for each x
+            } // End for each y
 
-                    RenderSpriteParams params = editor_create_entity_render_params(entity);
-                    render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+            // For each cell layer
+            for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
+                // TODO: render select ring of selected entity
+                // Select rings and healthbars
+
+                // Underground entities
+                if (cell_layer == CELL_LAYER_UNDERGROUND) {
+                    for (const Entity& entity : state.document->entities) {
+                        const EntityData& entity_data = entity_get_data(entity.type);
+                        if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
+                                entity_get_elevation(entity, state.document->map) != elevation) {
+                            continue;
+                        }
+                        if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+                            continue;
+                        }
+
+                        RenderSpriteParams params = editor_create_entity_render_params(entity);
+                        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+                    }
                 }
-            }
-        } // End for each cell layer
-    }
+            } // End for each cell layer
+        }
 
-    // Render ysort params
-    ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
-    for (const RenderSpriteParams& params : ysort_params) {
-        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
-    }
+        // Render ysort params
+        ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+        for (const RenderSpriteParams& params : ysort_params) {
+            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+        }
 
-    if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
-            !state.is_minimap_dragging &&
-            state.camera_drag_mouse_position.x == -1 &&
-            !editor_is_in_menu()) {
-        ivec2 cell = editor_get_hovered_cell();
-        Rect rect = (Rect) {
-            .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
-            .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
-            .w = TILE_SIZE, .h = TILE_SIZE
-        };
-        render_draw_rect(rect, RENDER_COLOR_WHITE);
-    }
-
-    // Console
-    if (input_is_text_input_active()) {
-        render_text(FONT_HACK_SHADOW, state.console_message.c_str(), CONSOLE_MESSAGE_POSITION + ivec2(1, 1));
-        render_text(FONT_HACK_WHITE, state.console_message.c_str(), CONSOLE_MESSAGE_POSITION);
-        if (state.console_cursor_visible) {
-            int prompt_width = render_get_text_size(FONT_HACK_WHITE, state.console_message.c_str()).x;
-            ivec2 cursor_pos = CONSOLE_MESSAGE_POSITION + ivec2(prompt_width - 1, -1);
-            render_text(FONT_HACK_SHADOW, "|", cursor_pos + ivec2(1, 1));
-            render_text(FONT_HACK_WHITE, "|", cursor_pos);
+        if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
+                !state.is_minimap_dragging &&
+                state.camera_drag_mouse_position.x == -1 &&
+                !editor_is_in_menu()) {
+            ivec2 cell = editor_get_hovered_cell();
+            Rect rect = (Rect) {
+                .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
+                .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
+                .w = TILE_SIZE, .h = TILE_SIZE
+            };
+            render_draw_rect(rect, RENDER_COLOR_WHITE);
         }
     }
 
@@ -635,37 +411,40 @@ void editor_render() {
         render_sprite(SPRITE_UI_MINIMAP, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
     }
 
-    // MINIMAP
-    // Minimap tiles
-    for (int y = 0; y < state.map.height; y++) {
-        for (int x = 0; x < state.map.width; x++) {
-            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), editor_get_minimap_pixel_for_cell(ivec2(x, y)));
+    if (state.document != NULL) {
+        // MINIMAP
+        // Minimap tiles
+        for (int y = 0; y < state.document->map.height; y++) {
+            for (int x = 0; x < state.document->map.width; x++) {
+                render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), editor_get_minimap_pixel_for_cell(ivec2(x, y)));
+            }
         }
-    }
-    // Minimap entities
-    for (const Entity& entity : state.entities) {
-        int entity_cell_size = entity_get_data(entity.type).cell_size;
-        Rect entity_rect = (Rect) {
-            .x = entity.cell.x, .y = entity.cell.y,
-            .w = entity_cell_size, .h = entity_cell_size
+        // Minimap entities
+        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+            const Entity& entity = state.document->entities[entity_index];
+            int entity_cell_size = entity_get_data(entity.type).cell_size;
+            Rect entity_rect = (Rect) {
+                .x = entity.cell.x, .y = entity.cell.y,
+                .w = entity_cell_size, .h = entity_cell_size
+            };
+            render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, editor_get_minimap_pixel_for_entity(entity));
+        }
+        // Clear fog layer
+        for (int y = 0; y < state.document->map.height; y++) {
+            for (int x = 0; x < state.document->map.width; x++) {
+                render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
+            }
+        }
+        // Minimap camera rect
+        Rect camera_rect = (Rect) {
+            .x = state.camera_offset.x / TILE_SIZE,
+            .y = state.camera_offset.y / TILE_SIZE,
+            .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
+            .h = (SCREEN_HEIGHT / TILE_SIZE)
         };
-        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, editor_get_minimap_pixel_for_entity(entity));
+        render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
+        render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.document->map.width, state.document->map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
     }
-    // Clear fog layer
-    for (int y = 0; y < state.map.height; y++) {
-        for (int x = 0; x < state.map.width; x++) {
-            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
-        }
-    }
-    // Minimap camera rect
-    Rect camera_rect = (Rect) {
-        .x = state.camera_offset.x / TILE_SIZE,
-        .y = state.camera_offset.y / TILE_SIZE,
-        .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
-        .h = (SCREEN_HEIGHT / TILE_SIZE)
-    };
-    render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
-    render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.map.width, state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 }
 
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity) {
@@ -676,7 +455,7 @@ RenderSpriteParams editor_create_entity_render_params(const Entity& entity) {
         .position = params_position,
         .ysort_position = params_position.y,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state.players[entity.player_id].recolor_id
+        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state.document->players[entity.player_id].recolor_id
     };
 
     const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
@@ -698,7 +477,7 @@ RenderSpriteParams editor_create_entity_render_params(const Entity& entity) {
 }
 
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell) {
-    switch (map_get_tile(state.map, cell).sprite) {
+    switch (map_get_tile(state.document->map, cell).sprite) {
         case SPRITE_TILE_SAND1:
         case SPRITE_TILE_SAND2:
         case SPRITE_TILE_SAND3:
@@ -723,7 +502,7 @@ MinimapPixel editor_get_minimap_pixel_for_entity(const Entity& entity) {
     if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
         return MINIMAP_PIXEL_WHITE;
     }
-    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.players[entity.player_id].recolor_id);
+    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.document->players[entity.player_id].recolor_id);
 }
 
 #endif
