@@ -298,6 +298,12 @@ void ui_frame_rect(UI& state, Rect rect) {
     ui_frame(state, ivec2(rect.w, rect.h));
 }
 
+void ui_small_frame_rect(UI& state, Rect rect) {
+    ui_element_position(state, ivec2(rect.x, rect.y));
+    ui_update_container(state, ivec2(rect.x, rect.y));
+    ui_queue_ninepatch(state, SPRITE_UI_FRAME_SMALL, rect, 0);
+}
+
 void ui_screen_shade(UI& state) {
     ui_queue_fill_rect(state, { 
         .x = 0, .y = 0, 

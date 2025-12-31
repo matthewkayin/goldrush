@@ -246,6 +246,11 @@ void ui_frame(UI& state, ivec2 size);
  */
 void ui_frame_rect(UI& state, Rect rect);
 
+/*
+ * Like UI frame rect, but small
+ */
+void ui_small_frame_rect(UI& state, Rect rect);
+
 /**
  * Reners an offblack transparent rect across the entire screen
  */

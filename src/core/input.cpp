@@ -14,6 +14,7 @@ struct InputState {
     bool current[INPUT_ACTION_COUNT];
     bool previous[INPUT_ACTION_COUNT];
     bool user_requests_exit;
+    bool should_capture_mouse;
 
     std::string* text_input_str;
     size_t text_input_max_length;
@@ -32,6 +33,8 @@ void input_init(SDL_Window* window) {
     input_update_screen_scale();
     input_stop_text_input();
     input_set_hotkey_mapping_to_default(state.hotkey_mapping);
+
+    state.should_capture_mouse = true;
 
     #ifndef GOLD_DEBUG
         SDL_SetWindowMouseGrab(state.window, true);
@@ -52,6 +55,10 @@ void input_update_screen_scale() {
         (window_size.y / 2) - (state.scaled_screen_size.y / 2));
 }
 
+void input_set_mouse_capture_enabled(bool value) {
+    state.should_capture_mouse = value;
+}
+
 void input_poll_events() {
     memcpy(&state.previous, &state.current, sizeof(state.current));
     state.key_just_pressed = INPUT_KEY_NONE;
@@ -70,7 +77,7 @@ void input_poll_events() {
         }
 
         // Capture mouse
-        if (!SDL_GetWindowMouseGrab(state.window)) {
+        if (state.should_capture_mouse && !SDL_GetWindowMouseGrab(state.window)) {
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
                 SDL_SetWindowMouseGrab(state.window, true);
                 continue;

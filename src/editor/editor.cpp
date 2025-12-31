@@ -4,6 +4,7 @@
 
 #include "core/logger.h"
 #include "core/input.h"
+#include "core/ui.h"
 #include "match/map.h"
 #include "container/id_array.h"
 #include "match/state.h"
@@ -14,19 +15,45 @@
 #include <vector>
 #include <string>
 
-// Camera
-static const int CAMERA_DRAG_MARGIN = 4;
-
 // Console
 static const size_t CONSOLE_MESSAGE_MAX_LENGTH = 256;
 static const uint32_t CONSOLE_CURSOR_BLINK_DURATION = 30;
 static const ivec2 CONSOLE_MESSAGE_POSITION = ivec2(8, SCREEN_HEIGHT - 24);
 
+// Minimap
+static const Rect TOOLBAR_RECT = (Rect) {
+    .x = 0, .y = 0,
+    .w = SCREEN_WIDTH, .h = 22
+};
+static const Rect STATUS_RECT = (Rect) {
+    .x = 0, .y = SCREEN_HEIGHT - 18,
+    .w = SCREEN_WIDTH, .h = 18
+};
+static const Rect SIDEBAR_RECT = (Rect) {
+    .x = 0, .y = TOOLBAR_RECT.h,
+    .w = 144,
+    .h = SCREEN_HEIGHT - TOOLBAR_RECT.h - STATUS_RECT.h
+};
+static const Rect MINIMAP_RECT = (Rect) {
+    .x = 8, .y = SCREEN_HEIGHT - 132 - 22,
+    .w = 128, .h = 128
+};
+static const Rect CANVAS_RECT = (Rect) {
+    .x = SIDEBAR_RECT.w,
+    .y = TOOLBAR_RECT.y + TOOLBAR_RECT.h,
+    .w = SCREEN_WIDTH - SIDEBAR_RECT.w,
+    .h = SCREEN_HEIGHT - STATUS_RECT.h - TOOLBAR_RECT.h
+};
+
 struct EditorState {
+    UI ui;
+
     Map map;
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
     MatchPlayer players[MAX_PLAYERS];
 
+    ivec2 camera_drag_previous_offset;
+    ivec2 camera_drag_mouse_position;
     ivec2 camera_offset;
     bool is_minimap_dragging;
 
@@ -37,12 +64,23 @@ struct EditorState {
 static EditorState state;
 
 void editor_clamp_camera();
+void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_input();
 void editor_handle_console_message(const std::vector<std::string>& words);
 
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
+MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell);
+MinimapPixel editor_get_minimap_pixel_for_entity(const Entity& entity);
 
 void editor_init() {
+    input_set_mouse_capture_enabled(false);
+
+    if (option_get_value(OPTION_DISPLAY) != RENDER_DISPLAY_WINDOWED) {
+        option_set_value(OPTION_DISPLAY, RENDER_DISPLAY_WINDOWED);
+    }
+
+    state.ui = ui_init();
+
     map_init(state.map, MAP_TYPE_TOMBSTONE, 96, 96);
 
     memset(state.players, 0, sizeof(state.players));
@@ -52,32 +90,63 @@ void editor_init() {
         player.recolor_id = (int)player_id;
     }
 
-    if (option_get_value(OPTION_DISPLAY) != RENDER_DISPLAY_WINDOWED) {
-        option_set_value(OPTION_DISPLAY, RENDER_DISPLAY_WINDOWED);
-    }
-
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
+    state.camera_drag_mouse_position = ivec2(-1, -1);
 
     log_info("Initialized map editor.");
 }
 
 void editor_update() {
+    ui_begin(state.ui);
+    ui_small_frame_rect(state.ui, TOOLBAR_RECT);
+    ui_begin_row(state.ui, ivec2(3, 3), 2);
+        uint32_t item = 0;
+        if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &item, { "File", "New", "Open", "Save", "Save As" }, false)) {
+
+        }
+        item = 0;
+        if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &item, { "Edit", "Undo" }, false)) {
+
+        }
+    ui_end_container(state.ui);
+
+    ui_small_frame_rect(state.ui, SIDEBAR_RECT);
+    ui_small_frame_rect(state.ui, STATUS_RECT);
+    ui_element_position(state.ui, ivec2(4, SCREEN_HEIGHT - 15));
+    ui_text(state.ui, FONT_HACK_WHITE, "Status Text");
+
     // Camera drag
-    if (!state.is_minimap_dragging) {
-        ivec2 camera_drag_direction = ivec2(0, 0);
-        if (input_get_mouse_position().x < CAMERA_DRAG_MARGIN) {
-            camera_drag_direction.x = -1;
-        } else if (input_get_mouse_position().x > SCREEN_WIDTH - CAMERA_DRAG_MARGIN) {
-            camera_drag_direction.x = 1;
-        }
-        if (input_get_mouse_position().y < CAMERA_DRAG_MARGIN) {
-            camera_drag_direction.y = -1;
-        } else if (input_get_mouse_position().y > SCREEN_HEIGHT - CAMERA_DRAG_MARGIN) {
-            camera_drag_direction.y = 1;
-        }
-        state.camera_offset += camera_drag_direction * option_get_value(OPTION_CAMERA_SPEED);
+    if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK)) {
+        state.camera_drag_previous_offset = state.camera_offset;
+        state.camera_drag_mouse_position = input_get_mouse_position();
+    }
+    if (input_is_action_just_released(INPUT_ACTION_RIGHT_CLICK)) {
+        state.camera_drag_mouse_position = ivec2(-1, -1);
+    }
+    if (state.camera_drag_mouse_position.x != -1) {
+        ivec2 mouse_position_difference = input_get_mouse_position() - state.camera_drag_mouse_position;
+        state.camera_offset = state.camera_drag_previous_offset - mouse_position_difference;
         editor_clamp_camera();
+    }
+
+    // Minimap drag
+    if (MINIMAP_RECT.has_point(input_get_mouse_position()) &&
+            state.camera_drag_mouse_position.x == -1 &&
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        state.is_minimap_dragging = true;
+    }
+    if (state.is_minimap_dragging && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
+        state.is_minimap_dragging = false;
+    }
+    if (state.is_minimap_dragging) {
+        ivec2 minimap_pos = ivec2(
+            std::clamp(input_get_mouse_position().x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w),
+            std::clamp(input_get_mouse_position().y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
+        ivec2 map_pos = ivec2(
+            (state.map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+            (state.map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+        editor_center_camera_on_cell(map_pos / TILE_SIZE);
     }
 
     // Update console cursor blinker
@@ -95,6 +164,12 @@ void editor_update() {
 void editor_clamp_camera() {
     state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map.width * TILE_SIZE) - SCREEN_WIDTH);
     state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map.height * TILE_SIZE) - SCREEN_HEIGHT);
+}
+
+void editor_center_camera_on_cell(ivec2 cell) {
+    state.camera_offset.x = (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2);
+    state.camera_offset.y = (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_HEIGHT / 2);
+    editor_clamp_camera();
 }
 
 void editor_handle_input() {
@@ -144,7 +219,7 @@ void editor_render() {
 
     ivec2 base_pos = ivec2(-(state.camera_offset.x % TILE_SIZE), -(state.camera_offset.y % TILE_SIZE));
     ivec2 base_coords = ivec2(state.camera_offset.x / TILE_SIZE, state.camera_offset.y / TILE_SIZE);
-    ivec2 max_visible_tiles = ivec2(SCREEN_WIDTH / TILE_SIZE, (SCREEN_HEIGHT / TILE_SIZE) + 1);
+    ivec2 max_visible_tiles = ivec2(CANVAS_RECT.w / TILE_SIZE, CANVAS_RECT.h / TILE_SIZE);
     if (base_pos.x != 0) {
         max_visible_tiles.x++;
     }
@@ -157,14 +232,15 @@ void editor_render() {
     for (uint32_t elevation = 0; elevation < ELEVATION_COUNT; elevation++) {
         // Render map
         for (int y = 0; y < max_visible_tiles.y; y++) {
-            if (base_coords.y + y >= state.map.height) {
-                continue;
-            }
             for (int x = 0; x < max_visible_tiles.x; x++) {
+                if (base_coords.x + x >= state.map.width || base_coords.y + y >= state.map.height) {
+                    continue;
+                }
+
                 int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.map.width);
                 Tile tile = state.map.tiles[map_index];
 
-                ivec2 tile_params_position = base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
+                ivec2 tile_params_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
                 RenderSpriteParams tile_params = (RenderSpriteParams) {
                     .sprite = tile.sprite,
                     .frame = tile.frame,
@@ -240,6 +316,66 @@ void editor_render() {
             render_text(FONT_HACK_WHITE, "|", cursor_pos);
         }
     }
+
+    // UI covers
+    {
+        Rect src_rect = (Rect) {
+            .x = RENDER_COLOR_OFFBLACK, .y = 0, .w = 1, .h = 1
+        };
+        render_sprite(SPRITE_UI_SWATCH, src_rect, TOOLBAR_RECT, RENDER_SPRITE_NO_CULL);
+        render_sprite(SPRITE_UI_SWATCH, src_rect, SIDEBAR_RECT, RENDER_SPRITE_NO_CULL);
+        render_sprite(SPRITE_UI_SWATCH, src_rect, STATUS_RECT, RENDER_SPRITE_NO_CULL);
+    }
+
+    ui_render(state.ui);
+
+    // Minimap frame
+    {
+        const SpriteInfo& minimap_frame_sprite_info = render_get_sprite_info(SPRITE_UI_MINIMAP);
+        Rect src_rect = (Rect) {
+            .x = 0, .y = 0, 
+            .w = minimap_frame_sprite_info.frame_width, 
+            .h = minimap_frame_sprite_info.frame_width 
+        };
+        Rect dst_rect = (Rect) {
+            .x = MINIMAP_RECT.x - 4, .y = MINIMAP_RECT.y - 4, 
+            .w = minimap_frame_sprite_info.frame_width,
+            .h = minimap_frame_sprite_info.frame_width
+        };
+        render_sprite(SPRITE_UI_MINIMAP, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
+    }
+
+    // MINIMAP
+    // Minimap tiles
+    for (int y = 0; y < state.map.height; y++) {
+        for (int x = 0; x < state.map.width; x++) {
+            render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), editor_get_minimap_pixel_for_cell(ivec2(x, y)));
+        }
+    }
+    // Minimap entities
+    for (const Entity& entity : state.entities) {
+        int entity_cell_size = entity_get_data(entity.type).cell_size;
+        Rect entity_rect = (Rect) {
+            .x = entity.cell.x, .y = entity.cell.y,
+            .w = entity_cell_size, .h = entity_cell_size
+        };
+        render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, editor_get_minimap_pixel_for_entity(entity));
+    }
+    // Clear fog layer
+    for (int y = 0; y < state.map.height; y++) {
+        for (int x = 0; x < state.map.width; x++) {
+            render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
+        }
+    }
+    // Minimap camera rect
+    Rect camera_rect = (Rect) {
+        .x = state.camera_offset.x / TILE_SIZE,
+        .y = state.camera_offset.y / TILE_SIZE,
+        .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
+        .h = (SCREEN_HEIGHT / TILE_SIZE)
+    };
+    render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
+    render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.map.width, state.map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
 }
 
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity) {
@@ -269,6 +405,35 @@ RenderSpriteParams editor_create_entity_render_params(const Entity& entity) {
     }
 
     return params;
+}
+
+MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell) {
+    switch (map_get_tile(state.map, cell).sprite) {
+        case SPRITE_TILE_SAND1:
+        case SPRITE_TILE_SAND2:
+        case SPRITE_TILE_SAND3:
+            return MINIMAP_PIXEL_SAND;
+        case SPRITE_TILE_SAND_WATER:
+            return MINIMAP_PIXEL_WATER;
+        case SPRITE_TILE_SNOW1:
+        case SPRITE_TILE_SNOW2:
+        case SPRITE_TILE_SNOW3:
+            return MINIMAP_PIXEL_SNOW;
+        case SPRITE_TILE_SNOW_WATER:
+            return MINIMAP_PIXEL_SNOW_WATER;
+        default:
+            return MINIMAP_PIXEL_WALL;
+    }
+}
+
+MinimapPixel editor_get_minimap_pixel_for_entity(const Entity& entity) {
+    if (entity.type == ENTITY_GOLDMINE) {
+        return MINIMAP_PIXEL_GOLD;
+    }
+    if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
+        return MINIMAP_PIXEL_WHITE;
+    }
+    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.players[entity.player_id].recolor_id);
 }
 
 #endif
