@@ -88,7 +88,10 @@ struct Map {
 
 void map_init(Map& map, MapType map_type, int width, int height);
 void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, std::vector<ivec2>& player_spawns, std::vector<ivec2>& goldmine_cells);
+void map_cleanup_noise(const Map& map, Noise* noise);
 void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed);
+void map_bake_map_tiles_and_remove_artifacts(Map& map, Noise* noise, int* lcg_seed);
+void map_bake_front_walls(Map& map);
 SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_seed);
 SpriteName map_choose_water_tile_sprite(MapType map_type);
 SpriteName map_get_plain_ground_tile_sprite(MapType map_type);

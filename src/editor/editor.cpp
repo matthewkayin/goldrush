@@ -45,10 +45,10 @@ static const Rect CANVAS_RECT = (Rect) {
 };
 
 static const Rect MENU_NEW_RECT = (Rect) {
-    .x = (SCREEN_WIDTH / 2) - (200 / 2),
-    .y = 64,
-    .w = 200,
-    .h = 128
+    .x = (SCREEN_WIDTH / 2) - (300 / 2),
+    .y = 48,
+    .w = 300,
+    .h = 256
 };
 
 enum EditorMode {
@@ -79,6 +79,9 @@ struct EditorState {
     uint32_t menu_new_map_size;
     uint32_t menu_new_use_noise_gen_params;
     uint32_t menu_new_noise_gen_inverted;
+    uint32_t menu_new_noise_gen_map_water_threshold;
+    uint32_t menu_new_noise_gen_map_lowground_threshold;
+    uint32_t menu_new_noise_gen_forest_threshold;
 };
 static EditorState state;
 
@@ -89,7 +92,9 @@ void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_input();
 void editor_handle_console_message(const std::vector<std::string>& words);
 void editor_handle_toolbar_action(const std::string& action);
+void editor_menu_new_set_map_type(MapType map_type);
 bool editor_menu_dropdown(const char* prompt, uint32_t* selection, const std::vector<std::string>& items, const Rect& rect);
+void editor_menu_slider(const char* prompt, uint32_t* value, const Rect& rect);
 void editor_free_map();
 void editor_new_map();
 void editor_bake_map_tiles();
@@ -168,21 +173,23 @@ void editor_update() {
         ui_begin_column(state.ui, ivec2(MENU_NEW_RECT.x + 8, MENU_NEW_RECT.y + 30), 4);
             // Map type
             if (editor_menu_dropdown("Map Type:", &state.menu_new_map_type, match_setting_data(MATCH_SETTING_MAP_TYPE).values, MENU_NEW_RECT)) {
-
+                editor_menu_new_set_map_type((MapType)state.menu_new_map_type);
             }
 
             // Map size
-            if (editor_menu_dropdown("Map Size:", &state.menu_new_map_size, match_setting_data(MATCH_SETTING_MAP_SIZE).values, MENU_NEW_RECT)) {
-
-            }
+            editor_menu_dropdown("Map Size:", &state.menu_new_map_size, match_setting_data(MATCH_SETTING_MAP_SIZE).values, MENU_NEW_RECT);
 
             // Use noise gen params
-            if (editor_menu_dropdown("Generation Style:", &state.menu_new_use_noise_gen_params, { "Blank", "Noise" }, MENU_NEW_RECT)) {
+            editor_menu_dropdown("Generation Style:", &state.menu_new_use_noise_gen_params, { "Blank", "Noise" }, MENU_NEW_RECT);
 
-            }
-
+            // Noise gen params
             if (state.menu_new_use_noise_gen_params) {
                 editor_menu_dropdown("Noise Inverted:", &state.menu_new_noise_gen_inverted, { "No", "Yes" }, MENU_NEW_RECT);
+                editor_menu_slider(state.menu_new_noise_gen_inverted ? "Highground Threshold:" : "Water Threshold:", &state.menu_new_noise_gen_map_water_threshold, MENU_NEW_RECT);
+                editor_menu_slider("Lowground Threshold:", &state.menu_new_noise_gen_map_lowground_threshold, MENU_NEW_RECT);
+                if (state.menu_new_map_type == MAP_TYPE_KLONDIKE) {
+                    editor_menu_slider("Forest Threshold:", &state.menu_new_noise_gen_forest_threshold, MENU_NEW_RECT);
+                }
             }
         ui_end_container(state.ui);
 
@@ -305,12 +312,22 @@ void editor_handle_console_message(const std::vector<std::string>& words) {
 
 void editor_handle_toolbar_action(const std::string& action) {
     if (action == "New") {
-        state.menu_new_map_type = MAP_TYPE_TOMBSTONE;
+        editor_menu_new_set_map_type(MAP_TYPE_TOMBSTONE);
         state.menu_new_map_size = MAP_SIZE_SMALL;
         state.menu_new_use_noise_gen_params = 0;
         state.menu_new_noise_gen_inverted = 0;
         state.mode = EDITOR_MODE_MENU_NEW;
     }
+}
+
+void editor_menu_new_set_map_type(MapType map_type) {
+    state.menu_new_map_type = map_type;
+    // set threshold values based on defaults
+    NoiseGenParams params = noise_create_noise_gen_params(map_type, MAP_SIZE_SMALL, 0, 0);
+    state.menu_new_noise_gen_inverted = (uint32_t)params.map_inverted;
+    state.menu_new_noise_gen_map_water_threshold = params.water_threshold;
+    state.menu_new_noise_gen_map_lowground_threshold = params.lowground_threshold;
+    state.menu_new_noise_gen_forest_threshold = params.forest_threshold;
 }
 
 bool editor_menu_dropdown(const char* prompt, uint32_t* selection, const std::vector<std::string>& items, const Rect& rect) {
@@ -330,6 +347,19 @@ bool editor_menu_dropdown(const char* prompt, uint32_t* selection, const std::ve
     return dropdown_clicked;
 }
 
+void editor_menu_slider(const char* prompt, uint32_t* value, const Rect& rect) {
+    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
+
+    ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
+    ui_begin_row(state.ui, ivec2(0, 0), 0);
+        ui_element_position(state.ui, ivec2(0, 3));
+        ui_text(state.ui, FONT_HACK_GOLD, prompt);
+
+        ui_element_position(state.ui, ivec2(rect.w - 16 - dropdown_sprite_info.frame_width, 0));
+        ui_slider(state.ui, value, NULL, 0, 100, UI_SLIDER_DISPLAY_RAW_VALUE);
+    ui_end_container(state.ui);
+}
+
 void editor_free_map() {
     noise_free(state.noise);
     state.noise = NULL;
@@ -340,23 +370,40 @@ void editor_new_map() {
         editor_free_map();
     }
 
-    Map map;
     int map_size = match_setting_get_map_size((MapSize)state.menu_new_map_size);
-    state.noise = noise_init(map_size, map_size);
-    for (int index = 0; index < state.noise->width * state.noise->height; index++) {
-        state.noise->map[index] = NOISE_VALUE_LOWGROUND;
-        state.noise->forest[index] = 0;
+    if (state.menu_new_use_noise_gen_params) {
+        uint64_t map_seed = rand();
+        uint64_t forest_seed = rand();
+        NoiseGenParams params = noise_create_noise_gen_params((MapType)state.menu_new_map_type, (MapSize)state.menu_new_map_size, map_seed, forest_seed);
+        params.water_threshold = state.menu_new_noise_gen_map_water_threshold;
+        params.lowground_threshold = state.menu_new_noise_gen_map_lowground_threshold;
+        params.forest_threshold = state.menu_new_noise_gen_forest_threshold;
+        state.noise = noise_generate(params);
+    } else {
+        state.noise = noise_init(map_size, map_size);
+        for (int index = 0; index < state.noise->width * state.noise->height; index++) {
+            state.noise->map[index] = NOISE_VALUE_LOWGROUND;
+            state.noise->forest[index] = 0;
+        }
     }
+
+    Map map;
     map_init(map, (MapType)state.menu_new_map_type, map_size, map_size);
-    state.map = map;
+    map_cleanup_noise(map, state.noise);
 
     state.bake_tiles_lcg_seed = rand();
-    editor_bake_map_tiles();
+    int lcg_seed = state.bake_tiles_lcg_seed;
+    map_bake_map_tiles_and_remove_artifacts(map, state.noise, &lcg_seed);
+    map_bake_front_walls(map);
+
+    state.map = map;
+    state.camera_offset = ivec2(0, 0);
 }
 
 void editor_bake_map_tiles() {
     int lcg_seed = state.bake_tiles_lcg_seed;
     map_bake_tiles(state.map, state.noise, &lcg_seed);
+    map_bake_front_walls(state.map);
 }
 
 void editor_render() {
@@ -401,7 +448,7 @@ void editor_render() {
                 if (elevation == 0 && 
                         !map_is_tile_ground(state.map, base_coords + ivec2(x, y)) &&
                         !map_is_tile_water(state.map, base_coords + ivec2(x, y))) {
-                    render_sprite_frame(map_get_plain_ground_tile_sprite(state.map.type), ivec2(0, 0), base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                    render_sprite_frame(map_get_plain_ground_tile_sprite(state.map.type), ivec2(0, 0), ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                 }
                 if ((should_render_on_ground_level && elevation == 0) || 
                         (!should_render_on_ground_level && elevation == tile.elevation)) {
@@ -448,6 +495,12 @@ void editor_render() {
                 }
             }
         } // End for each cell layer
+    }
+
+    // Render ysort params
+    ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+    for (const RenderSpriteParams& params : ysort_params) {
+        render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
     }
 
     // Console
