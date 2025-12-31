@@ -286,7 +286,7 @@ bool ui_team_picker(UI& state, char value, bool disabled);
  */
 bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
 
-bool ui_toolbar(UI& state, std::string* action, const std::vector<std::vector<std::string>>& items, int spacing);
+bool ui_toolbar(UI& state, std::string* column, std::string* action, const std::vector<std::vector<std::string>>& items, int spacing);
 
 /**
  * Creates a slider

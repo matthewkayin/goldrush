@@ -56,8 +56,13 @@ enum EditorMode {
     EDITOR_MODE_MENU_NEW
 };
 
+enum EditorTool {
+    EDITOR_TOOL_BRUSH
+};
+
 struct EditorState {
     EditorMode mode;
+    EditorTool tool;
     UI ui;
 
     int bake_tiles_lcg_seed;
@@ -70,6 +75,8 @@ struct EditorState {
     ivec2 camera_drag_mouse_position;
     ivec2 camera_offset;
     bool is_minimap_dragging;
+    bool is_painting;
+    uint32_t tool_value;
 
     std::string console_message;
     bool console_cursor_visible;
@@ -91,13 +98,15 @@ void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_input();
 void editor_handle_console_message(const std::vector<std::string>& words);
-void editor_handle_toolbar_action(const std::string& action);
+void editor_handle_toolbar_action(const std::string& column, const std::string& action);
+void editor_set_tool(EditorTool tool);
 void editor_menu_new_set_map_type(MapType map_type);
 bool editor_menu_dropdown(const char* prompt, uint32_t* selection, const std::vector<std::string>& items, const Rect& rect);
 void editor_menu_slider(const char* prompt, uint32_t* value, const Rect& rect);
 void editor_free_map();
 void editor_new_map();
 void editor_bake_map_tiles();
+ivec2 editor_get_hovered_cell();
 
 // Render
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
@@ -148,18 +157,48 @@ void editor_update() {
     ui_begin_row(state.ui, ivec2(3, 3), 2);
         static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
             { "File", "New", "Open", "Save" },
-            { "Edit", "Undo" }
+            { "Edit", "Undo" },
+            { "Tool", "Brush" }
         };
-        std::string action;
-        if (ui_toolbar(state.ui, &action, TOOLBAR_OPTIONS, 2)) {
-            editor_handle_toolbar_action(action);
+        std::string column, action;
+        if (ui_toolbar(state.ui, &column, &action, TOOLBAR_OPTIONS, 2)) {
+            editor_handle_toolbar_action(column, action);
         }
     ui_end_container(state.ui);
 
+    // Sidebar
     ui_small_frame_rect(state.ui, SIDEBAR_RECT);
+    {
+        ui_begin_column(state.ui, ivec2(SIDEBAR_RECT.x + 4, SIDEBAR_RECT.y + 4), 4);
+            char tool_text[64];
+            sprintf(tool_text, "%s Tool", TOOLBAR_OPTIONS[2][state.tool + 1].c_str());
+            ui_text(state.ui, FONT_HACK_GOLD, tool_text);
+
+            switch (state.tool) {
+                case EDITOR_TOOL_BRUSH: {
+                    editor_menu_dropdown("Value:", &state.tool_value, { "Water", "Lowground", "Highground" }, SIDEBAR_RECT);
+                    break;
+                }
+            }
+        ui_end_container(state.ui);
+    }
+
     ui_small_frame_rect(state.ui, STATUS_RECT);
-    ui_element_position(state.ui, ivec2(4, SCREEN_HEIGHT - 15));
-    ui_text(state.ui, FONT_HACK_WHITE, "Status Text");
+
+    char status_text[512];
+    status_text[0] = '\0';
+    char* status_text_ptr = status_text;
+    if (CANVAS_RECT.has_point(input_get_mouse_position()) && 
+            !state.is_minimap_dragging &&
+            state.camera_drag_mouse_position.x == -1 &&
+            !editor_is_in_menu()) {
+        ivec2 cell = editor_get_hovered_cell();
+        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i>", cell.x, cell.y);
+    }
+    if (status_text[0] != '\0') {
+        ui_element_position(state.ui, ivec2(4, SCREEN_HEIGHT - 15));
+        ui_text(state.ui, FONT_HACK_GOLD, status_text);
+    }
 
     // New menu
     if (state.mode == EDITOR_MODE_MENU_NEW) {
@@ -208,6 +247,7 @@ void editor_update() {
     if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK) && 
             !state.is_minimap_dragging && 
             !editor_is_in_menu() &&
+            !state.is_painting &&
             CANVAS_RECT.has_point(input_get_mouse_position())) {
         state.camera_drag_previous_offset = state.camera_offset;
         state.camera_drag_mouse_position = input_get_mouse_position();
@@ -219,6 +259,25 @@ void editor_update() {
         ivec2 mouse_position_difference = input_get_mouse_position() - state.camera_drag_mouse_position;
         state.camera_offset = state.camera_drag_previous_offset - mouse_position_difference;
         editor_clamp_camera();
+    }
+
+    // Paint
+    if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
+            !state.is_minimap_dragging &&
+            !editor_is_in_menu() &&
+            state.tool == EDITOR_TOOL_BRUSH &&
+            CANVAS_RECT.has_point(input_get_mouse_position())) {
+        state.is_painting = true;
+    }
+    if (state.is_painting && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
+        state.is_painting = false;
+    }
+    if (state.is_painting && CANVAS_RECT.has_point(input_get_mouse_position())) {
+        ivec2 cell = editor_get_hovered_cell();
+        if (state.noise->map[cell.x + (cell.y * state.noise->width)] != (uint8_t)state.tool_value) {
+            state.noise->map[cell.x + (cell.y * state.noise->width)] = (uint8_t)state.tool_value;
+            editor_bake_map_tiles();
+        }
     }
 
     // Minimap drag
@@ -258,8 +317,8 @@ bool editor_is_in_menu() {
 }
 
 void editor_clamp_camera() {
-    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map.width * TILE_SIZE) - SCREEN_WIDTH);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map.height * TILE_SIZE) - SCREEN_HEIGHT);
+    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.map.width * TILE_SIZE) - CANVAS_RECT.w);
+    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.map.height * TILE_SIZE) - CANVAS_RECT.h);
 }
 
 void editor_center_camera_on_cell(ivec2 cell) {
@@ -310,13 +369,29 @@ void editor_handle_console_message(const std::vector<std::string>& words) {
     GOLD_ASSERT(!words.empty());
 }
 
-void editor_handle_toolbar_action(const std::string& action) {
-    if (action == "New") {
-        editor_menu_new_set_map_type(MAP_TYPE_TOMBSTONE);
-        state.menu_new_map_size = MAP_SIZE_SMALL;
-        state.menu_new_use_noise_gen_params = 0;
-        state.menu_new_noise_gen_inverted = 0;
-        state.mode = EDITOR_MODE_MENU_NEW;
+void editor_handle_toolbar_action(const std::string& column, const std::string& action) {
+    if (column == "File") {
+        if (action == "New") {
+            editor_menu_new_set_map_type(MAP_TYPE_TOMBSTONE);
+            state.menu_new_map_size = MAP_SIZE_SMALL;
+            state.menu_new_use_noise_gen_params = 0;
+            state.menu_new_noise_gen_inverted = 0;
+            state.mode = EDITOR_MODE_MENU_NEW;
+        }
+    } else if (column == "Tool") {
+        if (action == "Brush") {
+            editor_set_tool(EDITOR_TOOL_BRUSH);
+        }
+    }
+}
+
+void editor_set_tool(EditorTool tool) {
+    state.tool = tool;
+    switch (state.tool) {
+        case EDITOR_TOOL_BRUSH: {
+            state.tool_value = NOISE_VALUE_LOWGROUND;
+            break;
+        }
     }
 }
 
@@ -404,6 +479,10 @@ void editor_bake_map_tiles() {
     int lcg_seed = state.bake_tiles_lcg_seed;
     map_bake_tiles(state.map, state.noise, &lcg_seed);
     map_bake_front_walls(state.map);
+}
+
+ivec2 editor_get_hovered_cell() {
+    return ((input_get_mouse_position() - ivec2(CANVAS_RECT.x, CANVAS_RECT.y)) + state.camera_offset) / TILE_SIZE;
 }
 
 void editor_render() {
@@ -501,6 +580,19 @@ void editor_render() {
     ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
     for (const RenderSpriteParams& params : ysort_params) {
         render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+    }
+
+    if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
+            !state.is_minimap_dragging &&
+            state.camera_drag_mouse_position.x == -1 &&
+            !editor_is_in_menu()) {
+        ivec2 cell = editor_get_hovered_cell();
+        Rect rect = (Rect) {
+            .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
+            .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
+            .w = TILE_SIZE, .h = TILE_SIZE
+        };
+        render_draw_rect(rect, RENDER_COLOR_WHITE);
     }
 
     // Console

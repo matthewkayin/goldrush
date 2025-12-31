@@ -518,7 +518,7 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
     return false;
 }
 
-bool ui_toolbar(UI& state, std::string* action, const std::vector<std::vector<std::string>>& items, int spacing) {
+bool ui_toolbar(UI& state, std::string* column, std::string* action, const std::vector<std::vector<std::string>>& items, int spacing) {
     const int toolbar_id = ui_get_next_element_id(state);
     const ivec2 origin = ui_get_container_origin(state);
 
@@ -540,6 +540,7 @@ bool ui_toolbar(UI& state, std::string* action, const std::vector<std::vector<st
         state.element_selected == UI_ELEMENT_NONE && 
         toolbar_rect.has_point(input_get_mouse_position());
 
+    *column = "";
     *action = "";
     for (int column_index = 0; column_index < (int)items.size(); column_index++) {
         const int column_x = toolbar_rect.x + (column_index * (dropdown_sprite_info.frame_width + spacing));
@@ -586,6 +587,7 @@ bool ui_toolbar(UI& state, std::string* action, const std::vector<std::vector<st
             }
 
             if (state.input_enabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && item_hovered != -1) {
+                *column = items[column_index][0];
                 *action = items[column_index][item_hovered + 1];
             }
         }
