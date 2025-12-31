@@ -46,4 +46,4 @@ enum Difficulty {
 };
 
 const MatchSettingData& match_setting_data(MatchSetting setting);
-uint32_t match_setting_get_map_size(MapSize value);
+int match_setting_get_map_size(MapSize value);

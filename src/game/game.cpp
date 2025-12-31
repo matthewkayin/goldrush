@@ -69,6 +69,11 @@ void game_set_mode(GameState& state, GameSetModeParams params) {
         delete state.match_shell_state;
         state.match_shell_state = nullptr;
     }
+    #ifdef GOLD_DEBUG
+        if (state.mode == GAME_MODE_MAP_EDIT) {
+            editor_quit();
+        }
+    #endif
 
     state.mode = params.mode;
 
@@ -138,12 +143,12 @@ void game_update(GameState& state) {
 
                 // Generate noise
                 MapType map_type = (MapType)network_get_match_setting(MATCH_SETTING_MAP_TYPE);
+                MapSize map_size = (MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE);
                 int noise_lcg_seed = lcg_seed;
-                uint64_t noise_seed = (uint64_t)noise_lcg_seed;
+                uint64_t map_seed = (uint64_t)noise_lcg_seed;
                 uint64_t forest_seed = (uint64_t)lcg_rand(&noise_lcg_seed);
-                int map_width = match_setting_get_map_size((MapSize)network_get_match_setting(MATCH_SETTING_MAP_SIZE));
-                int map_height = map_width;
-                Noise* noise = noise_generate(map_type, noise_seed, forest_seed, map_width, map_height);
+                NoiseGenParams params = noise_create_noise_gen_params(map_type, map_size, map_seed, forest_seed);
+                Noise* noise = noise_generate(params);
 
                 network_begin_loading_match(lcg_seed, noise);
 

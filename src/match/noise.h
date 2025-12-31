@@ -19,7 +19,20 @@ struct Noise {
     uint8_t* forest;
 };
 
-Noise* noise_generate(MapType map_type, uint64_t seed, uint64_t forest_seed, int width, int height);
+struct NoiseGenParams {
+    int width;
+    int height;
+    uint64_t map_seed;
+    uint64_t forest_seed;
+    uint32_t water_threshold;
+    uint32_t lowground_threshold;
+    uint32_t forest_threshold;
+    bool map_inverted;
+};
+
+NoiseGenParams noise_create_noise_gen_params(MapType map_type, MapSize map_size, uint64_t map_seed, uint64_t forest_seed);
+Noise* noise_init(int width, int height);
+Noise* noise_generate(const NoiseGenParams& params);
 void noise_free(Noise* noise);
 
 size_t noise_serialized_size(const Noise* noise);

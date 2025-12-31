@@ -342,72 +342,12 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
         artifacts.clear();
 
         log_debug("Baking map tiles...");
-        for (int y = 0; y < map.height; y++) {
-            for (int x = 0; x < map.width; x++) {
-                int index = x + (y * map.width);
-                if (noise->map[index] == NOISE_VALUE_LOWGROUND || noise->map[index] == NOISE_VALUE_HIGHGROUND) {
-                    map.tiles[index].elevation = (uint32_t)(noise->map[index] == NOISE_VALUE_HIGHGROUND);
-                    // First check if we need to place a regular wall here
-                    uint32_t neighbors = 0;
-                    if (noise->map[index] == NOISE_VALUE_HIGHGROUND) {
-                        for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                            ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                            if (!map_is_cell_in_bounds(map, neighbor_cell)) {
-                                continue;
-                            }
-                            int neighbor_index = neighbor_cell.x + (neighbor_cell.y * map.width);
-                            uint32_t neighbor_elevation = (uint32_t)(noise->map[neighbor_index] == NOISE_VALUE_HIGHGROUND);
-                            if (map.tiles[index].elevation > neighbor_elevation) {
-                                neighbors += DIRECTION_MASK[direction];
-                            }
-                        }
-                    }
-
-                    // Regular sand tile 
-                    if (neighbors == 0) {
-                        map.tiles[index].sprite = map_choose_ground_tile_sprite(map_type, index, lcg_seed);
-                    // Wall tile 
-                    } else {
-                        map.tiles[index].sprite = map_wall_autotile_lookup(neighbors);
-                        if (map.tiles[index].sprite == SPRITE_TILE_NULL) {
-                            artifacts.push_back(ivec2(x, y));
-                        }
-                    }
-                } else if (noise->map[index] == NOISE_VALUE_WATER) {
-                    uint32_t neighbors = 0;
-                    // Check adjacent neighbors
-                    for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
-                        ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                        if (!map_is_cell_in_bounds(map, neighbor_cell) || 
-                                noise->map[index] == noise->map[neighbor_cell.x + (neighbor_cell.y * map.width)]) {
-                            neighbors += DIRECTION_MASK[direction];
-                        }
-                    }
-                    // Check diagonal neighbors
-                    for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
-                        ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
-                        int prev_direction = direction - 1;
-                        int next_direction = (direction + 1) % DIRECTION_COUNT;
-                        if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
-                                (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
-                            continue;
-                        }
-                        if (!map_is_cell_in_bounds(map, neighbor_cell) || 
-                                noise->map[index] == noise->map[neighbor_cell.x + (neighbor_cell.y * map.width)]) {
-                            neighbors += DIRECTION_MASK[direction];
-                        }
-                    }
-                    // Set the map tile based on the neighbors
-                    uint32_t autotile_index = map_neighbors_to_autotile_index(neighbors);
-                    map.tiles[index] = (Tile) {
-                        .sprite = map_choose_water_tile_sprite(map_type),
-                        .frame = ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES),
-                        .elevation = 0
-                    };
-                // End else if tile is water
-                } 
-            } // end for each x
-        } // end for each y
+        map_bake_tiles(map, noise, lcg_seed);
+        for (int index = 0; index < map.width * map.height; index++) {
+            if (map.tiles[index].sprite == SPRITE_TILE_NULL) {
+                artifacts.push_back(ivec2(index % map.width, index / map.width));
+            }
+        }
 
         log_debug("Artifacts count: %u", artifacts.size());
     } while (!artifacts.empty());
@@ -957,6 +897,72 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
             other_connection.cost_to_connection[connection_index] = path.size();
         }
     }
+}
+
+void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed) {
+    for (int y = 0; y < map.height; y++) {
+        for (int x = 0; x < map.width; x++) {
+            int index = x + (y * map.width);
+            if (noise->map[index] == NOISE_VALUE_LOWGROUND || noise->map[index] == NOISE_VALUE_HIGHGROUND) {
+                map.tiles[index].elevation = (uint32_t)(noise->map[index] == NOISE_VALUE_HIGHGROUND);
+                // First check if we need to place a regular wall here
+                uint32_t neighbors = 0;
+                if (noise->map[index] == NOISE_VALUE_HIGHGROUND) {
+                    for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
+                        ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                        if (!map_is_cell_in_bounds(map, neighbor_cell)) {
+                            continue;
+                        }
+                        int neighbor_index = neighbor_cell.x + (neighbor_cell.y * map.width);
+                        uint32_t neighbor_elevation = (uint32_t)(noise->map[neighbor_index] == NOISE_VALUE_HIGHGROUND);
+                        if (map.tiles[index].elevation > neighbor_elevation) {
+                            neighbors += DIRECTION_MASK[direction];
+                        }
+                    }
+                }
+
+                // Regular sand tile 
+                if (neighbors == 0) {
+                    map.tiles[index].sprite = map_choose_ground_tile_sprite(map.type, index, lcg_seed);
+                // Wall tile 
+                } else {
+                    map.tiles[index].sprite = map_wall_autotile_lookup(neighbors);
+                }
+            } else if (noise->map[index] == NOISE_VALUE_WATER) {
+                uint32_t neighbors = 0;
+                // Check adjacent neighbors
+                for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                    if (!map_is_cell_in_bounds(map, neighbor_cell) || 
+                            noise->map[index] == noise->map[neighbor_cell.x + (neighbor_cell.y * map.width)]) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+                // Check diagonal neighbors
+                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                    ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
+                    int prev_direction = direction - 1;
+                    int next_direction = (direction + 1) % DIRECTION_COUNT;
+                    if ((DIRECTION_MASK[prev_direction] & neighbors) != DIRECTION_MASK[prev_direction] ||
+                            (DIRECTION_MASK[next_direction] & neighbors) != DIRECTION_MASK[next_direction]) {
+                        continue;
+                    }
+                    if (!map_is_cell_in_bounds(map, neighbor_cell) || 
+                            noise->map[index] == noise->map[neighbor_cell.x + (neighbor_cell.y * map.width)]) {
+                        neighbors += DIRECTION_MASK[direction];
+                    }
+                }
+                // Set the map tile based on the neighbors
+                uint32_t autotile_index = map_neighbors_to_autotile_index(neighbors);
+                map.tiles[index] = (Tile) {
+                    .sprite = map_choose_water_tile_sprite(map.type),
+                    .frame = ivec2(autotile_index % AUTOTILE_HFRAMES, autotile_index / AUTOTILE_HFRAMES),
+                    .elevation = 0
+                };
+            // End else if tile is water
+            } 
+        } // end for each x
+    } // end for each y
 }
 
 SpriteName map_choose_ground_tile_sprite(MapType map_type, int index, int* lcg_seed) {

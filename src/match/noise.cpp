@@ -162,43 +162,54 @@ float simplex_noise(uint64_t seed, double x, double y) {
     return value;
 }
 
-uint8_t noise_value_from_result(MapType map_type, double result) {
+NoiseGenParams noise_create_noise_gen_params(MapType map_type, MapSize map_size, uint64_t map_seed, uint64_t forest_seed) {
+    NoiseGenParams params;
+
+    params.width = match_setting_get_map_size(map_size);
+    params.height = params.width;
+    params.map_seed = map_seed;
+    params.forest_seed = forest_seed;
+
     switch (map_type) {
         case MAP_TYPE_TOMBSTONE: {
-            if (result < 0.15) {
-                return NOISE_VALUE_WATER;
-            } else if (result < 0.6) { 
-                return NOISE_VALUE_LOWGROUND;
-            } else {
-                return NOISE_VALUE_HIGHGROUND;
-            }
+            params.map_inverted = false;
+            params.water_threshold = 15;
+            params.lowground_threshold = 60;
+            params.forest_threshold = 0;
+            break;
         }
         case MAP_TYPE_KLONDIKE: {
-            if (result < 0.4) {
-                return NOISE_VALUE_HIGHGROUND;
-            } else if (result < 0.9) {
-                return NOISE_VALUE_LOWGROUND;
-            } else {
-                return NOISE_VALUE_WATER;
-            }
+            params.map_inverted = true;
+            params.water_threshold = 40;
+            params.lowground_threshold = 90;
+            params.forest_threshold = 25;
+            break;
         }
         case MAP_TYPE_COUNT: {
             GOLD_ASSERT(false);
-            return NOISE_VALUE_LOWGROUND;
+            break;
         }
+    }
+
+    return params;
+}
+
+uint8_t noise_value_from_result(const NoiseGenParams& params, double result) {
+    if (result < ((double)params.water_threshold / 100.0)) {
+        return params.map_inverted 
+            ? NOISE_VALUE_HIGHGROUND 
+            : NOISE_VALUE_WATER;
+    } else if (result < ((double)params.lowground_threshold / 100.0)) {
+        return NOISE_VALUE_LOWGROUND;
+    } else {
+        return params.map_inverted 
+            ? NOISE_VALUE_WATER
+            : NOISE_VALUE_HIGHGROUND;
     }
 }
 
-uint8_t noise_forest_value_from_result(MapType map_type, double result) {
-    switch (map_type) {
-        case MAP_TYPE_TOMBSTONE:
-            return 0;
-        case MAP_TYPE_KLONDIKE:
-            return (uint8_t)(result < 0.25);
-        case MAP_TYPE_COUNT:
-            GOLD_ASSERT(false);
-            return 0;
-    }
+uint8_t noise_forest_value_from_result(const NoiseGenParams& params, double result) {
+    return (uint8_t)(result < ((double)params.forest_threshold / 100.0));
 }
 
 Noise* noise_init(int width, int height) {
@@ -211,8 +222,8 @@ Noise* noise_init(int width, int height) {
     return noise;
 }
 
-Noise* noise_generate(MapType map_type, uint64_t seed, uint64_t forest_seed, int width, int height) {
-    Noise* noise = noise_init(width, height);
+Noise* noise_generate(const NoiseGenParams& params) {
+    Noise* noise = noise_init(params.width, params.height);
 
     const double FREQUENCY = 1.0 / 56.0;
     const double FOREST_FREQUENCY = 1.0 / 8.0;
@@ -220,11 +231,11 @@ Noise* noise_generate(MapType map_type, uint64_t seed, uint64_t forest_seed, int
     for (int x = 0; x < noise->width; x++) {
         for (int y = 0; y < noise->height; y++) {
             // simplex_noise generates a result from -1 to 1, so we convert to the range 0 to 1
-            double perlin_result = (1.0 + simplex_noise(seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
-            noise->map[x + (y * noise->width)] = noise_value_from_result(map_type, perlin_result);
+            double perlin_result = (1.0 + simplex_noise(params.map_seed, x * FREQUENCY, y * FREQUENCY)) * 0.5;
+            noise->map[x + (y * noise->width)] = noise_value_from_result(params, perlin_result);
 
-            double forest_result = (1.0 + simplex_noise(forest_seed, x * FOREST_FREQUENCY, y * FOREST_FREQUENCY)) * 0.5;
-            noise->forest[x + (y * noise->width)] = noise_forest_value_from_result(map_type, forest_result);
+            double forest_result = (1.0 + simplex_noise(params.forest_seed, x * FOREST_FREQUENCY, y * FOREST_FREQUENCY)) * 0.5;
+            noise->forest[x + (y * noise->width)] = noise_forest_value_from_result(params, forest_result);
         }
     }
 

@@ -60,6 +60,8 @@ struct EditorState {
     EditorMode mode;
     UI ui;
 
+    int bake_tiles_lcg_seed;
+    Noise* noise;
     Map map;
     IdArray<Entity, MATCH_MAX_ENTITIES> entities;
     MatchPlayer players[MAX_PLAYERS];
@@ -75,17 +77,24 @@ struct EditorState {
 
     uint32_t menu_new_map_type;
     uint32_t menu_new_map_size;
+    uint32_t menu_new_use_noise_gen_params;
+    uint32_t menu_new_noise_gen_inverted;
 };
 static EditorState state;
 
+// Update
 bool editor_is_in_menu();
 void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_input();
 void editor_handle_console_message(const std::vector<std::string>& words);
 void editor_handle_toolbar_action(const std::string& action);
+bool editor_menu_dropdown(const char* prompt, uint32_t* selection, const std::vector<std::string>& items, const Rect& rect);
+void editor_free_map();
 void editor_new_map();
+void editor_bake_map_tiles();
 
+// Render
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell);
 MinimapPixel editor_get_minimap_pixel_for_entity(const Entity& entity);
@@ -102,6 +111,8 @@ void editor_init() {
 
     state.menu_new_map_size = MAP_SIZE_SMALL;
     state.menu_new_map_type = MAP_TYPE_TOMBSTONE;
+    state.menu_new_use_noise_gen_params = 0;
+    state.menu_new_noise_gen_inverted = 0;
     editor_new_map();
 
     memset(state.players, 0, sizeof(state.players));
@@ -116,6 +127,10 @@ void editor_init() {
     state.camera_drag_mouse_position = ivec2(-1, -1);
 
     log_info("Initialized map editor.");
+}
+
+void editor_quit() {
+    editor_free_map();
 }
 
 void editor_update() {
@@ -151,26 +166,24 @@ void editor_update() {
         ui_text(state.ui, FONT_HACK_GOLD, "New Map");
 
         ui_begin_column(state.ui, ivec2(MENU_NEW_RECT.x + 8, MENU_NEW_RECT.y + 30), 4);
-            const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
             // Map type
-            ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
-            ui_begin_row(state.ui, ivec2(0, 0), 0);
-                ui_element_position(state.ui, ivec2(0, 3));
-                ui_text(state.ui, FONT_HACK_GOLD, "Map Type:");
+            if (editor_menu_dropdown("Map Type:", &state.menu_new_map_type, match_setting_data(MATCH_SETTING_MAP_TYPE).values, MENU_NEW_RECT)) {
 
-                ui_element_position(state.ui, ivec2(MENU_NEW_RECT.w - 16 - dropdown_sprite_info.frame_width, 0));
-                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.menu_new_map_type, match_setting_data(MATCH_SETTING_MAP_TYPE).values, false);
-            ui_end_container(state.ui);
+            }
 
             // Map size
-            ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height + 4));
-            ui_begin_row(state.ui, ivec2(0, 0), 0);
-                ui_element_position(state.ui, ivec2(0, 3));
-                ui_text(state.ui, FONT_HACK_GOLD, "Map Size:");
+            if (editor_menu_dropdown("Map Size:", &state.menu_new_map_size, match_setting_data(MATCH_SETTING_MAP_SIZE).values, MENU_NEW_RECT)) {
 
-                ui_element_position(state.ui, ivec2(MENU_NEW_RECT.w - 16 - dropdown_sprite_info.frame_width, 0));
-                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.menu_new_map_size, match_setting_data(MATCH_SETTING_MAP_SIZE).values, false);
-            ui_end_container(state.ui);
+            }
+
+            // Use noise gen params
+            if (editor_menu_dropdown("Generation Style:", &state.menu_new_use_noise_gen_params, { "Blank", "Noise" }, MENU_NEW_RECT)) {
+
+            }
+
+            if (state.menu_new_use_noise_gen_params) {
+                editor_menu_dropdown("Noise Inverted:", &state.menu_new_noise_gen_inverted, { "No", "Yes" }, MENU_NEW_RECT);
+            }
         ui_end_container(state.ui);
 
         ui_element_position(state.ui, ui_button_position_frame_bottom_left(MENU_NEW_RECT));
@@ -294,15 +307,56 @@ void editor_handle_toolbar_action(const std::string& action) {
     if (action == "New") {
         state.menu_new_map_type = MAP_TYPE_TOMBSTONE;
         state.menu_new_map_size = MAP_SIZE_SMALL;
+        state.menu_new_use_noise_gen_params = 0;
+        state.menu_new_noise_gen_inverted = 0;
         state.mode = EDITOR_MODE_MENU_NEW;
     }
 }
 
+bool editor_menu_dropdown(const char* prompt, uint32_t* selection, const std::vector<std::string>& items, const Rect& rect) {
+    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+
+    bool dropdown_clicked = false;
+
+    ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
+    ui_begin_row(state.ui, ivec2(0, 0), 0);
+        ui_element_position(state.ui, ivec2(0, 3));
+        ui_text(state.ui, FONT_HACK_GOLD, prompt);
+
+        ui_element_position(state.ui, ivec2(rect.w - 16 - dropdown_sprite_info.frame_width, 0));
+        dropdown_clicked = ui_dropdown(state.ui, UI_DROPDOWN_MINI, selection, items, false);
+    ui_end_container(state.ui);
+
+    return dropdown_clicked;
+}
+
+void editor_free_map() {
+    noise_free(state.noise);
+    state.noise = NULL;
+}
+
 void editor_new_map() {
+    if (state.noise != NULL) {
+        editor_free_map();
+    }
+
     Map map;
     int map_size = match_setting_get_map_size((MapSize)state.menu_new_map_size);
+    state.noise = noise_init(map_size, map_size);
+    for (int index = 0; index < state.noise->width * state.noise->height; index++) {
+        state.noise->map[index] = NOISE_VALUE_LOWGROUND;
+        state.noise->forest[index] = 0;
+    }
     map_init(map, (MapType)state.menu_new_map_type, map_size, map_size);
     state.map = map;
+
+    state.bake_tiles_lcg_seed = rand();
+    editor_bake_map_tiles();
+}
+
+void editor_bake_map_tiles() {
+    int lcg_seed = state.bake_tiles_lcg_seed;
+    map_bake_tiles(state.map, state.noise, &lcg_seed);
 }
 
 void editor_render() {
