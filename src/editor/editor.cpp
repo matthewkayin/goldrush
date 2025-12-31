@@ -20,7 +20,6 @@ static const size_t CONSOLE_MESSAGE_MAX_LENGTH = 256;
 static const uint32_t CONSOLE_CURSOR_BLINK_DURATION = 30;
 static const ivec2 CONSOLE_MESSAGE_POSITION = ivec2(8, SCREEN_HEIGHT - 24);
 
-// Minimap
 static const Rect TOOLBAR_RECT = (Rect) {
     .x = 0, .y = 0,
     .w = SCREEN_WIDTH, .h = 22
@@ -45,6 +44,13 @@ static const Rect CANVAS_RECT = (Rect) {
     .h = SCREEN_HEIGHT - STATUS_RECT.h - TOOLBAR_RECT.h
 };
 
+static const Rect MENU_NEW_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (200 / 2),
+    .y = 64,
+    .w = 200,
+    .h = 128
+};
+
 enum EditorMode {
     EDITOR_MODE_DEFAULT,
     EDITOR_MODE_MENU_NEW
@@ -66,6 +72,9 @@ struct EditorState {
     std::string console_message;
     bool console_cursor_visible;
     uint32_t console_cursor_blink_timer;
+
+    uint32_t menu_new_map_type;
+    uint32_t menu_new_map_size;
 };
 static EditorState state;
 
@@ -74,6 +83,8 @@ void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_input();
 void editor_handle_console_message(const std::vector<std::string>& words);
+void editor_handle_toolbar_action(const std::string& action);
+void editor_new_map();
 
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell);
@@ -89,7 +100,9 @@ void editor_init() {
     state.mode = EDITOR_MODE_DEFAULT;
     state.ui = ui_init();
 
-    map_init(state.map, MAP_TYPE_TOMBSTONE, 96, 96);
+    state.menu_new_map_size = MAP_SIZE_SMALL;
+    state.menu_new_map_type = MAP_TYPE_TOMBSTONE;
+    editor_new_map();
 
     memset(state.players, 0, sizeof(state.players));
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
@@ -119,7 +132,7 @@ void editor_update() {
         };
         std::string action;
         if (ui_toolbar(state.ui, &action, TOOLBAR_OPTIONS, 2)) {
-            log_debug("TOOLBAR %s", action.c_str());
+            editor_handle_toolbar_action(action);
         }
     ui_end_container(state.ui);
 
@@ -128,8 +141,54 @@ void editor_update() {
     ui_element_position(state.ui, ivec2(4, SCREEN_HEIGHT - 15));
     ui_text(state.ui, FONT_HACK_WHITE, "Status Text");
 
+    // New menu
+    if (state.mode == EDITOR_MODE_MENU_NEW) {
+        state.ui.input_enabled = true;
+        ui_frame_rect(state.ui, MENU_NEW_RECT);
+
+        ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "New Map");
+        ui_element_position(state.ui, ivec2(MENU_NEW_RECT.x + (MENU_NEW_RECT.w / 2) - (header_text_size.x / 2), MENU_NEW_RECT.y + 6));
+        ui_text(state.ui, FONT_HACK_GOLD, "New Map");
+
+        ui_begin_column(state.ui, ivec2(MENU_NEW_RECT.x + 8, MENU_NEW_RECT.y + 30), 4);
+            const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
+            // Map type
+            ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height));
+            ui_begin_row(state.ui, ivec2(0, 0), 0);
+                ui_element_position(state.ui, ivec2(0, 3));
+                ui_text(state.ui, FONT_HACK_GOLD, "Map Type:");
+
+                ui_element_position(state.ui, ivec2(MENU_NEW_RECT.w - 16 - dropdown_sprite_info.frame_width, 0));
+                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.menu_new_map_type, match_setting_data(MATCH_SETTING_MAP_TYPE).values, false);
+            ui_end_container(state.ui);
+
+            // Map size
+            ui_element_size(state.ui, ivec2(0, dropdown_sprite_info.frame_height + 4));
+            ui_begin_row(state.ui, ivec2(0, 0), 0);
+                ui_element_position(state.ui, ivec2(0, 3));
+                ui_text(state.ui, FONT_HACK_GOLD, "Map Size:");
+
+                ui_element_position(state.ui, ivec2(MENU_NEW_RECT.w - 16 - dropdown_sprite_info.frame_width, 0));
+                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.menu_new_map_size, match_setting_data(MATCH_SETTING_MAP_SIZE).values, false);
+            ui_end_container(state.ui);
+        ui_end_container(state.ui);
+
+        ui_element_position(state.ui, ui_button_position_frame_bottom_left(MENU_NEW_RECT));
+        if (ui_button(state.ui, "Back")) {
+            state.mode = EDITOR_MODE_DEFAULT;
+        }
+        ui_element_position(state.ui, ui_button_position_frame_bottom_right(MENU_NEW_RECT, "Create"));
+        if (ui_button(state.ui, "Create")) {
+            editor_new_map();
+            state.mode = EDITOR_MODE_DEFAULT;
+        }
+    }
+
     // Camera drag
-    if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK)) {
+    if (input_is_action_just_pressed(INPUT_ACTION_RIGHT_CLICK) && 
+            !state.is_minimap_dragging && 
+            !editor_is_in_menu() &&
+            CANVAS_RECT.has_point(input_get_mouse_position())) {
         state.camera_drag_previous_offset = state.camera_offset;
         state.camera_drag_mouse_position = input_get_mouse_position();
     }
@@ -145,6 +204,7 @@ void editor_update() {
     // Minimap drag
     if (MINIMAP_RECT.has_point(input_get_mouse_position()) &&
             state.camera_drag_mouse_position.x == -1 &&
+            !editor_is_in_menu() &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         state.is_minimap_dragging = true;
     }
@@ -228,6 +288,21 @@ void editor_handle_input() {
 
 void editor_handle_console_message(const std::vector<std::string>& words) {
     GOLD_ASSERT(!words.empty());
+}
+
+void editor_handle_toolbar_action(const std::string& action) {
+    if (action == "New") {
+        state.menu_new_map_type = MAP_TYPE_TOMBSTONE;
+        state.menu_new_map_size = MAP_SIZE_SMALL;
+        state.mode = EDITOR_MODE_MENU_NEW;
+    }
+}
+
+void editor_new_map() {
+    Map map;
+    int map_size = match_setting_get_map_size((MapSize)state.menu_new_map_size);
+    map_init(map, (MapType)state.menu_new_map_type, map_size, map_size);
+    state.map = map;
 }
 
 void editor_render() {
