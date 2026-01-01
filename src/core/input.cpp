@@ -160,6 +160,27 @@ void input_poll_events() {
                         break;
                     }
                     default: {
+                    // Map editor shortcuts
+                    #ifdef GOLD_DEBUG
+                        const bool ctrl_is_pressed = SDL_GetKeyboardState(NULL)[SDL_SCANCODE_LCTRL];
+                        if (event.key.scancode == SDL_SCANCODE_S && ctrl_is_pressed) {
+                            state.current[INPUT_ACTION_EDITOR_SAVE] = event.type == SDL_EVENT_KEY_DOWN;
+                            break;
+                        }
+                        if (event.key.scancode == SDL_SCANCODE_Z && ctrl_is_pressed) {
+                            state.current[INPUT_ACTION_EDITOR_UNDO] = event.type == SDL_EVENT_KEY_DOWN;
+                            break;
+                        }
+                        if (event.key.scancode == SDL_SCANCODE_R && ctrl_is_pressed) {
+                            state.current[INPUT_ACTION_EDITOR_REDO] = event.type == SDL_EVENT_KEY_DOWN;
+                            break;
+                        }
+                        if (event.key.scancode == SDL_SCANCODE_B) {
+                            state.current[INPUT_ACTION_EDITOR_TOOL_BRUSH] = event.type == SDL_EVENT_KEY_DOWN;
+                            break;
+                        }
+                    #endif
+
                         if (event.key.scancode >= SDL_SCANCODE_1 && event.key.scancode <= SDL_SCANCODE_0) {
                             int key_index = event.key.scancode - SDL_SCANCODE_1;
                             state.current[INPUT_ACTION_NUM1 + key_index] = event.type == SDL_EVENT_KEY_DOWN;

@@ -175,6 +175,29 @@ void editor_update() {
         ui_text(state.ui, FONT_HACK_GOLD, status_text);
     }
 
+    // Editor shortcuts
+    if (!editor_is_in_menu() && 
+            !state.is_minimap_dragging && 
+            !state.is_painting &&
+            state.camera_drag_mouse_position.x == -1) {
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_SAVE)) {
+            editor_handle_toolbar_action("File", "Save");
+            return;
+        }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_UNDO)) {
+            editor_handle_toolbar_action("Edit", "Undo");
+            return;
+        }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_REDO)) {
+            editor_handle_toolbar_action("Edit", "Redo");
+            return;
+        }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_BRUSH)) {
+            editor_handle_toolbar_action("Tool", "Brush");
+            return;
+        }
+    }
+
     // Menu new
     if (state.menu_new.mode == EDITOR_MENU_NEW_OPEN) {
         editor_menu_new_update(state.menu_new, state.ui);
@@ -311,12 +334,11 @@ ivec2 editor_get_hovered_cell() {
 }
 
 void editor_do_action(const EditorAction& action) {
-    if (state.action_head == state.actions.size()) {
-        state.actions.push_back(action);
-    } else {
-        editor_action_destroy(state.actions[state.action_head]);
-        state.actions[state.action_head] = action;
+    while (state.actions.size() > state.action_head) {
+        editor_action_destroy(state.actions.back());
+        state.actions.pop_back();
     }
+    state.actions.push_back(action);
     state.action_head++;
 
     editor_action_execute(state.document, action, EDITOR_ACTION_MODE_DO);
