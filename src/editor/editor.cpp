@@ -46,33 +46,39 @@ static const Rect CANVAS_RECT = (Rect) {
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save" },
     { "Edit", "Undo", "Redo" },
-    { "Tool", "Brush", "Fill" }
+    { "Tool", "Brush", "Fill", "Rect" }
 };
 
 enum EditorTool {
     EDITOR_TOOL_BRUSH,
-    EDITOR_TOOL_FILL
+    EDITOR_TOOL_FILL,
+    EDITOR_TOOL_RECT
 };
 
 struct EditorState {
     UI ui;
-
-    EditorTool tool;
-    uint32_t tool_value;
-    std::vector<EditorActionBrushStroke> tool_brush_stroke;
-
     EditorDocument* document;
 
+    // Actions
     size_t action_head;
     std::vector<EditorAction> actions;
 
+    // Menus
     EditorMenuNew menu_new;
 
+    // Tool
+    EditorTool tool;
+    uint32_t tool_value;
+    std::vector<EditorActionBrushStroke> tool_brush_stroke;
+    ivec2 tool_rect_origin;
+    ivec2 tool_rect_end;
+    bool is_painting;
+
+    // Camera
     ivec2 camera_drag_previous_offset;
     ivec2 camera_drag_mouse_position;
     ivec2 camera_offset;
     bool is_minimap_dragging;
-    bool is_painting;
 };
 static EditorState state;
 
@@ -89,6 +95,9 @@ void editor_undo_action();
 void editor_redo_action();
 void editor_clear_actions();
 void editor_fill();
+Rect editor_tool_rect_get_rect();
+std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke();
+SpriteName editor_tool_rect_get_preview_sprite();
 
 // Render
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
@@ -153,7 +162,8 @@ void editor_update() {
 
             switch (state.tool) {
                 case EDITOR_TOOL_BRUSH: 
-                case EDITOR_TOOL_FILL: {
+                case EDITOR_TOOL_FILL:
+                case EDITOR_TOOL_RECT: {
                     editor_menu_dropdown(state.ui, "Value:", &state.tool_value, { "Water", "Lowground", "Highground" }, SIDEBAR_RECT);
                     break;
                 }
@@ -261,26 +271,41 @@ void editor_update() {
         } else if (state.tool == EDITOR_TOOL_FILL) {
             editor_fill();
             return;
+        } else if (state.tool == EDITOR_TOOL_RECT && !state.is_painting) {
+            state.is_painting = true;
+            state.tool_rect_origin = editor_get_hovered_cell();
+            state.tool_rect_end = editor_get_hovered_cell();
         }
     }
 
-    // Brush paint
+    // Paint
     if (state.is_painting && CANVAS_RECT.has_point(input_get_mouse_position())) {
-        ivec2 cell = editor_get_hovered_cell();
-        if (editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value) {
-            state.tool_brush_stroke.push_back((EditorActionBrushStroke) {
-                .cell = cell,
-                .previous_value = editor_document_get_noise_map_value(state.document, cell)
-            });
-            editor_document_set_noise_map_value(state.document, cell, state.tool_value);
+        if (state.tool == EDITOR_TOOL_BRUSH) {
+            ivec2 cell = editor_get_hovered_cell();
+            if (editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value) {
+                state.tool_brush_stroke.push_back((EditorActionBrushStroke) {
+                    .cell = cell,
+                    .previous_value = editor_document_get_noise_map_value(state.document, cell)
+                });
+                editor_document_set_noise_map_value(state.document, cell, state.tool_value);
+            }
+        } else if (state.tool == EDITOR_TOOL_RECT) {
+            state.tool_rect_end = editor_get_hovered_cell();
         }
     }
 
     // Brush release
     if (state.is_painting && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
         state.is_painting = false;
-        if (!state.tool_brush_stroke.empty()) {
-            EditorAction action = editor_action_create_brush(state.tool_brush_stroke, state.tool_value);
+        if (state.tool == EDITOR_TOOL_BRUSH) {
+            if (!state.tool_brush_stroke.empty()) {
+                EditorAction action = editor_action_create_brush(state.tool_brush_stroke, state.tool_value);
+                action.brush.skip_do = true;
+                editor_do_action(action);
+            }
+        } else if (state.tool == EDITOR_TOOL_RECT) {
+            std::vector<EditorActionBrushStroke> stroke = editor_tool_rect_get_brush_stroke();
+            EditorAction action = editor_action_create_brush(stroke, state.tool_value);
             editor_do_action(action);
         }
         return;
@@ -339,6 +364,8 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             editor_set_tool(EDITOR_TOOL_BRUSH);
         } else if (action == "Fill") {
             editor_set_tool(EDITOR_TOOL_FILL);
+        } else if (action == "Rect") {
+            editor_set_tool(EDITOR_TOOL_RECT);
         }
     }
 }
@@ -351,7 +378,8 @@ void editor_set_tool(EditorTool tool) {
     state.tool = tool;
     switch (state.tool) {
         case EDITOR_TOOL_BRUSH:
-        case EDITOR_TOOL_FILL: {
+        case EDITOR_TOOL_FILL: 
+        case EDITOR_TOOL_RECT: {
             if (state.tool_value > NOISE_VALUE_HIGHGROUND) {
                 state.tool_value = NOISE_VALUE_LOWGROUND;
             }
@@ -444,6 +472,61 @@ void editor_fill() {
 
     EditorAction fill_action = editor_action_create_fill(fill_indices, previous_value, new_value);
     editor_do_action(fill_action);
+}
+
+Rect editor_tool_rect_get_rect() {
+    // The +1 on the width and height is to ensure that the rect is inclusive of the end cell
+    return (Rect) {
+        .x = std::min(state.tool_rect_origin.x, state.tool_rect_end.x),
+        .y = std::min(state.tool_rect_origin.y, state.tool_rect_end.y),
+        .w = std::abs(state.tool_rect_origin.x - state.tool_rect_end.x) + 1,
+        .h = std::abs(state.tool_rect_origin.y - state.tool_rect_end.y) + 1
+    };
+}
+
+std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke() {
+    Rect rect = editor_tool_rect_get_rect();
+
+    std::vector<EditorActionBrushStroke> stroke;
+    std::function<void(ivec2)> stroke_push_back = [&stroke](ivec2 cell) {
+        stroke.push_back((EditorActionBrushStroke) {
+            .cell = cell,
+            .previous_value = editor_document_get_noise_map_value(state.document, cell)
+        });
+    };
+    // Rect top row
+    for (int x = rect.x; x < rect.x + rect.w; x++) {
+        stroke_push_back(ivec2(x, rect.y));
+    }
+    // Rect sides
+    for (int y = rect.y + 1; y < rect.y + rect.h - 1; y++) {
+        stroke_push_back(ivec2(rect.x, y));
+        stroke_push_back(ivec2(rect.x + rect.w - 1, y));
+    }
+    // Rect bottom row
+    for (int x = rect.x; x < rect.x + rect.w; x++) {
+        stroke_push_back(ivec2(x, rect.y + rect.h - 1));
+    }
+
+    return stroke;
+}
+
+SpriteName editor_tool_rect_get_preview_sprite() {
+    switch (state.tool_value) {
+        case NOISE_VALUE_WATER: {
+            return map_choose_water_tile_sprite(state.document->map.type);
+        }
+        case NOISE_VALUE_LOWGROUND: {
+            return map_get_plain_ground_tile_sprite(state.document->map.type);
+        }
+        case NOISE_VALUE_HIGHGROUND: {
+            return SPRITE_TILE_WALL_SOUTH_EDGE;
+        }
+        default: {
+            GOLD_ASSERT(false);
+            return SPRITE_TILE_NULL;
+        }
+    }
 }
 
 void editor_render() {
@@ -556,6 +639,24 @@ void editor_render() {
                 .w = TILE_SIZE, .h = TILE_SIZE
             };
             render_draw_rect(rect, RENDER_COLOR_WHITE);
+        }
+    }
+
+    // Tool rect preview
+    if (state.is_painting && state.tool == EDITOR_TOOL_RECT) {
+        Rect rect = editor_tool_rect_get_rect();
+        std::function<void(ivec2)> render_rect_preview = [](ivec2 cell) {
+            ivec2 cell_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + (cell * TILE_SIZE) - state.camera_offset;
+            render_sprite_frame(editor_tool_rect_get_preview_sprite(), ivec2(0, 0), cell_position, RENDER_SPRITE_NO_CULL, 0);
+        };
+
+        for (int x = rect.x; x < rect.x + rect.w; x++) {
+            render_rect_preview(ivec2(x, rect.y));
+            render_rect_preview(ivec2(x, rect.y + rect.h - 1));
+        }
+        for (int y = rect.y + 1; y < rect.y + rect.h - 1; y++) {
+            render_rect_preview(ivec2(rect.x, y));
+            render_rect_preview(ivec2(rect.x + rect.w - 1, y));
         }
     }
 

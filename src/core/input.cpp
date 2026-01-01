@@ -136,9 +136,11 @@ void input_poll_events() {
                         state.current[INPUT_ACTION_EDITOR_REDO] = 
                             key_state[SDL_SCANCODE_R] && key_state[SDL_SCANCODE_LCTRL];
                         state.current[INPUT_ACTION_EDITOR_TOOL_BRUSH] = 
-                            key_state[SDL_SCANCODE_B]; 
+                            key_state[SDL_SCANCODE_B] && !key_state[SDL_SCANCODE_LCTRL]; 
                         state.current[INPUT_ACTION_EDITOR_TOOL_FILL] = 
-                            key_state[SDL_SCANCODE_F]; 
+                            key_state[SDL_SCANCODE_F] && !key_state[SDL_SCANCODE_LCTRL]; 
+                        state.current[INPUT_ACTION_EDITOR_TOOL_RECT] = 
+                            key_state[SDL_SCANCODE_R] && !key_state[SDL_SCANCODE_LCTRL];
                     }
                 #endif
 

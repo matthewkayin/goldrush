@@ -13,6 +13,7 @@ EditorAction editor_action_create_brush(const std::vector<EditorActionBrushStrok
     action.brush.stroke = (EditorActionBrushStroke*)malloc(action.brush.stroke_size * sizeof(EditorActionBrushStroke));
     memcpy(action.brush.stroke, &stroke[0], action.brush.stroke_size * sizeof(EditorActionBrushStroke));
     action.brush.new_value = new_value;
+    action.brush.skip_do = false;
 
     return action;
 }
@@ -46,7 +47,7 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
     switch (action.type) {
         case EDITOR_ACTION_BRUSH: {
             // Don't do anything for do because we have already been painting the tiles
-            if (mode == EDITOR_ACTION_MODE_DO) {
+            if (action.brush.skip_do && mode == EDITOR_ACTION_MODE_DO) {
                 break;
             }
 

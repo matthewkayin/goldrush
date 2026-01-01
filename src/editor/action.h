@@ -29,6 +29,7 @@ struct EditorActionBrush {
     uint32_t stroke_size;
     EditorActionBrushStroke* stroke;
     uint8_t new_value;
+    bool skip_do;
 };
 
 struct EditorActionFill {
