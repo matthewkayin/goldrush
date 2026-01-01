@@ -1,5 +1,9 @@
 #include "document.h"
 
+#ifdef GOLD_DEBUG
+
+#include "core/logger.h"
+
 EditorDocument* editor_document_base_init() {
     EditorDocument* document = (EditorDocument*)malloc(sizeof(EditorDocument));
     if (document == NULL) {
@@ -90,3 +94,5 @@ void editor_document_set_noise_map_value(EditorDocument* document, ivec2 cell, u
     map_bake_tiles(document->map, document->noise, &lcg_seed);
     map_bake_front_walls(document->map);
 }
+
+#endif

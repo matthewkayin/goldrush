@@ -1,5 +1,7 @@
 #include "ui.h"
 
+#ifdef GOLD_DEBUG
+
 bool editor_menu_dropdown(UI& ui, const char* prompt, uint32_t* selection, const std::vector<std::string>& items, const Rect& rect) {
     const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
 
@@ -29,3 +31,5 @@ void editor_menu_slider(UI& ui, const char* prompt, uint32_t* value, const Rect&
         ui_slider(ui, value, NULL, 0, 100, UI_SLIDER_DISPLAY_RAW_VALUE);
     ui_end_container(ui);
 }
+
+#endif

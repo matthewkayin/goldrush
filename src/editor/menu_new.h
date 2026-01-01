@@ -1,6 +1,9 @@
 #pragma once
 
 #include "defines.h"
+
+#ifdef GOLD_DEBUG
+
 #include "core/ui.h"
 #include "editor/document.h"
 
@@ -24,3 +27,5 @@ struct EditorMenuNew {
 EditorMenuNew editor_menu_new_open();
 void editor_menu_new_update(EditorMenuNew& menu, UI& ui);
 NoiseGenParams editor_menu_new_create_noise_gen_params(const EditorMenuNew& menu);
+
+#endif

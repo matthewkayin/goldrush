@@ -1,5 +1,9 @@
 #pragma once
 
+#include "defines.h"
+
+#ifdef GOLD_DEBUG
+
 #include "match/noise.h"
 #include "match/state.h"
 #include "match/map.h"
@@ -20,3 +24,5 @@ void editor_document_free(EditorDocument* document);
 
 uint8_t editor_document_get_noise_map_value(EditorDocument* document, ivec2 cell);
 void editor_document_set_noise_map_value(EditorDocument* document, ivec2 cell, uint8_t value);
+
+#endif

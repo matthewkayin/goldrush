@@ -48,11 +48,15 @@ enum EditorTool {
 };
 
 struct EditorState {
-    EditorTool tool;
     UI ui;
+
+    EditorTool tool;
+    uint32_t tool_value;
+    std::vector<EditorActionBrushStroke> tool_brush_stroke;
 
     EditorDocument* document;
 
+    size_t action_head;
     std::vector<EditorAction> actions;
 
     EditorMenuNew menu_new;
@@ -62,17 +66,21 @@ struct EditorState {
     ivec2 camera_offset;
     bool is_minimap_dragging;
     bool is_painting;
-    uint32_t tool_value;
 };
 static EditorState state;
 
 // Update
+void editor_free_current_document();
 bool editor_is_in_menu();
 void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_toolbar_action(const std::string& column, const std::string& action);
 void editor_set_tool(EditorTool tool);
 ivec2 editor_get_hovered_cell();
+void editor_do_action(const EditorAction& action);
+void editor_undo_action();
+void editor_redo_action();
+void editor_clear_actions();
 
 // Render
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
@@ -89,6 +97,8 @@ void editor_init() {
     state.ui = ui_init();
     state.document = editor_document_init_blank(MAP_TYPE_TOMBSTONE, MAP_SIZE_SMALL);
 
+    state.action_head = 0;
+
     state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
 
     state.camera_offset = ivec2(0, 0);
@@ -98,10 +108,16 @@ void editor_init() {
     log_info("Initialized map editor.");
 }
 
-void editor_quit() {
+void editor_free_current_document() {
     if (state.document != NULL) {
         editor_document_free(state.document);
+        state.document = NULL;
     }
+    editor_clear_actions();
+}
+
+void editor_quit() {
+    editor_free_current_document();
 }
 
 void editor_update() {
@@ -114,12 +130,14 @@ void editor_update() {
     ui_begin_row(state.ui, ivec2(3, 3), 2);
         static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
             { "File", "New", "Open", "Save" },
-            { "Edit", "Undo" },
+            { "Edit", "Undo", "Redo" },
             { "Tool", "Brush" }
         };
-        std::string column, action;
-        if (ui_toolbar(state.ui, &column, &action, TOOLBAR_OPTIONS, 2)) {
-            editor_handle_toolbar_action(column, action);
+        {
+            std::string column, action;
+            if (ui_toolbar(state.ui, &column, &action, TOOLBAR_OPTIONS, 2)) {
+                editor_handle_toolbar_action(column, action);
+            }
         }
     ui_end_container(state.ui);
 
@@ -162,6 +180,8 @@ void editor_update() {
         editor_menu_new_update(state.menu_new, state.ui);
     }
     if (state.menu_new.mode == EDITOR_MENU_NEW_CREATE) {
+        editor_free_current_document();
+
         MapType map_type = (MapType)state.menu_new.map_type;
         MapSize map_size = (MapSize)state.menu_new.map_size;
         if (state.menu_new.use_noise_gen_params) {
@@ -171,6 +191,7 @@ void editor_update() {
             state.document = editor_document_init_blank(map_type, map_size);
         }
         state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
+        return;
     }
 
     // Camera drag
@@ -184,6 +205,7 @@ void editor_update() {
     }
     if (input_is_action_just_released(INPUT_ACTION_RIGHT_CLICK)) {
         state.camera_drag_mouse_position = ivec2(-1, -1);
+        return;
     }
     if (state.camera_drag_mouse_position.x != -1) {
         ivec2 mouse_position_difference = input_get_mouse_position() - state.camera_drag_mouse_position;
@@ -198,14 +220,24 @@ void editor_update() {
             state.tool == EDITOR_TOOL_BRUSH &&
             CANVAS_RECT.has_point(input_get_mouse_position())) {
         state.is_painting = true;
+        state.tool_brush_stroke.clear();
     }
     if (state.is_painting && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
         state.is_painting = false;
+        if (!state.tool_brush_stroke.empty()) {
+            EditorAction action = editor_action_create_brush(state.tool_brush_stroke, state.tool_value);
+            editor_do_action(action);
+        }
+        return;
     }
     if (state.is_painting && CANVAS_RECT.has_point(input_get_mouse_position())) {
         ivec2 cell = editor_get_hovered_cell();
         if (editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value) {
-            // TODO: paint
+            state.tool_brush_stroke.push_back((EditorActionBrushStroke) {
+                .cell = cell,
+                .previous_value = editor_document_get_noise_map_value(state.document, cell)
+            });
+            editor_document_set_noise_map_value(state.document, cell, state.tool_value);
         }
     }
 
@@ -218,6 +250,7 @@ void editor_update() {
     }
     if (state.is_minimap_dragging && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
         state.is_minimap_dragging = false;
+        return;
     }
     if (state.is_minimap_dragging) {
         ivec2 minimap_pos = ivec2(
@@ -250,6 +283,12 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
         if (action == "New") {
             state.menu_new = editor_menu_new_open();
         }
+    } else if (column == "Edit") {
+        if (action == "Undo") {
+            editor_undo_action();
+        } else if (action == "Redo") {
+            editor_redo_action();
+        }
     } else if (column == "Tool") {
         if (action == "Brush") {
             editor_set_tool(EDITOR_TOOL_BRUSH);
@@ -269,6 +308,43 @@ void editor_set_tool(EditorTool tool) {
 
 ivec2 editor_get_hovered_cell() {
     return ((input_get_mouse_position() - ivec2(CANVAS_RECT.x, CANVAS_RECT.y)) + state.camera_offset) / TILE_SIZE;
+}
+
+void editor_do_action(const EditorAction& action) {
+    if (state.action_head == state.actions.size()) {
+        state.actions.push_back(action);
+    } else {
+        editor_action_destroy(state.actions[state.action_head]);
+        state.actions[state.action_head] = action;
+    }
+    state.action_head++;
+
+    editor_action_execute(state.document, action, EDITOR_ACTION_MODE_DO);
+}
+
+void editor_undo_action() {
+    if (state.action_head == 0) {
+        return;
+    }
+
+    state.action_head--;
+    editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_UNDO);
+}
+
+void editor_redo_action() {
+    if (state.action_head == state.actions.size()) {
+        return;
+    }
+
+    editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_REDO);
+    state.action_head++;
+}
+
+void editor_clear_actions() {
+    for (EditorAction& action : state.actions) {
+        editor_action_destroy(action);
+    }
+    state.actions.clear();
 }
 
 void editor_render() {
@@ -346,7 +422,8 @@ void editor_render() {
 
                 // Underground entities
                 if (cell_layer == CELL_LAYER_UNDERGROUND) {
-                    for (const Entity& entity : state.document->entities) {
+                    for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+                        const Entity& entity = state.document->entities[entity_index];
                         const EntityData& entity_data = entity_get_data(entity.type);
                         if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
                                 entity_get_elevation(entity, state.document->map) != elevation) {

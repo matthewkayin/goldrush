@@ -1,5 +1,7 @@
 #include "menu_new.h"
 
+#ifdef GOLD_DEBUG
+
 #include "editor/ui.h"
 
 static const Rect MENU_NEW_RECT = (Rect) {
@@ -46,7 +48,7 @@ void editor_menu_new_update(EditorMenuNew& menu, UI& ui) {
             editor_menu_dropdown(ui, "Noise Inverted:", &menu.noise_gen_inverted, { "No", "Yes" }, MENU_NEW_RECT);
             editor_menu_slider(ui, menu.noise_gen_inverted ? "Highground Threshold:" : "Water Threshold:", &menu.noise_gen_water_threshold, MENU_NEW_RECT);
             editor_menu_slider(ui, "Lowground Threshold:", &menu.noise_gen_lowground_threshold, MENU_NEW_RECT);
-            if (ui, menu.map_type == MAP_TYPE_KLONDIKE) {
+            if (menu.map_type == MAP_TYPE_KLONDIKE) {
                 editor_menu_slider(ui, "Forest Threshold:", &menu.noise_gen_forest_threshold, MENU_NEW_RECT);
             }
         }
@@ -84,3 +86,5 @@ NoiseGenParams editor_menu_new_create_noise_gen_params(const EditorMenuNew& menu
 
     return params;
 }
+
+#endif

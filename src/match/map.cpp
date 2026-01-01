@@ -874,6 +874,7 @@ void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed) {
             int index = x + (y * map.width);
             if (noise->map[index] == NOISE_VALUE_LOWGROUND || noise->map[index] == NOISE_VALUE_HIGHGROUND) {
                 map.tiles[index].elevation = (uint32_t)(noise->map[index] == NOISE_VALUE_HIGHGROUND);
+                map.tiles[index].frame = ivec2(0, 0);
                 // First check if we need to place a regular wall here
                 uint32_t neighbors = 0;
                 if (noise->map[index] == NOISE_VALUE_HIGHGROUND) {
@@ -883,8 +884,7 @@ void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed) {
                             continue;
                         }
                         int neighbor_index = neighbor_cell.x + (neighbor_cell.y * map.width);
-                        uint32_t neighbor_elevation = (uint32_t)(noise->map[neighbor_index] == NOISE_VALUE_HIGHGROUND);
-                        if (map.tiles[index].elevation > neighbor_elevation) {
+                        if (noise->map[neighbor_index] != NOISE_VALUE_HIGHGROUND) {
                             neighbors += DIRECTION_MASK[direction];
                         }
                     }
