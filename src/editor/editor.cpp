@@ -45,14 +45,19 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save" },
-    { "Edit", "Undo", "Redo" },
-    { "Tool", "Brush", "Fill", "Rect" }
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste" },
+    { "Tool", "Brush", "Fill", "Rect", "Select" }
 };
 
 enum EditorTool {
     EDITOR_TOOL_BRUSH,
     EDITOR_TOOL_FILL,
-    EDITOR_TOOL_RECT
+    EDITOR_TOOL_RECT,
+    EDITOR_TOOL_SELECT
+};
+
+struct EditorClipboardContents {
+    std::vector<EditorActionBrushStroke> stroke;
 };
 
 struct EditorState {
@@ -72,6 +77,9 @@ struct EditorState {
     std::vector<EditorActionBrushStroke> tool_brush_stroke;
     ivec2 tool_rect_origin;
     ivec2 tool_rect_end;
+    ivec2 tool_select_origin;
+    ivec2 tool_select_end;
+    Rect tool_select_selection;
     bool is_painting;
 
     // Camera
@@ -89,6 +97,7 @@ void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_toolbar_action(const std::string& column, const std::string& action);
 void editor_set_tool(EditorTool tool);
+ivec2 editor_canvas_to_world_space(ivec2 point);
 ivec2 editor_get_hovered_cell();
 void editor_do_action(const EditorAction& action);
 void editor_undo_action();
@@ -98,6 +107,9 @@ void editor_fill();
 Rect editor_tool_rect_get_rect();
 std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke();
 SpriteName editor_tool_rect_get_preview_sprite();
+Rect editor_tool_select_get_select_rect();
+void editor_tool_select_clear_selection();
+Rect editor_cell_rect_to_world_space(const Rect& rect);
 
 // Render
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
@@ -120,6 +132,7 @@ void editor_init() {
 
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
+    state.is_painting = false;
     state.camera_drag_mouse_position = ivec2(-1, -1);
 
     log_info("Initialized map editor.");
@@ -128,6 +141,7 @@ void editor_init() {
 void editor_free_current_document() {
     if (state.document != NULL) {
         editor_document_free(state.document);
+        editor_tool_select_clear_selection();
         state.document = NULL;
     }
     editor_clear_actions();
@@ -165,6 +179,9 @@ void editor_update() {
                 case EDITOR_TOOL_FILL:
                 case EDITOR_TOOL_RECT: {
                     editor_menu_dropdown(state.ui, "Value:", &state.tool_value, { "Water", "Lowground", "Highground" }, SIDEBAR_RECT);
+                    break;
+                }
+                case EDITOR_TOOL_SELECT: {
                     break;
                 }
             }
@@ -211,12 +228,32 @@ void editor_update() {
             editor_handle_toolbar_action("Edit", "Redo");
             return;
         }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_COPY)) {
+            editor_handle_toolbar_action("Edit", "Copy");
+            return;
+        }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_CUT)) {
+            editor_handle_toolbar_action("Edit", "Cut");
+            return;
+        }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_PASTE)) {
+            editor_handle_toolbar_action("Edit", "Cut");
+            return;
+        }
         if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_BRUSH)) {
             editor_handle_toolbar_action("Tool", "Brush");
             return;
         }
         if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_FILL)) {
             editor_handle_toolbar_action("Tool", "Fill");
+            return;
+        }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_RECT)) {
+            editor_handle_toolbar_action("Tool", "Rect");
+            return;
+        }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_SELECT)) {
+            editor_handle_toolbar_action("Tool", "Select");
             return;
         }
     }
@@ -275,10 +312,15 @@ void editor_update() {
             state.is_painting = true;
             state.tool_rect_origin = editor_get_hovered_cell();
             state.tool_rect_end = editor_get_hovered_cell();
+        } else if (state.tool == EDITOR_TOOL_SELECT && !state.is_painting) {
+            const ivec2 world_space_mouse_pos = editor_canvas_to_world_space(input_get_mouse_position());
+            state.tool_select_origin = world_space_mouse_pos;
+            state.tool_select_end = state.tool_select_origin;
+            state.is_painting = true;
         }
     }
 
-    // Paint
+    // Paint / Selection move
     if (state.is_painting && CANVAS_RECT.has_point(input_get_mouse_position())) {
         if (state.tool == EDITOR_TOOL_BRUSH) {
             ivec2 cell = editor_get_hovered_cell();
@@ -291,12 +333,16 @@ void editor_update() {
             }
         } else if (state.tool == EDITOR_TOOL_RECT) {
             state.tool_rect_end = editor_get_hovered_cell();
+        } else if (state.tool == EDITOR_TOOL_SELECT) {
+            state.tool_select_end = editor_canvas_to_world_space(input_get_mouse_position()); 
         }
     }
 
     // Brush release
     if (state.is_painting && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
+        const bool was_painting = state.is_painting;
         state.is_painting = false;
+
         if (state.tool == EDITOR_TOOL_BRUSH) {
             if (!state.tool_brush_stroke.empty()) {
                 EditorAction action = editor_action_create_brush(state.tool_brush_stroke, state.tool_value);
@@ -307,7 +353,24 @@ void editor_update() {
             std::vector<EditorActionBrushStroke> stroke = editor_tool_rect_get_brush_stroke();
             EditorAction action = editor_action_create_brush(stroke, state.tool_value);
             editor_do_action(action);
+        } else if (state.tool == EDITOR_TOOL_SELECT && was_painting) {
+            if (state.tool_select_end == state.tool_select_origin) {
+                editor_tool_select_clear_selection();
+                return;
+            }
+            Rect select_rect = editor_tool_select_get_select_rect();
+            if (!input_is_action_pressed(INPUT_ACTION_SHIFT)) {
+                editor_tool_select_clear_selection();
+            }
+            state.tool_select_selection = select_rect;
+        } else if (state.tool == EDITOR_TOOL_SELECT && !was_painting) {
+            ivec2 origin_cell = state.tool_select_origin / TILE_SIZE;
+            ivec2 end_cell = state.tool_select_end / TILE_SIZE;
+            if (origin_cell == end_cell) {
+                return;
+            }
         }
+
         return;
     }
 
@@ -366,6 +429,8 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             editor_set_tool(EDITOR_TOOL_FILL);
         } else if (action == "Rect") {
             editor_set_tool(EDITOR_TOOL_RECT);
+        } else if (action == "Select") {
+            editor_set_tool(EDITOR_TOOL_SELECT);
         }
     }
 }
@@ -385,11 +450,18 @@ void editor_set_tool(EditorTool tool) {
             }
             break;
         }
+        case EDITOR_TOOL_SELECT: {
+            break;
+        }
     }
 }
 
+ivec2 editor_canvas_to_world_space(ivec2 point) {
+    return point - ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + state.camera_offset;
+}
+
 ivec2 editor_get_hovered_cell() {
-    return ((input_get_mouse_position() - ivec2(CANVAS_RECT.x, CANVAS_RECT.y)) + state.camera_offset) / TILE_SIZE;
+    return editor_canvas_to_world_space(input_get_mouse_position()) / TILE_SIZE;
 }
 
 void editor_do_action(const EditorAction& action) {
@@ -529,6 +601,32 @@ SpriteName editor_tool_rect_get_preview_sprite() {
     }
 }
 
+Rect editor_tool_select_get_select_rect() {
+    ivec2 origin_cell = state.tool_select_origin / TILE_SIZE;
+    ivec2 end_cell = state.tool_select_end / TILE_SIZE;
+    return (Rect) {
+        .x = std::min(origin_cell.x, end_cell.x),
+        .y = std::min(origin_cell.y, end_cell.y),
+        .w = std::abs(origin_cell.x - end_cell.x) + 1,
+        .h = std::abs(origin_cell.y - end_cell.y) + 1
+    };
+}
+
+void editor_tool_select_clear_selection() {
+    state.tool_select_selection = (Rect) {
+        .x = -1, .y = -1, .w = 0, .h = 0
+    };
+}
+
+Rect editor_cell_rect_to_world_space(const Rect& rect) {
+    return (Rect) {
+        .x = (rect.x * TILE_SIZE) - state.camera_offset.x,
+        .y = (rect.y * TILE_SIZE) - state.camera_offset.y,
+        .w = rect.w * TILE_SIZE,
+        .h = rect.h * TILE_SIZE
+    };
+}
+
 void editor_render() {
     if (state.document != NULL) {
         std::vector<RenderSpriteParams> ysort_params;
@@ -657,6 +755,21 @@ void editor_render() {
         for (int y = rect.y + 1; y < rect.y + rect.h - 1; y++) {
             render_rect_preview(ivec2(rect.x, y));
             render_rect_preview(ivec2(rect.x + rect.w - 1, y));
+        }
+    }
+
+    // Selection
+    {
+        if ((state.is_painting && state.tool == EDITOR_TOOL_SELECT) || state.tool_select_selection.x != -1) {
+            const Rect rect = state.is_painting && state.tool == EDITOR_TOOL_SELECT 
+                ? editor_tool_select_get_select_rect()
+                : state.tool_select_selection;
+            Rect rendered_rect = editor_cell_rect_to_world_space(rect);
+            rendered_rect.x += CANVAS_RECT.x;
+            rendered_rect.y += CANVAS_RECT.y;
+            if (CANVAS_RECT.intersects(rendered_rect)) {
+                render_draw_rect(rendered_rect, RENDER_COLOR_WHITE);
+            }
         }
     }
 

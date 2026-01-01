@@ -129,18 +129,32 @@ void input_poll_events() {
                     // This ensures that any colliding hotkeys still work in debug (such as S for stop)
                     if (!state.should_capture_mouse) {
                         const bool* key_state = SDL_GetKeyboardState(NULL);
+                        // Use CMD instead of CTRL on Mac version of the editor
+                        #ifdef PLATFORM_MACOS
+                            const SDL_Scancode CTRL = SDL_SCANCODE_LGUI;
+                        #else
+                            const SDL_Scancode CTRL = SDL_SCANCODE_LCTRL;
+                        #endif
                         state.current[INPUT_ACTION_EDITOR_SAVE] = 
-                            key_state[SDL_SCANCODE_S] && key_state[SDL_SCANCODE_LCTRL];
+                            key_state[SDL_SCANCODE_S] && key_state[CTRL];
                         state.current[INPUT_ACTION_EDITOR_UNDO] = 
-                            key_state[SDL_SCANCODE_Z] && key_state[SDL_SCANCODE_LCTRL];
+                            key_state[SDL_SCANCODE_Z] && key_state[CTRL];
                         state.current[INPUT_ACTION_EDITOR_REDO] = 
-                            key_state[SDL_SCANCODE_R] && key_state[SDL_SCANCODE_LCTRL];
+                            key_state[SDL_SCANCODE_R] && key_state[CTRL];
                         state.current[INPUT_ACTION_EDITOR_TOOL_BRUSH] = 
-                            key_state[SDL_SCANCODE_B] && !key_state[SDL_SCANCODE_LCTRL]; 
+                            key_state[SDL_SCANCODE_B] && !key_state[CTRL]; 
                         state.current[INPUT_ACTION_EDITOR_TOOL_FILL] = 
-                            key_state[SDL_SCANCODE_F] && !key_state[SDL_SCANCODE_LCTRL]; 
+                            key_state[SDL_SCANCODE_F] && !key_state[CTRL]; 
                         state.current[INPUT_ACTION_EDITOR_TOOL_RECT] = 
-                            key_state[SDL_SCANCODE_R] && !key_state[SDL_SCANCODE_LCTRL];
+                            key_state[SDL_SCANCODE_R] && !key_state[CTRL];
+                        state.current[INPUT_ACTION_EDITOR_TOOL_SELECT] = 
+                            key_state[SDL_SCANCODE_S] && !key_state[CTRL];
+                        state.current[INPUT_ACTION_EDITOR_COPY] = 
+                            key_state[SDL_SCANCODE_C] && key_state[CTRL];
+                        state.current[INPUT_ACTION_EDITOR_CUT] = 
+                            key_state[SDL_SCANCODE_X] && key_state[CTRL];
+                        state.current[INPUT_ACTION_EDITOR_PASTE] = 
+                            key_state[SDL_SCANCODE_V] && key_state[CTRL];
                     }
                 #endif
 
