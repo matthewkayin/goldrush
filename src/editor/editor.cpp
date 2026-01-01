@@ -43,8 +43,15 @@ static const Rect CANVAS_RECT = (Rect) {
     .h = SCREEN_HEIGHT - STATUS_RECT.h - TOOLBAR_RECT.h
 };
 
+static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
+    { "File", "New", "Open", "Save" },
+    { "Edit", "Undo", "Redo" },
+    { "Tool", "Brush", "Fill" }
+};
+
 enum EditorTool {
-    EDITOR_TOOL_BRUSH
+    EDITOR_TOOL_BRUSH,
+    EDITOR_TOOL_FILL
 };
 
 struct EditorState {
@@ -81,6 +88,7 @@ void editor_do_action(const EditorAction& action);
 void editor_undo_action();
 void editor_redo_action();
 void editor_clear_actions();
+void editor_fill();
 
 // Render
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
@@ -121,25 +129,19 @@ void editor_quit() {
 }
 
 void editor_update() {
+    std::string toolbar_column, toolbar_action;
+    bool toolbar_was_clicked;
+
     ui_begin(state.ui);
     state.ui.input_enabled = 
         !state.is_minimap_dragging && 
         state.camera_drag_mouse_position.x == -1 &&
         !editor_is_in_menu();
+
+    // Toolbar
     ui_small_frame_rect(state.ui, TOOLBAR_RECT);
-    ui_begin_row(state.ui, ivec2(3, 3), 2);
-        static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
-            { "File", "New", "Open", "Save" },
-            { "Edit", "Undo", "Redo" },
-            { "Tool", "Brush" }
-        };
-        {
-            std::string column, action;
-            if (ui_toolbar(state.ui, &column, &action, TOOLBAR_OPTIONS, 2)) {
-                editor_handle_toolbar_action(column, action);
-            }
-        }
-    ui_end_container(state.ui);
+    ui_element_position(state.ui, ivec2(3, 3));
+    toolbar_was_clicked = ui_toolbar(state.ui, &toolbar_column, &toolbar_action, TOOLBAR_OPTIONS, 2);
 
     // Sidebar
     ui_small_frame_rect(state.ui, SIDEBAR_RECT);
@@ -150,7 +152,8 @@ void editor_update() {
             ui_text(state.ui, FONT_HACK_GOLD, tool_text);
 
             switch (state.tool) {
-                case EDITOR_TOOL_BRUSH: {
+                case EDITOR_TOOL_BRUSH: 
+                case EDITOR_TOOL_FILL: {
                     editor_menu_dropdown(state.ui, "Value:", &state.tool_value, { "Water", "Lowground", "Highground" }, SIDEBAR_RECT);
                     break;
                 }
@@ -175,6 +178,12 @@ void editor_update() {
         ui_text(state.ui, FONT_HACK_GOLD, status_text);
     }
 
+    // Toolbar click handle
+    if (toolbar_was_clicked) {
+        editor_handle_toolbar_action(toolbar_column, toolbar_action);
+        return;
+    }
+
     // Editor shortcuts
     if (!editor_is_in_menu() && 
             !state.is_minimap_dragging && 
@@ -194,6 +203,10 @@ void editor_update() {
         }
         if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_BRUSH)) {
             editor_handle_toolbar_action("Tool", "Brush");
+            return;
+        }
+        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_FILL)) {
+            editor_handle_toolbar_action("Tool", "Fill");
             return;
         }
     }
@@ -236,23 +249,22 @@ void editor_update() {
         editor_clamp_camera();
     }
 
-    // Paint
+    // Use tool
     if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !state.is_minimap_dragging &&
             !editor_is_in_menu() &&
-            state.tool == EDITOR_TOOL_BRUSH &&
+            state.camera_drag_mouse_position.x == -1 &&
             CANVAS_RECT.has_point(input_get_mouse_position())) {
-        state.is_painting = true;
-        state.tool_brush_stroke.clear();
-    }
-    if (state.is_painting && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
-        state.is_painting = false;
-        if (!state.tool_brush_stroke.empty()) {
-            EditorAction action = editor_action_create_brush(state.tool_brush_stroke, state.tool_value);
-            editor_do_action(action);
+        if (state.tool == EDITOR_TOOL_BRUSH && !state.is_painting) {
+            state.is_painting = true;
+            state.tool_brush_stroke.clear();
+        } else if (state.tool == EDITOR_TOOL_FILL) {
+            editor_fill();
+            return;
         }
-        return;
     }
+
+    // Brush paint
     if (state.is_painting && CANVAS_RECT.has_point(input_get_mouse_position())) {
         ivec2 cell = editor_get_hovered_cell();
         if (editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value) {
@@ -262,6 +274,16 @@ void editor_update() {
             });
             editor_document_set_noise_map_value(state.document, cell, state.tool_value);
         }
+    }
+
+    // Brush release
+    if (state.is_painting && input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
+        state.is_painting = false;
+        if (!state.tool_brush_stroke.empty()) {
+            EditorAction action = editor_action_create_brush(state.tool_brush_stroke, state.tool_value);
+            editor_do_action(action);
+        }
+        return;
     }
 
     // Minimap drag
@@ -315,15 +337,24 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
     } else if (column == "Tool") {
         if (action == "Brush") {
             editor_set_tool(EDITOR_TOOL_BRUSH);
+        } else if (action == "Fill") {
+            editor_set_tool(EDITOR_TOOL_FILL);
         }
     }
 }
 
 void editor_set_tool(EditorTool tool) {
+    if (state.is_painting) {
+        return;
+    }
+
     state.tool = tool;
     switch (state.tool) {
-        case EDITOR_TOOL_BRUSH: {
-            state.tool_value = NOISE_VALUE_LOWGROUND;
+        case EDITOR_TOOL_BRUSH:
+        case EDITOR_TOOL_FILL: {
+            if (state.tool_value > NOISE_VALUE_HIGHGROUND) {
+                state.tool_value = NOISE_VALUE_LOWGROUND;
+            }
             break;
         }
     }
@@ -367,6 +398,52 @@ void editor_clear_actions() {
         editor_action_destroy(action);
     }
     state.actions.clear();
+}
+
+void editor_fill() {
+    ivec2 cell = editor_get_hovered_cell();
+    if (editor_document_get_noise_map_value(state.document, cell) == (uint8_t)state.tool_value) {
+        return;
+    }
+
+    std::vector<int> fill_indices;
+    const uint8_t previous_value = editor_document_get_noise_map_value(state.document, cell);
+    const uint8_t new_value = (uint8_t)state.tool_value;
+
+    std::vector<ivec2> frontier;
+    std::vector<bool> is_explored(state.document->noise->width * state.document->noise->height, false);
+    frontier.push_back(cell);
+
+    while (!frontier.empty()) {
+        ivec2 next = frontier.back();
+        frontier.pop_back();
+        
+        if (is_explored[next.x + (next.y * state.document->noise->width)]) {
+            continue;
+        }
+
+        fill_indices.push_back(next.x + (next.y * state.document->noise->width));
+        is_explored[next.x + (next.y * state.document->noise->width)] = true;
+
+        for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
+            ivec2 child = next + DIRECTION_IVEC2[direction];
+            if (!map_is_cell_in_bounds(state.document->map, child)) {
+                continue;
+            }
+            if (is_explored[child.x + (child.y * state.document->noise->width)]) {
+                continue;
+            }
+            if (editor_document_get_noise_map_value(state.document, child) != previous_value) {
+                continue;
+            }
+            frontier.push_back(child);
+        }
+    }
+
+    std::sort(fill_indices.begin(), fill_indices.end());
+
+    EditorAction fill_action = editor_action_create_fill(fill_indices, previous_value, new_value);
+    editor_do_action(fill_action);
 }
 
 void editor_render() {

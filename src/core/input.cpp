@@ -123,6 +123,25 @@ void input_poll_events() {
             }
             case SDL_EVENT_KEY_DOWN:
             case SDL_EVENT_KEY_UP: {
+                // Map editor shortcuts
+                #ifdef GOLD_DEBUG
+                    // Only capture these shortcuts when mouse capture is disabled (i.e. when we are in the editor)
+                    // This ensures that any colliding hotkeys still work in debug (such as S for stop)
+                    if (!state.should_capture_mouse) {
+                        const bool* key_state = SDL_GetKeyboardState(NULL);
+                        state.current[INPUT_ACTION_EDITOR_SAVE] = 
+                            key_state[SDL_SCANCODE_S] && key_state[SDL_SCANCODE_LCTRL];
+                        state.current[INPUT_ACTION_EDITOR_UNDO] = 
+                            key_state[SDL_SCANCODE_Z] && key_state[SDL_SCANCODE_LCTRL];
+                        state.current[INPUT_ACTION_EDITOR_REDO] = 
+                            key_state[SDL_SCANCODE_R] && key_state[SDL_SCANCODE_LCTRL];
+                        state.current[INPUT_ACTION_EDITOR_TOOL_BRUSH] = 
+                            key_state[SDL_SCANCODE_B]; 
+                        state.current[INPUT_ACTION_EDITOR_TOOL_FILL] = 
+                            key_state[SDL_SCANCODE_F]; 
+                    }
+                #endif
+
                 if (event.type == SDL_EVENT_KEY_DOWN) {
                     state.key_just_pressed = event.key.scancode;
                 }
@@ -160,27 +179,6 @@ void input_poll_events() {
                         break;
                     }
                     default: {
-                    // Map editor shortcuts
-                    #ifdef GOLD_DEBUG
-                        const bool ctrl_is_pressed = SDL_GetKeyboardState(NULL)[SDL_SCANCODE_LCTRL];
-                        if (event.key.scancode == SDL_SCANCODE_S && ctrl_is_pressed) {
-                            state.current[INPUT_ACTION_EDITOR_SAVE] = event.type == SDL_EVENT_KEY_DOWN;
-                            break;
-                        }
-                        if (event.key.scancode == SDL_SCANCODE_Z && ctrl_is_pressed) {
-                            state.current[INPUT_ACTION_EDITOR_UNDO] = event.type == SDL_EVENT_KEY_DOWN;
-                            break;
-                        }
-                        if (event.key.scancode == SDL_SCANCODE_R && ctrl_is_pressed) {
-                            state.current[INPUT_ACTION_EDITOR_REDO] = event.type == SDL_EVENT_KEY_DOWN;
-                            break;
-                        }
-                        if (event.key.scancode == SDL_SCANCODE_B) {
-                            state.current[INPUT_ACTION_EDITOR_TOOL_BRUSH] = event.type == SDL_EVENT_KEY_DOWN;
-                            break;
-                        }
-                    #endif
-
                         if (event.key.scancode >= SDL_SCANCODE_1 && event.key.scancode <= SDL_SCANCODE_0) {
                             int key_index = event.key.scancode - SDL_SCANCODE_1;
                             state.current[INPUT_ACTION_NUM1 + key_index] = event.type == SDL_EVENT_KEY_DOWN;
