@@ -56,8 +56,10 @@ enum EditorTool {
     EDITOR_TOOL_SELECT
 };
 
-struct EditorClipboardContents {
-    std::vector<EditorActionBrushStroke> stroke;
+struct EditorClipboard {
+    int width;
+    int height;
+    std::vector<uint8_t> values;
 };
 
 struct EditorState {
@@ -71,7 +73,7 @@ struct EditorState {
     // Menus
     EditorMenuNew menu_new;
 
-    // Tool
+    // Tools
     EditorTool tool;
     uint32_t tool_value;
     std::vector<EditorActionBrushStroke> tool_brush_stroke;
@@ -81,12 +83,16 @@ struct EditorState {
     ivec2 tool_select_end;
     Rect tool_select_selection;
     bool is_painting;
+    bool is_pasting;
 
     // Camera
     ivec2 camera_drag_previous_offset;
     ivec2 camera_drag_mouse_position;
     ivec2 camera_offset;
     bool is_minimap_dragging;
+
+    // Clipboard
+    EditorClipboard clipboard;
 };
 static EditorState state;
 
@@ -106,10 +112,16 @@ void editor_clear_actions();
 void editor_fill();
 Rect editor_tool_rect_get_rect();
 std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke();
-SpriteName editor_tool_rect_get_preview_sprite();
+SpriteName editor_get_noise_preview_sprite(uint8_t value);
 Rect editor_tool_select_get_select_rect();
-void editor_tool_select_clear_selection();
 Rect editor_cell_rect_to_world_space(const Rect& rect);
+void editor_tool_select_clear_selection();
+void editor_clipboard_clear();
+bool editor_clipboard_is_empty();
+void editor_clipboard_copy();
+void editor_clipboard_paste(ivec2 cell);
+void editor_flatten_rect(const Rect& rect);
+bool editor_is_using_noise_tool();
 
 // Render
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
@@ -133,6 +145,7 @@ void editor_init() {
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
     state.is_painting = false;
+    state.is_pasting = false;
     state.camera_drag_mouse_position = ivec2(-1, -1);
 
     log_info("Initialized map editor.");
@@ -142,6 +155,7 @@ void editor_free_current_document() {
     if (state.document != NULL) {
         editor_document_free(state.document);
         editor_tool_select_clear_selection();
+        editor_clipboard_clear();
         state.document = NULL;
     }
     editor_clear_actions();
@@ -182,6 +196,10 @@ void editor_update() {
                     break;
                 }
                 case EDITOR_TOOL_SELECT: {
+                    if (state.is_pasting) {
+                        sprintf(tool_text, "Pasting %ux%u", state.clipboard.width, state.clipboard.height);
+                        ui_text(state.ui, FONT_HACK_GOLD, tool_text);
+                    }
                     break;
                 }
             }
@@ -207,6 +225,7 @@ void editor_update() {
 
     // Toolbar click handle
     if (toolbar_was_clicked) {
+        state.is_pasting = false;
         editor_handle_toolbar_action(toolbar_column, toolbar_action);
         return;
     }
@@ -215,6 +234,7 @@ void editor_update() {
     if (!editor_is_in_menu() && 
             !state.is_minimap_dragging && 
             !state.is_painting &&
+            !state.is_pasting &&
             state.camera_drag_mouse_position.x == -1) {
         if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_SAVE)) {
             editor_handle_toolbar_action("File", "Save");
@@ -237,7 +257,7 @@ void editor_update() {
             return;
         }
         if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_PASTE)) {
-            editor_handle_toolbar_action("Edit", "Cut");
+            editor_handle_toolbar_action("Edit", "Paste");
             return;
         }
         if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_BRUSH)) {
@@ -300,6 +320,7 @@ void editor_update() {
     if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !state.is_minimap_dragging &&
             !editor_is_in_menu() &&
+            !state.is_pasting &&
             state.camera_drag_mouse_position.x == -1 &&
             CANVAS_RECT.has_point(input_get_mouse_position())) {
         if (state.tool == EDITOR_TOOL_BRUSH && !state.is_painting) {
@@ -326,8 +347,9 @@ void editor_update() {
             ivec2 cell = editor_get_hovered_cell();
             if (editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value) {
                 state.tool_brush_stroke.push_back((EditorActionBrushStroke) {
-                    .cell = cell,
-                    .previous_value = editor_document_get_noise_map_value(state.document, cell)
+                    .index = cell.x + (cell.y * state.document->noise->width),
+                    .previous_value = editor_document_get_noise_map_value(state.document, cell),
+                    .new_value = (uint8_t)state.tool_value
                 });
                 editor_document_set_noise_map_value(state.document, cell, state.tool_value);
             }
@@ -345,13 +367,13 @@ void editor_update() {
 
         if (state.tool == EDITOR_TOOL_BRUSH) {
             if (!state.tool_brush_stroke.empty()) {
-                EditorAction action = editor_action_create_brush(state.tool_brush_stroke, state.tool_value);
+                EditorAction action = editor_action_create_brush(state.tool_brush_stroke);
                 action.brush.skip_do = true;
                 editor_do_action(action);
             }
         } else if (state.tool == EDITOR_TOOL_RECT) {
             std::vector<EditorActionBrushStroke> stroke = editor_tool_rect_get_brush_stroke();
-            EditorAction action = editor_action_create_brush(stroke, state.tool_value);
+            EditorAction action = editor_action_create_brush(stroke);
             editor_do_action(action);
         } else if (state.tool == EDITOR_TOOL_SELECT && was_painting) {
             if (state.tool_select_end == state.tool_select_origin) {
@@ -394,6 +416,15 @@ void editor_update() {
             (state.document->map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         editor_center_camera_on_cell(map_pos / TILE_SIZE);
     }
+
+    // Paste
+    if (state.is_pasting && 
+            CANVAS_RECT.has_point(input_get_mouse_position()) &&
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        ivec2 paste_cell = editor_get_hovered_cell();
+        editor_clipboard_paste(paste_cell);
+        state.is_pasting = false;
+    }
 }
 
 bool editor_is_in_menu() {
@@ -412,6 +443,15 @@ void editor_center_camera_on_cell(ivec2 cell) {
 }
 
 void editor_handle_toolbar_action(const std::string& column, const std::string& action) {
+    if (state.is_painting ||
+            editor_is_in_menu() ||
+            state.is_minimap_dragging ||
+            state.camera_drag_mouse_position.x != -1) {
+        return;
+    }
+
+    log_debug("toolbar action %s %s", column.c_str(), action.c_str());
+
     if (column == "File") {
         if (action == "New") {
             state.menu_new = editor_menu_new_open();
@@ -421,6 +461,22 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             editor_undo_action();
         } else if (action == "Redo") {
             editor_redo_action();
+        } else if ((action == "Copy" || action == "Cut") && 
+                !state.is_pasting &&
+                editor_is_using_noise_tool()) {
+            editor_clipboard_copy();
+            if (action == "Cut") {
+                editor_flatten_rect(state.tool_select_selection);
+                editor_tool_select_clear_selection();
+            }
+        } else if (action == "Paste" &&
+                !state.is_pasting &&
+                !editor_clipboard_is_empty() &&
+                editor_is_using_noise_tool()) {
+            editor_set_tool(EDITOR_TOOL_SELECT);
+            editor_tool_select_clear_selection();
+            state.is_pasting = true;
+            log_debug("begin pasting");
         }
     } else if (column == "Tool") {
         if (action == "Brush") {
@@ -436,7 +492,7 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
 }
 
 void editor_set_tool(EditorTool tool) {
-    if (state.is_painting) {
+    if (state.is_painting || state.is_pasting) {
         return;
     }
 
@@ -542,8 +598,16 @@ void editor_fill() {
 
     std::sort(fill_indices.begin(), fill_indices.end());
 
-    EditorAction fill_action = editor_action_create_fill(fill_indices, previous_value, new_value);
-    editor_do_action(fill_action);
+    std::vector<EditorActionBrushStroke> stroke;
+    for (int index : fill_indices) {
+        stroke.push_back((EditorActionBrushStroke) {
+            .index = index,
+            .previous_value = previous_value,
+            .new_value = new_value
+        });
+    }
+    EditorAction action = editor_action_create_brush(stroke);
+    editor_do_action(action);
 }
 
 Rect editor_tool_rect_get_rect() {
@@ -562,8 +626,9 @@ std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke() {
     std::vector<EditorActionBrushStroke> stroke;
     std::function<void(ivec2)> stroke_push_back = [&stroke](ivec2 cell) {
         stroke.push_back((EditorActionBrushStroke) {
-            .cell = cell,
-            .previous_value = editor_document_get_noise_map_value(state.document, cell)
+            .index = cell.x + (cell.y * state.document->noise->width),
+            .previous_value = editor_document_get_noise_map_value(state.document, cell),
+            .new_value = (uint8_t)state.tool_value
         });
     };
     // Rect top row
@@ -583,8 +648,8 @@ std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke() {
     return stroke;
 }
 
-SpriteName editor_tool_rect_get_preview_sprite() {
-    switch (state.tool_value) {
+SpriteName editor_get_noise_preview_sprite(uint8_t value) {
+    switch (value) {
         case NOISE_VALUE_WATER: {
             return map_choose_water_tile_sprite(state.document->map.type);
         }
@@ -625,6 +690,80 @@ Rect editor_cell_rect_to_world_space(const Rect& rect) {
         .w = rect.w * TILE_SIZE,
         .h = rect.h * TILE_SIZE
     };
+}
+
+void editor_clipboard_clear() {
+    state.clipboard.width = 0;
+    state.clipboard.height = 0;
+    state.clipboard.values.clear();
+}
+
+bool editor_clipboard_is_empty() {
+    return state.clipboard.width == 0;
+}
+
+void editor_clipboard_copy() {
+    if (state.tool_select_selection.x == -1) {
+        return;
+    }
+
+    editor_clipboard_clear();
+    state.clipboard.width = state.tool_select_selection.w;
+    state.clipboard.height = state.tool_select_selection.h;
+    state.clipboard.values.reserve(state.clipboard.width * state.clipboard.height);
+    for (int y = 0; y < state.clipboard.height; y++) {
+        for (int x = 0; x < state.clipboard.width; x++) {
+            ivec2 map_cell = ivec2(state.tool_select_selection.x + x, state.tool_select_selection.y + y);
+            state.clipboard.values.push_back(editor_document_get_noise_map_value(state.document, map_cell));
+        }
+    }
+}
+
+void editor_clipboard_paste(ivec2 top_left_cell) {
+    std::vector<EditorActionBrushStroke> stroke;
+
+    for (int y = 0; y < state.clipboard.height; y++) {
+        for (int x = 0; x < state.clipboard.width; x++) {
+            ivec2 cell = top_left_cell + ivec2(x, y);
+            if (!map_is_cell_in_bounds(state.document->map, cell)) {
+                continue;
+            }
+
+            int index = cell.x + (cell.y * state.document->noise->width);
+            stroke.push_back((EditorActionBrushStroke) {
+                .index = index,
+                .previous_value = state.document->noise->map[index],
+                .new_value = state.clipboard.values[x + (y * state.clipboard.width)]
+            });
+        }
+    }
+
+    EditorAction action = editor_action_create_brush(stroke);
+    editor_do_action(action);
+}
+
+bool editor_is_using_noise_tool() {
+    return state.tool == EDITOR_TOOL_BRUSH || 
+        state.tool == EDITOR_TOOL_FILL || 
+        state.tool == EDITOR_TOOL_RECT || 
+        state.tool == EDITOR_TOOL_SELECT;
+}
+
+void editor_flatten_rect(const Rect& rect) {
+    std::vector<EditorActionBrushStroke> stroke;
+
+    for (int y = rect.y; y < rect.y + rect.w; y++) {
+        for (int x = rect.x; x < rect.x + rect.h; x++) {
+            stroke.push_back((EditorActionBrushStroke) {
+                .index = x + (y * state.document->noise->width),
+                .previous_value = state.document->noise->map[x + (y * state.document->noise->width)],
+                .new_value = NOISE_VALUE_LOWGROUND
+            });
+        }
+    }
+
+    EditorAction action = editor_action_create_brush(stroke);
+    editor_do_action(action);
 }
 
 void editor_render() {
@@ -745,7 +884,7 @@ void editor_render() {
         Rect rect = editor_tool_rect_get_rect();
         std::function<void(ivec2)> render_rect_preview = [](ivec2 cell) {
             ivec2 cell_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + (cell * TILE_SIZE) - state.camera_offset;
-            render_sprite_frame(editor_tool_rect_get_preview_sprite(), ivec2(0, 0), cell_position, RENDER_SPRITE_NO_CULL, 0);
+            render_sprite_frame(editor_get_noise_preview_sprite(state.tool_value), ivec2(0, 0), cell_position, RENDER_SPRITE_NO_CULL, 0);
         };
 
         for (int x = rect.x; x < rect.x + rect.w; x++) {
@@ -756,6 +895,34 @@ void editor_render() {
             render_rect_preview(ivec2(rect.x, y));
             render_rect_preview(ivec2(rect.x + rect.w - 1, y));
         }
+    }
+
+    // Paste preview
+    if (state.is_pasting && state.tool == EDITOR_TOOL_SELECT && CANVAS_RECT.has_point(input_get_mouse_position())) {
+        const ivec2 hovered_cell = editor_get_hovered_cell();
+
+        // Draw preview cells
+        for (int y = 0; y < state.clipboard.height; y++) {
+            for (int x = 0; x < state.clipboard.width; x++) {
+                uint8_t clipboard_value = state.clipboard.values[x + (y * state.clipboard.width)];
+                SpriteName sprite = editor_get_noise_preview_sprite(clipboard_value);
+                ivec2 cell = hovered_cell + ivec2(x, y);
+                ivec2 cell_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + (cell * TILE_SIZE) - state.camera_offset;
+                render_sprite_frame(sprite, ivec2(0, 0), cell_position, 0, 0);
+            }
+        }
+
+        // Draw a rect around the paste area
+        const Rect paste_rect = (Rect) {
+            .x = hovered_cell.x,
+            .y = hovered_cell.y,
+            .w = state.clipboard.width,
+            .h = state.clipboard.height
+        };
+        Rect rendered_rect = editor_cell_rect_to_world_space(paste_rect);
+        rendered_rect.x += CANVAS_RECT.x;
+        rendered_rect.y += CANVAS_RECT.y;
+        render_draw_rect(rendered_rect, RENDER_COLOR_WHITE);
     }
 
     // Selection
