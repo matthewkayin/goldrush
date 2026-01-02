@@ -225,6 +225,7 @@ GameState game_debug_init(LaunchMode launch_mode) {
     state.launch_mode = launch_mode;
 
     if (state.launch_mode == LAUNCH_MODE_MAP_EDIT) {
+        log_info("Launching as map editor...");
         editor_init();
     }
 

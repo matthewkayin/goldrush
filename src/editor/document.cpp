@@ -24,13 +24,13 @@ EditorDocument* editor_document_base_init() {
 }
 
 void editor_document_init_map(EditorDocument* document, MapType map_type) {
-    document->map = Map();
-    map_init(document->map, map_type, document->noise->width, document->noise->height);
-    map_cleanup_noise(document->map, document->noise);
+    document->map = new Map();
+    map_init(*document->map, map_type, document->noise->width, document->noise->height);
+    map_cleanup_noise(*document->map, document->noise);
 
     int lcg_seed = document->tile_bake_seed;
-    map_bake_map_tiles_and_remove_artifacts(document->map, document->noise, &lcg_seed);
-    map_bake_front_walls(document->map);
+    map_bake_map_tiles_and_remove_artifacts(*document->map, document->noise, &lcg_seed);
+    map_bake_front_walls(*document->map);
 }
 
 EditorDocument* editor_document_init_blank(MapType map_type, MapSize map_size) {
@@ -80,6 +80,7 @@ EditorDocument* editor_document_init_generated(MapType map_type, const NoiseGenP
 
 void editor_document_free(EditorDocument* document) {
     noise_free(document->noise);
+    delete document->map;
     free(document);
 }
 
@@ -91,8 +92,8 @@ void editor_document_set_noise_map_value(EditorDocument* document, ivec2 cell, u
     document->noise->map[cell.x + (cell.y * document->noise->width)] = value;
 
     int lcg_seed = document->tile_bake_seed;
-    map_bake_tiles(document->map, document->noise, &lcg_seed);
-    map_bake_front_walls(document->map);
+    map_bake_tiles(*document->map, document->noise, &lcg_seed);
+    map_bake_front_walls(*document->map);
 }
 
 #endif

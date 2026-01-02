@@ -151,9 +151,11 @@ void editor_init() {
     if (option_get_value(OPTION_DISPLAY) != RENDER_DISPLAY_WINDOWED) {
         option_set_value(OPTION_DISPLAY, RENDER_DISPLAY_WINDOWED);
     }
+    log_debug("Set display to windowed.");
 
     state.ui = ui_init();
     state.document = editor_document_init_blank(MAP_TYPE_TOMBSTONE, MAP_SIZE_SMALL);
+    log_debug("Initialized document");
 
     state.action_head = 0;
 
@@ -393,14 +395,14 @@ void editor_update() {
             CANVAS_RECT.has_point(input_get_mouse_position()) &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         ivec2 cell = editor_get_hovered_cell();
-        Cell map_cell = map_get_cell(state.document->map, CELL_LAYER_GROUND, cell);
+        Cell map_cell = map_get_cell(*state.document->map, CELL_LAYER_GROUND, cell);
         if (map_cell.type == CELL_DECORATION || map_cell.type == CELL_EMPTY) {
-            const SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map.type);
+            const SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map->type);
             const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
             editor_do_action((EditorAction) {
                 .type = EDITOR_ACTION_DECORATE,
                 .decorate = (EditorActionDecorate) {
-                    .index = cell.x + (cell.y * state.document->map.width),
+                    .index = cell.x + (cell.y * state.document->map->width),
                     .previous_hframe = map_cell.type == CELL_DECORATION
                         ? map_cell.decoration_hframe
                         : EDITOR_ACTION_DECORATE_REMOVE_DECORATION,
@@ -428,8 +430,8 @@ void editor_update() {
             std::clamp(input_get_mouse_position().x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w),
             std::clamp(input_get_mouse_position().y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
         ivec2 map_pos = ivec2(
-            (state.document->map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-            (state.document->map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+            (state.document->map->width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+            (state.document->map->height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         editor_center_camera_on_cell(map_pos / TILE_SIZE);
     }
 
@@ -448,8 +450,8 @@ bool editor_is_in_menu() {
 }
 
 void editor_clamp_camera() {
-    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.document->map.width * TILE_SIZE) - CANVAS_RECT.w);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.document->map.height * TILE_SIZE) - CANVAS_RECT.h);
+    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.document->map->width * TILE_SIZE) - CANVAS_RECT.w);
+    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.document->map->height * TILE_SIZE) - CANVAS_RECT.h);
 }
 
 void editor_center_camera_on_cell(ivec2 cell) {
@@ -599,7 +601,7 @@ void editor_fill() {
 
         for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
             ivec2 child = next + DIRECTION_IVEC2[direction];
-            if (!map_is_cell_in_bounds(state.document->map, child)) {
+            if (!map_is_cell_in_bounds(*state.document->map, child)) {
                 continue;
             }
             if (is_explored[child.x + (child.y * state.document->noise->width)]) {
@@ -667,10 +669,10 @@ std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke() {
 SpriteName editor_get_noise_preview_sprite(uint8_t value) {
     switch (value) {
         case NOISE_VALUE_WATER: {
-            return map_choose_water_tile_sprite(state.document->map.type);
+            return map_choose_water_tile_sprite(state.document->map->type);
         }
         case NOISE_VALUE_LOWGROUND: {
-            return map_get_plain_ground_tile_sprite(state.document->map.type);
+            return map_get_plain_ground_tile_sprite(state.document->map->type);
         }
         case NOISE_VALUE_HIGHGROUND: {
             return SPRITE_TILE_WALL_SOUTH_EDGE;
@@ -741,7 +743,7 @@ void editor_clipboard_paste(ivec2 top_left_cell) {
     for (int y = 0; y < state.clipboard.height; y++) {
         for (int x = 0; x < state.clipboard.width; x++) {
             ivec2 cell = top_left_cell + ivec2(x, y);
-            if (!map_is_cell_in_bounds(state.document->map, cell)) {
+            if (!map_is_cell_in_bounds(*state.document->map, cell)) {
                 continue;
             }
 
@@ -784,11 +786,11 @@ void editor_flatten_rect(const Rect& rect) {
 
 void editor_generate_decorations() {
     std::vector<EditorActionDecorate> changes;
-    std::vector<int> change_indices(state.document->map.width * state.document->map.height, -1);
+    std::vector<int> change_indices(state.document->map->width * state.document->map->height, -1);
 
     // Clear all decorations and mark the changes
-    for (int index = 0; index < state.document->map.width * state.document->map.height; index++) {
-        Cell map_cell = state.document->map.cells[CELL_LAYER_GROUND][index];
+    for (int index = 0; index < state.document->map->width * state.document->map->height; index++) {
+        Cell map_cell = state.document->map->cells[CELL_LAYER_GROUND][index];
         if (map_cell.type != CELL_DECORATION) {
             continue;
         }
@@ -800,7 +802,7 @@ void editor_generate_decorations() {
         });
         change_indices[index] = (int)changes.size() - 1;
 
-        state.document->map.cells[CELL_LAYER_GROUND][index] = (Cell) {
+        state.document->map->cells[CELL_LAYER_GROUND][index] = (Cell) {
             .type = CELL_EMPTY,
             .id = ID_NULL
         };
@@ -816,11 +818,11 @@ void editor_generate_decorations() {
 
     // Generate decorations
     int generate_decorations_seed = rand();
-    map_generate_decorations(state.document->map, state.document->noise, &generate_decorations_seed, goldmine_cells);
+    map_generate_decorations(*state.document->map, state.document->noise, &generate_decorations_seed, goldmine_cells);
 
     // Record all changes
-    for (int index = 0; index < state.document->map.width * state.document->map.height; index++) {
-        Cell map_cell = state.document->map.cells[CELL_LAYER_GROUND][index];
+    for (int index = 0; index < state.document->map->width * state.document->map->height; index++) {
+        Cell map_cell = state.document->map->cells[CELL_LAYER_GROUND][index];
         if (map_cell.type != CELL_DECORATION) {
             continue;
         }
@@ -863,12 +865,12 @@ void editor_render() {
             // Render map
             for (int y = 0; y < max_visible_tiles.y; y++) {
                 for (int x = 0; x < max_visible_tiles.x; x++) {
-                    if (base_coords.x + x >= state.document->map.width || base_coords.y + y >= state.document->map.height) {
+                    if (base_coords.x + x >= state.document->map->width || base_coords.y + y >= state.document->map->height) {
                         continue;
                     }
 
-                    int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.document->map.width);
-                    Tile tile = state.document->map.tiles[map_index];
+                    int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.document->map->width);
+                    Tile tile = state.document->map->tiles[map_index];
 
                     ivec2 tile_params_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
                     RenderSpriteParams tile_params = (RenderSpriteParams) {
@@ -881,12 +883,12 @@ void editor_render() {
                     };
 
                     bool should_render_on_ground_level = 
-                        map_is_tile_ground(state.document->map, base_coords + ivec2(x, y)) || 
-                        map_is_tile_ramp(state.document->map, base_coords + ivec2(x, y));
+                        map_is_tile_ground(*state.document->map, base_coords + ivec2(x, y)) || 
+                        map_is_tile_ramp(*state.document->map, base_coords + ivec2(x, y));
                     if (elevation == 0 && 
-                            !map_is_tile_ground(state.document->map, base_coords + ivec2(x, y)) &&
-                            !map_is_tile_water(state.document->map, base_coords + ivec2(x, y))) {
-                        render_sprite_frame(map_get_plain_ground_tile_sprite(state.document->map.type), ivec2(0, 0), ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                            !map_is_tile_ground(*state.document->map, base_coords + ivec2(x, y)) &&
+                            !map_is_tile_water(*state.document->map, base_coords + ivec2(x, y))) {
+                        render_sprite_frame(map_get_plain_ground_tile_sprite(state.document->map->type), ivec2(0, 0), ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
                     }
                     if ((should_render_on_ground_level && elevation == 0) || 
                             (!should_render_on_ground_level && elevation == tile.elevation)) {
@@ -894,9 +896,9 @@ void editor_render() {
                     } 
 
                     // Decorations
-                    Cell cell = state.document->map.cells[CELL_LAYER_GROUND][map_index];
+                    Cell cell = state.document->map->cells[CELL_LAYER_GROUND][map_index];
                     if (cell.type == CELL_DECORATION && tile.elevation == elevation) {
-                        SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map.type);
+                        SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map->type);
                         const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
                         const int decoration_extra_height = decoration_sprite_info.frame_height - TILE_SIZE;
                         ysort_params.push_back((RenderSpriteParams) {
@@ -922,7 +924,7 @@ void editor_render() {
                         const Entity& entity = state.document->entities[entity_index];
                         const EntityData& entity_data = entity_get_data(entity.type);
                         if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
-                                entity_get_elevation(entity, state.document->map) != elevation) {
+                                entity_get_elevation(entity, *state.document->map) != elevation) {
                             continue;
                         }
                         if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
@@ -1048,8 +1050,8 @@ void editor_render() {
     if (state.document != NULL) {
         // MINIMAP
         // Minimap tiles
-        for (int y = 0; y < state.document->map.height; y++) {
-            for (int x = 0; x < state.document->map.width; x++) {
+        for (int y = 0; y < state.document->map->height; y++) {
+            for (int x = 0; x < state.document->map->width; x++) {
                 render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), editor_get_minimap_pixel_for_cell(ivec2(x, y)));
             }
         }
@@ -1064,8 +1066,8 @@ void editor_render() {
             render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, editor_get_minimap_pixel_for_entity(entity));
         }
         // Clear fog layer
-        for (int y = 0; y < state.document->map.height; y++) {
-            for (int x = 0; x < state.document->map.width; x++) {
+        for (int y = 0; y < state.document->map->height; y++) {
+            for (int x = 0; x < state.document->map->width; x++) {
                 render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
             }
         }
@@ -1077,7 +1079,7 @@ void editor_render() {
             .h = (SCREEN_HEIGHT / TILE_SIZE)
         };
         render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
-        render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.document->map.width, state.document->map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
+        render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.document->map->width, state.document->map->height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
     }
 }
 
@@ -1111,7 +1113,7 @@ RenderSpriteParams editor_create_entity_render_params(const Entity& entity) {
 }
 
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell) {
-    switch (map_get_tile(state.document->map, cell).sprite) {
+    switch (map_get_tile(*state.document->map, cell).sprite) {
         case SPRITE_TILE_SAND1:
         case SPRITE_TILE_SAND2:
         case SPRITE_TILE_SAND3:

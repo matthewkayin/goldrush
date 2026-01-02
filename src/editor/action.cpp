@@ -52,8 +52,8 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
             }
 
             int lcg_seed = document->tile_bake_seed;
-            map_bake_tiles(document->map, document->noise, &lcg_seed);
-            map_bake_front_walls(document->map);
+            map_bake_tiles(*document->map, document->noise, &lcg_seed);
+            map_bake_front_walls(*document->map);
             break;
         }
         case EDITOR_ACTION_DECORATE: 
@@ -66,7 +66,7 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 int hframe = mode == EDITOR_ACTION_MODE_UNDO 
                     ? changes[change_index].previous_hframe
                     : changes[change_index].new_hframe;
-                document->map.cells[CELL_LAYER_GROUND][changes[change_index].index] = hframe == EDITOR_ACTION_DECORATE_REMOVE_DECORATION
+                document->map->cells[CELL_LAYER_GROUND][changes[change_index].index] = hframe == EDITOR_ACTION_DECORATE_REMOVE_DECORATION
                     ? (Cell) {
                         .type = CELL_EMPTY,
                         .id = ID_NULL

@@ -9,13 +9,12 @@
 #include "match/map.h"
 
 struct EditorDocument {
+    Map* map;
     Noise* noise;
     int tile_bake_seed;
     uint32_t entity_count;
     Entity entities[MATCH_MAX_ENTITIES];
     MatchPlayer players[MAX_PLAYERS];
-
-    Map map;
 };
 
 EditorDocument* editor_document_init_blank(MapType map_type, MapSize map_size);
