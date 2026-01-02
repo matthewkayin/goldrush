@@ -40,6 +40,12 @@ void editor_document_bake_map(EditorDocument* document, bool remove_artifacts) {
     }
     map_bake_front_walls(*document->map);
     map_bake_ramps(*document->map, document->noise);
+    for (int index = 0; index < document->map->width * document->map->height; index++) {
+        if (document->map->cells[CELL_LAYER_GROUND][index].type == CELL_BLOCKED) {
+            document->map->cells[CELL_LAYER_GROUND][index].type = CELL_EMPTY;
+        }
+    }
+    map_block_all_walls_and_water(*document->map);
 }
 
 EditorDocument* editor_document_init_blank(MapType map_type, MapSize map_size) {

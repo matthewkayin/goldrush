@@ -685,18 +685,10 @@ std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke() {
             .new_value = (uint8_t)state.tool_value
         });
     };
-    // Rect top row
-    for (int x = rect.x; x < rect.x + rect.w; x++) {
-        stroke_push_back(ivec2(x, rect.y));
-    }
-    // Rect sides
-    for (int y = rect.y + 1; y < rect.y + rect.h - 1; y++) {
-        stroke_push_back(ivec2(rect.x, y));
-        stroke_push_back(ivec2(rect.x + rect.w - 1, y));
-    }
-    // Rect bottom row
-    for (int x = rect.x; x < rect.x + rect.w; x++) {
-        stroke_push_back(ivec2(x, rect.y + rect.h - 1));
+    for (int y = rect.y; y < rect.y + rect.h; y++) {
+        for (int x = rect.x; x < rect.x + rect.w; x++) {
+            stroke_push_back(ivec2(x, y));
+        }
     }
 
     return stroke;
@@ -997,18 +989,12 @@ void editor_render() {
     // Tool rect preview
     if (state.is_painting && state.tool == EDITOR_TOOL_RECT) {
         Rect rect = editor_tool_rect_get_rect();
-        std::function<void(ivec2)> render_rect_preview = [](ivec2 cell) {
-            ivec2 cell_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + (cell * TILE_SIZE) - state.camera_offset;
-            render_sprite_frame(editor_get_noise_preview_sprite(state.tool_value), ivec2(0, 0), cell_position, RENDER_SPRITE_NO_CULL, 0);
-        };
-
-        for (int x = rect.x; x < rect.x + rect.w; x++) {
-            render_rect_preview(ivec2(x, rect.y));
-            render_rect_preview(ivec2(x, rect.y + rect.h - 1));
-        }
-        for (int y = rect.y + 1; y < rect.y + rect.h - 1; y++) {
-            render_rect_preview(ivec2(rect.x, y));
-            render_rect_preview(ivec2(rect.x + rect.w - 1, y));
+        for (int y = rect.y; y < rect.y + rect.h; y++) {
+            for (int x = rect.x; x < rect.x + rect.w; x++) {
+                ivec2 cell = ivec2(x, y);
+                ivec2 cell_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + (cell * TILE_SIZE) - state.camera_offset;
+                render_sprite_frame(editor_get_noise_preview_sprite(state.tool_value), ivec2(0, 0), cell_position, RENDER_SPRITE_NO_CULL, 0);
+            }
         }
     }
 
