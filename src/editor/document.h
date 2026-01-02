@@ -19,6 +19,7 @@ struct EditorDocument {
 
 EditorDocument* editor_document_init_blank(MapType map_type, MapSize map_size);
 EditorDocument* editor_document_init_generated(MapType map_type, const NoiseGenParams& params);
+void editor_document_bake_map(EditorDocument* document, bool remove_artifacts = false);
 void editor_document_free(EditorDocument* document);
 
 uint8_t editor_document_get_noise_map_value(EditorDocument* document, ivec2 cell);

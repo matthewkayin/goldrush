@@ -60,7 +60,7 @@ static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_S
     { INPUT_ACTION_EDITOR_TOOL_FILL, { "Tool", "Fill" }},
     { INPUT_ACTION_EDITOR_TOOL_RECT, { "Tool", "Rect" }},
     { INPUT_ACTION_EDITOR_TOOL_SELECT, { "Tool", "Select" }},
-    { INPUT_ACTION_EDITOR_TOOL_DECORATE, { "Tool", "Decorate" }},
+    { INPUT_ACTION_EDITOR_TOOL_DECORATE, { "Tool", "Decorate" }}
 };
 
 enum EditorTool {
@@ -125,6 +125,7 @@ void editor_do_action(const EditorAction& action);
 void editor_undo_action();
 void editor_redo_action();
 void editor_clear_actions();
+bool editor_tool_brush_should_paint();
 void editor_fill();
 Rect editor_tool_rect_get_rect();
 std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke();
@@ -208,7 +209,10 @@ void editor_update() {
             ui_text(state.ui, FONT_HACK_GOLD, tool_text);
 
             switch (state.tool) {
-                case EDITOR_TOOL_BRUSH: 
+                case EDITOR_TOOL_BRUSH: {
+                    editor_menu_dropdown(state.ui, "Value:", &state.tool_value, { "Water", "Lowground", "Highground", "Ramp" }, SIDEBAR_RECT);
+                    break;
+                }
                 case EDITOR_TOOL_FILL:
                 case EDITOR_TOOL_RECT: {
                     editor_menu_dropdown(state.ui, "Value:", &state.tool_value, { "Water", "Lowground", "Highground" }, SIDEBAR_RECT);
@@ -241,7 +245,7 @@ void editor_update() {
             state.camera_drag_mouse_position.x == -1 &&
             !editor_is_in_menu()) {
         ivec2 cell = editor_get_hovered_cell();
-        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i>", cell.x, cell.y);
+        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i> Noise %u", cell.x, cell.y, state.document->noise->map[cell.x + (cell.y * state.document->noise->width)]);
     }
     if (status_text[0] != '\0') {
         ui_element_position(state.ui, ivec2(4, SCREEN_HEIGHT - 15));
@@ -330,14 +334,16 @@ void editor_update() {
             state.tool_select_origin = world_space_mouse_pos;
             state.tool_select_end = state.tool_select_origin;
             state.is_painting = true;
+        } else if (state.tool == EDITOR_TOOL_SELECT && !state.is_painting) {
+            state.is_painting = true;
         }
     }
 
     // Paint / Selection move
     if (state.is_painting && CANVAS_RECT.has_point(input_get_mouse_position())) {
         if (state.tool == EDITOR_TOOL_BRUSH) {
-            ivec2 cell = editor_get_hovered_cell();
-            if (editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value) {
+            if (editor_tool_brush_should_paint()) {
+                ivec2 cell = editor_get_hovered_cell();
                 state.tool_brush_stroke.push_back((EditorActionBrushStroke) {
                     .index = cell.x + (cell.y * state.document->noise->width),
                     .previous_value = editor_document_get_noise_map_value(state.document, cell),
@@ -510,7 +516,12 @@ void editor_set_tool(EditorTool tool) {
 
     state.tool = tool;
     switch (state.tool) {
-        case EDITOR_TOOL_BRUSH:
+        case EDITOR_TOOL_BRUSH: {
+            if (state.tool_value > NOISE_VALUE_RAMP) {
+                state.tool_value = NOISE_VALUE_LOWGROUND;
+            }
+            break;
+        }
         case EDITOR_TOOL_FILL: 
         case EDITOR_TOOL_RECT: {
             if (state.tool_value > NOISE_VALUE_HIGHGROUND) {
@@ -572,6 +583,14 @@ void editor_clear_actions() {
         editor_action_destroy(action);
     }
     state.actions.clear();
+}
+
+bool editor_tool_brush_should_paint() {
+    ivec2 cell = editor_get_hovered_cell();
+    if (state.tool_value == NOISE_VALUE_RAMP && !map_can_ramp_be_placed_on_tile(map_get_tile(*state.document->map, cell))) {
+        return false;
+    }
+    return editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value;
 }
 
 void editor_fill() {

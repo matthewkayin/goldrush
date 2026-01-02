@@ -11,6 +11,8 @@
 const uint8_t NOISE_VALUE_WATER = 0;
 const uint8_t NOISE_VALUE_LOWGROUND = 1;
 const uint8_t NOISE_VALUE_HIGHGROUND = 2;
+// Used by editor
+const uint8_t NOISE_VALUE_RAMP = 3;
 
 struct Noise {
     int width;

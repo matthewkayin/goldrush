@@ -28,9 +28,18 @@ void editor_document_init_map(EditorDocument* document, MapType map_type) {
     map_init(*document->map, map_type, document->noise->width, document->noise->height);
     map_cleanup_noise(*document->map, document->noise);
 
+    editor_document_bake_map(document, true);
+}
+
+void editor_document_bake_map(EditorDocument* document, bool remove_artifacts) {
     int lcg_seed = document->tile_bake_seed;
-    map_bake_map_tiles_and_remove_artifacts(*document->map, document->noise, &lcg_seed);
+    if (remove_artifacts) {
+        map_bake_map_tiles_and_remove_artifacts(*document->map, document->noise, &lcg_seed);
+    } else {
+        map_bake_tiles(*document->map, document->noise, &lcg_seed);
+    }
     map_bake_front_walls(*document->map);
+    map_bake_ramps(*document->map, document->noise);
 }
 
 EditorDocument* editor_document_init_blank(MapType map_type, MapSize map_size) {
@@ -91,9 +100,7 @@ uint8_t editor_document_get_noise_map_value(EditorDocument* document, ivec2 cell
 void editor_document_set_noise_map_value(EditorDocument* document, ivec2 cell, uint8_t value) {
     document->noise->map[cell.x + (cell.y * document->noise->width)] = value;
 
-    int lcg_seed = document->tile_bake_seed;
-    map_bake_tiles(*document->map, document->noise, &lcg_seed);
-    map_bake_front_walls(*document->map);
+    editor_document_bake_map(document);
 }
 
 #endif

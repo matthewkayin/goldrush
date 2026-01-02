@@ -51,9 +51,7 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 document->noise->map[action.brush.stroke[index].index] = value;
             }
 
-            int lcg_seed = document->tile_bake_seed;
-            map_bake_tiles(*document->map, document->noise, &lcg_seed);
-            map_bake_front_walls(*document->map);
+            editor_document_bake_map(document);
             break;
         }
         case EDITOR_ACTION_DECORATE: 

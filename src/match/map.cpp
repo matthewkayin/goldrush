@@ -64,18 +64,14 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
 
     // Generate ramps
     std::vector<ivec2> stair_cells;
-    std::vector<ivec2> stair_centers;
     for (int pass = 0; pass < 2; pass++) {
         for (int x = 0; x < map.width; x++) {
             for (int y = 0; y < (int)map.height; y++) {
                 Tile tile = map.tiles[x + (y * map.width)];
-                // Only generate ramps on straight edged walls
-                if (!(tile.sprite == SPRITE_TILE_WALL_SOUTH_EDGE ||
-                    tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE ||
-                    tile.sprite == SPRITE_TILE_WALL_WEST_EDGE ||
-                    tile.sprite == SPRITE_TILE_WALL_EAST_EDGE)) {
+                if (!map_can_ramp_be_placed_on_tile(tile)) {
                     continue;
                 }
+
                 // Determine whether this is a horizontal or vertical stair
                 ivec2 step_direction = (tile.sprite == SPRITE_TILE_WALL_SOUTH_EDGE ||
                                     tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE)
@@ -122,18 +118,7 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
                     stair_length--;
                 }
 
-                Direction stair_direction = DIRECTION_COUNT;
-                if (tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE) {
-                    stair_direction = DIRECTION_NORTH;
-                } else if (tile.sprite == SPRITE_TILE_WALL_EAST_EDGE) {
-                    stair_direction = DIRECTION_EAST;
-                } else if (tile.sprite == SPRITE_TILE_WALL_WEST_EDGE) {
-                    stair_direction = DIRECTION_WEST;
-                } else if (tile.sprite == SPRITE_TILE_WALL_SOUTH_EDGE) {
-                    stair_direction = DIRECTION_SOUTH;
-                }
-                GOLD_ASSERT(stair_direction != DIRECTION_COUNT);
-
+                Direction stair_direction = map_get_tile_stair_direction(tile);
                 int stair_mouth_cell_distance = stair_direction == DIRECTION_SOUTH ? 4 : 3;
                 ivec2 stair_mouth_cell = stair_min + (DIRECTION_IVEC2[stair_direction] * stair_mouth_cell_distance);
                 if (!map_is_cell_in_bounds(map, stair_mouth_cell)) {
@@ -154,67 +139,7 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
 
                 stair_cells.push_back(stair_min);
                 stair_cells.push_back(stair_max);
-                stair_centers.push_back((stair_min + stair_max) / 2);
-                for (ivec2 cell = stair_min; cell != stair_max + step_direction; cell += step_direction) {
-                    SpriteName stair_tile = SPRITE_TILE_NULL;
-                    if (tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE) {
-                        if (cell == stair_min) {
-                            stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_LEFT;
-                        } else if (cell == stair_max) {
-                            stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_RIGHT;
-                        } else {
-                            stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_CENTER;
-                        }
-                    } else if (tile.sprite == SPRITE_TILE_WALL_EAST_EDGE) {
-                        if (cell == stair_min) {
-                            stair_tile = SPRITE_TILE_WALL_EAST_STAIR_TOP;
-                        } else if (cell == stair_max) {
-                            stair_tile = SPRITE_TILE_WALL_EAST_STAIR_BOTTOM;
-                        } else {
-                            stair_tile = SPRITE_TILE_WALL_EAST_STAIR_CENTER;
-                        }
-                    } else if (tile.sprite == SPRITE_TILE_WALL_WEST_EDGE) {
-                        if (cell == stair_min) {
-                            stair_tile = SPRITE_TILE_WALL_WEST_STAIR_TOP;
-                        } else if (cell == stair_max) {
-                            stair_tile = SPRITE_TILE_WALL_WEST_STAIR_BOTTOM;
-                        } else {
-                            stair_tile = SPRITE_TILE_WALL_WEST_STAIR_CENTER;
-                        }
-                    } else if (tile.sprite == SPRITE_TILE_WALL_SOUTH_EDGE) {
-                        if (cell == stair_min) {
-                            stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_LEFT;
-                        } else if (cell == stair_max) {
-                            stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT;
-                        } else {
-                            stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_CENTER;
-                        }
-                    }
-
-                    ivec2 stair_front_cell = cell + DIRECTION_IVEC2[stair_direction];
-                    if (stair_direction == DIRECTION_SOUTH) {
-                        stair_front_cell += DIRECTION_IVEC2[stair_direction];
-                    }
-                    if (!map_is_cell_in_bounds(map, stair_front_cell)) {
-                        continue;
-                    }
-                    if (!map_is_tile_ground(map, stair_front_cell)) {
-                        continue;
-                    }
-
-                    map.tiles[cell.x + (cell.y * map.width)].sprite = stair_tile;
-                    SpriteName south_front_tile = SPRITE_TILE_NULL;
-                    if (stair_tile == SPRITE_TILE_WALL_SOUTH_STAIR_LEFT) {
-                        south_front_tile = SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_LEFT;
-                    } else if (stair_tile == SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT) {
-                        south_front_tile = SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_RIGHT;
-                    } else if (stair_tile == SPRITE_TILE_WALL_SOUTH_STAIR_CENTER) {
-                        south_front_tile = SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_CENTER;
-                    }
-                    if (south_front_tile != SPRITE_TILE_NULL) {
-                        map.tiles[cell.x + ((cell.y + 1) * map.width)].sprite = south_front_tile;
-                    }
-                } // End for cell in ramp
+                map_bake_ramp(map, stair_direction, stair_min, stair_max);
             } // End for each y
         } // End for each x
     } // End for each pass
@@ -781,19 +706,19 @@ void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed) {
     for (int y = 0; y < map.height; y++) {
         for (int x = 0; x < map.width; x++) {
             int index = x + (y * map.width);
-            if (noise->map[index] == NOISE_VALUE_LOWGROUND || noise->map[index] == NOISE_VALUE_HIGHGROUND) {
-                map.tiles[index].elevation = (uint32_t)(noise->map[index] == NOISE_VALUE_HIGHGROUND);
+            if (noise->map[index] >= NOISE_VALUE_LOWGROUND) {
+                map.tiles[index].elevation = (uint32_t)(noise->map[index] == NOISE_VALUE_HIGHGROUND || noise->map[index] == NOISE_VALUE_RAMP);
                 map.tiles[index].frame = ivec2(0, 0);
                 // First check if we need to place a regular wall here
                 uint32_t neighbors = 0;
-                if (noise->map[index] == NOISE_VALUE_HIGHGROUND) {
+                if (noise->map[index] == NOISE_VALUE_HIGHGROUND || noise->map[index] == NOISE_VALUE_RAMP) {
                     for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
                         ivec2 neighbor_cell = ivec2(x, y) + DIRECTION_IVEC2[direction];
                         if (!map_is_cell_in_bounds(map, neighbor_cell)) {
                             continue;
                         }
                         int neighbor_index = neighbor_cell.x + (neighbor_cell.y * map.width);
-                        if (noise->map[neighbor_index] != NOISE_VALUE_HIGHGROUND) {
+                        if (!(noise->map[neighbor_index] == NOISE_VALUE_HIGHGROUND || noise->map[neighbor_index] == NOISE_VALUE_RAMP)) {
                             neighbors += DIRECTION_MASK[direction];
                         }
                     }
@@ -880,6 +805,169 @@ void map_bake_front_walls(Map& map) {
             map.tiles[index].sprite = SPRITE_TILE_WALL_SW_FRONT;
         } else if (map.tiles[previous].sprite == SPRITE_TILE_WALL_SE_CORNER) {
             map.tiles[index].sprite = SPRITE_TILE_WALL_SE_FRONT;
+        }
+    }
+}
+
+void map_block_all_walls_and_water(Map& map) {
+    for (int y = 0; y < map.height; y++) {
+        for (int x = 0; x < map.width; x++) {
+            if (map_should_cell_be_blocked(map, ivec2(x, y))) {
+                map.cells[CELL_LAYER_GROUND][x + (y * map.width)] = (Cell) {
+                    .type = CELL_BLOCKED,
+                    .id = ID_NULL
+                };
+            }
+        }
+    }
+}
+
+bool map_should_cell_be_blocked(const Map& map, ivec2 cell) {
+    return !map_is_tile_ground(map, cell) && !map_is_tile_ramp(map, cell);
+}
+
+bool map_can_ramp_be_placed_on_tile(const Tile& tile) {
+    // Only generate ramps on straight edged walls
+    return tile.sprite == SPRITE_TILE_WALL_SOUTH_EDGE ||
+        tile.sprite == SPRITE_TILE_WALL_NORTH_EDGE ||
+        tile.sprite == SPRITE_TILE_WALL_WEST_EDGE ||
+        tile.sprite == SPRITE_TILE_WALL_EAST_EDGE;
+}
+
+Direction map_get_tile_stair_direction(const Tile& tile) {
+    switch (tile.sprite) {
+        case SPRITE_TILE_WALL_NORTH_EDGE:
+            return DIRECTION_NORTH;
+        case SPRITE_TILE_WALL_EAST_EDGE:
+            return DIRECTION_EAST;
+        case SPRITE_TILE_WALL_WEST_EDGE:
+            return DIRECTION_WEST;
+        case SPRITE_TILE_WALL_SOUTH_EDGE:
+            return DIRECTION_SOUTH;
+        default:
+            GOLD_ASSERT(false);
+            return DIRECTION_COUNT;
+    }
+}
+
+void map_bake_ramp(Map& map, Direction stair_direction, ivec2 stair_min, ivec2 stair_max) {
+    ivec2 step_direction = stair_max - stair_min;
+    if (step_direction.x != 0) {
+        step_direction.x /= std::abs(step_direction.x);
+    }
+    if (step_direction.y != 0) {
+        step_direction.y /= std::abs(step_direction.y);
+    }
+    for (ivec2 cell = stair_min; cell != stair_max + step_direction; cell += step_direction) {
+        SpriteName stair_tile = SPRITE_TILE_NULL;
+        if (stair_direction == DIRECTION_NORTH) {
+            if (cell == stair_min) {
+                stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_LEFT;
+            } else if (cell == stair_max) {
+                stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_RIGHT;
+            } else {
+                stair_tile = SPRITE_TILE_WALL_NORTH_STAIR_CENTER;
+            }
+        } else if (stair_direction == DIRECTION_EAST) {
+            if (cell == stair_min) {
+                stair_tile = SPRITE_TILE_WALL_EAST_STAIR_TOP;
+            } else if (cell == stair_max) {
+                stair_tile = SPRITE_TILE_WALL_EAST_STAIR_BOTTOM;
+            } else {
+                stair_tile = SPRITE_TILE_WALL_EAST_STAIR_CENTER;
+            }
+        } else if (stair_direction == DIRECTION_WEST) {
+            if (cell == stair_min) {
+                stair_tile = SPRITE_TILE_WALL_WEST_STAIR_TOP;
+            } else if (cell == stair_max) {
+                stair_tile = SPRITE_TILE_WALL_WEST_STAIR_BOTTOM;
+            } else {
+                stair_tile = SPRITE_TILE_WALL_WEST_STAIR_CENTER;
+            }
+        } else if (stair_direction == DIRECTION_SOUTH) {
+            if (cell == stair_min) {
+                stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_LEFT;
+            } else if (cell == stair_max) {
+                stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT;
+            } else {
+                stair_tile = SPRITE_TILE_WALL_SOUTH_STAIR_CENTER;
+            }
+        }
+
+        ivec2 stair_front_cell = cell + DIRECTION_IVEC2[stair_direction];
+        if (stair_direction == DIRECTION_SOUTH) {
+            stair_front_cell += DIRECTION_IVEC2[stair_direction];
+        }
+        if (!map_is_cell_in_bounds(map, stair_front_cell)) {
+            continue;
+        }
+        if (!map_is_tile_ground(map, stair_front_cell)) {
+            continue;
+        }
+
+        map.tiles[cell.x + (cell.y * map.width)].sprite = stair_tile;
+        SpriteName south_front_tile = SPRITE_TILE_NULL;
+        if (stair_tile == SPRITE_TILE_WALL_SOUTH_STAIR_LEFT) {
+            south_front_tile = SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_LEFT;
+        } else if (stair_tile == SPRITE_TILE_WALL_SOUTH_STAIR_RIGHT) {
+            south_front_tile = SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_RIGHT;
+        } else if (stair_tile == SPRITE_TILE_WALL_SOUTH_STAIR_CENTER) {
+            south_front_tile = SPRITE_TILE_WALL_SOUTH_STAIR_FRONT_CENTER;
+        }
+        if (south_front_tile != SPRITE_TILE_NULL) {
+            map.tiles[cell.x + ((cell.y + 1) * map.width)].sprite = south_front_tile;
+        }
+    } // End for cell in ramp
+}
+
+void map_bake_ramps(Map& map, const Noise* noise) {
+    std::vector<bool> is_ramp(map.width * map.height, false);
+    for (int index = 0; index < map.width * map.height; index++) {
+        if (noise->map[index] == NOISE_VALUE_RAMP) {
+            is_ramp[index] = true;
+        }
+    }
+
+    for (int index = 0; index < map.width * map.height; index++) {
+        if (!is_ramp[index]) {
+            continue;
+        }
+
+        const ivec2 stair_min = ivec2(index % map.width, index / map.width);
+        ivec2 step_direction = ivec2(0, 0);
+        const ivec2 possible_step_directions[2] = { ivec2(1, 0), ivec2(0, 1) };
+        for (uint32_t direction_index = 0; direction_index < 2; direction_index++) {
+            ivec2 neighbor = stair_min + possible_step_directions[direction_index];
+            if (!map_is_cell_in_bounds(map, neighbor)) {
+                continue;
+            }
+            if (noise->map[neighbor.x + (neighbor.y * map.width)] != NOISE_VALUE_RAMP) {
+                continue;
+            }
+            step_direction = possible_step_directions[direction_index];
+            break;
+        }
+
+        // Stairs are assumed to be at least 2 cells, having 1 neighbor
+        // If they don't have a neighbor, we'll just render them as tile_null
+        if (step_direction == ivec2(0, 0)) {
+            map.tiles[index].sprite = SPRITE_TILE_NULL;
+            continue;
+        }
+
+        ivec2 current = stair_min + step_direction;
+        while (map_is_cell_in_bounds(map, current) &&
+                    noise->map[current.x + (current.y * noise->width)] == NOISE_VALUE_RAMP) {
+            current += step_direction;
+        }
+        // Step back one since that while loop would have moved us beyond the stair max
+        const ivec2 stair_max = current - step_direction;
+
+        map_bake_ramp(map, map_get_tile_stair_direction(map_get_tile(map, stair_min)), stair_min, stair_max);
+
+        // Mark stairs as no longer a ramp so that we only use these cells once
+        for (ivec2 cell = stair_min; cell != stair_max + step_direction; cell += step_direction) {
+            is_ramp[cell.x + (cell.y * map.width)] = false;
         }
     }
 }
