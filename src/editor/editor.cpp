@@ -46,14 +46,29 @@ static const Rect CANVAS_RECT = (Rect) {
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save" },
     { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste" },
-    { "Tool", "Brush", "Fill", "Rect", "Select" }
+    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate" }
+};
+
+static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_SHORTCUTS = {
+    { INPUT_ACTION_EDITOR_SAVE, { "File", "Save" }},
+    { INPUT_ACTION_EDITOR_UNDO, { "Edit", "Undo" }},
+    { INPUT_ACTION_EDITOR_REDO, { "Edit", "Redo" }},
+    { INPUT_ACTION_EDITOR_COPY, { "Edit", "Copy" }},
+    { INPUT_ACTION_EDITOR_CUT, { "Edit", "Cut" }},
+    { INPUT_ACTION_EDITOR_PASTE, { "Edit", "Paste" }},
+    { INPUT_ACTION_EDITOR_TOOL_BRUSH, { "Tool", "Brush" }},
+    { INPUT_ACTION_EDITOR_TOOL_FILL, { "Tool", "Fill" }},
+    { INPUT_ACTION_EDITOR_TOOL_RECT, { "Tool", "Rect" }},
+    { INPUT_ACTION_EDITOR_TOOL_SELECT, { "Tool", "Select" }},
+    { INPUT_ACTION_EDITOR_TOOL_DECORATE, { "Tool", "Decorate" }},
 };
 
 enum EditorTool {
     EDITOR_TOOL_BRUSH,
     EDITOR_TOOL_FILL,
     EDITOR_TOOL_RECT,
-    EDITOR_TOOL_SELECT
+    EDITOR_TOOL_SELECT,
+    EDITOR_TOOL_DECORATE
 };
 
 struct EditorClipboard {
@@ -105,6 +120,7 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
 void editor_set_tool(EditorTool tool);
 ivec2 editor_canvas_to_world_space(ivec2 point);
 ivec2 editor_get_hovered_cell();
+void editor_push_action(const EditorAction& action);
 void editor_do_action(const EditorAction& action);
 void editor_undo_action();
 void editor_redo_action();
@@ -122,6 +138,7 @@ void editor_clipboard_copy();
 void editor_clipboard_paste(ivec2 cell);
 void editor_flatten_rect(const Rect& rect);
 bool editor_is_using_noise_tool();
+void editor_generate_decorations();
 
 // Render
 RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
@@ -202,6 +219,12 @@ void editor_update() {
                     }
                     break;
                 }
+                case EDITOR_TOOL_DECORATE: {
+                    if (ui_slim_button(state.ui, "Generate")) {
+                        editor_generate_decorations();
+                    }
+                    break;
+                }
             }
         ui_end_container(state.ui);
     }
@@ -236,45 +259,12 @@ void editor_update() {
             !state.is_painting &&
             !state.is_pasting &&
             state.camera_drag_mouse_position.x == -1) {
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_SAVE)) {
-            editor_handle_toolbar_action("File", "Save");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_UNDO)) {
-            editor_handle_toolbar_action("Edit", "Undo");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_REDO)) {
-            editor_handle_toolbar_action("Edit", "Redo");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_COPY)) {
-            editor_handle_toolbar_action("Edit", "Copy");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_CUT)) {
-            editor_handle_toolbar_action("Edit", "Cut");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_PASTE)) {
-            editor_handle_toolbar_action("Edit", "Paste");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_BRUSH)) {
-            editor_handle_toolbar_action("Tool", "Brush");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_FILL)) {
-            editor_handle_toolbar_action("Tool", "Fill");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_RECT)) {
-            editor_handle_toolbar_action("Tool", "Rect");
-            return;
-        }
-        if (input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_SELECT)) {
-            editor_handle_toolbar_action("Tool", "Select");
-            return;
+        for (auto it : TOOLBAR_SHORTCUTS) {
+            InputAction shortcut = it.first;
+            if (input_is_action_just_pressed(shortcut)) {
+                editor_handle_toolbar_action(it.second[0], it.second[1]);
+                return;
+            }
         }
     }
 
@@ -368,8 +358,7 @@ void editor_update() {
         if (state.tool == EDITOR_TOOL_BRUSH) {
             if (!state.tool_brush_stroke.empty()) {
                 EditorAction action = editor_action_create_brush(state.tool_brush_stroke);
-                action.brush.skip_do = true;
-                editor_do_action(action);
+                editor_push_action(action);
             }
         } else if (state.tool == EDITOR_TOOL_RECT) {
             std::vector<EditorActionBrushStroke> stroke = editor_tool_rect_get_brush_stroke();
@@ -394,6 +383,33 @@ void editor_update() {
         }
 
         return;
+    }
+
+    // Decorate paint
+    if (state.tool == EDITOR_TOOL_DECORATE && 
+            !editor_is_in_menu() &&
+            !state.is_minimap_dragging &&
+            state.camera_drag_mouse_position.x == -1 &&
+            CANVAS_RECT.has_point(input_get_mouse_position()) &&
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        ivec2 cell = editor_get_hovered_cell();
+        Cell map_cell = map_get_cell(state.document->map, CELL_LAYER_GROUND, cell);
+        if (map_cell.type == CELL_DECORATION || map_cell.type == CELL_EMPTY) {
+            const SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map.type);
+            const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
+            editor_do_action((EditorAction) {
+                .type = EDITOR_ACTION_DECORATE,
+                .decorate = (EditorActionDecorate) {
+                    .index = cell.x + (cell.y * state.document->map.width),
+                    .previous_hframe = map_cell.type == CELL_DECORATION
+                        ? map_cell.decoration_hframe
+                        : EDITOR_ACTION_DECORATE_REMOVE_DECORATION,
+                    .new_hframe = map_cell.type == CELL_DECORATION
+                        ? EDITOR_ACTION_DECORATE_REMOVE_DECORATION
+                        : (rand() % decoration_sprite_info.hframes)
+                }
+            });
+        }
     }
 
     // Minimap drag
@@ -450,8 +466,6 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
         return;
     }
 
-    log_debug("toolbar action %s %s", column.c_str(), action.c_str());
-
     if (column == "File") {
         if (action == "New") {
             state.menu_new = editor_menu_new_open();
@@ -479,14 +493,10 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             log_debug("begin pasting");
         }
     } else if (column == "Tool") {
-        if (action == "Brush") {
-            editor_set_tool(EDITOR_TOOL_BRUSH);
-        } else if (action == "Fill") {
-            editor_set_tool(EDITOR_TOOL_FILL);
-        } else if (action == "Rect") {
-            editor_set_tool(EDITOR_TOOL_RECT);
-        } else if (action == "Select") {
-            editor_set_tool(EDITOR_TOOL_SELECT);
+        for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {
+            if (action == TOOLBAR_OPTIONS[2][index]) {
+                editor_set_tool((EditorTool)(index - 1));
+            }
         }
     }
 }
@@ -506,7 +516,8 @@ void editor_set_tool(EditorTool tool) {
             }
             break;
         }
-        case EDITOR_TOOL_SELECT: {
+        case EDITOR_TOOL_SELECT:
+        case EDITOR_TOOL_DECORATE: {
             break;
         }
     }
@@ -520,14 +531,19 @@ ivec2 editor_get_hovered_cell() {
     return editor_canvas_to_world_space(input_get_mouse_position()) / TILE_SIZE;
 }
 
-void editor_do_action(const EditorAction& action) {
+// Adds an action to the stack but does not execute the action
+void editor_push_action(const EditorAction& action) {
     while (state.actions.size() > state.action_head) {
         editor_action_destroy(state.actions.back());
         state.actions.pop_back();
     }
     state.actions.push_back(action);
     state.action_head++;
+}
 
+// Adds an action to the stack and also executes the action
+void editor_do_action(const EditorAction& action) {
+    editor_push_action(action);
     editor_action_execute(state.document, action, EDITOR_ACTION_MODE_DO);
 }
 
@@ -545,7 +561,7 @@ void editor_redo_action() {
         return;
     }
 
-    editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_REDO);
+    editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_DO);
     state.action_head++;
 }
 
@@ -765,6 +781,67 @@ void editor_flatten_rect(const Rect& rect) {
     EditorAction action = editor_action_create_brush(stroke);
     editor_do_action(action);
 }
+
+void editor_generate_decorations() {
+    std::vector<EditorActionDecorate> changes;
+    std::vector<int> change_indices(state.document->map.width * state.document->map.height, -1);
+
+    // Clear all decorations and mark the changes
+    for (int index = 0; index < state.document->map.width * state.document->map.height; index++) {
+        Cell map_cell = state.document->map.cells[CELL_LAYER_GROUND][index];
+        if (map_cell.type != CELL_DECORATION) {
+            continue;
+        }
+
+        changes.push_back((EditorActionDecorate) {
+            .index = index,
+            .previous_hframe = map_cell.decoration_hframe,
+            .new_hframe = EDITOR_ACTION_DECORATE_REMOVE_DECORATION
+        });
+        change_indices[index] = (int)changes.size() - 1;
+
+        state.document->map.cells[CELL_LAYER_GROUND][index] = (Cell) {
+            .type = CELL_EMPTY,
+            .id = ID_NULL
+        };
+    }
+
+    // Get a list of goldmine cells
+    std::vector<ivec2> goldmine_cells;
+    for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+        if (state.document->entities[entity_index].type == ENTITY_GOLDMINE) {
+            goldmine_cells.push_back(state.document->entities[entity_index].cell);
+        }
+    }
+
+    // Generate decorations
+    int generate_decorations_seed = rand();
+    map_generate_decorations(state.document->map, state.document->noise, &generate_decorations_seed, goldmine_cells);
+
+    // Record all changes
+    for (int index = 0; index < state.document->map.width * state.document->map.height; index++) {
+        Cell map_cell = state.document->map.cells[CELL_LAYER_GROUND][index];
+        if (map_cell.type != CELL_DECORATION) {
+            continue;
+        }
+
+        // If change indices is not -1, it means that we previously recorded this cell
+        // as a change from decorated to undecorated, so now we will update that change
+        // as a change from decorated with one hframe to decorated with another hframe
+        if (change_indices[index] != -1) {
+            changes[change_indices[index]].new_hframe = map_cell.decoration_hframe;
+        } else {
+            changes.push_back((EditorActionDecorate) {
+                .index = index,
+                .previous_hframe = EDITOR_ACTION_DECORATE_REMOVE_DECORATION,
+                .new_hframe = map_cell.decoration_hframe
+            });
+        }
+    }
+
+    EditorAction action = editor_action_create_decorate_bulk(changes);
+    editor_push_action(action);
+} 
 
 void editor_render() {
     if (state.document != NULL) {

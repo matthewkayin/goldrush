@@ -4,6 +4,7 @@
 #include "core/logger.h"
 #include <cstring>
 #include <algorithm>
+#include <functional>
 
 struct InputState {
     SDL_Window* window;
@@ -135,26 +136,49 @@ void input_poll_events() {
                         #else
                             const SDL_Scancode CTRL = SDL_SCANCODE_LCTRL;
                         #endif
-                        state.current[INPUT_ACTION_EDITOR_SAVE] = 
-                            key_state[SDL_SCANCODE_S] && key_state[CTRL];
-                        state.current[INPUT_ACTION_EDITOR_UNDO] = 
-                            key_state[SDL_SCANCODE_Z] && key_state[CTRL];
-                        state.current[INPUT_ACTION_EDITOR_REDO] = 
-                            key_state[SDL_SCANCODE_R] && key_state[CTRL];
-                        state.current[INPUT_ACTION_EDITOR_TOOL_BRUSH] = 
-                            key_state[SDL_SCANCODE_B] && !key_state[CTRL]; 
-                        state.current[INPUT_ACTION_EDITOR_TOOL_FILL] = 
-                            key_state[SDL_SCANCODE_F] && !key_state[CTRL]; 
-                        state.current[INPUT_ACTION_EDITOR_TOOL_RECT] = 
-                            key_state[SDL_SCANCODE_R] && !key_state[CTRL];
-                        state.current[INPUT_ACTION_EDITOR_TOOL_SELECT] = 
-                            key_state[SDL_SCANCODE_S] && !key_state[CTRL];
-                        state.current[INPUT_ACTION_EDITOR_COPY] = 
-                            key_state[SDL_SCANCODE_C] && key_state[CTRL];
-                        state.current[INPUT_ACTION_EDITOR_CUT] = 
-                            key_state[SDL_SCANCODE_X] && key_state[CTRL];
-                        state.current[INPUT_ACTION_EDITOR_PASTE] = 
-                            key_state[SDL_SCANCODE_V] && key_state[CTRL];
+                        std::function<bool(InputAction, SDL_Scancode)> handle_ctrl_action = [&key_state, &event](InputAction action, SDL_Scancode action_scancode) {
+                            if (!(event.key.scancode == action_scancode || event.key.scancode == CTRL)) {
+                                return false;
+                            }
+                            if (event.type == SDL_EVENT_KEY_UP) {
+                                state.current[action] = false;
+                                return true;
+                            }
+                            if (key_state[action_scancode] && key_state[CTRL]) {
+                                state.current[action] = true;
+                                return true;
+                            }
+
+                            return false;
+                        };
+                        if (handle_ctrl_action(INPUT_ACTION_EDITOR_SAVE, SDL_SCANCODE_S)) { break; }
+                        if (handle_ctrl_action(INPUT_ACTION_EDITOR_UNDO, SDL_SCANCODE_Z)) { break; }
+                        if (handle_ctrl_action(INPUT_ACTION_EDITOR_UNDO, SDL_SCANCODE_Z)) { break; }
+                        if (handle_ctrl_action(INPUT_ACTION_EDITOR_REDO, SDL_SCANCODE_R)) { break; }
+                        if (handle_ctrl_action(INPUT_ACTION_EDITOR_COPY, SDL_SCANCODE_C)) { break; }
+                        if (handle_ctrl_action(INPUT_ACTION_EDITOR_CUT, SDL_SCANCODE_X)) { break; }
+                        if (handle_ctrl_action(INPUT_ACTION_EDITOR_PASTE, SDL_SCANCODE_V)) { break; }
+                        if (!key_state[CTRL]) {
+                            switch (event.key.scancode) {
+                                case SDL_SCANCODE_B:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_BRUSH] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
+                                case SDL_SCANCODE_F:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_FILL] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
+                                case SDL_SCANCODE_R:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_RECT] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
+                                case SDL_SCANCODE_S:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_SELECT] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
+                                case SDL_SCANCODE_D:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_DECORATE] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
                     }
                 #endif
 

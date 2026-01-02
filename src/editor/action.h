@@ -11,12 +11,13 @@
 
 enum EditorActionMode {
     EDITOR_ACTION_MODE_DO,
-    EDITOR_ACTION_MODE_UNDO,
-    EDITOR_ACTION_MODE_REDO
+    EDITOR_ACTION_MODE_UNDO
 };
 
 enum EditorActionType {
-    EDITOR_ACTION_BRUSH
+    EDITOR_ACTION_BRUSH,
+    EDITOR_ACTION_DECORATE,
+    EDITOR_ACTION_DECORATE_BULK
 };
 
 struct EditorActionBrushStroke {
@@ -28,19 +29,34 @@ struct EditorActionBrushStroke {
 struct EditorActionBrush {
     uint32_t stroke_size;
     EditorActionBrushStroke* stroke;
-    bool skip_do;
+};
+
+static const int EDITOR_ACTION_DECORATE_REMOVE_DECORATION = -1;
+
+struct EditorActionDecorate {
+    int index;
+    int previous_hframe;
+    int new_hframe;
+};
+
+struct EditorActionDecorateBulk {
+    uint32_t size;
+    EditorActionDecorate* changes;
 };
 
 struct EditorAction {
     EditorActionType type;
     union {
         EditorActionBrush brush;
+        EditorActionDecorate decorate;
+        EditorActionDecorateBulk decorate_bulk;
     };
 };
 
 // Action
 
 EditorAction editor_action_create_brush(const std::vector<EditorActionBrushStroke>& stroke);
+EditorAction editor_action_create_decorate_bulk(const std::vector<EditorActionDecorate>& changes);
 void editor_action_destroy(EditorAction& action);
 void editor_action_execute(EditorDocument* document, const EditorAction& action, EditorActionMode mode);
 

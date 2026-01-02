@@ -362,98 +362,7 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
     log_debug("Generated gold mines.");
 
     // Generate decorations
-    {
-        // Generate avoid values for decorations
-        std::vector<PoissonAvoidValue> avoid_values;
-
-        // Ramps
-        for (int y = 0; y < map.height; y++) {
-            for (int x = 0; x < map.width; x++) {
-                if (!map_is_tile_ramp(map, ivec2(x, y))) {
-                    continue;
-                }
-                avoid_values.push_back((PoissonAvoidValue) {
-                    .cell = ivec2(x, y),
-                    .distance = 6
-                });
-            }
-        }
-
-        // Goldmines
-        for (ivec2 goldmine_cell : goldmine_cells) {
-            avoid_values.push_back((PoissonAvoidValue) {
-                .cell = goldmine_cell,
-                .distance = 16
-            });
-        }
-
-        PoissonDiskParams params = (PoissonDiskParams) {
-            .avoid_values = avoid_values,
-            .disk_radius = 16,
-            .allow_unreachable_cells = true,
-            .margin = ivec2(0, 0)
-        };
-
-        std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
-
-        if (map_type == MAP_TYPE_TOMBSTONE) {
-            for (ivec2 cell : decoration_cells) {
-                map_create_decoration_at_cell(map, lcg_seed, cell);
-            }
-        }
-
-        if (map_type == MAP_TYPE_KLONDIKE) {
-            struct TreeNode {
-                ivec2 cell;
-                ivec2 source_cell;
-            };
-
-            std::vector<TreeNode> frontier;
-            std::vector<bool> is_explored(map.width * map.height, false);
-
-            for (ivec2 cell : decoration_cells) {
-                frontier.push_back((TreeNode) {
-                    .cell = cell,
-                    .source_cell = cell
-                });
-            }
-
-            while (!frontier.empty()) {
-                TreeNode next = frontier.back();
-                frontier.pop_back();
-
-                if (map_is_tree_cell_valid(map, next.cell, avoid_values)) {
-                    map_create_decoration_at_cell(map, lcg_seed, next.cell);
-                }
-
-                is_explored[next.cell.x + (next.cell.y * map.width)] = true;
-
-                for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
-                    ivec2 child = next.cell + DIRECTION_IVEC2[direction];
-                    if (!map_is_cell_in_bounds(map, child)) {
-                        continue;
-                    }
-                    if (is_explored[child.x + child.y * map.width]) {
-                        continue;
-                    }
-                    if (map_is_tile_ramp(map, child)) {
-                        continue;
-                    }
-                    if (noise->forest[child.x + (child.y * map.width)] == 0) {
-                        continue;
-                    }
-                    if (ivec2::manhattan_distance(child, next.source_cell) > 8) {
-                        continue;
-                    }
-
-                    frontier.push_back((TreeNode) {
-                        .cell = child,
-                        .source_cell = next.source_cell
-                    });
-                }
-            }
-        }
-    }
+    map_generate_decorations(map, noise, lcg_seed, goldmine_cells);
     log_debug("Generated decorations.");
 
     map_calculate_unreachable_cells(map);
@@ -1039,6 +948,97 @@ SpriteName map_get_decoration_sprite(MapType map_type) {
         case MAP_TYPE_COUNT: {
             GOLD_ASSERT(false);
             return SPRITE_TILE_NULL;
+        }
+    }
+}
+
+void map_generate_decorations(Map& map, Noise* noise, int* lcg_seed, const std::vector<ivec2>& goldmine_cells) {
+    // Generate avoid values for decorations
+    std::vector<PoissonAvoidValue> avoid_values;
+
+    // Ramps
+    for (int y = 0; y < map.height; y++) {
+        for (int x = 0; x < map.width; x++) {
+            if (!map_is_tile_ramp(map, ivec2(x, y))) {
+                continue;
+            }
+            avoid_values.push_back((PoissonAvoidValue) {
+                .cell = ivec2(x, y),
+                .distance = 6
+            });
+        }
+    }
+
+    // Goldmines
+    for (ivec2 goldmine_cell : goldmine_cells) {
+        avoid_values.push_back((PoissonAvoidValue) {
+            .cell = goldmine_cell,
+            .distance = 16
+        });
+    }
+
+    PoissonDiskParams params = (PoissonDiskParams) {
+        .avoid_values = avoid_values,
+        .disk_radius = 16,
+        .allow_unreachable_cells = true,
+        .margin = ivec2(0, 0)
+    };
+
+    std::vector<ivec2> decoration_cells = map_poisson_disk(map, lcg_seed, params);
+
+    if (map.type == MAP_TYPE_TOMBSTONE) {
+        for (ivec2 cell : decoration_cells) {
+            map_create_decoration_at_cell(map, lcg_seed, cell);
+        }
+    } else if (map.type == MAP_TYPE_KLONDIKE) {
+        struct TreeNode {
+            ivec2 cell;
+            ivec2 source_cell;
+        };
+
+        std::vector<TreeNode> frontier;
+        std::vector<bool> is_explored(map.width * map.height, false);
+
+        for (ivec2 cell : decoration_cells) {
+            frontier.push_back((TreeNode) {
+                .cell = cell,
+                .source_cell = cell
+            });
+        }
+
+        while (!frontier.empty()) {
+            TreeNode next = frontier.back();
+            frontier.pop_back();
+
+            if (map_is_tree_cell_valid(map, next.cell, avoid_values)) {
+                map_create_decoration_at_cell(map, lcg_seed, next.cell);
+            }
+
+            is_explored[next.cell.x + (next.cell.y * map.width)] = true;
+
+            for (int direction = 1; direction < DIRECTION_COUNT; direction += 2) {
+                ivec2 child = next.cell + DIRECTION_IVEC2[direction];
+                if (!map_is_cell_in_bounds(map, child)) {
+                    continue;
+                }
+                if (is_explored[child.x + child.y * map.width]) {
+                    continue;
+                }
+                if (map_is_tile_ramp(map, child)) {
+                    continue;
+                }
+                if (noise->forest[child.x + (child.y * map.width)] == 0) {
+                    continue;
+                }
+                if (ivec2::manhattan_distance(child, next.source_cell) > 8) {
+                    continue;
+                }
+
+                frontier.push_back((TreeNode) {
+                    .cell = child,
+                    .source_cell = next.source_cell
+                });
+            }
         }
     }
 }
