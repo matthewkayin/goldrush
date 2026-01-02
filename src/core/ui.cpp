@@ -589,15 +589,18 @@ bool ui_toolbar(UI& state, std::string* column, std::string* action, const std::
             if (state.input_enabled && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && item_hovered != -1) {
                 *column = items[column_index][0];
                 *action = items[column_index][item_hovered + 1];
+                sound_play(SOUND_UI_CLICK);
             }
         }
     }
 
     if (state.element_selected == toolbar_id && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         state.element_selected_future = UI_ELEMENT_NONE;
+        sound_play(SOUND_UI_CLICK);
     } else if (state.element_selected == UI_ELEMENT_NONE && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) && hovered) {
         state.element_selected_future = toolbar_id;
         state.toolbar_column_selected = (input_get_mouse_position().x - origin.x) / (dropdown_sprite_info.frame_width + spacing);
+        sound_play(SOUND_UI_CLICK);
     }
 
     return *action != "";

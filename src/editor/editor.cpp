@@ -120,6 +120,7 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
 void editor_set_tool(EditorTool tool);
 ivec2 editor_canvas_to_world_space(ivec2 point);
 ivec2 editor_get_hovered_cell();
+const char* editor_get_noise_value_str(uint8_t noise_value);
 void editor_push_action(const EditorAction& action);
 void editor_do_action(const EditorAction& action);
 void editor_undo_action();
@@ -245,7 +246,7 @@ void editor_update() {
             state.camera_drag_mouse_position.x == -1 &&
             !editor_is_in_menu()) {
         ivec2 cell = editor_get_hovered_cell();
-        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i> Noise %u", cell.x, cell.y, state.document->noise->map[cell.x + (cell.y * state.document->noise->width)]);
+        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i> Value: %s", cell.x, cell.y, editor_get_noise_value_str(state.document->noise->map[cell.x + (cell.y * state.document->noise->width)]));
     }
     if (status_text[0] != '\0') {
         ui_element_position(state.ui, ivec2(4, SCREEN_HEIGHT - 15));
@@ -542,6 +543,22 @@ ivec2 editor_canvas_to_world_space(ivec2 point) {
 
 ivec2 editor_get_hovered_cell() {
     return editor_canvas_to_world_space(input_get_mouse_position()) / TILE_SIZE;
+}
+
+const char* editor_get_noise_value_str(uint8_t noise_value) {
+    switch (noise_value) {
+        case NOISE_VALUE_WATER: 
+            return "Water";
+        case NOISE_VALUE_LOWGROUND:
+            return "Lowground";
+        case NOISE_VALUE_HIGHGROUND:
+            return "Highground";
+        case NOISE_VALUE_RAMP:
+            return "Ramp";
+        default:
+            GOLD_ASSERT(false);
+            return "";
+    }
 }
 
 // Adds an action to the stack but does not execute the action
