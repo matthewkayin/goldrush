@@ -5,7 +5,6 @@
 #include "logger.h"
 #include "filesystem.h"
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_image.h>
 #include <cstdio>
 #include <unordered_map>
 
@@ -36,7 +35,7 @@ bool cursor_init() {
         const CursorParams params = CURSOR_PARAMS.at((CursorName)cursor);
         std::string path = filesystem_get_resource_path() + "sprite/" + params.path;
 
-        SDL_Surface* cursor_surface = IMG_Load(path.c_str());
+        SDL_Surface* cursor_surface = SDL_LoadPNG(path.c_str());
         if (cursor_surface == NULL) {
             log_error("Unable to load surface %s for cursor: %s", path.c_str(), SDL_GetError());
             return false;

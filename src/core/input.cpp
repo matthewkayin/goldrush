@@ -12,6 +12,7 @@ struct InputState {
     ivec2 scaled_screen_position;
 
     ivec2 mouse_position;
+    int mouse_scroll;
     bool current[INPUT_ACTION_COUNT];
     bool previous[INPUT_ACTION_COUNT];
     bool user_requests_exit;
@@ -36,6 +37,7 @@ void input_init(SDL_Window* window) {
     input_set_hotkey_mapping_to_default(state.hotkey_mapping);
 
     state.should_capture_mouse = true;
+    state.mouse_scroll = 0;
 
     #ifndef GOLD_DEBUG
         SDL_SetWindowMouseGrab(state.window, true);
@@ -63,6 +65,7 @@ void input_set_mouse_capture_enabled(bool value) {
 void input_poll_events() {
     memcpy(&state.previous, &state.current, sizeof(state.current));
     state.key_just_pressed = INPUT_KEY_NONE;
+    state.mouse_scroll = 0;
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -244,6 +247,10 @@ void input_poll_events() {
                 }
                 break;
             }
+            case SDL_EVENT_MOUSE_WHEEL: {
+                state.mouse_scroll = event.wheel.integer_y;
+                break;
+            }
             default: 
                 break;
         }
@@ -271,6 +278,10 @@ ivec2 input_get_mouse_position() {
 
 bool input_user_requests_exit() {
     return state.user_requests_exit;
+}
+
+int input_get_mouse_scroll() {
+    return state.mouse_scroll;
 }
 
 bool input_is_action_pressed(InputAction action) {

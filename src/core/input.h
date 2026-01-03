@@ -102,6 +102,8 @@ bool input_is_text_input_active();
 ivec2 input_get_mouse_position();
 bool input_user_requests_exit();
 
+int input_get_mouse_scroll();
+
 bool input_is_action_pressed(InputAction action);
 bool input_is_action_just_pressed(InputAction action);
 bool input_is_action_just_released(InputAction action);

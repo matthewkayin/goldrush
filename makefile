@@ -40,7 +40,7 @@ ifeq ($(OS),Windows_NT)
 
 # ws2_32 and winmm are linked for enet
 	COMPILER_FLAGS += -Wno-missing-designated-field-initializers
-	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_image -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -ldbghelp
+	LINKER_FLAGS += -L$(LIB_DIR) -lSDL3 -lSDL3_ttf -luser32 -lws2_32 -lwinmm -lenet64 -lsteam_api64 -ldbghelp
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Darwin)
@@ -48,14 +48,14 @@ else
 		EXTENSION :=
 # Use -Wno-deprecated-declarations on MacOS because Apple clang considers sprintf() as deprecated (sprintf() is used by logger)
 		COMPILER_FLAGS += -Wno-deprecated-declarations -mmacos-version-min=14.5
-		LINKER_FLAGS += -Llib/macos -lenet -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_image -framework SDL3_ttf
+		LINKER_FLAGS += -Llib/macos -lenet -lsteam_api -Flib/macos -framework SDL3 -framework SDL3_ttf
 		ifeq ($(RELEASE_VERSION),)
 			LINKER_FLAGS += -rpath ../lib/macos
 		endif
 	endif
 	ifeq ($(UNAME_S),Linux)
 		BUILD_PLATFORM := linux
-		LINKER_FLAGS += -lSDL3 -lSDL3_image -lSDL3_ttf -ldl -Llib/linux64 -Wl,-rpath='$$ORIGIN',--enable-new-dtags -lenet -lsteam_api
+		LINKER_FLAGS += -lSDL3 -lSDL3_ttf -ldl -Llib/linux64 -Wl,-rpath='$$ORIGIN',--enable-new-dtags -lenet -lsteam_api
 	endif
 
 	SRC_FILES := $(shell find src -type f \( -name "*.cpp" -o -name "*.mm" \))

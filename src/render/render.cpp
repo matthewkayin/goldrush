@@ -5,7 +5,6 @@
 #include "core/filesystem.h"
 #include "core/asserts.h"
 #include "math/mat4.h"
-#include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
 #include <glad/glad.h>
 #include <vector>
@@ -341,7 +340,7 @@ bool render_load_sprites() {
     for (int tileset = 0; tileset < TILESET_COUNT; tileset++) {
         const TilesetParams& params = render_get_tileset_params((Tileset)tileset);
         std::string tileset_path = filesystem_get_resource_path() + "sprite/" + params.path;
-        tileset_surfaces[tileset] = IMG_Load(tileset_path.c_str());
+        tileset_surfaces[tileset] = SDL_LoadPNG(tileset_path.c_str());
         if (tileset_surfaces[tileset] == NULL) {
             log_error("Unable to load tileset %s: %s", tileset_path.c_str(), SDL_GetError());
             return false;
@@ -379,7 +378,7 @@ bool render_load_sprites() {
             surfaces[FONT_COUNT + sprite].surface = swatch_surface;
         } else {
             std::string sprite_path = filesystem_get_resource_path() + "sprite/" + params.sheet.path;
-            SDL_Surface* sprite_surface = IMG_Load(sprite_path.c_str());
+            SDL_Surface* sprite_surface = SDL_LoadPNG(sprite_path.c_str());
             if (sprite_surface == NULL) {
                 log_error("Unable to load sprite %s: %s", sprite_path.c_str(), SDL_GetError());
                 return false;
@@ -1436,7 +1435,7 @@ bool render_take_screenshot() {
     render_flip_sdl_surface_vertically(screenshot);
 
     std::string path = filesystem_get_data_path() + filesystem_get_timestamp_str() + ".png";
-    bool success = IMG_SavePNG(screenshot, path.c_str());
+    bool success = SDL_SavePNG(screenshot, path.c_str());
     log_info("Screenshot %s save success %i", path.c_str(), (int)success);
 
     return success;

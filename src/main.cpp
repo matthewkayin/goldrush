@@ -12,7 +12,6 @@
 #include "shell/desync.h"
 #include "profile/profile.h"
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_image.h>
 #include <SDL3/SDL_ttf.h>
 #include <ctime>
 #include <string>
