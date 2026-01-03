@@ -199,7 +199,15 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
                             option_set_value((OptionName)option, value);
                         }
                     } else if (option_data.type == OPTION_TYPE_PERCENT_SLIDER || option_data.type == OPTION_TYPE_SLIDER) {
-                        if (ui_slider(ui, &value, NULL, option_data.min_value, option_data.max_value, option_data.type == OPTION_TYPE_SLIDER ? UI_SLIDER_DISPLAY_RAW_VALUE : UI_SLIDER_DISPLAY_PERCENT)) {
+                        UiSliderParams params = (UiSliderParams) {
+                            .display = option_data.type == OPTION_TYPE_SLIDER
+                                ? UI_SLIDER_DISPLAY_RAW_VALUE
+                                : UI_SLIDER_DISPLAY_PERCENT,
+                            .min = option_data.min_value,
+                            .max = option_data.max_value,
+                            .step = 1
+                        };
+                        if (ui_slider(ui, &value, NULL, params)) {
                             option_set_value((OptionName)option, value);
                         }
                     }

@@ -33,6 +33,13 @@ enum UiSliderDisplay {
     UI_SLIDER_DISPLAY_NO_VALUE
 };
 
+struct UiSliderParams {
+    UiSliderDisplay display;
+    uint32_t min;
+    uint32_t max;
+    uint32_t step;
+};
+
 enum UiRenderType {
     UI_RENDER_TEXT,
     UI_RENDER_SPRITE,
@@ -264,9 +271,8 @@ void ui_screen_shade(UI& state);
  * @param size The size of the text input element
  * @param value Pointer to the string that will be edited by the text input
  * @param max_length Text entered by the input will not exceed this length
- * @param word_wrap Enables word wrap
  */
-void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length, bool word_wrap = false);
+void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length);
 
 /**
  * Creates a team picker
@@ -286,19 +292,25 @@ bool ui_team_picker(UI& state, char value, bool disabled);
  */
 bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
 
+/**
+ * Creates a toolbar
+ * @param column Will be set equal to the column of the selected action
+ * @param action Will be set equal to the selected action
+ * @param items List of items to appear in the toolbar
+ * @param spacing Distance between each column
+ * @return True if a toolbar item was clicked
+ */
 bool ui_toolbar(UI& state, std::string* column, std::string* action, const std::vector<std::vector<std::string>>& items, int spacing);
 
 /**
  * Creates a slider
  * @param slider_id Needed for state keeping, should be a unique ID per slider
  * @param value Pointer to the value. Will be modified when user changes the value.
- * @param buffered_value Pointer to the buffered value. Can be NULL, in which case no buffered value will be rendered.
- * @param min The minimum value of the slider
- * @param max The maximum value of the slider
- * @param display Determines how the slider should render the value text
+ * @param buffered_value Pointer to the buffered value. Can be NULL, in which case no buffered value will be rendered. The buffered value is used to display the white bar on the slider that shows how much of a replay has been loaded.
+ * @param params Parameters customizing the slider
  * @return True if the slider value has changed
  */
-bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t min, uint32_t max, UiSliderDisplay display);
+bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, UiSliderParams params);
 
 /**
  * Creates a screenshot frame

@@ -553,7 +553,13 @@ void match_shell_update(MatchShellState* state) {
             ui_end_container(state->replay_ui);
 
             uint32_t position = state->match_timer;
-            if (ui_slider(state->replay_ui, &position, &state->replay_loaded_match_timer, 0, match_shell_replay_end_of_tape(state), UI_SLIDER_DISPLAY_NO_VALUE)) {
+            UiSliderParams slider_params = (UiSliderParams) {
+                .display = UI_SLIDER_DISPLAY_NO_VALUE,
+                .min = 0,
+                .max = (uint32_t)match_shell_replay_end_of_tape(state),
+                .step = 1
+            };
+            if (ui_slider(state->replay_ui, &position, &state->replay_loaded_match_timer, slider_params)) {
                 state->selection.clear();
                 state->chat.clear();
                 match_shell_replay_scrub(state, position);

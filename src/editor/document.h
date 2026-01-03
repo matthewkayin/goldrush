@@ -8,13 +8,18 @@
 #include "match/state.h"
 #include "match/map.h"
 
+struct EditorPlayer {
+    std::string name;
+    uint32_t starting_gold;
+};
+
 struct EditorDocument {
     Map* map;
     Noise* noise;
     int tile_bake_seed;
     uint32_t entity_count;
     Entity entities[MATCH_MAX_ENTITIES];
-    MatchPlayer players[MAX_PLAYERS];
+    EditorPlayer players[MAX_PLAYERS];
 };
 
 EditorDocument* editor_document_init_blank(MapType map_type, MapSize map_size);

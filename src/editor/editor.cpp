@@ -4,6 +4,7 @@
 
 #include "editor/document.h"
 #include "editor/menu_new.h"
+#include "editor/menu_players.h"
 #include "editor/ui.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -45,7 +46,7 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save" },
-    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste" },
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
     { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate" }
 };
 
@@ -87,6 +88,7 @@ struct EditorState {
 
     // Menus
     EditorMenuNew menu_new;
+    EditorMenuPlayers menu_players;
 
     // Tools
     EditorTool tool;
@@ -162,6 +164,7 @@ void editor_init() {
     state.action_head = 0;
 
     state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
+    state.menu_players.mode = EDITOR_MENU_PLAYERS_CLOSED;
 
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
@@ -278,19 +281,25 @@ void editor_update() {
     // Menu new
     if (state.menu_new.mode == EDITOR_MENU_NEW_OPEN) {
         editor_menu_new_update(state.menu_new, state.ui);
-    }
-    if (state.menu_new.mode == EDITOR_MENU_NEW_CREATE) {
-        editor_free_current_document();
+        if (state.menu_new.mode == EDITOR_MENU_NEW_CREATE) {
+            editor_free_current_document();
 
-        MapType map_type = (MapType)state.menu_new.map_type;
-        MapSize map_size = (MapSize)state.menu_new.map_size;
-        if (state.menu_new.use_noise_gen_params) {
-            NoiseGenParams params = editor_menu_new_create_noise_gen_params(state.menu_new);
-            state.document = editor_document_init_generated(map_type, params);
-        } else {
-            state.document = editor_document_init_blank(map_type, map_size);
+            MapType map_type = (MapType)state.menu_new.map_type;
+            MapSize map_size = (MapSize)state.menu_new.map_size;
+            if (state.menu_new.use_noise_gen_params) {
+                NoiseGenParams params = editor_menu_new_create_noise_gen_params(state.menu_new);
+                state.document = editor_document_init_generated(map_type, params);
+            } else {
+                state.document = editor_document_init_blank(map_type, map_size);
+            }
+            state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
         }
-        state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
+        return;
+    }
+
+    // Menu players
+    if (state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN) {
+        editor_menu_players_update(state.menu_players, state.ui, state.document);
         return;
     }
 
@@ -500,6 +509,8 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             editor_tool_select_clear_selection();
             state.is_pasting = true;
             log_debug("begin pasting");
+        } else if (action == "Players") {
+            state.menu_players = editor_menu_players_open();
         }
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {
@@ -1113,7 +1124,7 @@ RenderSpriteParams editor_create_entity_render_params(const Entity& entity) {
         .position = params_position,
         .ysort_position = params_position.y,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : state.document->players[entity.player_id].recolor_id
+        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : entity.player_id
     };
 
     const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
@@ -1160,7 +1171,7 @@ MinimapPixel editor_get_minimap_pixel_for_entity(const Entity& entity) {
     if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
         return MINIMAP_PIXEL_WHITE;
     }
-    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state.document->players[entity.player_id].recolor_id);
+    return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + entity.player_id);
 }
 
 #endif

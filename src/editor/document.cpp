@@ -13,11 +13,9 @@ EditorDocument* editor_document_base_init() {
     document->tile_bake_seed = rand();
     document->entity_count = 0;
 
-    memset(document->players, 0, sizeof(document->players));
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        sprintf(document->players[player_id].name, "Player %u", (player_id + 1));
-        document->players[player_id].recolor_id = player_id;
-        document->players[player_id].team = player_id;
+        document->players[player_id].name = std::string(player_id == 0 ? "Player" : "Enemy");
+        document->players[player_id].starting_gold = 50;
     }
 
     return document;

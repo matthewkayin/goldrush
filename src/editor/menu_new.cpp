@@ -45,11 +45,17 @@ void editor_menu_new_update(EditorMenuNew& menu, UI& ui) {
 
         // Noise gen params
         if (menu.use_noise_gen_params) {
+            UiSliderParams slider_params = (UiSliderParams) {
+                .display = UI_SLIDER_DISPLAY_RAW_VALUE,
+                .min = 0,
+                .max = 100,
+                .step = 1
+            };
             editor_menu_dropdown(ui, "Noise Inverted:", &menu.noise_gen_inverted, { "No", "Yes" }, MENU_NEW_RECT);
-            editor_menu_slider(ui, menu.noise_gen_inverted ? "Highground Threshold:" : "Water Threshold:", &menu.noise_gen_water_threshold, MENU_NEW_RECT);
-            editor_menu_slider(ui, "Lowground Threshold:", &menu.noise_gen_lowground_threshold, MENU_NEW_RECT);
+            editor_menu_slider(ui, menu.noise_gen_inverted ? "Highground Threshold:" : "Water Threshold:", &menu.noise_gen_water_threshold, slider_params, MENU_NEW_RECT);
+            editor_menu_slider(ui, "Lowground Threshold:", &menu.noise_gen_lowground_threshold, slider_params, MENU_NEW_RECT);
             if (menu.map_type == MAP_TYPE_KLONDIKE) {
-                editor_menu_slider(ui, "Forest Threshold:", &menu.noise_gen_forest_threshold, MENU_NEW_RECT);
+                editor_menu_slider(ui, "Forest Threshold:", &menu.noise_gen_forest_threshold, slider_params, MENU_NEW_RECT);
             }
         }
     ui_end_container(ui);

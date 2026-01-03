@@ -311,7 +311,7 @@ void ui_screen_shade(UI& state) {
     RENDER_COLOR_OFFBLACK_A128, 0);
 }
 
-void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length, bool word_wrap) {
+void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value, size_t max_length) {
     int id = ui_get_next_text_input_id(state);
     ivec2 origin = ui_get_container_origin(state);
     ui_update_container(state, size);
@@ -325,59 +325,8 @@ void ui_text_input(UI& state, const char* prompt, ivec2 size, std::string* value
     ivec2 prompt_size = render_get_text_size(FONT_HACK_GOLD, prompt);
     ivec2 text_pos = ivec2(text_input_rect.x + prompt_size.x, text_input_rect.y + 6);
 
-    if (word_wrap) {
-        std::string text = *value;
-        while (!text.empty()) {
-            size_t space_index = text.find(' ');
-            std::string word; 
-            if (space_index == std::string::npos) {
-                word = text;
-                text.clear();
-            } else {
-                word = text.substr(0, space_index + 1);
-                text = text.substr(space_index + 1);
-            }
-
-            ivec2 word_size = render_get_text_size(FONT_HACK_GOLD, word.c_str());
-            bool word_breaks_line = text_pos.x + word_size.x > text_input_rect.x + text_input_rect.w - 5;
-            if (word_breaks_line && word.length() > 8) {
-                while (!word.empty()) {
-                    std::string word_part;
-                    int word_part_width = 0;
-                    while (!word.empty() && text_pos.x + word_part_width <= text_input_rect.x + text_input_rect.w - 3) {
-                        word_part.push_back(word[0]);
-                        word.erase(word.begin());
-                        word_part_width = render_get_text_size(FONT_HACK_GOLD, word_part.c_str()).x;
-                    }
-                    bool word_part_reaches_end_of_line = false;
-                    if (!word_part.empty() && text_pos.x + word_part_width > text_input_rect.x + text_input_rect.w - 3) {
-                        word.insert(0, 1, word_part[word_part.size() - 1]);
-                        word_part.pop_back();
-                        word_part_reaches_end_of_line = true;
-                    }
-                    word_part_width = render_get_text_size(FONT_HACK_GOLD, word_part.c_str()).x;
-                    ui_queue_text(state, FONT_HACK_GOLD, word_part.c_str(), text_pos, 0);
-                    if (word_part_reaches_end_of_line) {
-                        text_pos.x = text_input_rect.x + 3;
-                        text_pos.y += prompt_size.y + 2;
-                    } else {
-                        text_pos.x += word_part_width;
-                    }
-                }
-            } else {
-                if (word_breaks_line) {
-                    text_pos.x = text_input_rect.x + 3;
-                    text_pos.y += prompt_size.y + 2;
-                }
-
-                ui_queue_text(state, FONT_HACK_GOLD, word.c_str(), text_pos, 0);
-                text_pos.x += word_size.x;
-            }
-        }
-    } else {
-        ui_queue_text(state, FONT_HACK_GOLD, value->c_str(), text_pos, 0);
-        text_pos.x += render_get_text_size(FONT_HACK_GOLD, value->c_str()).x;
-    }
+    ui_queue_text(state, FONT_HACK_GOLD, value->c_str(), text_pos, 0);
+    text_pos.x += render_get_text_size(FONT_HACK_GOLD, value->c_str()).x;
 
     if (input_is_text_input_active() && state.text_input_selected == id) {
         if (!state.input_enabled) {
@@ -606,7 +555,7 @@ bool ui_toolbar(UI& state, std::string* column, std::string* action, const std::
     return *action != "";
 }
 
-bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t min, uint32_t max, UiSliderDisplay display) {
+bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, UiSliderParams params) {
     static const int VALUE_STR_PADDING = 4;
     static const int SLIDER_HEIGHT = 5;
     static const int NOTCH_WIDTH = 5;
@@ -619,12 +568,12 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t mi
     // Slider width will be based on the dropdown sprite's width
     const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
     ivec2 size = ivec2(dropdown_sprite_info.frame_width, dropdown_sprite_info.frame_height);
-    if (display != UI_SLIDER_DISPLAY_NO_VALUE) {
+    if (params.display != UI_SLIDER_DISPLAY_NO_VALUE) {
         char option_value_str[8];
-        if (display == UI_SLIDER_DISPLAY_RAW_VALUE) {
+        if (params.display == UI_SLIDER_DISPLAY_RAW_VALUE) {
             sprintf(option_value_str, "%i", *value);
-        } else if (display == UI_SLIDER_DISPLAY_PERCENT) {
-            float percentage = (float)(*value) / (float)max;
+        } else if (params.display == UI_SLIDER_DISPLAY_PERCENT) {
+            float percentage = (float)(*value) / (float)params.max;
             sprintf(option_value_str, "%i%%", (int)(percentage * 100.0f));
         }
         ivec2 value_str_text_size = render_get_text_size(FONT_WESTERN8_GOLD, option_value_str);
@@ -644,7 +593,7 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t mi
     Rect slider_subrect = (Rect) {
         .x = slider_rect.x + 1, 
         .y = slider_rect.y,
-        .w = ((slider_rect.w - 2) * ((int)*value - (int)min)) / (int)max,
+        .w = ((slider_rect.w - 2) * ((int)*value - (int)params.min)) / (int)params.max,
         .h = slider_rect.h
     };
     Rect notch_rect = (Rect) {
@@ -663,7 +612,7 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t mi
         Rect slider_buffered_subrect = (Rect) {
             .x = slider_rect.x + 1, 
             .y = slider_rect.y,
-            .w = ((slider_rect.w - 2) * ((int)*buffered_value - (int)min)) / (int)max,
+            .w = ((slider_rect.w - 2) * ((int)*buffered_value - (int)params.min)) / (int)params.max,
             .h = slider_rect.h
         };
         ui_queue_fill_rect(state, slider_buffered_subrect, RENDER_COLOR_WHITE, 0);
@@ -694,7 +643,11 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, uint32_t mi
             mouse_x = input_rect.x + input_rect.w;
         }
         mouse_x -= input_rect.x;
-        *value = min + (uint32_t)((mouse_x * (int)max) / input_rect.w);
+
+        uint32_t scaled_min = params.min / params.step;
+        uint32_t scaled_max = params.max / params.step;
+        uint32_t scaled_value = scaled_min + (uint32_t)((mouse_x * (int)scaled_max) / input_rect.w);
+        *value = scaled_value * params.step;
 
         if (input_is_action_just_released(INPUT_ACTION_LEFT_CLICK)) {
             state.element_selected = UI_ELEMENT_NONE;

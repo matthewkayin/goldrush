@@ -19,7 +19,7 @@ bool editor_menu_dropdown(UI& ui, const char* prompt, uint32_t* selection, const
     return dropdown_clicked;
 }
 
-void editor_menu_slider(UI& ui, const char* prompt, uint32_t* value, const Rect& rect) {
+void editor_menu_slider(UI& ui, const char* prompt, uint32_t* value, const UiSliderParams& params, const Rect& rect) {
     const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
 
     ui_element_size(ui, ivec2(0, dropdown_sprite_info.frame_height));
@@ -28,7 +28,7 @@ void editor_menu_slider(UI& ui, const char* prompt, uint32_t* value, const Rect&
         ui_text(ui, FONT_HACK_GOLD, prompt);
 
         ui_element_position(ui, ivec2(rect.w - 16 - dropdown_sprite_info.frame_width, 0));
-        ui_slider(ui, value, NULL, 0, 100, UI_SLIDER_DISPLAY_RAW_VALUE);
+        ui_slider(ui, value, NULL, params);
     ui_end_container(ui);
 }
 
