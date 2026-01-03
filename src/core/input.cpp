@@ -178,6 +178,15 @@ void input_poll_events() {
                                 case SDL_SCANCODE_D:
                                     state.current[INPUT_ACTION_EDITOR_TOOL_DECORATE] = event.type == SDL_EVENT_KEY_DOWN;
                                     break;
+                                case SDL_SCANCODE_A:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_ENTITY_ADD] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
+                                case SDL_SCANCODE_E:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_ENTITY_EDIT] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
+                                case SDL_SCANCODE_DELETE:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_ENTITY_EDIT_DELETE] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
                                 default:
                                     break;
                             }

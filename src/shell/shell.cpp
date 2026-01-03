@@ -555,6 +555,7 @@ void match_shell_update(MatchShellState* state) {
             uint32_t position = state->match_timer;
             UiSliderParams slider_params = (UiSliderParams) {
                 .display = UI_SLIDER_DISPLAY_NO_VALUE,
+                .size = UI_SLIDER_SIZE_NORMAL,
                 .min = 0,
                 .max = (uint32_t)match_shell_replay_end_of_tape(state),
                 .step = 1

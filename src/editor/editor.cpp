@@ -47,7 +47,7 @@ static const Rect CANVAS_RECT = (Rect) {
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save" },
     { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
-    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Entity Place" }
+    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Entity Add", "Entity Edit" }
 };
 
 static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_SHORTCUTS = {
@@ -61,11 +61,13 @@ static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_S
     { INPUT_ACTION_EDITOR_TOOL_FILL, { "Tool", "Fill" }},
     { INPUT_ACTION_EDITOR_TOOL_RECT, { "Tool", "Rect" }},
     { INPUT_ACTION_EDITOR_TOOL_SELECT, { "Tool", "Select" }},
-    { INPUT_ACTION_EDITOR_TOOL_DECORATE, { "Tool", "Decorate" }}
+    { INPUT_ACTION_EDITOR_TOOL_DECORATE, { "Tool", "Decorate" }},
+    { INPUT_ACTION_EDITOR_TOOL_ENTITY_ADD, { "Tool", "Entity Add" }},
+    { INPUT_ACTION_EDITOR_TOOL_ENTITY_EDIT, { "Tool", "Entity Edit" }},
 };
 
-static const uint32_t TOOL_ENTITY_PLACE_ROW_SIZE = 4;
-static const uint32_t TOOL_ENTITY_PLACE_VISIBLE_ROW_COUNT = 4;
+static const uint32_t TOOL_ENTITY_ADD_ROW_SIZE = 4;
+static const uint32_t TOOL_ENTITY_ADD_VISIBLE_ROW_COUNT = 4;
 
 enum EditorTool {
     EDITOR_TOOL_BRUSH,
@@ -73,7 +75,8 @@ enum EditorTool {
     EDITOR_TOOL_RECT,
     EDITOR_TOOL_SELECT,
     EDITOR_TOOL_DECORATE,
-    EDITOR_TOOL_ENTITY_PLACE
+    EDITOR_TOOL_ENTITY_ADD,
+    EDITOR_TOOL_ENTITY_EDIT
 };
 
 struct EditorClipboard {
@@ -83,8 +86,9 @@ struct EditorClipboard {
 };
 
 struct EditorState {
-    UI ui;
     EditorDocument* document;
+    UI ui;
+    int ui_toolbar_id;
 
     // Actions
     size_t action_head;
@@ -103,8 +107,9 @@ struct EditorState {
     ivec2 tool_select_origin;
     ivec2 tool_select_end;
     Rect tool_select_selection;
-    uint32_t tool_entity_place_player_id;
-    uint32_t tool_entity_place_scroll;
+    uint32_t tool_entity_add_player_id;
+    uint32_t tool_entity_add_scroll;
+    uint32_t tool_entity_edit_gold_held;
     bool is_painting;
     bool is_pasting;
 
@@ -122,6 +127,7 @@ static EditorState state;
 // Update
 void editor_free_current_document();
 bool editor_is_in_menu();
+bool editor_is_toolbar_open();
 void editor_clamp_camera();
 void editor_center_camera_on_cell(ivec2 cell);
 void editor_handle_toolbar_action(const std::string& column, const std::string& action);
@@ -152,7 +158,8 @@ void editor_flatten_rect(const Rect& rect);
 bool editor_is_using_noise_tool();
 void editor_generate_decorations();
 std::vector<EditorActionDecorate> editor_clear_deocrations();
-uint32_t editor_tool_entity_place_get_row_count();
+uint32_t editor_tool_entity_add_get_row_count();
+void editor_tool_entity_edit_set_selection(uint32_t entity_index);
 
 // Render
 ivec2 editor_entity_get_animation_frame(EntityType type);
@@ -182,7 +189,7 @@ void editor_init() {
     state.is_minimap_dragging = false;
     state.is_painting = false;
     state.is_pasting = false;
-    state.tool_entity_place_player_id = 0;
+    state.tool_entity_add_player_id = 0;
     state.camera_drag_mouse_position = ivec2(-1, -1);
 
     log_info("Initialized map editor.");
@@ -215,6 +222,7 @@ void editor_update() {
     // Toolbar
     ui_small_frame_rect(state.ui, TOOLBAR_RECT);
     ui_element_position(state.ui, ivec2(3, 3));
+    state.ui_toolbar_id = state.ui.next_element_id + 1;
     toolbar_was_clicked = ui_toolbar(state.ui, &toolbar_column, &toolbar_action, TOOLBAR_OPTIONS, 2);
 
     // Sidebar
@@ -253,26 +261,82 @@ void editor_update() {
                     }
                     break;
                 }
-                case EDITOR_TOOL_ENTITY_PLACE: {
+                case EDITOR_TOOL_ENTITY_ADD: {
                     std::vector<std::string> items;
                     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
                         items.push_back(std::to_string(player_id) + ": " + *state.document->players[player_id].name);
                     }
-                    ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_entity_place_player_id, items, false);
+                    ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_entity_add_player_id, items, false);
 
-                    for (uint32_t row = state.tool_entity_place_scroll; row < state.tool_entity_place_scroll + TOOL_ENTITY_PLACE_VISIBLE_ROW_COUNT; row++) {
+                    for (uint32_t row = state.tool_entity_add_scroll; row < state.tool_entity_add_scroll + TOOL_ENTITY_ADD_VISIBLE_ROW_COUNT; row++) {
                         ui_begin_row(state.ui, ivec2(0, 0), 2);
-                            for (uint32_t col = 0; col < TOOL_ENTITY_PLACE_ROW_SIZE; col++) {
-                                if ((row * TOOL_ENTITY_PLACE_ROW_SIZE) + col >= ENTITY_TYPE_COUNT) {
+                            for (uint32_t col = 0; col < TOOL_ENTITY_ADD_ROW_SIZE; col++) {
+                                if ((row * TOOL_ENTITY_ADD_ROW_SIZE) + col >= ENTITY_TYPE_COUNT) {
                                     continue;
                                 }
-                                EntityType entity_type = (EntityType)((row * TOOL_ENTITY_PLACE_ROW_SIZE) + col);
+                                EntityType entity_type = (EntityType)((row * TOOL_ENTITY_ADD_ROW_SIZE) + col);
                                 if (ui_icon_button(state.ui, entity_get_data(entity_type).icon, state.tool_value == entity_type)) {
                                     state.tool_value = entity_type;
                                 }
                             }
                         ui_end_container(state.ui);
                     }
+                    break;
+                }
+                case EDITOR_TOOL_ENTITY_EDIT: {
+                    if (state.tool_value == INDEX_INVALID) {
+                        break;
+                    }
+
+                    const EditorEntity& entity = state.document->entities[state.tool_value];
+
+                    ui_icon_button(state.ui, entity_get_data(entity.type).icon, true);
+
+                    if (entity.type == ENTITY_GOLDMINE) {
+                        char gold_text[16];
+                        sprintf(gold_text, "Gold: %u", state.tool_entity_edit_gold_held);
+
+                        ui_text(state.ui, FONT_HACK_GOLD, gold_text);
+
+                        ui_slider(state.ui, &state.tool_entity_edit_gold_held, NULL, (UiSliderParams) {
+                            .display = UI_SLIDER_DISPLAY_NO_VALUE,
+                            .size = UI_SLIDER_SIZE_MINI,
+                            .min = 0,
+                            .max = 10000,
+                            .step = 50
+                        }); 
+                        if (input_is_action_just_released(INPUT_ACTION_LEFT_CLICK) && state.tool_entity_edit_gold_held != entity.gold_held) {
+                            EditorEntity edited_entity = entity;
+                            edited_entity.gold_held = state.tool_entity_edit_gold_held;
+                            editor_do_action((EditorAction) {
+                                .type = EDITOR_ACTION_ENTITY_EDIT,
+                                .entity_edit = (EditorActionEntityEdit) {
+                                    .index = state.tool_value,
+                                    .previous_value = entity,
+                                    .new_value = edited_entity
+                                }
+                            });
+                        }
+                    } else {
+                        std::vector<std::string> items;
+                        for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                            items.push_back(std::to_string(player_id) + ": " + *state.document->players[player_id].name);
+                        }
+                        uint32_t entity_player_id = entity.player_id;
+                        if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &entity_player_id, items, false)) {
+                            EditorEntity edited_entity = entity;
+                            edited_entity.player_id = (uint8_t)entity_player_id;
+                            editor_do_action((EditorAction) {
+                                .type = EDITOR_ACTION_ENTITY_EDIT,
+                                .entity_edit = (EditorActionEntityEdit) {
+                                    .index = state.tool_value,
+                                    .previous_value = entity,
+                                    .new_value = edited_entity
+                                }
+                            });
+                        }
+                    }
+
                     break;
                 }
             }
@@ -366,6 +430,7 @@ void editor_update() {
     if (input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK) &&
             !state.is_minimap_dragging &&
             !editor_is_in_menu() &&
+            !editor_is_toolbar_open() &&
             !state.is_pasting &&
             state.camera_drag_mouse_position.x == -1 &&
             CANVAS_RECT.has_point(input_get_mouse_position())) {
@@ -463,23 +528,41 @@ void editor_update() {
         });
     }
 
-    // Entity place
-    if (state.tool == EDITOR_TOOL_ENTITY_PLACE && editor_can_single_use_tool_be_used() && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+    // Entity add
+    if (state.tool == EDITOR_TOOL_ENTITY_ADD && editor_can_single_use_tool_be_used() && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         editor_do_action((EditorAction) {
-            .type = EDITOR_ACTION_ENTITY_PLACE,
-            .entity_place = (EditorActionEntityPlace) {
+            .type = EDITOR_ACTION_ENTITY_ADD,
+            .entity_add = (EditorActionEntityAdd) {
                 .type = (EntityType)state.tool_value,
                 .player_id = state.tool_value == ENTITY_GOLDMINE 
                     ? (uint8_t)PLAYER_NONE 
-                    : (uint8_t)state.tool_entity_place_player_id,
+                    : (uint8_t)state.tool_entity_add_player_id,
                 .cell = editor_get_hovered_cell()
             }
         });
     }
 
+    // Entity edit - select entity
+    if (state.tool == EDITOR_TOOL_ENTITY_EDIT && editor_can_single_use_tool_be_used() && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        ivec2 cell = editor_get_hovered_cell();
+        state.tool_value = INDEX_INVALID;
+        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+            const EditorEntity& entity = state.document->entities[entity_index];
+            const int entity_cell_size = entity_get_data(entity.type).cell_size;
+            Rect entity_cell_rect = (Rect) {
+                .x = entity.cell.x, .y = entity.cell.y,
+                .w = entity_cell_size, .h = entity_cell_size
+            };
+            if (entity_cell_rect.has_point(cell)) {
+                editor_tool_entity_edit_set_selection(entity_index);
+                break;
+            }
+        }
+    }
+
     // Entity place scroll
-    if (state.tool == EDITOR_TOOL_ENTITY_PLACE && SIDEBAR_RECT.has_point(input_get_mouse_position())) {
-        state.tool_entity_place_scroll = (uint32_t)std::clamp((int)state.tool_entity_place_scroll - input_get_mouse_scroll(), 0, (int)editor_tool_entity_place_get_row_count() - (int)TOOL_ENTITY_PLACE_VISIBLE_ROW_COUNT);
+    if (state.tool == EDITOR_TOOL_ENTITY_ADD && SIDEBAR_RECT.has_point(input_get_mouse_position())) {
+        state.tool_entity_add_scroll = (uint32_t)std::clamp((int)state.tool_entity_add_scroll - input_get_mouse_scroll(), 0, (int)editor_tool_entity_add_get_row_count() - (int)TOOL_ENTITY_ADD_VISIBLE_ROW_COUNT);
     }
 
     // Minimap drag
@@ -516,6 +599,10 @@ void editor_update() {
 bool editor_is_in_menu() {
     return state.menu_new.mode == EDITOR_MENU_NEW_OPEN ||
         state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN;
+}
+
+bool editor_is_toolbar_open() {
+    return state.ui.element_selected == state.ui_toolbar_id;
 }
 
 void editor_clamp_camera() {
@@ -598,9 +685,13 @@ void editor_set_tool(EditorTool tool) {
         case EDITOR_TOOL_DECORATE: {
             break;
         }
-        case EDITOR_TOOL_ENTITY_PLACE: {
+        case EDITOR_TOOL_ENTITY_ADD: {
             state.tool_value = ENTITY_MINER;
-            state.tool_entity_place_scroll = 0;
+            state.tool_entity_add_scroll = 0;
+            break;
+        }
+        case EDITOR_TOOL_ENTITY_EDIT: {
+            state.tool_value = INDEX_INVALID;
             break;
         }
     }
@@ -620,7 +711,7 @@ bool editor_is_hovered_cell_valid() {
         Cell map_cell = map_get_cell(*state.document->map, CELL_LAYER_GROUND, cell);
         return map_cell.type == CELL_DECORATION || map_cell.type == CELL_EMPTY;
     }
-    if (state.tool == EDITOR_TOOL_ENTITY_PLACE) {
+    if (state.tool == EDITOR_TOOL_ENTITY_ADD) {
         const EntityData& entity_data = entity_get_data((EntityType)state.tool_value);
         return !map_is_cell_rect_occupied(*state.document->map, entity_data.cell_layer, cell, entity_data.cell_size);
     }
@@ -632,6 +723,7 @@ bool editor_can_single_use_tool_be_used() {
         !state.is_minimap_dragging &&
         state.camera_drag_mouse_position.x == -1 &&
         CANVAS_RECT.has_point(input_get_mouse_position()) &&
+        !editor_is_toolbar_open() &&
         editor_is_hovered_cell_valid();
 }
 
@@ -674,6 +766,10 @@ void editor_undo_action() {
 
     state.action_head--;
     editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_UNDO);
+
+    if (state.tool == EDITOR_TOOL_ENTITY_EDIT) {
+        editor_tool_entity_edit_set_selection(state.tool_value);
+    }
 }
 
 void editor_redo_action() {
@@ -683,6 +779,10 @@ void editor_redo_action() {
 
     editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_DO);
     state.action_head++;
+
+    if (state.tool == EDITOR_TOOL_ENTITY_EDIT) {
+        editor_tool_entity_edit_set_selection(state.tool_value);
+    }
 }
 
 void editor_clear_actions() {
@@ -973,12 +1073,23 @@ std::vector<EditorActionDecorate> editor_clear_deocrations() {
     return changes;
 }
 
-uint32_t editor_tool_entity_place_get_row_count() {
-    uint32_t count = ENTITY_TYPE_COUNT / TOOL_ENTITY_PLACE_ROW_SIZE;
-    if (ENTITY_TYPE_COUNT % TOOL_ENTITY_PLACE_ROW_SIZE != 0) {
+uint32_t editor_tool_entity_add_get_row_count() {
+    uint32_t count = ENTITY_TYPE_COUNT / TOOL_ENTITY_ADD_ROW_SIZE;
+    if (ENTITY_TYPE_COUNT % TOOL_ENTITY_ADD_ROW_SIZE != 0) {
         count++;
     }
     return count;
+}
+
+void editor_tool_entity_edit_set_selection(uint32_t entity_index) {
+    if (entity_index >= state.document->entity_count) {
+        state.tool_value = INDEX_INVALID;
+        return;
+    }
+
+    state.tool_value = entity_index;
+    const EditorEntity& entity = state.document->entities[entity_index];
+    state.tool_entity_edit_gold_held = entity.gold_held;
 }
 
 void editor_render() {
@@ -1099,16 +1210,16 @@ void editor_render() {
     if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
             !state.is_minimap_dragging &&
             state.camera_drag_mouse_position.x == -1 &&
-            !editor_is_in_menu()) {
-
-        if (state.tool == EDITOR_TOOL_ENTITY_PLACE) {
+            !editor_is_in_menu() &&
+            !editor_is_toolbar_open()) {
+        if (state.tool == EDITOR_TOOL_ENTITY_ADD) {
             EntityType entity_type = (EntityType)state.tool_value;
             const EntityData& entity_data = entity_get_data(entity_type);
             ivec2 entity_position = editor_entity_get_render_position(entity_type, editor_get_hovered_cell());
             const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
             entity_position.x -= sprite_info.frame_width / 2;
             entity_position.y -= sprite_info.frame_height / 2;
-            render_sprite_frame(entity_data.sprite, editor_entity_get_animation_frame(entity_type), entity_position, RENDER_SPRITE_NO_CULL, entity_type == ENTITY_GOLDMINE ? 0 : state.tool_entity_place_player_id);
+            render_sprite_frame(entity_data.sprite, editor_entity_get_animation_frame(entity_type), entity_position, RENDER_SPRITE_NO_CULL, entity_type == ENTITY_GOLDMINE ? 0 : state.tool_entity_add_player_id);
         }
 
         ivec2 cell = editor_get_hovered_cell();
@@ -1158,6 +1269,23 @@ void editor_render() {
         rendered_rect.x += CANVAS_RECT.x;
         rendered_rect.y += CANVAS_RECT.y;
         render_draw_rect(rendered_rect, RENDER_COLOR_WHITE);
+    }
+
+    // Edit entity selection rect
+    if (state.tool == EDITOR_TOOL_ENTITY_EDIT && state.tool_value != INDEX_INVALID) {
+        const EditorEntity& entity = state.document->entities[state.tool_value];
+        const int entity_cell_size = entity_get_data(entity.type).cell_size;
+        const Rect& entity_rect = (Rect) {
+            .x = entity.cell.x, .y = entity.cell.y,
+            .w = entity_cell_size, .h = entity_cell_size
+        };
+        Rect render_rect = editor_cell_rect_to_world_space(entity_rect);
+        render_rect.x += CANVAS_RECT.x;
+        render_rect.y += CANVAS_RECT.y;
+
+        if (CANVAS_RECT.intersects(render_rect)) {
+            render_draw_rect(render_rect, RENDER_COLOR_WHITE);
+        }
     }
 
     // Selection

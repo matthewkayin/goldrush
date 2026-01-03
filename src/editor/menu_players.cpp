@@ -13,9 +13,10 @@ static const Rect MENU_RECT = (Rect) {
 
 static const UiSliderParams STARTING_GOLD_SLIDER_PARAMS = (UiSliderParams) {
     .display = UI_SLIDER_DISPLAY_RAW_VALUE,
+    .size = UI_SLIDER_SIZE_NORMAL,
     .min = 0,
     .max = 1500,
-    .step = 10
+    .step = 50
 };
 
 EditorMenuPlayers editor_menu_players_open() {

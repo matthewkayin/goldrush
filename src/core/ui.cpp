@@ -565,8 +565,11 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, UiSliderPar
     ivec2 origin = ui_get_container_origin(state);
     uint32_t old_value = *value;
 
+    SpriteName dropdown_sprite_name = params.size == UI_SLIDER_SIZE_NORMAL ? SPRITE_UI_DROPDOWN : SPRITE_UI_DROPDOWN_MINI;
+    FontName font_name = params.size == UI_SLIDER_SIZE_NORMAL ? FONT_WESTERN8_GOLD : FONT_HACK_GOLD;
+
     // Slider width will be based on the dropdown sprite's width
-    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN);
+    const SpriteInfo& dropdown_sprite_info = render_get_sprite_info(dropdown_sprite_name);
     ivec2 size = ivec2(dropdown_sprite_info.frame_width, dropdown_sprite_info.frame_height);
     if (params.display != UI_SLIDER_DISPLAY_NO_VALUE) {
         char option_value_str[8];
@@ -576,10 +579,10 @@ bool ui_slider(UI& state, uint32_t* value, uint32_t* buffered_value, UiSliderPar
             float percentage = (float)(*value) / (float)params.max;
             sprintf(option_value_str, "%i%%", (int)(percentage * 100.0f));
         }
-        ivec2 value_str_text_size = render_get_text_size(FONT_WESTERN8_GOLD, option_value_str);
+        ivec2 value_str_text_size = render_get_text_size(font_name, option_value_str);
         size.x += VALUE_STR_PADDING + value_str_text_size.x;
 
-        ui_queue_text(state, FONT_WESTERN8_GOLD, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 3), 0);
+        ui_queue_text(state, font_name, option_value_str, ivec2(origin.x - VALUE_STR_PADDING - value_str_text_size.x, origin.y + 3), 0);
     }
 
     ui_update_container(state, size);

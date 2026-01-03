@@ -47,6 +47,7 @@ void editor_menu_new_update(EditorMenuNew& menu, UI& ui) {
         if (menu.use_noise_gen_params) {
             UiSliderParams slider_params = (UiSliderParams) {
                 .display = UI_SLIDER_DISPLAY_RAW_VALUE,
+                .size = UI_SLIDER_SIZE_NORMAL,
                 .min = 0,
                 .max = 100,
                 .step = 1

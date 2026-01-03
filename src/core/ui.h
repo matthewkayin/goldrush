@@ -33,8 +33,14 @@ enum UiSliderDisplay {
     UI_SLIDER_DISPLAY_NO_VALUE
 };
 
+enum UiSliderSize {
+    UI_SLIDER_SIZE_NORMAL,
+    UI_SLIDER_SIZE_MINI
+};
+
 struct UiSliderParams {
     UiSliderDisplay display;
+    UiSliderSize size;
     uint32_t min;
     uint32_t max;
     uint32_t step;

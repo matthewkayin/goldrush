@@ -32,13 +32,13 @@ void editor_action_destroy(EditorAction& action) {
             free(action.brush.stroke);
             break;
         }
-        case EDITOR_ACTION_DECORATE:
-            break;
         case EDITOR_ACTION_DECORATE_BULK: {
             free(action.decorate_bulk.changes);
             break;
         }
-        case EDITOR_ACTION_ENTITY_PLACE: 
+        case EDITOR_ACTION_DECORATE:
+        case EDITOR_ACTION_ENTITY_ADD: 
+        case EDITOR_ACTION_ENTITY_EDIT: 
             break;
     }
 }
@@ -78,7 +78,7 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
             }
             break;
         }
-        case EDITOR_ACTION_ENTITY_PLACE: {
+        case EDITOR_ACTION_ENTITY_ADD: {
             Cell cell_value = mode == EDITOR_ACTION_MODE_DO
                 ? (Cell) {
                     .type = CELL_UNIT,
@@ -88,14 +88,14 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                     .type = CELL_EMPTY,
                     .id = ID_NULL
                 };
-            const EntityData& entity_data = entity_get_data(action.entity_place.type);
-            map_set_cell_rect(*document->map, entity_data.cell_layer, action.entity_place.cell, entity_data.cell_size, cell_value);
+            const EntityData& entity_data = entity_get_data(action.entity_add.type);
+            map_set_cell_rect(*document->map, entity_data.cell_layer, action.entity_add.cell, entity_data.cell_size, cell_value);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
                 EditorEntity entity;
-                entity.type = action.entity_place.type;
-                entity.player_id = action.entity_place.player_id;
-                entity.cell = action.entity_place.cell;
+                entity.type = action.entity_add.type;
+                entity.player_id = action.entity_add.player_id;
+                entity.cell = action.entity_add.cell;
                 entity.gold_held = 0;
                 if (entity.type == ENTITY_GOLDMINE) {
                     entity.gold_held = 7500;
@@ -106,6 +106,12 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 document->entity_count--;
             }
 
+            break;
+        }
+        case EDITOR_ACTION_ENTITY_EDIT: {
+            document->entities[action.entity_edit.index] = mode == EDITOR_ACTION_MODE_DO
+                ? action.entity_edit.new_value
+                : action.entity_edit.previous_value;
             break;
         }
     }
