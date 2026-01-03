@@ -48,7 +48,10 @@ void editor_document_bake_map(EditorDocument* document, bool remove_artifacts) {
         for (int x = 0; x < document->map->width; x++) {
             if (map_should_cell_be_blocked(*document->map, ivec2(x, y)) &&
                     map_get_cell(*document->map, CELL_LAYER_GROUND, ivec2(x,y)).type == CELL_EMPTY) {
-                continue;
+                map_set_cell(*document->map, CELL_LAYER_GROUND, ivec2(x, y), (Cell) {
+                    .type = CELL_BLOCKED,
+                    .id = ID_NULL
+                });
             }
         }
     }
