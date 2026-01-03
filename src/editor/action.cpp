@@ -39,6 +39,7 @@ void editor_action_destroy(EditorAction& action) {
         case EDITOR_ACTION_DECORATE:
         case EDITOR_ACTION_ENTITY_ADD: 
         case EDITOR_ACTION_ENTITY_EDIT: 
+        case EDITOR_ACTION_ENTITY_DELETE: 
             break;
     }
 }
@@ -112,6 +113,18 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
             document->entities[action.entity_edit.index] = mode == EDITOR_ACTION_MODE_DO
                 ? action.entity_edit.new_value
                 : action.entity_edit.previous_value;
+            break;
+        }
+        case EDITOR_ACTION_ENTITY_DELETE: {
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                document->entities[action.entity_delete.index] = document->entities[document->entity_count - 1];
+                document->entity_count--;
+            } else if (mode == EDITOR_ACTION_MODE_UNDO) {
+                document->entities[document->entity_count] = document->entities[action.entity_delete.index];
+                document->entities[action.entity_delete.index] = action.entity_delete.value;
+                document->entity_count++;
+            }
+
             break;
         }
     }

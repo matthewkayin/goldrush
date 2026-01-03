@@ -136,8 +136,10 @@ void input_poll_events() {
                         // Use CMD instead of CTRL on Mac version of the editor
                         #ifdef PLATFORM_MACOS
                             const SDL_Scancode CTRL = SDL_SCANCODE_LGUI;
+                            const SDL_Scancode DELETE = SDL_SCANCODE_BACKSPACE;
                         #else
                             const SDL_Scancode CTRL = SDL_SCANCODE_LCTRL;
+                            const SDL_Scancode DELETE = SDL_SCANCODE_DELETE;
                         #endif
                         std::function<bool(InputAction, SDL_Scancode)> handle_ctrl_action = [&key_state, &event](InputAction action, SDL_Scancode action_scancode) {
                             if (!(event.key.scancode == action_scancode || event.key.scancode == CTRL)) {
@@ -184,7 +186,7 @@ void input_poll_events() {
                                 case SDL_SCANCODE_E:
                                     state.current[INPUT_ACTION_EDITOR_TOOL_ENTITY_EDIT] = event.type == SDL_EVENT_KEY_DOWN;
                                     break;
-                                case SDL_SCANCODE_DELETE:
+                                case DELETE:
                                     state.current[INPUT_ACTION_EDITOR_TOOL_ENTITY_EDIT_DELETE] = event.type == SDL_EVENT_KEY_DOWN;
                                     break;
                                 default:

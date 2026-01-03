@@ -19,7 +19,8 @@ enum EditorActionType {
     EDITOR_ACTION_DECORATE,
     EDITOR_ACTION_DECORATE_BULK,
     EDITOR_ACTION_ENTITY_ADD,
-    EDITOR_ACTION_ENTITY_EDIT
+    EDITOR_ACTION_ENTITY_EDIT,
+    EDITOR_ACTION_ENTITY_DELETE
 };
 
 struct EditorActionBrushStroke {
@@ -58,6 +59,11 @@ struct EditorActionEntityEdit {
     EditorEntity new_value;
 };
 
+struct EditorActionEntityDelete {
+    uint32_t index;
+    EditorEntity value;
+};
+
 struct EditorAction {
     EditorActionType type;
     union {
@@ -66,6 +72,7 @@ struct EditorAction {
         EditorActionDecorateBulk decorate_bulk;
         EditorActionEntityAdd entity_add;
         EditorActionEntityEdit entity_edit;
+        EditorActionEntityDelete entity_delete;
     };
 };
 

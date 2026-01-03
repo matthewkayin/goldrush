@@ -160,6 +160,7 @@ void editor_generate_decorations();
 std::vector<EditorActionDecorate> editor_clear_deocrations();
 uint32_t editor_tool_entity_add_get_row_count();
 void editor_tool_entity_edit_set_selection(uint32_t entity_index);
+void editor_tool_entity_edit_delete_entity(uint32_t entity_index);
 
 // Render
 ivec2 editor_entity_get_animation_frame(EntityType type);
@@ -335,6 +336,10 @@ void editor_update() {
                                 }
                             });
                         }
+                    }
+
+                    if (ui_button(state.ui, "Delete") || input_is_action_just_pressed(INPUT_ACTION_EDITOR_TOOL_ENTITY_EDIT_DELETE)) {
+                        editor_tool_entity_edit_delete_entity(state.tool_value);
                     }
 
                     break;
@@ -1090,6 +1095,17 @@ void editor_tool_entity_edit_set_selection(uint32_t entity_index) {
     state.tool_value = entity_index;
     const EditorEntity& entity = state.document->entities[entity_index];
     state.tool_entity_edit_gold_held = entity.gold_held;
+}
+
+void editor_tool_entity_edit_delete_entity(uint32_t entity_index) {
+    editor_do_action((EditorAction) {
+        .type = EDITOR_ACTION_ENTITY_DELETE,
+        .entity_delete = (EditorActionEntityDelete) {
+            .index = entity_index,
+            .value = state.document->entities[entity_index]
+        }
+    });
+    state.tool_value = INDEX_INVALID;
 }
 
 void editor_render() {
