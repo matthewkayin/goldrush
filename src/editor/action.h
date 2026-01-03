@@ -18,9 +18,9 @@ enum EditorActionType {
     EDITOR_ACTION_BRUSH,
     EDITOR_ACTION_DECORATE,
     EDITOR_ACTION_DECORATE_BULK,
-    EDITOR_ACTION_ENTITY_ADD,
-    EDITOR_ACTION_ENTITY_EDIT,
-    EDITOR_ACTION_ENTITY_DELETE
+    EDITOR_ACTION_ADD_ENTITY,
+    EDITOR_ACTION_EDIT_ENTITY,
+    EDITOR_ACTION_DELETE_ENTITY
 };
 
 struct EditorActionBrushStroke {
@@ -47,19 +47,19 @@ struct EditorActionDecorateBulk {
     EditorActionDecorate* changes;
 };
 
-struct EditorActionEntityAdd {
+struct EditorActionAddEntity {
     EntityType type;
     uint8_t player_id;
     ivec2 cell;
 };
 
-struct EditorActionEntityEdit {
+struct EditorActionEditEntity {
     uint32_t index;
     EditorEntity previous_value;
     EditorEntity new_value;
 };
 
-struct EditorActionEntityDelete {
+struct EditorActionDeleteEntity {
     uint32_t index;
     EditorEntity value;
 };
@@ -70,9 +70,9 @@ struct EditorAction {
         EditorActionBrush brush;
         EditorActionDecorate decorate;
         EditorActionDecorateBulk decorate_bulk;
-        EditorActionEntityAdd entity_add;
-        EditorActionEntityEdit entity_edit;
-        EditorActionEntityDelete entity_delete;
+        EditorActionAddEntity add_entity;
+        EditorActionEditEntity edit_entity;
+        EditorActionDeleteEntity delete_entity;
     };
 };
 

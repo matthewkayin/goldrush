@@ -37,9 +37,9 @@ void editor_action_destroy(EditorAction& action) {
             break;
         }
         case EDITOR_ACTION_DECORATE:
-        case EDITOR_ACTION_ENTITY_ADD: 
-        case EDITOR_ACTION_ENTITY_EDIT: 
-        case EDITOR_ACTION_ENTITY_DELETE: 
+        case EDITOR_ACTION_ADD_ENTITY: 
+        case EDITOR_ACTION_EDIT_ENTITY: 
+        case EDITOR_ACTION_DELETE_ENTITY: 
             break;
     }
 }
@@ -79,7 +79,7 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
             }
             break;
         }
-        case EDITOR_ACTION_ENTITY_ADD: {
+        case EDITOR_ACTION_ADD_ENTITY: {
             Cell cell_value = mode == EDITOR_ACTION_MODE_DO
                 ? (Cell) {
                     .type = CELL_UNIT,
@@ -89,14 +89,14 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                     .type = CELL_EMPTY,
                     .id = ID_NULL
                 };
-            const EntityData& entity_data = entity_get_data(action.entity_add.type);
-            map_set_cell_rect(*document->map, entity_data.cell_layer, action.entity_add.cell, entity_data.cell_size, cell_value);
+            const EntityData& entity_data = entity_get_data(action.add_entity.type);
+            map_set_cell_rect(*document->map, entity_data.cell_layer, action.add_entity.cell, entity_data.cell_size, cell_value);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
                 EditorEntity entity;
-                entity.type = action.entity_add.type;
-                entity.player_id = action.entity_add.player_id;
-                entity.cell = action.entity_add.cell;
+                entity.type = action.add_entity.type;
+                entity.player_id = action.add_entity.player_id;
+                entity.cell = action.add_entity.cell;
                 entity.gold_held = 0;
                 if (entity.type == ENTITY_GOLDMINE) {
                     entity.gold_held = 7500;
@@ -109,19 +109,19 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
 
             break;
         }
-        case EDITOR_ACTION_ENTITY_EDIT: {
-            document->entities[action.entity_edit.index] = mode == EDITOR_ACTION_MODE_DO
-                ? action.entity_edit.new_value
-                : action.entity_edit.previous_value;
+        case EDITOR_ACTION_EDIT_ENTITY: {
+            document->entities[action.edit_entity.index] = mode == EDITOR_ACTION_MODE_DO
+                ? action.edit_entity.new_value
+                : action.edit_entity.previous_value;
             break;
         }
-        case EDITOR_ACTION_ENTITY_DELETE: {
+        case EDITOR_ACTION_DELETE_ENTITY: {
             if (mode == EDITOR_ACTION_MODE_DO) {
-                document->entities[action.entity_delete.index] = document->entities[document->entity_count - 1];
+                document->entities[action.delete_entity.index] = document->entities[document->entity_count - 1];
                 document->entity_count--;
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                document->entities[document->entity_count] = document->entities[action.entity_delete.index];
-                document->entities[action.entity_delete.index] = action.entity_delete.value;
+                document->entities[document->entity_count] = document->entities[action.delete_entity.index];
+                document->entities[action.delete_entity.index] = action.delete_entity.value;
                 document->entity_count++;
             }
 
