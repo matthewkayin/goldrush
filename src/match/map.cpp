@@ -809,19 +809,6 @@ void map_bake_front_walls(Map& map) {
     }
 }
 
-void map_block_all_walls_and_water(Map& map) {
-    for (int y = 0; y < map.height; y++) {
-        for (int x = 0; x < map.width; x++) {
-            if (map_should_cell_be_blocked(map, ivec2(x, y))) {
-                map.cells[CELL_LAYER_GROUND][x + (y * map.width)] = (Cell) {
-                    .type = CELL_BLOCKED,
-                    .id = ID_NULL
-                };
-            }
-        }
-    }
-}
-
 bool map_should_cell_be_blocked(const Map& map, ivec2 cell) {
     return !map_is_tile_ground(map, cell) && !map_is_tile_ramp(map, cell);
 }

@@ -17,7 +17,8 @@ enum EditorActionMode {
 enum EditorActionType {
     EDITOR_ACTION_BRUSH,
     EDITOR_ACTION_DECORATE,
-    EDITOR_ACTION_DECORATE_BULK
+    EDITOR_ACTION_DECORATE_BULK,
+    EDITOR_ACTION_ENTITY_PLACE
 };
 
 struct EditorActionBrushStroke {
@@ -44,12 +45,19 @@ struct EditorActionDecorateBulk {
     EditorActionDecorate* changes;
 };
 
+struct EditorActionEntityPlace {
+    EntityType type;
+    uint8_t player_id;
+    ivec2 cell;
+};
+
 struct EditorAction {
     EditorActionType type;
     union {
         EditorActionBrush brush;
         EditorActionDecorate decorate;
         EditorActionDecorateBulk decorate_bulk;
+        EditorActionEntityPlace entity_place;
     };
 };
 

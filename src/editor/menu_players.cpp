@@ -35,13 +35,13 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorDocument*
     ui_text(ui, FONT_HACK_GOLD, "Edit Players");
 
     ui_begin_column(ui, ivec2(MENU_RECT.x + 8, MENU_RECT.y + 30), 4);
-        ui_text(ui, FONT_HACK_GOLD, document->players[0].name.c_str());
+        ui_text(ui, FONT_HACK_GOLD, document->players[0].name->c_str());
         editor_menu_slider(ui, "Starting Gold:", &document->players[0].starting_gold, STARTING_GOLD_SLIDER_PARAMS, MENU_RECT);
 
         for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
             char prompt[16];
             sprintf(prompt, "Player %u: ", player_id);
-            ui_text_input(ui, prompt, ivec2(MENU_RECT.w - 32, 24), &document->players[player_id].name, MAX_USERNAME_LENGTH);
+            ui_text_input(ui, prompt, ivec2(MENU_RECT.w - 32, 24), document->players[player_id].name, MAX_USERNAME_LENGTH);
             editor_menu_slider(ui, "Starting Gold:", &document->players[player_id].starting_gold, STARTING_GOLD_SLIDER_PARAMS, MENU_RECT);
         }
     ui_end_container(ui);

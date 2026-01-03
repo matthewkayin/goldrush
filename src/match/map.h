@@ -92,7 +92,6 @@ void map_cleanup_noise(const Map& map, Noise* noise);
 void map_bake_tiles(Map& map, const Noise* noise, int* lcg_seed);
 void map_bake_map_tiles_and_remove_artifacts(Map& map, Noise* noise, int* lcg_seed);
 void map_bake_front_walls(Map& map);
-void map_block_all_walls_and_water(Map& map);
 Direction map_get_tile_stair_direction(const Tile& tile);
 bool map_should_cell_be_blocked(const Map& map, ivec2 cell);
 bool map_can_ramp_be_placed_on_tile(const Tile& tile);

@@ -8,8 +8,15 @@
 #include "match/state.h"
 #include "match/map.h"
 
+struct EditorEntity {
+    EntityType type;
+    uint8_t player_id;
+    uint32_t gold_held;
+    ivec2 cell;
+};
+
 struct EditorPlayer {
-    std::string name;
+    std::string* name;
     uint32_t starting_gold;
 };
 
@@ -18,7 +25,7 @@ struct EditorDocument {
     Noise* noise;
     int tile_bake_seed;
     uint32_t entity_count;
-    Entity entities[MATCH_MAX_ENTITIES];
+    EditorEntity entities[MATCH_MAX_ENTITIES];
     EditorPlayer players[MAX_PLAYERS];
 };
 

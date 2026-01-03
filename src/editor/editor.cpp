@@ -47,7 +47,7 @@ static const Rect CANVAS_RECT = (Rect) {
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save" },
     { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
-    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate" }
+    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Entity Place" }
 };
 
 static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_SHORTCUTS = {
@@ -69,7 +69,8 @@ enum EditorTool {
     EDITOR_TOOL_FILL,
     EDITOR_TOOL_RECT,
     EDITOR_TOOL_SELECT,
-    EDITOR_TOOL_DECORATE
+    EDITOR_TOOL_DECORATE,
+    EDITOR_TOOL_ENTITY_PLACE
 };
 
 struct EditorClipboard {
@@ -99,6 +100,7 @@ struct EditorState {
     ivec2 tool_select_origin;
     ivec2 tool_select_end;
     Rect tool_select_selection;
+    uint32_t tool_entity_place_player_id;
     bool is_painting;
     bool is_pasting;
 
@@ -122,6 +124,8 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
 void editor_set_tool(EditorTool tool);
 ivec2 editor_canvas_to_world_space(ivec2 point);
 ivec2 editor_get_hovered_cell();
+bool editor_is_hovered_cell_valid();
+bool editor_can_single_use_tool_be_used();
 const char* editor_get_noise_value_str(uint8_t noise_value);
 void editor_push_action(const EditorAction& action);
 void editor_do_action(const EditorAction& action);
@@ -145,9 +149,9 @@ bool editor_is_using_noise_tool();
 void editor_generate_decorations();
 
 // Render
-RenderSpriteParams editor_create_entity_render_params(const Entity& entity);
+RenderSpriteParams editor_create_entity_render_params(const EditorEntity& entity);
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell);
-MinimapPixel editor_get_minimap_pixel_for_entity(const Entity& entity);
+MinimapPixel editor_get_minimap_pixel_for_entity(const EditorEntity& entity);
 
 void editor_init() {
     input_set_mouse_capture_enabled(false);
@@ -170,6 +174,7 @@ void editor_init() {
     state.is_minimap_dragging = false;
     state.is_painting = false;
     state.is_pasting = false;
+    state.tool_entity_place_player_id = 0;
     state.camera_drag_mouse_position = ivec2(-1, -1);
 
     log_info("Initialized map editor.");
@@ -233,6 +238,14 @@ void editor_update() {
                     if (ui_slim_button(state.ui, "Generate")) {
                         editor_generate_decorations();
                     }
+                    break;
+                }
+                case EDITOR_TOOL_ENTITY_PLACE: {
+                    std::vector<std::string> items;
+                    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+                        items.push_back(std::to_string(player_id) + ": " + *state.document->players[player_id].name);
+                    }
+                    ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_entity_place_player_id, items, false);
                     break;
                 }
             }
@@ -404,30 +417,35 @@ void editor_update() {
     }
 
     // Decorate paint
-    if (state.tool == EDITOR_TOOL_DECORATE && 
-            !editor_is_in_menu() &&
-            !state.is_minimap_dragging &&
-            state.camera_drag_mouse_position.x == -1 &&
-            CANVAS_RECT.has_point(input_get_mouse_position()) &&
-            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+    if (state.tool == EDITOR_TOOL_DECORATE && editor_can_single_use_tool_be_used() && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         ivec2 cell = editor_get_hovered_cell();
         Cell map_cell = map_get_cell(*state.document->map, CELL_LAYER_GROUND, cell);
-        if (map_cell.type == CELL_DECORATION || map_cell.type == CELL_EMPTY) {
-            const SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map->type);
-            const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
-            editor_do_action((EditorAction) {
-                .type = EDITOR_ACTION_DECORATE,
-                .decorate = (EditorActionDecorate) {
-                    .index = cell.x + (cell.y * state.document->map->width),
-                    .previous_hframe = map_cell.type == CELL_DECORATION
-                        ? map_cell.decoration_hframe
-                        : EDITOR_ACTION_DECORATE_REMOVE_DECORATION,
-                    .new_hframe = map_cell.type == CELL_DECORATION
-                        ? EDITOR_ACTION_DECORATE_REMOVE_DECORATION
-                        : (rand() % decoration_sprite_info.hframes)
-                }
-            });
-        }
+        const SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map->type);
+        const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
+        editor_do_action((EditorAction) {
+            .type = EDITOR_ACTION_DECORATE,
+            .decorate = (EditorActionDecorate) {
+                .index = cell.x + (cell.y * state.document->map->width),
+                .previous_hframe = map_cell.type == CELL_DECORATION
+                    ? map_cell.decoration_hframe
+                    : EDITOR_ACTION_DECORATE_REMOVE_DECORATION,
+                .new_hframe = map_cell.type == CELL_DECORATION
+                    ? EDITOR_ACTION_DECORATE_REMOVE_DECORATION
+                    : (rand() % decoration_sprite_info.hframes)
+            }
+        });
+    }
+
+    // Entity place
+    if (state.tool == EDITOR_TOOL_ENTITY_PLACE && editor_can_single_use_tool_be_used() && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        editor_do_action((EditorAction) {
+            .type = EDITOR_ACTION_ENTITY_PLACE,
+            .entity_place = (EditorActionEntityPlace) {
+                .type = (EntityType)state.tool_value,
+                .player_id = (uint8_t)state.tool_entity_place_player_id,
+                .cell = editor_get_hovered_cell()
+            }
+        });
     }
 
     // Minimap drag
@@ -462,7 +480,8 @@ void editor_update() {
 }
 
 bool editor_is_in_menu() {
-    return state.menu_new.mode == EDITOR_MENU_NEW_OPEN;
+    return state.menu_new.mode == EDITOR_MENU_NEW_OPEN ||
+        state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN;
 }
 
 void editor_clamp_camera() {
@@ -545,6 +564,10 @@ void editor_set_tool(EditorTool tool) {
         case EDITOR_TOOL_DECORATE: {
             break;
         }
+        case EDITOR_TOOL_ENTITY_PLACE: {
+            state.tool_value = ENTITY_MINER;
+            break;
+        }
     }
 }
 
@@ -554,6 +577,27 @@ ivec2 editor_canvas_to_world_space(ivec2 point) {
 
 ivec2 editor_get_hovered_cell() {
     return editor_canvas_to_world_space(input_get_mouse_position()) / TILE_SIZE;
+}
+
+bool editor_is_hovered_cell_valid() {
+    ivec2 cell = editor_get_hovered_cell();
+    if (state.tool == EDITOR_TOOL_DECORATE) {
+        Cell map_cell = map_get_cell(*state.document->map, CELL_LAYER_GROUND, cell);
+        return map_cell.type == CELL_DECORATION || map_cell.type == CELL_EMPTY;
+    }
+    if (state.tool == EDITOR_TOOL_ENTITY_PLACE) {
+        const EntityData& entity_data = entity_get_data((EntityType)state.tool_value);
+        return !map_is_cell_rect_occupied(*state.document->map, entity_data.cell_layer, cell, entity_data.cell_size);
+    }
+    return true;
+}
+
+bool editor_can_single_use_tool_be_used() {
+    return !editor_is_in_menu() &&
+        !state.is_minimap_dragging &&
+        state.camera_drag_mouse_position.x == -1 &&
+        CANVAS_RECT.has_point(input_get_mouse_position()) &&
+        editor_is_hovered_cell_valid();
 }
 
 const char* editor_get_noise_value_str(uint8_t noise_value) {
@@ -927,7 +971,7 @@ void editor_render() {
                     if (elevation == 0 && 
                             !map_is_tile_ground(*state.document->map, base_coords + ivec2(x, y)) &&
                             !map_is_tile_water(*state.document->map, base_coords + ivec2(x, y))) {
-                        render_sprite_frame(map_get_plain_ground_tile_sprite(state.document->map->type), ivec2(0, 0), ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE), RENDER_SPRITE_NO_CULL, 0);
+                        render_sprite_frame(map_get_plain_ground_tile_sprite(state.document->map->type), ivec2(0, 0), tile_params_position, RENDER_SPRITE_NO_CULL, 0);
                     }
                     if ((should_render_on_ground_level && elevation == 0) || 
                             (!should_render_on_ground_level && elevation == tile.elevation)) {
@@ -954,19 +998,13 @@ void editor_render() {
 
             // For each cell layer
             for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
-                // TODO: render select ring of selected entity
-                // Select rings and healthbars
-
                 // Underground entities
                 if (cell_layer == CELL_LAYER_UNDERGROUND) {
                     for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
-                        const Entity& entity = state.document->entities[entity_index];
+                        const EditorEntity& entity = state.document->entities[entity_index];
                         const EntityData& entity_data = entity_get_data(entity.type);
                         if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
-                                entity_get_elevation(entity, *state.document->map) != elevation) {
-                            continue;
-                        }
-                        if (entity.mode == MODE_UNIT_DEATH_FADE || entity.mode == MODE_BUILDING_DESTROYED) {
+                                map_get_tile(*state.document->map, entity.cell).elevation != elevation) {
                             continue;
                         }
 
@@ -977,24 +1015,44 @@ void editor_render() {
             } // End for each cell layer
         }
 
+        // Entities
+        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+            const EditorEntity& entity = state.document->entities[entity_index];
+
+            RenderSpriteParams params = editor_create_entity_render_params(entity);
+            const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_data(entity.type).sprite);
+            const Rect render_rect = (Rect) {
+                .x = params.position.x, .y = params.position.y,
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            };
+
+            if (!CANVAS_RECT.intersects(render_rect)) {
+                continue;
+            }
+            params.options |= RENDER_SPRITE_NO_CULL;
+
+            ysort_params.push_back(params);
+        }
+
         // Render ysort params
         ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
         for (const RenderSpriteParams& params : ysort_params) {
             render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
         }
+    }
 
-        if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
-                !state.is_minimap_dragging &&
-                state.camera_drag_mouse_position.x == -1 &&
-                !editor_is_in_menu()) {
-            ivec2 cell = editor_get_hovered_cell();
-            Rect rect = (Rect) {
-                .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
-                .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
-                .w = TILE_SIZE, .h = TILE_SIZE
-            };
-            render_draw_rect(rect, RENDER_COLOR_WHITE);
-        }
+    // Mouse hover rect
+    if (CANVAS_RECT.has_point(input_get_mouse_position()) &&
+            !state.is_minimap_dragging &&
+            state.camera_drag_mouse_position.x == -1 &&
+            !editor_is_in_menu()) {
+        ivec2 cell = editor_get_hovered_cell();
+        Rect rect = (Rect) {
+            .x = ((cell.x * TILE_SIZE) - state.camera_offset.x) + CANVAS_RECT.x,
+            .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
+            .w = TILE_SIZE, .h = TILE_SIZE
+        };
+        render_draw_rect(rect, state.document == NULL || editor_is_hovered_cell_valid() ? RENDER_COLOR_WHITE : RENDER_COLOR_RED);
     }
 
     // Tool rect preview
@@ -1090,7 +1148,7 @@ void editor_render() {
         }
         // Minimap entities
         for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
-            const Entity& entity = state.document->entities[entity_index];
+            const EditorEntity& entity = state.document->entities[entity_index];
             int entity_cell_size = entity_get_data(entity.type).cell_size;
             Rect entity_rect = (Rect) {
                 .x = entity.cell.x, .y = entity.cell.y,
@@ -1116,31 +1174,35 @@ void editor_render() {
     }
 }
 
-RenderSpriteParams editor_create_entity_render_params(const Entity& entity) {
-    ivec2 params_position = entity.position.to_ivec2() - state.camera_offset;
+ivec2 editor_entity_get_animation_frame(EntityType type) {
+    if (type == ENTITY_GOLDMINE) {
+        return ivec2(0, 0);
+    }
+    if (entity_is_building(type)) {
+        return ivec2(3, 0);
+    }
+    return ivec2(0, 0);
+}
+
+RenderSpriteParams editor_create_entity_render_params(const EditorEntity& entity) {
+    const EntityData& entity_data = entity_get_data(entity.type);
+    ivec2 params_position = 
+        ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + 
+        ((entity.cell * TILE_SIZE) + 
+            (ivec2(entity_data.cell_size, entity_data.cell_size) * TILE_SIZE / 2)) - 
+        state.camera_offset;
     RenderSpriteParams params = (RenderSpriteParams) {
         .sprite = entity_get_data(entity.type).sprite,
-        .frame = entity_get_animation_frame(entity),
+        .frame = editor_entity_get_animation_frame(entity.type),
         .position = params_position,
         .ysort_position = params_position.y,
         .options = 0,
-        .recolor_id = entity.type == ENTITY_GOLDMINE || entity.mode == MODE_BUILDING_DESTROYED ? 0 : entity.player_id
+        .recolor_id = entity.type == ENTITY_GOLDMINE ? 0 : entity.player_id
     };
-
+    
     const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
-
     params.position.x -= sprite_info.frame_width / 2;
     params.position.y -= sprite_info.frame_height / 2;
-    if (entity_get_data(entity.type).cell_layer == CELL_LAYER_SKY) {
-        if (entity.mode == MODE_UNIT_BALLOON_DEATH) {
-            params.position.y += ((int)entity.timer * ENTITY_SKY_POSITION_Y_OFFSET) / (int)ENTITY_BALLOON_DEATH_DURATION;
-        } else {
-            params.position.y += ENTITY_SKY_POSITION_Y_OFFSET;
-        }
-    }
-    if (entity.direction > DIRECTION_SOUTH) {
-        params.options |= RENDER_SPRITE_FLIP_H;
-    }
 
     return params;
 }
@@ -1164,12 +1226,9 @@ MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell) {
     }
 }
 
-MinimapPixel editor_get_minimap_pixel_for_entity(const Entity& entity) {
+MinimapPixel editor_get_minimap_pixel_for_entity(const EditorEntity& entity) {
     if (entity.type == ENTITY_GOLDMINE) {
         return MINIMAP_PIXEL_GOLD;
-    }
-    if (entity_check_flag(entity, ENTITY_FLAG_DAMAGE_FLICKER)) {
-        return MINIMAP_PIXEL_WHITE;
     }
     return (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + entity.player_id);
 }

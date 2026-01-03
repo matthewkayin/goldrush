@@ -14,7 +14,7 @@ EditorDocument* editor_document_base_init() {
     document->entity_count = 0;
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        document->players[player_id].name = std::string(player_id == 0 ? "Player" : "Enemy");
+        document->players[player_id].name = new std::string(player_id == 0 ? "Player" : "Enemy");
         document->players[player_id].starting_gold = 50;
     }
 
@@ -43,7 +43,15 @@ void editor_document_bake_map(EditorDocument* document, bool remove_artifacts) {
             document->map->cells[CELL_LAYER_GROUND][index].type = CELL_EMPTY;
         }
     }
-    map_block_all_walls_and_water(*document->map);
+
+    for (int y = 0; y < document->map->height; y++) {
+        for (int x = 0; x < document->map->width; x++) {
+            if (map_should_cell_be_blocked(*document->map, ivec2(x, y)) &&
+                    map_get_cell(*document->map, CELL_LAYER_GROUND, ivec2(x,y)).type == CELL_EMPTY) {
+                continue;
+            }
+        }
+    }
 }
 
 EditorDocument* editor_document_init_blank(MapType map_type, MapSize map_size) {
@@ -92,6 +100,9 @@ EditorDocument* editor_document_init_generated(MapType map_type, const NoiseGenP
 }
 
 void editor_document_free(EditorDocument* document) {
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        delete document->players[player_id].name;
+    }
     noise_free(document->noise);
     delete document->map;
     free(document);
