@@ -25,7 +25,8 @@ struct EditorEntity {
 
 enum EditorSquadType {
     EDITOR_SQUAD_TYPE_DEFEND,
-    EDITOR_SQUAD_TYPE_LANDMINES
+    EDITOR_SQUAD_TYPE_LANDMINES,
+    EDITOR_SQUAD_TYPE_COUNT
 };
 
 struct EditorSquad {
@@ -53,6 +54,8 @@ void editor_document_bake_map(EditorDocument* document, bool remove_artifacts = 
 void editor_document_free(EditorDocument* document);
 
 EditorSquad editor_document_squad_init();
+bool editor_document_squads_are_equal(const EditorSquad& a, const EditorSquad& b);
+const char* editor_document_squad_type_str(EditorSquadType type);
 
 uint8_t editor_document_get_noise_map_value(EditorDocument* document, ivec2 cell);
 void editor_document_set_noise_map_value(EditorDocument* document, ivec2 cell, uint8_t value);

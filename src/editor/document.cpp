@@ -124,6 +124,33 @@ EditorSquad editor_document_squad_init() {
     return squad;
 }
 
+bool editor_document_squads_are_equal(const EditorSquad& a, const EditorSquad& b) {
+    if (strcmp(a.name, b.name) != 0) {
+        return false;
+    }
+    if (a.player_id != b.player_id || a.type != b.type || a.entity_count != b.entity_count) {
+        return false;
+    }
+    for (uint32_t index = 0; index < a.entity_count; index++) {
+        if (a.entities[index] != b.entities[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+const char* editor_document_squad_type_str(EditorSquadType type) {
+    switch (type) {
+        case EDITOR_SQUAD_TYPE_DEFEND:
+            return "Defend";
+        case EDITOR_SQUAD_TYPE_LANDMINES:
+            return "Landmines";
+        case EDITOR_SQUAD_TYPE_COUNT:
+            GOLD_ASSERT(false);
+            return "";
+    }
+}
+
 uint8_t editor_document_get_noise_map_value(EditorDocument* document, ivec2 cell) {
     return document->noise->map[cell.x + (cell.y * document->noise->width)];
 }

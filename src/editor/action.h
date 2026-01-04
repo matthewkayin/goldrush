@@ -67,6 +67,12 @@ struct EditorActionDeleteEntity {
     EditorEntity value;
 };
 
+struct EditorActionEditSquad {
+    uint32_t index;
+    EditorSquad previous_value;
+    EditorSquad new_value;
+};
+
 struct EditorAction {
     EditorActionType type;
     union {
@@ -76,6 +82,7 @@ struct EditorAction {
         EditorActionAddEntity add_entity;
         EditorActionEditEntity edit_entity;
         EditorActionDeleteEntity delete_entity;
+        EditorActionEditSquad edit_squad;
     };
 };
 

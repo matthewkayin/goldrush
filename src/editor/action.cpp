@@ -40,6 +40,9 @@ void editor_action_destroy(EditorAction& action) {
         case EDITOR_ACTION_ADD_ENTITY: 
         case EDITOR_ACTION_EDIT_ENTITY: 
         case EDITOR_ACTION_DELETE_ENTITY: 
+        case EDITOR_ACTION_ADD_SQUAD:
+        case EDITOR_ACTION_EDIT_SQUAD:
+        case EDITOR_ACTION_DELETE_SQUAD:
             break;
     }
 }
@@ -125,6 +128,22 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 document->entity_count++;
             }
 
+            break;
+        }
+        case EDITOR_ACTION_ADD_SQUAD: {
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                document->squads[document->squad_count] = editor_document_squad_init();
+                sprintf(document->squads[document->squad_count].name, "Squad %u", document->squad_count + 1);
+                document->squad_count++;
+            } else if (mode == EDITOR_ACTION_MODE_UNDO) {
+                document->squad_count--;
+            }
+            break;
+        }
+        case EDITOR_ACTION_EDIT_SQUAD: {
+            document->squads[action.edit_squad.index] = mode == EDITOR_ACTION_MODE_DO
+                ? action.edit_squad.new_value
+                : action.edit_squad.previous_value;
             break;
         }
     }

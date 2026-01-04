@@ -5,6 +5,7 @@
 #include "editor/document.h"
 #include "editor/menu_new.h"
 #include "editor/menu_players.h"
+#include "editor/menu_edit_squad.h"
 #include "editor/ui.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -99,6 +100,7 @@ struct EditorState {
     // Menus
     EditorMenuNew menu_new;
     EditorMenuPlayers menu_players;
+    EditorMenuEditSquad menu_edit_squad;
 
     // Tools
     EditorTool tool;
@@ -163,6 +165,7 @@ void editor_generate_decorations();
 std::vector<EditorActionDecorate> editor_clear_deocrations();
 uint32_t editor_tool_add_entity_get_row_count();
 void editor_tool_edit_entity_set_selection(uint32_t entity_index);
+void editor_validate_tool_value();
 void editor_tool_edit_entity_delete_entity(uint32_t entity_index);
 
 // Render
@@ -188,6 +191,7 @@ void editor_init() {
 
     state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
     state.menu_players.mode = EDITOR_MENU_PLAYERS_CLOSED;
+    state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
 
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
@@ -355,14 +359,24 @@ void editor_update() {
                         }
                         ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_value, squad_dropdown_items, false, 9);
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_PLUS, state.document->squad_count == EDITOR_MAX_SQUADS, false)) {
-                            EditorSquad new_squad = editor_document_squad_init();
-                            sprintf(new_squad.name, "Squad %u", state.document->squad_count + 1);
-                            state.document->squads[state.document->squad_count] = new_squad;
-                            state.document->squad_count++;
+                            editor_do_action((EditorAction) {
+                                .type = EDITOR_ACTION_ADD_SQUAD
+                            });
+                            state.tool_value = state.document->squad_count - 1;
                         }
-                        ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false);
-                        ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false);
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.document->squad_count == 0, false)) {
+                            state.menu_edit_squad = editor_menu_edit_squad_open(state.document->squads[state.tool_value], state.document);
+                        }
+                        ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.document->squad_count == 0, false);
                     ui_end_container(state.ui);
+
+                    if (state.document->squad_count != 0) {
+                        const EditorSquad& squad = state.document->squads[state.tool_value];
+                        char squad_info_text[64];
+                        sprintf(squad_info_text, "%s / %s", state.document->players[squad.player_id].name, editor_document_squad_type_str(squad.type));
+                        ui_text(state.ui, FONT_HACK_GOLD, squad_info_text);
+                    }
+
                     ui_text(state.ui, FONT_HACK_GOLD, "Entities");
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         ui_icon_button(state.ui, SPRITE_BUTTON_ICON_BANDIT, true);
@@ -438,6 +452,34 @@ void editor_update() {
     if (state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN) {
         editor_menu_players_update(state.menu_players, state.ui, state.document);
         return;
+    }
+
+    // Menu edit squad
+    if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN) {
+        editor_menu_edit_squad_update(state.menu_edit_squad, state.ui);
+        if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_SAVE) {
+            const EditorSquad previous_squad = state.document->squads[state.tool_value];
+            EditorSquad edited_squad = previous_squad;
+            strncpy(edited_squad.name, state.menu_edit_squad.squad_name.c_str(), MAX_USERNAME_LENGTH);
+            edited_squad.player_id = state.menu_edit_squad.squad_player + 1;
+            edited_squad.type = (EditorSquadType)state.menu_edit_squad.squad_type;
+            if (edited_squad.player_id != previous_squad.player_id) {
+                edited_squad.entity_count = 0;
+            }
+
+            if (!editor_document_squads_are_equal(edited_squad, previous_squad)) {
+                editor_do_action((EditorAction) {
+                    .type = EDITOR_ACTION_EDIT_SQUAD,
+                    .edit_squad = (EditorActionEditSquad) {
+                        .index = state.tool_value,
+                        .previous_value = previous_squad,
+                        .new_value = edited_squad
+                    }
+                });
+            }
+
+            state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
+        }
     }
 
     // Camera drag
@@ -648,7 +690,8 @@ void editor_update() {
 
 bool editor_is_in_menu() {
     return state.menu_new.mode == EDITOR_MENU_NEW_OPEN ||
-        state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN;
+        state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN ||
+        state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN;
 }
 
 bool editor_is_toolbar_open() {
@@ -827,9 +870,7 @@ void editor_undo_action() {
     state.action_head--;
     editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_UNDO);
 
-    if (state.tool == EDITOR_TOOL_EDIT_ENTITY) {
-        editor_tool_edit_entity_set_selection(state.tool_value);
-    }
+    editor_validate_tool_value();
 }
 
 void editor_redo_action() {
@@ -840,9 +881,7 @@ void editor_redo_action() {
     editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_DO);
     state.action_head++;
 
-    if (state.tool == EDITOR_TOOL_EDIT_ENTITY) {
-        editor_tool_edit_entity_set_selection(state.tool_value);
-    }
+    editor_validate_tool_value();
 }
 
 void editor_clear_actions() {
@@ -1142,14 +1181,23 @@ uint32_t editor_tool_add_entity_get_row_count() {
 }
 
 void editor_tool_edit_entity_set_selection(uint32_t entity_index) {
-    if (entity_index >= state.document->entity_count) {
-        state.tool_value = INDEX_INVALID;
+    state.tool_value = entity_index;
+    editor_validate_tool_value();
+    if (state.tool_value == INDEX_INVALID) {
         return;
     }
 
-    state.tool_value = entity_index;
     const EditorEntity& entity = state.document->entities[entity_index];
     state.tool_edit_entity_gold_held = entity.gold_held;
+}
+
+void editor_validate_tool_value() {
+    if (state.tool == EDITOR_TOOL_EDIT_ENTITY && state.tool_value >= state.document->entity_count) {
+        state.tool_value = INDEX_INVALID;
+    }
+    if (state.tool == EDITOR_TOOL_SQUADS && state.tool_value >= state.document->squad_count) {
+        state.tool_value = 0;
+    }
 }
 
 void editor_tool_edit_entity_delete_entity(uint32_t entity_index) {
