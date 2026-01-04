@@ -11,6 +11,7 @@ EditorDocument* editor_document_base_init() {
     }
 
     document->tile_bake_seed = rand();
+    document->player_spawn = ivec2(0, 0);
     document->entity_count = 0;
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {

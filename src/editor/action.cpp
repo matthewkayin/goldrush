@@ -43,6 +43,7 @@ void editor_action_destroy(EditorAction& action) {
         case EDITOR_ACTION_ADD_SQUAD:
         case EDITOR_ACTION_EDIT_SQUAD:
         case EDITOR_ACTION_DELETE_SQUAD:
+        case EDITOR_ACTION_SET_PLAYER_SPAWN:
             break;
     }
 }
@@ -155,6 +156,12 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 document->squads[action.delete_squad.index] = action.delete_squad.value;
                 document->squad_count++;
             }
+            break;
+        }
+        case EDITOR_ACTION_SET_PLAYER_SPAWN: {
+            document->player_spawn = mode == EDITOR_ACTION_MODE_DO
+                ? action.set_player_spawn.new_value
+                : action.set_player_spawn.previous_value;
             break;
         }
     }

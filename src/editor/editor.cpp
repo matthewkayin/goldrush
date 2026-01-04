@@ -48,7 +48,7 @@ static const Rect CANVAS_RECT = (Rect) {
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save" },
     { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
-    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads" }
+    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn" }
 };
 
 static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_SHORTCUTS = {
@@ -80,7 +80,8 @@ enum EditorTool {
     EDITOR_TOOL_DECORATE,
     EDITOR_TOOL_ADD_ENTITY,
     EDITOR_TOOL_EDIT_ENTITY,
-    EDITOR_TOOL_SQUADS
+    EDITOR_TOOL_SQUADS,
+    EDITOR_TOOL_PLAYER_SPAWN
 };
 
 struct EditorClipboard {
@@ -173,6 +174,7 @@ void editor_tool_edit_entity_delete_entity(uint32_t entity_index);
 uint32_t editor_get_entity_squad(uint32_t entity_index);
 void editor_remove_entity_from_squad(uint32_t squad_index, uint32_t entity_index);
 std::vector<std::string> editor_get_player_name_dropdown_items();
+ivec2 editor_get_player_spawn_camera_offset(ivec2 cell);
 
 // Render
 ivec2 editor_entity_get_animation_frame(EntityType type);
@@ -406,6 +408,8 @@ void editor_update() {
 
                     break;
                 }
+                case EDITOR_TOOL_PLAYER_SPAWN:
+                    break;
             }
         ui_end_container(state.ui);
     }
@@ -573,6 +577,20 @@ void editor_update() {
                 return;
             }
         }
+    }
+
+    // Player spawn place
+    if (state.tool == EDITOR_TOOL_PLAYER_SPAWN &&
+            editor_can_single_use_tool_be_used() &&
+            editor_is_hovered_cell_valid() &&
+            input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
+        editor_do_action((EditorAction) {
+            .type = EDITOR_ACTION_SET_PLAYER_SPAWN,
+            .set_player_spawn = (EditorActionSetPlayerSpawn) {
+                .previous_value = state.document->player_spawn,
+                .new_value = editor_get_hovered_cell()
+            }
+        });
     }
 
     // Use tool
@@ -855,6 +873,8 @@ void editor_set_tool(EditorTool tool) {
             state.tool_squad_dropdown_scroll = 0;
             break;
         }
+        case EDITOR_TOOL_PLAYER_SPAWN:
+            break;
     }
 }
 
@@ -1406,6 +1426,17 @@ std::vector<std::string> editor_get_player_name_dropdown_items() {
     return items;
 }
 
+ivec2 editor_get_player_spawn_camera_offset(ivec2 cell) {
+    const int MATCH_SHELL_UI_HEIGHT = 86;
+    ivec2 camera_offset = ivec2(
+        (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2),
+        (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2));
+    camera_offset.x = std::clamp(camera_offset.x, 0, (state.document->map->width * TILE_SIZE) - SCREEN_WIDTH);
+    camera_offset.y = std::clamp(camera_offset.y, 0, (state.document->map->height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
+
+    return camera_offset;
+}
+
 void editor_render() {
     std::vector<uint32_t> selection;
 
@@ -1630,6 +1661,20 @@ void editor_render() {
         }
     }
 
+    // Player spawn rect
+    if (state.tool == EDITOR_TOOL_PLAYER_SPAWN) {
+        ivec2 camera_offset = editor_get_player_spawn_camera_offset(state.document->player_spawn);
+        const Rect rendered_rect = (Rect) {
+            .x = camera_offset.x + CANVAS_RECT.x - state.camera_offset.x,
+            .y = camera_offset.y + CANVAS_RECT.y - state.camera_offset.y,
+            .w = SCREEN_WIDTH,
+            .h = SCREEN_HEIGHT - 86
+        };
+        if (CANVAS_RECT.intersects(rendered_rect)) {
+            render_draw_rect(rendered_rect, RENDER_COLOR_PLAYER_UI0);
+        }
+    }
+
     // UI covers
     {
         Rect src_rect = (Rect) {
@@ -1681,6 +1726,17 @@ void editor_render() {
             for (int x = 0; x < state.document->map->width; x++) {
                 render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
             }
+        }
+        // Player spawn rect
+        if (state.tool == EDITOR_TOOL_PLAYER_SPAWN) {
+            ivec2 camera_offset = editor_get_player_spawn_camera_offset(state.document->player_spawn);
+            Rect spawn_rect = (Rect) {
+                .x = camera_offset.x / TILE_SIZE,
+                .y = camera_offset.y / TILE_SIZE,
+                .w = (SCREEN_WIDTH / TILE_SIZE) - 1,
+                .h = ((SCREEN_HEIGHT - 86) / TILE_SIZE)
+            };
+            render_minimap_draw_rect(MINIMAP_LAYER_FOG, spawn_rect, MINIMAP_PIXEL_PLAYER0);
         }
         // Minimap camera rect
         Rect camera_rect = (Rect) {

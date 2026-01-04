@@ -41,6 +41,7 @@ struct EditorDocument {
     Map* map;
     Noise* noise;
     int tile_bake_seed;
+    ivec2 player_spawn;
     EditorPlayer players[MAX_PLAYERS];
     uint32_t entity_count;
     EditorEntity entities[MATCH_MAX_ENTITIES];

@@ -23,7 +23,8 @@ enum EditorActionType {
     EDITOR_ACTION_DELETE_ENTITY,
     EDITOR_ACTION_ADD_SQUAD,
     EDITOR_ACTION_EDIT_SQUAD,
-    EDITOR_ACTION_DELETE_SQUAD
+    EDITOR_ACTION_DELETE_SQUAD,
+    EDITOR_ACTION_SET_PLAYER_SPAWN
 };
 
 struct EditorActionBrushStroke {
@@ -78,6 +79,11 @@ struct EditorActionDeleteSquad {
     EditorSquad value;
 };
 
+struct EditorActionSetPlayerSpawn {
+    ivec2 previous_value;
+    ivec2 new_value;
+};
+
 struct EditorAction {
     EditorActionType type;
     union {
@@ -89,6 +95,7 @@ struct EditorAction {
         EditorActionDeleteEntity delete_entity;
         EditorActionEditSquad edit_squad;
         EditorActionDeleteSquad delete_squad;
+        EditorActionSetPlayerSpawn set_player_spawn;
     };
 };
 
