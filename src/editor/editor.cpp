@@ -367,7 +367,16 @@ void editor_update() {
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.document->squad_count == 0, false)) {
                             state.menu_edit_squad = editor_menu_edit_squad_open(state.document->squads[state.tool_value], state.document);
                         }
-                        ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.document->squad_count == 0, false);
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.document->squad_count == 0, false)) {
+                            editor_do_action((EditorAction) {
+                                .type = EDITOR_ACTION_DELETE_SQUAD,
+                                .delete_squad = (EditorActionDeleteSquad) {
+                                    .index = state.tool_value,
+                                    .value = state.document->squads[state.tool_value]
+                                }
+                            }); 
+                            state.tool_value = 0;
+                        }
                     ui_end_container(state.ui);
 
                     if (state.document->squad_count != 0) {

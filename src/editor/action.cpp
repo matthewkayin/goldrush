@@ -146,6 +146,17 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 : action.edit_squad.previous_value;
             break;
         }
+        case EDITOR_ACTION_DELETE_SQUAD: {
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                document->squads[action.delete_squad.index] = document->squads[document->squad_count - 1];
+                document->squad_count--;
+            } else if (mode == EDITOR_ACTION_MODE_UNDO) {
+                document->squads[document->squad_count] = document->squads[action.delete_squad.index];
+                document->squads[action.delete_squad.index] = action.delete_squad.value;
+                document->squad_count++;
+            }
+            break;
+        }
     }
 }
 
