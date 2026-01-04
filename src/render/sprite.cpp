@@ -482,6 +482,32 @@ static const std::unordered_map<SpriteName, SpriteParams> SPRITE_PARAMS = {
             .vframes = 1
         }
     }},
+#ifdef GOLD_DEBUG
+    { SPRITE_UI_EDITOR_PLUS, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "ui/editor_plus.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_EDITOR_EDIT, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "ui/editor_edit.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+    { SPRITE_UI_EDITOR_TRASH, (SpriteParams) {
+        .strategy = SPRITE_IMPORT_DEFAULT,
+        .sheet = {
+            .path = "ui/editor_trash.png",
+            .hframes = 2,
+            .vframes = 1
+        }
+    }},
+#endif
     { SPRITE_UI_GOLD_ICON, (SpriteParams) {
         .strategy = SPRITE_IMPORT_DEFAULT,
         .sheet = {

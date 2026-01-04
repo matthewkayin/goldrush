@@ -47,7 +47,7 @@ static const Rect CANVAS_RECT = (Rect) {
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save" },
     { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
-    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity" }
+    { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads" }
 };
 
 static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_SHORTCUTS = {
@@ -64,6 +64,7 @@ static const std::unordered_map<InputAction, std::vector<std::string>> TOOLBAR_S
     { INPUT_ACTION_EDITOR_TOOL_DECORATE, { "Tool", "Decorate" }},
     { INPUT_ACTION_EDITOR_TOOL_ADD_ENTITY, { "Tool", "Add Entity" }},
     { INPUT_ACTION_EDITOR_TOOL_EDIT_ENTITY, { "Tool", "Edit Entity" }},
+    { INPUT_ACTION_EDITOR_TOOL_SQUADS, { "Tool", "Squads" }},
 };
 
 static const uint32_t TOOL_ADD_ENTITY_ROW_SIZE = 4;
@@ -76,7 +77,8 @@ enum EditorTool {
     EDITOR_TOOL_SELECT,
     EDITOR_TOOL_DECORATE,
     EDITOR_TOOL_ADD_ENTITY,
-    EDITOR_TOOL_EDIT_ENTITY
+    EDITOR_TOOL_EDIT_ENTITY,
+    EDITOR_TOOL_SQUADS
 };
 
 struct EditorClipboard {
@@ -108,8 +110,9 @@ struct EditorState {
     ivec2 tool_select_end;
     Rect tool_select_selection;
     uint32_t tool_add_entity_player_id;
-    uint32_t tool_add_entity_scroll;
+    uint32_t tool_scroll;
     uint32_t tool_edit_entity_gold_held;
+    uint32_t tool_squad_dropdown_scroll;
     bool is_painting;
     bool is_pasting;
 
@@ -269,7 +272,7 @@ void editor_update() {
                     }
                     ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_add_entity_player_id, items, false);
 
-                    for (uint32_t row = state.tool_add_entity_scroll; row < state.tool_add_entity_scroll + TOOL_ADD_ENTITY_VISIBLE_ROW_COUNT; row++) {
+                    for (uint32_t row = state.tool_scroll; row < state.tool_scroll + TOOL_ADD_ENTITY_VISIBLE_ROW_COUNT; row++) {
                         ui_begin_row(state.ui, ivec2(0, 0), 2);
                             for (uint32_t col = 0; col < TOOL_ADD_ENTITY_ROW_SIZE; col++) {
                                 if ((row * TOOL_ADD_ENTITY_ROW_SIZE) + col >= ENTITY_TYPE_COUNT) {
@@ -342,6 +345,31 @@ void editor_update() {
                         editor_tool_edit_entity_delete_entity(state.tool_value);
                     }
 
+                    break;
+                }
+                case EDITOR_TOOL_SQUADS: {
+                    ui_begin_row(state.ui, ivec2(0, 0), 2);
+                        std::vector<std::string> squad_dropdown_items;
+                        for (uint32_t squad_index = 0; squad_index < state.document->squad_count; squad_index++) {
+                            squad_dropdown_items.push_back(std::string(state.document->squads[squad_index].name));
+                        }
+                        ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_value, squad_dropdown_items, false, 9);
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_PLUS, state.document->squad_count == EDITOR_MAX_SQUADS, false)) {
+                            EditorSquad new_squad = editor_document_squad_init();
+                            sprintf(new_squad.name, "Squad %u", state.document->squad_count + 1);
+                            state.document->squads[state.document->squad_count] = new_squad;
+                            state.document->squad_count++;
+                        }
+                        ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false);
+                        ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false);
+                    ui_end_container(state.ui);
+                    ui_text(state.ui, FONT_HACK_GOLD, "Entities");
+                    ui_begin_row(state.ui, ivec2(0, 0), 2);
+                        ui_icon_button(state.ui, SPRITE_BUTTON_ICON_BANDIT, true);
+                        ui_icon_button(state.ui, SPRITE_BUTTON_ICON_BANDIT, true);
+                        ui_icon_button(state.ui, SPRITE_BUTTON_ICON_BANDIT, true);
+                        ui_icon_button(state.ui, SPRITE_BUTTON_ICON_BANDIT, true);
+                    ui_end_container(state.ui);
                     break;
                 }
             }
@@ -584,7 +612,7 @@ void editor_update() {
 
     // Entity place scroll
     if (state.tool == EDITOR_TOOL_ADD_ENTITY && SIDEBAR_RECT.has_point(input_get_mouse_position())) {
-        state.tool_add_entity_scroll = (uint32_t)std::clamp((int)state.tool_add_entity_scroll - input_get_mouse_scroll(), 0, (int)editor_tool_add_entity_get_row_count() - (int)TOOL_ADD_ENTITY_VISIBLE_ROW_COUNT);
+        state.tool_scroll = (uint32_t)std::clamp((int)state.tool_scroll - input_get_mouse_scroll(), 0, (int)editor_tool_add_entity_get_row_count() - (int)TOOL_ADD_ENTITY_VISIBLE_ROW_COUNT);
     }
 
     // Minimap drag
@@ -672,7 +700,7 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             state.is_pasting = true;
             log_debug("begin pasting");
         } else if (action == "Players") {
-            state.menu_players = editor_menu_players_open();
+            state.menu_players = editor_menu_players_open(state.document);
         }
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {
@@ -709,11 +737,17 @@ void editor_set_tool(EditorTool tool) {
         }
         case EDITOR_TOOL_ADD_ENTITY: {
             state.tool_value = ENTITY_MINER;
-            state.tool_add_entity_scroll = 0;
+            state.tool_scroll = 0;
             break;
         }
         case EDITOR_TOOL_EDIT_ENTITY: {
             state.tool_value = INDEX_INVALID;
+            break;
+        }
+        case EDITOR_TOOL_SQUADS: {
+            state.tool_value = 0;
+            state.tool_scroll = 0;
+            state.tool_squad_dropdown_scroll = 0;
             break;
         }
     }

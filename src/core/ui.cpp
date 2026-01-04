@@ -182,7 +182,7 @@ bool ui_sprite_button(UI& state, SpriteName sprite, bool disabled, bool flip_h) 
     };
     int hframe = 0;
     if (disabled) {
-        hframe = 2;
+        hframe = sprite_info.hframes == 2 ? 0 : 2;
     } else if (state.input_enabled && sprite_rect.has_point(input_get_mouse_position())) {
         hframe = 1;
     }
@@ -381,7 +381,14 @@ bool ui_team_picker(UI& state, char value, bool disabled) {
     return clicked;
 }
 
-bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled) {
+int ui_dropdown_clamp_scroll_offset(int scroll_offset, size_t selected_items_size, int scroll_max_visible_items) {
+    if (scroll_max_visible_items >= (int)selected_items_size) {
+        return 0;
+    }
+    return std::clamp(scroll_offset, 0, (int)selected_items_size - scroll_max_visible_items);
+}
+
+bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled, int scroll_max_visible_items) {
     int dropdown_id = ui_get_next_element_id(state);
     ivec2 origin = ui_get_container_origin(state);
     SpriteName sprite = type == UI_DROPDOWN ? SPRITE_UI_DROPDOWN : SPRITE_UI_DROPDOWN_MINI;
@@ -394,6 +401,9 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
         .w = size.x, .h = size.y
     };
 
+    if (items.empty()) {
+        disabled = true;
+    }
     bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && rect.has_point(input_get_mouse_position());
 
     int vframe = 0;
@@ -413,19 +423,29 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
     ui_queue_sprite(state, sprite, ivec2(0, vframe), origin, 0);
 
     char item_text[32];
-    if (type == UI_DROPDOWN_MINI) {
-        strncpy(item_text, items.at(*selected_item).c_str(), 9);
-        item_text[9] = '\0';
-    } else {
-        strcpy(item_text, items.at(*selected_item).c_str());
+    if (!items.empty()) {
+        if (type == UI_DROPDOWN_MINI) {
+            strncpy(item_text, items.at(*selected_item).c_str(), 9);
+            item_text[9] = '\0';
+        } else {
+            strcpy(item_text, items.at(*selected_item).c_str());
+        }
+        ui_queue_text(state, vframe == 1 ? hovered_font : font, item_text, ivec2(origin.x + 5, origin.y + text_yoffset), 0);
     }
-    ui_queue_text(state, vframe == 1 ? hovered_font : font, item_text, ivec2(origin.x + 5, origin.y + text_yoffset), 0);
 
     if (state.element_selected == dropdown_id) {
+        // Dropdown item scroll
+        if (scroll_max_visible_items != UI_DROPDOWN_SCROLL_DISABLED) {
+            state.dropdown_scroll_offset = ui_dropdown_clamp_scroll_offset(state.dropdown_scroll_offset - input_get_mouse_scroll(), items.size(), scroll_max_visible_items);
+        }
+
         // Render all the dropdown items
         int item_hovered = -1;
-        for (int index = 0; index < (int)items.size(); index++) {
-            int dropdown_direction = origin.y + (size.y * ((int)items.size() + 1)) > SCREEN_HEIGHT ? -1 : 1;
+        const int visible_item_count = scroll_max_visible_items == UI_DROPDOWN_SCROLL_DISABLED
+            ? (int)items.size()
+            : std::min((int)items.size(), scroll_max_visible_items);
+        for (int index = 0; index < visible_item_count; index++) {
+            int dropdown_direction = origin.y + (size.y * (visible_item_count + 1)) > SCREEN_HEIGHT ? -1 : 1;
 
             Rect item_rect = (Rect) {
                 .x = origin.x, .y = origin.y + ((size.y * (index + 1)) * dropdown_direction),
@@ -436,10 +456,10 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
             ui_queue_sprite(state, sprite, ivec2(0, 3 + (int)item_is_hovered), ivec2(item_rect.x, item_rect.y), 1);
 
             if (type == UI_DROPDOWN_MINI) {
-                strncpy(item_text, items.at((size_t)index).c_str(), 12);
+                strncpy(item_text, items.at((size_t)(state.dropdown_scroll_offset + index)).c_str(), 12);
                 item_text[12] = '\0';
             } else {
-                strcpy(item_text, items.at((size_t)index).c_str());
+                strcpy(item_text, items.at((size_t)(state.dropdown_scroll_offset + index)).c_str());
             }
             ui_queue_text(state, item_is_hovered ? hovered_font : font, item_text, ivec2(item_rect.x + 5, item_rect.y + text_yoffset), 1);
 
@@ -453,7 +473,7 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
             state.element_selected_future = UI_ELEMENT_NONE;
             // If they happened to be selecting an item, update the value
             if (item_hovered != -1) {
-                *selected_item = (uint32_t)item_hovered;
+                *selected_item = (uint32_t)(state.dropdown_scroll_offset + item_hovered);
             } 
             sound_play(SOUND_UI_CLICK);
             // Return true if the item was changed
@@ -461,6 +481,8 @@ bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const 
         }
     } else if (!disabled && hovered && input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         state.element_selected_future = dropdown_id;
+        state.dropdown_scroll_offset = scroll_max_visible_items == UI_DROPDOWN_SCROLL_DISABLED ? 0
+            : ui_dropdown_clamp_scroll_offset((int)*selected_item, items.size(), scroll_max_visible_items);
         sound_play(SOUND_UI_CLICK);
     } 
 

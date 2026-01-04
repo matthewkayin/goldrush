@@ -13,6 +13,8 @@
 #define UI_Z_INDEX_COUNT 2
 #define UI_ICON_BUTTON_EMPTY SPRITE_COUNT
 
+const int UI_DROPDOWN_SCROLL_DISABLED = -1;
+
 enum UiHotkeyButtonMode {
     // The button can be hovered and clicked
     UI_ICON_BUTTON_ENABLED,
@@ -113,6 +115,7 @@ struct UI {
     int text_input_selected;
     int next_text_input_id;
     int toolbar_column_selected;
+    int dropdown_scroll_offset;
 };
 
 UI ui_init();
@@ -296,7 +299,7 @@ bool ui_team_picker(UI& state, char value, bool disabled);
  * @param disabled If true, the dropdown will not be clickable.
  * @return True if the dropdown value was changed
  */
-bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled);
+bool ui_dropdown(UI& state, UiDropdownType type, uint32_t* selected_item, const std::vector<std::string>& items, bool disabled, int scroll_max_visible_items = UI_DROPDOWN_SCROLL_DISABLED);
 
 /**
  * Creates a toolbar

@@ -14,9 +14,11 @@ enum EditorMenuPlayersMode {
 
 struct EditorMenuPlayers {
     EditorMenuPlayersMode mode;
+    uint32_t starting_gold[MAX_PLAYERS];
+    std::string player_names[MAX_PLAYERS - 1];
 };
 
-EditorMenuPlayers editor_menu_players_open();
+EditorMenuPlayers editor_menu_players_open(const EditorDocument* document);
 void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorDocument* document);
 
 #endif

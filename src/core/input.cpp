@@ -186,6 +186,9 @@ void input_poll_events() {
                                 case SDL_SCANCODE_E:
                                     state.current[INPUT_ACTION_EDITOR_TOOL_EDIT_ENTITY] = event.type == SDL_EVENT_KEY_DOWN;
                                     break;
+                                case SDL_SCANCODE_Q:
+                                    state.current[INPUT_ACTION_EDITOR_TOOL_SQUADS] = event.type == SDL_EVENT_KEY_DOWN;
+                                    break;
                                 case DELETE:
                                     state.current[INPUT_ACTION_EDITOR_DELETE] = event.type == SDL_EVENT_KEY_DOWN;
                                     break;

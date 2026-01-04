@@ -14,9 +14,15 @@ EditorDocument* editor_document_base_init() {
     document->entity_count = 0;
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        document->players[player_id].name = new std::string(player_id == 0 ? "Player" : "Enemy");
+        if (player_id == 0) {
+            sprintf(document->players[player_id].name, "Player");
+        } else {
+            sprintf(document->players[player_id].name, "Enemy %u", player_id);
+        }
         document->players[player_id].starting_gold = 50;
     }
+
+    document->squad_count = 0;
 
     return document;
 }
@@ -103,12 +109,19 @@ EditorDocument* editor_document_init_generated(MapType map_type, const NoiseGenP
 }
 
 void editor_document_free(EditorDocument* document) {
-    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        delete document->players[player_id].name;
-    }
     noise_free(document->noise);
     delete document->map;
     free(document);
+}
+
+EditorSquad editor_document_squad_init() {
+    EditorSquad squad;
+    sprintf(squad.name, "New Squad");
+    squad.player_id = 1;
+    squad.type = EDITOR_SQUAD_TYPE_DEFEND;
+    squad.entity_count = 0;
+
+    return squad;
 }
 
 uint8_t editor_document_get_noise_map_value(EditorDocument* document, ivec2 cell) {
