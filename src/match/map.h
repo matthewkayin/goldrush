@@ -19,6 +19,7 @@ struct Tile {
     ivec2 frame;
     uint32_t elevation;
 };
+STATIC_ASSERT(sizeof(Tile) == 16);
 
 enum CellLayer {
     CELL_LAYER_UNDERGROUND,
@@ -46,6 +47,7 @@ struct Cell {
     };
     uint16_t padding = 0;
 };
+STATIC_ASSERT(sizeof(Cell) == 8);
 
 struct MapRegionPathNode {
     int parent;

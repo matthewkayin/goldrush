@@ -4,6 +4,7 @@
 
 #include "editor/document.h"
 #include "editor/menu_new.h"
+#include "editor/menu_file.h"
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
 #include "editor/ui.h"
@@ -11,6 +12,7 @@
 #include "core/logger.h"
 #include "core/input.h"
 #include "core/ui.h"
+#include "core/filesystem.h"
 #include "match/map.h"
 #include "container/id_array.h"
 #include "match/state.h"
@@ -46,7 +48,7 @@ static const Rect CANVAS_RECT = (Rect) {
 };
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
-    { "File", "New", "Open", "Save" },
+    { "File", "New", "Open", "Save", "Save As" },
     { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
     { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn" }
 };
@@ -92,6 +94,8 @@ struct EditorClipboard {
 
 struct EditorState {
     EditorDocument* document;
+    std::string document_path;
+    bool document_is_saved;
     UI ui;
     int ui_toolbar_id;
 
@@ -101,6 +105,7 @@ struct EditorState {
 
     // Menus
     EditorMenuNew menu_new;
+    EditorMenuFile menu_file;
     EditorMenuPlayers menu_players;
     EditorMenuEditSquad menu_edit_squad;
 
@@ -116,6 +121,7 @@ struct EditorState {
     uint32_t tool_add_entity_player_id;
     uint32_t tool_scroll;
     uint32_t tool_edit_entity_gold_held;
+    ivec2 tool_edit_entity_offset;
     uint32_t tool_squad_dropdown_scroll;
     bool is_painting;
     bool is_pasting;
@@ -175,6 +181,8 @@ uint32_t editor_get_entity_squad(uint32_t entity_index);
 void editor_remove_entity_from_squad(uint32_t squad_index, uint32_t entity_index);
 std::vector<std::string> editor_get_player_name_dropdown_items();
 ivec2 editor_get_player_spawn_camera_offset(ivec2 cell);
+void editor_save(const char* path);
+void editor_open(const char* path);
 
 // Render
 ivec2 editor_entity_get_animation_frame(EntityType type);
@@ -193,6 +201,8 @@ void editor_init() {
 
     state.ui = ui_init();
     state.document = editor_document_init_blank(MAP_TYPE_TOMBSTONE, MAP_SIZE_SMALL);
+    state.document_path = "";
+    state.document_is_saved = false;
     log_debug("Initialized document");
 
     state.action_head = 0;
@@ -425,6 +435,11 @@ void editor_update() {
             !editor_is_in_menu()) {
         ivec2 cell = editor_get_hovered_cell();
         status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i> Value: %s", cell.x, cell.y, editor_get_noise_value_str(state.document->noise->map[cell.x + (cell.y * state.document->noise->width)]));
+    } else if (!CANVAS_RECT.has_point(input_get_mouse_position())) {
+        status_text_ptr += sprintf(status_text_ptr, "%s", state.document_path.empty() ? "Untitled" : state.document_path.c_str());
+        if (!state.document_is_saved) {
+            status_text_ptr += sprintf(status_text_ptr, "*");
+        }
     }
     if (status_text[0] != '\0') {
         ui_element_position(state.ui, ivec2(4, SCREEN_HEIGHT - 15));
@@ -467,7 +482,23 @@ void editor_update() {
             } else {
                 state.document = editor_document_init_blank(map_type, map_size);
             }
+            state.document_path = "";
+            state.document_is_saved = false;
             state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
+        }
+        return;
+    }
+
+    // Menu file
+    if (state.menu_file.mode != EDITOR_MENU_FILE_CLOSED) {
+        editor_menu_file_update(state.menu_file, state.ui);
+        if (state.menu_file.mode == EDITOR_MENU_FILE_SAVE_FINISHED) {
+            editor_save(state.menu_file.path.c_str());
+            state.menu_file.mode = EDITOR_MENU_FILE_CLOSED;
+        }
+        if (state.menu_file.mode == EDITOR_MENU_FILE_OPEN_FINISHED) {
+            editor_open(state.menu_file.path.c_str());
+            state.menu_file.mode = EDITOR_MENU_FILE_CLOSED;
         }
         return;
     }
@@ -504,6 +535,7 @@ void editor_update() {
 
             state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
         }
+        return;
     }
 
     // Camera drag
@@ -619,6 +651,7 @@ void editor_update() {
         } else if (state.tool == EDITOR_TOOL_SELECT && !state.is_painting) {
             state.is_painting = true;
         } else if (state.tool == EDITOR_TOOL_EDIT_ENTITY && !state.is_painting && state.tool_value != INDEX_INVALID) {
+            state.tool_edit_entity_offset = editor_get_hovered_cell() - state.document->entities[state.tool_value].cell;
             state.is_painting = true;
         }
     }
@@ -675,9 +708,9 @@ void editor_update() {
         } else if (state.tool == EDITOR_TOOL_EDIT_ENTITY) {
             if (CANVAS_RECT.has_point(input_get_mouse_position()) && 
                     editor_is_hovered_cell_valid() &&
-                    editor_get_hovered_cell() != state.document->entities[state.tool_value].cell) {
+                    editor_get_hovered_cell() - state.tool_edit_entity_offset != state.document->entities[state.tool_value].cell) {
                 EditorEntity edited_entity = state.document->entities[state.tool_value];
-                edited_entity.cell = editor_get_hovered_cell();
+                edited_entity.cell = editor_get_hovered_cell() - state.tool_edit_entity_offset;
                 editor_do_action((EditorAction) {
                     .type = EDITOR_ACTION_EDIT_ENTITY,
                     .edit_entity = (EditorActionEditEntity) {
@@ -770,6 +803,7 @@ void editor_update() {
 
 bool editor_is_in_menu() {
     return state.menu_new.mode == EDITOR_MENU_NEW_OPEN ||
+        state.menu_file.mode != EDITOR_MENU_FILE_CLOSED ||
         state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN ||
         state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN;
 }
@@ -800,6 +834,16 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
     if (column == "File") {
         if (action == "New") {
             state.menu_new = editor_menu_new_open();
+        } else if (action == "Save") {
+            if (state.document_path == "") {
+                state.menu_file = editor_menu_file_save_open(state.document_path.c_str());
+            } else {
+                editor_save(state.document_path.c_str());
+            }
+        } else if (action == "Save As") {
+            state.menu_file = editor_menu_file_save_open(state.document_path.c_str());
+        } else if (action == "Open") {
+            state.menu_file = editor_menu_file_open_open();
         }
     } else if (column == "Edit") {
         if (action == "Undo") {
@@ -912,6 +956,9 @@ bool editor_is_hovered_cell_valid() {
     }
     if (state.tool == EDITOR_TOOL_ADD_ENTITY || 
             (state.tool == EDITOR_TOOL_EDIT_ENTITY && state.is_painting)) {
+        if (state.tool == EDITOR_TOOL_EDIT_ENTITY) {
+            cell -= state.tool_edit_entity_offset;
+        }
         EntityType entity_type = state.tool == EDITOR_TOOL_ADD_ENTITY
             ? (EntityType)state.tool_value
             : state.document->entities[state.tool_value].type;
@@ -1328,16 +1375,13 @@ int editor_tool_get_scroll_max() {
 }
 
 void editor_tool_edit_entity_set_selection(uint32_t entity_index) {
-    if (entity_index == INDEX_INVALID) {
-        return;
-    }
-
     state.tool_value = entity_index;
-    editor_validate_tool_value();
+
     if (state.tool_value == INDEX_INVALID) {
         return;
     }
 
+    editor_validate_tool_value();
     const EditorEntity& entity = state.document->entities[entity_index];
     state.tool_edit_entity_gold_held = entity.gold_held;
 }
@@ -1435,6 +1479,26 @@ ivec2 editor_get_player_spawn_camera_offset(ivec2 cell) {
     camera_offset.y = std::clamp(camera_offset.y, 0, (state.document->map->height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
 
     return camera_offset;
+}
+
+void editor_save(const char* path) {
+    bool success = editor_document_save_file(state.document, path);
+    if (success) {
+        state.document_path = path;
+        state.document_is_saved = true;
+    }
+}
+
+void editor_open(const char* path) {
+    EditorDocument* opened_document = editor_document_open_file(path);
+    if (opened_document == NULL) {
+        return;
+    }
+
+    editor_free_current_document();
+    state.document = opened_document;
+    state.document_path = path;
+    state.document_is_saved = true;
 }
 
 void editor_render() {
@@ -1569,15 +1633,35 @@ void editor_render() {
             !editor_is_toolbar_open()) {
         if (state.tool == EDITOR_TOOL_ADD_ENTITY || 
                 (state.tool == EDITOR_TOOL_EDIT_ENTITY && state.is_painting)) {
+            // Determine preview entity type
             EntityType entity_type = state.tool == EDITOR_TOOL_ADD_ENTITY
                 ? (EntityType)state.tool_value
                 : state.document->entities[state.tool_value].type;
             const EntityData& entity_data = entity_get_data(entity_type);
-            ivec2 entity_position = editor_entity_get_render_position(entity_type, editor_get_hovered_cell());
+
+            // Determine cell
+            ivec2 cell = editor_get_hovered_cell();
+            if (state.tool == EDITOR_TOOL_EDIT_ENTITY) {
+                cell -= state.tool_edit_entity_offset;
+            }
+
+            // Determine preview position
+            ivec2 entity_position = editor_entity_get_render_position(entity_type, cell);
             const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
             entity_position.x -= sprite_info.frame_width / 2;
             entity_position.y -= sprite_info.frame_height / 2;
-            render_sprite_frame(entity_data.sprite, editor_entity_get_animation_frame(entity_type), entity_position, RENDER_SPRITE_NO_CULL, entity_type == ENTITY_GOLDMINE ? 0 : state.tool_add_entity_player_id);
+
+            // Determine preview recolor ID
+            uint8_t recolor_id;
+            if (entity_type == ENTITY_GOLDMINE) {
+                recolor_id = 0;
+            } else if (state.tool == EDITOR_TOOL_ADD_ENTITY) {
+                recolor_id = state.tool_add_entity_player_id;
+            } else {
+                recolor_id = state.document->entities[state.tool_value].player_id;
+            }
+
+            render_sprite_frame(entity_data.sprite, editor_entity_get_animation_frame(entity_type), entity_position, RENDER_SPRITE_NO_CULL, recolor_id);
         }
 
         ivec2 cell = editor_get_hovered_cell();

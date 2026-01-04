@@ -1,9 +1,6 @@
 #pragma once
 
 #include "defines.h"
-
-#ifdef GOLD_DEBUG
-
 #include "match/noise.h"
 #include "match/state.h"
 #include "match/map.h"
@@ -40,7 +37,6 @@ struct EditorSquad {
 struct EditorDocument {
     Map* map;
     Noise* noise;
-    int tile_bake_seed;
     ivec2 player_spawn;
     EditorPlayer players[MAX_PLAYERS];
     uint32_t entity_count;
@@ -61,4 +57,5 @@ const char* editor_document_squad_type_str(EditorSquadType type);
 uint8_t editor_document_get_noise_map_value(EditorDocument* document, ivec2 cell);
 void editor_document_set_noise_map_value(EditorDocument* document, ivec2 cell, uint8_t value);
 
-#endif
+bool editor_document_save_file(const EditorDocument* document, const char* path);
+EditorDocument* editor_document_open_file(const char* path);

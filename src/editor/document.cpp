@@ -1,8 +1,9 @@
 #include "document.h"
 
-#ifdef GOLD_DEBUG
-
 #include "core/logger.h"
+#include "core/filesystem.h"
+
+static const uint32_t MAP_FILE_SIGNATURE = 0x46536877;
 
 EditorDocument* editor_document_base_init() {
     EditorDocument* document = (EditorDocument*)malloc(sizeof(EditorDocument));
@@ -10,7 +11,6 @@ EditorDocument* editor_document_base_init() {
         return NULL;
     }
 
-    document->tile_bake_seed = rand();
     document->player_spawn = ivec2(0, 0);
     document->entity_count = 0;
 
@@ -37,7 +37,7 @@ void editor_document_init_map(EditorDocument* document, MapType map_type) {
 }
 
 void editor_document_bake_map(EditorDocument* document, bool remove_artifacts) {
-    int lcg_seed = document->tile_bake_seed;
+    int lcg_seed = rand();
     if (remove_artifacts) {
         map_bake_map_tiles_and_remove_artifacts(*document->map, document->noise, &lcg_seed);
     } else {
@@ -162,4 +162,122 @@ void editor_document_set_noise_map_value(EditorDocument* document, ivec2 cell, u
     editor_document_bake_map(document);
 }
 
-#endif
+bool editor_document_save_file(const EditorDocument* document, const char* path) {
+    std::string full_path = filesystem_get_resource_path() + "map/" + path;
+    FILE* file = fopen(full_path.c_str(), "wb");
+    if (file == NULL) {
+        log_error("Could not open editor file %s for writing.", full_path.c_str());
+        return false;
+    }
+
+    // Signature
+    fwrite(&MAP_FILE_SIGNATURE, 1, sizeof(uint32_t), file);
+
+    // Map
+    uint8_t map_type_byte = (uint8_t)document->map->type;
+    fwrite(&map_type_byte, 1, sizeof(uint8_t), file);
+    fwrite(&document->map->width, 1, sizeof(int), file);
+    fwrite(&document->map->height, 1, sizeof(int), file);
+    fwrite(&document->map->tiles[0], 1, document->map->width * document->map->height * sizeof(Tile), file);
+    for (uint32_t cell_layer = 0; cell_layer < CELL_LAYER_COUNT; cell_layer++) {
+        fwrite(&document->map->cells[cell_layer], 1, document->map->width * document->map->height * sizeof(Cell), file);
+    }
+
+    // Noise
+    noise_fwrite(document->noise, file);
+
+    // Player spawn
+    fwrite(&document->player_spawn, 1, sizeof(ivec2), file);
+
+    // Players
+    fwrite(document->players, 1, sizeof(document->players), file);
+
+    // Entities
+    fwrite(&document->entity_count, 1, sizeof(uint32_t), file);
+    fwrite(document->entities, 1, document->entity_count * sizeof(EditorEntity), file);
+
+    // Squads
+    fwrite(&document->squad_count, 1, sizeof(uint32_t), file);
+    fwrite(document->squads, 1, document->squad_count * sizeof(EditorSquad), file);
+
+    fclose(file);
+    log_info("Map file saved successfully.");
+    return true;
+}
+
+EditorDocument* editor_document_open_file(const char* path) {
+    std::string full_path = filesystem_get_resource_path() + "map/" + path;
+    FILE* file = fopen(full_path.c_str(), "rb");
+    if (file == NULL) {
+        log_error("Could not open map file for reading with path %s.", full_path.c_str());
+        return NULL;
+    }
+
+    // Signature
+    uint32_t signature;
+    fread(&signature, 1, sizeof(uint32_t), file);
+    if (signature != MAP_FILE_SIGNATURE) {
+        log_error("File %s is not a valid map file.", full_path.c_str());
+        fclose(file);
+        return NULL;
+    }
+
+    // Init document
+    EditorDocument* document = editor_document_base_init();
+    if (document == NULL) {
+        log_error("Error creating editor document.");
+        fclose(file);
+        return NULL;
+    }
+
+    // Map type
+    uint8_t map_type_byte;
+    fread(&map_type_byte, 1, sizeof(uint8_t), file);
+    MapType map_type = (MapType)map_type_byte;
+
+    // Map width, height
+    int map_width, map_height;
+    fread(&map_width, 1, sizeof(int), file);
+    fread(&map_height, 1, sizeof(int), file);
+
+    // Map init
+    document->map = new Map();
+    map_init(*document->map, map_type, map_width, map_height);
+
+    // Map tiles
+    fread(&document->map->tiles[0], 1, map_width * map_height * sizeof(Tile), file);
+
+    // Map cells
+    for (uint32_t cell_layer = 0; cell_layer < CELL_LAYER_COUNT; cell_layer++) {
+        fread(&document->map->cells[cell_layer], 1, map_width * map_height * sizeof(Cell), file);
+    }
+
+    // Noise
+    document->noise = noise_fread(file);
+    if (document->noise == NULL) {
+        log_error("Error reading noise.");
+        delete document->map;
+        free(document);
+        fclose(file);
+        return NULL;
+    }
+
+    // Player spawn
+    fread(&document->player_spawn, 1, sizeof(ivec2), file);
+
+    // Players
+    fread(document->players, 1, sizeof(document->players), file);
+
+    // Entities
+    fread(&document->entity_count, 1, sizeof(uint32_t), file);
+    fread(document->entities, 1, document->entity_count * sizeof(EditorEntity), file);
+
+    // Squads
+    fread(&document->squad_count, 1, sizeof(uint32_t), file);
+    fread(document->squads, 1, document->squad_count * sizeof(EditorSquad), file);
+
+    fclose(file);
+    log_info("Loaded map file %s.", full_path.c_str());
+
+    return document;
+}
