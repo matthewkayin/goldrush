@@ -8,6 +8,7 @@
 #include "render/sprite.h"
 #include "render/font.h"
 #include "render/render.h"
+#include "util/util.h"
 
 static const int WAGON_X_DEFAULT = 380;
 static const int WAGON_X_LOBBY = 480;
@@ -98,11 +99,6 @@ SDL_EnumerationResult menu_on_replay_file_found(void* state_ptr, const char* dir
     return SDL_ENUM_CONTINUE;
 }
 #pragma clang diagnostic pop
-
-bool string_ends_with(const std::string& str, const char* suffix) {
-    size_t suffix_length = strlen(suffix);
-    return str.size() >= suffix_length + 1 && str.compare(str.size() - suffix_length, suffix_length, suffix) == 0;
-}
 
 void menu_search_replays_folder(MenuState* state) {
     state->replay_filenames.clear();

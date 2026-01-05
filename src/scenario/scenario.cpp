@@ -164,7 +164,7 @@ void scenario_set_noise_map_value(Scenario* scenario, ivec2 cell, uint8_t value)
 }
 
 bool scenario_save_file(const Scenario* scenario, const char* path) {
-    std::string full_path = filesystem_get_resource_path() + "map/" + path;
+    std::string full_path = filesystem_get_resource_path() + "scenario/" + path;
     FILE* file = fopen(full_path.c_str(), "wb");
     if (file == NULL) {
         log_error("Could not open editor file %s for writing.", full_path.c_str());
@@ -210,7 +210,7 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
 }
 
 Scenario* scenario_open_file(const char* path) {
-    std::string full_path = filesystem_get_resource_path() + "map/" + path;
+    std::string full_path = filesystem_get_resource_path() + "scenario/" + path;
     FILE* file = fopen(full_path.c_str(), "rb");
     if (file == NULL) {
         log_error("Could not open map file for reading with path %s.", full_path.c_str());

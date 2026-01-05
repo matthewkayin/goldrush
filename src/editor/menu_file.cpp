@@ -2,6 +2,8 @@
 
 #ifdef GOLD_DEBUG
 
+#include "util/util.h"
+
 static const Rect MENU_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (300 / 2),
     .y = 64,
@@ -45,10 +47,13 @@ void editor_menu_file_update(EditorMenuFile& menu, UI& ui) {
 
     ui_element_position(ui, ui_button_position_frame_bottom_right(MENU_RECT, header_text));
     if (ui_button(ui, header_text)) {
+        input_stop_text_input();
+        if (!string_ends_with(menu.path, ".scn")) {
+            menu.path = menu.path + ".scn";
+        }
         menu.mode = menu.mode == EDITOR_MENU_FILE_SAVE_OPEN
             ? EDITOR_MENU_FILE_SAVE_FINISHED
             : EDITOR_MENU_FILE_OPEN_FINISHED;
-        input_stop_text_input();
     }
 }
 
