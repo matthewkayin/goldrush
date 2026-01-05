@@ -6,7 +6,7 @@ static const Rect MENU_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (300 / 2),
     .y = 64,
     .w = 300,
-    .h = 200
+    .h = 128
 };
 
 EditorMenuFile editor_menu_file_save_open(const char* previous_path) {
@@ -35,7 +35,7 @@ void editor_menu_file_update(EditorMenuFile& menu, UI& ui) {
     ui_text(ui, FONT_HACK_GOLD, header_text);
 
     ui_begin_column(ui, ivec2(MENU_RECT.x + 8, MENU_RECT.y + 30), 4);
-        ui_text_input(ui, "Path: ", ivec2(256, 24), &menu.path, 128);
+        ui_text_input(ui, "Path: ", ivec2(300 - 16, 24), &menu.path, 128);
     ui_end_container(ui);
 
     ui_element_position(ui, ui_button_position_frame_bottom_left(MENU_RECT));

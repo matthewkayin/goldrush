@@ -903,7 +903,7 @@ void editor_set_tool(EditorTool tool) {
             break;
         }
         case EDITOR_TOOL_ADD_ENTITY: {
-            state.tool_value = ENTITY_MINER;
+            state.tool_value = ENTITY_GOLDMINE;
             state.tool_scroll = 0;
             break;
         }
@@ -1662,6 +1662,23 @@ void editor_render() {
             }
 
             render_sprite_frame(entity_data.sprite, editor_entity_get_animation_frame(entity_type), entity_position, RENDER_SPRITE_NO_CULL, recolor_id);
+
+            // Render blocked rects for goldmines
+            for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+                const EditorEntity& entity = state.document->entities[entity_index];
+                if (entity.type != ENTITY_GOLDMINE) {
+                    continue;
+                }
+
+                Rect block_rect = entity_goldmine_get_block_building_rect(entity.cell);
+                Rect render_rect = editor_cell_rect_to_world_space(block_rect);
+                render_rect.x += CANVAS_RECT.x;
+                render_rect.y += CANVAS_RECT.y;
+
+                if (CANVAS_RECT.intersects(render_rect)) {
+                    render_draw_rect(render_rect, RENDER_COLOR_GOLD);
+                }
+            }
         }
 
         ivec2 cell = editor_get_hovered_cell();

@@ -178,7 +178,7 @@ bool editor_document_save_file(const EditorDocument* document, const char* path)
     fwrite(&document->map.height, 1, sizeof(int), file);
     fwrite(&document->map.tiles[0], 1, document->map.width * document->map.height * sizeof(Tile), file);
     for (uint32_t cell_layer = 0; cell_layer < CELL_LAYER_COUNT; cell_layer++) {
-        fwrite(&document->map.cells[cell_layer], 1, document->map.width * document->map.height * sizeof(Cell), file);
+        fwrite(&document->map.cells[cell_layer][0], 1, document->map.width * document->map.height * sizeof(Cell), file);
     }
 
     // Noise
@@ -246,7 +246,7 @@ EditorDocument* editor_document_open_file(const char* path) {
 
     // Map cells
     for (uint32_t cell_layer = 0; cell_layer < CELL_LAYER_COUNT; cell_layer++) {
-        fread(&document->map.cells[cell_layer], 1, map_width * map_height * sizeof(Cell), file);
+        fread(&document->map.cells[cell_layer][0], 1, map_width * map_height * sizeof(Cell), file);
     }
 
     // Noise
