@@ -5,7 +5,7 @@
 #ifdef GOLD_DEBUG
 
 #include "core/ui.h"
-#include "editor/document.h"
+#include "scenario/scenario.h"
 
 enum EditorMenuEditSquadMode {
     EDITOR_MENU_EDIT_SQUAD_CLOSED,
@@ -22,7 +22,7 @@ struct EditorMenuEditSquad {
     std::vector<std::string> squad_type_items;
 };
 
-EditorMenuEditSquad editor_menu_edit_squad_open(const EditorSquad& squad, const EditorDocument* document);
+EditorMenuEditSquad editor_menu_edit_squad_open(const ScenarioSquad& squad, const Scenario* scenario);
 void editor_menu_edit_squad_update(EditorMenuEditSquad& menu, UI& ui);
 
 #endif

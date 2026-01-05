@@ -4,7 +4,7 @@
 
 #ifdef GOLD_DEBUG
 
-#include "editor/document.h"
+#include "scenario/scenario.h"
 #include "math/gmath.h"
 #include "match/noise.h"
 #include <vector>
@@ -60,24 +60,24 @@ struct EditorActionAddEntity {
 
 struct EditorActionEditEntity {
     uint32_t index;
-    EditorEntity previous_value;
-    EditorEntity new_value;
+    ScenarioEntity previous_value;
+    ScenarioEntity new_value;
 };
 
 struct EditorActionDeleteEntity {
     uint32_t index;
-    EditorEntity value;
+    ScenarioEntity value;
 };
 
 struct EditorActionEditSquad {
     uint32_t index;
-    EditorSquad previous_value;
-    EditorSquad new_value;
+    ScenarioSquad previous_value;
+    ScenarioSquad new_value;
 };
 
 struct EditorActionDeleteSquad {
     uint32_t index;
-    EditorSquad value;
+    ScenarioSquad value;
 };
 
 struct EditorActionSetPlayerSpawn {
@@ -86,8 +86,8 @@ struct EditorActionSetPlayerSpawn {
 };
 
 struct EditorActionSetObjective {
-    Objective previous_value;
-    Objective new_value;
+    ScenarioObjective previous_value;
+    ScenarioObjective new_value;
 };
 
 struct EditorAction {
@@ -111,6 +111,6 @@ struct EditorAction {
 EditorAction editor_action_create_brush(const std::vector<EditorActionBrushStroke>& stroke);
 EditorAction editor_action_create_decorate_bulk(const std::vector<EditorActionDecorate>& changes);
 void editor_action_destroy(EditorAction& action);
-void editor_action_execute(EditorDocument* document, const EditorAction& action, EditorActionMode mode);
+void editor_action_execute(Scenario* scenario, const EditorAction& action, EditorActionMode mode);
 
 #endif

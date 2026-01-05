@@ -8,7 +8,7 @@
 #include "render/render.h"
 #include "network/types.h"
 #include "bot/bot.h"
-#include "shell/ysort.h"
+#include "render/ysort.h"
 
 #define MATCH_SHELL_UI_HEIGHT 86
 #define MATCH_SHELL_CONTROL_GROUP_COUNT 10

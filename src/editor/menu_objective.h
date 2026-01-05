@@ -5,7 +5,7 @@
 #ifdef GOLD_DEBUG
 
 #include "core/ui.h"
-#include "editor/document.h"
+#include "scenario/scenario.h"
 
 enum EditorMenuObjectiveMode {
     EDITOR_MENU_OBJECTIVE_CLOSED,
@@ -21,8 +21,8 @@ struct EditorMenuObjective {
     uint32_t objective_gold_target;
 };
 
-EditorMenuObjective editor_menu_objective_open(const EditorDocument* document);
+EditorMenuObjective editor_menu_objective_open(const Scenario* scenario);
 void editor_menu_objective_update(EditorMenuObjective& menu, UI& ui);
-Objective editor_menu_objective_get_objective(const EditorMenuObjective& menu);
+ScenarioObjective editor_menu_objective_get_objective(const EditorMenuObjective& menu);
 
 #endif

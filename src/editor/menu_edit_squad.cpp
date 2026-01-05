@@ -11,7 +11,7 @@ static const Rect MENU_RECT = (Rect) {
     .h = 256
 };
 
-EditorMenuEditSquad editor_menu_edit_squad_open(const EditorSquad& squad, const EditorDocument* document) {
+EditorMenuEditSquad editor_menu_edit_squad_open(const ScenarioSquad& squad, const Scenario* scenario) {
     EditorMenuEditSquad menu;
     menu.mode = EDITOR_MENU_EDIT_SQUAD_OPEN;
     menu.squad_name = std::string(squad.name);
@@ -20,12 +20,12 @@ EditorMenuEditSquad editor_menu_edit_squad_open(const EditorSquad& squad, const 
 
     for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
         char player_text[64];
-        sprintf(player_text, "%u: %s", player_id, document->players[player_id].name);
+        sprintf(player_text, "%u: %s", player_id, scenario->players[player_id].name);
         menu.squad_player_items.push_back(std::string(player_text));
     }
 
-    for (uint32_t squad_type = 0; squad_type < EDITOR_SQUAD_TYPE_COUNT; squad_type++) {
-        menu.squad_type_items.push_back(std::string(editor_document_squad_type_str((EditorSquadType)squad_type)));
+    for (uint32_t squad_type = 0; squad_type < SCENARIO_SQUAD_TYPE_COUNT; squad_type++) {
+        menu.squad_type_items.push_back(std::string(scenario_squad_type_str((ScenarioSquadType)squad_type)));
     }
 
     return menu;

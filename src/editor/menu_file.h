@@ -5,7 +5,7 @@
 #ifdef GOLD_DEBUG
 
 #include "core/ui.h"
-#include "editor/document.h"
+#include "scenario/scenario.h"
 
 enum EditorMenuFileMode {
     EDITOR_MENU_FILE_CLOSED,

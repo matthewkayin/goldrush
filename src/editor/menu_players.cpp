@@ -19,22 +19,22 @@ static const UiSliderParams STARTING_GOLD_SLIDER_PARAMS = (UiSliderParams) {
     .step = 50
 };
 
-EditorMenuPlayers editor_menu_players_open(const EditorDocument* document) {
+EditorMenuPlayers editor_menu_players_open(const Scenario* scenario) {
     EditorMenuPlayers menu;
 
     menu.mode = EDITOR_MENU_PLAYERS_OPEN;
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-        menu.starting_gold[player_id] = document->players[player_id].starting_gold;
+        menu.starting_gold[player_id] = scenario->players[player_id].starting_gold;
         if (player_id != 0) {
-            menu.player_names[player_id - 1] = std::string(document->players[player_id].name);
+            menu.player_names[player_id - 1] = std::string(scenario->players[player_id].name);
         }
     }
 
     return menu;
 }
 
-void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorDocument* document) {
+void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, Scenario* scenario) {
     ui.input_enabled = true;
     ui_frame_rect(ui, MENU_RECT);
 
@@ -43,7 +43,7 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorDocument*
     ui_text(ui, FONT_HACK_GOLD, "Edit Players");
 
     ui_begin_column(ui, ivec2(MENU_RECT.x + 8, MENU_RECT.y + 30), 4);
-        ui_text(ui, FONT_HACK_GOLD, document->players[0].name);
+        ui_text(ui, FONT_HACK_GOLD, scenario->players[0].name);
         editor_menu_slider(ui, "Starting Gold:", &menu.starting_gold[0], STARTING_GOLD_SLIDER_PARAMS, MENU_RECT);
 
         for (uint8_t player_id = 1; player_id < MAX_PLAYERS; player_id++) {
@@ -63,9 +63,9 @@ void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorDocument*
     ui_element_position(ui, ui_button_position_frame_bottom_right(MENU_RECT, "Save"));
     if (ui_button(ui, "Save")) {
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
-            document->players[player_id].starting_gold = menu.starting_gold[player_id];
+            scenario->players[player_id].starting_gold = menu.starting_gold[player_id];
             if (player_id != 0) {
-                strncpy(document->players[player_id].name, menu.player_names[player_id - 1].c_str(), MAX_USERNAME_LENGTH);
+                strncpy(scenario->players[player_id].name, menu.player_names[player_id - 1].c_str(), MAX_USERNAME_LENGTH);
             }
         }
         menu.mode = EDITOR_MENU_PLAYERS_CLOSED;

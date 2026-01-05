@@ -11,17 +11,17 @@ static const Rect MENU_RECT = (Rect) {
     .h = 256
 };
 
-EditorMenuObjective editor_menu_objective_open(const EditorDocument* document) {
+EditorMenuObjective editor_menu_objective_open(const Scenario* scenario) {
     EditorMenuObjective menu;
     menu.mode = EDITOR_MENU_OBJECTIVE_OPEN;
 
-    for (uint32_t objective_type = 0; objective_type < OBJECTIVE_TYPE_COUNT; objective_type++) {
-        menu.objective_type_items.push_back(objective_type_str((ObjectiveType)objective_type));
+    for (uint32_t objective_type = 0; objective_type < SCENARIO_OBJECTIVE_COUNT; objective_type++) {
+        menu.objective_type_items.push_back(objective_type_str((ScenarioObjectiveType)objective_type));
     }
 
-    menu.objective_type = document->objective.type;
-    menu.objective_gold_target = document->objective.type == OBJECTIVE_TYPE_GOLD 
-        ? document->objective.gold.target 
+    menu.objective_type = scenario->objective.type;
+    menu.objective_gold_target = scenario->objective.type == SCENARIO_OBJECTIVE_GOLD 
+        ? scenario->objective.gold.target 
         : 0;
 
     return menu;
@@ -41,7 +41,7 @@ void editor_menu_objective_update(EditorMenuObjective& menu, UI& ui) {
         editor_menu_dropdown(ui, "Type:", &menu.objective_type, menu.objective_type_items, MENU_RECT);
 
         // Gold
-        if (menu.objective_type == OBJECTIVE_TYPE_GOLD) {
+        if (menu.objective_type == SCENARIO_OBJECTIVE_GOLD) {
             UiSliderParams params = (UiSliderParams) {
                 .display = UI_SLIDER_DISPLAY_RAW_VALUE,
                 .size = UI_SLIDER_SIZE_NORMAL,
@@ -65,12 +65,12 @@ void editor_menu_objective_update(EditorMenuObjective& menu, UI& ui) {
     }
 }
 
-Objective editor_menu_objective_get_objective(const EditorMenuObjective& menu) {
-    Objective objective;
-    objective.type = (ObjectiveType)menu.objective_type;
+ScenarioObjective editor_menu_objective_get_objective(const EditorMenuObjective& menu) {
+    ScenarioObjective objective;
+    objective.type = (ScenarioObjectiveType)menu.objective_type;
 
     switch (menu.objective_type) {
-        case OBJECTIVE_TYPE_GOLD: {
+        case SCENARIO_OBJECTIVE_GOLD: {
             objective.gold.target = menu.objective_gold_target;
             break;
         }

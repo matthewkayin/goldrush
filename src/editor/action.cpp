@@ -49,17 +49,17 @@ void editor_action_destroy(EditorAction& action) {
     }
 }
 
-void editor_action_execute(EditorDocument* document, const EditorAction& action, EditorActionMode mode) {
+void editor_action_execute(Scenario* scenario, const EditorAction& action, EditorActionMode mode) {
     switch (action.type) {
         case EDITOR_ACTION_BRUSH: {
             for (uint32_t index = 0; index < action.brush.stroke_size; index++) {
                 uint8_t value = mode == EDITOR_ACTION_MODE_UNDO 
                     ? action.brush.stroke[index].previous_value
                     : action.brush.stroke[index].new_value;
-                document->noise->map[action.brush.stroke[index].index] = value;
+                scenario->noise->map[action.brush.stroke[index].index] = value;
             }
 
-            editor_document_bake_map(document);
+            scenario_bake_map(scenario);
             break;
         }
         case EDITOR_ACTION_DECORATE: 
@@ -72,7 +72,7 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 int hframe = mode == EDITOR_ACTION_MODE_UNDO 
                     ? changes[change_index].previous_hframe
                     : changes[change_index].new_hframe;
-                document->map.cells[CELL_LAYER_GROUND][changes[change_index].index] = hframe == EDITOR_ACTION_DECORATE_REMOVE_DECORATION
+                scenario->map.cells[CELL_LAYER_GROUND][changes[change_index].index] = hframe == EDITOR_ACTION_DECORATE_REMOVE_DECORATION
                     ? (Cell) {
                         .type = CELL_EMPTY,
                         .id = ID_NULL
@@ -88,17 +88,17 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
             Cell cell_value = mode == EDITOR_ACTION_MODE_DO
                 ? (Cell) {
                     .type = CELL_UNIT,
-                    .id = (uint16_t)document->entity_count
+                    .id = (uint16_t)scenario->entity_count
                 }
                 : (Cell) {
                     .type = CELL_EMPTY,
                     .id = ID_NULL
                 };
             const EntityData& entity_data = entity_get_data(action.add_entity.type);
-            map_set_cell_rect(document->map, entity_data.cell_layer, action.add_entity.cell, entity_data.cell_size, cell_value);
+            map_set_cell_rect(scenario->map, entity_data.cell_layer, action.add_entity.cell, entity_data.cell_size, cell_value);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
-                EditorEntity entity;
+                ScenarioEntity entity;
                 entity.type = action.add_entity.type;
                 entity.player_id = action.add_entity.player_id;
                 entity.cell = action.add_entity.cell;
@@ -106,67 +106,67 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 if (entity.type == ENTITY_GOLDMINE) {
                     entity.gold_held = 7500;
                 } 
-                document->entities[document->entity_count] = entity;
-                document->entity_count++;
+                scenario->entities[scenario->entity_count] = entity;
+                scenario->entity_count++;
             } else {
-                document->entity_count--;
+                scenario->entity_count--;
             }
 
             break;
         }
         case EDITOR_ACTION_EDIT_ENTITY: {
-            document->entities[action.edit_entity.index] = mode == EDITOR_ACTION_MODE_DO
+            scenario->entities[action.edit_entity.index] = mode == EDITOR_ACTION_MODE_DO
                 ? action.edit_entity.new_value
                 : action.edit_entity.previous_value;
             break;
         }
         case EDITOR_ACTION_DELETE_ENTITY: {
             if (mode == EDITOR_ACTION_MODE_DO) {
-                document->entities[action.delete_entity.index] = document->entities[document->entity_count - 1];
-                document->entity_count--;
+                scenario->entities[action.delete_entity.index] = scenario->entities[scenario->entity_count - 1];
+                scenario->entity_count--;
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                document->entities[document->entity_count] = document->entities[action.delete_entity.index];
-                document->entities[action.delete_entity.index] = action.delete_entity.value;
-                document->entity_count++;
+                scenario->entities[scenario->entity_count] = scenario->entities[action.delete_entity.index];
+                scenario->entities[action.delete_entity.index] = action.delete_entity.value;
+                scenario->entity_count++;
             }
 
             break;
         }
         case EDITOR_ACTION_ADD_SQUAD: {
             if (mode == EDITOR_ACTION_MODE_DO) {
-                document->squads[document->squad_count] = editor_document_squad_init();
-                sprintf(document->squads[document->squad_count].name, "Squad %u", document->squad_count + 1);
-                document->squad_count++;
+                scenario->squads[scenario->squad_count] = scenario_squad_init();
+                sprintf(scenario->squads[scenario->squad_count].name, "Squad %u", scenario->squad_count + 1);
+                scenario->squad_count++;
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                document->squad_count--;
+                scenario->squad_count--;
             }
             break;
         }
         case EDITOR_ACTION_EDIT_SQUAD: {
-            document->squads[action.edit_squad.index] = mode == EDITOR_ACTION_MODE_DO
+            scenario->squads[action.edit_squad.index] = mode == EDITOR_ACTION_MODE_DO
                 ? action.edit_squad.new_value
                 : action.edit_squad.previous_value;
             break;
         }
         case EDITOR_ACTION_DELETE_SQUAD: {
             if (mode == EDITOR_ACTION_MODE_DO) {
-                document->squads[action.delete_squad.index] = document->squads[document->squad_count - 1];
-                document->squad_count--;
+                scenario->squads[action.delete_squad.index] = scenario->squads[scenario->squad_count - 1];
+                scenario->squad_count--;
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                document->squads[document->squad_count] = document->squads[action.delete_squad.index];
-                document->squads[action.delete_squad.index] = action.delete_squad.value;
-                document->squad_count++;
+                scenario->squads[scenario->squad_count] = scenario->squads[action.delete_squad.index];
+                scenario->squads[action.delete_squad.index] = action.delete_squad.value;
+                scenario->squad_count++;
             }
             break;
         }
         case EDITOR_ACTION_SET_PLAYER_SPAWN: {
-            document->player_spawn = mode == EDITOR_ACTION_MODE_DO
+            scenario->player_spawn = mode == EDITOR_ACTION_MODE_DO
                 ? action.set_player_spawn.new_value
                 : action.set_player_spawn.previous_value;
             break;
         }
         case EDITOR_ACTION_SET_OBJECTIVE: {
-            document->objective = mode == EDITOR_ACTION_MODE_DO
+            scenario->objective = mode == EDITOR_ACTION_MODE_DO
                 ? action.set_objective.new_value
                 : action.set_objective.previous_value;
             break;

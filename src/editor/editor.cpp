@@ -2,7 +2,7 @@
 
 #ifdef GOLD_DEBUG
 
-#include "editor/document.h"
+#include "scenario/scenario.h"
 #include "editor/menu_new.h"
 #include "editor/menu_file.h"
 #include "editor/menu_players.h"
@@ -19,7 +19,7 @@
 #include "match/state.h"
 #include "core/options.h"
 #include "render/render.h"
-#include "shell/ysort.h"
+#include "render/ysort.h"
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -94,9 +94,9 @@ struct EditorClipboard {
 };
 
 struct EditorState {
-    EditorDocument* document;
-    std::string document_path;
-    bool document_is_saved;
+    Scenario* scenario;
+    std::string scenario_path;
+    bool scenario_is_saved;
     UI ui;
     int ui_toolbar_id;
 
@@ -189,7 +189,7 @@ void editor_open(const char* path);
 // Render
 ivec2 editor_entity_get_animation_frame(EntityType type);
 ivec2 editor_entity_get_render_position(EntityType type, ivec2 cell);
-RenderSpriteParams editor_create_entity_render_params(const EditorEntity& entity);
+RenderSpriteParams editor_create_entity_render_params(const ScenarioEntity& entity);
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell);
 MinimapPixel editor_get_minimap_pixel_for_entity(const std::vector<uint32_t>& selection, uint32_t entity_index);
 
@@ -202,9 +202,9 @@ void editor_init() {
     log_debug("Set display to windowed.");
 
     state.ui = ui_init();
-    state.document = editor_document_init_blank(MAP_TYPE_TOMBSTONE, MAP_SIZE_SMALL);
-    state.document_path = "";
-    state.document_is_saved = false;
+    state.scenario = scenario_init_blank(MAP_TYPE_TOMBSTONE, MAP_SIZE_SMALL);
+    state.scenario_path = "";
+    state.scenario_is_saved = false;
     log_debug("Initialized document");
 
     state.action_head = 0;
@@ -225,11 +225,11 @@ void editor_init() {
 }
 
 void editor_free_current_document() {
-    if (state.document != NULL) {
-        editor_document_free(state.document);
+    if (state.scenario != NULL) {
+        scenario_free(state.scenario);
         editor_tool_select_clear_selection();
         editor_clipboard_clear();
-        state.document = NULL;
+        state.scenario = NULL;
     }
     editor_clear_actions();
 }
@@ -314,7 +314,7 @@ void editor_update() {
                         break;
                     }
 
-                    const EditorEntity& entity = state.document->entities[state.tool_value];
+                    const ScenarioEntity& entity = state.scenario->entities[state.tool_value];
 
                     ui_icon_button(state.ui, entity_get_data(entity.type).icon, true);
 
@@ -332,7 +332,7 @@ void editor_update() {
                             .step = 50
                         }); 
                         if (input_is_action_just_released(INPUT_ACTION_LEFT_CLICK) && state.tool_edit_entity_gold_held != entity.gold_held) {
-                            EditorEntity edited_entity = entity;
+                            ScenarioEntity edited_entity = entity;
                             edited_entity.gold_held = state.tool_edit_entity_gold_held;
                             editor_do_action((EditorAction) {
                                 .type = EDITOR_ACTION_EDIT_ENTITY,
@@ -347,7 +347,7 @@ void editor_update() {
                         std::vector<std::string> items = editor_get_player_name_dropdown_items();
                         uint32_t entity_player_id = entity.player_id;
                         if (ui_dropdown(state.ui, UI_DROPDOWN_MINI, &entity_player_id, items, false)) {
-                            EditorEntity edited_entity = entity;
+                            ScenarioEntity edited_entity = entity;
                             edited_entity.player_id = (uint8_t)entity_player_id;
                             editor_do_action((EditorAction) {
                                 .type = EDITOR_ACTION_EDIT_ENTITY,
@@ -369,35 +369,35 @@ void editor_update() {
                 case EDITOR_TOOL_SQUADS: {
                     ui_begin_row(state.ui, ivec2(0, 0), 2);
                         std::vector<std::string> squad_dropdown_items;
-                        for (uint32_t squad_index = 0; squad_index < state.document->squad_count; squad_index++) {
-                            squad_dropdown_items.push_back(std::string(state.document->squads[squad_index].name));
+                        for (uint32_t squad_index = 0; squad_index < state.scenario->squad_count; squad_index++) {
+                            squad_dropdown_items.push_back(std::string(state.scenario->squads[squad_index].name));
                         }
                         ui_dropdown(state.ui, UI_DROPDOWN_MINI, &state.tool_value, squad_dropdown_items, false, 9);
-                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_PLUS, state.document->squad_count == EDITOR_MAX_SQUADS, false)) {
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_PLUS, state.scenario->squad_count == SCENARIO_MAX_SQUADS, false)) {
                             editor_do_action((EditorAction) {
                                 .type = EDITOR_ACTION_ADD_SQUAD
                             });
-                            state.tool_value = state.document->squad_count - 1;
+                            state.tool_value = state.scenario->squad_count - 1;
                         }
-                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.document->squad_count == 0, false)) {
-                            state.menu_edit_squad = editor_menu_edit_squad_open(state.document->squads[state.tool_value], state.document);
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.scenario->squad_count == 0, false)) {
+                            state.menu_edit_squad = editor_menu_edit_squad_open(state.scenario->squads[state.tool_value], state.scenario);
                         }
-                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.document->squad_count == 0, false)) {
+                        if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.scenario->squad_count == 0, false)) {
                             editor_do_action((EditorAction) {
                                 .type = EDITOR_ACTION_DELETE_SQUAD,
                                 .delete_squad = (EditorActionDeleteSquad) {
                                     .index = state.tool_value,
-                                    .value = state.document->squads[state.tool_value]
+                                    .value = state.scenario->squads[state.tool_value]
                                 }
                             }); 
                             state.tool_value = 0;
                         }
                     ui_end_container(state.ui);
 
-                    if (state.document->squad_count != 0) {
-                        const EditorSquad& squad = state.document->squads[state.tool_value];
+                    if (state.scenario->squad_count != 0) {
+                        const ScenarioSquad& squad = state.scenario->squads[state.tool_value];
                         char squad_info_text[64];
-                        sprintf(squad_info_text, "%s / %s", state.document->players[squad.player_id].name, editor_document_squad_type_str(squad.type));
+                        sprintf(squad_info_text, "%s / %s", state.scenario->players[squad.player_id].name, scenario_squad_type_str(squad.type));
                         ui_text(state.ui, FONT_HACK_GOLD, squad_info_text);
 
                         ui_text(state.ui, FONT_HACK_GOLD, "Entities");
@@ -410,7 +410,7 @@ void editor_update() {
                                         continue;
                                     }
                                     uint32_t entity_index = squad.entities[squad_entity_index];
-                                    EntityType entity_type = state.document->entities[entity_index].type;
+                                    EntityType entity_type = state.scenario->entities[entity_index].type;
                                     if (ui_icon_button(state.ui, entity_get_data(entity_type).icon, true)) {
                                         editor_remove_entity_from_squad(state.tool_value, entity_index);
                                     }
@@ -437,10 +437,10 @@ void editor_update() {
             state.camera_drag_mouse_position.x == -1 &&
             !editor_is_in_menu()) {
         ivec2 cell = editor_get_hovered_cell();
-        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i> Value: %s", cell.x, cell.y, editor_get_noise_value_str(state.document->noise->map[cell.x + (cell.y * state.document->noise->width)]));
+        status_text_ptr += sprintf(status_text_ptr, "Cell: <%i, %i> Value: %s", cell.x, cell.y, editor_get_noise_value_str(state.scenario->noise->map[cell.x + (cell.y * state.scenario->noise->width)]));
     } else if (!CANVAS_RECT.has_point(input_get_mouse_position())) {
-        status_text_ptr += sprintf(status_text_ptr, "%s", state.document_path.empty() ? "Untitled" : state.document_path.c_str());
-        if (!state.document_is_saved) {
+        status_text_ptr += sprintf(status_text_ptr, "%s", state.scenario_path.empty() ? "Untitled" : state.scenario_path.c_str());
+        if (!state.scenario_is_saved) {
             status_text_ptr += sprintf(status_text_ptr, "*");
         }
     }
@@ -483,12 +483,12 @@ void editor_update() {
                 MapSize map_size = (MapSize)state.menu_new.map_size;
                 if (state.menu_new.use_noise_gen_params) {
                     NoiseGenParams params = editor_menu_new_create_noise_gen_params(state.menu_new);
-                    state.document = editor_document_init_generated(map_type, params);
+                    state.scenario = scenario_init_generated(map_type, params);
                 } else {
-                    state.document = editor_document_init_blank(map_type, map_size);
+                    state.scenario = scenario_init_blank(map_type, map_size);
                 }
-                state.document_path = "";
-                state.document_is_saved = false;
+                state.scenario_path = "";
+                state.scenario_is_saved = false;
                 state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
             }
         }
@@ -508,23 +508,23 @@ void editor_update() {
 
         // Menu players
         if (state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN) {
-            editor_menu_players_update(state.menu_players, state.ui, state.document);
+            editor_menu_players_update(state.menu_players, state.ui, state.scenario);
         }
 
         // Menu edit squad
         if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN) {
             editor_menu_edit_squad_update(state.menu_edit_squad, state.ui);
             if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_SAVE) {
-                const EditorSquad previous_squad = state.document->squads[state.tool_value];
-                EditorSquad edited_squad = previous_squad;
+                const ScenarioSquad previous_squad = state.scenario->squads[state.tool_value];
+                ScenarioSquad edited_squad = previous_squad;
                 strncpy(edited_squad.name, state.menu_edit_squad.squad_name.c_str(), MAX_USERNAME_LENGTH);
                 edited_squad.player_id = state.menu_edit_squad.squad_player + 1;
-                edited_squad.type = (EditorSquadType)state.menu_edit_squad.squad_type;
+                edited_squad.type = (ScenarioSquadType)state.menu_edit_squad.squad_type;
                 if (edited_squad.player_id != previous_squad.player_id) {
                     edited_squad.entity_count = 0;
                 }
 
-                if (!editor_document_squads_are_equal(edited_squad, previous_squad)) {
+                if (!scenario_squads_are_equal(edited_squad, previous_squad)) {
                     editor_do_action((EditorAction) {
                         .type = EDITOR_ACTION_EDIT_SQUAD,
                         .edit_squad = (EditorActionEditSquad) {
@@ -546,7 +546,7 @@ void editor_update() {
                 editor_do_action((EditorAction) {
                     .type = EDITOR_ACTION_SET_OBJECTIVE,
                     .set_objective = (EditorActionSetObjective) {
-                        .previous_value = state.document->objective,
+                        .previous_value = state.scenario->objective,
                         .new_value = editor_menu_objective_get_objective(state.menu_objective)
                     }
                 });
@@ -586,7 +586,7 @@ void editor_update() {
 
     // Squad edit - Add entity to squad
     if (state.tool == EDITOR_TOOL_SQUADS && 
-            state.document->squad_count != 0 &&
+            state.scenario->squad_count != 0 &&
             editor_can_single_use_tool_be_used() &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         uint32_t entity_index = editor_get_hovered_entity();
@@ -595,7 +595,7 @@ void editor_update() {
 
             // Select entity squad
             if (input_is_action_pressed(INPUT_ACTION_CTRL) && 
-                    entity_squad_index != state.document->squad_count) {
+                    entity_squad_index != state.scenario->squad_count) {
                 state.tool_value = entity_squad_index;
                 return;
             }
@@ -608,19 +608,19 @@ void editor_update() {
 
             // Otherwise add entity to squad
             if (!input_is_action_just_pressed(INPUT_ACTION_SHIFT) &&
-                    entity_squad_index == state.document->squad_count &&
-                    state.document->squads[state.tool_value].entity_count < 
-                        EDITOR_SQUAD_MAX_ENTITIES && 
-                    state.document->entities[entity_index].player_id == 
-                        state.document->squads[state.tool_value].player_id) {
-                EditorSquad edited_squad = state.document->squads[state.tool_value];
+                    entity_squad_index == state.scenario->squad_count &&
+                    state.scenario->squads[state.tool_value].entity_count < 
+                        SCENARIO_SQUAD_MAX_ENTITIES && 
+                    state.scenario->entities[entity_index].player_id == 
+                        state.scenario->squads[state.tool_value].player_id) {
+                ScenarioSquad edited_squad = state.scenario->squads[state.tool_value];
                 edited_squad.entities[edited_squad.entity_count] = entity_index;
                 edited_squad.entity_count++;
                 editor_do_action((EditorAction) {
                     .type = EDITOR_ACTION_EDIT_SQUAD,
                     .edit_squad = (EditorActionEditSquad) {
                         .index = state.tool_value,
-                        .previous_value = state.document->squads[state.tool_value],
+                        .previous_value = state.scenario->squads[state.tool_value],
                         .new_value = edited_squad
                     }
                 });
@@ -638,7 +638,7 @@ void editor_update() {
         editor_do_action((EditorAction) {
             .type = EDITOR_ACTION_SET_PLAYER_SPAWN,
             .set_player_spawn = (EditorActionSetPlayerSpawn) {
-                .previous_value = state.document->player_spawn,
+                .previous_value = state.scenario->player_spawn,
                 .new_value = editor_get_hovered_cell()
             }
         });
@@ -670,7 +670,7 @@ void editor_update() {
         } else if (state.tool == EDITOR_TOOL_SELECT && !state.is_painting) {
             state.is_painting = true;
         } else if (state.tool == EDITOR_TOOL_EDIT_ENTITY && !state.is_painting && state.tool_value != INDEX_INVALID) {
-            state.tool_edit_entity_offset = editor_get_hovered_cell() - state.document->entities[state.tool_value].cell;
+            state.tool_edit_entity_offset = editor_get_hovered_cell() - state.scenario->entities[state.tool_value].cell;
             state.is_painting = true;
         }
     }
@@ -681,11 +681,11 @@ void editor_update() {
             if (editor_tool_brush_should_paint()) {
                 ivec2 cell = editor_get_hovered_cell();
                 state.tool_brush_stroke.push_back((EditorActionBrushStroke) {
-                    .index = cell.x + (cell.y * state.document->noise->width),
-                    .previous_value = editor_document_get_noise_map_value(state.document, cell),
+                    .index = cell.x + (cell.y * state.scenario->noise->width),
+                    .previous_value = scenario_get_noise_map_value(state.scenario, cell),
                     .new_value = (uint8_t)state.tool_value
                 });
-                editor_document_set_noise_map_value(state.document, cell, state.tool_value);
+                scenario_set_noise_map_value(state.scenario, cell, state.tool_value);
             }
         } else if (state.tool == EDITOR_TOOL_RECT) {
             state.tool_rect_end = editor_get_hovered_cell();
@@ -727,14 +727,14 @@ void editor_update() {
         } else if (state.tool == EDITOR_TOOL_EDIT_ENTITY) {
             if (CANVAS_RECT.has_point(input_get_mouse_position()) && 
                     editor_is_hovered_cell_valid() &&
-                    editor_get_hovered_cell() - state.tool_edit_entity_offset != state.document->entities[state.tool_value].cell) {
-                EditorEntity edited_entity = state.document->entities[state.tool_value];
+                    editor_get_hovered_cell() - state.tool_edit_entity_offset != state.scenario->entities[state.tool_value].cell) {
+                ScenarioEntity edited_entity = state.scenario->entities[state.tool_value];
                 edited_entity.cell = editor_get_hovered_cell() - state.tool_edit_entity_offset;
                 editor_do_action((EditorAction) {
                     .type = EDITOR_ACTION_EDIT_ENTITY,
                     .edit_entity = (EditorActionEditEntity) {
                         .index = state.tool_value,
-                        .previous_value = state.document->entities[state.tool_value],
+                        .previous_value = state.scenario->entities[state.tool_value],
                         .new_value = edited_entity
                     }
                 });
@@ -750,13 +750,13 @@ void editor_update() {
             editor_is_hovered_cell_valid() &&
             input_is_action_just_pressed(INPUT_ACTION_LEFT_CLICK)) {
         ivec2 cell = editor_get_hovered_cell();
-        Cell map_cell = map_get_cell(state.document->map, CELL_LAYER_GROUND, cell);
-        const SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map.type);
+        Cell map_cell = map_get_cell(state.scenario->map, CELL_LAYER_GROUND, cell);
+        const SpriteName decoration_sprite = map_get_decoration_sprite(state.scenario->map.type);
         const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
         editor_do_action((EditorAction) {
             .type = EDITOR_ACTION_DECORATE,
             .decorate = (EditorActionDecorate) {
-                .index = cell.x + (cell.y * state.document->map.width),
+                .index = cell.x + (cell.y * state.scenario->map.width),
                 .previous_hframe = map_cell.type == CELL_DECORATION
                     ? map_cell.decoration_hframe
                     : EDITOR_ACTION_DECORATE_REMOVE_DECORATION,
@@ -805,8 +805,8 @@ void editor_update() {
             std::clamp(input_get_mouse_position().x - MINIMAP_RECT.x, 0, MINIMAP_RECT.w),
             std::clamp(input_get_mouse_position().y - MINIMAP_RECT.y, 0, MINIMAP_RECT.h));
         ivec2 map_pos = ivec2(
-            (state.document->map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
-            (state.document->map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
+            (state.scenario->map.width * TILE_SIZE * minimap_pos.x) / MINIMAP_RECT.w,
+            (state.scenario->map.height * TILE_SIZE * minimap_pos.y) / MINIMAP_RECT.h);
         editor_center_camera_on_cell(map_pos / TILE_SIZE);
     }
 
@@ -833,8 +833,8 @@ bool editor_is_toolbar_open() {
 }
 
 void editor_clamp_camera() {
-    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.document->map.width * TILE_SIZE) - CANVAS_RECT.w);
-    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.document->map.height * TILE_SIZE) - CANVAS_RECT.h);
+    state.camera_offset.x = std::clamp(state.camera_offset.x, 0, (state.scenario->map.width * TILE_SIZE) - CANVAS_RECT.w);
+    state.camera_offset.y = std::clamp(state.camera_offset.y, 0, (state.scenario->map.height * TILE_SIZE) - CANVAS_RECT.h);
 }
 
 void editor_center_camera_on_cell(ivec2 cell) {
@@ -855,13 +855,13 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
         if (action == "New") {
             state.menu_new = editor_menu_new_open();
         } else if (action == "Save") {
-            if (state.document_path == "") {
-                state.menu_file = editor_menu_file_save_open(state.document_path.c_str());
+            if (state.scenario_path == "") {
+                state.menu_file = editor_menu_file_save_open(state.scenario_path.c_str());
             } else {
-                editor_save(state.document_path.c_str());
+                editor_save(state.scenario_path.c_str());
             }
         } else if (action == "Save As") {
-            state.menu_file = editor_menu_file_save_open(state.document_path.c_str());
+            state.menu_file = editor_menu_file_save_open(state.scenario_path.c_str());
         } else if (action == "Open") {
             state.menu_file = editor_menu_file_open_open();
         }
@@ -887,9 +887,9 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             state.is_pasting = true;
             log_debug("begin pasting");
         } else if (action == "Players") {
-            state.menu_players = editor_menu_players_open(state.document);
+            state.menu_players = editor_menu_players_open(state.scenario);
         } else if (action == "Objective") {
-            state.menu_objective = editor_menu_objective_open(state.document);
+            state.menu_objective = editor_menu_objective_open(state.scenario);
         }
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {
@@ -955,8 +955,8 @@ ivec2 editor_get_hovered_cell() {
 uint32_t editor_get_hovered_entity() {
     ivec2 cell = editor_get_hovered_cell();
 
-    for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
-        const EditorEntity& entity = state.document->entities[entity_index];
+    for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
+        const ScenarioEntity& entity = state.scenario->entities[entity_index];
         const int entity_cell_size = entity_get_data(entity.type).cell_size;
         Rect entity_cell_rect = (Rect) {
             .x = entity.cell.x, .y = entity.cell.y,
@@ -973,7 +973,7 @@ uint32_t editor_get_hovered_entity() {
 bool editor_is_hovered_cell_valid() {
     ivec2 cell = editor_get_hovered_cell();
     if (state.tool == EDITOR_TOOL_DECORATE) {
-        Cell map_cell = map_get_cell(state.document->map, CELL_LAYER_GROUND, cell);
+        Cell map_cell = map_get_cell(state.scenario->map, CELL_LAYER_GROUND, cell);
         return map_cell.type == CELL_DECORATION || map_cell.type == CELL_EMPTY;
     }
     if (state.tool == EDITOR_TOOL_ADD_ENTITY || 
@@ -983,9 +983,9 @@ bool editor_is_hovered_cell_valid() {
         }
         EntityType entity_type = state.tool == EDITOR_TOOL_ADD_ENTITY
             ? (EntityType)state.tool_value
-            : state.document->entities[state.tool_value].type;
+            : state.scenario->entities[state.tool_value].type;
         const EntityData& entity_data = entity_get_data(entity_type);
-        return !map_is_cell_rect_occupied(state.document->map, entity_data.cell_layer, cell, entity_data.cell_size);
+        return !map_is_cell_rect_occupied(state.scenario->map, entity_data.cell_layer, cell, entity_data.cell_size);
     }
     if (state.tool == EDITOR_TOOL_SQUADS) {
         uint32_t entity_index = editor_get_hovered_entity();
@@ -993,15 +993,15 @@ bool editor_is_hovered_cell_valid() {
             return false;
         }
 
-        if (state.document->squads[state.tool_value].entity_count == EDITOR_SQUAD_MAX_ENTITIES) {
+        if (state.scenario->squads[state.tool_value].entity_count == SCENARIO_SQUAD_MAX_ENTITIES) {
             return false;
         }
 
         uint32_t squad_index = editor_get_entity_squad(entity_index);
-        if (squad_index < state.document->squad_count && squad_index != state.tool_value) {
+        if (squad_index < state.scenario->squad_count && squad_index != state.tool_value) {
             return false;
         }
-        if (state.document->entities[entity_index].player_id != state.document->squads[state.tool_value].player_id) {
+        if (state.scenario->entities[entity_index].player_id != state.scenario->squads[state.tool_value].player_id) {
             return false;
         }
 
@@ -1047,7 +1047,7 @@ void editor_push_action(const EditorAction& action) {
 // Adds an action to the stack and also executes the action
 void editor_do_action(const EditorAction& action) {
     editor_push_action(action);
-    editor_action_execute(state.document, action, EDITOR_ACTION_MODE_DO);
+    editor_action_execute(state.scenario, action, EDITOR_ACTION_MODE_DO);
 }
 
 void editor_undo_action() {
@@ -1056,7 +1056,7 @@ void editor_undo_action() {
     }
 
     state.action_head--;
-    editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_UNDO);
+    editor_action_execute(state.scenario, state.actions[state.action_head], EDITOR_ACTION_MODE_UNDO);
 
     editor_validate_tool_value();
 }
@@ -1066,7 +1066,7 @@ void editor_redo_action() {
         return;
     }
 
-    editor_action_execute(state.document, state.actions[state.action_head], EDITOR_ACTION_MODE_DO);
+    editor_action_execute(state.scenario, state.actions[state.action_head], EDITOR_ACTION_MODE_DO);
     state.action_head++;
 
     editor_validate_tool_value();
@@ -1081,46 +1081,46 @@ void editor_clear_actions() {
 
 bool editor_tool_brush_should_paint() {
     ivec2 cell = editor_get_hovered_cell();
-    if (state.tool_value == NOISE_VALUE_RAMP && !map_can_ramp_be_placed_on_tile(map_get_tile(state.document->map, cell))) {
+    if (state.tool_value == NOISE_VALUE_RAMP && !map_can_ramp_be_placed_on_tile(map_get_tile(state.scenario->map, cell))) {
         return false;
     }
-    return editor_document_get_noise_map_value(state.document, cell) != (uint8_t)state.tool_value;
+    return scenario_get_noise_map_value(state.scenario, cell) != (uint8_t)state.tool_value;
 }
 
 void editor_fill() {
     ivec2 cell = editor_get_hovered_cell();
-    if (editor_document_get_noise_map_value(state.document, cell) == (uint8_t)state.tool_value) {
+    if (scenario_get_noise_map_value(state.scenario, cell) == (uint8_t)state.tool_value) {
         return;
     }
 
     std::vector<int> fill_indices;
-    const uint8_t previous_value = editor_document_get_noise_map_value(state.document, cell);
+    const uint8_t previous_value = scenario_get_noise_map_value(state.scenario, cell);
     const uint8_t new_value = (uint8_t)state.tool_value;
 
     std::vector<ivec2> frontier;
-    std::vector<bool> is_explored(state.document->noise->width * state.document->noise->height, false);
+    std::vector<bool> is_explored(state.scenario->noise->width * state.scenario->noise->height, false);
     frontier.push_back(cell);
 
     while (!frontier.empty()) {
         ivec2 next = frontier.back();
         frontier.pop_back();
         
-        if (is_explored[next.x + (next.y * state.document->noise->width)]) {
+        if (is_explored[next.x + (next.y * state.scenario->noise->width)]) {
             continue;
         }
 
-        fill_indices.push_back(next.x + (next.y * state.document->noise->width));
-        is_explored[next.x + (next.y * state.document->noise->width)] = true;
+        fill_indices.push_back(next.x + (next.y * state.scenario->noise->width));
+        is_explored[next.x + (next.y * state.scenario->noise->width)] = true;
 
         for (int direction = 0; direction < DIRECTION_COUNT; direction += 2) {
             ivec2 child = next + DIRECTION_IVEC2[direction];
-            if (!map_is_cell_in_bounds(state.document->map, child)) {
+            if (!map_is_cell_in_bounds(state.scenario->map, child)) {
                 continue;
             }
-            if (is_explored[child.x + (child.y * state.document->noise->width)]) {
+            if (is_explored[child.x + (child.y * state.scenario->noise->width)]) {
                 continue;
             }
-            if (editor_document_get_noise_map_value(state.document, child) != previous_value) {
+            if (scenario_get_noise_map_value(state.scenario, child) != previous_value) {
                 continue;
             }
             frontier.push_back(child);
@@ -1157,8 +1157,8 @@ std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke() {
     std::vector<EditorActionBrushStroke> stroke;
     std::function<void(ivec2)> stroke_push_back = [&stroke](ivec2 cell) {
         stroke.push_back((EditorActionBrushStroke) {
-            .index = cell.x + (cell.y * state.document->noise->width),
-            .previous_value = editor_document_get_noise_map_value(state.document, cell),
+            .index = cell.x + (cell.y * state.scenario->noise->width),
+            .previous_value = scenario_get_noise_map_value(state.scenario, cell),
             .new_value = (uint8_t)state.tool_value
         });
     };
@@ -1174,10 +1174,10 @@ std::vector<EditorActionBrushStroke> editor_tool_rect_get_brush_stroke() {
 SpriteName editor_get_noise_preview_sprite(uint8_t value) {
     switch (value) {
         case NOISE_VALUE_WATER: {
-            return map_choose_water_tile_sprite(state.document->map.type);
+            return map_choose_water_tile_sprite(state.scenario->map.type);
         }
         case NOISE_VALUE_LOWGROUND: {
-            return map_get_plain_ground_tile_sprite(state.document->map.type);
+            return map_get_plain_ground_tile_sprite(state.scenario->map.type);
         }
         case NOISE_VALUE_HIGHGROUND: {
             return SPRITE_TILE_WALL_SOUTH_EDGE;
@@ -1237,7 +1237,7 @@ void editor_clipboard_copy() {
     for (int y = 0; y < state.clipboard.height; y++) {
         for (int x = 0; x < state.clipboard.width; x++) {
             ivec2 map_cell = ivec2(state.tool_select_selection.x + x, state.tool_select_selection.y + y);
-            state.clipboard.values.push_back(editor_document_get_noise_map_value(state.document, map_cell));
+            state.clipboard.values.push_back(scenario_get_noise_map_value(state.scenario, map_cell));
         }
     }
 }
@@ -1248,14 +1248,14 @@ void editor_clipboard_paste(ivec2 top_left_cell) {
     for (int y = 0; y < state.clipboard.height; y++) {
         for (int x = 0; x < state.clipboard.width; x++) {
             ivec2 cell = top_left_cell + ivec2(x, y);
-            if (!map_is_cell_in_bounds(state.document->map, cell)) {
+            if (!map_is_cell_in_bounds(state.scenario->map, cell)) {
                 continue;
             }
 
-            int index = cell.x + (cell.y * state.document->noise->width);
+            int index = cell.x + (cell.y * state.scenario->noise->width);
             stroke.push_back((EditorActionBrushStroke) {
                 .index = index,
-                .previous_value = state.document->noise->map[index],
+                .previous_value = state.scenario->noise->map[index],
                 .new_value = state.clipboard.values[x + (y * state.clipboard.width)]
             });
         }
@@ -1278,8 +1278,8 @@ void editor_flatten_rect(const Rect& rect) {
     for (int y = rect.y; y < rect.y + rect.w; y++) {
         for (int x = rect.x; x < rect.x + rect.h; x++) {
             stroke.push_back((EditorActionBrushStroke) {
-                .index = x + (y * state.document->noise->width),
-                .previous_value = state.document->noise->map[x + (y * state.document->noise->width)],
+                .index = x + (y * state.scenario->noise->width),
+                .previous_value = state.scenario->noise->map[x + (y * state.scenario->noise->width)],
                 .new_value = NOISE_VALUE_LOWGROUND
             });
         }
@@ -1293,26 +1293,26 @@ void editor_generate_decorations() {
     std::vector<EditorActionDecorate> changes = editor_clear_deocrations();
 
     // Mark change indices
-    std::vector<int> change_indices(state.document->map.width * state.document->map.height, -1);
+    std::vector<int> change_indices(state.scenario->map.width * state.scenario->map.height, -1);
     for (int change_index = 0; change_index < (int)changes.size(); change_index++) {
         change_indices[changes[change_index].index] = change_index;
     }
 
     // Get a list of goldmine cells
     std::vector<ivec2> goldmine_cells;
-    for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
-        if (state.document->entities[entity_index].type == ENTITY_GOLDMINE) {
-            goldmine_cells.push_back(state.document->entities[entity_index].cell);
+    for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
+        if (state.scenario->entities[entity_index].type == ENTITY_GOLDMINE) {
+            goldmine_cells.push_back(state.scenario->entities[entity_index].cell);
         }
     }
 
     // Generate decorations
     int generate_decorations_seed = rand();
-    map_generate_decorations(state.document->map, state.document->noise, &generate_decorations_seed, goldmine_cells);
+    map_generate_decorations(state.scenario->map, state.scenario->noise, &generate_decorations_seed, goldmine_cells);
 
     // Record all changes
-    for (int index = 0; index < state.document->map.width * state.document->map.height; index++) {
-        Cell map_cell = state.document->map.cells[CELL_LAYER_GROUND][index];
+    for (int index = 0; index < state.scenario->map.width * state.scenario->map.height; index++) {
+        Cell map_cell = state.scenario->map.cells[CELL_LAYER_GROUND][index];
         if (map_cell.type != CELL_DECORATION) {
             continue;
         }
@@ -1339,8 +1339,8 @@ std::vector<EditorActionDecorate> editor_clear_deocrations() {
     std::vector<EditorActionDecorate> changes;
 
     // Clear all decorations and mark the changes
-    for (int index = 0; index < state.document->map.width * state.document->map.height; index++) {
-        Cell map_cell = state.document->map.cells[CELL_LAYER_GROUND][index];
+    for (int index = 0; index < state.scenario->map.width * state.scenario->map.height; index++) {
+        Cell map_cell = state.scenario->map.cells[CELL_LAYER_GROUND][index];
         if (map_cell.type != CELL_DECORATION) {
             continue;
         }
@@ -1351,7 +1351,7 @@ std::vector<EditorActionDecorate> editor_clear_deocrations() {
             .new_hframe = EDITOR_ACTION_DECORATE_REMOVE_DECORATION
         });
 
-        state.document->map.cells[CELL_LAYER_GROUND][index] = (Cell) {
+        state.scenario->map.cells[CELL_LAYER_GROUND][index] = (Cell) {
             .type = CELL_EMPTY,
             .id = ID_NULL
         };
@@ -1371,7 +1371,7 @@ bool editor_tool_is_scroll_enabled() {
     if (state.tool == EDITOR_TOOL_ADD_ENTITY && SIDEBAR_RECT.has_point(input_get_mouse_position())) {
         return true;
     }
-    if (state.tool == EDITOR_TOOL_SQUADS && state.document->squad_count != 0) {
+    if (state.tool == EDITOR_TOOL_SQUADS && state.scenario->squad_count != 0) {
         return true;
     }
     return false;
@@ -1385,8 +1385,8 @@ int editor_tool_get_scroll_max() {
         }
         return count - (int)TOOL_ADD_ENTITY_VISIBLE_ROW_COUNT;
     }
-    if (state.tool == EDITOR_TOOL_SQUADS && state.document->squad_count != 0) {
-        const int squad_entity_count = (int)state.document->squads[state.tool_value].entity_count;
+    if (state.tool == EDITOR_TOOL_SQUADS && state.scenario->squad_count != 0) {
+        const int squad_entity_count = (int)state.scenario->squads[state.tool_value].entity_count;
         int count = squad_entity_count / (int)TOOL_ENTITY_ROW_SIZE;
         if (squad_entity_count != 0 && squad_entity_count % TOOL_ENTITY_ROW_SIZE != 0) {
             count++;
@@ -1404,15 +1404,15 @@ void editor_tool_edit_entity_set_selection(uint32_t entity_index) {
     }
 
     editor_validate_tool_value();
-    const EditorEntity& entity = state.document->entities[entity_index];
+    const ScenarioEntity& entity = state.scenario->entities[entity_index];
     state.tool_edit_entity_gold_held = entity.gold_held;
 }
 
 void editor_validate_tool_value() {
-    if (state.tool == EDITOR_TOOL_EDIT_ENTITY && state.tool_value >= state.document->entity_count) {
+    if (state.tool == EDITOR_TOOL_EDIT_ENTITY && state.tool_value >= state.scenario->entity_count) {
         state.tool_value = INDEX_INVALID;
     }
-    if (state.tool == EDITOR_TOOL_SQUADS && state.tool_value >= state.document->squad_count) {
+    if (state.tool == EDITOR_TOOL_SQUADS && state.tool_value >= state.scenario->squad_count) {
         state.tool_value = 0;
     }
 }
@@ -1422,26 +1422,26 @@ void editor_tool_edit_entity_delete_entity(uint32_t entity_index) {
         .type = EDITOR_ACTION_DELETE_ENTITY,
         .delete_entity = (EditorActionDeleteEntity) {
             .index = entity_index,
-            .value = state.document->entities[entity_index]
+            .value = state.scenario->entities[entity_index]
         }
     });
     state.tool_value = INDEX_INVALID;
 }
 
 uint32_t editor_get_entity_squad(uint32_t entity_index) {
-    for (uint32_t squad_index = 0; squad_index < state.document->squad_count; squad_index++) {
-        for (uint32_t squad_entity_index = 0; squad_entity_index < state.document->squads[squad_index].entity_count; squad_entity_index++) {
-            if (entity_index == state.document->squads[squad_index].entities[squad_entity_index]) {
+    for (uint32_t squad_index = 0; squad_index < state.scenario->squad_count; squad_index++) {
+        for (uint32_t squad_entity_index = 0; squad_entity_index < state.scenario->squads[squad_index].entity_count; squad_entity_index++) {
+            if (entity_index == state.scenario->squads[squad_index].entities[squad_entity_index]) {
                 return squad_index;
             }
         }
     }
 
-    return state.document->squad_count;
+    return state.scenario->squad_count;
 }
 
 void editor_remove_entity_from_squad(uint32_t squad_index, uint32_t entity_index) {
-    EditorSquad edited_squad = state.document->squads[squad_index];
+    ScenarioSquad edited_squad = state.scenario->squads[squad_index];
 
     uint32_t squad_entity_index;
     for (squad_entity_index = 0; squad_entity_index < edited_squad.entity_count; squad_entity_index++) {
@@ -1458,7 +1458,7 @@ void editor_remove_entity_from_squad(uint32_t squad_index, uint32_t entity_index
         .type = EDITOR_ACTION_EDIT_SQUAD,
         .edit_squad = (EditorActionEditSquad) {
             .index = squad_index,
-            .previous_value = state.document->squads[squad_index],
+            .previous_value = state.scenario->squads[squad_index],
             .new_value = edited_squad
         }
     });
@@ -1471,8 +1471,8 @@ std::vector<uint32_t> editor_get_selected_entities() {
         entities.push_back(state.tool_value);
     }
 
-    if (state.tool == EDITOR_TOOL_SQUADS && state.document->squad_count != 0) {
-        const EditorSquad& squad = state.document->squads[state.tool_value];
+    if (state.tool == EDITOR_TOOL_SQUADS && state.scenario->squad_count != 0) {
+        const ScenarioSquad& squad = state.scenario->squads[state.tool_value];
         for (uint32_t squad_entity_index = 0; squad_entity_index < squad.entity_count; squad_entity_index++) {
             entities.push_back(squad.entities[squad_entity_index]);
         }
@@ -1485,7 +1485,7 @@ std::vector<std::string> editor_get_player_name_dropdown_items() {
     std::vector<std::string> items;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         char player_text[64];
-        sprintf(player_text, "%u: %s", player_id, state.document->players[player_id].name);
+        sprintf(player_text, "%u: %s", player_id, state.scenario->players[player_id].name);
         items.push_back(std::string(player_text));
     }
     
@@ -1497,36 +1497,36 @@ ivec2 editor_get_player_spawn_camera_offset(ivec2 cell) {
     ivec2 camera_offset = ivec2(
         (cell.x * TILE_SIZE) + (TILE_SIZE / 2) - (SCREEN_WIDTH / 2),
         (cell.y * TILE_SIZE) + (TILE_SIZE / 2) - ((SCREEN_HEIGHT - MATCH_SHELL_UI_HEIGHT) / 2));
-    camera_offset.x = std::clamp(camera_offset.x, 0, (state.document->map.width * TILE_SIZE) - SCREEN_WIDTH);
-    camera_offset.y = std::clamp(camera_offset.y, 0, (state.document->map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
+    camera_offset.x = std::clamp(camera_offset.x, 0, (state.scenario->map.width * TILE_SIZE) - SCREEN_WIDTH);
+    camera_offset.y = std::clamp(camera_offset.y, 0, (state.scenario->map.height * TILE_SIZE) - SCREEN_HEIGHT + MATCH_SHELL_UI_HEIGHT);
 
     return camera_offset;
 }
 
 void editor_save(const char* path) {
-    bool success = editor_document_save_file(state.document, path);
+    bool success = scenario_save_file(state.scenario, path);
     if (success) {
-        state.document_path = path;
-        state.document_is_saved = true;
+        state.scenario_path = path;
+        state.scenario_is_saved = true;
     }
 }
 
 void editor_open(const char* path) {
-    EditorDocument* opened_document = editor_document_open_file(path);
-    if (opened_document == NULL) {
+    Scenario* opened_scenario = scenario_open_file(path);
+    if (opened_scenario == NULL) {
         return;
     }
 
     editor_free_current_document();
-    state.document = opened_document;
-    state.document_path = path;
-    state.document_is_saved = true;
+    state.scenario = opened_scenario;
+    state.scenario_path = path;
+    state.scenario_is_saved = true;
 }
 
 void editor_render() {
     std::vector<uint32_t> selection;
 
-    if (state.document != NULL) {
+    if (state.scenario != NULL) {
         std::vector<RenderSpriteParams> ysort_params;
         selection = editor_get_selected_entities();
 
@@ -1546,12 +1546,12 @@ void editor_render() {
             // Render map
             for (int y = 0; y < max_visible_tiles.y; y++) {
                 for (int x = 0; x < max_visible_tiles.x; x++) {
-                    if (base_coords.x + x >= state.document->map.width || base_coords.y + y >= state.document->map.height) {
+                    if (base_coords.x + x >= state.scenario->map.width || base_coords.y + y >= state.scenario->map.height) {
                         continue;
                     }
 
-                    int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.document->map.width);
-                    Tile tile = state.document->map.tiles[map_index];
+                    int map_index = (base_coords.x + x) + ((base_coords.y + y) * state.scenario->map.width);
+                    Tile tile = state.scenario->map.tiles[map_index];
 
                     ivec2 tile_params_position = ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + base_pos + ivec2(x * TILE_SIZE, y * TILE_SIZE);
                     RenderSpriteParams tile_params = (RenderSpriteParams) {
@@ -1564,12 +1564,12 @@ void editor_render() {
                     };
 
                     bool should_render_on_ground_level = 
-                        map_is_tile_ground(state.document->map, base_coords + ivec2(x, y)) || 
-                        map_is_tile_ramp(state.document->map, base_coords + ivec2(x, y));
+                        map_is_tile_ground(state.scenario->map, base_coords + ivec2(x, y)) || 
+                        map_is_tile_ramp(state.scenario->map, base_coords + ivec2(x, y));
                     if (elevation == 0 && 
-                            !map_is_tile_ground(state.document->map, base_coords + ivec2(x, y)) &&
-                            !map_is_tile_water(state.document->map, base_coords + ivec2(x, y))) {
-                        render_sprite_frame(map_get_plain_ground_tile_sprite(state.document->map.type), ivec2(0, 0), tile_params_position, RENDER_SPRITE_NO_CULL, 0);
+                            !map_is_tile_ground(state.scenario->map, base_coords + ivec2(x, y)) &&
+                            !map_is_tile_water(state.scenario->map, base_coords + ivec2(x, y))) {
+                        render_sprite_frame(map_get_plain_ground_tile_sprite(state.scenario->map.type), ivec2(0, 0), tile_params_position, RENDER_SPRITE_NO_CULL, 0);
                     }
                     if ((should_render_on_ground_level && elevation == 0) || 
                             (!should_render_on_ground_level && elevation == tile.elevation)) {
@@ -1577,9 +1577,9 @@ void editor_render() {
                     } 
 
                     // Decorations
-                    Cell cell = state.document->map.cells[CELL_LAYER_GROUND][map_index];
+                    Cell cell = state.scenario->map.cells[CELL_LAYER_GROUND][map_index];
                     if (cell.type == CELL_DECORATION && tile.elevation == elevation) {
-                        SpriteName decoration_sprite = map_get_decoration_sprite(state.document->map.type);
+                        SpriteName decoration_sprite = map_get_decoration_sprite(state.scenario->map.type);
                         const SpriteInfo& decoration_sprite_info = render_get_sprite_info(decoration_sprite);
                         const int decoration_extra_height = decoration_sprite_info.frame_height - TILE_SIZE;
                         ysort_params.push_back((RenderSpriteParams) {
@@ -1598,11 +1598,11 @@ void editor_render() {
             for (int cell_layer = CELL_LAYER_UNDERGROUND; cell_layer < CELL_LAYER_GROUND + 1; cell_layer++) {
                 // Underground entities
                 if (cell_layer == CELL_LAYER_UNDERGROUND) {
-                    for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
-                        const EditorEntity& entity = state.document->entities[entity_index];
+                    for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
+                        const ScenarioEntity& entity = state.scenario->entities[entity_index];
                         const EntityData& entity_data = entity_get_data(entity.type);
                         if (entity_data.cell_layer != CELL_LAYER_UNDERGROUND ||
-                                map_get_tile(state.document->map, entity.cell).elevation != elevation) {
+                                map_get_tile(state.scenario->map, entity.cell).elevation != elevation) {
                             continue;
                         }
 
@@ -1614,14 +1614,14 @@ void editor_render() {
         }
 
         // Entities
-        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+        for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
             // Don't render entity while we are moving it because 
             // it will be rendered by the move preview
             if (state.tool == EDITOR_TOOL_EDIT_ENTITY && state.is_painting && entity_index == state.tool_value) {
                 continue;
             }
 
-            const EditorEntity& entity = state.document->entities[entity_index];
+            const ScenarioEntity& entity = state.scenario->entities[entity_index];
             const EntityData& entity_data = entity_get_data(entity.type);
             if (entity_data.cell_layer != CELL_LAYER_GROUND) {
                 continue;
@@ -1649,8 +1649,8 @@ void editor_render() {
         }
 
         // Balloon shadows
-        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
-            const EditorEntity& entity = state.document->entities[entity_index];
+        for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
+            const ScenarioEntity& entity = state.scenario->entities[entity_index];
             if (entity.type != ENTITY_BALLOON) {
                 continue;
             }
@@ -1661,14 +1661,14 @@ void editor_render() {
 
         // Sky entities
         ysort_params.clear();
-        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+        for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
             // Don't render entity while we are moving it because 
             // it will be rendered by the move preview
             if (state.tool == EDITOR_TOOL_EDIT_ENTITY && state.is_painting && entity_index == state.tool_value) {
                 continue;
             }
 
-            const EditorEntity& entity = state.document->entities[entity_index];
+            const ScenarioEntity& entity = state.scenario->entities[entity_index];
             const EntityData& entity_data = entity_get_data(entity.type);
             if (entity_data.cell_layer != CELL_LAYER_SKY) {
                 continue;
@@ -1708,7 +1708,7 @@ void editor_render() {
             // Determine preview entity type
             EntityType entity_type = state.tool == EDITOR_TOOL_ADD_ENTITY
                 ? (EntityType)state.tool_value
-                : state.document->entities[state.tool_value].type;
+                : state.scenario->entities[state.tool_value].type;
             const EntityData& entity_data = entity_get_data(entity_type);
 
             // Determine cell
@@ -1733,14 +1733,14 @@ void editor_render() {
             } else if (state.tool == EDITOR_TOOL_ADD_ENTITY) {
                 recolor_id = state.tool_add_entity_player_id;
             } else {
-                recolor_id = state.document->entities[state.tool_value].player_id;
+                recolor_id = state.scenario->entities[state.tool_value].player_id;
             }
 
             render_sprite_frame(entity_data.sprite, editor_entity_get_animation_frame(entity_type), entity_position, RENDER_SPRITE_NO_CULL, recolor_id);
 
             // Render blocked rects for goldmines
-            for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
-                const EditorEntity& entity = state.document->entities[entity_index];
+            for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
+                const ScenarioEntity& entity = state.scenario->entities[entity_index];
                 if (entity.type != ENTITY_GOLDMINE) {
                     continue;
                 }
@@ -1762,7 +1762,7 @@ void editor_render() {
             .y = ((cell.y * TILE_SIZE) - state.camera_offset.y) + CANVAS_RECT.y,
             .w = TILE_SIZE, .h = TILE_SIZE
         };
-        render_draw_rect(rect, state.document == NULL || editor_is_hovered_cell_valid() ? RENDER_COLOR_WHITE : RENDER_COLOR_RED);
+        render_draw_rect(rect, state.scenario == NULL || editor_is_hovered_cell_valid() ? RENDER_COLOR_WHITE : RENDER_COLOR_RED);
     }
 
     // Tool rect preview
@@ -1807,7 +1807,7 @@ void editor_render() {
 
     // Entity selection rect
     for (uint32_t entity_index : selection) {
-        const EditorEntity& entity = state.document->entities[entity_index];
+        const ScenarioEntity& entity = state.scenario->entities[entity_index];
         const int entity_cell_size = entity_get_data(entity.type).cell_size;
         const Rect& entity_rect = (Rect) {
             .x = entity.cell.x, .y = entity.cell.y,
@@ -1839,7 +1839,7 @@ void editor_render() {
 
     // Player spawn rect
     if (state.tool == EDITOR_TOOL_PLAYER_SPAWN) {
-        ivec2 camera_offset = editor_get_player_spawn_camera_offset(state.document->player_spawn);
+        ivec2 camera_offset = editor_get_player_spawn_camera_offset(state.scenario->player_spawn);
         const Rect rendered_rect = (Rect) {
             .x = camera_offset.x + CANVAS_RECT.x - state.camera_offset.x,
             .y = camera_offset.y + CANVAS_RECT.y - state.camera_offset.y,
@@ -1879,17 +1879,17 @@ void editor_render() {
         render_sprite(SPRITE_UI_MINIMAP, src_rect, dst_rect, RENDER_SPRITE_NO_CULL);
     }
 
-    if (state.document != NULL) {
+    if (state.scenario != NULL) {
         // MINIMAP
         // Minimap tiles
-        for (int y = 0; y < state.document->map.height; y++) {
-            for (int x = 0; x < state.document->map.width; x++) {
+        for (int y = 0; y < state.scenario->map.height; y++) {
+            for (int x = 0; x < state.scenario->map.width; x++) {
                 render_minimap_putpixel(MINIMAP_LAYER_TILE, ivec2(x, y), editor_get_minimap_pixel_for_cell(ivec2(x, y)));
             }
         }
         // Minimap entities
-        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
-            const EditorEntity& entity = state.document->entities[entity_index];
+        for (uint32_t entity_index = 0; entity_index < state.scenario->entity_count; entity_index++) {
+            const ScenarioEntity& entity = state.scenario->entities[entity_index];
             int entity_cell_size = entity_get_data(entity.type).cell_size;
             Rect entity_rect = (Rect) {
                 .x = entity.cell.x, .y = entity.cell.y,
@@ -1898,14 +1898,14 @@ void editor_render() {
             render_minimap_fill_rect(MINIMAP_LAYER_TILE, entity_rect, editor_get_minimap_pixel_for_entity(selection, entity_index));
         }
         // Clear fog layer
-        for (int y = 0; y < state.document->map.height; y++) {
-            for (int x = 0; x < state.document->map.width; x++) {
+        for (int y = 0; y < state.scenario->map.height; y++) {
+            for (int x = 0; x < state.scenario->map.width; x++) {
                 render_minimap_putpixel(MINIMAP_LAYER_FOG, ivec2(x, y), MINIMAP_PIXEL_TRANSPARENT);
             }
         }
         // Player spawn rect
         if (state.tool == EDITOR_TOOL_PLAYER_SPAWN) {
-            ivec2 camera_offset = editor_get_player_spawn_camera_offset(state.document->player_spawn);
+            ivec2 camera_offset = editor_get_player_spawn_camera_offset(state.scenario->player_spawn);
             Rect spawn_rect = (Rect) {
                 .x = camera_offset.x / TILE_SIZE,
                 .y = camera_offset.y / TILE_SIZE,
@@ -1922,7 +1922,7 @@ void editor_render() {
             .h = (SCREEN_HEIGHT / TILE_SIZE)
         };
         render_minimap_draw_rect(MINIMAP_LAYER_FOG, camera_rect, MINIMAP_PIXEL_WHITE);
-        render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.document->map.width, state.document->map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
+        render_minimap_queue_render(ivec2(MINIMAP_RECT.x, MINIMAP_RECT.y), ivec2(state.scenario->map.width, state.scenario->map.height), ivec2(MINIMAP_RECT.w, MINIMAP_RECT.h));
     }
 }
 
@@ -1944,7 +1944,7 @@ ivec2 editor_entity_get_render_position(EntityType type, ivec2 cell) {
         state.camera_offset;
 }
 
-RenderSpriteParams editor_create_entity_render_params(const EditorEntity& entity) {
+RenderSpriteParams editor_create_entity_render_params(const ScenarioEntity& entity) {
     ivec2 params_position = editor_entity_get_render_position(entity.type, entity.cell);
     RenderSpriteParams params = (RenderSpriteParams) {
         .sprite = entity_get_data(entity.type).sprite,
@@ -1966,7 +1966,7 @@ RenderSpriteParams editor_create_entity_render_params(const EditorEntity& entity
 }
 
 MinimapPixel editor_get_minimap_pixel_for_cell(ivec2 cell) {
-    switch (map_get_tile(state.document->map, cell).sprite) {
+    switch (map_get_tile(state.scenario->map, cell).sprite) {
         case SPRITE_TILE_SAND1:
         case SPRITE_TILE_SAND2:
         case SPRITE_TILE_SAND3:
@@ -1991,7 +1991,7 @@ MinimapPixel editor_get_minimap_pixel_for_entity(const std::vector<uint32_t>& se
         }
     }
 
-    const EditorEntity& entity = state.document->entities[entity_index];
+    const ScenarioEntity& entity = state.scenario->entities[entity_index];
     if (entity.type == ENTITY_GOLDMINE) {
         return MINIMAP_PIXEL_GOLD;
     }

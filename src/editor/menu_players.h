@@ -5,7 +5,7 @@
 #ifdef GOLD_DEBUG
 
 #include "core/ui.h"
-#include "editor/document.h"
+#include "scenario/scenario.h"
 
 enum EditorMenuPlayersMode {
     EDITOR_MENU_PLAYERS_CLOSED,
@@ -18,7 +18,7 @@ struct EditorMenuPlayers {
     std::string player_names[MAX_PLAYERS - 1];
 };
 
-EditorMenuPlayers editor_menu_players_open(const EditorDocument* document);
-void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, EditorDocument* document);
+EditorMenuPlayers editor_menu_players_open(const Scenario* scenario);
+void editor_menu_players_update(EditorMenuPlayers& menu, UI& ui, Scenario* scenario);
 
 #endif
