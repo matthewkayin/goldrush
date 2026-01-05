@@ -63,7 +63,7 @@ struct NetworkSteamHost {
 
 struct NetworkHost {
     NetworkBackend backend;
-    std::queue<NetworkHostEvent>* events;
+    std::queue<NetworkHostEvent> events;
     union {
         NetworkLanHost lan;
     #ifdef GOLD_STEAM

@@ -5,9 +5,8 @@
 #include <cstring>
 
 NetworkHost* network_host_create(NetworkBackend backend) {
-    NetworkHost* host = (NetworkHost*)malloc(sizeof(NetworkHost));
+    NetworkHost* host = new NetworkHost();
     host->backend = backend;
-    host->events = new std::queue<NetworkHostEvent>();
 
     if (host->backend == NETWORK_BACKEND_LAN) {
         ENetAddress address;
@@ -42,7 +41,6 @@ NetworkHost* network_host_create(NetworkBackend backend) {
 
 void network_host_destroy(NetworkHost* host) {
     log_info("Destroying host with backend %u", host->backend);
-    delete host->events;
     if (host->backend == NETWORK_BACKEND_LAN) {
         enet_host_destroy(host->lan.host);
     } 
@@ -52,7 +50,7 @@ void network_host_destroy(NetworkHost* host) {
         SteamNetworkingSockets()->CloseListenSocket(host->steam.listen_socket);
     }
 #endif
-    free(host);
+    delete host;
 }
 
 bool network_host_connect(NetworkHost* host, NetworkConnectionInfo connection_info) {
@@ -282,7 +280,7 @@ void network_host_service(NetworkHost* host) {
         if (enet_host_service(host->lan.host, &enet_event, 0) > 0) {
             switch (enet_event.type) {
                 case ENET_EVENT_TYPE_CONNECT: {
-                    host->events->push((NetworkHostEvent) {
+                    host->events.push((NetworkHostEvent) {
                         .type = NETWORK_HOST_EVENT_CONNECTED,
                         .connected = (NetworkHostEventConnected) {
                             .peer_id = enet_event.peer->incomingPeerID
@@ -291,7 +289,7 @@ void network_host_service(NetworkHost* host) {
                     break;
                 }
                 case ENET_EVENT_TYPE_DISCONNECT: {
-                    host->events->push((NetworkHostEvent) {
+                    host->events.push((NetworkHostEvent) {
                         .type = NETWORK_HOST_EVENT_DISCONNECTED,
                         .disconnected = (NetworkHostEventDisconnected) {
                             .player_id = network_host_get_peer_player_id(host, enet_event.peer->incomingPeerID)
@@ -300,7 +298,7 @@ void network_host_service(NetworkHost* host) {
                     break;
                 }
                 case ENET_EVENT_TYPE_RECEIVE: {
-                    host->events->push((NetworkHostEvent) {
+                    host->events.push((NetworkHostEvent) {
                         .type = NETWORK_HOST_EVENT_RECEIVED,
                         .received = (NetworkHostEventReceived) {
                             .peer_id = enet_event.peer->incomingPeerID,
@@ -337,7 +335,7 @@ void network_host_service(NetworkHost* host) {
                 continue;
             }
 
-            host->events->push((NetworkHostEvent) {
+            host->events.push((NetworkHostEvent) {
                 .type = NETWORK_HOST_EVENT_RECEIVED,
                 .received = (NetworkHostEventReceived) {
                     .peer_id = peer_id,
@@ -404,7 +402,7 @@ void network_host_steam_on_connection_status_changed(NetworkHost* host, SteamNet
             return;
         }
 
-        host->events->push((NetworkHostEvent) {
+        host->events.push((NetworkHostEvent) {
             .type = NETWORK_HOST_EVENT_CONNECTED,
             .connected = (NetworkHostEventConnected) {
                 .peer_id = peer_id
@@ -425,7 +423,7 @@ void network_host_steam_on_connection_status_changed(NetworkHost* host, SteamNet
 
         // If we know who this is, so post an event. 
         if (peer_id != host->steam.peer_count) {
-            host->events->push((NetworkHostEvent) {
+            host->events.push((NetworkHostEvent) {
                 .type = NETWORK_HOST_EVENT_DISCONNECTED,
                 .disconnected = (NetworkHostEventDisconnected) {
                     .player_id = network_host_get_peer_player_id(host, peer_id)
@@ -440,12 +438,12 @@ void network_host_steam_on_connection_status_changed(NetworkHost* host, SteamNet
 #endif
 
 bool network_host_poll_events(NetworkHost* host, NetworkHostEvent* event) {
-    if (host->events->empty()) {
+    if (host->events.empty()) {
         return false;
     }
 
-    *event = host->events->front();
-    host->events->pop();
+    *event = host->events.front();
+    host->events.pop();
 
     return true;
 }

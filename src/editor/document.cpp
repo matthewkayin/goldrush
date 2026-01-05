@@ -6,11 +6,9 @@
 static const uint32_t MAP_FILE_SIGNATURE = 0x46536877;
 
 EditorDocument* editor_document_base_init() {
-    EditorDocument* document = (EditorDocument*)malloc(sizeof(EditorDocument));
-    if (document == NULL) {
-        return NULL;
-    }
+    EditorDocument* document = new EditorDocument();
 
+    document->noise = NULL;
     document->player_spawn = ivec2(0, 0);
     document->entity_count = 0;
 
@@ -29,9 +27,8 @@ EditorDocument* editor_document_base_init() {
 }
 
 void editor_document_init_map(EditorDocument* document, MapType map_type) {
-    document->map = new Map();
-    map_init(*document->map, map_type, document->noise->width, document->noise->height);
-    map_cleanup_noise(*document->map, document->noise);
+    map_init(document->map, map_type, document->noise->width, document->noise->height);
+    map_cleanup_noise(document->map, document->noise);
 
     editor_document_bake_map(document, true);
 }
@@ -39,23 +36,23 @@ void editor_document_init_map(EditorDocument* document, MapType map_type) {
 void editor_document_bake_map(EditorDocument* document, bool remove_artifacts) {
     int lcg_seed = rand();
     if (remove_artifacts) {
-        map_bake_map_tiles_and_remove_artifacts(*document->map, document->noise, &lcg_seed);
+        map_bake_map_tiles_and_remove_artifacts(document->map, document->noise, &lcg_seed);
     } else {
-        map_bake_tiles(*document->map, document->noise, &lcg_seed);
+        map_bake_tiles(document->map, document->noise, &lcg_seed);
     }
-    map_bake_front_walls(*document->map);
-    map_bake_ramps(*document->map, document->noise);
-    for (int index = 0; index < document->map->width * document->map->height; index++) {
-        if (document->map->cells[CELL_LAYER_GROUND][index].type == CELL_BLOCKED) {
-            document->map->cells[CELL_LAYER_GROUND][index].type = CELL_EMPTY;
+    map_bake_front_walls(document->map);
+    map_bake_ramps(document->map, document->noise);
+    for (int index = 0; index < document->map.width * document->map.height; index++) {
+        if (document->map.cells[CELL_LAYER_GROUND][index].type == CELL_BLOCKED) {
+            document->map.cells[CELL_LAYER_GROUND][index].type = CELL_EMPTY;
         }
     }
 
-    for (int y = 0; y < document->map->height; y++) {
-        for (int x = 0; x < document->map->width; x++) {
-            if (map_should_cell_be_blocked(*document->map, ivec2(x, y)) &&
-                    map_get_cell(*document->map, CELL_LAYER_GROUND, ivec2(x,y)).type == CELL_EMPTY) {
-                map_set_cell(*document->map, CELL_LAYER_GROUND, ivec2(x, y), (Cell) {
+    for (int y = 0; y < document->map.height; y++) {
+        for (int x = 0; x < document->map.width; x++) {
+            if (map_should_cell_be_blocked(document->map, ivec2(x, y)) &&
+                    map_get_cell(document->map, CELL_LAYER_GROUND, ivec2(x,y)).type == CELL_EMPTY) {
+                map_set_cell(document->map, CELL_LAYER_GROUND, ivec2(x, y), (Cell) {
                     .type = CELL_BLOCKED,
                     .id = ID_NULL
                 });
@@ -110,9 +107,10 @@ EditorDocument* editor_document_init_generated(MapType map_type, const NoiseGenP
 }
 
 void editor_document_free(EditorDocument* document) {
-    noise_free(document->noise);
-    delete document->map;
-    free(document);
+    if (document->noise != NULL) {
+        noise_free(document->noise);
+    }
+    delete document;
 }
 
 EditorSquad editor_document_squad_init() {
@@ -174,13 +172,13 @@ bool editor_document_save_file(const EditorDocument* document, const char* path)
     fwrite(&MAP_FILE_SIGNATURE, 1, sizeof(uint32_t), file);
 
     // Map
-    uint8_t map_type_byte = (uint8_t)document->map->type;
+    uint8_t map_type_byte = (uint8_t)document->map.type;
     fwrite(&map_type_byte, 1, sizeof(uint8_t), file);
-    fwrite(&document->map->width, 1, sizeof(int), file);
-    fwrite(&document->map->height, 1, sizeof(int), file);
-    fwrite(&document->map->tiles[0], 1, document->map->width * document->map->height * sizeof(Tile), file);
+    fwrite(&document->map.width, 1, sizeof(int), file);
+    fwrite(&document->map.height, 1, sizeof(int), file);
+    fwrite(&document->map.tiles[0], 1, document->map.width * document->map.height * sizeof(Tile), file);
     for (uint32_t cell_layer = 0; cell_layer < CELL_LAYER_COUNT; cell_layer++) {
-        fwrite(&document->map->cells[cell_layer], 1, document->map->width * document->map->height * sizeof(Cell), file);
+        fwrite(&document->map.cells[cell_layer], 1, document->map.width * document->map.height * sizeof(Cell), file);
     }
 
     // Noise
@@ -241,23 +239,21 @@ EditorDocument* editor_document_open_file(const char* path) {
     fread(&map_height, 1, sizeof(int), file);
 
     // Map init
-    document->map = new Map();
-    map_init(*document->map, map_type, map_width, map_height);
+    map_init(document->map, map_type, map_width, map_height);
 
     // Map tiles
-    fread(&document->map->tiles[0], 1, map_width * map_height * sizeof(Tile), file);
+    fread(&document->map.tiles[0], 1, map_width * map_height * sizeof(Tile), file);
 
     // Map cells
     for (uint32_t cell_layer = 0; cell_layer < CELL_LAYER_COUNT; cell_layer++) {
-        fread(&document->map->cells[cell_layer], 1, map_width * map_height * sizeof(Cell), file);
+        fread(&document->map.cells[cell_layer], 1, map_width * map_height * sizeof(Cell), file);
     }
 
     // Noise
     document->noise = noise_fread(file);
     if (document->noise == NULL) {
         log_error("Error reading noise.");
-        delete document->map;
-        free(document);
+        editor_document_free(document);
         fclose(file);
         return NULL;
     }

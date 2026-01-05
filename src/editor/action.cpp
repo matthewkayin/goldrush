@@ -71,7 +71,7 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                 int hframe = mode == EDITOR_ACTION_MODE_UNDO 
                     ? changes[change_index].previous_hframe
                     : changes[change_index].new_hframe;
-                document->map->cells[CELL_LAYER_GROUND][changes[change_index].index] = hframe == EDITOR_ACTION_DECORATE_REMOVE_DECORATION
+                document->map.cells[CELL_LAYER_GROUND][changes[change_index].index] = hframe == EDITOR_ACTION_DECORATE_REMOVE_DECORATION
                     ? (Cell) {
                         .type = CELL_EMPTY,
                         .id = ID_NULL
@@ -94,7 +94,7 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
                     .id = ID_NULL
                 };
             const EntityData& entity_data = entity_get_data(action.add_entity.type);
-            map_set_cell_rect(*document->map, entity_data.cell_layer, action.add_entity.cell, entity_data.cell_size, cell_value);
+            map_set_cell_rect(document->map, entity_data.cell_layer, action.add_entity.cell, entity_data.cell_size, cell_value);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
                 EditorEntity entity;

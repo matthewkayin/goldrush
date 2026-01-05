@@ -35,7 +35,7 @@ struct EditorSquad {
 };
 
 struct EditorDocument {
-    Map* map;
+    Map map;
     Noise* noise;
     ivec2 player_spawn;
     EditorPlayer players[MAX_PLAYERS];
