@@ -44,6 +44,7 @@ void editor_action_destroy(EditorAction& action) {
         case EDITOR_ACTION_EDIT_SQUAD:
         case EDITOR_ACTION_DELETE_SQUAD:
         case EDITOR_ACTION_SET_PLAYER_SPAWN:
+        case EDITOR_ACTION_SET_OBJECTIVE:
             break;
     }
 }
@@ -162,6 +163,12 @@ void editor_action_execute(EditorDocument* document, const EditorAction& action,
             document->player_spawn = mode == EDITOR_ACTION_MODE_DO
                 ? action.set_player_spawn.new_value
                 : action.set_player_spawn.previous_value;
+            break;
+        }
+        case EDITOR_ACTION_SET_OBJECTIVE: {
+            document->objective = mode == EDITOR_ACTION_MODE_DO
+                ? action.set_objective.new_value
+                : action.set_objective.previous_value;
             break;
         }
     }

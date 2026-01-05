@@ -7,6 +7,7 @@
 #include "editor/menu_file.h"
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
+#include "editor/menu_objective.h"
 #include "editor/ui.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -49,7 +50,7 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
-    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players" },
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objective" },
     { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn" }
 };
 
@@ -108,6 +109,7 @@ struct EditorState {
     EditorMenuFile menu_file;
     EditorMenuPlayers menu_players;
     EditorMenuEditSquad menu_edit_squad;
+    EditorMenuObjective menu_objective;
 
     // Tools
     EditorTool tool;
@@ -210,6 +212,7 @@ void editor_init() {
     state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
     state.menu_players.mode = EDITOR_MENU_PLAYERS_CLOSED;
     state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
+    state.menu_objective.mode = EDITOR_MENU_OBJECTIVE_CLOSED;
 
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
@@ -468,73 +471,89 @@ void editor_update() {
         }
     }
 
-    // Menu new
-    if (state.menu_new.mode == EDITOR_MENU_NEW_OPEN) {
-        editor_menu_new_update(state.menu_new, state.ui);
-        if (state.menu_new.mode == EDITOR_MENU_NEW_CREATE) {
-            editor_free_current_document();
+    // Menus
+    if (editor_is_in_menu()) {
+        // Menu new
+        if (state.menu_new.mode == EDITOR_MENU_NEW_OPEN) {
+            editor_menu_new_update(state.menu_new, state.ui);
+            if (state.menu_new.mode == EDITOR_MENU_NEW_CREATE) {
+                editor_free_current_document();
 
-            MapType map_type = (MapType)state.menu_new.map_type;
-            MapSize map_size = (MapSize)state.menu_new.map_size;
-            if (state.menu_new.use_noise_gen_params) {
-                NoiseGenParams params = editor_menu_new_create_noise_gen_params(state.menu_new);
-                state.document = editor_document_init_generated(map_type, params);
-            } else {
-                state.document = editor_document_init_blank(map_type, map_size);
+                MapType map_type = (MapType)state.menu_new.map_type;
+                MapSize map_size = (MapSize)state.menu_new.map_size;
+                if (state.menu_new.use_noise_gen_params) {
+                    NoiseGenParams params = editor_menu_new_create_noise_gen_params(state.menu_new);
+                    state.document = editor_document_init_generated(map_type, params);
+                } else {
+                    state.document = editor_document_init_blank(map_type, map_size);
+                }
+                state.document_path = "";
+                state.document_is_saved = false;
+                state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
             }
-            state.document_path = "";
-            state.document_is_saved = false;
-            state.menu_new.mode = EDITOR_MENU_NEW_CLOSED;
         }
-        return;
-    }
 
-    // Menu file
-    if (state.menu_file.mode != EDITOR_MENU_FILE_CLOSED) {
-        editor_menu_file_update(state.menu_file, state.ui);
-        if (state.menu_file.mode == EDITOR_MENU_FILE_SAVE_FINISHED) {
-            editor_save(state.menu_file.path.c_str());
-            state.menu_file.mode = EDITOR_MENU_FILE_CLOSED;
-        }
-        if (state.menu_file.mode == EDITOR_MENU_FILE_OPEN_FINISHED) {
-            editor_open(state.menu_file.path.c_str());
-            state.menu_file.mode = EDITOR_MENU_FILE_CLOSED;
-        }
-        return;
-    }
-
-    // Menu players
-    if (state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN) {
-        editor_menu_players_update(state.menu_players, state.ui, state.document);
-        return;
-    }
-
-    // Menu edit squad
-    if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN) {
-        editor_menu_edit_squad_update(state.menu_edit_squad, state.ui);
-        if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_SAVE) {
-            const EditorSquad previous_squad = state.document->squads[state.tool_value];
-            EditorSquad edited_squad = previous_squad;
-            strncpy(edited_squad.name, state.menu_edit_squad.squad_name.c_str(), MAX_USERNAME_LENGTH);
-            edited_squad.player_id = state.menu_edit_squad.squad_player + 1;
-            edited_squad.type = (EditorSquadType)state.menu_edit_squad.squad_type;
-            if (edited_squad.player_id != previous_squad.player_id) {
-                edited_squad.entity_count = 0;
+        // Menu file
+        if (state.menu_file.mode != EDITOR_MENU_FILE_CLOSED) {
+            editor_menu_file_update(state.menu_file, state.ui);
+            if (state.menu_file.mode == EDITOR_MENU_FILE_SAVE_FINISHED) {
+                editor_save(state.menu_file.path.c_str());
+                state.menu_file.mode = EDITOR_MENU_FILE_CLOSED;
             }
+            if (state.menu_file.mode == EDITOR_MENU_FILE_OPEN_FINISHED) {
+                editor_open(state.menu_file.path.c_str());
+                state.menu_file.mode = EDITOR_MENU_FILE_CLOSED;
+            }
+        }
 
-            if (!editor_document_squads_are_equal(edited_squad, previous_squad)) {
+        // Menu players
+        if (state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN) {
+            editor_menu_players_update(state.menu_players, state.ui, state.document);
+        }
+
+        // Menu edit squad
+        if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN) {
+            editor_menu_edit_squad_update(state.menu_edit_squad, state.ui);
+            if (state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_SAVE) {
+                const EditorSquad previous_squad = state.document->squads[state.tool_value];
+                EditorSquad edited_squad = previous_squad;
+                strncpy(edited_squad.name, state.menu_edit_squad.squad_name.c_str(), MAX_USERNAME_LENGTH);
+                edited_squad.player_id = state.menu_edit_squad.squad_player + 1;
+                edited_squad.type = (EditorSquadType)state.menu_edit_squad.squad_type;
+                if (edited_squad.player_id != previous_squad.player_id) {
+                    edited_squad.entity_count = 0;
+                }
+
+                if (!editor_document_squads_are_equal(edited_squad, previous_squad)) {
+                    editor_do_action((EditorAction) {
+                        .type = EDITOR_ACTION_EDIT_SQUAD,
+                        .edit_squad = (EditorActionEditSquad) {
+                            .index = state.tool_value,
+                            .previous_value = previous_squad,
+                            .new_value = edited_squad
+                        }
+                    });
+                }
+
+                state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
+            }
+        }
+
+        // Menu objective
+        if (state.menu_objective.mode == EDITOR_MENU_OBJECTIVE_OPEN) {
+            editor_menu_objective_update(state.menu_objective, state.ui);
+            if (state.menu_objective.mode == EDITOR_MENU_OBJECTIVE_SAVE) {
                 editor_do_action((EditorAction) {
-                    .type = EDITOR_ACTION_EDIT_SQUAD,
-                    .edit_squad = (EditorActionEditSquad) {
-                        .index = state.tool_value,
-                        .previous_value = previous_squad,
-                        .new_value = edited_squad
+                    .type = EDITOR_ACTION_SET_OBJECTIVE,
+                    .set_objective = (EditorActionSetObjective) {
+                        .previous_value = state.document->objective,
+                        .new_value = editor_menu_objective_get_objective(state.menu_objective)
                     }
                 });
+                state.menu_objective.mode = EDITOR_MENU_OBJECTIVE_CLOSED;
             }
-
-            state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
         }
+
         return;
     }
 
@@ -804,6 +823,7 @@ void editor_update() {
 bool editor_is_in_menu() {
     return state.menu_new.mode == EDITOR_MENU_NEW_OPEN ||
         state.menu_file.mode != EDITOR_MENU_FILE_CLOSED ||
+        state.menu_objective.mode == EDITOR_MENU_OBJECTIVE_OPEN ||
         state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN ||
         state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN;
 }
@@ -868,6 +888,8 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             log_debug("begin pasting");
         } else if (action == "Players") {
             state.menu_players = editor_menu_players_open(state.document);
+        } else if (action == "Objective") {
+            state.menu_objective = editor_menu_objective_open(state.document);
         }
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {

@@ -4,6 +4,7 @@
 #include "match/noise.h"
 #include "match/state.h"
 #include "match/map.h"
+#include "shell/objective.h"
 
 #define EDITOR_SQUAD_MAX_ENTITIES SELECTION_LIMIT
 #define EDITOR_MAX_SQUADS 32
@@ -43,6 +44,7 @@ struct EditorDocument {
     EditorEntity entities[MATCH_MAX_ENTITIES];
     uint32_t squad_count;
     EditorSquad squads[EDITOR_MAX_SQUADS];
+    Objective objective;
 };
 
 EditorDocument* editor_document_init_blank(MapType map_type, MapSize map_size);

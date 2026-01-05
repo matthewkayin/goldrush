@@ -11,6 +11,9 @@ EditorDocument* editor_document_base_init() {
     document->noise = NULL;
     document->player_spawn = ivec2(0, 0);
     document->entity_count = 0;
+    document->objective = (Objective) {
+        .type = OBJECTIVE_TYPE_CONQUEST
+    };
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (player_id == 0) {
@@ -198,6 +201,9 @@ bool editor_document_save_file(const EditorDocument* document, const char* path)
     fwrite(&document->squad_count, 1, sizeof(uint32_t), file);
     fwrite(document->squads, 1, document->squad_count * sizeof(EditorSquad), file);
 
+    // Objective
+    fwrite(&document->objective, 1, sizeof(Objective), file);
+
     fclose(file);
     log_info("Map file saved successfully.");
     return true;
@@ -271,6 +277,9 @@ EditorDocument* editor_document_open_file(const char* path) {
     // Squads
     fread(&document->squad_count, 1, sizeof(uint32_t), file);
     fread(document->squads, 1, document->squad_count * sizeof(EditorSquad), file);
+
+    // Objective
+    fread(&document->objective, 1, sizeof(Objective), file);
 
     fclose(file);
     log_info("Loaded map file %s.", full_path.c_str());
