@@ -1600,6 +1600,10 @@ void editor_render() {
             }
 
             const EditorEntity& entity = state.document->entities[entity_index];
+            const EntityData& entity_data = entity_get_data(entity.type);
+            if (entity_data.cell_layer != CELL_LAYER_GROUND) {
+                continue;
+            }
 
             RenderSpriteParams params = editor_create_entity_render_params(entity);
             const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_data(entity.type).sprite);
@@ -1617,6 +1621,52 @@ void editor_render() {
         }
 
         // Render ysort params
+        ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
+        for (const RenderSpriteParams& params : ysort_params) {
+            render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
+        }
+
+        // Balloon shadows
+        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+            const EditorEntity& entity = state.document->entities[entity_index];
+            if (entity.type != ENTITY_BALLOON) {
+                continue;
+            }
+            const EntityData& entity_data = entity_get_data(entity.type);
+            ivec2 balloon_position = (entity.cell * TILE_SIZE) + ((ivec2(entity_data.cell_size, entity_data.cell_size) * TILE_SIZE) / 2);
+            render_sprite_frame(SPRITE_UNIT_BALLOON_SHADOW, ivec2(0, 0), ivec2(CANVAS_RECT.x, CANVAS_RECT.y) + balloon_position + ivec2(-5, 3) - state.camera_offset, 0, 0);
+        }
+
+        // Sky entities
+        ysort_params.clear();
+        for (uint32_t entity_index = 0; entity_index < state.document->entity_count; entity_index++) {
+            // Don't render entity while we are moving it because 
+            // it will be rendered by the move preview
+            if (state.tool == EDITOR_TOOL_EDIT_ENTITY && state.is_painting && entity_index == state.tool_value) {
+                continue;
+            }
+
+            const EditorEntity& entity = state.document->entities[entity_index];
+            const EntityData& entity_data = entity_get_data(entity.type);
+            if (entity_data.cell_layer != CELL_LAYER_SKY) {
+                continue;
+            }
+
+            RenderSpriteParams params = editor_create_entity_render_params(entity);
+            const SpriteInfo& sprite_info = render_get_sprite_info(entity_get_data(entity.type).sprite);
+            const Rect render_rect = (Rect) {
+                .x = params.position.x, .y = params.position.y,
+                .w = sprite_info.frame_width, .h = sprite_info.frame_height
+            };
+
+            if (!CANVAS_RECT.intersects(render_rect)) {
+                continue;
+            }
+            params.options |= RENDER_SPRITE_NO_CULL;
+
+            ysort_params.push_back(params);
+        }
+
         ysort_render_params(ysort_params, 0, ysort_params.size() - 1);
         for (const RenderSpriteParams& params : ysort_params) {
             render_sprite_frame(params.sprite, params.frame, params.position, params.options, params.recolor_id);
@@ -1650,6 +1700,9 @@ void editor_render() {
             const SpriteInfo& sprite_info = render_get_sprite_info(entity_data.sprite);
             entity_position.x -= sprite_info.frame_width / 2;
             entity_position.y -= sprite_info.frame_height / 2;
+            if (entity_type == ENTITY_BALLOON) {
+                entity_position.y += ENTITY_SKY_POSITION_Y_OFFSET;
+            }
 
             // Determine preview recolor ID
             uint8_t recolor_id;
@@ -1883,6 +1936,9 @@ RenderSpriteParams editor_create_entity_render_params(const EditorEntity& entity
     const SpriteInfo& sprite_info = render_get_sprite_info(params.sprite);
     params.position.x -= sprite_info.frame_width / 2;
     params.position.y -= sprite_info.frame_height / 2;
+    if (entity.type == ENTITY_BALLOON) {
+        params.position.y += ENTITY_SKY_POSITION_Y_OFFSET;
+    }
 
     return params;
 }
