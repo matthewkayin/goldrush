@@ -8,7 +8,7 @@ static const Rect MENU_RECT = (Rect) {
     .x = (SCREEN_WIDTH / 2) - (300 / 2),
     .y = 64,
     .w = 300,
-    .h = 256
+    .h = 128
 };
 
 EditorMenuObjective editor_menu_objective_open(const Scenario* scenario) {

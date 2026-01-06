@@ -1,0 +1,66 @@
+#include "menu_allowed_tech.h"
+
+#ifdef GOLD_DEBUG
+
+static const Rect MENU_RECT = (Rect) {
+    .x = (SCREEN_WIDTH / 2) - (300 / 2),
+    .y = 64,
+    .w = 300,
+    .h = 256
+};
+
+static const int ICON_ROW_SIZE = 8;
+
+EditorMenuAllowedTech editor_menu_allowed_tech_open(const Scenario* scenario) {
+    EditorMenuAllowedTech menu;
+    menu.mode = EDITOR_MENU_ALLOWED_TECH_MODE_OPEN;
+    memcpy(menu.allowed_tech, scenario->allowed_tech, sizeof(menu.allowed_tech));
+
+    return menu;
+}
+
+void editor_menu_allowed_tech_update(EditorMenuAllowedTech& menu, UI& ui) {
+    ui.input_enabled = true;
+    ui_frame_rect(ui, MENU_RECT);
+
+    // Header
+    ivec2 header_text_size = render_get_text_size(FONT_HACK_GOLD, "Edit Allowed Tech");
+    ui_element_position(ui, ivec2(MENU_RECT.x + (MENU_RECT.w / 2) - (header_text_size.x / 2), MENU_RECT.y + 6));
+    ui_text(ui, FONT_HACK_GOLD, "Edit Allowed Tech");
+
+    ui_begin_column(ui, ivec2(MENU_RECT.x + 8, MENU_RECT.y + 30), 4);
+        uint32_t row_count = ENTITY_TYPE_COUNT / ICON_ROW_SIZE;
+        if (ENTITY_TYPE_COUNT % ICON_ROW_SIZE != 0) {
+            row_count++;
+        }
+
+        for (uint32_t row = 0; row < row_count; row++) {
+            ui_begin_row(ui, ivec2(4, 0), 2);
+                for (uint32_t col = 0; col < ICON_ROW_SIZE; col++) {
+                    uint32_t entity_type_index = col + (row * ICON_ROW_SIZE);
+                    if (entity_type_index >= ENTITY_TYPE_COUNT) {
+                        continue;
+                    }
+
+                    EntityType entity_type = (EntityType)entity_type_index;
+                    if (ui_icon_button(ui, entity_get_data(entity_type).icon, menu.allowed_tech[entity_type])) {
+                        menu.allowed_tech[entity_type] = !menu.allowed_tech[entity_type];
+                    }
+                }
+            ui_end_container(ui);
+        }
+    ui_end_container(ui);
+
+    // Buttons
+    ui_element_position(ui, ui_button_position_frame_bottom_left(MENU_RECT));
+    if (ui_button(ui, "Back")) {
+        menu.mode = EDITOR_MENU_ALLOWED_TECH_MODE_CLOSED;
+    }
+
+    ui_element_position(ui, ui_button_position_frame_bottom_right(MENU_RECT, "Save"));
+    if (ui_button(ui, "Save")) {
+        menu.mode = EDITOR_MENU_ALLOWED_TECH_MODE_SAVE;
+    }
+}
+
+#endif

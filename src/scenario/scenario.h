@@ -45,6 +45,7 @@ struct Scenario {
     uint32_t squad_count;
     ScenarioSquad squads[SCENARIO_MAX_SQUADS];
     ScenarioObjective objective;
+    bool allowed_tech[ENTITY_TYPE_COUNT];
 };
 
 Scenario* scenario_init_blank(MapType map_type, MapSize map_size);

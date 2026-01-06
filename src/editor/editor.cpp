@@ -8,6 +8,7 @@
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
 #include "editor/menu_objective.h"
+#include "editor/menu_allowed_tech.h"
 #include "editor/ui.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -50,7 +51,7 @@ static const Rect CANVAS_RECT = (Rect) {
 
 static const std::vector<std::vector<std::string>> TOOLBAR_OPTIONS = {
     { "File", "New", "Open", "Save", "Save As" },
-    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objective" },
+    { "Edit", "Undo", "Redo", "Copy", "Cut", "Paste", "Players", "Objective", "Allowed Tech" },
     { "Tool", "Brush", "Fill", "Rect", "Select", "Decorate", "Add Entity", "Edit Entity", "Squads", "Player Spawn" }
 };
 
@@ -110,6 +111,7 @@ struct EditorState {
     EditorMenuPlayers menu_players;
     EditorMenuEditSquad menu_edit_squad;
     EditorMenuObjective menu_objective;
+    EditorMenuAllowedTech menu_allowed_tech;
 
     // Tools
     EditorTool tool;
@@ -213,6 +215,7 @@ void editor_init() {
     state.menu_players.mode = EDITOR_MENU_PLAYERS_CLOSED;
     state.menu_edit_squad.mode = EDITOR_MENU_EDIT_SQUAD_CLOSED;
     state.menu_objective.mode = EDITOR_MENU_OBJECTIVE_CLOSED;
+    state.menu_allowed_tech.mode = EDITOR_MENU_ALLOWED_TECH_MODE_CLOSED;
 
     state.camera_offset = ivec2(0, 0);
     state.is_minimap_dragging = false;
@@ -543,14 +546,17 @@ void editor_update() {
         if (state.menu_objective.mode == EDITOR_MENU_OBJECTIVE_OPEN) {
             editor_menu_objective_update(state.menu_objective, state.ui);
             if (state.menu_objective.mode == EDITOR_MENU_OBJECTIVE_SAVE) {
-                editor_do_action((EditorAction) {
-                    .type = EDITOR_ACTION_SET_OBJECTIVE,
-                    .set_objective = (EditorActionSetObjective) {
-                        .previous_value = state.scenario->objective,
-                        .new_value = editor_menu_objective_get_objective(state.menu_objective)
-                    }
-                });
+                state.scenario->objective = editor_menu_objective_get_objective(state.menu_objective);
                 state.menu_objective.mode = EDITOR_MENU_OBJECTIVE_CLOSED;
+            }
+        }
+
+        // Menu allowed tech
+        if (state.menu_allowed_tech.mode == EDITOR_MENU_ALLOWED_TECH_MODE_OPEN) {
+            editor_menu_allowed_tech_update(state.menu_allowed_tech, state.ui);
+            if (state.menu_allowed_tech.mode == EDITOR_MENU_ALLOWED_TECH_MODE_SAVE) {
+                memcpy(state.scenario->allowed_tech, state.menu_allowed_tech.allowed_tech, sizeof(state.scenario->allowed_tech));
+                state.menu_allowed_tech.mode = EDITOR_MENU_ALLOWED_TECH_MODE_CLOSED;
             }
         }
 
@@ -825,6 +831,7 @@ bool editor_is_in_menu() {
         state.menu_file.mode != EDITOR_MENU_FILE_CLOSED ||
         state.menu_objective.mode == EDITOR_MENU_OBJECTIVE_OPEN ||
         state.menu_players.mode == EDITOR_MENU_PLAYERS_OPEN ||
+        state.menu_allowed_tech.mode == EDITOR_MENU_ALLOWED_TECH_MODE_OPEN ||
         state.menu_edit_squad.mode == EDITOR_MENU_EDIT_SQUAD_OPEN;
 }
 
@@ -890,6 +897,8 @@ void editor_handle_toolbar_action(const std::string& column, const std::string& 
             state.menu_players = editor_menu_players_open(state.scenario);
         } else if (action == "Objective") {
             state.menu_objective = editor_menu_objective_open(state.scenario);
+        } else if (action == "Allowed Tech") {
+            state.menu_allowed_tech = editor_menu_allowed_tech_open(state.scenario);
         }
     } else if (column == "Tool") {
         for (uint32_t index = 1; index < TOOLBAR_OPTIONS[2].size(); index++) {

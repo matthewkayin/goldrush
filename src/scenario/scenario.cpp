@@ -26,6 +26,10 @@ Scenario* scenario_base_init() {
 
     scenario->squad_count = 0;
 
+    for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        scenario->allowed_tech[entity_type] = true;
+    }
+
     return scenario;
 }
 
@@ -204,6 +208,9 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
     // Objective
     fwrite(&scenario->objective, 1, sizeof(ScenarioObjective), file);
 
+    // Allowed tech
+    fwrite(&scenario->allowed_tech, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
+
     fclose(file);
     log_info("Map file saved successfully.");
     return true;
@@ -280,6 +287,9 @@ Scenario* scenario_open_file(const char* path) {
 
     // Objective
     fread(&scenario->objective, 1, sizeof(ScenarioObjective), file);
+
+    // Allowed tech
+    fread(&scenario->allowed_tech, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
 
     fclose(file);
     log_info("Loaded map file %s.", full_path.c_str());
