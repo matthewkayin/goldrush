@@ -38,7 +38,7 @@ enum HotkeyGroupName {
     HOTKEY_GROUP_BARRACKS,
     HOTKEY_GROUP_COOP,
     HOTKEY_GROUP_SHERIFFS,
-    HOTKEY_GROUP_MISC,
+    HOTKEY_GROUP_GLOBAL,
     HOTKEY_GROUP_COUNT
 };
 
@@ -46,6 +46,18 @@ struct HotkeyGroup {
     const char* name;
     SpriteName icon;
     InputAction hotkeys[HOTKEY_GROUP_SIZE];
+};
+
+enum HotkeyGroupError {
+    HOTKEY_GROUP_ERROR_NONE,
+    HOTKEY_GROUP_ERROR_GROUP_CONFLICT,
+    HOTKEY_GROUP_ERROR_LOCAL_CONFLICTS_GLOBAL,
+    HOTKEY_GROUP_ERROR_GLOBAL_CONFLICTS_LOCAL
+};
+
+struct HotkeyGroupErrorStrings {
+    const char* line1;
+    const char* line2;
 };
 
 static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
@@ -153,8 +165,8 @@ static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
             INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
         }
     }},
-    { HOTKEY_GROUP_MISC, (HotkeyGroup) {
-        .name = "Misc",
+    { HOTKEY_GROUP_GLOBAL, (HotkeyGroup) {
+        .name = "Global",
         .icon = SPRITE_BUTTON_ICON_LANDMINE,
         .hotkeys = {
             INPUT_HOTKEY_IDLE_MINER, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE,
@@ -163,7 +175,8 @@ static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
     }}
 };
 
-bool options_menu_is_hotkey_group_valid(const OptionsMenuState& state, HotkeyGroupName group);
+HotkeyGroupError options_menu_is_hotkey_group_valid(const OptionsMenuState& state, HotkeyGroupName group);
+HotkeyGroupErrorStrings options_menu_get_hotkey_group_error_strings(HotkeyGroupError error);
 bool options_menu_are_all_hotkey_groups_valid(const OptionsMenuState& state);
 bool options_menu_has_unsaved_hotkey_changes(const OptionsMenuState& state);
 void options_menu_save_hotkey_changes(OptionsMenuState& state);
@@ -300,10 +313,12 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
                         ui_end_container(ui);
                     }
 
-                    if (!options_menu_is_hotkey_group_valid(state, (HotkeyGroupName)state.hotkey_group_selected)) {
+                    HotkeyGroupError group_error = options_menu_is_hotkey_group_valid(state, (HotkeyGroupName)state.hotkey_group_selected);
+                    if (group_error != HOTKEY_GROUP_ERROR_NONE) {
+                        HotkeyGroupErrorStrings error_strings = options_menu_get_hotkey_group_error_strings(group_error);
                         ui_begin_column(ui, ivec2(0, 0), 0);
-                            ui_text(ui, FONT_HACK_WHITE, "Error: multiple actions in this");
-                            ui_text(ui, FONT_HACK_WHITE, "group are mapped to the same key.");
+                            ui_text(ui, FONT_HACK_WHITE, error_strings.line1);
+                            ui_text(ui, FONT_HACK_WHITE, error_strings.line2);
                         ui_end_container(ui);
                     }
 
@@ -353,8 +368,7 @@ void options_menu_update(OptionsMenuState& state, UI& ui) {
     }
 }
 
-bool options_menu_is_hotkey_group_valid(const OptionsMenuState& state, HotkeyGroupName name) {
-    const HotkeyGroup& group = HOTKEY_GROUPS.at(name);
+bool options_menu_hotkey_group_has_group_conflict(const OptionsMenuState& state, const HotkeyGroup& group) {
     for (int hotkey_index = 0; hotkey_index < HOTKEY_GROUP_SIZE; hotkey_index++) {
         for (int other_index = 0; other_index < HOTKEY_GROUP_SIZE; other_index++) {
             if (hotkey_index == other_index ||
@@ -365,17 +379,89 @@ bool options_menu_is_hotkey_group_valid(const OptionsMenuState& state, HotkeyGro
 
             if (state.hotkey_pending_changes[group.hotkeys[hotkey_index]] == 
                     state.hotkey_pending_changes[group.hotkeys[other_index]]) {
-                return false;
+                return true;
             }
         }
     }
 
-    return true;
+    return false;
+}
+
+bool options_menu_hotkey_groups_conflict(const OptionsMenuState& state, const HotkeyGroup& group_a, const HotkeyGroup& group_b) {
+    for (int a_index = 0; a_index < HOTKEY_GROUP_SIZE; a_index++) {
+        if (group_a.hotkeys[a_index] == INPUT_HOTKEY_NONE) {
+            continue;
+        }
+        for (int b_index = 0; b_index < HOTKEY_GROUP_SIZE; b_index++) {
+            if (group_b.hotkeys[b_index] == INPUT_HOTKEY_NONE) {
+                continue;
+            }
+
+            if (state.hotkey_pending_changes[group_a.hotkeys[a_index]] == 
+                    state.hotkey_pending_changes[group_b.hotkeys[b_index]]) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+HotkeyGroupError options_menu_is_hotkey_group_valid(const OptionsMenuState& state, HotkeyGroupName name) {
+    // Check for inter-group conflicts
+    const HotkeyGroup& group = HOTKEY_GROUPS.at(name);
+    if (options_menu_hotkey_group_has_group_conflict(state, group)) {
+        return HOTKEY_GROUP_ERROR_GROUP_CONFLICT;
+    }
+
+    // Check for global conflicts
+    if (name == HOTKEY_GROUP_GLOBAL) {
+        // If the hotkey group is misc (global), then check against all other groups
+        for (uint32_t name_index = 0; name_index < HOTKEY_GROUP_GLOBAL; name_index++) {
+            const HotkeyGroup& other_group = HOTKEY_GROUPS.at((HotkeyGroupName)name_index);
+            if (options_menu_hotkey_groups_conflict(state, group, other_group)) {
+                return HOTKEY_GROUP_ERROR_GLOBAL_CONFLICTS_LOCAL;
+            }
+        }
+    } else {
+        // If the hotkey gruop is not misc, then check against the global
+        const HotkeyGroup& global_group = HOTKEY_GROUPS.at(HOTKEY_GROUP_GLOBAL);
+        if (options_menu_hotkey_groups_conflict(state, group, global_group)) {
+            return HOTKEY_GROUP_ERROR_LOCAL_CONFLICTS_GLOBAL;
+        }
+    } 
+
+    return HOTKEY_GROUP_ERROR_NONE;
+}
+
+HotkeyGroupErrorStrings options_menu_get_hotkey_group_error_strings(HotkeyGroupError error) {
+    switch (error) {
+        case HOTKEY_GROUP_ERROR_NONE:
+            return (HotkeyGroupErrorStrings) { 
+                .line1 = "", 
+                .line2 = "" 
+            };
+        case HOTKEY_GROUP_ERROR_GROUP_CONFLICT: 
+            return (HotkeyGroupErrorStrings) {
+                .line1 = "Error: multiple actions in this",
+                .line2 = "group are mapped to the same key."
+            };
+        case HOTKEY_GROUP_ERROR_GLOBAL_CONFLICTS_LOCAL: 
+            return (HotkeyGroupErrorStrings) { 
+                .line1 = "Error: an action in this group", 
+                .line2 = "conflicts with another hotkey." 
+            };
+        case HOTKEY_GROUP_ERROR_LOCAL_CONFLICTS_GLOBAL: 
+            return (HotkeyGroupErrorStrings){ 
+                .line1 = "Error: an action in this group", 
+                .line2 = "conflicts with a global hotkey." 
+            };
+    }
 }
 
 bool options_menu_are_all_hotkey_groups_valid(const OptionsMenuState& state) {
     for (int group = 0; group < HOTKEY_GROUP_COUNT; group++) {
-        if (!options_menu_is_hotkey_group_valid(state, (HotkeyGroupName)group)) {
+        if (options_menu_is_hotkey_group_valid(state, (HotkeyGroupName)group) != HOTKEY_GROUP_ERROR_NONE) {
             return false;
         }
     }
@@ -408,7 +494,7 @@ void options_menu_set_hotkey_mapping_to_grid(SDL_Scancode* hotkey_mapping) {
     // First set mapping to default. This is so that the MISC hotkeys get set to default
     input_set_hotkey_mapping_to_default(hotkey_mapping);
 
-    for (int group_index = 0; group_index < HOTKEY_GROUP_MISC; group_index++) {
+    for (int group_index = 0; group_index < HOTKEY_GROUP_GLOBAL; group_index++) {
         const HotkeyGroup& group = HOTKEY_GROUPS.at((HotkeyGroupName)group_index);
         for (int index = 0; index < HOTKEY_GROUP_SIZE; index++) {
             InputAction hotkey = group.hotkeys[index];
