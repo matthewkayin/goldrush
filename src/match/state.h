@@ -369,6 +369,7 @@ Rect entity_goldmine_get_block_building_rect(ivec2 cell);
 
 bool entity_is_mining(const MatchState& state, const Entity& entity);
 bool entity_is_in_mine(const MatchState& state, const Entity& entity);
+bool entity_is_idle_miner(const Entity& entity);
 bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);
 
 void entity_set_target(MatchState& state, Entity& entity, Target target);

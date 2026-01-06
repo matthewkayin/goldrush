@@ -38,6 +38,7 @@ enum HotkeyGroupName {
     HOTKEY_GROUP_BARRACKS,
     HOTKEY_GROUP_COOP,
     HOTKEY_GROUP_SHERIFFS,
+    HOTKEY_GROUP_MISC,
     HOTKEY_GROUP_COUNT
 };
 
@@ -149,6 +150,14 @@ static const std::unordered_map<HotkeyGroupName, HotkeyGroup> HOTKEY_GROUPS = {
         .icon = SPRITE_BUTTON_ICON_SHERIFFS,
         .hotkeys = { 
             INPUT_HOTKEY_RESEARCH_PRIVATE_EYE, INPUT_HOTKEY_RESEARCH_STAKEOUT, INPUT_HOTKEY_NONE,
+            INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
+        }
+    }},
+    { HOTKEY_GROUP_MISC, (HotkeyGroup) {
+        .name = "Misc",
+        .icon = SPRITE_BUTTON_ICON_LANDMINE,
+        .hotkeys = {
+            INPUT_HOTKEY_IDLE_MINER, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE,
             INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE, INPUT_HOTKEY_NONE
         }
     }}
@@ -396,7 +405,10 @@ void options_menu_set_hotkey_mapping_to_grid(SDL_Scancode* hotkey_mapping) {
         SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D
     };
 
-    for (int group_index = 0; group_index < HOTKEY_GROUP_COUNT; group_index++) {
+    // First set mapping to default. This is so that the MISC hotkeys get set to default
+    input_set_hotkey_mapping_to_default(hotkey_mapping);
+
+    for (int group_index = 0; group_index < HOTKEY_GROUP_MISC; group_index++) {
         const HotkeyGroup& group = HOTKEY_GROUPS.at((HotkeyGroupName)group_index);
         for (int index = 0; index < HOTKEY_GROUP_SIZE; index++) {
             InputAction hotkey = group.hotkeys[index];

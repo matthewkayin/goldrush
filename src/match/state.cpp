@@ -2386,6 +2386,12 @@ bool entity_is_in_mine(const MatchState& state, const Entity& entity) {
     return entity.garrison_id != ID_NULL && state.entities.get_by_id(entity.garrison_id).type == ENTITY_GOLDMINE;
 }
 
+bool entity_is_idle_miner(const Entity& entity) {
+    return entity.type == ENTITY_MINER && entity.mode == MODE_UNIT_IDLE &&
+            entity.target.type == TARGET_NONE && entity.target_queue.empty() && 
+            entity_is_selectable(entity);
+}
+
 bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id) {
     if (entity.garrison_id != ID_NULL) {
         return false;

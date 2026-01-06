@@ -191,6 +191,7 @@ void match_shell_handle_network_event(MatchShellState* state, NetworkEvent event
 void match_shell_update(MatchShellState* state);
 void match_shell_handle_input(MatchShellState* state);
 void match_shell_order_move(MatchShellState* state);
+std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state);
 
 // State queries
 bool match_shell_is_mouse_in_ui();
@@ -231,6 +232,8 @@ bool match_shell_is_building_place_cell_valid(const MatchShellState* state, ivec
 
 // Hotkey Menu
 Rect match_shell_get_selection_list_item_rect(uint32_t selection_index);
+Rect match_shell_get_idle_miner_button_rect();
+bool match_shell_has_pressed_idle_miner_button();
 
 // Menu
 const char* match_shell_get_menu_header_text(const MatchShellState* state);
@@ -270,6 +273,7 @@ void match_shell_render_entity_move_animation(const MatchShellState* state, cons
 void match_shell_render_particle(const MatchShellState* state, const Particle& particle);
 bool match_shell_should_render_hotkey_toggled(const MatchShellState* state, InputAction hotkey);
 const char* match_shell_render_get_stat_tooltip(SpriteName sprite);
+void match_shell_render_tooltip(const MatchShellState* state, InputAction hotkey);
 FireCellRender match_shell_get_fire_cell_render(const MatchShellState* state, const Fire& fire);
 MinimapPixel match_shell_get_minimap_pixel_for_cell(const MatchShellState* state, ivec2 cell);
 MinimapPixel match_shell_get_minimap_pixel_for_entity(const MatchShellState* state, const Entity& entity);

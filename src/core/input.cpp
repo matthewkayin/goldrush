@@ -209,20 +209,20 @@ void input_poll_events() {
                         break;
                     case SDL_SCANCODE_LCTRL:
                     case SDL_SCANCODE_RCTRL:
-                    #ifdef PLATFORM_MACOS
+                #ifdef PLATFORM_MACOS
                     case SDL_SCANCODE_LGUI:
                     case SDL_SCANCODE_RGUI:
-                    #endif
+                #endif
                         state.current[INPUT_ACTION_CTRL] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
                     case SDL_SCANCODE_SPACE:
                         state.current[INPUT_ACTION_SPACE] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    #ifdef GOLD_DEBUG
+                #ifdef GOLD_DEBUG
                     case SDL_SCANCODE_F9:
                         state.current[INPUT_ACTION_TURBO] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
-                    #endif
+                #endif
                     case SDL_SCANCODE_F10:
                         state.current[INPUT_ACTION_MATCH_MENU] = event.type == SDL_EVENT_KEY_DOWN;
                         break;
@@ -319,7 +319,7 @@ int input_sprintf_sdl_scancode_str(char* str_ptr, SDL_Scancode scancode) {
         return sprintf(str_ptr, "%c", (char)((uint8_t)'A' + letter_index));
     }
     if (scancode >= SDL_SCANCODE_MINUS && scancode <= SDL_SCANCODE_SLASH) {
-        static const char* scancode_chars = "-=[]\\\\;'`,./";
+        static const char* scancode_chars = "-=[]\\\\;'~,./";
         return sprintf(str_ptr, "%c", scancode_chars[scancode - SDL_SCANCODE_MINUS]);
     }
     return 0;
@@ -401,6 +401,9 @@ void input_set_hotkey_mapping_to_default(SDL_Scancode* hotkey_mapping) {
 
     // Detective
     hotkey_mapping[INPUT_HOTKEY_CAMO] = SDL_SCANCODE_C;
+
+    // Misc
+    hotkey_mapping[INPUT_HOTKEY_IDLE_MINER] = SDL_SCANCODE_GRAVE;
 }
 
 SDL_Scancode input_get_key_just_pressed() {

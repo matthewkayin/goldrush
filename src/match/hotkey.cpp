@@ -311,6 +311,16 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }
+    }},
+    { INPUT_HOTKEY_IDLE_MINER, (HotkeyButtonInfo) {
+        .type = HOTKEY_BUTTON_ACTION,
+        .action = (HotkeyButtonActionInfo) {
+            .name = "Select Idle Miner",
+            .sprite = SPRITE_BUTTON_ICON_MINER
+        },
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
     }}
 };
 
