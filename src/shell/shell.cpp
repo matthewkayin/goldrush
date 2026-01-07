@@ -675,7 +675,7 @@ void match_shell_update(MatchShellState* state) {
         state->control_group_selected = MATCH_SHELL_CONTROL_GROUP_NONE;
 
         // Append selection
-        if (input_is_action_pressed(INPUT_ACTION_CTRL)) {
+        if (input_is_action_pressed(INPUT_ACTION_SHIFT)) {
             MatchShellSelectionType current_selection_type = match_shell_get_selection_type(state, state->selection);
             // Don't append selection if selection is not allied units or buildings
             if (!(current_selection_type == MATCH_SHELL_SELECTION_UNITS || current_selection_type == MATCH_SHELL_SELECTION_BUILDINGS)) {
@@ -696,11 +696,10 @@ void match_shell_update(MatchShellState* state) {
         }
 
         if (selection.size() == 1) {
-            if (state->double_click_timer == 0) {
-                state->double_click_timer = MATCH_SHELL_DOUBLE_CLICK_DURATION;
-            } else if (state->selection.size() == 1 && state->selection[0] == selection[0] &&
-                        state->match_state.entities.get_by_id(state->selection[0]).player_id == network_get_player_id()) {
-                EntityType selected_type = state->match_state.entities.get_by_id(state->selection[0]).type;
+            if ((input_is_action_pressed(INPUT_ACTION_CTRL) ||
+                    (state->double_click_timer != 0 && state->selection.size() == 1 && state->selection[0] == selection[0])) &&
+                    state->match_state.entities.get_by_id(selection[0]).player_id == network_get_player_id()) {
+                EntityType selected_type = state->match_state.entities.get_by_id(selection[0]).type;
                 selection.clear();
 
                 for (uint32_t entity_index = 0; entity_index < state->match_state.entities.size(); entity_index++) {
@@ -715,7 +714,9 @@ void match_shell_update(MatchShellState* state) {
                         selection.push_back(state->match_state.entities.get_id_of(entity_index));
                     }
                 }
-            }
+            } else if (state->double_click_timer == 0 && !input_is_action_pressed(INPUT_ACTION_CTRL)) {
+                state->double_click_timer = MATCH_SHELL_DOUBLE_CLICK_DURATION;
+            } 
         }
 
         match_shell_set_selection(state, selection);
