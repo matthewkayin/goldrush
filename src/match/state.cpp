@@ -1347,6 +1347,12 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                     bool try_walk_around_blocker = false;
                     bool is_entity_mining = entity_is_mining(state, entity);
                     if (is_entity_mining) {
+                        if (map_get_cell(state.map, CELL_LAYER_GROUND, entity.cell).type == CELL_MINER) {
+                            map_set_cell(state.map, CELL_LAYER_GROUND, entity.cell, (Cell) {
+                                .type = CELL_UNIT,
+                                .id = entity_id
+                            });
+                        }
                         Cell blocking_cell = map_get_cell(state.map, entity_data.cell_layer, entity.path[0]);
                         if (blocking_cell.type == CELL_MINER) {
                             const Entity& blocker = state.entities.get_by_id(blocking_cell.id);
