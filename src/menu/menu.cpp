@@ -932,7 +932,7 @@ void menu_render(const MenuState* state) {
     const SpriteInfo& sprite_wagon_info = render_get_sprite_info(SPRITE_UNIT_WAGON);
     // Wagon color defaults to blue
     int wagon_recolor_id = 0;
-    if (state->mode == MENU_MODE_LOBBY) { 
+    if (state->mode == MENU_MODE_LOBBY || state->mode == MENU_MODE_SKIRMISH_LOBBY) { 
         // If we are in lobby, wagon color is player color
         wagon_recolor_id = network_get_player(network_get_player_id()).recolor_id;
     }
