@@ -992,7 +992,7 @@ void match_shell_update(MatchShellState* state) {
                 MinimapPixel pixel;
                 if (event.alert.type == MATCH_ALERT_TYPE_ATTACK) {
                     pixel = MINIMAP_PIXEL_WHITE;
-                } else if (event.alert.type == MATCH_ALERT_TYPE_MINE_COLLAPSE) {
+                } else if (event.alert.type == MATCH_ALERT_TYPE_MINE_COLLAPSE || event.alert.type == MATCH_ALERT_TYPE_MINE_RUNNING_LOW) {
                     pixel = MINIMAP_PIXEL_GOLD;
                 } else {
                     pixel = (MinimapPixel)(MINIMAP_PIXEL_PLAYER0 + state->match_state.players[network_get_player_id()].recolor_id);

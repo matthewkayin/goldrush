@@ -20,6 +20,7 @@
 #define MATCH_UI_STATUS_NOT_ENOUGH_HOUSE "Not enough houses."
 #define MATCH_UI_STATUS_BUILDING_QUEUE_FULL "Building queue is full."
 #define MATCH_UI_STATUS_MINE_COLLAPSED "Your gold mine collapsed!"
+#define MATCH_UI_STATUS_MINE_RUNNING_LOW "Your gold mine is running low."
 #define MATCH_UI_STATUS_UNDER_ATTACK "You're under attack!"
 #define MATCH_UI_STATUS_ALLY_UNDER_ATTACK "Your ally is under attack!"
 #define MATCH_UI_STATUS_MINE_EXIT_BLOCKED "Mine exit is blocked."
@@ -212,7 +213,8 @@ enum MatchAlertType {
     MATCH_ALERT_TYPE_UNIT,
     MATCH_ALERT_TYPE_RESEARCH,
     MATCH_ALERT_TYPE_ATTACK,
-    MATCH_ALERT_TYPE_MINE_COLLAPSE
+    MATCH_ALERT_TYPE_MINE_COLLAPSE,
+    MATCH_ALERT_TYPE_MINE_RUNNING_LOW
 };
 
 struct MatchEventAlert {

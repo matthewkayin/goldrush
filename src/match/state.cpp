@@ -29,6 +29,7 @@ static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
 static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
+static const uint32_t MATCH_LOW_GOLD_THRESHOLD = 1000;
 
 MatchState match_init(int32_t lcg_seed, MapType map_type, Noise* noise, MatchPlayer players[MAX_PLAYERS]) {
     MatchState state;
@@ -1610,6 +1611,11 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                                 map_set_cell_rect(state.map, CELL_LAYER_GROUND, entity.cell, entity_data.cell_size, (Cell) {
                                     .type = CELL_EMPTY, .id = ID_NULL
                                 });
+
+                                if (target.gold_held < MATCH_LOW_GOLD_THRESHOLD && target.gold_held + entity.gold_held >= MATCH_LOW_GOLD_THRESHOLD) {
+                                    match_event_alert(state, MATCH_ALERT_TYPE_MINE_RUNNING_LOW, entity.player_id, target.cell, target_data.cell_size);
+                                    match_event_show_status(state, entity.player_id, MATCH_UI_STATUS_MINE_RUNNING_LOW);
+                                }
                             }
 
                             update_finished = true;
