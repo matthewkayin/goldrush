@@ -3370,9 +3370,10 @@ void match_shell_render(const MatchShellState* state) {
     }
 
     // UI Chat
+    static const ivec2 CHAT_PROMPT_POSITION = ivec2(32 + 12, MINIMAP_RECT.y - 20);
     for (uint32_t chat_index = 0; chat_index < state->chat.size(); chat_index++) {
         const ChatMessage& message = state->chat[state->chat.size() - chat_index - 1];
-        ivec2 message_pos = ivec2(16, MINIMAP_RECT.y - 48 - (chat_index * 16));
+        ivec2 message_pos = CHAT_PROMPT_POSITION + ivec2(0, -((chat_index + 1) * 16));
         if (message.player_id != PLAYER_NONE) {
             const MatchPlayer& player = state->match_state.players[message.player_id];
             char player_text[40];
@@ -3387,12 +3388,11 @@ void match_shell_render(const MatchShellState* state) {
     if (input_is_text_input_active()) {
         char prompt_str[128];
         sprintf(prompt_str, "Chat: %s", state->chat_message.c_str());
-        ivec2 chat_message_position = ivec2(16, MINIMAP_RECT.y - 32);
-        render_text(FONT_HACK_SHADOW, prompt_str, chat_message_position + ivec2(1, 1));
-        render_text(FONT_HACK_WHITE, prompt_str, chat_message_position);
+        render_text(FONT_HACK_SHADOW, prompt_str, CHAT_PROMPT_POSITION + ivec2(1, 1));
+        render_text(FONT_HACK_WHITE, prompt_str, CHAT_PROMPT_POSITION);
         if (state->chat_cursor_visible) {
             int prompt_width = render_get_text_size(FONT_HACK_WHITE, prompt_str).x;
-            ivec2 cursor_pos = chat_message_position + ivec2(prompt_width - 1, -1);
+            ivec2 cursor_pos = CHAT_PROMPT_POSITION + ivec2(prompt_width - 1, -1);
             render_text(FONT_HACK_SHADOW, "|", cursor_pos + ivec2(1, 1));
             render_text(FONT_HACK_WHITE, "|", cursor_pos);
         }

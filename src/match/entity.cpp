@@ -350,7 +350,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .accuracy = 80,
             .evasion = 9,
             .attack_cooldown = 45,
-            .range_squared = 24,
+            .range_squared = 25,
             .min_range_squared = 1
         }
     }},
