@@ -35,7 +35,7 @@
 #define MATCH_MAX_POPULATION 100U
 
 #define MOLOTOV_ENERGY_COST 40
-#define CAMO_ENERGY_COST 20
+#define CAMO_ENERGY_COST 30
 #define CAMO_ENERGY_PER_SECOND_COST 1
 
 const int FOG_HIDDEN = -1;
@@ -353,8 +353,8 @@ void entity_update(MatchState& state, uint32_t entity_index);
 SpriteName entity_get_sprite(const MatchState& state, const Entity& entity);
 SpriteName entity_get_icon(const MatchState& state, EntityType type, uint8_t player_id);
 fixed entity_get_speed(const MatchState& state, const Entity& entity);
-uint32_t entity_get_max_energy(const MatchState& state, const Entity& entity);
 bool entity_has_detection(const MatchState& state, const Entity& entity);
+uint32_t entity_get_energy_regen_duration(const MatchState& state, const Entity& entity);
 int entity_get_armor(const MatchState& state, const Entity& entity);
 int entity_get_range_squared(const MatchState& state, const Entity& entity);
 bool entity_is_selectable(const Entity& entity);

@@ -331,7 +331,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         
         .gold_cost = 200,
         .train_duration = 30,
-        .max_health = 40,
+        .max_health = 25,
         .sight = 11,
         .armor = 0,
         .attack_priority = 2,
@@ -343,10 +343,10 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .unit_data {
             .population_cost = 1,
             .speed = fixed::from_int_and_raw_decimal(0, 170),
-            .max_energy = 80,
+            .max_energy = 60,
 
             .attack_sound = SOUND_PISTOL_SILENCED,
-            .damage = 10,
+            .damage = 25,
             .accuracy = 80,
             .evasion = 9,
             .attack_cooldown = 45,

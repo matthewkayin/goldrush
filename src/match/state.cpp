@@ -26,7 +26,6 @@ static const uint32_t ENTITY_FIRE_DAMAGE_COOLDOWN = 8;
 static const uint32_t MINE_ARM_DURATION = 16;
 static const uint32_t MINE_PRIME_DURATION = 6 * 6;
 static const uint32_t FOG_REVEAL_DURATION = 60;
-static const uint32_t STAKEOUT_ENERGY_BONUS = 60;
 static const fixed BLEED_SPEED_PERCENTAGE = fixed::from_int_and_raw_decimal(0, 192);
 static const uint32_t MATCH_LOW_GOLD_THRESHOLD = 1000;
 
@@ -624,7 +623,7 @@ void match_handle_input(MatchState& state, const MatchInput& input) {
                 }
                 entity_set_flag(unit, ENTITY_FLAG_INVISIBLE, input.type == MATCH_INPUT_CAMO);
                 match_event_play_sound(state, input.type == MATCH_INPUT_CAMO ? SOUND_CAMO_ON : SOUND_CAMO_OFF, unit.position.to_ivec2());
-                unit.energy_regen_timer = UNIT_ENERGY_REGEN_DURATION;
+                unit.energy_regen_timer = entity_get_energy_regen_duration(state, unit);
             }
             break;
         }
@@ -898,7 +897,7 @@ EntityId entity_create(MatchState& state, EntityType type, ivec2 cell, uint8_t p
     entity.health = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
                         ? entity_data.max_health
                         : (entity_data.max_health / 10);
-    entity.energy = entity_is_unit(type) ? entity_get_max_energy(state, entity) / 4 : 0;
+    entity.energy = entity_is_unit(type) ? entity_data.unit_data.max_energy / 4 : 0;
     entity.target = target_none();
     entity.pathfind_attempts = 0;
     entity.timer = entity_is_unit(type) || entity.type == ENTITY_LANDMINE
@@ -1084,6 +1083,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
 
                 // If unit is idle, try to find a nearby target
                 if (entity.target.type == TARGET_NONE && entity.type != ENTITY_MINER && 
+                        !(entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) &&
                         entity_data.unit_data.damage != 0) {
                     entity.target = entity_target_nearest_enemy(state, entity); 
                 }
@@ -1787,6 +1787,10 @@ void entity_update(MatchState& state, uint32_t entity_index) {
 
                 if (!animation_is_playing(entity.animation)) {
                     entity_attack_target(state, entity_id);
+                    if (entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
+                        entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, false);
+                        match_event_play_sound(state, SOUND_CAMO_OFF, entity.position.to_ivec2());
+                    }
                     if (entity.mode == MODE_UNIT_SOLDIER_RANGED_ATTACK_WINDUP) {
                         entity_set_flag(entity, ENTITY_FLAG_CHARGED, false);
                         entity.mode = MODE_UNIT_SOLDIER_CHARGE;
@@ -2009,24 +2013,14 @@ void entity_update(MatchState& state, uint32_t entity_index) {
         }
     }
 
-    if (entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
+    const bool does_entity_regen_energy = 
+        !(entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE) && !match_player_has_upgrade(state, entity.player_id, UPGRADE_STAKEOUT));
+    if (entity_is_unit(entity.type) && entity.energy < entity_data.unit_data.max_energy && does_entity_regen_energy) {
         if (entity.energy_regen_timer != 0) {
             entity.energy_regen_timer--;
         }
         if (entity.energy_regen_timer == 0) {
-            entity.energy_regen_timer = UNIT_ENERGY_REGEN_DURATION;
-            entity.energy--;
-            if (entity.energy == 0) {
-                entity_set_flag(entity, ENTITY_FLAG_INVISIBLE, false);
-                match_event_play_sound(state, SOUND_CAMO_OFF, entity.position.to_ivec2());
-            }
-        }
-    } else if (entity_is_unit(entity.type) && entity.energy < entity_get_max_energy(state, entity)) {
-        if (entity.energy_regen_timer != 0) {
-            entity.energy_regen_timer--;
-        }
-        if (entity.energy_regen_timer == 0) {
-            entity.energy_regen_timer = UNIT_ENERGY_REGEN_DURATION;
+            entity.energy_regen_timer = entity_get_energy_regen_duration(state, entity);
             entity.energy++;
         }
     }
@@ -2122,23 +2116,22 @@ fixed entity_get_speed(const MatchState& state, const Entity& entity) {
     return entity_get_data(entity.type).unit_data.speed;    
 }
 
-uint32_t entity_get_max_energy(const MatchState& state, const Entity& entity) {
-    if (!entity_is_unit(entity.type)) {
-        return 0;
-    }
-
-    uint32_t max_energy = entity_get_data(entity.type).unit_data.max_energy;
-    if (entity.type == ENTITY_DETECTIVE && match_player_has_upgrade(state, entity.player_id, UPGRADE_STAKEOUT)) {
-        max_energy += STAKEOUT_ENERGY_BONUS;
-    }
-    return max_energy;
-}
-
 bool entity_has_detection(const MatchState& state, const Entity& entity) {
     if (entity.type == ENTITY_DETECTIVE && match_player_has_upgrade(state, entity.player_id, UPGRADE_PRIVATE_EYE)) {
         return true;
     }
     return entity_get_data(entity.type).has_detection;
+}
+
+uint32_t entity_get_energy_regen_duration(const MatchState& state, const Entity& entity) {
+    if (entity.type == ENTITY_DETECTIVE && entity_check_flag(entity, ENTITY_FLAG_INVISIBLE)) {
+        if (match_player_has_upgrade(state, entity.player_id, UPGRADE_STAKEOUT)) {
+            return UNIT_ENERGY_REGEN_DURATION * 2;
+        } else {
+            return 0;
+        }
+    }
+    return UNIT_ENERGY_REGEN_DURATION;
 }
 
 int entity_get_armor(const MatchState& state, const Entity& entity) {

@@ -33,7 +33,7 @@ static const std::unordered_map<uint32_t, UpgradeData> UPGRADE_DATA = {
     }},
     { UPGRADE_STAKEOUT, (UpgradeData) {
         .name = "Stakeout",
-        .desc = "Increases detective energy",
+        .desc = "Grants 50% energy regen to cloaked detectives",
         .icon = SPRITE_BUTTON_ICON_STAKEOUT,
         .gold_cost = 300,
         .research_duration = 80
