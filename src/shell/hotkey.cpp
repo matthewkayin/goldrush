@@ -274,14 +274,16 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
         .type = HOTKEY_BUTTON_RESEARCH,
         .upgrade = UPGRADE_WAR_WAGON,
         .requirements = (HotkeyButtonRequirements) {
-            .type = HOTKEY_REQUIRES_NONE
+            .type = HOTKEY_REQUIRES_BUILDING,
+            .building = ENTITY_COOP
         }
     }},
     { INPUT_HOTKEY_RESEARCH_BAYONETS, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_RESEARCH,
         .upgrade = UPGRADE_BAYONETS,
         .requirements = (HotkeyButtonRequirements) {
-            .type = HOTKEY_REQUIRES_NONE
+            .type = HOTKEY_REQUIRES_BUILDING,
+            .building = ENTITY_BARRACKS
         }
     }},
     { INPUT_HOTKEY_RESEARCH_PRIVATE_EYE, (HotkeyButtonInfo) {
@@ -308,6 +310,13 @@ static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INF
     { INPUT_HOTKEY_RESEARCH_TAILWIND, (HotkeyButtonInfo) {
         .type = HOTKEY_BUTTON_RESEARCH,
         .upgrade = UPGRADE_TAILWIND,
+        .requirements = (HotkeyButtonRequirements) {
+            .type = HOTKEY_REQUIRES_NONE
+        }
+    }},
+    { INPUT_HOTKEY_RESEARCH_IRON_SIGHTS, (HotkeyButtonInfo){ 
+        .type = HOTKEY_BUTTON_RESEARCH,
+        .upgrade = UPGRADE_IRON_SIGHTS,
         .requirements = (HotkeyButtonRequirements) {
             .type = HOTKEY_REQUIRES_NONE
         }

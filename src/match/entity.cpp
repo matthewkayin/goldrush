@@ -86,7 +86,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .accuracy = 80,
             .evasion = 10,
             .attack_cooldown = 40,
-            .range_squared = 25,
+            .range_squared = 16,
             .min_range_squared = 1
         }
     }},
@@ -166,7 +166,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         
         .gold_cost = 150,
         .train_duration = 30,
-        .max_health = 80,
+        .max_health = 60,
         .sight = 11,
         .armor = 0,
         .attack_priority = 2,
@@ -181,7 +181,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .max_energy = 0,
 
             .attack_sound = SOUND_GUN,
-            .damage = 8,
+            .damage = 10,
             .accuracy = 75,
             .evasion = 15,
             .attack_cooldown = 45,
@@ -197,8 +197,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 1,
         
-        .gold_cost = 125,
-        .train_duration = 27,
+        .gold_cost = 100,
+        .train_duration = 25,
         .max_health = 40,
         .sight = 7,
         .armor = 0,

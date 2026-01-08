@@ -42,7 +42,7 @@ static const std::unordered_map<uint32_t, UpgradeData> UPGRADE_DATA = {
         .name = "Serrated Knives",
         .desc = "Makes bandit attacks inflict bleed",
         .icon = SPRITE_BUTTON_ICON_SERRATED_KNIVES,
-        .gold_cost = 350,
+        .gold_cost = 300,
         .research_duration = 60
     }},
     { UPGRADE_TAILWIND, (UpgradeData) {
@@ -51,6 +51,13 @@ static const std::unordered_map<uint32_t, UpgradeData> UPGRADE_DATA = {
         .icon = SPRITE_BUTTON_ICON_TAILWIND,
         .gold_cost = 300,
         .research_duration = 80
+    }},
+    { UPGRADE_IRON_SIGHTS, (UpgradeData) {
+        .name = "Iron Sights",
+        .desc = "Increase cowboy range",
+        .icon = SPRITE_BUTTON_ICON_IRON_SIGHTS,
+        .gold_cost = 300,
+        .research_duration = 60
     }}
 };
 

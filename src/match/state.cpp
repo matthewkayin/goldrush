@@ -1494,7 +1494,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                             }
 
                             // Don't attack sky units unless this unit is ranged
-                            if (target_data.cell_layer == CELL_LAYER_SKY && (entity_data.unit_data.range_squared == 1 || entity.type == ENTITY_CANNON)) {
+                            if (target_data.cell_layer == CELL_LAYER_SKY && (entity_get_range_squared(state, entity) == 1 || entity.type == ENTITY_CANNON)) {
                                 entity.mode = MODE_UNIT_IDLE;
                                 update_finished = true;
                                 break;
@@ -1523,7 +1523,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                             if (entity.garrison_id != ID_NULL) {
                                 Entity& carrier = state.entities.get_by_id(entity.garrison_id);
                                 // Don't attack during bunker cooldown or if this is a melee unit
-                                if (carrier.cooldown_timer != 0 || entity_data.unit_data.range_squared == 1) {
+                                if (carrier.cooldown_timer != 0 || entity_get_range_squared(state, entity) == 1) {
                                     update_finished = true;
                                     break;
                                 }
@@ -2149,6 +2149,18 @@ int entity_get_armor(const MatchState& state, const Entity& entity) {
     return armor;
 }
 
+int entity_get_range_squared(const MatchState& state, const Entity& entity) {
+    if (!entity_is_unit(entity.type)) {
+        return 0;
+    }
+
+    int range_squared = entity_get_data(entity.type).unit_data.range_squared;
+    if (entity.type == ENTITY_COWBOY && match_player_has_upgrade(state, entity.player_id, UPGRADE_IRON_SIGHTS)) {
+        range_squared = 25;
+    }
+    return range_squared;
+}
+
 bool entity_is_selectable(const Entity& entity) {
     if (entity.type == ENTITY_GOLDMINE) {
         return true;
@@ -2547,7 +2559,7 @@ bool entity_is_target_in_range(const MatchState& state, const Entity& entity, co
         return entity.cell == entity_get_target_cell(state, entity);
     }
 
-    int entity_range_squared = entity_get_data(entity.type).unit_data.range_squared;
+    int entity_range_squared = entity_get_range_squared(state, entity);
     return target_type != TARGET_ATTACK_ENTITY || entity_range_squared == 1
                 ? entity_rect.is_adjacent_to(target_rect)
                 : Rect::euclidean_distance_squared_between(entity_rect, target_rect) <= entity_range_squared;
@@ -2853,7 +2865,7 @@ void entity_attack_target(MatchState& state, EntityId attacker_id) {
 
     int accuracy_roll = lcg_rand(&state.lcg_seed) % 100;
     bool attack_missed = accuracy < accuracy_roll;
-    bool attack_is_melee = attack_with_bayonets || attacker_data.unit_data.range_squared == 1;
+    bool attack_is_melee = attack_with_bayonets || entity_get_range_squared(state, attacker) == 1;
     if (attack_missed && attack_is_melee) {
         return;
     }

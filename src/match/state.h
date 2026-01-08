@@ -356,6 +356,7 @@ fixed entity_get_speed(const MatchState& state, const Entity& entity);
 uint32_t entity_get_max_energy(const MatchState& state, const Entity& entity);
 bool entity_has_detection(const MatchState& state, const Entity& entity);
 int entity_get_armor(const MatchState& state, const Entity& entity);
+int entity_get_range_squared(const MatchState& state, const Entity& entity);
 bool entity_is_selectable(const Entity& entity);
 bool entity_can_be_given_orders(const MatchState& state, const Entity& entity);
 uint32_t entity_get_elevation(const Entity& entity, const Map& map);
