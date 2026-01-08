@@ -3711,8 +3711,8 @@ void match_shell_render(const MatchShellState* state) {
                 Rect icon_rect = (Rect) {
                     .x = BUILDING_QUEUE_POSITIONS[building_queue_index].x,
                     .y = BUILDING_QUEUE_POSITIONS[building_queue_index].y,
-                    .w = icon_sprite_info.frame_width * 2,
-                    .h = icon_sprite_info.frame_height * 2
+                    .w = icon_sprite_info.frame_width,
+                    .h = icon_sprite_info.frame_height 
                 };
                 SpriteName item_sprite;
                 switch (building.queue[building_queue_index].type) {
