@@ -230,9 +230,9 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 1,
         
-        .gold_cost = 225,
+        .gold_cost = 200,
         .train_duration = 30,
-        .max_health = 40,
+        .max_health = 55,
         .sight = 11,
         .armor = 0,
         .attack_priority = 2,
@@ -265,7 +265,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         
         .gold_cost = 175,
         .train_duration = 30,
-        .max_health = 40,
+        .max_health = 60,
         .sight = 9,
         .armor = 0,
         .attack_priority = 2,
@@ -297,8 +297,8 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_size = 2,
         
         .gold_cost = 250,
-        .train_duration = 45,
-        .max_health = 100,
+        .train_duration = 38,
+        .max_health = 120,
         .sight = 9,
         .armor = 0,
         .attack_priority = 2,
@@ -317,7 +317,7 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
             .accuracy = 70,
             .evasion = 6,
             .attack_cooldown = 60,
-            .range_squared = 49,
+            .range_squared = 81,
             .min_range_squared = 9 
         }
     }},
@@ -329,9 +329,9 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 1,
         
-        .gold_cost = 225,
+        .gold_cost = 200,
         .train_duration = 30,
-        .max_health = 25,
+        .max_health = 40,
         .sight = 11,
         .armor = 0,
         .attack_priority = 2,
@@ -551,9 +551,9 @@ static const std::unordered_map<EntityType, EntityData> ENTITY_DATA = {
         .cell_layer = CELL_LAYER_GROUND,
         .cell_size = 3,
         
-        .gold_cost = 250,
+        .gold_cost = 200,
         .train_duration = 0,
-        .max_health = 560,
+        .max_health = 420,
         .sight = 9,
         .armor = 1,
         .attack_priority = 0,
