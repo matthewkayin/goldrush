@@ -1020,6 +1020,13 @@ void entity_update(MatchState& state, uint32_t entity_index) {
         } else {
             entity.mode = MODE_BUILDING_DESTROYED;
             entity.timer = BUILDING_FADE_DURATION;
+
+            // Make sure that any building upgrades are marked as re-available
+            for (const BuildingQueueItem& item : entity.queue) {
+                if (item.type == BUILDING_QUEUE_ITEM_UPGRADE) {
+                    state.players[entity.player_id].upgrades_in_progress &= ~item.upgrade;
+                }
+            }
             entity.queue.clear();
 
             if (entity.type == ENTITY_LANDMINE) {
@@ -1675,7 +1682,8 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                 }
 
                 Entity& target = state.entities.get_by_id(entity.target.id);
-                int target_max_health = entity_get_data(target.type).max_health;
+                const EntityData& target_data = entity_get_data(target.type);
+                int target_max_health = target_data.max_health;
                 if ((entity.mode == MODE_UNIT_REPAIR && target.health == target_max_health) || 
                         (entity.mode == MODE_UNIT_BUILD_ASSIST && target.mode == MODE_BUILDING_FINISHED) || 
                         state.players[entity.player_id].gold == 0) {
@@ -1696,7 +1704,7 @@ void entity_update(MatchState& state, uint32_t entity_index) {
                         state.players[entity.player_id].gold--;
                         target.health_regen_timer = 0;
                     }
-                    if (target.health > target_max_health / 4) {
+                    if (target.health > target_max_health / 4 && !match_is_cell_rect_on_fire(state, target.cell, target_data.cell_size)) {
                         entity_set_flag(target, ENTITY_FLAG_ON_FIRE, false);
                     }
                     if (entity.mode == MODE_UNIT_BUILD_ASSIST && target.timer == 0) {
