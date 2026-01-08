@@ -1204,9 +1204,9 @@ void match_shell_update(MatchShellState* state) {
                         }
                         case ENTITY_SMITH: {
                             state->hotkey_group[0] = INPUT_HOTKEY_RESEARCH_SERRATED_KNIVES;
-                            state->hotkey_group[1] = INPUT_HOTKEY_RESEARCH_BAYONETS;
+                            state->hotkey_group[1] = INPUT_HOTKEY_RESEARCH_IRON_SIGHTS;
                             state->hotkey_group[2] = INPUT_HOTKEY_RESEARCH_WAGON_ARMOR;
-                            state->hotkey_group[3] = INPUT_HOTKEY_RESEARCH_IRON_SIGHTS;
+                            state->hotkey_group[3] = INPUT_HOTKEY_RESEARCH_BAYONETS;
                             break;
                         }
                         case ENTITY_COOP: {
