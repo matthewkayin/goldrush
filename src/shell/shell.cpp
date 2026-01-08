@@ -3,7 +3,7 @@
 #include "core/logger.h"
 #include "core/cursor.h"
 #include "network/network.h"
-#include "match/hotkey.h"
+#include "shell/hotkey.h"
 #include "match/upgrade.h"
 #include "shell/desync.h"
 #include "profile/profile.h"
@@ -1330,7 +1330,7 @@ void match_shell_handle_input(MatchShellState* state) {
             if (hotkey == INPUT_HOTKEY_NONE) {
                 continue;
             }
-            if (!match_does_player_meet_hotkey_requirements(state->match_state, network_get_player_id(), hotkey)) {
+            if (!match_shell_does_player_meet_hotkey_requirements(state->match_state, hotkey)) {
                 continue;
             }
 
@@ -1944,6 +1944,27 @@ std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state)
     return match_find_entities(state->match_state, [](const Entity& entity, EntityId /*miner_id*/) {
         return entity_is_idle_miner(entity) && entity.player_id == network_get_player_id();
     });
+}
+
+bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, InputAction hotkey) {
+    const HotkeyButtonInfo& hotkey_info = hotkey_get_button_info(hotkey);
+
+    switch (hotkey_info.requirements.type) {
+        case HOTKEY_REQUIRES_NONE: {
+            return true;
+        }
+        case HOTKEY_REQUIRES_BUILDING: {
+            for (const Entity& entity : state.entities) {
+                if (entity.player_id == network_get_player_id() && entity.type == hotkey_info.requirements.building && entity.mode == MODE_BUILDING_FINISHED) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        case HOTKEY_REQUIRES_UPGRADE: {
+            return match_player_has_upgrade(state, network_get_player_id(), hotkey_info.requirements.upgrade);
+        }
+    }
 }
 
 // STATE QUERIES
@@ -3496,7 +3517,7 @@ void match_shell_render(const MatchShellState* state) {
             .w = sprite_info.frame_width, .h = sprite_info.frame_height
         };
         int hframe = 0;
-        if (!match_does_player_meet_hotkey_requirements(state->match_state, network_get_player_id(), hotkey)) {
+        if (!match_shell_does_player_meet_hotkey_requirements(state->match_state, hotkey)) {
             hframe = 2;
         } else if (!(state->is_minimap_dragging || match_shell_is_selecting(state)) && hotkey_rect.has_point(input_get_mouse_position())) {
             hframe = 1;
@@ -4169,6 +4190,10 @@ void match_shell_render_tooltip(const MatchShellState* state, InputAction hotkey
     tooltip_text_ptr += input_sprintf_sdl_scancode_str(tooltip_text_ptr, input_get_hotkey_mapping(hotkey));
     tooltip_text_ptr += sprintf(tooltip_text_ptr, ")");
 
+    // Write tooltip desc
+    char tooltip_desc[128];
+    sprintf(tooltip_desc, "%s", hotkey_get_desc(hotkey));
+
     // Determine gold, population, and energy cost
     uint32_t tooltip_gold_cost = 0;
     uint32_t tooltip_population_cost = 0;
@@ -4205,9 +4230,28 @@ void match_shell_render_tooltip(const MatchShellState* state, InputAction hotkey
         }
     }
 
+    // If requirements not met, overwrite tooltip desc with requirements text
+    if (!match_shell_does_player_meet_hotkey_requirements(state->match_state, hotkey)) {
+        switch (hotkey_info.requirements.type) {
+            case HOTKEY_REQUIRES_NONE: {
+                GOLD_ASSERT(false);
+                break;
+            }
+            case HOTKEY_REQUIRES_BUILDING: {
+                sprintf(tooltip_desc, "Requires %s", entity_get_data(hotkey_info.requirements.building).name);
+                break;
+            }
+            case HOTKEY_REQUIRES_UPGRADE: {
+                sprintf(tooltip_desc, "Requires %s", upgrade_get_data(hotkey_info.requirements.upgrade).name);
+                break;
+            }
+        }
+        tooltip_gold_cost = 0;
+        tooltip_population_cost = 0;
+        tooltip_energy_cost = 0;
+    }
+
     // Determine tooltip size
-    char tooltip_desc[128];
-    sprintf(tooltip_desc, "%s", hotkey_get_desc(hotkey));
     const bool tooltip_has_desc = tooltip_desc[0] != '\0';
     int tooltip_text_width = render_get_text_size(FONT_WESTERN8_OFFBLACK, tooltip_text).x;
     if (tooltip_has_desc) {

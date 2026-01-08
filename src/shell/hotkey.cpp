@@ -1,6 +1,6 @@
 #include "hotkey.h"
 
-#include "upgrade.h"
+#include "match/upgrade.h"
 #include <unordered_map>
 
 static const std::unordered_map<InputAction, HotkeyButtonInfo> HOTKEY_BUTTON_INFO = {

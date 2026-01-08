@@ -192,6 +192,7 @@ void match_shell_update(MatchShellState* state);
 void match_shell_handle_input(MatchShellState* state);
 void match_shell_order_move(MatchShellState* state);
 std::vector<EntityId> match_shell_find_idle_miners(const MatchShellState* state);
+bool match_shell_does_player_meet_hotkey_requirements(const MatchState& state, InputAction hotkey);
 
 // State queries
 bool match_shell_is_mouse_in_ui();

@@ -332,7 +332,6 @@ uint32_t match_get_player_max_population(const MatchState& state, uint8_t player
 bool match_player_has_upgrade(const MatchState& state, uint8_t player_id, uint32_t upgrade);
 bool match_player_upgrade_is_available(const MatchState& state, uint8_t player_id, uint32_t upgrade);
 void match_grant_player_upgrade(MatchState& state, uint8_t player_id, uint32_t upgrade);
-bool match_does_player_meet_hotkey_requirements(const MatchState& state, uint8_t player_id, InputAction hotkey);
 uint32_t match_get_miners_on_gold(const MatchState& state, EntityId goldmine_id, uint8_t player_id);
 void match_handle_input(MatchState& state, const MatchInput& input);
 void match_update(MatchState& state);

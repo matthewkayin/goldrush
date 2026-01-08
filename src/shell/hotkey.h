@@ -2,7 +2,7 @@
 
 #include "render/sprite.h"
 #include "core/input.h"
-#include "entity.h"
+#include "match/entity.h"
 
 enum HotkeyButtonType {
     HOTKEY_BUTTON_ACTION,
