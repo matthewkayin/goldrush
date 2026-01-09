@@ -162,15 +162,23 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             player_spawns.push_back(ivec2(-1, -1));
         }
+        const int spawn_margin = (MAP_PLAYER_SPAWN_SIZE / 2) + MAP_PLAYER_SPAWN_MARGIN;
+        const Rect spawn_point_rect = (Rect) {
+            .x = spawn_margin,
+            .y = spawn_margin,
+            .w = map.width - (2 * spawn_margin),
+            .h = map.height - (2 * spawn_margin)
+        };
+
         for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
             // Chooses diagonal directions clockwise beginning with NE
             int spawn_direction = 1 + (player_id * 2);
 
-            ivec2 start = ivec2(map.width / 2, map.height / 2) + ivec2(
-                            DIRECTION_IVEC2[spawn_direction].x * ((map.width / 2) - (MAP_PLAYER_SPAWN_SIZE + MAP_PLAYER_SPAWN_MARGIN)),
-                            DIRECTION_IVEC2[spawn_direction].y * ((map.height / 2) - (MAP_PLAYER_SPAWN_SIZE + MAP_PLAYER_SPAWN_MARGIN)));
+            ivec2 start = ivec2(
+                DIRECTION_IVEC2[spawn_direction].x == -1 ? spawn_point_rect.x : spawn_point_rect.x + spawn_point_rect.w - 1,
+                DIRECTION_IVEC2[spawn_direction].y == -1 ? spawn_point_rect.y : spawn_point_rect.y + spawn_point_rect.h - 1);
             std::vector<ivec2> frontier;
-            std::unordered_map<uint32_t, uint32_t> explored;
+            std::vector<bool> explored(map.width * map.height, false);
             frontier.push_back(start);
             ivec2 spawn_point = ivec2(-1, -1);
 
@@ -181,24 +189,19 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
                         next_index = index;
                     }
                 }
-                ivec2 next = frontier[next_index];
+                ivec2 candidate_center = frontier[next_index];
                 frontier.erase(frontier.begin() + next_index);
+                ivec2 candidate_top_left = candidate_center - ivec2(MAP_PLAYER_SPAWN_SIZE / 2, MAP_PLAYER_SPAWN_SIZE / 2);
 
-                if (map_is_cell_rect_same_elevation(map, next, MAP_PLAYER_SPAWN_SIZE) && 
-                        !map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, next, MAP_PLAYER_SPAWN_SIZE)) {
-                    ivec2 candidate = next;
-                    if (spawn_direction == DIRECTION_NORTHEAST || spawn_direction == DIRECTION_SOUTHEAST) {
-                        candidate.x += 5;
-                    } 
-                    if (spawn_direction == DIRECTION_SOUTHEAST || spawn_direction == DIRECTION_SOUTHWEST) {
-                        candidate.y += 5;
-                    }
+                if (map_is_cell_rect_same_elevation(map, candidate_top_left, MAP_PLAYER_SPAWN_SIZE) && 
+                        !map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, candidate_top_left, MAP_PLAYER_SPAWN_SIZE)) {
                     
                     // last check, check that candidate is not too close to stairs or walls
                     bool is_candidate_valid = true;
                     const int stair_radius = 2;
-                    for (int x = candidate.x - stair_radius; x < candidate.x + 3 + stair_radius; x++) {
-                        for (int y = candidate.y - stair_radius; y < candidate.y + 3 + stair_radius; y++) {
+                    const int goldmine_size = 3;
+                    for (int x = candidate_center.x - stair_radius; x < candidate_center.x + goldmine_size + stair_radius; x++) {
+                        for (int y = candidate_center.y - stair_radius; y < candidate_center.y + goldmine_size + stair_radius; y++) {
                             if (!map_is_cell_in_bounds(map, ivec2(x, y))) {
                                 continue;
                             }
@@ -212,18 +215,18 @@ void map_init_generate(Map& map, MapType map_type, Noise* noise, int* lcg_seed, 
                         }
                     }
                     if (is_candidate_valid) {
-                        spawn_point = candidate;
+                        spawn_point = candidate_center;
                         break;
                     }
                 }
 
-                explored[next.x + (next.y * map.width)] = 1;
+                explored[candidate_center.x + (candidate_center.y * map.width)] = 1;
                 for (int direction = 0; direction < DIRECTION_COUNT; direction++) {
-                    ivec2 child = next + DIRECTION_IVEC2[direction];
-                    if (!map_is_cell_rect_in_bounds(map, child, MAP_PLAYER_SPAWN_SIZE + MAP_PLAYER_SPAWN_MARGIN)) {
+                    ivec2 child = candidate_center + DIRECTION_IVEC2[direction];
+                    if (!spawn_point_rect.has_point(child)) {
                         continue;
                     }
-                    if (explored.find(child.x + (child.y * map.width)) != explored.end()) {
+                    if (explored[child.x + (child.y * map.width)]) {
                         continue;
                     }
                     bool is_in_frontier = false;
@@ -1592,7 +1595,18 @@ bool map_is_cell_rect_occupied(const Map& map, CellLayer layer, ivec2 cell, int 
 
 bool map_is_player_town_hall_cell_valid(const Map& map, ivec2 mine_cell, ivec2 cell) {
     static const int HALL_SIZE = 4;
-    if (!map_is_cell_rect_in_bounds(map, cell, HALL_SIZE)) {
+    const int spawn_margin = (MAP_PLAYER_SPAWN_SIZE / 2) + MAP_PLAYER_SPAWN_MARGIN;
+    const Rect spawn_point_rect = (Rect) {
+        .x = spawn_margin,
+        .y = spawn_margin,
+        .w = map.width - (2 * spawn_margin),
+        .h = map.height - (2 * spawn_margin)
+    };
+    if (cell.x < spawn_point_rect.x || cell.y < spawn_point_rect.y || 
+            cell.x >= spawn_point_rect.x + spawn_point_rect.w ||
+            cell.y >= spawn_point_rect.y + spawn_point_rect.h ||
+            cell.x + HALL_SIZE > spawn_point_rect.x + spawn_point_rect.w ||
+            cell.y + HALL_SIZE > spawn_point_rect.y + spawn_point_rect.h) {
         return false;
     }
     if (map_is_cell_rect_occupied(map, CELL_LAYER_GROUND, cell, HALL_SIZE)) {
