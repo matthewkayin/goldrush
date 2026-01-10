@@ -1744,7 +1744,7 @@ ivec2 map_get_nearest_cell_around_rect(const Map& map, CellLayer layer, ivec2 st
     return nearest_cell_dist != -1 ? nearest_cell : start;
 }
 
-ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, uint32_t ignore) {
+ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, int building_size, int unit_size, ivec2 rally_cell, uint32_t ignore, ivec2 ignore_cell) {
     ivec2 exit_cell = ivec2(-1, -1);
     int exit_cell_dist = -1;
     for (int x = building_cell.x - unit_size; x < building_cell.x + building_size + unit_size; x++) {
@@ -1752,6 +1752,7 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
         int cell_dist = ivec2::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
                 !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), ignore) &&
+                cell != ignore_cell &&
                 (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -1760,6 +1761,7 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
         cell_dist = ivec2::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
                 !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), ignore) &&
+                cell != ignore_cell &&
                 (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -1770,6 +1772,7 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
         int cell_dist = ivec2::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
                 !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), ignore) &&
+                cell != ignore_cell &&
                 (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -1778,6 +1781,7 @@ ivec2 map_get_exit_cell(const Map& map, CellLayer layer, ivec2 building_cell, in
         cell_dist = ivec2::manhattan_distance(cell, rally_cell);
         if (map_is_cell_rect_in_bounds(map, cell, unit_size) && 
                 !map_is_cell_rect_occupied(map, layer, cell, unit_size, ivec2(-1, -1), ignore) &&
+                cell != ignore_cell &&
                 (exit_cell_dist == -1 || cell_dist < exit_cell_dist)) {
             exit_cell = cell;
             exit_cell_dist = cell_dist;
@@ -2265,10 +2269,15 @@ void map_pathfind(const Map& map, CellLayer layer, ivec2 from, ivec2 to, int cel
     std::reverse(path->begin(), path->end());
 }
 
+// This returns the hall cell that exiting miners walk toward
+ivec2 map_get_ideal_mine_exit_path_rally_cell(const Map& map, ivec2 mine_cell, ivec2 hall_cell) {
+    return map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, mine_cell + ivec2(1, 1), 1, hall_cell, 4, MAP_OPTION_IGNORE_MINERS);
+}
+
 void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path) {
     GOLD_PROFILE_SCOPE;
 
-    ivec2 rally_cell = map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, mine_cell + ivec2(1, 1), 1, hall_cell, 4, MAP_OPTION_IGNORE_MINERS);
+    ivec2 rally_cell = map_get_ideal_mine_exit_path_rally_cell(map, mine_cell, hall_cell);
     ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, rally_cell, MAP_OPTION_IGNORE_MINERS);
 
     path->clear();
@@ -2279,4 +2288,27 @@ void map_get_ideal_mine_exit_path(const Map& map, ivec2 mine_cell, ivec2 hall_ce
 
     map_pathfind(map, CELL_LAYER_GROUND, mine_exit_cell, rally_cell, 1, path, MAP_OPTION_IGNORE_MINERS | MAP_OPTION_NO_REGION_PATH, NULL);
     path->push_back(mine_exit_cell);
+}
+
+ivec2 map_get_ideal_mine_entrance_cell(const Map& map, ivec2 mine_cell, ivec2 hall_cell) {
+    ivec2 start_cell = map_get_ideal_mine_exit_path_rally_cell(map, mine_cell, hall_cell);
+    ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, start_cell, MAP_OPTION_IGNORE_MINERS);
+    return map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, start_cell, 1, mine_cell, 3, MAP_OPTION_IGNORE_MINERS, mine_exit_cell);
+}
+
+void map_get_ideal_mine_entrance_path(const Map& map, ivec2 mine_cell, ivec2 hall_cell, std::vector<ivec2>* path) {
+    GOLD_PROFILE_SCOPE;
+
+    std::vector<ivec2> mine_exit_path;
+    map_get_ideal_mine_exit_path(map, mine_cell, hall_cell, &mine_exit_path);
+
+    if (mine_exit_path.empty()) {
+        return;
+    }
+
+    ivec2 start_cell = map_get_ideal_mine_exit_path_rally_cell(map, mine_cell, hall_cell);
+    ivec2 mine_exit_cell = map_get_exit_cell(map, CELL_LAYER_GROUND, mine_cell, 3, 1, start_cell, MAP_OPTION_IGNORE_MINERS);
+    ivec2 mine_entrance_cell = map_get_nearest_cell_around_rect(map, CELL_LAYER_GROUND, start_cell, 1, mine_cell, 3, MAP_OPTION_IGNORE_MINERS, mine_exit_cell);
+
+    map_pathfind(map, CELL_LAYER_GROUND, start_cell, mine_entrance_cell, 1, path, MAP_OPTION_IGNORE_MINERS | MAP_OPTION_NO_REGION_PATH, &mine_exit_path);
 }

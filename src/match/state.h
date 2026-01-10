@@ -372,6 +372,8 @@ Rect entity_goldmine_get_block_building_rect(ivec2 cell);
 bool entity_is_mining(const MatchState& state, const Entity& entity);
 bool entity_is_in_mine(const MatchState& state, const Entity& entity);
 bool entity_is_idle_miner(const Entity& entity);
+void entity_get_mining_path_to_avoid(const MatchState& state, const Entity& entity, std::vector<ivec2>* mine_exit_path);
+bool entity_is_blocker_walking_towards_entity(const MatchState& state, const Entity& entity);
 bool entity_is_visible_to_player(const MatchState& state, const Entity& entity, uint8_t player_id);
 
 void entity_set_target(MatchState& state, Entity& entity, Target target);

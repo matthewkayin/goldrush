@@ -4127,7 +4127,6 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& 
     if (hall_id != ID_NULL) {
         const Entity& hall = state.entities.get_by_id(hall_id);
         near_goldmine_cell = (goldmine.cell + hall.cell) / 2;
-        log_debug("hall surrounding goldmine %u goldmine cell <%i, %i> hall cell <%i, %i> avg <%i, %i>", hall_id, goldmine.cell.x, goldmine.cell.y, hall.cell.x, hall.cell.y, near_goldmine_cell.x, near_goldmine_cell.y);
     }
 
     frontier.push_back(near_goldmine_cell);
@@ -4142,12 +4141,6 @@ ivec2 bot_get_unoccupied_cell_near_goldmine(const MatchState& state, const Bot& 
         ivec2 next = frontier[closest_index];
         frontier[closest_index] = frontier.back();
         frontier.pop_back();
-        log_debug("considering <%i, %i> is_explored ? %i far ? %i in bounds ? %i not occupied ? %i", next.x, next.y,
-            (int)is_explored[next.x + (next.y * state.map.width)],
-            (int)(ivec2::manhattan_distance(next, near_goldmine_cell) > BOT_NEAR_DISTANCE),
-            (int)map_is_cell_rect_in_bounds(state.map, next - ivec2(1, 1), 3),
-            (int)(map_is_cell_rect_in_bounds(state.map, next - ivec2(1, 1), 3) && !map_is_cell_rect_occupied(state.map, CELL_LAYER_GROUND, next - ivec2(1, 1), 3))
-        );
 
         if (is_explored[next.x + (next.y * state.map.width)]) {
             continue;
