@@ -125,6 +125,9 @@ static const Rect DISCONNECT_FRAME_RECT = (Rect) {
 static const int HEALTHBAR_HEIGHT = 4;
 static const int HEALTHBAR_PADDING = 4;
 
+// Rally flag offset
+static const ivec2 RALLY_FLAG_OFFSET = ivec2(-4, -15);
+
 // Desync
 #ifdef GOLD_DEBUG_DESYNC
     static const uint32_t DESYNC_FREQUENCY = 4U;
@@ -3010,6 +3013,26 @@ void match_shell_render(const MatchShellState* state) {
         }
     }
 
+    // Define rally flag enqueue function
+    const std::function<void(ivec2, uint8_t)> queue_render_rally_flag = [state, &ysort_params, &above_fog_sprite_params](ivec2 rally_point, uint8_t player_id) {
+        ivec2 params_position = rally_point + RALLY_FLAG_OFFSET - state->camera_offset;
+        RenderSpriteParams params = (RenderSpriteParams) {
+            .sprite = SPRITE_RALLY_FLAG,
+            .frame = state->rally_flag_animation.frame,
+            .position = params_position,
+            .ysort_position = params_position.y,
+            .options = 0,
+            .recolor_id = state->match_state.players[player_id].recolor_id
+        };
+
+        ivec2 rally_cell = rally_point / TILE_SIZE;
+        if (match_shell_get_fog(state, rally_cell) > 0) {
+            ysort_params.push_back(params);
+        } else {
+            above_fog_sprite_params.push_back(params);
+        }
+    };
+
     // Rally points
     uint32_t selection_type = match_shell_get_selection_type(state, state->selection);
     if (selection_type == MATCH_SHELL_SELECTION_BUILDINGS || (state->replay_mode && selection_type == MATCH_SHELL_SELECTION_ENEMY_BUILDING)) {
@@ -3019,21 +3042,33 @@ void match_shell_render(const MatchShellState* state) {
                 continue;
             }
 
-            ivec2 params_position = building.rally_point - ivec2(4, 15) - state->camera_offset;
-            RenderSpriteParams params = (RenderSpriteParams) {
-                .sprite = SPRITE_RALLY_FLAG,
-                .frame = state->rally_flag_animation.frame,
-                .position = params_position,
-                .ysort_position = params_position.y,
-                .options = 0,
-                .recolor_id = state->match_state.players[building.player_id].recolor_id
-            };
+            queue_render_rally_flag(building.rally_point, building.player_id);
+        }
+    }
 
-            ivec2 rally_cell = building.rally_point / TILE_SIZE;
-            if (match_shell_get_fog(state, rally_cell) > 0) {
-                ysort_params.push_back(params);
-            } else {
-                above_fog_sprite_params.push_back(params);
+    // Queued entity target rally points
+    for (EntityId entity_id : state->selection) {
+        const Entity& entity = state->match_state.entities.get_by_id(entity_id);
+        // If it's not an allied unit, then we can break out of this whole loop, since the rest of the selection won't be either
+        if (!entity_is_unit(entity.type) || 
+                (!state->replay_mode && entity.player_id != network_get_player_id())) {
+            break;
+        }
+
+        // Render flag for entity's current target
+        if (!entity.target_queue.empty()) {
+            ivec2 queued_target_position = match_shell_get_queued_target_position(state, entity.target);
+            if (queued_target_position.x != -1) {
+                queue_render_rally_flag(queued_target_position, entity.player_id);
+            }
+
+        }
+
+        // Render flag for queued targets
+        for (const Target& target : entity.target_queue) {
+            ivec2 queued_target_position = match_shell_get_queued_target_position(state, target);
+            if (queued_target_position.x != -1) {
+                queue_render_rally_flag(queued_target_position, entity.player_id);
             }
         }
     }
@@ -3366,7 +3401,7 @@ void match_shell_render(const MatchShellState* state) {
         for (const Target& target : entity.target_queue) {
             if (target.type == TARGET_BUILD) {
                 match_shell_render_target_build(state, target, entity.player_id);
-            }
+            } 
         }
     }
 
@@ -4326,6 +4361,35 @@ void match_shell_render_tooltip(const MatchShellState* state, InputAction hotkey
         char energy_text[4];
         sprintf(energy_text, "%u", tooltip_energy_cost);
         render_text(FONT_WESTERN8_OFFBLACK, energy_text, tooltip_top_left + ivec2(22, tooltip_item_y));
+    }
+}
+
+ivec2 match_shell_get_queued_target_position(const MatchShellState* state, const Target& target) {
+    switch (target.type) {
+        case TARGET_CELL:
+        case TARGET_ATTACK_CELL:
+        case TARGET_UNLOAD:
+        case TARGET_MOLOTOV:
+            return (target.cell * TILE_SIZE) + ivec2(TILE_SIZE / 2, TILE_SIZE / 2);
+        case TARGET_ENTITY:
+        case TARGET_ATTACK_ENTITY:
+        case TARGET_REPAIR: {
+            uint32_t target_index = state->match_state.entities.get_index_of(target.id);
+            if (target_index == INDEX_INVALID) {
+                return ivec2(-1, -1);
+            }
+
+            const Entity& target_entity = state->match_state.entities[target_index];
+            if (entity_is_unit(target_entity.type)) {
+                return target_entity.position.to_ivec2();
+            }
+            const EntityData& target_data = entity_get_data(target_entity.type);
+            return (target_entity.cell * TILE_SIZE) + (ivec2(target_data.cell_size, target_data.cell_size) * TILE_SIZE / 2);
+        }
+        case TARGET_NONE:
+        case TARGET_BUILD:
+        case TARGET_BUILD_ASSIST:
+            return ivec2(-1, -1);
     }
 }
 

@@ -1235,8 +1235,6 @@ void entity_update(MatchState& state, uint32_t entity_index) {
 
                             uint32_t target_index = state.entities.get_index_of(entity.target.id);
                             if (target_index != INDEX_INVALID) {
-                                ivec2 blocked_cell = entity.path[0]; // TODO: delete this boi
-
                                 const Entity& target = state.entities[target_index];
                                 int target_size = entity_get_data(target.type).cell_size;
 
