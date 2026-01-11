@@ -426,7 +426,7 @@ void match_shell_update(MatchShellState* state) {
     const SpriteInfo& menu_button_sprite_info = render_get_sprite_info(SPRITE_UI_BUTTON_BURGER);
     Rect menu_button_rect = (Rect) {
         .x = MENU_BUTTON_POSITION.x, .y = MENU_BUTTON_POSITION.y,
-        .w = menu_button_sprite_info.frame_width * 2, .h = menu_button_sprite_info.frame_height * 2
+        .w = menu_button_sprite_info.frame_width, .h = menu_button_sprite_info.frame_height
     };
     if (!(state->is_minimap_dragging || match_shell_is_selecting(state)) && 
             // Menu button doesn't work for defeat / victory / desync screens
