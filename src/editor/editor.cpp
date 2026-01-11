@@ -555,7 +555,14 @@ void editor_update() {
         if (state.menu_allowed_tech.mode == EDITOR_MENU_ALLOWED_TECH_MODE_OPEN) {
             editor_menu_allowed_tech_update(state.menu_allowed_tech, state.ui);
             if (state.menu_allowed_tech.mode == EDITOR_MENU_ALLOWED_TECH_MODE_SAVE) {
-                memcpy(state.scenario->allowed_tech, state.menu_allowed_tech.allowed_tech, sizeof(state.scenario->allowed_tech));
+                memcpy(state.scenario->allowed_entities, state.menu_allowed_tech.allowed_entities, sizeof(state.scenario->allowed_entities));
+                state.scenario->allowed_upgrades = 0;
+                for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
+                    if (state.menu_allowed_tech.allowed_upgrades[upgrade_index]) {
+                        uint32_t flag = 1U << upgrade_index;
+                        state.scenario->allowed_upgrades |= flag;
+                    }
+                }
                 state.menu_allowed_tech.mode = EDITOR_MENU_ALLOWED_TECH_MODE_CLOSED;
             }
         }

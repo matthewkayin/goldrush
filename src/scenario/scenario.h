@@ -4,6 +4,7 @@
 #include "match/noise.h"
 #include "match/state.h"
 #include "match/map.h"
+#include "match/upgrade.h"
 #include "scenario/objective.h"
 
 #define SCENARIO_SQUAD_MAX_ENTITIES SELECTION_LIMIT
@@ -45,7 +46,8 @@ struct Scenario {
     uint32_t squad_count;
     ScenarioSquad squads[SCENARIO_MAX_SQUADS];
     ScenarioObjective objective;
-    bool allowed_tech[ENTITY_TYPE_COUNT];
+    bool allowed_entities[ENTITY_TYPE_COUNT];
+    uint32_t allowed_upgrades;
 };
 
 Scenario* scenario_init_blank(MapType map_type, MapSize map_size);

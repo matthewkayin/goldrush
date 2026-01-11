@@ -15,7 +15,8 @@ enum EditorMenuAllowedTechMode {
 
 struct EditorMenuAllowedTech {
     EditorMenuAllowedTechMode mode;
-    bool allowed_tech[ENTITY_TYPE_COUNT];
+    bool allowed_entities[ENTITY_TYPE_COUNT];
+    bool allowed_upgrades[UPGRADE_COUNT];
 };
 
 EditorMenuAllowedTech editor_menu_allowed_tech_open(const Scenario* scenario);

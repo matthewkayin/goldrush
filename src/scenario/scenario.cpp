@@ -27,7 +27,11 @@ Scenario* scenario_base_init() {
     scenario->squad_count = 0;
 
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
-        scenario->allowed_tech[entity_type] = true;
+        scenario->allowed_entities[entity_type] = true;
+    }
+
+    for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
+        scenario->allowed_upgrades |= 1U << upgrade_index;
     }
 
     return scenario;
@@ -208,8 +212,11 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
     // Objective
     fwrite(&scenario->objective, 1, sizeof(ScenarioObjective), file);
 
-    // Allowed tech
-    fwrite(&scenario->allowed_tech, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
+    // Allowed entities
+    fwrite(&scenario->allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
+
+    // Allowed upgrades
+    fwrite(&scenario->allowed_upgrades, 1, sizeof(uint32_t), file);
 
     fclose(file);
     log_info("Map file saved successfully.");
@@ -289,7 +296,10 @@ Scenario* scenario_open_file(const char* path) {
     fread(&scenario->objective, 1, sizeof(ScenarioObjective), file);
 
     // Allowed tech
-    fread(&scenario->allowed_tech, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
+    fread(&scenario->allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
+
+    // Allowed upgrades
+    fread(&scenario->allowed_upgrades, 1, sizeof(uint32_t), file);
 
     fclose(file);
     log_info("Loaded map file %s.", full_path.c_str());

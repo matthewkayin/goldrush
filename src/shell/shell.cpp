@@ -245,6 +245,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
     // Init bots
     // memset(state->bots, 0, sizeof(state->bots));
     Difficulty difficulty = (Difficulty)network_get_match_setting(MATCH_SETTING_DIFFICULTY);
+    BotConfig bot_config = bot_config_init_from_difficulty(difficulty);
     int bot_lcg_seed = lcg_seed;
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (network_get_player(player_id).status != NETWORK_PLAYER_STATUS_BOT) {
@@ -254,7 +255,7 @@ MatchShellState* match_shell_init(int lcg_seed, Noise* noise) {
 
         BotOpener opener = bot_roll_opener(&bot_lcg_seed, difficulty);
         BotUnitComp preferred_unit_comp = bot_roll_preferred_unit_comp(&bot_lcg_seed);
-        state->bots[player_id] = bot_init(state->match_state, player_id, difficulty, opener, preferred_unit_comp);
+        state->bots[player_id] = bot_init(state->match_state, player_id, bot_config, opener, preferred_unit_comp);
     }
 
     return state;

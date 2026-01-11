@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "bot/config.h"
 #include "bot/entity_count.h"
 #include "match/state.h"
 #include "core/match_setting.h"
@@ -71,8 +72,8 @@ struct BotRetreatMemory {
 };
 
 struct Bot {
+    BotConfig config;
     uint8_t player_id;
-    Difficulty difficulty;
 
     // Unit management
     std::unordered_map<EntityId, bool> is_entity_reserved;
@@ -105,7 +106,7 @@ struct Bot {
 };
 
 Bot bot_empty();
-Bot bot_init(const MatchState& state, uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp);
+Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config, BotOpener opener, BotUnitComp preferred_unit_comp);
 BotOpener bot_roll_opener(int* lcg_seed, Difficulty difficulty);
 BotUnitComp bot_roll_preferred_unit_comp(int* lcg_seed);
 MatchInput bot_get_turn_input(const MatchState& state, Bot& bot, uint32_t match_timer);
@@ -216,8 +217,6 @@ std::vector<EntityId> bot_determine_entities_to_scout(const MatchState& state, c
 bool bot_is_entity_in_entities_to_scout_list(const Bot& bot, EntityId entity_id);
 void bot_release_scout(Bot& bot);
 bool bot_should_scout(const Bot& bot, uint32_t match_timer);
-bool bot_check_scout_info(const Bot& bot, uint32_t flag);
-void bot_set_scout_info(Bot& bot, uint32_t flag, bool value);
 
 // Entity Reservation
 

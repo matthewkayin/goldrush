@@ -4,15 +4,12 @@
 #include "match/upgrade.h"
 #include "match/lcg.h"
 #include "profile/profile.h"
+#include "util/bitflag.h"
 
 // Scout info
 static const uint32_t BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES = 1;
 static const uint32_t BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES = 1 << 1;
 static const uint32_t BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED = 1 << 2;
-
-// Macro cooldowns
-static const uint32_t BOT_MACRO_COOLDOWN_EASY = 2U * 60U * UPDATES_PER_SECOND;
-static const uint32_t BOT_MACRO_COOLDOWN_MODERATE = 1U * 60U * UPDATES_PER_SECOND;
 
 // Unit scores
 static const int BOT_UNIT_SCORE = 4;
@@ -36,7 +33,6 @@ Bot bot_empty() {
     Bot bot;
 
     bot.player_id = PLAYER_NONE;
-    bot.difficulty = DIFFICULTY_EASY;
 
     bot.unit_comp = BOT_UNIT_COMP_NONE;
     bot.preferred_unit_comp = BOT_UNIT_COMP_NONE;
@@ -52,11 +48,11 @@ Bot bot_empty() {
     return bot;
 }
 
-Bot bot_init(const MatchState& state, uint8_t player_id, Difficulty difficulty, BotOpener opener, BotUnitComp preferred_unit_comp) {
+Bot bot_init(const MatchState& state, uint8_t player_id, BotConfig config, BotOpener opener, BotUnitComp preferred_unit_comp) {
     Bot bot = bot_empty();
 
     bot.player_id = player_id;
-    bot.difficulty = difficulty;
+    bot.config = config;
     bot.preferred_unit_comp = preferred_unit_comp;
 
     switch (opener) {
@@ -247,6 +243,7 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
         const BotBaseInfo& base_info = bot.base_info[goldmine_id_index];
 
         if (base_info.controlling_player == bot.player_id && base_info.is_under_attack) {
+            bitflag_set(&bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED, true);
             ivec2 location = state.entities.get_by_id(bot.goldmine_ids[goldmine_id_index]).cell;
             bot_defend_location(state, bot, location, BOT_DEFEND_COUNTERATTACK | BOT_DEFEND_WITH_WORKERS);
         }
@@ -438,17 +435,9 @@ bool bot_should_expand(const MatchState& state, const Bot& bot) {
         return false;
     }
 
-    // Easy: Maintain only one base
-    // Moderate: Maintain two bases
-    // Hard: Maintain two, but keep up with opponent if they take more than that
-    uint32_t target_base_count;
-    if (bot.difficulty == DIFFICULTY_EASY) {
-        target_base_count = 1U;
-    } else if (bot.difficulty == DIFFICULTY_MODERATE) {
-        target_base_count = 2U;
-    } else {
-        target_base_count = std::max(2U, bot_get_max_enemy_mining_base_count(state, bot));
-    } 
+    uint32_t target_base_count = bot.config.target_base_count == BOT_TARGET_BASE_COUNT_MATCH_ENEMY
+        ? std::max(2U, bot_get_max_enemy_mining_base_count(state, bot))
+        : bot.config.target_base_count;
 
     // Replace bases if one of them is low on gold
     target_base_count += bot_get_low_on_gold_base_count(bot);
@@ -710,11 +699,27 @@ int bot_score_entities_at_location(const MatchState& state, const Bot& bot, ivec
 }
 
 bool bot_should_attack(const MatchState& state, const Bot& bot) {
-    // Moderate: Push but don't harass
-    // Hard: Harass if possible, then push
+    // If we're not configured to attack, then don't
+    if (!bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_ATTACK)) {
+        return false;
+    }
 
-    // Easy: Don't attack unless player has attacked us first
-    if (bot.difficulty == DIFFICULTY_EASY && !bot_check_scout_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED)) {
+    // If there are no active opponents, then don't attack
+    bool has_active_opponents = false;
+    for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
+        if (state.players[player_id].active && 
+                state.players[player_id].team !=
+                state.players[bot.player_id].team) {
+            has_active_opponents = true;
+        }
+    }
+    if (!has_active_opponents) {
+        return false;
+    }
+
+    // Don't attack unless player has attacked us first
+    if (!bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_ATTACK_FIRST) &&
+            !bitflag_check(bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED)) {
         return false;
     }
 
@@ -744,7 +749,7 @@ bool bot_should_attack(const MatchState& state, const Bot& bot) {
     const int least_defended_base_score = bot.base_info.at(least_defended_enemy_goldmine_id).defense_score;
     const int minimum_attack_threshold = 
         least_defended_base_score < 4 * BOT_UNIT_SCORE_IN_BUNKER && 
-        bot.difficulty == DIFFICULTY_HARD
+        bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_HARASS)
             ? 4 * BOT_UNIT_SCORE_IN_BUNKER
             : 32 * BOT_UNIT_SCORE;
     const int attack_threshold = std::max(least_defended_base_score + (BOT_UNIT_SCORE * 4), minimum_attack_threshold);
@@ -790,7 +795,7 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
     } 
 
     // Research upgrades
-    uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot, unreserved_and_in_progress_entity_count);
+    const uint32_t desired_upgrade = bot_get_desired_upgrade(state, bot, unreserved_and_in_progress_entity_count);
     if (desired_upgrade != 0) {
         EntityType building_type = bot_get_building_which_researches(desired_upgrade);
         if (available_building_count[building_type] != 0) {
@@ -815,6 +820,14 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
         return bot_train_unit(state, bot, bot_get_unit_type_to_train(bot, desired_entities, available_building_count, unreserved_and_in_progress_entity_count), match_timer);
     }
 
+    // Determine other buildings based on upgrade pre-reqs
+    if (desired_upgrade != 0) {
+        EntityType building_type = bot_get_building_which_researches(desired_upgrade);
+        if (unreserved_and_in_progress_entity_count[building_type] == 0 && desired_entities[building_type] == 0) {
+            desired_entities[building_type] = 1;
+        }
+    }
+
     // Determine any other desired buildings based on building pre-reqs
     for (uint32_t entity_type = ENTITY_HALL; entity_type < ENTITY_LANDMINE; entity_type++) {
         if (desired_entities[entity_type] == 0) {
@@ -825,6 +838,13 @@ MatchInput bot_get_production_input(const MatchState& state, Bot& bot, uint32_t 
         while (prereq != ENTITY_TYPE_COUNT && desired_entities[prereq] == 0) {
             desired_entities[prereq] = 1;
             prereq = bot_get_building_prereq((EntityType)prereq);
+        }
+    }
+
+    // Disable any buildings that aren't allowed
+    for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        if (!bot.config.is_entity_allowed[entity_type]) {
+            desired_entities[entity_type] = 0;
         }
     }
 
@@ -909,10 +929,20 @@ void bot_update_desired_production(Bot& bot) {
     }
 
     // If enemy has invisible units and we're not using a pyro-based unit comp, then get balloons!
-    const bool enemy_has_invisible_units = bot_check_scout_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES) || bot_check_scout_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES);
+    const bool enemy_has_invisible_units = 
+        bitflag_check(bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES) ||
+        bitflag_check(bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES);
     if (enemy_has_invisible_units && bot.desired_army_ratio[ENTITY_PYRO] == 0) {
         bot.desired_buildings[ENTITY_WORKSHOP] = 1;
         bot.desired_army_ratio[ENTITY_BALLOON] = 1;
+    }
+
+    // Disable anything that isn't allowed
+    for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
+        if (!bot.config.is_entity_allowed[entity_type]) {
+            bot.desired_buildings[entity_type] = 0;
+            bot.desired_army_ratio[entity_type] = 0;
+        }
     }
 }
 
@@ -1539,38 +1569,46 @@ ivec2 bot_find_bunker_location(const MatchState& state, const Bot& bot, uint32_t
 // RESEARCH UPGRADES
 
 uint32_t bot_get_desired_upgrade(const MatchState& state, const Bot& bot, EntityCount unreserved_and_in_progress_entity_count) {
-    if (bot_has_squad_of_type(bot, BOT_SQUAD_TYPE_LANDMINES) && 
+    if (bitflag_check(bot.config.allowed_upgrades, UPGRADE_LANDMINES) &&
+            bot_has_squad_of_type(bot, BOT_SQUAD_TYPE_LANDMINES) && 
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_LANDMINES)) {
         return UPGRADE_LANDMINES;
     }
 
-    if (bot.difficulty == DIFFICULTY_EASY) {
-        return 0;
+    if (bitflag_check(bot.config.allowed_upgrades, UPGRADE_IRON_SIGHTS) &&
+            bot.desired_army_ratio[ENTITY_COWBOY] != 0 &&
+            match_player_upgrade_is_available(state, bot.player_id, UPGRADE_IRON_SIGHTS)) {
+        return UPGRADE_IRON_SIGHTS;
     }
 
-    if (unreserved_and_in_progress_entity_count[ENTITY_SHERIFFS] &&
+    if (bitflag_check(bot.config.allowed_upgrades, UPGRADE_PRIVATE_EYE) &&
+            unreserved_and_in_progress_entity_count[ENTITY_SHERIFFS] &&
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_PRIVATE_EYE)) {
         return UPGRADE_PRIVATE_EYE;
     }
 
-    if (bot.unit_comp == BOT_UNIT_COMP_SOLDIER_CANNON &&
+    if (bitflag_check(bot.config.allowed_upgrades, UPGRADE_BAYONETS) &&
+            bot.unit_comp == BOT_UNIT_COMP_SOLDIER_CANNON &&
             unreserved_and_in_progress_entity_count[ENTITY_BARRACKS] != 0 &&
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_BAYONETS)) {
         return UPGRADE_BAYONETS;
     }
 
-    if (bot.desired_army_ratio[ENTITY_WAGON] != 0 &&
+    if (bitflag_check(bot.config.allowed_upgrades, UPGRADE_WAR_WAGON) &&
+            bot.desired_army_ratio[ENTITY_WAGON] != 0 &&
             unreserved_and_in_progress_entity_count[ENTITY_COOP] != 0 &&
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_WAR_WAGON)) {
         return UPGRADE_WAR_WAGON;
     }
 
-    if (bot.desired_army_ratio[ENTITY_BANDIT] != 0 && 
+    if (bitflag_check(bot.config.allowed_upgrades, UPGRADE_SERRATED_KNIVES) &&
+            bot.desired_army_ratio[ENTITY_BANDIT] != 0 && 
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_SERRATED_KNIVES)) {
         return UPGRADE_SERRATED_KNIVES;
     }
 
-    if (bot.desired_army_ratio[ENTITY_BALLOON] != 0 && 
+    if (bitflag_check(bot.config.allowed_upgrades, UPGRADE_TAILWIND) &&
+            bot.desired_army_ratio[ENTITY_BALLOON] != 0 && 
             unreserved_and_in_progress_entity_count[ENTITY_WORKSHOP] != 0 &&
             match_player_upgrade_is_available(state, bot.player_id, UPGRADE_TAILWIND)) {
         return UPGRADE_TAILWIND;
@@ -1674,10 +1712,10 @@ MatchInput bot_train_unit(const MatchState& state, Bot& bot, EntityType unit_typ
 
     bot.buildings_to_set_rally_points.push(building_id);
 
-    if (bot.difficulty == DIFFICULTY_EASY || bot.difficulty == DIFFICULTY_MODERATE) {
+    if (bot.config.macro_cycle_cooldown != 0) {
         bot.macro_cycle_count++;
         if (bot.macro_cycle_count >= bot_get_player_mining_base_count(bot, bot.player_id) * 2) {
-            bot.macro_cycle_timer = match_timer + (bot.difficulty == DIFFICULTY_EASY ? BOT_MACRO_COOLDOWN_EASY : BOT_MACRO_COOLDOWN_MODERATE);
+            bot.macro_cycle_timer = match_timer + bot.config.macro_cycle_cooldown;
             bot.macro_cycle_count = 0;
         }
     } 
@@ -2106,8 +2144,8 @@ std::vector<EntityId> bot_squad_get_nearby_enemy_list(const MatchState& state, c
 }
 
 bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const BotSquad& squad, int nearby_enemy_score) {
-    // Don't retreat on easy mode
-    if (bot.difficulty == DIFFICULTY_EASY) {
+    // Don't retreat if not configured to
+    if (!bitflag_check(bot.config.flags, BOT_CONFIG_SHOULD_RETREAT)) {
         return false;
     }
 
@@ -2118,11 +2156,6 @@ bool bot_squad_should_retreat(const MatchState& state, const Bot& bot, const Bot
 
     // Score allied army
     int squad_score = bot_score_entity_list(state, bot, squad.entities);
-
-    // On moderate difficulty, retreat less willingly
-    if (bot.difficulty == DIFFICULTY_MODERATE) {
-        squad_score += 4 * BOT_UNIT_SCORE;
-    }
 
     return squad_score < nearby_enemy_score;
 }
@@ -3001,39 +3034,37 @@ void bot_scout_gather_info(const MatchState& state, Bot& bot) {
     }
 
     // Check for invisible units
-    if (bot.difficulty != DIFFICULTY_EASY) {
-        EntityId proof_of_landmines_id = match_find_entity(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
-            if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
-                return false;
-            }
-            if ((entity.type == ENTITY_PYRO || entity.type == ENTITY_LANDMINE) && 
-                    entity_is_visible_to_player(state, entity, bot.player_id)) {
-                return true;
-            }
-            if (entity.type == ENTITY_WORKSHOP && bot_has_scouted_entity(state, bot, entity, entity_id)) {
-                return true;
-            }
+    EntityId proof_of_landmines_id = match_find_entity(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
+        if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
             return false;
-        });
-        if (proof_of_landmines_id != ID_NULL) {
-            bot_set_scout_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES, true);
         }
+        if ((entity.type == ENTITY_PYRO || entity.type == ENTITY_LANDMINE) && 
+                entity_is_visible_to_player(state, entity, bot.player_id)) {
+            return true;
+        }
+        if (entity.type == ENTITY_WORKSHOP && bot_has_scouted_entity(state, bot, entity, entity_id)) {
+            return true;
+        }
+        return false;
+    });
+    if (proof_of_landmines_id != ID_NULL) {
+        bitflag_set(&bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES, true);
+    }
 
-        EntityId proof_of_detectives_id = match_find_entity(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
-            if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
-                return false;
-            }
-            if (entity.type == ENTITY_DETECTIVE && entity_is_visible_to_player(state, entity, bot.player_id)) {
-                return true;
-            }
-            if (entity.type == ENTITY_SHERIFFS && bot_has_scouted_entity(state, bot, entity, entity_id)) {
-                return true;
-            }
+    EntityId proof_of_detectives_id = match_find_entity(state, [&state, &bot](const Entity& entity, EntityId entity_id) {
+        if (state.players[entity.player_id].team == state.players[bot.player_id].team) {
             return false;
-        });
-        if (proof_of_detectives_id != ID_NULL) {
-            bot_set_scout_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES, true);
         }
+        if (entity.type == ENTITY_DETECTIVE && entity_is_visible_to_player(state, entity, bot.player_id)) {
+            return true;
+        }
+        if (entity.type == ENTITY_SHERIFFS && bot_has_scouted_entity(state, bot, entity, entity_id)) {
+            return true;
+        }
+        return false;
+    });
+    if (proof_of_detectives_id != ID_NULL) {
+        bitflag_set(&bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_DETECTIVES, true);
     }
 
     bot_update_desired_production(bot);
@@ -3120,7 +3151,7 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
         // If it's an enemy landmine, make sure we've scouted that they have landmines
         if (entity.type == ENTITY_LANDMINE && 
                 state.players[entity.player_id].team != state.players[bot.player_id].team &&
-                !bot_check_scout_info(bot, BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES)) {
+                !bitflag_check(bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_LANDMINES)) {
             continue;
         }
 
@@ -3427,18 +3458,6 @@ bool bot_should_scout(const Bot& bot, uint32_t match_timer) {
     return match_timer >= next_scout_time;
 }
 
-bool bot_check_scout_info(const Bot& bot, uint32_t flag) {
-    return (bot.scout_info & flag) == flag;
-}
-
-void bot_set_scout_info(Bot& bot, uint32_t flag, bool value) {
-    if (value) {
-        bot.scout_info |= flag;
-    } else {
-        bot.scout_info &= ~flag;
-    }
-}
-
 // ENTITY RESERVATION
 
 bool bot_is_entity_reserved(const Bot& bot, EntityId entity_id) {
@@ -3468,7 +3487,6 @@ EntityType bot_get_building_which_trains(EntityType unit_type) {
             return ENTITY_HALL;
         case ENTITY_COWBOY:
         case ENTITY_BANDIT:
-        case ENTITY_DETECTIVE:
             return ENTITY_SALOON;
         case ENTITY_SAPPER:
         case ENTITY_PYRO:
@@ -3480,6 +3498,8 @@ EntityType bot_get_building_which_trains(EntityType unit_type) {
         case ENTITY_SOLDIER:
         case ENTITY_CANNON:
             return ENTITY_BARRACKS;
+        case ENTITY_DETECTIVE:
+            return ENTITY_SHERIFFS;
         default:
             GOLD_ASSERT(false);
             return ENTITY_TYPE_COUNT;
@@ -3512,6 +3532,7 @@ EntityType bot_get_building_which_researches(uint32_t upgrade) {
         case UPGRADE_WAR_WAGON:
         case UPGRADE_BAYONETS:
         case UPGRADE_SERRATED_KNIVES:
+        case UPGRADE_IRON_SIGHTS:
             return ENTITY_SMITH;
         case UPGRADE_STAKEOUT:
         case UPGRADE_PRIVATE_EYE:

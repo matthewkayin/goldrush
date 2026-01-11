@@ -255,8 +255,8 @@ uint32_t desync_compute_match_checksum(const MatchState& match_state, const Bot 
         const Bot& bot = bots[player_id];
 
         // Player ID
+        desync_write_value<BotConfig>(bot.config);
         desync_write_value<uint8_t>(bot.player_id);
-        desync_write_value<Difficulty>(bot.difficulty);
 
         // Is entity reserved
         desync_write_unordered_map<EntityId, bool>(bot.is_entity_reserved);
