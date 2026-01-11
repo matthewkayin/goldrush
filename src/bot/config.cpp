@@ -28,7 +28,7 @@ BotConfig bot_config_init_from_difficulty(Difficulty difficulty) {
     switch (difficulty) {
         case DIFFICULTY_EASY: {
             config.flags = BOT_CONFIG_SHOULD_ATTACK;
-            config.macro_cycle_cooldown = 2U * 60U * UPDATES_PER_SECOND;
+            config.macro_cycle_cooldown = 1U * 60U * UPDATES_PER_SECOND;
             config.target_base_count = 1U;
             config.allowed_upgrades = 0;
             config.allowed_upgrades = UPGRADE_LANDMINES;
@@ -39,7 +39,7 @@ BotConfig bot_config_init_from_difficulty(Difficulty difficulty) {
                 BOT_CONFIG_SHOULD_ATTACK |
                 BOT_CONFIG_SHOULD_ATTACK_FIRST |
                 BOT_CONFIG_SHOULD_RETREAT;
-            config.macro_cycle_cooldown = 1U * 60U * UPDATES_PER_SECOND;
+            config.macro_cycle_cooldown = 1U * 30U * UPDATES_PER_SECOND;
             config.target_base_count = 2U;
             break;
         }

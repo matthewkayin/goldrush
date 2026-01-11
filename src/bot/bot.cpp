@@ -1228,10 +1228,10 @@ MatchInput bot_build_building(const MatchState& state, Bot& bot, EntityType buil
 bool bot_is_building_location_valid(const MatchState& state, ivec2 cell, int size) {
     GOLD_ASSERT(map_is_cell_rect_in_bounds(state.map, cell, size));
 
-    const int MARGIN = 2;
+    const int MARGIN = 1;
     uint32_t cell_elevation = map_get_tile(state.map, cell).elevation;
-    for (int y = cell.y - MARGIN; y < cell.y + MARGIN + 1; y++) {
-        for (int x = cell.x - MARGIN; x < cell.x + MARGIN + 1; x++) {
+    for (int y = cell.y - MARGIN; y < cell.y + size + MARGIN; y++) {
+        for (int x = cell.x - MARGIN; x < cell.x + + size + MARGIN; x++) {
             ivec2 neighbor = ivec2(x, y);
             if (!map_is_cell_in_bounds(state.map, neighbor)) {
                 continue;
@@ -1241,6 +1241,9 @@ bool bot_is_building_location_valid(const MatchState& state, ivec2 cell, int siz
                 return false;
             }
             if (map_get_tile(state.map, neighbor).elevation != cell_elevation) {
+                return false;
+            }
+            if (map_is_tile_ramp(state.map, neighbor)) {
                 return false;
             }
         }
