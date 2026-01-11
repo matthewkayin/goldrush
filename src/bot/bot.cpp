@@ -244,7 +244,8 @@ void bot_strategy_update(const MatchState& state, Bot& bot) {
 
         if (base_info.controlling_player == bot.player_id && base_info.is_under_attack) {
             bitflag_set(&bot.scout_info, BOT_SCOUT_INFO_ENEMY_HAS_ATTACKED, true);
-            ivec2 location = state.entities.get_by_id(bot.goldmine_ids[goldmine_id_index]).cell;
+            EntityId goldmine_id = bot.goldmine_ids[goldmine_id_index];
+            ivec2 location = state.entities.get_by_id(goldmine_id).cell;
             bot_defend_location(state, bot, location, BOT_DEFEND_COUNTERATTACK | BOT_DEFEND_WITH_WORKERS);
         }
     }
@@ -867,7 +868,7 @@ void bot_set_unit_comp(Bot& bot, BotUnitComp unit_comp) {
 }
 
 void bot_update_desired_production(Bot& bot) {
-    const uint32_t mining_base_count = bot_get_player_mining_base_count(bot, bot.player_id);
+    const uint32_t mining_base_count = bot_get_player_mining_base_count(bot, bot.player_id) - bot_get_low_on_gold_base_count(bot);
     bot.desired_buildings.clear();
     bot.desired_army_ratio.clear();
 
@@ -1811,7 +1812,7 @@ void bot_squad_remove_entity_by_id(Bot& bot, BotSquad& squad, EntityId entity_id
 
 MatchInput bot_squad_update(const MatchState& state, Bot& bot, BotSquad& squad, uint32_t match_timer) {
     GOLD_PROFILE_SCOPE;
-    
+
     // Remove dead units
     bot_squad_remove_dead_units(state, bot, squad);
     if (squad.entities.empty()) {
@@ -2380,7 +2381,10 @@ MatchInput bot_squad_move_carrier_toward_en_route_infantry(const MatchState& sta
     ivec2 path_midpoint = path_to_infantry_center[path_to_infantry_center.size() / 2];
 
     // If the carrier is already walking close to the path midpoint, then don't bother moving
-    if (ivec2::manhattan_distance(carrier.cell, path_midpoint) < BOT_NEAR_DISTANCE) {
+    ivec2 carrier_cell = carrier.target.type == TARGET_CELL
+        ? carrier.target.cell 
+        : carrier.cell;
+    if (ivec2::manhattan_distance(carrier_cell, path_midpoint) < BOT_NEAR_DISTANCE) {
         return (MatchInput) { .type = MATCH_INPUT_NONE };
     }
 
@@ -3098,7 +3102,10 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
         }
 
         bot.base_info[goldmine_id_index].has_gold = goldmine.gold_held != 0;
-        bot.base_info[goldmine_id_index].is_low_on_gold = goldmine.gold_held < 1000;
+        // Base is not considered low_on_gold if it does not have gold
+        // This is to prevent a bug where bot was building an extra base than it should have because
+        // it considered its collapsed goldmine base (which it had already replaced) as a low_on_gold base
+        bot.base_info[goldmine_id_index].is_low_on_gold = goldmine.gold_held != 0 && goldmine.gold_held < 1000;
         bot.base_info[goldmine_id_index].has_been_scouted = true;
 
         // First try to find the surrounding hall
@@ -3108,8 +3115,9 @@ void bot_update_base_info(const MatchState& state, Bot& bot) {
         if (nearest_building_id == ID_NULL) {
             nearest_building_id = match_find_best_entity(state, (MatchFindBestEntityParams) {
                 .filter = [&state, &bot, &goldmine](const Entity& building, EntityId building_id) {
-                    return building.mode == MODE_BUILDING_FINISHED && 
+                    return entity_is_building(building.type) &&
                             building.type != ENTITY_LANDMINE &&
+                            building.mode != MODE_BUILDING_DESTROYED &&
                             ivec2::manhattan_distance(building.cell, goldmine.cell) < BOT_NEAR_DISTANCE &&
                             bot_has_scouted_entity(state, bot, building, building_id);
                 },
