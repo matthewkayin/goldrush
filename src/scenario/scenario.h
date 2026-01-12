@@ -1,14 +1,13 @@
 #pragma once
 
 #include "defines.h"
+#include "scenario/trigger.h"
 #include "match/noise.h"
 #include "match/state.h"
 #include "match/map.h"
 #include "match/upgrade.h"
-#include "scenario/objective.h"
 
 #define SCENARIO_SQUAD_MAX_ENTITIES SELECTION_LIMIT
-#define SCENARIO_MAX_SQUADS 32
 
 struct ScenarioPlayer {
     char name[MAX_USERNAME_LENGTH + 1];
@@ -39,13 +38,16 @@ struct ScenarioSquad {
 struct Scenario {
     Map map;
     Noise* noise;
+
     ivec2 player_spawn;
     ScenarioPlayer players[MAX_PLAYERS];
+
     uint32_t entity_count;
     ScenarioEntity entities[MATCH_MAX_ENTITIES];
-    uint32_t squad_count;
-    ScenarioSquad squads[SCENARIO_MAX_SQUADS];
-    ScenarioObjective objective;
+
+    std::vector<ScenarioSquad> squads;
+    std::vector<Trigger> triggers;
+
     bool allowed_entities[ENTITY_TYPE_COUNT];
     uint32_t allowed_upgrades;
 };

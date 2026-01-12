@@ -6,84 +6,37 @@
 
 // Action
 
-EditorAction editor_action_create_brush(const std::vector<EditorActionBrushStroke>& stroke) {
-    EditorAction action;
-    action.type = EDITOR_ACTION_BRUSH;
-    action.brush.stroke_size = stroke.size();
-    action.brush.stroke = (EditorActionBrushStroke*)malloc(action.brush.stroke_size * sizeof(EditorActionBrushStroke));
-    memcpy(action.brush.stroke, &stroke[0], action.brush.stroke_size * sizeof(EditorActionBrushStroke));
-
-    return action;
-}
-
-EditorAction editor_action_create_decorate_bulk(const std::vector<EditorActionDecorate>& changes) {
-    EditorAction action;
-    action.type = EDITOR_ACTION_DECORATE_BULK;
-    action.decorate_bulk.size = changes.size();
-    action.decorate_bulk.changes = (EditorActionDecorate*)malloc(action.decorate_bulk.size * sizeof(EditorActionDecorateBulk));
-    memcpy(action.decorate_bulk.changes, &changes[0], action.decorate_bulk.size * sizeof(EditorActionDecorateBulk));
-
-    return action;
-}
-
-void editor_action_destroy(EditorAction& action) {
-    switch (action.type) {
-        case EDITOR_ACTION_BRUSH: {
-            free(action.brush.stroke);
-            break;
-        }
-        case EDITOR_ACTION_DECORATE_BULK: {
-            free(action.decorate_bulk.changes);
-            break;
-        }
-        case EDITOR_ACTION_DECORATE:
-        case EDITOR_ACTION_ADD_ENTITY: 
-        case EDITOR_ACTION_EDIT_ENTITY: 
-        case EDITOR_ACTION_DELETE_ENTITY: 
-        case EDITOR_ACTION_ADD_SQUAD:
-        case EDITOR_ACTION_EDIT_SQUAD:
-        case EDITOR_ACTION_DELETE_SQUAD:
-        case EDITOR_ACTION_SET_PLAYER_SPAWN:
-            break;
-    }
-}
+void editor_action_execute_decorate(Scenario* scenario, const EditorActionDecorate& data, EditorActionMode mode);
 
 void editor_action_execute(Scenario* scenario, const EditorAction& action, EditorActionMode mode) {
     switch (action.type) {
         case EDITOR_ACTION_BRUSH: {
-            for (uint32_t index = 0; index < action.brush.stroke_size; index++) {
+            const EditorActionBrush& action_data = std::get<EditorActionBrush>(action.data);
+            for (uint32_t index = 0; index < action_data.stroke.size(); index++) {
                 uint8_t value = mode == EDITOR_ACTION_MODE_UNDO 
-                    ? action.brush.stroke[index].previous_value
-                    : action.brush.stroke[index].new_value;
-                scenario->noise->map[action.brush.stroke[index].index] = value;
+                    ? action_data.stroke[index].previous_value
+                    : action_data.stroke[index].new_value;
+                scenario->noise->map[action_data.stroke[index].index] = value;
             }
 
             scenario_bake_map(scenario);
             break;
         }
-        case EDITOR_ACTION_DECORATE: 
+        case EDITOR_ACTION_DECORATE: {
+            const EditorActionDecorate& action_data = std::get<EditorActionDecorate>(action.data);
+            editor_action_execute_decorate(scenario, action_data, mode);
+            break;
+        }
         case EDITOR_ACTION_DECORATE_BULK: {
-            const EditorActionDecorate* changes = action.type == EDITOR_ACTION_DECORATE
-                ? &action.decorate
-                : action.decorate_bulk.changes;
-            const uint32_t size = action.type == EDITOR_ACTION_DECORATE ? 1 : action.decorate_bulk.size;
-            for (uint32_t change_index = 0; change_index < size; change_index++) {
-                int hframe = mode == EDITOR_ACTION_MODE_UNDO 
-                    ? changes[change_index].previous_hframe
-                    : changes[change_index].new_hframe;
-                scenario->map.cells[CELL_LAYER_GROUND][changes[change_index].index] = hframe == EDITOR_ACTION_DECORATE_REMOVE_DECORATION
-                    ? (Cell) {
-                        .type = CELL_EMPTY,
-                        .id = ID_NULL
-                    }
-                    : (Cell) {
-                        .type = CELL_DECORATION,
-                        .decoration_hframe = (uint16_t)hframe
-                    };
+            const EditorActionDecorateBulk& action_data = std::get<EditorActionDecorateBulk>(action.data);
+            for (uint32_t index = 0; index < action_data.changes.size(); index++) {
+                editor_action_execute_decorate(scenario, action_data.changes[index], mode);
             }
             break;
         }
         case EDITOR_ACTION_ADD_ENTITY: {
+            const EditorActionAddEntity& action_data = std::get<EditorActionAddEntity>(action.data);
+
             Cell cell_value = mode == EDITOR_ACTION_MODE_DO
                 ? (Cell) {
                     .type = CELL_UNIT,
@@ -93,14 +46,15 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
                     .type = CELL_EMPTY,
                     .id = ID_NULL
                 };
-            const EntityData& entity_data = entity_get_data(action.add_entity.type);
-            map_set_cell_rect(scenario->map, entity_data.cell_layer, action.add_entity.cell, entity_data.cell_size, cell_value);
+
+            const EntityData& entity_data = entity_get_data(action_data.type);
+            map_set_cell_rect(scenario->map, entity_data.cell_layer, action_data.cell, entity_data.cell_size, cell_value);
 
             if (mode == EDITOR_ACTION_MODE_DO) {
                 ScenarioEntity entity;
-                entity.type = action.add_entity.type;
-                entity.player_id = action.add_entity.player_id;
-                entity.cell = action.add_entity.cell;
+                entity.type = action_data.type;
+                entity.player_id = action_data.player_id;
+                entity.cell = action_data.cell;
                 entity.gold_held = 0;
                 if (entity.type == ENTITY_GOLDMINE) {
                     entity.gold_held = 7500;
@@ -114,18 +68,22 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             break;
         }
         case EDITOR_ACTION_EDIT_ENTITY: {
-            scenario->entities[action.edit_entity.index] = mode == EDITOR_ACTION_MODE_DO
-                ? action.edit_entity.new_value
-                : action.edit_entity.previous_value;
+            const EditorActionEditEntity& action_data = std::get<EditorActionEditEntity>(action.data);
+
+            scenario->entities[action_data.index] = mode == EDITOR_ACTION_MODE_DO
+                ? action_data.new_value
+                : action_data.previous_value;
             break;
         }
         case EDITOR_ACTION_DELETE_ENTITY: {
+            const EditorActionDeleteEntity& action_data = std::get<EditorActionDeleteEntity>(action.data);
+
             if (mode == EDITOR_ACTION_MODE_DO) {
-                scenario->entities[action.delete_entity.index] = scenario->entities[scenario->entity_count - 1];
+                scenario->entities[action_data.index] = scenario->entities[scenario->entity_count - 1];
                 scenario->entity_count--;
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                scenario->entities[scenario->entity_count] = scenario->entities[action.delete_entity.index];
-                scenario->entities[action.delete_entity.index] = action.delete_entity.value;
+                scenario->entities[scenario->entity_count] = scenario->entities[action_data.index];
+                scenario->entities[action_data.index] = action_data.value;
                 scenario->entity_count++;
             }
 
@@ -133,38 +91,96 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
         }
         case EDITOR_ACTION_ADD_SQUAD: {
             if (mode == EDITOR_ACTION_MODE_DO) {
-                scenario->squads[scenario->squad_count] = scenario_squad_init();
-                sprintf(scenario->squads[scenario->squad_count].name, "Squad %u", scenario->squad_count + 1);
-                scenario->squad_count++;
+                ScenarioSquad squad = scenario_squad_init();
+                sprintf(squad.name, "Squad %u", (uint32_t)scenario->squads.size() + 1U);
+                scenario->squads.push_back(squad);
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                scenario->squad_count--;
+                scenario->squads.pop_back();
             }
             break;
         }
         case EDITOR_ACTION_EDIT_SQUAD: {
-            scenario->squads[action.edit_squad.index] = mode == EDITOR_ACTION_MODE_DO
-                ? action.edit_squad.new_value
-                : action.edit_squad.previous_value;
+            const EditorActionEditSquad& action_data = std::get<EditorActionEditSquad>(action.data);
+
+            scenario->squads[action_data.index] = mode == EDITOR_ACTION_MODE_DO
+                ? action_data.new_value
+                : action_data.previous_value;
             break;
         }
         case EDITOR_ACTION_DELETE_SQUAD: {
+            const EditorActionDeleteSquad& action_data = std::get<EditorActionDeleteSquad>(action.data);
+
             if (mode == EDITOR_ACTION_MODE_DO) {
-                scenario->squads[action.delete_squad.index] = scenario->squads[scenario->squad_count - 1];
-                scenario->squad_count--;
+                scenario->squads[action_data.index] = scenario->squads.back();
+                scenario->squads.pop_back();
             } else if (mode == EDITOR_ACTION_MODE_UNDO) {
-                scenario->squads[scenario->squad_count] = scenario->squads[action.delete_squad.index];
-                scenario->squads[action.delete_squad.index] = action.delete_squad.value;
-                scenario->squad_count++;
+                scenario->squads.push_back(scenario->squads[action_data.index]);
+                scenario->squads[action_data.index] = action_data.value;
             }
             break;
         }
         case EDITOR_ACTION_SET_PLAYER_SPAWN: {
+            const EditorActionSetPlayerSpawn& action_data = std::get<EditorActionSetPlayerSpawn>(action.data);
+
             scenario->player_spawn = mode == EDITOR_ACTION_MODE_DO
-                ? action.set_player_spawn.new_value
-                : action.set_player_spawn.previous_value;
+                ? action_data.new_value
+                : action_data.previous_value;
+            break;
+        }
+        case EDITOR_ACTION_ADD_TRIGGER: {
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                Trigger trigger;
+                trigger.condition.type = TRIGGER_CONDITION_ACQUIRED_ENTITIES;
+                memset(&trigger.condition.acquired_entities, 0, sizeof(trigger.condition.acquired_entities));
+                trigger.is_active = true;
+                sprintf(trigger.name, "Trigger %u", (uint32_t)scenario->triggers.size() + 1U);
+                log_debug("created trigger %s", trigger.name);
+
+                scenario->triggers.push_back(trigger);
+            } else {
+                scenario->triggers.pop_back();
+            }
+
+            break;
+        }
+        case EDITOR_ACTION_DELETE_TRIGGER: {
+            const EditorActionDeleteTrigger& action_data = std::get<EditorActionDeleteTrigger>(action.data);
+
+            if (mode == EDITOR_ACTION_MODE_DO) {
+                scenario->triggers[action_data.index] = scenario->triggers.back();
+                scenario->triggers.pop_back();
+            } else if (mode == EDITOR_ACTION_MODE_UNDO) {
+                scenario->triggers.push_back(scenario->triggers[action_data.index]);
+                scenario->triggers[action_data.index] = action_data.value;
+            }
+
+            break;
+        }
+        case EDITOR_ACTION_RENAME_TRIGGER: {
+            const EditorActionRenameTrigger& action_data = std::get<EditorActionRenameTrigger>(action.data);
+
+            const char* name_ptr = mode == EDITOR_ACTION_MODE_DO
+                ? action_data.new_name
+                : action_data.previous_name;
+            strncpy(scenario->triggers[action_data.index].name, name_ptr, TRIGGER_NAME_MAX_LENGTH);
             break;
         }
     }
+}
+
+void editor_action_execute_decorate(Scenario* scenario, const EditorActionDecorate& data, EditorActionMode mode) {
+    int hframe = mode == EDITOR_ACTION_MODE_UNDO
+        ? data.previous_hframe
+        : data.new_hframe;
+    scenario->map.cells[CELL_LAYER_GROUND][data.index] = hframe == EDITOR_ACTION_DECORATE_REMOVE_DECORATION
+        ? (Cell) {
+            .type = CELL_EMPTY,
+            .id = ID_NULL
+        }
+        : (Cell) {
+            .type = CELL_DECORATION,
+            .decoration_hframe = (uint16_t)hframe
+        };
 }
 
 #endif

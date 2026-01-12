@@ -5,9 +5,11 @@
 #ifdef GOLD_DEBUG
 
 #include "scenario/scenario.h"
+#include "scenario/trigger.h"
 #include "math/gmath.h"
 #include "match/noise.h"
 #include <vector>
+#include <variant>
 
 enum EditorActionMode {
     EDITOR_ACTION_MODE_DO,
@@ -24,7 +26,10 @@ enum EditorActionType {
     EDITOR_ACTION_ADD_SQUAD,
     EDITOR_ACTION_EDIT_SQUAD,
     EDITOR_ACTION_DELETE_SQUAD,
-    EDITOR_ACTION_SET_PLAYER_SPAWN
+    EDITOR_ACTION_SET_PLAYER_SPAWN,
+    EDITOR_ACTION_ADD_TRIGGER,
+    EDITOR_ACTION_DELETE_TRIGGER,
+    EDITOR_ACTION_RENAME_TRIGGER
 };
 
 struct EditorActionBrushStroke {
@@ -34,8 +39,7 @@ struct EditorActionBrushStroke {
 };
 
 struct EditorActionBrush {
-    uint32_t stroke_size;
-    EditorActionBrushStroke* stroke;
+    std::vector<EditorActionBrushStroke> stroke;
 };
 
 static const int EDITOR_ACTION_DECORATE_REMOVE_DECORATION = -1;
@@ -47,8 +51,7 @@ struct EditorActionDecorate {
 };
 
 struct EditorActionDecorateBulk {
-    uint32_t size;
-    EditorActionDecorate* changes;
+    std::vector<EditorActionDecorate> changes;
 };
 
 struct EditorActionAddEntity {
@@ -84,26 +87,35 @@ struct EditorActionSetPlayerSpawn {
     ivec2 new_value;
 };
 
+struct EditorActionDeleteTrigger {
+    uint32_t index;
+    Trigger value;
+};
+
+struct EditorActionRenameTrigger {
+    uint32_t index;
+    char previous_name[TRIGGER_NAME_MAX_LENGTH];
+    char new_name[TRIGGER_NAME_MAX_LENGTH];
+};
+
 struct EditorAction {
     EditorActionType type;
-    union {
-        EditorActionBrush brush;
-        EditorActionDecorate decorate;
-        EditorActionDecorateBulk decorate_bulk;
-        EditorActionAddEntity add_entity;
-        EditorActionEditEntity edit_entity;
-        EditorActionDeleteEntity delete_entity;
-        EditorActionEditSquad edit_squad;
-        EditorActionDeleteSquad delete_squad;
-        EditorActionSetPlayerSpawn set_player_spawn;
-    };
+    std::variant<
+        EditorActionBrush,
+        EditorActionDecorate,
+        EditorActionDecorateBulk,
+        EditorActionAddEntity,
+        EditorActionEditEntity,
+        EditorActionDeleteEntity,
+        EditorActionEditSquad,
+        EditorActionDeleteSquad,
+        EditorActionSetPlayerSpawn,
+        EditorActionDeleteTrigger,
+        EditorActionRenameTrigger> data;
 };
 
 // Action
 
-EditorAction editor_action_create_brush(const std::vector<EditorActionBrushStroke>& stroke);
-EditorAction editor_action_create_decorate_bulk(const std::vector<EditorActionDecorate>& changes);
-void editor_action_destroy(EditorAction& action);
 void editor_action_execute(Scenario* scenario, const EditorAction& action, EditorActionMode mode);
 
 #endif

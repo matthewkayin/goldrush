@@ -11,9 +11,6 @@ Scenario* scenario_base_init() {
     scenario->noise = NULL;
     scenario->player_spawn = ivec2(0, 0);
     scenario->entity_count = 0;
-    scenario->objective = (ScenarioObjective) {
-        .type = SCENARIO_OBJECTIVE_CONQUEST
-    };
 
     for (uint8_t player_id = 0; player_id < MAX_PLAYERS; player_id++) {
         if (player_id == 0) {
@@ -23,8 +20,6 @@ Scenario* scenario_base_init() {
         }
         scenario->players[player_id].starting_gold = 50;
     }
-
-    scenario->squad_count = 0;
 
     for (uint32_t entity_type = 0; entity_type < ENTITY_TYPE_COUNT; entity_type++) {
         scenario->allowed_entities[entity_type] = true;
@@ -206,11 +201,14 @@ bool scenario_save_file(const Scenario* scenario, const char* path) {
     fwrite(scenario->entities, 1, scenario->entity_count * sizeof(ScenarioEntity), file);
 
     // Squads
-    fwrite(&scenario->squad_count, 1, sizeof(uint32_t), file);
-    fwrite(scenario->squads, 1, scenario->squad_count * sizeof(ScenarioSquad), file);
+    size_t squads_size = scenario->squads.size();
+    fwrite(&squads_size, 1, sizeof(size_t), file);
+    fwrite(&scenario->squads[0], 1, scenario->squads.size() * sizeof(ScenarioSquad), file);
 
-    // Objective
-    fwrite(&scenario->objective, 1, sizeof(ScenarioObjective), file);
+    // Triggers
+    size_t triggers_size = scenario->triggers.size();
+    fwrite(&triggers_size, 1, sizeof(size_t), file);
+    fwrite(&scenario->triggers[0], 1, scenario->triggers.size() * sizeof(Trigger), file);
 
     // Allowed entities
     fwrite(&scenario->allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
@@ -289,11 +287,16 @@ Scenario* scenario_open_file(const char* path) {
     fread(scenario->entities, 1, scenario->entity_count * sizeof(ScenarioEntity), file);
 
     // Squads
-    fread(&scenario->squad_count, 1, sizeof(uint32_t), file);
-    fread(scenario->squads, 1, scenario->squad_count * sizeof(ScenarioSquad), file);
-
-    // Objective
-    fread(&scenario->objective, 1, sizeof(ScenarioObjective), file);
+    size_t squads_size;
+    fread(&squads_size, 1, sizeof(size_t), file);
+    scenario->squads = std::vector<ScenarioSquad>(squads_size);
+    fread(&scenario->squads[0], 1, squads_size * sizeof(ScenarioSquad), file);
+    
+    // Triggers
+    size_t triggers_size;
+    fread(&triggers_size, 1, sizeof(size_t), file);
+    scenario->triggers = std::vector<Trigger>(triggers_size);
+    fread(&scenario->triggers[0], 1, triggers_size * sizeof(Trigger), file);
 
     // Allowed tech
     fread(&scenario->allowed_entities, 1, sizeof(bool) * ENTITY_TYPE_COUNT, file);
