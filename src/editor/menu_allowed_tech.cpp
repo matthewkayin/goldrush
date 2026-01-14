@@ -40,10 +40,10 @@ void editor_menu_allowed_tech_update(EditorMenuAllowedTech& menu, UI& ui, Editor
                         continue;
                     }
 
-                    const SpriteName icon = tech_index <= ENTITY_TYPE_COUNT
+                    const SpriteName icon = tech_index < ENTITY_TYPE_COUNT
                         ? entity_get_data((EntityType)tech_index).icon
-                        : upgrade_get_data(tech_index - ENTITY_TYPE_COUNT).icon;
-                    bool* is_tech_allowed = tech_index <= ENTITY_TYPE_COUNT
+                        : upgrade_get_data(1U << (tech_index - ENTITY_TYPE_COUNT)).icon;
+                    bool* is_tech_allowed = tech_index < ENTITY_TYPE_COUNT
                         ? menu.allowed_entities + tech_index
                         : menu.allowed_upgrades + (tech_index - ENTITY_TYPE_COUNT);
                     if (ui_icon_button(ui, icon, *is_tech_allowed)) {

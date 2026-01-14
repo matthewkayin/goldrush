@@ -8,7 +8,8 @@
 #include "editor/menu_players.h"
 #include "editor/menu_edit_squad.h"
 #include "editor/menu_allowed_tech.h"
-#include "editor/menu_triggers.h"
+#include "editor/menu_rename_trigger.h"
+#include "editor/menu_trigger_condition.h"
 #include "editor/menu.h"
 #include "editor/action.h"
 #include "core/logger.h"
@@ -101,9 +102,10 @@ enum EditorMenuType {
     EDITOR_MENU_TYPE_FILE_SAVE,
     EDITOR_MENU_TYPE_FILE_OPEN,
     EDITOR_MENU_TYPE_PLAYERS,
-    EDITOR_MENU_TYPE_TRIGGERS,
+    EDITOR_MENU_TYPE_RENAME_TRIGGER,
     EDITOR_MENU_TYPE_EDIT_SQUAD,
-    EDITOR_MENU_TYPE_ALLOWED_TECH
+    EDITOR_MENU_TYPE_ALLOWED_TECH,
+    EDITOR_MENU_TYPE_TRIGGER_CONDITION,
 };
 
 struct EditorMenu {
@@ -113,9 +115,10 @@ struct EditorMenu {
         EditorMenuNew,
         EditorMenuFile,
         EditorMenuPlayers,
-        EditorMenuTriggers,
+        EditorMenuRenameTrigger,
         EditorMenuEditSquad,
-        EditorMenuAllowedTech
+        EditorMenuAllowedTech,
+        EditorMenuTriggerCondition
     > menu;
 };
 
@@ -467,9 +470,9 @@ void editor_update() {
                         }
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, state.scenario->triggers.empty(), false)) {
                             state.menu = (EditorMenu) {
-                                .type = EDITOR_MENU_TYPE_TRIGGERS,
+                                .type = EDITOR_MENU_TYPE_RENAME_TRIGGER,
                                 .mode = EDITOR_MENU_MODE_OPEN,
-                                .menu = editor_menu_triggers_open(state.scenario->triggers[state.tool_value])
+                                .menu = editor_menu_rename_trigger_open(state.scenario->triggers[state.tool_value])
                             };
                         }
                         if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, state.scenario->triggers.empty(), false)) {
@@ -490,17 +493,21 @@ void editor_update() {
 
                         ui_text(state.ui, FONT_HACK_GOLD, "Conditions");
 
-                        std::vector<std::string> condition_type_items;
-                        for (uint32_t condition_type = 0; condition_type < TRIGGER_CONDITION_COUNT; condition_type++) {
-                            condition_type_items.push_back(trigger_condition_type_str((TriggerConditionType)condition_type));
-                        }
-
                         for (uint32_t condition_index = 0; condition_index < trigger.conditions.size(); condition_index++) {
                             const TriggerCondition& condition = trigger.conditions[condition_index];
 
                             ui_begin_row(state.ui, ivec2(0, 0), 4);
-                                uint32_t condition_type = condition.type;
-                                ui_dropdown(state.ui, UI_DROPDOWN_MINI, &condition_type, condition_type_items, false);
+                                char condition_str[128];
+                                trigger_condition_sprintf(condition_str, condition);
+                                ui_slim_button(state.ui, condition_str, true);
+
+                                if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_EDIT, false, false)) {
+                                    state.menu = (EditorMenu) {
+                                        .type = EDITOR_MENU_TYPE_TRIGGER_CONDITION,
+                                        .mode = EDITOR_MENU_MODE_OPEN,
+                                        .menu = editor_menu_trigger_condition_open(condition, condition_index)
+                                    };
+                                }
 
                                 if (ui_sprite_button(state.ui, SPRITE_UI_EDITOR_TRASH, false, false)) {
                                     editor_do_action((EditorAction) {
@@ -605,9 +612,9 @@ void editor_update() {
                 editor_menu_file_update(menu, state.ui, state.menu.mode);
 
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
-                    if (state.menu.type == EDITOR_MENU_FILE_TYPE_SAVE) {
+                    if (state.menu.type == EDITOR_MENU_TYPE_FILE_SAVE) {
                         editor_save(menu.path.c_str());
-                    } else if (state.menu.type == EDITOR_MENU_FILE_TYPE_OPEN) {
+                    } else if (state.menu.type == EDITOR_MENU_TYPE_FILE_OPEN) {
                         editor_open(menu.path.c_str());
                     }
                 }
@@ -651,9 +658,9 @@ void editor_update() {
 
                 break;
             }
-            case EDITOR_MENU_TYPE_TRIGGERS: {
-                EditorMenuTriggers& menu = std::get<EditorMenuTriggers>(state.menu.menu);
-                editor_menu_triggers_update(menu, state.ui, state.menu.mode);
+            case EDITOR_MENU_TYPE_RENAME_TRIGGER: {
+                EditorMenuRenameTrigger& menu = std::get<EditorMenuRenameTrigger>(state.menu.menu);
+                editor_menu_rename_trigger_update(menu, state.ui, state.menu.mode);
 
                 if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
                     EditorActionRenameTrigger rename_trigger;
@@ -668,6 +675,44 @@ void editor_update() {
 
                 break;
             }
+            case EDITOR_MENU_TYPE_ALLOWED_TECH: {
+                EditorMenuAllowedTech& menu = std::get<EditorMenuAllowedTech>(state.menu.menu);
+                editor_menu_allowed_tech_update(menu, state.ui, state.menu.mode);
+
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    memcpy(state.scenario->allowed_entities, menu.allowed_entities, sizeof(menu.allowed_entities));
+                    state.scenario->allowed_upgrades = 0;
+                    for (uint32_t upgrade_index = 0; upgrade_index < UPGRADE_COUNT; upgrade_index++) {
+                        if (menu.allowed_upgrades[upgrade_index]) {
+                            uint32_t upgrade = 1U << upgrade_index;
+                            state.scenario->allowed_upgrades |= upgrade;
+                        }
+                    }
+                }
+
+                break;
+            }
+            case EDITOR_MENU_TYPE_TRIGGER_CONDITION: {
+                EditorMenuTriggerCondition& menu = std::get<EditorMenuTriggerCondition>(state.menu.menu);
+                editor_menu_trigger_condition_update(menu, state.ui, state.menu.mode);
+
+                if (state.menu.mode == EDITOR_MENU_MODE_SUBMIT) {
+                    editor_do_action((EditorAction) {
+                        .type = EDITOR_ACTION_EDIT_TRIGGER_CONDITION,
+                        .data = (EditorActionEditTriggerCondition) {
+                            .trigger_index = state.tool_value,
+                            .condition_index = menu.condition_index,
+                            .previous_value = state.scenario->triggers[state.tool_value].conditions[menu.condition_index],
+                            .new_value = menu.condition
+                        }
+                    });
+                }
+
+                break;
+            }
+            case EDITOR_MENU_TYPE_NONE:
+                GOLD_ASSERT(false);
+                break;
         }
 
         // Close menu

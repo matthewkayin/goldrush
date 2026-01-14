@@ -10,8 +10,8 @@
 // Condition
 
 enum TriggerConditionType {
-    TRIGGER_CONDITION_ENTITY_COUNT,
-    TRIGGER_CONDITION_COUNT
+    TRIGGER_CONDITION_TYPE_ENTITY_COUNT,
+    TRIGGER_CONDITION_TYPE_COUNT
 };
 
 struct TriggerConditionEntityCount {
@@ -57,3 +57,4 @@ struct Trigger {
 
 const char* trigger_condition_type_str(TriggerConditionType type);
 const char* trigger_effect_type_str(TriggerEffectType type);
+int trigger_condition_sprintf(char* str_ptr, const TriggerCondition& condition);

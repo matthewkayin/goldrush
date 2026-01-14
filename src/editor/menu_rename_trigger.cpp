@@ -1,4 +1,4 @@
-#include "menu_triggers.h"
+#include "menu_rename_trigger.h"
 
 #ifdef GOLD_DEBUG
 
@@ -9,14 +9,14 @@ static const Rect MENU_RECT = (Rect) {
     .h = 112
 };
 
-EditorMenuTriggers editor_menu_triggers_open(const Trigger& trigger) {
-    EditorMenuTriggers menu;
+EditorMenuRenameTrigger editor_menu_rename_trigger_open(const Trigger& trigger) {
+    EditorMenuRenameTrigger menu;
     menu.trigger_name = std::string(trigger.name);
 
     return menu;
 }
 
-void editor_menu_triggers_update(EditorMenuTriggers& menu, UI& ui, EditorMenuMode& mode) {
+void editor_menu_rename_trigger_update(EditorMenuRenameTrigger& menu, UI& ui, EditorMenuMode& mode) {
     editor_menu_header(ui, MENU_RECT, "Edit Triggers");
 
     // Name

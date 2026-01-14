@@ -202,11 +202,10 @@ bool ui_button(UI& state, const char* text, ivec2 size = ivec2(-1, -1), bool cen
 /**
  * Creates a button, uses UI_DROPDOWN_MINI as the frame
  * @param text The text on the button
- * @param size If overriden, will be used as the size of the button, the text will go in the center
- * @param center_horizontally If true, the button will be centered horizontally about its render position
+ * @param disabled If true, the button will not hover or click
  * @return True if the button has been clicked this frame
  */
-bool ui_slim_button(UI& state, const char* text);
+bool ui_slim_button(UI& state, const char* text, bool disabled = false);
 
 /**
  * Create a sprite button

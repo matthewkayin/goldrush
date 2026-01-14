@@ -148,7 +148,7 @@ bool ui_button(UI& state, const char* text, ivec2 size, bool center_horizontally
     return clicked;
 }
 
-bool ui_slim_button(UI& state, const char* text) {
+bool ui_slim_button(UI& state, const char* text, bool disabled) {
     ivec2 origin = ui_get_container_origin(state);
     const SpriteInfo& sprite_info = render_get_sprite_info(SPRITE_UI_DROPDOWN_MINI);
     ivec2 button_size = ivec2(sprite_info.frame_width, sprite_info.frame_height);
@@ -157,7 +157,7 @@ bool ui_slim_button(UI& state, const char* text) {
         .w = button_size.x, .h = button_size.y
     };
     ui_update_container(state, ivec2(button_rect.w, button_rect.h));
-    bool hovered = state.input_enabled && state.element_selected == UI_ELEMENT_NONE && button_rect.has_point(input_get_mouse_position());
+    bool hovered = state.input_enabled && !disabled && state.element_selected == UI_ELEMENT_NONE && button_rect.has_point(input_get_mouse_position());
 
     ivec2 render_pos = ivec2(button_rect.x, button_rect.y - (int)hovered);
     ivec2 text_pos = ivec2(render_pos.x + 5, render_pos.y + 2);

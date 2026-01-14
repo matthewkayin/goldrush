@@ -167,7 +167,7 @@ void editor_action_execute(Scenario* scenario, const EditorAction& action, Edito
             const EditorActionAddTriggerCondition& action_data = std::get<EditorActionAddTriggerCondition>(action.data);
 
             TriggerCondition new_condition = (TriggerCondition) {
-                .type = TRIGGER_CONDITION_ENTITY_COUNT,
+                .type = TRIGGER_CONDITION_TYPE_ENTITY_COUNT,
                 .entity_count = (TriggerConditionEntityCount) {
                     .entity_type = ENTITY_MINER,
                     .entity_count = 1
